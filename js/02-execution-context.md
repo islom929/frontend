@@ -25,15 +25,13 @@
 
 ### Nazariya
 
-Execution Context — bu JavaScript engine kodni bajarish uchun yaratadigan **muhit (environment)**. Bu muhit ichida quyidagilar saqlanadi:
+Execution Context — bu JavaScript engine kodni bajarish uchun yaratadigan **muhit (environment)** bo'lib, u dasturning istalgan nuqtasida qaysi o'zgaruvchilar mavjud, ularning qiymatlari nima, qaysi scope'larga kirish mumkin va `this` nimaga ishora qilayotganini belgilaydi.
 
-- Qaysi **o'zgaruvchilar** mavjud
-- **Scope chain** — tashqi scope'larga kirish
-- **`this`** qiymati
+Buni **teatr sahnasi**ga o'xshatish mumkin. Har bir sahna (Execution Context) o'zining dekoratsiyalari (o'zgaruvchilar), aktyorlari (funksiyalar) va rejissyori (engine) ga ega. Yangi sahna o'ynalsa — yangi dekoratsiya o'rnatiladi. Eski sahna tugasa — dekoratsiya yig'ishtiriladi. Global kod — bu asosiy sahna, har bir funksiya chaqiruvi esa yangi kichik sahna ochadi.
 
-Har bir kod bajarilganda — albatta biror Execution Context ichida bajariladi. Global kod uchun Global EC, har bir funksiya chaqiruvi uchun alohida Function EC yaratiladi.
+Execution Context tushunchasi nima uchun muhim? Chunki JavaScript'dagi eng ko'p uchraydigan tushunmovchiliklar — hoisting, scope, closure, `this` ning kutilmagan qiymati — bularning barchasi Execution Context mexanizmini bilmaslikdan kelib chiqadi. Agar siz EC qanday yaratilishini, uning ichida nima borligini va qachon yo'q qilinishini tushunsangiz, bu tushunchalarning barchasi o'z joyiga tushadi.
 
-Oddiy qilib aytganda: Execution Context = **"kod bajarilayotgan kontekst"** — o'zgaruvchilar, scope va this haqidagi barcha ma'lumotlar to'plami.
+ECMAScript spetsifikatsiyasiga ko'ra har bir Execution Context uchta asosiy komponentdan iborat: **LexicalEnvironment** (`let`, `const`, funksiya e'lonlari uchun), **VariableEnvironment** (`var` e'lonlari uchun) va **ThisBinding** (`this` qiymati). Bu komponentlarning har biri alohida va muhim rol o'ynaydi — ularni keyingi bo'limlarda batafsil ko'rib chiqamiz.
 
 ### Under the Hood
 
@@ -79,13 +77,13 @@ JavaScript da **3 xil** Execution Context bor:
 
 ### Nazariya
 
-GEC — dastur boshlanganda eng birinchi yaratiladigan execution context. U **bitta** — butun dastur davomida yashaydi.
+GEC (Global Execution Context) — JavaScript dasturi ishga tushganda eng birinchi yaratiladigan Execution Context. U butun dastur davomida yashaydi va faqat **bitta** bo'ladi — dastur tugaguncha. GEC barcha global kodning "uyi" hisoblanadi.
 
-GEC yaratilganda nima sodir bo'ladi:
+GEC nima uchun muhim? Chunki u dasturning ishlash uchun zarur bo'lgan dastlabki muhitni tayyorlaydi. GEC yaratilganda uchta muhim ish sodir bo'ladi: birinchidan, **Global Object** yaratiladi (brauzerda `window`, Node.js da `global`, universal `globalThis`), ikkinchidan, `this` global ob'ektga bog'lanadi, uchinchidan, barcha global `var` e'lonlari va function declaration'lar **hoist** qilinadi — ya'ni xotiraga oldindan yoziladi.
 
-1. **Global Object** yaratiladi — browser da `window`, Node.js da `global` (`globalThis` universal)
-2. **`this`** global object ga bog'lanadi (`this === window` browser da)
-3. Barcha global `var` va function declaration'lar **hoist** qilinadi
+Buni **ofis binosi**ga o'xshatish mumkin. GEC — bu binoning asosiy qavati (lobby). Bino qurilganda avval lobby tayyorlanadi. Lobby doimiy — bino yashayotgan ekan u bor. Barcha umumiy resurslar (receptsiya, lift, yo'laklar) shu yerda. Har bir xona (funksiya) o'z ichki muhitiga ega, lekin lobby'dagi resurslardan foydalanishi mumkin. Xuddi shunday, global scope'dagi o'zgaruvchi va funksiyalar istalgan joydan ko'rinadi.
+
+Amaliy nuqtai nazardan, GEC bilan ishlashda ikkita muhim narsani bilish kerak: `var` bilan global scope'da e'lon qilingan o'zgaruvchilar global ob'ektning property'siga aylanadi (`window.myVar`), lekin `let` va `const` bilan e'lon qilinganlar global scope'da mavjud bo'lsa-da, global ob'ektga **qo'shilmaydi**. Bu farq ko'p xatolarga sabab bo'ladi.
 
 ```javascript
 // Bu kod hali BIRORTA ham funksiya ichida emas
@@ -148,7 +146,11 @@ Bu muhim farq — `var` global scope da `window` ning property'si bo'ladi, `let`
 
 ### Nazariya
 
-Har safar funksiya **chaqirilganda** (declare emas, aynan **chaqirilganda**) yangi Function Execution Context yaratiladi.
+Har safar funksiya **chaqirilganda** (e'lon qilinganda emas, aynan **chaqirilganda**) yangi Function Execution Context yaratiladi. Bu JavaScript'ning eng fundamental mexanizmlaridan biri — har bir funksiya chaqiruvi mustaqil, izolyatsiyalangan muhitda bajariladi.
+
+Buni **restoran buyurtmasi**ga o'xshatish mumkin. Oshpaz (engine) har bir buyurtma (funksiya chaqiruvi) uchun yangi ish stolini tayyorlaydi: ingredientlarni qo'yadi (parametrlar), idishlarni joylashtiradi (local o'zgaruvchilar), retseptni ko'radi (kod). Taom tayyor bo'lganda (funksiya tugaganda) — stol tozalanadi va yangi buyurtma uchun bo'shatiladi.
+
+Nima uchun har bir chaqiruv uchun yangi EC kerak? Chunki bir xil funksiya turli argumentlar bilan chaqirilishi mumkin. `calculate(3, 7)` va `calculate(10, 20)` turli natija beradi — har birining o'z muhiti bo'lishi kerak. Shuningdek, rekursiv funksiyalarda bir xil funksiya o'zini qayta-qayta chaqiradi — har bir chaqiruv o'z alohida EC'siga ega bo'lishi shart, aks holda o'zgaruvchilar bir-birini buzib yuboradi.
 
 ```javascript
 function sayHi(name) {
@@ -315,7 +317,11 @@ function greet() { return "hi"; } // allaqachon hoist bo'lgan
 
 ### Nazariya
 
-ES6 dan keyin Execution Context da **ikki alohida** environment bor. Bu `var` va `let`/`const` ning farqli ishlashini ta'minlaydi.
+ES6 (ECMAScript 2015) dan boshlab Execution Context ichida ikkita alohida environment mavjud — **VariableEnvironment** va **LexicalEnvironment**. Bu ikki muhitning mavjudligi `var` va `let`/`const` ning tubdan farqli ishlash mexanizmini ta'minlaydi.
+
+Nima uchun ikkita environment kerak bo'ldi? ES6 dan oldin JavaScript'da faqat `var` bor edi va u faqat function scope'ni tan olardi. Block scope (`if`, `for` ichida) tushunchasi umuman yo'q edi. ES6 da `let` va `const` block scope bilan kelganda, engine ichida muammo paydo bo'ldi: eski `var` behavior'ini buzmasdan, yangi block scope mexanizmini qanday qo'shish kerak? Javob — ikkita alohida muhit yaratish: `var` uchun VariableEnvironment (eski funksional scope qoidalari bilan), `let`/`const` uchun LexicalEnvironment (yangi block scope qoidalari bilan).
+
+Bu tushunchani bilish nima uchun amaliy jihatdan muhim? Chunki ko'pgina murakkab xatolar — masalan, `var` ning loop'dan chiqib ketishi, `let` ning block ichida qolishi, TDZ (Temporal Dead Zone) — bularning barchasi shu ikki environment ning turli ishlash qoidalaridan kelib chiqadi. Agar siz VariableEnvironment va LexicalEnvironment ning farqini tushunsangiz, `var` vs `let`/`const` bilan bog'liq muammolarni tezda aniqlash va hal qilishingiz mumkin.
 
 | Xususiyat | VariableEnvironment | LexicalEnvironment |
 |-----------|--------------------|--------------------|
@@ -392,7 +398,11 @@ function example() {
 
 ### Nazariya
 
-Environment Record — bu LexicalEnvironment va VariableEnvironment ichidagi **haqiqiy ma'lumotlar bazasi**. O'zgaruvchilar, funksiyalar, parametrlar shu yerda saqlanadi.
+Environment Record — bu LexicalEnvironment va VariableEnvironment ning **ichki ma'lumotlar bazasi**. Har bir Environment o'z ichida Environment Record saqlaydi va aynan shu record o'zgaruvchilar, funksiyalar, parametrlar haqidagi barcha ma'lumotlarni o'z ichiga oladi. Buni **ma'lumotlar bazasining jadvali**ga o'xshatish mumkin: environment — bu baza, record — bu jadval, o'zgaruvchilar — bu jadval satrlari.
+
+ECMAScript spetsifikatsiyasiga ko'ra Environment Record ikki asosiy turga bo'linadi: **Declarative Environment Record** va **Object Environment Record**. Bu bo'linish sun'iy emas — u JavaScript'ning ichki arxitekturasidan kelib chiqadi. Funksiya va block scope'larda o'zgaruvchilar **to'g'ridan-to'g'ri** (optimallashtirilgan holda) saqlanadi — bu Declarative ER. Global scope'da esa `var` o'zgaruvchilari global ob'ekt (`window`) ning property'siga aylanadi — bu Object ER. Shu sababli `window.myVar` ishlaydi, lekin `window.myLet` ishlamaydi.
+
+Bu farqni tushunish production kodda amaliy ahamiyatga ega. Masalan, kutubxona global `var` orqali o'zgaruvchi e'lon qilsa, u `window` ga tushadi va boshqa kutubxonalar bilan **nom to'qnashuvi** xavfi bor. `let`/`const` esa global ob'ektga qo'shilmaydi — bu muammoni bartaraf etadi. Shuning uchun zamonaviy kod doimo `let`/`const` ishlatadi.
 
 ECMAScript spec da ikki turi bor:
 
@@ -467,7 +477,9 @@ let globalLet = "dunyo";
 
 ### Nazariya
 
-Har bir Execution Context yaratilganda `this` qiymati ham aniqlanadi. Bu **Creation Phase** da sodir bo'ladi.
+`this` — JavaScript'ning eng ko'p chalkashlik keltiradigan tushunchalaridan biri. Har bir Execution Context yaratilganda `this` qiymati ham aniqlanadi. Bu **Creation Phase** da sodir bo'ladi va `this` qiymati **funksiya qanday chaqirilganiga** bog'liq — qayerda yozilganiga emas.
+
+Bu yerda `this` haqida qisqacha umumiy ko'rinish beramiz, chunki u Execution Context'ning tarkibiy qismi. Lekin `this` ning to'liq mexanizmi, binding qoidalari, priority tartibi va amaliy jihatlari juda keng mavzu — shuning uchun alohida [10-this-keyword.md](10-this-keyword.md) bo'limida batafsil yoritilgan.
 
 `this` qanday aniqlanishi **kontekstga** bog'liq:
 
@@ -526,13 +538,13 @@ Bu mavzu juda keng — to'liq [10-this-keyword.md](10-this-keyword.md) da.
 
 ### Nazariya
 
-Execution Context Stack (yoki **Call Stack**) — barcha Execution Context'larni tartib bilan saqlaydigan LIFO stack. [01-js-engine.md](01-js-engine.md) da Call Stack haqida gaplagandik — bu **aynan o'sha narsa**.
+Execution Context Stack (yoki **Call Stack**) — bu engine'ning barcha Execution Context'larni tartib bilan saqlash va boshqarish uchun ishlatiladigan asosiy tuzilmasi. [01-js-engine.md](01-js-engine.md) da Call Stack haqida gaplangan edik — Execution Context Stack ham **aynan o'sha narsa**, faqat boshqa nom bilan.
 
 ```
 Execution Context Stack = Call Stack
 ```
 
-Engine har doim stack'ning **eng tepasidagi** context'ni bajaradi.
+Bu tushunchani to'liq anglash muhim, chunki JavaScript'ning **single-threaded** tabiati aynan shu stack orqali namoyon bo'ladi. Engine har doim stack'ning **eng tepasidagi** context'ni bajaradi. Yangi funksiya chaqirilganda — uning EC'si tepaga qo'yiladi (push), funksiya tugaganda — olib tashlanadi (pop). Global EC har doim stack'ning eng pastida turadi va dastur yakunlanguncha yo'qolmaydi.
 
 ### To'liq Misol
 
@@ -768,7 +780,7 @@ console.log(window.globalVar);       // "salom"
 console.log(globalVar);              // "salom"
 console.log(window.globalVar === globalVar); // true
 
-// let global scope da → Declarative Environment Record → window ga QOSHILMAYDI
+// let global scope da → Declarative Environment Record → window ga QO'SHILMAYDI
 let globalLet = "dunyo";
 console.log(window.globalLet);       // undefined
 console.log(globalLet);              // "dunyo"

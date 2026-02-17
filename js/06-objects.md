@@ -98,7 +98,11 @@ const user = new User("Islom", 25);
 
 ### Nazariya
 
-Har bir object property'si oddiy qiymatdan **ko'proq** ma'lumotga ega. Har bir property **descriptor** — uning xususiyatlarini belgilaydigan meta-ma'lumot:
+JavaScript'da biz object property'siga qiymat berganimizda (`obj.name = "Islom"`), bu oddiy ko'rinadigan operatsiya ortida murakkab mexanizm yashiringan. Har bir property aslida oddiy qiymatdan **ancha ko'proq** ma'lumotga ega — u **Property Descriptor** deb ataluvchi meta-ma'lumot ob'ekti bilan birga saqlanadi.
+
+Property Descriptor — bu property xulq-atvorini belgilaydigan to'rtta flag dan iborat: `value` (qiymat), `writable` (o'zgartirish mumkinmi), `enumerable` (`for...in` da ko'rinadimi) va `configurable` (o'chirib yoki qayta sozlash mumkinmi). Buni **fayl tizimi ruxsatnomasi**ga o'xshatish mumkin: faylda faqat mazmun emas, balki "o'qish mumkin", "yozish mumkin", "bajarish mumkin" kabi meta-ma'lumotlar ham bor. Property descriptor ham xuddi shunday — qiymat va uning ustida nima qilish mumkinligini belgilaydi.
+
+Nima uchun bu muhim? Real-world dasturlashda siz ba'zan property'ni faqat o'qish uchun (read-only) qilishingiz kerak (masalan, ob'ekt `id` si), ba'zan esa property'ni `Object.keys()` va `for...in` dan yashirishingiz kerak (masalan, ichki `_private` property'lar). Framework'lar (Vue.js ning reactivity tizimi, MobX) ham descriptor'lar orqali ishlaydi — ular `Object.defineProperty` yordamida property'larga getter/setter o'rnatib, qiymat o'zgarganda UI ni yangilaydi.
 
 | Flag | Default | Ma'nosi |
 |------|---------|---------|
@@ -204,7 +208,11 @@ Object.defineProperty(obj, "x", {
 
 ### Nazariya
 
-Getter va Setter — bu **accessor properties**. Ular oddiy property kabi ko'rinadi, lekin ichida funksiya ishlaydi.
+Getter va Setter — bu **accessor properties** (kirish xossalari) bo'lib, ular tashqi ko'rinishda oddiy property kabi ishlaydi, lekin ichida funksiya bajariladi. `get` — property o'qilganda, `set` — property ga qiymat yozilganda chaqiriladi.
+
+Nima uchun getter/setter kerak? Oddiy property'da qiymatni o'qish va yozish cheklanmagan — istalgan qiymat berilishi mumkin. Lekin real-world da ko'pincha **validatsiya** (masalan, yosh manfiy bo'lishi mumkin emas), **computed values** (masalan, `fullName = firstName + lastName`) yoki **side effects** (masalan, qiymat o'zgarganda log yozish) kerak bo'ladi. Getter va Setter aynan shu ehtiyojlarni qondiradi — ular property'ga **aqlli interfeys** beradi.
+
+Bu pattern zamonaviy JavaScript ekotizimida keng tarqalgan. Vue.js 2.x butun reaktivlik tizimini `Object.defineProperty` orqali getter/setter'lar bilan qurgan. Class'larda private property'larga xavfsiz kirish uchun getter/setter ishlatiladi. Node.js stream'larida, Express middleware'larida — hamma joyda accessor pattern'lar uchraydi.
 
 ```javascript
 const user = {

@@ -34,12 +34,9 @@
 
 ### Nazariya
 
-JavaScript da **iteration protocol** — bu ma'lumotlarni ketma-ket (sequential) olish uchun standart shartnoma. Bu protocol ikki qismdan iborat:
+JavaScript da **iteration protocol** — bu ma'lumotlarni ketma-ket (sequential) olish uchun standart shartnoma. Bu protocol ikki qismdan iborat: **Iterable Protocol** ("men ustimda iteratsiya qilsa bo'ladi") va **Iterator Protocol** ("men qiymatlarni birma-bir beraman").
 
-1. **Iterable Protocol** — "Men ustimda iteratsiya qilsa bo'ladi" degan shartnoma
-2. **Iterator Protocol** — "Men qiymatlarni birma-bir beraman" degan shartnoma
-
-Bularni oddiy misol bilan tushunaylik:
+Nima uchun bu protocol kerak? ES6 dan oldin, turli data structure'lar (Array, arguments, NodeList) ustida iteratsiya qilishning yagona universal usuli yo'q edi — hamma narsa indeks bilan bo'lardi. Iteration protocol yagona, standart interfeys yaratadi, shunda `for...of`, spread operator, destructuring, `Promise.all`, `Array.from` kabi mexanizmlar **istalgan** iterable bilan ishlashi mumkin. Bu protocol'ni tushunish JavaScript'ning data access modelining asosiy tushunchasi hisoblanadi.
 
 ```javascript
 // Array — iterable (ustida for...of ishlaydi)
@@ -159,7 +156,7 @@ const fullIterator = {
     return { value, done: true };
   },
   throw(error) {
-    // Generator'larda ishlatilinadi
+    // Generator'larda ishlatiladi
     // Tashqaridan xato yuborish uchun
     return { value: undefined, done: true };
   }
@@ -200,7 +197,9 @@ console.log(counter.next()); // { value: undefined, done: true }
 
 ### Nazariya
 
-`Symbol.iterator` — bu JavaScript ning well-known symbol'laridan biri. Object'ni **iterable** qilish uchun shu symbol key'ga method berish kerak. Bu method chaqirilganda **iterator** qaytarishi kerak.
+`Symbol.iterator` — JavaScript ning well-known symbol'laridan biri bo'lib, ob'ektni **iterable** qilish uchun mo'ljallangan. Object'da shu symbol key'ga method berish kifoya — bu method chaqirilganda **iterator** qaytarishi kerak.
+
+`Symbol.iterator` ni kim ishlatadi? `for...of`, spread operator (`...`), destructuring assignment, `Array.from()`, `Promise.all()`, `Map`/`Set` constructor'lari, va `yield*` — bularning barchasi ichida `Symbol.iterator` ni chaqiradi. Shuning uchun o'z ob'ektingizga bu method'ni qo'shsangiz, u barcha bu mexanizmlar bilan **avtomatik** ishlaydi.
 
 ```javascript
 // Symbol.iterator — built-in, unique symbol
@@ -338,7 +337,9 @@ console.log(isIterable(null));             // false — null
 
 ### Nazariya
 
-JavaScript da bir qancha **built-in iterable** turlar bor — bular tayyor holda `Symbol.iterator` ga ega:
+JavaScript da bir qancha **built-in iterable** turlar bor — Array, String, Map, Set, TypedArray, arguments, va NodeList. Bular tayyor holda `Symbol.iterator` ga ega bo'lib, `for...of`, spread, destructuring bilan to'g'ridan-to'g'ri ishlaydi.
+
+Bu turlardan har birining iterator'i o'ziga xos xatti-harakatga ega. Masalan, String iterator Unicode code point bo'yicha ishlaydi (surrogate pair'larni to'g'ri handle qiladi), Map iterator `[key, value]` juftlarini beradi, Set esa qiymatlarni kiritilgan tartibda beradi. Muhim istisno: oddiy Object (`{}`), `WeakMap`, va `WeakSet` iterable **emas**.
 
 ```javascript
 // 1. ARRAY — eng ko'p ishlatiladigan iterable
@@ -498,7 +499,9 @@ Built-in Iterables xaritasi:
 
 ### Nazariya
 
-O'z object'larimizni iterable qilish uchun `Symbol.iterator` method'ini implement qilishimiz kerak. Bu method **iterator object** qaytarishi shart — ya'ni `next()` method'i bor object.
+O'z ob'ektlarimizni iterable qilish uchun `Symbol.iterator` method'ini implement qilishimiz kerak. Bu method **iterator object** qaytarishi shart — ya'ni `next()` method'i bo'lib, `{ value, done }` qaytaradigan ob'ekt.
+
+Muhim qoida: har safar `Symbol.iterator` chaqirilganda **yangi** iterator yaratilishi kerak — shunda bir nechta `for...of` loop mustaqil ishlaydi. Agar ob'ekt o'zini qaytarsa (singleton iterator), ikkinchi loop ishlamaydi. Custom iterator'larda ixtiyoriy `return()` method ham implement qilish mumkin — bu `for...of` dagi `break`, `return`, yoki `throw` da cleanup logic bajarish uchun kerak.
 
 ```javascript
 // Custom Range iterable — [start, end] oraliqda son beradi
@@ -544,7 +547,7 @@ console.log(a, b, c); // 1 2 3
 for (const n of range) console.log(n); // 1, 2, 3, 4, 5
 for (const n of range) console.log(n); // 1, 2, 3, 4, 5 ← yana ishlaydi!
 
-// ❌ Agar bitta iterator qayta ishlatilinsa — ikkinchi loop ishlamaydi
+// ❌ Agar bitta iterator qayta ishlatilsa — ikkinchi loop ishlamaydi
 const badRange = {
   from: 1, to: 3,
   current: 1,
@@ -683,7 +686,9 @@ for (const row of cursor) {
 
 ### Nazariya
 
-`for...of` loop — bu **syntactic sugar**. Ichida u iterator protocol ishlatadi. Keling, `for...of` aslida nimaga "desugar" bo'lishini ko'raylik.
+`for...of` loop — bu **syntactic sugar**. Ichida u iterator protocol ishlatadi: avval `Symbol.iterator` chaqirib iterator oladi, keyin `next()` ni loop qilib, `done: true` bo'lguncha har bir qiymatni o'zgaruvchiga beradi. `break`, `return`, yoki `throw` bo'lganda esa iterator'ning `return()` method'i chaqiriladi (agar mavjud bo'lsa) — bu cleanup logic uchun muhim.
+
+`for...of` vs `for...in` farqini tushunish ham muhim: `for...in` barcha enumerable property **key'larini** (string) beradi (prototypedan ham), `for...of` esa faqat iterable **value'larni** beradi.
 
 ```javascript
 // Biz yozamiz:
@@ -835,7 +840,9 @@ for (const val of arr) {
 
 ### Nazariya
 
-Generator — bu **to'xtatib turiladigan** (pausable) funksiya. Oddiy funksiya bir marta chaqiriladi va to'liq bajariladi. Generator esa `yield` orqali **o'rtasida to'xtaydi** va keyin **davom etadi**.
+Generator — bu **to'xtatib turiladigan** (pausable) funksiya. Oddiy funksiya bir marta chaqiriladi va to'liq bajariladi. Generator esa `yield` orqali **o'rtasida to'xtaydi** va `next()` chaqirilganda **davom etadi**. Generator funksiya `function*` bilan belgilanadi va chaqirilganda **bajarilmaydi** — faqat Generator object yaratadi.
+
+Generator'ning eng katta kuchi — **lazy evaluation**. Qiymatlar faqat so'ralganda hisoblanadi, shuning uchun cheksiz ketma-ketliklar (Fibonacci, random sonlar) ham xavfsiz. Generator object ham iterable, ham iterator — `Symbol.iterator` o'zini qaytaradi. Muhim cheklov: arrow function generator bo'la olmaydi, chunki generator alohida execution context talab qiladi.
 
 ```javascript
 // Oddiy funksiya — bir marta bajariladi
@@ -1023,10 +1030,9 @@ console.log(calc.throw(new Error("Nolga bo'lish mumkin emas")));
 
 ### Nazariya
 
-`yield` — generator ichida ishlatiladigan maxsus keyword. U ikki vazifa bajaradi:
+`yield` — generator ichida ishlatiladigan maxsus keyword bo'lib, u ikki vazifa bajaradi: **tashqariga qiymat berish** (`yield value` → `next()` chaqirgan kishiga `{ value, done: false }` qaytaradi) va **ichkariga qiymat olish** (`const x = yield` → keyingi `next(value)` da berilgan `value` ni `x` ga beradi).
 
-1. **Tashqariga qiymat berish** — `yield value` → `next()` chaqirgan kishiga `{ value, done: false }` qaytaradi
-2. **Ichkariga qiymat olish** — `const x = yield` → keyingi `next(value)` da berilgan `value` ni `x` ga beradi
+V8 generator'ni suspend qilganda, **GeneratorContext** ichida butun execution state saqlanadi: local variables, instruction pointer (qaysi yield da to'xtagan), scope chain (closure reference'lar), va try/catch state. Bu oddiy funksiyadan tubdan farq qiladi — oddiy funksiyada Call Stack'dan frame olib tashlanadi va hamma narsa yo'qoladi, generator da esa state **heap**'da saqlanadi.
 
 ```javascript
 // yield — to'xtash nuqtasi
@@ -1170,7 +1176,7 @@ console.log(first5); // [1, 2, 3, 4, 5]
 
 ### Nazariya
 
-Generator funksiya chaqirilganda qaytadigan Generator object **ham iterable, ham iterator**. Bu juda qulaylik beradi — `Symbol.iterator` ni qo'lda implement qilish o'rniga generator ishlatish mumkin.
+Generator funksiya chaqirilganda qaytadigan Generator object **ham iterable, ham iterator** — `Symbol.iterator` o'zini qaytaradi. Bu juda qulaylik beradi: `Symbol.iterator` ni qo'lda implement qilish o'rniga generator ishlatish ancha sodda bo'ladi — `next()`, `{ value, done }` qo'lda yozish shart emas, state management avtomatik, va `return()` ham avtomatik ishlaydi (`for...of` da `break` qilsak, generator'ning `finally` bloki bajariladi).
 
 ```javascript
 // ❌ Qo'lda iterator yozish — ko'p kod
@@ -1305,7 +1311,9 @@ console.log(evens.map(c => c.value)); // [2, 4, 6, 8]
 
 ### Nazariya
 
-`yield*` — boshqa iterable yoki generator'ga **delegatsiya** qiladi. Ya'ni boshqa generator ning barcha qiymatlarini o'zidan berganday beradi.
+`yield*` — boshqa iterable yoki generator'ga **delegatsiya** qiladi. Ya'ni boshqa generator'ning barcha qiymatlarini o'zidan berganday chiqaradi. `yield*` faqat generator bilan emas, Array, String, Set kabi istalgan iterable bilan ishlaydi.
+
+Eng muhim nuance: `yield*` ning expression qiymati boshqa generator'ning `return` qiymati bo'ladi (but not yielded values). Bundan tashqari, `yield*` `next()`, `return()`, va `throw()` ni ham delegate qiladi — ya'ni tashqi `gen.throw(err)` ichki generator'ga yetkaziladi. Bu xususiyat recursive tree traversal uchun `yield*` ni eng ideal vosita qiladi.
 
 ```javascript
 // yield* bilan delegation
@@ -1457,7 +1465,9 @@ console.log(result); // [6, 7, 8]
 
 ### Nazariya
 
-Generator faqat qiymat **bermaydi** — u qiymat **olishi** ham mumkin. `next(value)` chaqirilganda, `value` generator ichida **oxirgi yield ifodasi** ning qiymati bo'ladi.
+Generator faqat qiymat **bermaydi** — u qiymat **olishi** ham mumkin. `next(value)` chaqirilganda, `value` generator ichida **oxirgi yield ifodasi**ning qiymati bo'ladi. Bu ikki tomonlama kanal yaratadi: generator `yield` orqali tashqariga ma'lumot beradi, tashqi kod esa `next(value)` orqali ichkariga ma'lumot yuboradi.
+
+Muhim tushuncha: birinchi `next()` ga berilgan argument **har doim ignore** bo'ladi, chunki birinchi `next()` generator'ni boshlab, birinchi `yield` gacha olib boradi — bu paytda hali "kutayotgan yield ifodasi" yo'q. Bu two-way communication Redux-saga kabi kutubxonalarning asosiy mexanizmi hisoblanadi.
 
 ```javascript
 function* conversation() {
@@ -1614,7 +1624,9 @@ async function runSaga(generator) {
 
 ### Nazariya
 
-Async generator — `async function*` bilan yaratiladi. U oddiy generator bilan async/await ni birlashtiradi. Har bir `yield` da **Promise** berishi mumkin va `for await...of` orqali iterate qilinadi.
+Async generator — `async function*` bilan yaratilib, oddiy generator bilan async/await ni birlashtiradi. Har bir `yield` da **Promise** berishi mumkin va `for await...of` orqali iterate qilinadi. Oddiy iterator'dan farqi: async iterator'ning `next()` metodi **Promise** qaytaradi, ya'ni `{ value, done }` o'rniga `Promise<{ value, done }>` olasiz.
+
+Async generator ayniqsa paginated API, WebSocket stream, va server-sent events kabi asinxron data oqimlarini qayta ishlash uchun ideal. U lazy evaluation va async operatsiyalarni birlashtiradi — katta ma'lumotlarni bo'laklab, har bir bo'lakni asinxron tarzda olish va qayta ishlash imkonini beradi.
 
 > **Oldingi bo'limlar bilan bog'lanish:** Async/Await [13-async-await.md](13-async-await.md) va Event Loop [11-event-loop.md](11-event-loop.md) — ular bilan tanish bo'lish kerak.
 

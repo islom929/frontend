@@ -27,7 +27,11 @@
 
 ### Nazariya
 
-ES6 `class` — bu **yangi narsa emas**, balki constructor function + prototype pattern'ining **chiroyli yozilishi**.
+ES6 `class` — bu **yangi narsa emas**, balki constructor function + prototype pattern'ining **chiroyli yozilishi** (syntactic sugar). Lekin bu "shunchaki qand" emas — class bir nechta muhim yaxshilanishlar olib keldi: avtomatik strict mode, `new` siz chaqirishdan himoya, method'larning non-enumerable bo'lishi, va TDZ (Temporal Dead Zone) orqali ishonchli hoisting xulq-atvori.
+
+Nima uchun class kerak bo'ldi? ES5 da constructor function va prototype bilan ishlash juda ko'p boilerplate kod talab qilardi va yangi dasturchilar uchun tushunarsiz edi. Java, C#, Python dan kelgan dasturchilar uchun prototype-based OOP g'alati ko'rinardi. `class` sintaksisi bu muammoni hal qildi — u tanish OOP interfeys beradi, lekin ichida JavaScript'ning kuchli prototype mexanizmi ishlaydi.
+
+Muhim tushuncha: class **prototype**ni **almashtirmaydi** — u prototype ustiga qurilgan **abstraksiya**. `typeof MyClass` — `"function"`, method'lar `MyClass.prototype` da saqlanadi, va `new` keyword ichida xuddi shu 4 qadam bajariladi. Shu sababli [07-prototypes.md](07-prototypes.md) dagi bilimlar class'larni chuqur tushunish uchun zarur.
 
 ```javascript
 // ES5 — Constructor Function
@@ -483,7 +487,11 @@ document.addEventListener("hover", btn.onHover);   // ❌ this = document!
 
 ### Nazariya
 
-`static` — class'ning **o'ziga** tegishli, instance'larga emas. `new` qilmasdan to'g'ridan-to'g'ri class orqali ishlatiladi.
+`static` keyword — bu class'ning **o'ziga** (constructor funksiyasiga) tegishli property va method'larni belgilash uchun ishlatiladi. Static a'zolar instance'larda mavjud emas — ular `new` qilmasdan to'g'ridan-to'g'ri class orqali chaqiriladi.
+
+Buni **fabrika binosi** ga o'xshatish mumkin: fabrika (class) ning o'zi "bu fabrikada nechta mahsulot ishlab chiqarilgan" degan hisobni yuritadi (static property), lekin har bir mahsulot (instance) bu hisob haqida bilmaydi. `Math.random()`, `Date.now()`, `Array.isArray()` — bularning barchasi static method'lar.
+
+Static method'lar qachon kerak? Utility/helper funksiyalar (masalan, `MathUtils.clamp()`), factory method'lar (masalan, `User.fromJSON()`), singleton pattern, va konfiguratsiya konstantalari uchun. Muhim: static method ichida `this` class'ning o'ziga ishora qiladi (instance'ga emas), va static a'zolar ham `extends` orqali meros bo'ladi.
 
 ```javascript
 class MathUtils {
@@ -638,7 +646,11 @@ Object.defineProperty(User, "create", {
 
 ### Nazariya
 
-JavaScript **single inheritance** — class faqat **bitta** class'dan `extends` qila oladi. Lekin ba'zan bir nechta "qobiliyat" kerak. Yechim — **Mixin**.
+JavaScript **single inheritance** tildir — class faqat **bitta** class'dan `extends` qila oladi. Lekin real-world dasturlashda ko'pincha bitta ob'ektga bir nechta mustaqil "qobiliyat" berish kerak bo'ladi: masalan, ob'ekt ham serializable, ham validatable, ham timestamped bo'lishi kerak. Bu muammoning yechimi — **Mixin** pattern.
+
+Mixin — bu class'ga qo'shimcha funksionallik qo'shadigan funksiya. JavaScript'da mixin'lar odatda **higher-order function** sifatida amalga oshiriladi: ular Base class'ni qabul qiladi va yangi class qaytaradi. Bu pattern aslida **function composition** ga asoslanadi va u juda moslashuvchan: istalgan kombinatsiyada istalgan qobiliyatlarni birlashtirish mumkin.
+
+Mixin'lar zamonaviy JavaScript ekotizimida keng tarqalgan. React'ning eski versiyalarida `React.createClass` bilan mixin'lar ishlatilgan. LitElement (Web Components) va boshqa framework'larda hozir ham mixin pattern faol ishlatiladi. TypeScript'da esa `Mixin` pattern rasmiy documentation'da tavsiya etilgan.
 
 ### Mixin Pattern
 

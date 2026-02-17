@@ -30,7 +30,9 @@
 
 ### Nazariya
 
-JavaScript da funksiya yaratishning **3 ta asosiy usuli** bor. Har biri o'ziga xos xususiyatlarga ega — hoisting, `this` binding, `arguments` — bularni tushunish production da xato qilmaslik uchun muhim.
+JavaScript da funksiya yaratishning **3 ta asosiy usuli** bor va ularning farqini tushunish professional dasturlashning asosiy talabi. Har bir usul o'ziga xos xususiyatlarga ega — hoisting xulq-atvori, `this` binding mexanizmi, `arguments` ob'ekti, va `new` bilan chaqirish imkoniyati. Bu farqlarni bilmaslik production da jiddiy va qiyin topiladigan xatolarga olib keladi.
+
+Nima uchun uchta usul kerak? JavaScript tarixan faqat Function Declaration ga ega edi. Keyin Function Expression qo'shildi — bu funksiyani qiymat sifatida ishlatish imkonini berdi (first-class function). ES6 da Arrow Function kiritildi — u `this` binding muammosini hal qildi va qisqa callback yozish imkonini berdi. Zamonaviy kodda uchala usul ham faol ishlatiladi, lekin har biri o'z joyida.
 
 **1. Function Declaration** — klassik usul, `function` keyword bilan boshlanadi:
 
@@ -255,15 +257,11 @@ const createUser = (name, age) => ({ name, age, createdAt: Date.now() });
 
 ### Nazariya
 
-JavaScript da funksiyalar — **birinchi darajali fuqarolar (first-class citizens)**. Bu degani funksiyalar boshqa qiymatlar (`number`, `string`, `object`) bilan **teng huquqli**:
+JavaScript da funksiyalar — **birinchi darajali fuqarolar (first-class citizens)**. Bu degani funksiyalar `number`, `string`, `object` kabi boshqa qiymatlar bilan **teng huquqli** — ularni o'zgaruvchiga saqlash, argument sifatida berish, funksiyadan qaytarish, massiv va ob'ektlarda saqlash mumkin.
 
-1. **O'zgaruvchiga saqlash** mumkin
-2. **Argument sifatida berish** mumkin
-3. **Funksiyadan qaytarish** mumkin
-4. **Massiv/Objectda saqlash** mumkin
-5. **Property/method sifatida tayinlash** mumkin
+Bu xususiyat nima uchun muhim? Ko'pgina dasturlash tillarida (masalan, eski Java versiyalarida) funksiyalar "ikkinchi darajali" edi — ularni o'zgaruvchiga saqlash yoki argument sifatida berish mumkin emas edi. JavaScript funksiyalarning first-class bo'lishi butun tilning **functional programming** qobiliyatlarining asosi — closure, callback, higher-order function, decorator, memoization — bularning barchasi aynan shu xususiyat tufayli mumkin.
 
-Bu xususiyat JavaScript ning **functional programming** imkoniyatlarining asosi.
+ECMAScript spetsifikatsiyasi bo'yicha funksiya aslida **callable object** — ya'ni oddiy ob'ektga `[[Call]]` internal method qo'shilgan maxsus versiya. Shu sababli funksiyaga property qo'shish, `typeof` bilan tekshirish, va ob'ekt kabi ishlash mumkin:
 
 ### Under the Hood
 
@@ -382,7 +380,9 @@ function executeMiddlewares(req, middlewares) {
 
 ### Nazariya
 
-**IIFE** — bu funksiya yaratilishi bilan **darhol chaqiriladi**. Nomi "Immediately Invoked Function Expression" dan keladi.
+**IIFE** (Immediately Invoked Function Expression) — bu funksiya yaratilishi bilan **darhol chaqiriladi**. U scope izolyatsiyasi, module pattern, va bir martalik initialization uchun ishlatiladi.
+
+IIFE JavaScript tarixida juda muhim rol o'ynagan. ES6 dan oldin `let`, `const` va modullar yo'q edi — faqat `var` va function scope bor edi. Shu sababli dasturchilar global scope'ni ifloslantirmaslik uchun IIFE ishlatishgan. jQuery, Lodash, va boshqa mashhur kutubxonalarning barchasi IIFE ichida o'ralgan edi. Zamonaviy kodda ES modules va block scope (`let`/`const`) IIFE ning aksariyat use case'larini almashtirgani bo'lsa-da, legacy kod bilan ishlashda va top-level await mavjud bo'lmagan muhitda async initialization uchun IIFE hali ham kerak.
 
 ```javascript
 // Klassik IIFE syntax
@@ -574,12 +574,11 @@ export function getSecret() { return secret; }
 
 ### Nazariya
 
-**Higher-Order Function (HOF)** — bu:
-1. Boshqa funksiyani **argument sifatida qabul qiladigan**, YOKI
-2. Funksiyani **natija sifatida qaytaradigan**, YOKI
-3. **Ikkalasini ham** qiladigan funksiya
+**Higher-Order Function (HOF)** — bu boshqa funksiyani **argument sifatida qabul qiladigan**, yoki funksiyani **natija sifatida qaytaradigan**, yoki ikkalasini ham qiladigan funksiya. Bu tushuncha matematikadan kelgan va functional programming ning **asosiy qurilish bloki**.
 
-Bu first-class functions tushunchasining **amaliy qo'llanishi**. JavaScript da HOF lar hamma joyda — `map`, `filter`, `reduce`, `addEventListener`, `setTimeout` — bularning barchasi HOF.
+HOF nima uchun muhim? U kodni **abstraksiya** qilish imkonini beradi — "nima qilish" dan "qanday qilish" ni ajratadi. Masalan, `array.filter(predicate)` da filter "massivda yurib chiqish" logikasini o'z ichiga oladi, siz esa faqat "qaysi elementni olish" qoidasini berasiz. Bu separation of concerns prinsipi bo'lib, kodni o'qish va test qilishni osonlashtiradi.
+
+JavaScript da HOF lar hamma joyda: `map`, `filter`, `reduce`, `addEventListener`, `setTimeout`, `Promise.then`, Express middleware — bularning barchasi HOF. First-class functions tushunchasining **amaliy qo'llanishi** aynan shu yerda namoyon bo'ladi.
 
 ```
 ┌───────────────────────────────────────────────────┐
@@ -732,12 +731,9 @@ console.log(withVAT); // [112000, 280000, 560000]
 
 ### Nazariya
 
-**Callback** — boshqa funksiyaga argument sifatida beriladigan funksiya. "Meni keyin chaqir" degani. JavaScript ning async pattern'larining **asosi**.
+**Callback** — boshqa funksiyaga argument sifatida beriladigan va ma'lum bir voqea yoki shart bajarilganda **chaqiriladigan** funksiya. "Meni keyin chaqir" (call me back) degani — nom aynan shu ma'nodan kelgan. Callback JavaScript ning asinxron dasturlash pattern'larining **tarixiy asosi** bo'lib, Promise va async/await paydo bo'lishidan oldin yagona asinxron mexanizm edi.
 
-Callback 2 xil ishlatiladi:
-
-1. **Synchronous callback** — darhol chaqiriladi (map, filter, forEach)
-2. **Asynchronous callback** — keyinroq chaqiriladi (setTimeout, fetch, event handler)
+Callback ikki xil ishlatiladi: **sinxron callback** (darhol chaqiriladi — `map`, `filter`, `forEach`) va **asinxron callback** (keyinroq, biror voqea sodir bo'lganda chaqiriladi — `setTimeout`, `addEventListener`, `fs.readFile`). Bu ikki turni farqlash muhim — chunki ularning xatti-harakati tubdan farq qiladi.
 
 ```javascript
 // Synchronous callback — darhol bajariladi
@@ -879,18 +875,11 @@ readConfig("./config.json", function(error, config) {
 
 ### Nazariya
 
-**Pure Function** — ikki shartni bajaradigan funksiya:
+**Pure Function** — functional programming ning eng asosiy tushunchasi bo'lib, ikki shartni bajaradigan funksiya: birinchidan, **bir xil input doim bir xil output** beradi (deterministic); ikkinchidan, **side effect yo'q** — funksiya tashqi dunyoni hech qanday tarzda o'zgartirmaydi.
 
-1. **Bir xil input → doim bir xil output** (deterministic)
-2. **Side effect yo'q** — tashqi dunyoni o'zgartirmaydi
+Nima uchun purelik muhim? Pure funksiyalar kodni **predictable** (oldindan aytib berish mumkin) qiladi, test yozish osonlashadi (faqat input/output tekshirish yetarli, mock kerak emas), parallel bajarish xavfsiz bo'ladi (shared state yo'q), va caching/memoization mumkin bo'ladi (bir xil input = bir xil output). React'ning butun rendering tizimi pure function konsepsiyasiga asoslangan — component pure bo'lishi kerak, side effect'lar esa `useEffect` ichida bo'lishi kerak.
 
-**Side Effect** — funksiya tashqi dunyoga ta'sir qilishi:
-- Global o'zgaruvchini o'zgartirish
-- Console ga yozish
-- DOM ni o'zgartirish
-- Network request
-- File tizimiga yozish
-- Random/Date ishlatish
+**Side Effect** — funksiyaning tashqi dunyoga ta'sir qilishi: global o'zgaruvchini o'zgartirish, console ga yozish, DOM ni o'zgartirish, network request, file tizimiga yozish, yoki `Math.random()`/`Date.now()` ishlatish. Side effect'lar zarur (ularsiz dastur foydali ish qila olmaydi), lekin ularni **nazorat qilish** va **izolyatsiya qilish** kerak.
 
 ```javascript
 // ✅ Pure — bir xil input, bir xil output, side effect yo'q
@@ -1050,7 +1039,9 @@ async function processPayment(order) {
 
 ### Nazariya
 
-**Currying** — ko'p argumentli funksiyani **bir argumentli funksiyalar ketma-ketligiga** aylantirish.
+**Currying** — ko'p argumentli funksiyani **bir argumentli funksiyalar ketma-ketligiga** aylantirish texnikasi. Ya'ni `f(a, b, c)` o'rniga `f(a)(b)(c)` shaklida chaqirish imkonini beradi. Bu tushuncha matematik Haskell Curry sharafiga nomlangan va functional programming ning fundamental tushunchalaridan biri.
+
+Currying nima uchun kerak? U funksiyalarni **qayta ishlatish** (reusability) va **maxsuslashtirish** (specialization) imkonini beradi. Masalan, `multiply(2)(3)` da `multiply(2)` — bu "ikkiga ko'paytiruvchi" maxsus funksiya bo'lib, uni alohida saqlab boshqa joylarda ishlatish mumkin. Bu ayniqsa function composition va functional pipeline'larda juda foydali.
 
 ```
 Oddiy funksiya:     f(a, b, c) → natija
@@ -1193,7 +1184,9 @@ const handleAgeChange = handleInputChange("age")(isValidAge);
 
 ### Nazariya
 
-**Partial Application** — funksiyaning **ba'zi argumentlarini oldindan berish** va qolgan argumentlarni kutuvchi yangi funksiya yaratish.
+**Partial Application** — funksiyaning **ba'zi argumentlarini oldindan berish** va qolgan argumentlarni kutuvchi yangi funksiya yaratish texnikasi. Currying bilan o'xshash bo'lsa-da, muhim farqi bor: currying har doim birma-bir argument oladi (`f(a)(b)(c)`), partial application esa bir nechtasini bir yo'la berib qolgan argumentlarni kutadi (`f(a, b)` → `g(c)`).
+
+Partial application nima uchun foydali? U **maxsuslashtirilgan funksiyalar** yaratishning eng oson usuli. Masalan, umumiy `log(level, timestamp, message)` funksiyasidan `errorLog(message)` kabi tayyor funksiya yaratish mumkin. JavaScript'da `Function.prototype.bind` aslida partial application ning built-in implementatsiyasi.
 
 **Currying bilan farqi:**
 
@@ -1301,16 +1294,11 @@ function TodoList({ todos, onToggle, onDelete }) {
 
 ### Nazariya
 
-**Function Composition** — bir nechta funksiyani **birlashtirib**, yangi funksiya yaratish. Matematikadagi `f(g(x))` ga to'g'ri keladi.
+**Function Composition** — bir nechta kichik funksiyalarni **birlashtirib**, yangi murakkab funksiya yaratish texnikasi. Matematikadagi `f(g(x))` ga to'g'ri keladi — bitta funksiyaning natijasi keyingisining inputi bo'ladi.
 
-```
-Oddiy chaqirish:     result = f(g(h(x)))   — ichidan tashqariga o'qiladi
+Composition functional programming ning **eng asosiy prinsipi**: kichik, sodda, pure funksiyalarni yozib, keyin ularni birlashtirish orqali murakkab operatsiyalar yaratish. Bu yondashuv kodni modular qiladi (har bir funksiya bitta vazifani bajaradi), test qilish osonlashadi (har bir funksiya alohida test qilinadi), va qayta ishlatish imkoniyati ortadi.
 
-compose(f, g, h)(x):  x → h → g → f → result   (o'ngdan chapga)
-pipe(h, g, f)(x):     x → h → g → f → result   (chapdan o'ngga — o'qilishi osonroq)
-```
-
-Bu functional programming ning **asosiy prinsipi** — kichik, oddiy funksiyalarni birlashtirib murakkab operatsiyalar yaratish.
+Ikki asosiy usul bor: `compose(f, g, h)` — o'ngdan chapga (`f(g(h(x)))`), va `pipe(h, g, f)` — chapdan o'ngga, tabiiy o'qish tartibida. Zamonaviy kodda `pipe` ko'proq ishlatiladi chunki u o'qishga osonroq.
 
 ### Under the Hood
 
@@ -1443,22 +1431,11 @@ const result = await processOrder(newOrder);
 
 ### Nazariya
 
-**Memoization** — funksiya natijasini **cache** qilish pattern'i. Agar funksiya avval bir xil argumentlar bilan chaqirilgan bo'lsa, qayta hisob-kitob qilmasdan **saqlangan natijani qaytaradi**.
+**Memoization** — funksiya natijasini **cache** qilish pattern'i. Agar funksiya avval bir xil argumentlar bilan chaqirilgan bo'lsa, qayta hisob-kitob qilmasdan **saqlangan natijani qaytaradi**. Bu xotira va tezlik o'rtasidagi **trade-off** — qo'shimcha xotira sarflash evaziga ishlash tezligini oshirish.
 
-```
-Birinchi chaqiruv:  fibonacci(40) → 102334155  (2.5 sek)
-Ikkinchi chaqiruv:  fibonacci(40) → 102334155  (0.001 sek — cache dan!)
-```
+Memoization nima uchun muhim? Og'ir hisob-kitoblar (masalan, Fibonacci, faktorial, yoki katta ma'lumotlarni qayta ishlash) bir xil inputlar bilan ko'p marta chaqirilishi mumkin. Har safar qayta hisoblash o'rniga natijani cache'da saqlash performance ni keskin oshiradi. React'da `useMemo` va `React.memo` aynan shu printsipga asoslanadi.
 
-**Qachon ishlatish kerak:**
-- Funksiya **pure** bo'lganda (bir xil input = bir xil output)
-- Hisob-kitob **og'ir** (sekin) bo'lganda
-- Bir xil argumentlar bilan **ko'p marta** chaqirilganda
-
-**Qachon ishlatmaslik kerak:**
-- Funksiya **impure** bo'lganda (side effect, random, time)
-- Argumentlar har doim **unikal** bo'lganda (cache befoyda)
-- Memory cheklangan bo'lganda (cache hajmi)
+**Qachon ishlatish kerak:** funksiya **pure** bo'lganda, hisob-kitob **sekin** bo'lganda, va bir xil argumentlar bilan **ko'p marta** chaqirilganda. **Qachon ishlatmaslik kerak:** funksiya impure bo'lganda (side effect, random, time), argumentlar har doim unikal bo'lganda (cache befoyda), yoki memory cheklangan bo'lganda.
 
 ### Under the Hood
 
@@ -1601,15 +1578,13 @@ const report2 = calculateExpensiveReport(transactions, "2025-01-01", "2025-01-31
 
 ### Nazariya
 
-**Debounce** va **Throttle** — ko'p chaqiriladigan funksiyalarni **cheklash** pattern'lari. Ikkalasi ham performance optimization uchun ishlatiladi, lekin boshqa-boshqa maqsadlarda.
+**Debounce** va **Throttle** — ko'p chaqiriladigan funksiyalarni **cheklash** pattern'lari. Ikkalasi ham performance optimization uchun ishlatiladi, lekin har biri boshqa muammoni hal qiladi.
 
-**Debounce** — foydalanuvchi to'xtagan vaqtdan keyin **bitta marta** bajaradi.
-- Masalan: search input — har harf bosilganda emas, **yozib to'xtagandan keyin** search qilish
-- "Kuting, hali yozyapman..."
+**Debounce** — foydalanuvchi **to'xtagandan keyin** bitta marta bajaradi. Tasavvur qiling, lift tugmasini bossangiz, lift darhol yopilmaydi — boshqa odam ham kirishini kutadi. Agar 3 soniya hech kim bosmasa — eshik yopiladi. Xuddi shunday, debounce foydalanuvchi yozishni to'xtatganidan keyin gina search so'rovini yuboradi.
 
-**Throttle** — berilgan vaqt oralig'ida **ko'pi bilan bitta marta** bajaradi.
-- Masalan: scroll event — har pikselda emas, **har 200ms da bitta marta** pozitsiyani tekshirish
-- "Tez-tez bajaring, lekin chegarani oshirmang"
+**Throttle** — berilgan vaqt oralig'ida **ko'pi bilan bitta marta** bajaradi. Buni **chastota cheklovchi** deb tushunish mumkin — qancha tez bosmang, har 300ms da birgina marta ishlaydi. Scroll event, resize, yoki sensor ma'lumotlarini qayta ishlashda throttle ishlatiladi.
+
+Bu ikki pattern zamonaviy frontend dasturlashda **deyarli har doim** kerak: search input'larda debounce, scroll/resize handler'larda throttle, API rate limiting'da throttle. Lodash va boshqa kutubxonalarda tayyor implementatsiyalar bor, lekin ularni o'zingiz yoza olish — closure va timer'lar bilan ishlashni to'liq tushunganingiz isboti.
 
 ```
 Debounce (300ms):
@@ -1836,20 +1811,11 @@ const debouncedSave = debounce(saveToServer, 1000);
 
 ### Nazariya
 
-`arguments` — har bir **regular function** ichida mavjud bo'lgan **array-like** (massivga o'xshash) object. Funksiyaga berilgan **barcha argumentlarni** o'z ichiga oladi.
+`arguments` — har bir **regular function** (declaration va expression) ichida mavjud bo'lgan **array-like** (massivga o'xshash) ob'ekt. U funksiyaga berilgan **barcha argumentlarni** indeks bo'yicha saqlaydi, parametrlar soni necha bo'lishidan qat'i nazar.
 
-```javascript
-function showArguments() {
-  console.log(arguments);        // Arguments(3) [1, "hello", true]
-  console.log(arguments[0]);     // 1
-  console.log(arguments[1]);     // "hello"
-  console.log(arguments.length); // 3
-}
+`arguments` JavaScript'ning eng eski xususiyatlaridan biri bo'lib, ES1 dan beri mavjud. U funksiya nechta argument qabul qilishini oldindan bilmaslik muammosini hal qilgan. Lekin `arguments` ning **jiddiy kamchiliklari** bor: u haqiqiy massiv emas (Array.prototype method'lari yo'q), arrow function'da mavjud emas, va strict mode'da ba'zi kutilmagan xulq-atvor ko'rsatadi. Shu sababli ES6 da uning zamonaviy almashtiruvi — **rest parameters** (`...args`) kiritildi.
 
-showArguments(1, "hello", true);
-```
-
-**Muhim:** `arguments` **haqiqiy massiv emas** — u `Array.prototype` ga ega emas. Shuning uchun `map`, `filter`, `reduce` kabi methodlar to'g'ridan-to'g'ri ishlamaydi.
+**Muhim:** `arguments` **haqiqiy massiv emas** — u `Array.prototype` ga ega emas. `map`, `filter`, `reduce` kabi method'lar to'g'ridan-to'g'ri ishlamaydi — avval `Array.from(arguments)` yoki `[...arguments]` bilan haqiqiy massivga aylantirish kerak.
 
 ### Under the Hood
 
@@ -1973,17 +1939,9 @@ const sum2 = (...numbers) => numbers.reduce((total, num) => total + num, 0);
 
 ### Nazariya
 
-**Rest parameters** (`...`) — ES6 da kiritilgan, `arguments` ning zamonaviy almashtiruvi. Farqlari muhim:
+**Rest parameters** (`...`) — ES6 da kiritilgan, `arguments` ob'ektining zamonaviy va kuchli almashtiruvi. `arguments` dan farqli o'laroq, rest parameters **haqiqiy Array** qaytaradi (barcha Array method'lari ishlaydi), **arrow function**'larda ishlaydi, va faqat **qolgan argumentlarni** oladi (nomlangan parametrlardan keyingilarini).
 
-| Xususiyat | `arguments` | Rest Parameters (`...args`) |
-|-----------|------------|---------------------------|
-| **Turi** | Array-like object | **Haqiqiy Array** |
-| **Array methods** | Yo'q (aylantirish kerak) | Bor (map, filter, reduce) |
-| **Arrow function** | Yo'q | **Bor** |
-| **Nomlangan parametrlardan keyin** | Hammasi kiradi | Faqat **qolganlari** |
-| **ES versiyasi** | ES1 (boshidan beri) | ES6 (2015) |
-| **`length`** | Ha | Ha (Array.length) |
-| **Parametr soni** | `fn.length` ga ta'sir qilmaydi | `fn.length` ga ta'sir qilmaydi |
+Nima uchun rest parameters kerak bo'ldi? `arguments` ob'ektining kamchiliklari (array-like, arrow function'da yo'q, strict mode muammolari) ko'p xatolarga sabab bo'lardi. Rest parameters bu muammolarning barchasini hal qildi va zamonaviy kodda `arguments` ishlatish uchun hech qanday sabab qolmadi. Bugungi kunda `arguments` faqat legacy kodda uchraydi.
 
 ### Under the Hood
 
@@ -2093,7 +2051,11 @@ emitter.emit("userCreated", "Ali", "ali@mail.com");
 
 ### Nazariya
 
-**Default Parameters** (ES6) — funksiya parametrlariga **standart qiymat** berish. Agar argument berilmasa yoki `undefined` bo'lsa, default qiymat ishlatiladi.
+**Default Parameters** (ES6) — funksiya parametrlariga **standart qiymat** berish imkonini beradigan xususiyat. Agar argument berilmasa yoki `undefined` bo'lsa, default qiymat ishlatiladi. Bu ES5 dagi `name = name || "Mehmon"` pattern'ining xavfsiz almashtiruvi.
+
+Nima uchun ES5 usuli xavfli edi? `||` operatori **falsy** qiymatlarning hammasini default bilan almashtirardi: `0`, `""` (bo'sh string), `false`, `null` — bularning barchasi ham default qiymatga aylanib ketardi, bu esa ko'p kutilmagan xatolarga sabab bo'lardi. ES6 default parameters faqat `undefined` holatda ishlaydi — bu ancha xavfsiz va predictable.
+
+Muhim nozik nuqta: `null` berilganda default parameter **ishlamaydi** (chunki `null` explicit qiymat hisoblanadi), lekin `undefined` berilganda ishlaydi. Bu JavaScript'ning `null` va `undefined` farqining amaliy namoyon bo'lishi.
 
 ```javascript
 // ❌ ES5 usul — manual default

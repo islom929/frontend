@@ -29,7 +29,9 @@
 
 ### Nazariya
 
-`async` keyword bilan belgilangan funksiya **doim Promise qaytaradi**. Agar siz oddiy qiymat return qilsangiz — u avtomatik `Promise.resolve()` ga o'raladi.
+`async` keyword bilan belgilangan funksiya **doim Promise qaytaradi** — hatto siz oddiy qiymat return qilsangiz ham, u avtomatik `Promise.resolve()` ga o'raladi; `throw` qilsangiz esa `Promise.reject()` ga aylanadi. Bu shuni anglatadiki, async funksiya chaqirilganda natija hech qachon **bevosita** qaytmaydi — u doim Promise ichida keladi.
+
+Async funksiya nima uchun yaratilgan? Promise chain'lari (`.then().then()`) callback hell'dan ancha yaxshi bo'lsa-da, murakkab asinxron logikada ular ham o'qilishi qiyin va debugging qiyinlashadi. `async/await` asinxron kodni **sinxron ko'rinishda** yozish imkonini beradi — lekin ichida hamma narsa Promise va microtask'lar bilan ishlaydi. Bu ES2017 da kiritilgan va zamonaviy JavaScript'da asinxron kodning **standart** yozish usuli hisoblanadi.
 
 ```javascript
 // Oddiy funksiya
@@ -140,7 +142,9 @@ async function example() {
 
 ### Nazariya
 
-`await` — Promise resolve bo'lguncha funksiya bajarilishini **to'xtatadi**. Faqat `async` funksiya ichida ishlatiladi (yoki top-level await — keyinroq ko'ramiz).
+`await` — Promise resolve bo'lguncha funksiya bajarilishini **to'xtatadigan** (suspend) operator. Faqat `async` funksiya ichida yoki ES Module'ning top-level scope'ida ishlatiladi. `await` Promise'ni, thenable ob'ektni, yoki oddiy qiymatni qabul qiladi.
+
+Eng muhim tushuncha: `await` funksiyani to'xtatadi, lekin **main thread ni BLOKLAMAYDI**. Funksiya to'xtaganda boshqaruv chaqiruvchiga qaytadi va Event Loop erkin qoladi. Promise resolve bo'lganda funksiya microtask orqali davom etadi. Shu sababli `await` dan keyingi kod aslida sinxron emas — u microtask sifatida bajariladi.
 
 ```javascript
 async function demo() {
@@ -235,7 +239,9 @@ Nima uchun `END` avval chiqadi? Chunki `await` funksiyani to'xtatib, **boshqaruv
 
 ### Nazariya
 
-Async/await ning eng katta afzalliklaridan biri — error handling oddiy `try/catch` bilan ishlaydi. Promise'dagi `.catch()` zanjirlariga hojat yo'q.
+Async/await ning eng katta afzalliklaridan biri — error handling oddiy `try/catch` bilan ishlaydi, xuddi sinxron koddagidek. Promise'dagi `.catch()` zanjirlariga hojat yo'q — kod o'qilishi va tuzatilishi ancha osonlashadi.
+
+Bundan tashqari, `try/catch` yordamida turli xato turlarini `instanceof` bilan ajratish, har bir `await` ni alohida try/catch da o'rash (granular error handling), yoki `await promise.catch()` pattern ishlatish mumkin. `finally` bloki esa resurslarni tozalash (spinner yashirish, connection yopish) uchun ishlatiladi — xuddi Promise'dagi `.finally()` kabi.
 
 ```javascript
 // ❌ Promise bilan error handling — zanjir
@@ -380,7 +386,9 @@ async function loadData() {
 
 ### Nazariya
 
-`await` ni ketma-ket ishlatish — har biri oldingi tugashini kutadi. Agar operatsiyalar **bir-biriga bog'liq bo'lmasa** — ularni parallel bajaring!
+`await` ni ketma-ket ishlatish har bir operatsiya uchun oldingi tugashini kutadi. Agar operatsiyalar **bir-biriga bog'liq bo'lmasa** — bu behuda vaqt yo'qotish. `Promise.all()` bilan mustaqil operatsiyalarni **parallel** bajarish mumkin — natijada umumiy vaqt eng sekin operatsiya vaqtiga teng bo'ladi.
+
+Eng muhim nuance: `Promise.all` **fail-fast** — bitta xato bo'lsa hammasi reject bo'ladi va muvaffaqiyatli natijalar yo'qoladi. Agar xatolarga chidamli bo'lish kerak bo'lsa — `Promise.allSettled` ishlatiladi, u barcha natijalarni (fulfilled va rejected) qaytaradi.
 
 ```javascript
 // ❌ YOMON: ketma-ket — har biri oldingi tugashini kutadi
@@ -500,13 +508,9 @@ async function loadDashboard(userId) {
 
 ### Nazariya
 
-**Qachon sequential (ketma-ket)?**
-- Keyingi operatsiya oldingi natijaga **bog'liq** bo'lsa
-- Tartib muhim bo'lsa (transaction, step-by-step)
+Sequential va parallel execution qachon ishlatishni bilish — async kodning **performance**ini belgilovchi eng muhim qaror. Qoida oddiy: keyingi operatsiya oldingi natijaga **bog'liq** bo'lsa — sequential; operatsiyalar **mustaqil** bo'lsa — parallel. Real-world da ko'pincha **aralash** pattern ishlatiladi: ba'zi operatsiyalar parallel, natijalar kelgandan keyin keyingi bosqich sequential davom etadi.
 
-**Qachon parallel?**
-- Operatsiyalar **mustaqil** bo'lsa
-- Tartib muhim bo'lmasa
+Bu farqni bilmaslik eng ko'p uchraydigan performance muammolardan biri. Masalan, 3 ta mustaqil API so'rovini ketma-ket qilish 3x sekinroq, parallel qilish esa tezlikni keskin oshiradi.
 
 ### Qaror Daraxti
 
@@ -646,7 +650,9 @@ async function parallel() {
 
 ### Nazariya
 
-ES2022 dan boshlab, **ES Modules** ichida `await` ni `async` funksiya siz ham ishlatish mumkin — bu **top-level await** deb ataladi.
+ES2022 dan boshlab, **ES Modules** ichida `await` ni `async` funksiya siz ham ishlatish mumkin — bu **top-level await**. U modulning o'zini "async" qiladi — bu modulni import qilgan boshqa modullar ham uning tayyor bo'lishini kutadi.
+
+Top-level await faqat ES Module'larda ishlaydi (`.mjs` yoki `"type": "module"` package.json da). CommonJS va oddiy script'larda ishlamaydi. U database connection, konfiguratsiya yuklash, dynamic import, va conditional module loading uchun juda qulay. Lekin ehtiyot bo'ling: top-level await sekin operatsiyani modulda ishlatish butun dependency tree'ni bloklab qo'yishi mumkin.
 
 ```javascript
 // config.mjs (ES Module)
@@ -767,7 +773,7 @@ Bu section da production-ready async patternlarni ko'rib chiqamiz.
 
 #### Nazariya
 
-Network so'rovlari muvaffaqiyatsiz bo'lganda qayta urinish — juda ko'p ishlatiladigan pattern. **Exponential backoff** — har safar kutish vaqtini 2x ga oshirish (server ni bosmaslik uchun).
+Network so'rovlari muvaffaqiyatsiz bo'lganda qayta urinish — production dasturlarda eng ko'p ishlatiladigan patternlardan biri. **Exponential backoff** har safar kutish vaqtini 2x ga oshiradi (1s → 2s → 4s → 8s) — bu serverni ortiqcha yuklamaslik uchun muhim. Qo'shimcha **jitter** (random kechikish) esa barcha clientlar bir vaqtda retry qilmasligini ta'minlaydi.
 
 ```
 Retry with Exponential Backoff:
@@ -864,7 +870,7 @@ const data = await retry(
 
 #### Nazariya
 
-Asinxron operatsiyaga vaqt chegarasi qo'yish — `Promise.race()` yordamida.
+Asinxron operatsiyaga vaqt chegarasi qo'yish — `Promise.race()` bilan bajariladigan muhim pattern. Agar operatsiya belgilangan vaqt ichida tugamasa, timeout xatosi qaytariladi. Bu ayniqsa tashqi API'lar bilan ishlashda muhim — javob kelmasa dastur cheksiz kutmasligi kerak.
 
 ```javascript
 function withTimeout(promise, ms, message = 'Operation timed out') {
@@ -928,7 +934,7 @@ async function fetchWithAbort(url, timeoutMs = 5000) {
 
 #### Nazariya
 
-1000 ta URL bor — hammasini bir vaqtda `Promise.all` qilsak, server 1000 ta parallel so'rov ko'radi. Bu DDos hisoblanadi! **Concurrent limit** — bir vaqtda faqat N ta so'rov yuborish.
+1000 ta URL bor — hammasini bir vaqtda `Promise.all` qilsak, server 1000 ta parallel so'rov ko'radi va bu DDoS hisoblanadi. **Concurrent limit** — bir vaqtda faqat N ta so'rov yuborib, biri tugashi bilan navbatdagini boshlash. Bu server va client resurslarini tejaydi, rate-limiting'ga tushishdan saqlaydi.
 
 ```
 Concurrent Limit (max 3):
@@ -1028,7 +1034,7 @@ const results = await Promise.all(
 
 #### Nazariya
 
-Queue pattern — task'lar ketma-ket (bitta-bitta) bajarilishi kerak bo'lganda. Database yozish, file operations, yoki tartib muhim bo'lgan operatsiyalar uchun.
+Queue pattern — task'lar ketma-ket (bitta-bitta) bajarilishi kerak bo'lganda ishlatiladigan pattern. Database yozish operatsiyalari, file system o'zgarishlari, yoki tartib muhim bo'lgan tranzaktsiyalar uchun ideal. U yangi task'larni navbatga qo'yadi va har bir task'ni oldingi tugagandan keyin bajaradi.
 
 ```javascript
 class AsyncQueue {
@@ -1132,7 +1138,9 @@ queue.enqueue(() => logAnalytics(event), 0);    // eng past
 
 ### Nazariya
 
-`for-await-of` — asinxron iterable (async iterator) ustida iteratsiya qilish uchun. Stream, paginated API, real-time data kabi scenariolarda ishlatiladi.
+`for-await-of` — asinxron iterable (async iterator) ustida iteratsiya qilish uchun maxsus tsikl. Stream, paginated API, va real-time data kabi scenariolarda ishlatiladi. U oddiy `for-of` ning asinxron versiyasi bo'lib, har bir iteratsiyada Promise resolve bo'lishini kutadi.
+
+Bu pattern ayniqsa katta ma'lumotlarni bo'laklab o'qish (streaming), sahifalangan API natijalarini ketma-ket olish, yoki WebSocket/Server-Sent Events kabi real-time ma'lumot oqimlarini qayta ishlash uchun muhim.
 
 > **Eslatma:** Iterator va Generator haqida batafsil — [14-iterators-generators.md](14-iterators-generators.md)
 
@@ -1292,7 +1300,9 @@ for await (const event of poller) {
 
 ### Nazariya
 
-`async/await` aslida **generator + promise** ning syntactic sugar versiyasi. ES2017 dan oldin Babel va boshqa transpiler lar async/await ni generator+promise ga aylantirar edi.
+`async/await` aslida **generator + promise** ning syntactic sugar versiyasi. ES2017 dan oldin Babel va boshqa transpiler'lar async/await ni generator+promise ga aylantirar edi. Generator'ning `yield` operatori funksiyani to'xtatadi, Promise resolve bo'lganda davom ettiradi — aynan `await` qilgan ishni bajaradi.
+
+Bu ichki mexanizmni tushunish `async/await` ning nega microtask orqali ishlashini, nima uchun `await` dan keyingi kod darhol bajarilmasligini, va debug paytida call stack'da generator frame'larini ko'rish sabablarini tushuntirib beradi.
 
 ### Async/Await Qanday Desugar Bo'ladi
 

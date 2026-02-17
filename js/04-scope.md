@@ -26,9 +26,13 @@
 
 ### Nazariya
 
-Scope — bu o'zgaruvchilar, funksiyalar va ob'ektlarning **ko'rinish (accessibility) sohasi**. Ya'ni kodning qaysi qismida qaysi o'zgaruvchiga kirish mumkinligi.
+Scope — bu o'zgaruvchilar, funksiyalar va ob'ektlarning **ko'rinish (accessibility) sohasi**. Ya'ni kodning qaysi qismida qaysi o'zgaruvchiga kirish mumkinligi aniq qoidalar bilan belgilangan.
 
-Oddiy qilib: scope = **"bu o'zgaruvchini qayerdan ko'rish mumkin?"**
+Nima uchun scope kerak? Tasavvur qiling, 10 ming qatordan iborat dasturda barcha o'zgaruvchilar hamma joydan ko'rinsa — nomlar to'qnashadi, kutilmagan qayta yozishlar sodir bo'ladi, xatolarni topish imkonsiz bo'lib qoladi. Scope bu muammoni hal qiladi: u o'zgaruvchilarni **izolyatsiya** qiladi, ya'ni har bir kod bloki faqat o'ziga tegishli o'zgaruvchilarni ko'radi.
+
+Buni **xonalar** ga o'xshatish mumkin. Uy ichida turli xonalar bor — har bir xonada o'z buyumlari. Oshxonadagi pichoq yotoqxonada ko'rinmaydi. Lekin umumiy koridor (global scope) dan barcha xonalarga kirish mumkin. Xuddi shunday, funksiya ichidagi o'zgaruvchi tashqaridan ko'rinmaydi, lekin global o'zgaruvchilar hamma joydan ko'rinadi.
+
+Scope JavaScript'ning eng fundamental tushunchalaridan biri — closure, hoisting, module pattern va boshqa ko'plab tushunchalar scope mexanizmiga asoslanadi. Scope qoidalarini chuqur tushunish kodning xatti-harakatini oldindan aytib berishga imkon beradi.
 
 ```javascript
 function greet() {
@@ -68,7 +72,9 @@ JavaScript da **3 xil** scope bor:
 
 ### Nazariya
 
-Global scope — eng tashqi scope. Bu yerda e'lon qilingan o'zgaruvchilar **hamma joydan** ko'rinadi — istalgan funksiya, istalgan block ichidan.
+Global scope — eng tashqi, eng keng scope. Bu yerda e'lon qilingan o'zgaruvchilar **istalgan joydan** — istalgan funksiya, istalgan block ichidan ko'rinadi. Dastur ishga tushganda Global Execution Context yaratiladi va aynan shu EC ning environment'i global scope'ni hosil qiladi.
+
+Global scope qulay bo'lsa-da, u **xavfli**. Katta loyihalarda, ayniqsa ko'p kutubxonalar ishlatilganda, global scope "ifloslangan" bo'lishi mumkin: turli fayllar va kutubxonalar bir xil nomli global o'zgaruvchilar yaratishi va bir-birini kutilmagan tarzda qayta yozishi mumkin. Bu muammo JavaScript tarixida shunchalik jiddiy ediki, uni hal qilish uchun avval IIFE (Immediately Invoked Function Expression) pattern, keyin esa ES6 modullar tizimi yaratildi. Zamonaviy kodda global scope'ni imkon qadar **toza** saqlash — professional dasturlashning asosiy qoidasi.
 
 ```javascript
 // Global scope
@@ -141,9 +147,11 @@ export const config = { port: 3000 };
 
 ### Nazariya
 
-Function scope — funksiya ichida e'lon qilingan o'zgaruvchilar **faqat shu funksiya ichidan** ko'rinadi. Tashqaridan ko'rinmaydi.
+Function scope — funksiya ichida e'lon qilingan o'zgaruvchilarning **faqat shu funksiya ichidan** ko'rinadigan sohasi. Funksiya tugaganda — uning scope'i yo'qoladi va undagi barcha local o'zgaruvchilar garbage collection uchun tayyor bo'ladi (agar closure yo'q bo'lsa).
 
-`var`, `let`, `const` — **uchalasi** ham function scope'ni tushunadi. Lekin `var` **faqat** function scope ni tanimaydi (block scope'ni emas).
+Function scope JavaScript'ning eng asosiy izolyatsiya mexanizmi. ES6 dan oldin JavaScript'da **faqat** function scope bor edi (block scope yo'q edi). Shu sababli dasturchilar o'zgaruvchilarni izolyatsiya qilish uchun IIFE (Immediately Invoked Function Expression) ishlatishgan — bu aslida sun'iy ravishda function scope yaratish edi.
+
+Muhim nuqta: `var`, `let`, `const` — **uchala** keyword ham function scope'ni hurmat qiladi. Ya'ni ular funksiya ichida e'lon qilinsa, tashqaridan ko'rinmaydi. Farq shundaki `var` **faqat** function scope'ni tan oladi (block scope'ni e'tiborsiz qoldiradi), `let` va `const` esa ham function, ham block scope'ni tushunadi.
 
 ```javascript
 function calculate() {
@@ -212,7 +220,11 @@ outer() scope:
 
 ### Nazariya
 
-Block scope — `{}` (curly braces) ichida yaratilgan scope. `let` va `const` block scope'ni tushunadi, `var` **tushunmaydi**.
+Block scope — `{}` (curly braces) ichida yaratilgan scope. Bu ES6 (2015) da `let` va `const` bilan birga kiritilgan tushuncha bo'lib, JavaScript'ning scope tizimini sezilarli darajada kuchaytirdi.
+
+Nima uchun block scope kerak bo'ldi? ES6 dan oldin JavaScript'da faqat function scope bor edi. Buning natijasida `for` loop ichida `var` bilan e'lon qilingan `i` o'zgaruvchisi loop'dan tashqarida ham yashab qolardi — bu ko'plab kutilmagan xatolarga sabab bo'lardi (masalan, klassik closure-in-loop muammosi). Block scope bu muammoni hal qildi: `let` va `const` har bir `{}` blok ichida yangi scope yaratadi va o'zgaruvchilar o'sha blokdan chiqmaydi.
+
+`var` block scope'ni **tushunmaydi** — u `if`, `for`, `while` ichida e'lon qilinsa ham function yoki global scope'ga "chiqib ketadi". `let` va `const` esa block scope'ni to'liq hurmat qiladi.
 
 Block: `if`, `for`, `while`, `switch`, yoki oddiy `{}`
 
@@ -292,11 +304,13 @@ switch (action) {
 
 ### Nazariya
 
-JavaScript **Lexical Scope** (yoki **Static Scope**) ishlatadi. Bu degani:
+JavaScript **Lexical Scope** (yoki **Static Scope**) ishlatadi. Bu JavaScript'ning scope tizimini belgilaydigan eng muhim qoida:
 
 > O'zgaruvchining scope'i **kodda yozilgan joyiga** qarab aniqlanadi — **chaqirilgan joyiga** qarab emas.
 
-Bu juda muhim tushuncha — closure'lar aynan shu prinsipga asoslanadi.
+Bu nima degani? Funksiya qayerda chaqirilgan bo'lmasin — u har doim **yozilgan joydagi** scope chain'ni ishlatadi. Bu tushuncha **closure**'larning asosi — [05-closures.md](05-closures.md) da ko'rib chiqamiz.
+
+Lexical scope nima uchun muhim? Chunki u kodni **predictable** (oldindan aytib berish mumkin) qiladi. Siz kodni o'qib turib, hech qanday dasturni ishga tushirmasdan, istalgan o'zgaruvchining qaysi scope'ga tegishli ekanligini aniq aytib bera olasiz. Bu xususiyat IDE'larga (VS Code) auto-complete va refactoring imkonini beradi, linter'larga (ESLint) xatolarni compile vaqtida topish imkonini beradi, va bundler'larga (Webpack, Rollup) tree-shaking orqali ishlatilmagan kodni olib tashlash imkonini beradi. Bularning barchasi lexical scope tufayli mumkin.
 
 ```javascript
 let x = "global";
@@ -364,7 +378,11 @@ let x; // ← faqat bu bo'lsa ko'radi
 
 ### Nazariya
 
-Ko'pchilik tillar (JavaScript, Python, C, Java) **Lexical Scope** ishlatadi. Ba'zi tillar (Bash, eski Perl, some Lisps) **Dynamic Scope** ishlatadi.
+Ko'pchilik dasturlash tillari (JavaScript, Python, C, Java, Go) **Lexical Scope** ishlatadi. Lekin ba'zi tillar (Bash, eski Perl, ayrim Lisp dialektlari) **Dynamic Scope** ishlatadi. Bu ikki yondashuvning farqini tushunish JavaScript'ning scope mexanizmini chuqurroq anglashga yordam beradi.
+
+**Lexical Scope** da o'zgaruvchi qaysi scope'ga tegishli ekanligi **kod yozilgan paytda** (parse-time) aniqlanadi — dastur ishlashdan oldin. **Dynamic Scope** da esa bu **runtime** da — funksiya chaqirilgan paytda aniqlanadi. Amaliy farq shuki — lexical scope'da kodni o'qib turib natijani oldindan bilish mumkin, dynamic scope'da esa dasturni ishga tushirmasdan natijani aytib bo'lmaydi.
+
+Qiziq fakt: JavaScript'da `this` keyword aslida dynamic scope'ga **o'xshash** behavior ko'rsatadi — u funksiya qanday chaqirilganiga qarab o'zgaradi. Lekin bu scope emas, bu **binding** mexanizmi — to'liq [10-this-keyword.md](10-this-keyword.md) da.
 
 | Xususiyat | Lexical Scope (JS) | Dynamic Scope |
 |-----------|-------------------|---------------|
@@ -410,7 +428,13 @@ JavaScript **doim** lexical scope — `second()` qayerda chaqirilmasin, u **yozi
 
 ### Nazariya
 
-Scope Chain — bu engine o'zgaruvchini qidirish uchun yuradigan **zanjir**. Har bir scope o'z **tashqi (outer) scope**'iga havola qiladi. Engine o'zgaruvchini avval **o'z scope**'ida qidiradi, topmasa — **tashqi scope**'ga, keyin yana tashqiga... to global scope'gacha.
+Scope Chain — bu engine o'zgaruvchini qidirish uchun yuradigan **zanjir**. Har bir scope o'z **tashqi (outer) scope**'iga havola (reference) qiladi va bu havolalar zanjiri global scope'gacha davom etadi.
+
+Buni **pochta manzili**ga o'xshatish mumkin. Xat yetkazilayotganda avval ko'cha nomeri, keyin ko'cha, keyin mahalla, keyin shahar tekshiriladi. Xuddi shunday, engine o'zgaruvchini avval **joriy scope**'da qidiradi, topmasa **tashqi scope**'ga, keyin yana tashqiga — to global scope'gacha ko'tariladi. Global scope'da ham topilmasa — `ReferenceError` tashlanadi.
+
+Muhim qoida: scope chain **faqat ichdan tashqariga** yuradi. Tashqi scope ichki scope'ni **ko'ra olmaydi**. Bu izolyatsiya prinsipi — ichki funksiya tashqi funksiyaning o'zgaruvchilarini ko'radi, lekin tashqi funksiya ichki funksiyaning o'zgaruvchilarini ko'ra olmaydi.
+
+Scope chain aslida [02-execution-context.md](02-execution-context.md) da o'rgangan LexicalEnvironment'larning **outer reference** lar orqali bog'langan zanjiriga teng. Engine har bir o'zgaruvchi uchun aynan shu zanjir bo'ylab qidiradi.
 
 ```
 inner scope → outer scope → ... → global scope → topilmadi? → ReferenceError
@@ -537,7 +561,11 @@ Engine o'zgaruvchini qidirganda:
 
 ### Nazariya
 
-Variable shadowing — ichki scope'dagi o'zgaruvchi tashqi scope'dagini **"yashirishi"**. Ichki scope'da bir xil nomli o'zgaruvchi yaratilsa, tashqi scope'dagi ko'rinmay qoladi.
+Variable shadowing — ichki scope'dagi o'zgaruvchi tashqi scope'dagini **"yashirishi"** (shadow qilishi). Ichki scope'da bir xil nomli o'zgaruvchi yaratilsa, tashqi scope'dagi o'zgaruvchi o'sha ichki scope uchun **ko'rinmay qoladi** — lekin yo'q bo'lmaydi, shunchaki vaqtinchalik "soyada" qoladi.
+
+Buni **nomlar** ga o'xshatish mumkin. Maktabda ikki xil "Islom" bo'lishi mumkin — sinfda "Islom" desangiz, shu sinfdagi Islom tushuniladi (ichki scope). Lekin maktab yo'lagida "Islom" desangiz, boshqa Islom tushunilishi mumkin (tashqi scope). Ichki "Islom" tashqini "yashiradi" — bu shadowing.
+
+Shadowing ba'zan ataylab qilinadi (masalan, funksiya ichida global o'zgaruvchi bilan bir xil nomli local o'zgaruvchi yaratish), lekin ko'pincha bu **xato manbayi**. Ayniqsa `var` bilan shadowing'da hoisting ham aralashsa, natija juda chalkash bo'lishi mumkin — bu ko'p intervyu savollarining asosi. ESLint ning `no-shadow` qoidasi aynan shu muammoni oldini olish uchun yaratilgan.
 
 ```javascript
 let name = "Global";
@@ -616,7 +644,9 @@ let y = 1;
 
 ### Nazariya
 
-Engine o'zgaruvchini topish uchun **scope chain bo'ylab qidiradi**. Bu jarayon aniq qoidalar bo'yicha ishlaydi:
+Engine o'zgaruvchini topish uchun **scope chain bo'ylab aniq algoritmga** asosan qidiradi. Bu jarayon Variable Lookup deb ataladi va u JavaScript'ning istalgan o'zgaruvchiga murojaat qilganida sodir bo'ladi.
+
+Lookup jarayoni doimo **joriy scope**'dan boshlanadi va **tashqariga** yo'naladi — hech qachon ichkariga emas. Birinchi topilgan qiymat ishlatiladi (shuning uchun shadowing ishlaydi). Agar global scope'gacha yetib ham topilmasa — strict mode'da `ReferenceError` tashlanadi, non-strict mode'da esa assignment bo'lsa **implicit global** yaratiladi (bu juda xavfli antipattern). Shu sababli doimo `"use strict"` yoki ES modules ishlatish tavsiya etiladi.
 
 ### Lookup Algoritmi
 

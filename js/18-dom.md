@@ -31,7 +31,7 @@
 
 DOM (Document Object Model) — brauzer HTML hujjatni parse qilib, undan yaratadigan **daraxt (tree) strukturasi**. Bu daraxtdagi har bir element, matn, komment — barchasi **node** deb ataladi. JavaScript orqali biz bu daraxtni o'qiymiz, o'zgartiramiz, yangi elementlar qo'shamiz, eskilarini o'chiramiz.
 
-DOM **HTML ning o'zi emas**. HTML — bu matn fayl, DOM — bu brauzer xotirasidagi tirik (live) obyekt. Brauzer HTML ni parse qilib DOM yaratadi, keyin JavaScript va CSS shu DOM bilan ishlaydi.
+DOM **HTML ning o'zi emas** — HTML bu matn fayl, DOM esa brauzer xotirasidagi tirik (live) obyekt. Brauzer HTML ni parse qilib DOM yaratadi, keyin JavaScript va CSS shu DOM bilan ishlaydi. Parse jarayoni **incremental** — brauzer hujjatni to'liq kutmaydi, kelgan qismlari bilan DOM qurishni boshlaydi. Rendering pipeline: `HTML → Parser → DOM Tree → Render Tree → Layout → Paint → Screen`. Bu pipeline'ning har bir bosqichini tushunish DOM manipulation performance'ini optimallashtirish uchun muhim.
 
 ```
 HTML Source Code → Parser → DOM Tree → Render Tree → Layout → Paint → Screen
@@ -85,7 +85,7 @@ document.body.style.background = "lightblue"; // sahifa rangi o'zgardi
 
 ### Nazariya
 
-DOM daraxtidagi har bir element — **node**. Har bir node ning turi (type) bor va har biri boshqacha xususiyatlarga ega.
+DOM daraxtidagi har bir element — **node**. Har bir node ning turi (type) va nodeType raqami bor: Element (1), Text (3), Comment (8), Document (9), DocumentType (10), DocumentFragment (11). Barcha node'lar `Node` class'idan meros oladi, element'lar esa qo'shimcha `Element → HTMLElement → HTMLDivElement` kabi zanjirdan o'tadi. Muhim farq: `childNodes` barcha node'larni (text, comment ham) qaytaradi, `children` esa faqat element node'larni qaytaradi.
 
 ### Asosiy Node Turlari
 
@@ -156,10 +156,7 @@ console.log(div instanceof EventTarget);   // true
 
 ### Nazariya
 
-DOM traversal — daraxtdagi node'lar orasida harakatlanish. Ikki xil navigatsiya mavjud:
-
-1. **Node navigatsiyasi** — barcha node'lar (text, comment ham)
-2. **Element navigatsiyasi** — faqat element node'lar
+DOM traversal — daraxtdagi node'lar orasida harakatlanish. Ikki xil navigatsiya mavjud: **Node navigatsiyasi** (parentNode, childNodes, firstChild — barcha node'lar, text va comment ham) va **Element navigatsiyasi** (parentElement, children, firstElementChild — faqat element node'lar). Amalda deyarli doim element navigatsiyasi ishlatiladi, chunki text node'lar (whitespace, yangi qator) odatda kerak emas. `closest()` metodi o'zidan yuqoriga qarab CSS selector bo'yicha qidiradi (event delegation'da juda foydali), `matches()` esa element berilgan selector'ga mos kelishini tekshiradi.
 
 ### Node Navigatsiyasi vs Element Navigatsiyasi
 
@@ -240,7 +237,7 @@ document.addEventListener("click", (e) => {
 
 ### Nazariya
 
-DOM dan element tanlashning bir necha usuli bor. Zamonaviy JS da asosan `querySelector` va `querySelectorAll` ishlatiladi.
+DOM dan element tanlashning bir necha usuli bor. `getElementById` eng tez — brauzer ID lar uchun **hash map** yuritadi, lookup O(1). `querySelector`/`querySelectorAll` CSS selector bilan ishlaydi, lekin CSS parser'dan o'tgani uchun biroz sekinroq. Muhim farq: `getElementsByClassName`/`getElementsByTagName` **live** HTMLCollection qaytaradi (DOM o'zgarganda avtomatik yangilanadi), `querySelectorAll` esa **static** NodeList qaytaradi. Zamonaviy JS da asosan `querySelector` va `querySelectorAll` ishlatiladi — ular yetarli darajada tez va CSS selector kuchi bilan eng moslashuvchan.
 
 ### Usullar Jadvali
 
@@ -326,7 +323,7 @@ console.timeEnd("querySelector"); // ~5-15ms
 
 ### Nazariya
 
-DOM ga yangi element qo'shish — web dasturlarning asosiy vazifalaridan biri. Element yaratib, uni daraxtga qo'shishning bir necha usuli bor.
+DOM ga yangi element qo'shish — web dasturlarning asosiy vazifalaridan biri. `createElement()` bilan element yaratiladi, keyin `appendChild()`, `append()`, `prepend()`, `before()`, `after()`, `replaceWith()` kabi usullar bilan daraxtga qo'shiladi. `insertAdjacentHTML/Element/Text` esa 4 ta aniq pozitsiyani belgilash imkonini beradi (beforebegin, afterbegin, beforeend, afterend). Har safar DOM ga element qo'shilganda brauzer rendering pipeline'dan o'tadi (Style → Layout → Paint), shuning uchun ko'p elementni birma-bir qo'shish sekin — buning o'rniga `DocumentFragment` yoki batch usullar ishlatish kerak.
 
 ### Element Yaratish
 
@@ -457,7 +454,7 @@ Shuning uchun ko'p elementni birma-bir qo'shish — **sekin**. Buning o'rniga **
 
 ### Nazariya
 
-DOM dan element o'chirish ham bir necha usulda amalga oshiriladi. Zamonaviy `remove()` methodi eng qulay.
+DOM dan element o'chirish bir necha usulda amalga oshiriladi. Zamonaviy `remove()` metodi eng qulay — element o'zini o'zi DOM dan chiqaradi. Eski `removeChild()` esa parent orqali ishlaydi. Barcha bolalarni o'chirish uchun `replaceChildren()` (ES2020+), `innerHTML = ""`, yoki loop ishlatiladi. Muhim: o'chirilgan element JavaScript'da reference saqlansa xotirada qoladi (memory leak xavfi) — reference'ni `null` ga o'rnatish kerak.
 
 ### Kod Misollari
 
@@ -506,7 +503,7 @@ removed.remove(); // DOM dan chiqdi
 
 ### Nazariya
 
-Element ichidagi contentni o'zgartirishning 3 xil yo'li bor. Har birining farqi va xavfini tushunish muhim.
+Element ichidagi contentni o'zgartirishning 3 xil yo'li bor: `textContent` (barcha matn, yashirin ham, HTML parse qilmaydi, xavfsiz va tez), `innerHTML` (HTML content, parse qiladi, **XSS xavfi** bor — foydalanuvchi kiritgan ma'lumotni hech qachon innerHTML ga qo'ymang!), va `innerText` (faqat ko'rinadigan matn, display:none ni o'tkazib yuboradi, lekin layout hisoblashi kerak bo'lgani uchun sekin). `outerHTML` esa element'ning o'zini ham qamrab oladi. Xavfsizlik uchun foydalanuvchi inputi bilan doim `textContent` ishlatish, agar HTML kerak bo'lsa DOMPurify kabi sanitizer ishlatish kerak.
 
 ### `textContent` vs `innerHTML` vs `innerText`
 
@@ -577,7 +574,7 @@ el.outerHTML = "<section>Yangi element</section>";
 
 ### Nazariya
 
-HTML element'larning attribute'lari DOM orqali o'qiladi va o'zgartiriladi. Standart attribute'lar property sifatida ham mavjud, lekin umumiy usullar ham bor.
+HTML element'larning attribute'lari DOM orqali `getAttribute()`, `setAttribute()`, `hasAttribute()`, `removeAttribute()` usullari bilan boshqariladi. Muhim farq: **attribute** — HTML da yozilgan boshlang'ich qiymat, **property** — DOM object dagi hozirgi amaliy qiymat (masalan, input'ga yozilgan matn property'ni o'zgartiradi, lekin attribute o'zgarmaydi). Custom ma'lumotlar uchun `data-*` attribute'lar va `dataset` API ishlatiladi — `data-user-id` → `element.dataset.userId` (camelCase). Dataset qiymatlari doim **string** qaytaradi, shuning uchun raqam uchun `Number()` konversiya kerak.
 
 ### Standart Attribute Usullari
 
@@ -671,7 +668,7 @@ const userId = Number(card.dataset.userId); // 42
 
 ### Nazariya
 
-Element'larning CSS class'larini boshqarish uchun `classList` API ishlatiladi. Bu `className` property'siga qaraganda ancha qulay va xavfsiz.
+Element'larning CSS class'larini boshqarish uchun `classList` API ishlatiladi — bu eski `className` (butun string bilan ishlaydi, oldingi class'larni o'chirishi mumkin) ga qaraganda ancha qulay va xavfsiz. `classList` ning asosiy usullari: `add()` (bir yoki ko'p class qo'shish), `remove()` (o'chirish), `toggle()` (bor bo'lsa o'chiradi/yo'q bo'lsa qo'shadi, force parametri ham bor), `contains()` (borligini tekshirish), `replace()` (almashtirish). `classList` iterable va `forEach()` qo'llab-quvvatlaydi.
 
 ### Kod Misollari
 
@@ -745,7 +742,7 @@ if (savedTheme === "dark") {
 
 ### Nazariya
 
-Element'larning CSS stillarini JavaScript orqali ikki usulda boshqarish mumkin: **inline styles** (to'g'ridan-to'g'ri) va **computed styles** (hisoblangan).
+Element'larning CSS stillarini JavaScript orqali ikki usulda boshqarish mumkin: **inline styles** (`element.style.propertyName` — yozish va o'qish, faqat inline stil ko'rsatadi) va **computed styles** (`getComputedStyle(element)` — faqat o'qish, haqiqiy hisoblangan qiymatlarni ko'rsatadi, CSS fayldan, meros, va boshqa manbalardan). Inline style property nomlari camelCase ishlatadi (`background-color` → `backgroundColor`). CSS custom properties (o'zgaruvchilar) uchun `setProperty()`/`getPropertyValue()` usullari kerak. Muhim: `transform` va `opacity` GPU'da ishlanadi — ular reflow/repaint trigger qilmaydi.
 
 ### Inline Styles
 
@@ -815,10 +812,7 @@ console.log(getComputedStyle(div).color);    // "rgb(255, 0, 0)" — CSS dan
 
 ### Nazariya
 
-DOM o'zgartirishlar brauzer rendering pipeline'iga ta'sir qiladi. Ikki asosiy tushuncha bor:
-
-- **Reflow (Layout)** — element'larning o'lchami yoki pozitsiyasi qayta hisoblanadi. **Qimmat** operatsiya.
-- **Repaint** — element'larning ko'rinishi (rang, shadow) qayta chiziladi. Reflow dan **arzonroq**.
+DOM o'zgartirishlar brauzer rendering pipeline'iga ta'sir qiladi. **Reflow (Layout)** — element'larning o'lchami yoki pozitsiyasi qayta hisoblanadi (qimmat operatsiya, butun sahifaga ta'sir qilishi mumkin). **Repaint** — element'larning ko'rinishi (rang, shadow) qayta chiziladi (reflow dan arzonroq). Eng katta muammo — **Layout Thrashing**: loop ichida DOM o'qish va yozishni almashtirish har safar yangi reflow trigger qiladi. Yechim: avval hammasini o'qish, keyin hammasini yozish, yoki `classList` orqali CSS class o'zgartirish (bitta reflow), yoki `requestAnimationFrame` ishlatish.
 
 ### Rendering Pipeline
 
@@ -931,7 +925,7 @@ element.style.opacity = "0.5";                  // Paint ta'sir qilmaydi
 
 ### Nazariya
 
-`DocumentFragment` — bu **yengil, virtual DOM container**. U haqiqiy DOM ning bir qismi emas, shuning uchun unga element qo'shish **reflow trigger qilmaydi**. Barcha elementlarni fragment ga yig'ib, keyin bir marta DOM ga qo'shish — samarali usul.
+`DocumentFragment` — **yengil, virtual DOM container** bo'lib, u haqiqiy DOM ning bir qismi emas. Unga element qo'shish **reflow trigger qilmaydi**, chunki u render tree'da ishtirok etmaydi. Barcha elementlarni fragment ga yig'ib, keyin bir marta DOM ga qo'shish — ko'p element qo'shishning eng samarali usuli. Fragment DOM ga qo'shilganda, u "eritiladi" — faqat bolalari qo'shiladi, fragment o'zi yo'qoladi.
 
 ### Kod Misollari
 
@@ -1027,7 +1021,7 @@ const clone = template.content.cloneNode(true); // DocumentFragment
 
 ### Nazariya
 
-Virtual DOM — bu DOM ning **JavaScript object** sifatidagi engil nusxasi. React, Vue kabi framework'lar ishlatadi. Maqsad: DOM operatsiyalarini minimallashtirib, performance ni oshirish.
+Virtual DOM — bu haqiqiy DOM ning **JavaScript object** sifatidagi engil nusxasi. React, Vue kabi framework'lar ishlatadi — maqsad: DOM operatsiyalarini minimallashtirib, performance ni oshirish. Ishlash prinsipi: state o'zgarganda yangi Virtual DOM yaratiladi, oldingi versiya bilan **diffing** (taqqoslash) algoritmi orqali farqlar aniqlanadi, va faqat o'zgargan qismlar haqiqiy DOM ga qo'llaniladi (**reconciliation/patching**). Bu yondashuv developer'larga declarative UI yozish imkonini beradi ("UI qanday ko'rinishi kerak" ni tasvirlaysiz), framework esa optimal DOM update'larni o'zi boshqaradi.
 
 ### Nima Uchun Kerak?
 

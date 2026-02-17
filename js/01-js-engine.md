@@ -26,9 +26,15 @@
 
 ### Nazariya
 
-JavaScript engine — bu JavaScript kodini olib, uni mashina tushunadigan instruksiyalarga aylantirib, bajaradigan dastur. Browserlar va Node.js ning ichida aynan shu engine ishlaydi.
+JavaScript engine — bu JavaScript kodini qabul qilib, uni mashina tushunadigan past darajadagi instruksiyalarga aylantiradigan va bajaradigan maxsus dastur. Har bir brauzer va server-side muhit (Node.js, Deno, Bun) ning ichida aynan shu engine ishlaydi.
 
-Oddiy qilib aytganda: biz `.js` faylga yozgan kodimizni kompyuter tushunmaydi. Engine bu kodini o'qiydi, tahlil qiladi, optimizatsiya qiladi va bajaradi.
+Nima uchun engine kerak? Kompyuter protsessori (CPU) faqat **machine code** — ikkilik sanoq sistemasidagi instruksiyalar (0 va 1) ni tushunadi. Biz yozgan `let x = 5` kabi ifodalar CPU uchun umuman ma'nosiz matn. Engine aynan shu bo'shliqni to'ldiradi: u bizning o'qish uchun qulay bo'lgan yuqori darajadagi kodni CPU bajara oladigan past darajadagi instruksiyalarga aylantiradi.
+
+Bu jarayonni **tarjimon**ga o'xshatish mumkin. Tasavvur qiling, siz o'zbek tilida gaplashyapsiz, lekin qarshingizda faqat mashina tilini tushunadigan kompyuter bor. Engine — bu ikki tomon o'rtasidagi professional tarjimon bo'lib, u nafaqat tarjima qiladi, balki matnni **optimizatsiya** ham qiladi — tez-tez takrorlanadigan iboralarni yodlab, keyingi safar tezroq tarjima qiladi.
+
+Zamonaviy enginelar oddiy tarjimondan ancha murakkab. Ular kodni tahlil qiladi (parsing), oraliq ko'rinishga aylantiradi (bytecode), profiling orqali "issiq" (ko'p ishlatiladigan) kod qismlarini aniqlaydi va ularni yuqori samarali mashina kodiga compile qiladi. Bu ko'p bosqichli jarayon engine'larga bir vaqtning o'zida ham tezkor ishga tushishni (cold start), ham yuqori bajarish tezligini (peak performance) ta'minlash imkonini beradi.
+
+Real-world kontekstda engine nafaqat brauzer ichida ishlaydi. Node.js orqali server-side dasturlash, Electron orqali desktop ilovalar, React Native orqali mobil ilovalar — bularning barchasi ichida JavaScript engine turadi. Shuning uchun engine qanday ishlashini tushunish — bu nafaqat akademik bilim, balki production koddagi performance muammolarini tushunish va hal qilish uchun zaruriy ko'nikma.
 
 ### Asosiy Enginelar
 
@@ -80,7 +86,11 @@ Har bir engine o'zining interpreter va compiler nomlariga ega:
 
 ### Nazariya
 
-Biz `console.log("salom")` deb yozganda, engine buni bir necha bosqichdan o'tkazadi:
+Biz `console.log("salom")` deb yozganda, bu oddiy ko'rinadigan qator aslida engine ichida bir necha murakkab bosqichdan o'tadi. Har bir bosqich o'z vazifasini bajaradi va natijani keyingi bosqichga uzatadi — xuddi zavod konveyeridek.
+
+Nima uchun bu qadar murakkab? Chunki inson uchun tushunarli bo'lgan `let x = 5` ifodasi CPU uchun hech qanday ma'no anglatmaydi. CPU faqat registrlar bilan ishlaydi, xotira manzillarini tushunadi va arifmetik operatsiyalar bajaradi. Engine bu ikki dunyo o'rtasidagi ko'prikdir.
+
+Dastlabki JavaScript enginelar (masalan, Netscape dagi birinchi interpreter) kodni to'g'ridan-to'g'ri satr-bosatr interpretatsiya qilardi. Bu yondashuv tez ishga tushardi, lekin bajarish juda sekin edi. Zamonaviy enginelar esa **ko'p bosqichli pipeline** arxitekturasidan foydalanadi: avval kodni tez ishga tushirish uchun bytecode ga aylantiradi, keyin ko'p ishlatiladigan qismlarni optimallashtirilgan mashina kodiga compile qiladi. Bu yondashuv **"tez boshla, vaqt o'tishi bilan tezlash"** strategiyasi deb ataladi va bugungi kunda barcha zamonaviy enginelar shu prinsipda ishlaydi:
 
 ```
 Source Code → Tokenizing → Parsing → AST → Bytecode → (Optimization) → Machine Code
@@ -126,7 +136,11 @@ Bu **lazy compilation** deyiladi — V8 hamma narsani birdaniga compile qilmaydi
 
 ### Nazariya
 
-Source code — bu aslida oddiy matn (string). Engine buni tushunishi uchun avval **parchalashi** kerak.
+Source code — bu aslida kompyuter uchun hech qanday ma'no anglatmaydigan oddiy matn (string). `let name = "Islom";` qatori inson ko'zi uchun tushunarli bo'lsa-da, engine uchun bu shunchaki belgilar ketma-ketligi. Engine buni tushunishi uchun avval matnni **strukturalangan shaklga** aylantirishi kerak — xuddi inson gapni o'qiganda avval so'zlarni ajratib, keyin grammatik tuzilmani tahlil qilganidek.
+
+Bu jarayonni **tabiiy tilni tahlil qilish**ga o'xshatish mumkin. "Men maktabga bordim" gapini tushunish uchun avval so'zlarni ajratamiz ("Men", "maktabga", "bordim"), keyin grammatik tuzilmani aniqlaymiz (ega, to'ldiruvchi, kesim). Engine ham xuddi shunday qiladi — avval kodni token'larga (so'zlarga) ajratadi, keyin ulardan grammatik daraxt (AST) quradi.
+
+Agar bu bosqich bo'lmaganida, engine har bir belgi bilan alohida-alohida ishlashi kerak bo'lardi — bu nafaqat sekin, balki murakkab ifodalarni tushunish ham imkonsiz bo'lardi. Masalan, `let` ni keyword sifatida, `name` ni identifier sifatida, `=` ni operator sifatida ajratib olish — bu tokenizer'ning ishi. Keyin parser bu token'larni semantik tuzilmaga — **Abstract Syntax Tree** ga aylantiradi.
 
 Bu ikki bosqichda sodir bo'ladi:
 
@@ -205,7 +219,11 @@ Nima uchun lazy parsing? Chunki odatiy web sahifadagi JS kodining **~30-50%** he
 
 ### Nazariya
 
-AST — bu kodning **daraxt ko'rinishidagi** tuzilmasi. "Abstract" deyilishiga sabab — keraksiz narsalar (bo'sh joylar, nuqtali vergullar, qavslar) olib tashlanadi, faqat **ma'no** qoladi.
+AST (Abstract Syntax Tree) — bu kodning ierarxik **daraxt ko'rinishidagi** tuzilmasi bo'lib, dasturning mantiqiy strukturasini ifodalaydi. "Abstract" deyilishiga sabab — source code dagi sintaktik bezaklar (bo'sh joylar, nuqtali vergullar, ortiqcha qavslar) olib tashlanadi va faqat **semantik ma'no** — dasturning asl maqsadi qoladi.
+
+Nima uchun AST kerak? Tasavvur qiling, siz uy qurishni rejalashtirmoqchisiz. Arxitektor chizmani (source code) olib, undan 3D model (AST) quradi. Bu modelda devorlarning rangi yoki bezak elementlari yo'q — faqat tarkibiy tuzilma: qayerda devor turadi, qayerda eshik bor, qayerga oyna qo'yiladi. Xuddi shunday, AST koddan faqat tuzilmaviy ma'lumotni ajratib oladi: qayerda o'zgaruvchi e'lon qilingan, qanday operatsiya bajariladi, qaysi funksiyalar chaqiriladi.
+
+AST butun JavaScript ekotizimining **poydevori** hisoblanadi. Engine AST dan bytecode hosil qiladi, lekin undan tashqari — Babel, ESLint, Prettier, TypeScript, Webpack kabi toollarning barchasi AST ustida ishlaydi. Masalan, Babel ES6+ kodning AST ini olib, uni ES5 ga mos AST ga aylantiradi va qaytadan kod generatsiya qiladi. ESLint esa AST ni tekshirib, potensial xatolarni topadi. Shuning uchun AST ni tushunish — bu nafaqat engine ichki mexanizmini bilish, balki zamonaviy JavaScript toolchain ini to'liq tushunish demakdir.
 
 ### Kod Misoli
 
@@ -270,11 +288,13 @@ Shuning uchun AST ni tushunish — bu faqat engine bilimi emas, balki butun JS e
 
 ### Nazariya
 
-Dasturlash tillarini bajarish uchun ikkita asosiy yondashuv bor:
+Dasturlash tillari yaratilganidan beri ularni bajarish uchun ikkita fundamental yondashuv mavjud — interpretation va compilation. Bu ikki yondashuv o'rtasidagi farqni tushunish JavaScript engine'ning nima uchun aynan JIT (Just-In-Time) compilation strategiyasini tanlaganini anglash uchun muhim.
 
-**Interpreter** — kodni satr-bosatr o'qiydi va darhol bajaradi. Tarjimonga o'xshaydi — har bir gapni birma-bir tarjima qiladi.
+**Interpreter** — kodni satr-bosatr o'qiydi va darhol bajaradi. Buni **sinxron tarjimon**ga o'xshatish mumkin: notiq gapni aytadi, tarjimon darhol tarjima qiladi, keyin keyingi gap. Dastur darhol ishga tushadi (chunki kutish kerak emas), lekin bajarish jarayoni sekin bo'ladi, chunki har bir satr qayta-qayta interpretatsiya qilinadi. Dastlabki JavaScript enginelar (1995-yillarda Brendan Eich yaratgan birinchi engine) aynan shu usulda ishlagan.
 
-**Compiler** — butun kodni oldindan mashina tiliga aylantiradi, keyin bajaradi. Kitob tarjimasiga o'xshaydi — avval butun kitob tarjima qilinadi, keyin o'qiladi.
+**Compiler** — butun kodni oldindan mashina tiliga aylantiradi, keyin bajaradi. Buni **kitob tarjimasi**ga o'xshatish mumkin: avval butun kitob to'liq tarjima qilinadi, keyin o'qiladi. Boshlash uzoq davom etadi (chunki avval hamma narsa compile bo'lishi kerak), lekin bajarilish juda tez, chunki natijada hosil bo'lgan mashina kodi to'g'ridan-to'g'ri CPU da ishlaydi. C, C++, Rust, Go kabi tillar compile qilinadi.
+
+JavaScript web uchun yaratilgan til — foydalanuvchi sahifani ochganda kod **darhol** ishga tushishi kerak. Shuning uchun faqat compiler ishlatish mumkin emas (foydalanuvchi butun kod compile bo'lguncha kutib tura olmaydi). Lekin faqat interpreter ham samarasiz — zamonaviy web ilovalar (Gmail, Google Maps, VS Code) juda murakkab va sekin interpretatsiya foydalanuvchi tajribasini buzadi. Aynan shu muammo uchun **JIT Compilation** ixtiro qilindi — bu ikki yondashuvning eng yaxshi tomonlarini birlashtirgan inqilobiy yechim.
 
 ### Taqqoslash
 
@@ -308,12 +328,16 @@ Kod → Bajir                       (kutish...)            Optimize → Machine 
 
 ### Nazariya
 
-JIT — **Just-In-Time** Compilation. Bu degani kod **kerak bo'lganda, shu joyda** compile qilinadi. V8 engine aynan shu usulda ishlaydi.
+JIT — **Just-In-Time** Compilation — bu zamonaviy JavaScript engine'larning eng muhim innovatsiyasi. "Just-In-Time" — ya'ni "aynan kerak bo'lgan paytda" compile qilish degani. Kod oldindan butunlay compile qilinmaydi, balki dastur ishlayotgan paytda, kerak bo'lgan qismlar kerak bo'lgan vaqtda mashina kodiga aylantiriladi.
 
-V8 ning ikki asosiy komponenti:
+Bu yondashuv 2008-yilda Google V8 engine bilan keng ommaga tarqaldi. Ungacha JavaScript enginelar asosan interpretatorlar edi va juda sekin ishlardi. V8 ning JIT compilation bilan paydo bo'lishi JavaScript ning tezligini **10-100 marta** oshirdi va bugungi kunda biz bilgan murakkab web ilovalar (Google Maps, Gmail, VS Code Web) ning paydo bo'lishiga zamin yaratdi.
 
-1. **Ignition** — Interpreter. AST ni **bytecode** ga aylantiradi va bajaradi.
-2. **TurboFan** — Optimizing Compiler. "Hot" (ko'p ishlatiladigan) kodni **machine code** ga aylantiradi.
+JIT ning asosiy g'oyasi **"kuzatib bor va optimizatsiya qil"** strategiyasiga asoslanadi. Engine avval kodni tez ishga tushirish uchun bytecode ga aylantiradi (bu tez jarayon), keyin dastur ishlayotgan paytda qaysi funksiyalar ko'p chaqirilayotganini kuzatadi (profiling). Ko'p chaqiriladigan "issiq" (hot) funksiyalarni engine yuqori samarali mashina kodiga compile qiladi. Bu xuddi **restoran oshpazi**ga o'xshaydi: avval barcha buyurtmalarni oddiy tarzda tayyorlaydi, lekin eng ko'p buyurtiladigan taomning retseptini yodlab oladi va uni tezroq tayyorlashni o'rganadi.
+
+V8 ning ikki asosiy komponenti bu jarayonni amalga oshiradi:
+
+1. **Ignition** — Interpreter. AST ni **bytecode** ga aylantiradi va darhol bajaradi. Shu bilan birga, har bir funksiya haqida **type feedback** (ma'lumot turlari statistikasi) to'playdi — qanday argumentlar keladi, qanday natijalar qaytadi.
+2. **TurboFan** — Optimizing Compiler. Ignition to'plagan feedback ma'lumotlari asosida "hot" (ko'p ishlatiladigan) kodni yuqori darajada optimallashtirilgan **machine code** ga aylantiradi. Bu mashina kodi to'g'ridan-to'g'ri CPU registrlari bilan ishlaydi va C/C++ ga yaqin tezlikda bajariladi.
 
 ### V8 Pipeline Diagramma
 
@@ -398,7 +422,11 @@ add(100, 200); // TurboFan optimized machine code
 
 ### Nazariya
 
-TurboFan kodni optimize qilayotganda **taxmin** (assumption) qiladi. Masalan: "bu funksiya doim number qabul qiladi". Agar taxmin buzilsa — **deoptimization** sodir bo'ladi.
+Optimization va deoptimization — V8 engine'ning eng muhim va amaliy jihatdan eng ko'p ta'sir qiladigan mexanizmi. Bu tushunchalarni bilish sizning JavaScript kodingiziing production da qanchalik tez ishlashiga bevosita ta'sir qiladi.
+
+TurboFan kodni optimize qilayotganda u **speculative optimization** — ya'ni **taxminga asoslangan optimizatsiya** strategiyasini qo'llaydi. Engine Ignition orqali to'plangan profiling ma'lumotlariga asoslanib taxminlar qiladi: "bu funksiya doim `number` tipidagi argumentlar qabul qiladi", "bu property doim mavjud", "bu shart doim `true` bo'ladi". Keyin engine shu taxminlarga asoslanib maksimal darajada optimallashtirilgan mashina kodini hosil qiladi — gereksiz tip tekshiruvlarini olib tashlaydi, xotira manzillarini oldindan hisoblaydi, hatto butun funksiya chaqiruvlarini inline qiladi.
+
+Lekin hayotda taxminlar buzilishi mumkin. Masalan, 10 000 marta `number` qabul qilgan funksiyaga birdan `string` berilsa — TurboFan hosil qilgan optimallashtirilgan mashina kodi noto'g'ri natija berishi mumkin. Bunday hollarda engine **deoptimization** — ya'ni optimizatsiyani bekor qilish jarayonini boshlaydi: mashina kodini tashlab, qayta bytecode ga qaytadi va Ignition orqali qayta bajaradi. Bu jarayon qimmat — vaqt va resurs talab qiladi. Shuning uchun professional JavaScript dasturchilari o'z kodlarini V8 uchun "do'stona" qilib yozadilar — ya'ni tiplarni barqaror (monomorphic) saqlaydilar va deoptimizatsiyaga sabab bo'ladigan patternlardan qochadilar.
 
 ### Optimization Misol
 
@@ -509,9 +537,13 @@ C0 {} ──→ C1 {name} ──→ C2     C0 {} ──→ C3 {age} ──→ C4
 
 ### Nazariya
 
-Call Stack — bu engine **funksiya chaqiruvlarini kuzatib boradigan** ma'lumot tuzilmasi. U **LIFO** (Last In, First Out) prinsipi bilan ishlaydi — oxirgi kirgan birinchi chiqadi.
+Call Stack — bu engine'ning **funksiya chaqiruvlarini kuzatib borish va boshqarish** uchun ishlatiladigan asosiy ma'lumot tuzilmasi. U **LIFO** (Last In, First Out) — ya'ni "oxirgi kirgan birinchi chiqadi" prinsipi bilan ishlaydi.
 
-Har safar funksiya chaqirilganda, engine yangi **Execution Context** yaratib, stack ning tepasiga qo'yadi. Funksiya tugaganda — o'sha context stack dan olib tashlanadi.
+Call Stack ni **kitoblar ustma-ust qo'yilgan ustun**ga o'xshatish mumkin. Yangi kitob faqat tepaga qo'yiladi, olish ham faqat tepadan mumkin. Xuddi shunday, yangi funksiya chaqirilganda uning Execution Context stack'ning tepasiga qo'yiladi, funksiya tugaganda esa tepadan olib tashlanadi.
+
+Call Stack nima uchun muhim? JavaScript **single-threaded** til — ya'ni bir vaqtda faqat bitta ish bajara oladi. Call Stack aynan shu "bitta ish" ni boshqaradi: engine doimo stack'ning eng **tepasidagi** funksiyani bajaradi. Agar funksiya A ichida funksiya B chaqirilsa, B A ning tepasiga qo'yiladi va engine B ni bajarishga o'tadi. B tugaganda stack'dan chiqariladi va engine A ni davom ettiradi.
+
+Amaliy jihatdan Call Stack ikki muhim chegaraga ega. Birinchisi — stack hajmi cheklangan (odatda 10 000–25 000 frame). Agar funksiya cheksiz o'zini chaqirsa (rekursiya to'xtash shartisiz), stack to'lib ketadi va **Stack Overflow** xatosi yuz beradi. Ikkinchisi — bitta uzoq davom etadigan funksiya butun stack'ni band qiladi va boshqa hech narsa bajara olmaydi. Brauzerda bu UI ni "muzlatib" qo'yadi — foydalanuvchi hech narsani bosa olmaydi. Shuning uchun og'ir hisob-kitoblarni asinxron qilish yoki Web Worker'larga o'tkazish muhim — bu haqida [11-event-loop.md](11-event-loop.md) da batafsil gaplashamiz.
 
 ### Vizualizatsiya
 
@@ -625,9 +657,13 @@ Call Stack aslida **Execution Context Stack** deb ham ataladi. Har bir "frame" a
 
 ### Nazariya
 
-Memory Heap — bu engine ning **unstructured (tartibsiz) xotira sohasi**. Bu yerda object'lar, array'lar, funksiyalar va boshqa murakkab (reference type) ma'lumotlar saqlanadi.
+Memory Heap — bu engine'ning **tartibsiz (unstructured) xotira sohasi** bo'lib, bu yerda ob'ektlar, massivlar, funksiyalar va boshqa murakkab (reference type) ma'lumotlar saqlanadi. Stack bilan birga u JavaScript xotira boshqaruvining ikki asosiy tarkibiy qismidan birini tashkil qiladi.
 
-Stack dan farqi — heap da ma'lumotlar **tartibsiz** joylashadi. Engine o'zi xotira ajratadi va kerak bo'lmaganda **Garbage Collector** orqali tozalaydi.
+Stack va Heap ning farqini tushunish uchun **shkaf va ombor** analogiyasini olaylik. Stack — bu kichik, tartibli shkaf: har bir javon aniq belgilangan, narsalarni tez topish va qo'yish mumkin, lekin sig'imi cheklangan. Heap esa — katta ombor: ko'p narsa sig'adi, lekin narsalar tartibsiz joylashadi va biror narsani topish uchun manzil (reference) kerak.
+
+Nima uchun heap kerak? Primitive qiymatlar (number, boolean, string) hajmi oldindan ma'lum va kichik — ular stack da saqlash uchun ideal. Lekin ob'ektlar, massivlar, funksiyalar — bularning hajmi oldindan noma'lum va dinamik o'zgarishi mumkin. Masalan, massivga yangi element qo'shsangiz, u o'sadi. Ob'ektga yangi property qo'shsangiz, u kengayadi. Bunday dinamik ma'lumotlar uchun **heap** — ya'ni katta, moslashuvchan xotira hududi kerak.
+
+Heap da ma'lumotlar stack'dagi kabi avtomatik tozalanmaydi. Funksiya tugaganda stack frame yo'qoladi va undagi barcha primitive qiymatlar bilan birga ketadi. Lekin heap dagi ob'ektlar funksiya tugagandan keyin ham yashashi mumkin (masalan, boshqa o'zgaruvchi ularga reference qilayotgan bo'lsa). Shuning uchun heap da ishlatilmagan ma'lumotlarni tozalash uchun maxsus mexanizm — **Garbage Collector** kerak. V8 ning Garbage Collector'i murakkab algoritmlar (Mark-and-Sweep, Generational GC) yordamida ishlatilmagan ob'ektlarni aniqlaydi va xotirani bo'shatadi. Bu haqida batafsil [16-memory.md](16-memory.md) da gaplashamiz.
 
 ### Nima Qayerda Saqlanadi
 

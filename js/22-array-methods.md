@@ -26,7 +26,7 @@
 
 ### Nazariya
 
-`map()` — har bir element uchun funksiya chaqirib, **yangi array** qaytaradi. Original array o'zgarmaydi.
+`map()` — har bir element uchun callback funksiya chaqirib, **yangi array** qaytaradi. Original array o'zgarmaydi (immutable). Callback 3 ta argument oladi: element, index, va array o'zi. `map` doim yangi array qaytarishi kerak — side effect uchun ishlatmang (`forEach` ishlatish kerak). Sparse array'da bo'sh joylarni o'tkazib yuboradi.
 
 ### Kod Misollari
 
@@ -86,7 +86,7 @@ Array.prototype.myMap = function(callback) {
 
 ### Nazariya
 
-`filter()` — callback `true` qaytargan elementlardan **yangi array** hosil qiladi. Original o'zgarmaydi.
+`filter()` — callback `true` qaytargan elementlardan **yangi array** hosil qiladi, original o'zgarmaydi. Agar hech bir element mos kelmasa, bo'sh array `[]` qaytaradi. `Boolean` konstruktorini callback sifatida berib falsy qiymatlarni olib tashlash mumkin (`.filter(Boolean)`), lekin 0 va "" kabi qiymatlar ham ketadi — aniq shart yozish tavsiya etiladi.
 
 ### Kod Misollari
 
@@ -131,7 +131,7 @@ const truthy = mixed.filter(Boolean);
 
 ### Nazariya
 
-`reduce()` — array ni **bitta qiymatga** kamaytiradi (number, string, object, array — har qanday narsa). Eng kuchli va universal array metodi.
+`reduce()` — array ni **bitta qiymatga** kamaytiradi (number, string, object, array — har qanday narsa). Eng kuchli va universal array metodi. `accumulator` va `currentValue` parametrlari bilan ishlaydi. **Doim** `initialValue` bering — bo'sh array'da berilmasa `TypeError` chiqadi. Amaliy qo'llanilishi: yig'indi, hisoblash (counting), guruhlash (grouping), flatten, pipeline (funksiya zanjiri). Murakkab hollarda `map` + `filter` kombinatsiyasi o'qiluvchanroq bo'lishi mumkin.
 
 ### Kod Misollari
 
@@ -235,7 +235,7 @@ Array.prototype.myReduce = function(callback, initialValue) {
 
 ### Nazariya
 
-`forEach()` — har bir element ustida funksiya bajaradi. **Hech narsa qaytarmaydi** (`undefined`). Faqat side effect lar uchun.
+`forEach()` — har bir element ustida funksiya bajaradi, **hech narsa qaytarmaydi** (`undefined`). Faqat side effect'lar uchun (console.log, DOM manipulation, API chaqirish). `map` dan farqi: natija qaytarmaydi. Muhim cheklov: `forEach` ni `break` yoki `return` bilan **to'xtatib bo'lmaydi** — `return` faqat joriy iteratsiyani o'tkazadi. To'xtatish kerak bo'lsa `for...of` yoki oddiy `for` loop ishlatish kerak.
 
 ### Kod Misollari
 
@@ -362,7 +362,7 @@ const hasVerified = users.some(u => u.verified);  // true
 
 ### Nazariya
 
-`flat()` — nested array larni tekislash. `flatMap()` — map + flat(1) birga.
+`flat(depth)` — nested array'larni berilgan chuqurlikka qadar tekislaydi (default 1, `Infinity` — to'liq tekislash). Sparse array'dagi bo'sh joylarni ham olib tashlaydi. `flatMap(callback)` — `map` + `flat(1)` bitta operatsiyada, ya'ni callback har bir element uchun array qaytarsa, natija 1 daraja tekislanadi. `flatMap` filter + transform ni bitta qadamda qilish uchun qulay: bo'sh array `[]` qaytarib elementni o'tkazib yuborish, ko'p elementli array qaytarib kengaytirish mumkin.
 
 ### Kod Misollari
 
@@ -412,7 +412,7 @@ numbers.flatMap(n => n % 2 === 0 ? [n, n * 10] : []);
 
 ### Nazariya
 
-`sort()` — array elementlarini joyida tartiblaydi. ⚠️ **Original array ni o'zgartiradi!** Default holatda string sifatida tartiblaydi.
+`sort()` — array elementlarini **joyida** tartiblaydi (original array o'zgaradi — mutating!). Default holatda elementlarni `String()` bilan string'ga aylantirib, Unicode code point bo'yicha solishtiradi — shuning uchun sonlar uchun **doim** comparator funksiya berilishi kerak: `(a, b) => a - b`. Comparator `< 0` qaytarsa a birinchi, `> 0` qaytarsa b birinchi. ES2019 dan beri barcha brauzerlar **stable sort** qiladi (teng elementlarning original tartibi saqlanadi). ES2023 da `toSorted()` — immutable variant qo'shildi.
 
 ### Muammolar
 
@@ -509,7 +509,7 @@ items.sort((a, b) => a.priority - b.priority);
 
 ### Nazariya
 
-Mutating method'lar (sort, reverse, splice, push, pop) original array ni o'zgartiradi. Immutable pattern'lar yangi array qaytaradi.
+Mutating method'lar (`sort`, `reverse`, `splice`, `push`, `pop`, `shift`, `unshift`, `fill`, `copyWithin`) original array'ni o'zgartiradi. Immutable (non-mutating) method'lar (`map`, `filter`, `reduce`, `concat`, `slice`, `flat`, `flatMap`) yangi array qaytaradi. ES2023 da mutating method'larning immutable variantlari qo'shildi: `toSorted()`, `toReversed()`, `toSpliced()`, `with()`. Eski kodda `[...arr].sort()` pattern bilan immutability ta'minlanardi.
 
 ### Mutating vs Non-Mutating
 
@@ -582,7 +582,7 @@ const updated = arr.map((val, i) => i === 2 ? 99 : val);
 
 ### Nazariya
 
-Array method'larni zanjir qilib, murakkab operatsiyalarni o'qiluvchan qilish mumkin.
+Array method'larni zanjir qilib (chaining), murakkab data transformation operatsiyalarini o'qiluvchan va deklarativ tarzda yozish mumkin. Har bir method yangi array qaytarganligi uchun keyingi methodni to'g'ridan-to'g'ri chaqirish mumkin: `.filter(...).map(...).reduce(...)`. Chaining o'qiluvchanlik va debugging qulayligi beradi, lekin juda uzun zanjirlarni intermediate o'zgaruvchilarga ajratish tavsiya etiladi.
 
 ### Kod Misollari
 

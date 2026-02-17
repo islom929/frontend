@@ -26,9 +26,9 @@
 
 ### Nazariya
 
-JavaScript single-threaded til. Network request, file o'qish, timer — bularning hammasi **asinxron**. ES6 dan oldin asinxron operatsiyalarni boshqarishning yagona usuli **callback** edi.
+JavaScript single-threaded til bo'lgani uchun, network request, file o'qish, timer kabi operatsiyalar **asinxron** bajariladi. ES6 dan oldin asinxron operatsiyalarni boshqarishning yagona usuli **callback** edi. Bitta operatsiya uchun callback yaxshi ishlaydi, lekin real-world da operatsiyalar bir-biriga **bog'liq** bo'lganda (birinchisining natijasi ikkinchisiga kerak) — nested callback'lar "Pyramid of Doom" hosil qiladi.
 
-Oddiy callback ishlaydi:
+Callback Hell ning 4 ta asosiy muammosi bor: vizual o'qilmaslik (har bir daraja o'ngga suradi), error handling nightmare (har bir callback uchun alohida handler), **Inversion of Control** (biz boshqaruvni uchinchi tomon kodga berib yuboramiz — u callback'ni necha marta chaqirishini bilmaymiz), va composability yo'qligi (callback'larni birlashtirish, parallel qilish qiyin). Promise aynan shu muammolarni hal qilish uchun ES6 da kiritilgan.
 
 ```javascript
 // Bitta asinxron operatsiya — muammo yo'q
@@ -114,11 +114,9 @@ Promise bu muammolarni yechadi — **biz** natijani boshqaramiz, boshqa funksiya
 
 ### Nazariya
 
-Promise — **kelajakdagi qiymatni ifodalovchi object**. U hozir mavjud bo'lmagan, lekin kelajakda tayyor bo'ladigan natijani "va'da qiladi".
+Promise — **kelajakdagi qiymatni ifodalovchi ob'ekt**. U hozir mavjud bo'lmagan, lekin kelajakda tayyor bo'ladigan natijani "va'da qiladi". Oddiy tilda: "Men senga javob beraman, hozir emas, lekin albatta beraman — yaxshi yoki yomon."
 
-Oddiy tilda: "Men senga javob beraman, hozir emas, lekin albatta beraman — yaxshi yoki yomon."
-
-Promise — **state machine**. U uchta holatdan birida bo'lishi mumkin:
+Promise — **state machine**. U uchta holatdan birida bo'lishi mumkin: `pending` (kutilmoqda), `fulfilled` (muvaffaqiyatli tugadi, natija bor), va `rejected` (xato bilan tugadi, sabab bor). Eng muhimi — Promise **bir marta** settled bo'ladi: `pending` dan `fulfilled` ga YOKI `pending` dan `rejected` ga. Orqaga qaytish yoki `fulfilled` dan `rejected` ga o'tish **mumkin emas**. Bu xususiyat callback'lardan tubdan farq qiladi — callback necha marta chaqirilishini nazorat qilib bo'lmaydi, lekin Promise doim faqat bir marta settle bo'ladi.
 
 | State | Ma'nosi | O'zgaradimi? |
 |-------|---------|--------------|
@@ -206,17 +204,9 @@ V8 pending paytida `result` field'ini **reaction'lar listini saqlash** uchun ish
 
 ### Nazariya
 
-Promise `new Promise()` constructor bilan yaratiladi. U **executor** funksiya qabul qiladi:
+Promise `new Promise()` constructor bilan yaratiladi. U **executor** funksiya qabul qiladi — bu funksiya ikkita argument oladi: `resolve` (muvaffaqiyat) va `reject` (xato). Executor funksiya **darhol sinxron** ishga tushadi — Promise yaratilgan zahoti, `.then()` chaqirilishini kutmasdan.
 
-```javascript
-const promise = new Promise(function executor(resolve, reject) {
-  // Asinxron operatsiya
-  // Muvaffaqiyat → resolve(value)
-  // Xato → reject(reason)
-});
-```
-
-**Executor** darhol (sinxron) ishga tushadi — Promise yaratilgan zahoti:
+Executor ichida asinxron operatsiya boshlanadi, va natijaga qarab `resolve(value)` yoki `reject(reason)` chaqiriladi. Muhim qoidalar: faqat birinchi `resolve`/`reject` chaqiruvi ishlaydi (keyingilari ignored), executor ichidagi `throw` avtomatik `reject` ga aylanadi, va `resolve` ga boshqa Promise berilsa — tashqi Promise ichki Promise'ni "adopt" qiladi.
 
 ```javascript
 console.log("1 — oldin");
@@ -374,15 +364,9 @@ function readFilePromise(path) {
 
 ### Nazariya
 
-`.then()` — Promise'ning asosiy metodi. U Promise fulfilled bo'lganda ishlatiladigan callback'ni ro'yxatdan o'tkazadi.
+`.then()` — Promise'ning **asosiy** va eng muhim metodi. U Promise fulfilled bo'lganda ishlatiladigan callback'ni ro'yxatdan o'tkazadi. `.then()` ikkita argument qabul qiladi: `onFulfilled` (fulfilled bo'lganda) va `onRejected` (rejected bo'lganda), ikkalasi ham ixtiyoriy.
 
-```javascript
-promise.then(onFulfilled, onRejected);
-```
-
-`.then()` **ikki** argument qabul qiladi:
-1. `onFulfilled` — fulfilled bo'lganda chaqiriladi (ixtiyoriy)
-2. `onRejected` — rejected bo'lganda chaqiriladi (ixtiyoriy)
+`.then()` ning eng muhim xususiyati — u **har doim yangi Promise qaytaradi**. Shu sababli `.then()` larni zanjir qilib ulash mumkin (chaining). Callback'dan qaytarilgan qiymat keyingi Promise'ning natijasini belgilaydi: oddiy qiymat qaytarsa — keyingi `then` shu qiymatni oladi; Promise qaytarsa — keyingi `then` shu Promise'ni kutadi; hech narsa qaytarmasa — `undefined`; throw qilsa — keyingi Promise rejected bo'ladi. `.then()` handler'lari **hech qachon sinxron ishlamaydi** — doim microtask queue orqali.
 
 ```javascript
 const p = new Promise((resolve) => {
@@ -501,18 +485,9 @@ console.log("3");
 
 ### Nazariya
 
-`.catch()` — rejected Promise'ni ushlash uchun. Aslida u `.then(undefined, onRejected)` ning **shorthand**'i:
+`.catch()` — rejected Promise'ni ushlash uchun mo'ljallangan method. Aslida u `.then(undefined, onRejected)` ning **shorthand**'i, lekin amaliyotda `.catch()` ni ishlatish `.then()` ning ikkinchi argumentidan **afzalroq** chunki u chain'dagi oldingi `.then()` handler'i ichida yuzaga kelgan xatolarni ham ushlaydi.
 
-```javascript
-// Bu ikkalasi bir xil:
-promise.catch(onRejected);
-promise.then(undefined, onRejected);
-```
-
-```javascript
-const p = new Promise((resolve, reject) => {
-  reject(new Error("Server javob bermadi"));
-});
+`.catch()` ham `.then()` kabi **yangi Promise qaytaradi**. Bu degani `.catch()` xatoni ushlab, **recovery** qilishi mumkin — callback'dan qaytarilgan qiymat keyingi chain'ga fulfilled Promise sifatida o'tadi. Bu pattern ayniqsa API so'rovlarida fallback qiymat berish, offline rejimda keshdan o'qish, yoki foydalanuvchiga xato xabarini ko'rsatib, dastur ishini davom ettirish uchun ishlatiladi.
 
 // ❌ then bilan — o'qish qiyin
 p.then(undefined, err => console.error(err.message));
@@ -603,16 +578,9 @@ getUser(1).then(user => {
 
 ### Nazariya
 
-`.finally()` — Promise **fulfilled yoki rejected** — qanday tugashidan qat'i nazar ishlaydi. U `try/catch/finally` dagi `finally` bilan bir xil mantiq.
+`.finally()` — Promise **fulfilled yoki rejected** — qanday tugashidan qat'i nazar ishlaydi, xuddi `try/catch/finally` dagi `finally` bloki kabi. U **hech qanday argument** olmaydi (na value, na reason), **qiymatni o'zgartirmaydi** (transparently pass-through qiladi), va **cleanup logic** uchun idealdir.
 
-```javascript
-promise.finally(onFinally);
-```
-
-**Muhim xususiyatlari:**
-1. `onFinally` **hech qanday argument** olmaydi — na value, na reason
-2. `.finally()` **qiymatni o'zgartirmaydi** — u transparently pass-through qiladi
-3. **Har doim** ishlaydi — cleanup logic uchun ideal
+`.finally()` nima uchun kerak? Real-world dasturlarda ko'pincha operatsiya natijasidan qat'i nazar bajarilishi kerak bo'lgan ishlar bor: loading spinner'ni yashirish, database connection'ni yopish, vaqtincha fayllarni tozalash, performance o'lchashni tugatish. `.finally()` siz bu logikani ham `.then()` da, ham `.catch()` da takrorlashga to'g'ri kelardi.
 
 ```javascript
 let isLoading = true;
@@ -723,7 +691,9 @@ Shuning uchun:
 
 ### Nazariya
 
-Promise chaining — `.then().then().then()` — har bir `.then()` **yangi Promise** qaytarganligi sababli, ularni zanjir qilib ulash mumkin. Bu callback hell'ning **flat**, o'qiladigan alternativi.
+Promise chaining — `.then().then().then()` zanjiri. Har bir `.then()` **yangi Promise** qaytarganligi sababli, ularni cheksiz zanjir qilib ulash mumkin. Bu callback hell'ning **flat**, chiziqli, o'qiladigan alternativi bo'lib, xatolarni esa bitta `.catch()` da ushlash mumkin.
+
+Chaining qanday ishlaydi? Har bir `.then()` callback'idan qaytarilgan qiymat keyingi Promise'ning natijasini belgilaydi. Agar callback oddiy qiymat qaytarsa — keyingi `then` shu qiymatni oladi. Agar Promise qaytarsa — keyingi `then` shu Promise resolve bo'lishini **kutadi** va natijasini oladi. Shu tufayli bir nechta asinxron operatsiyalarni ketma-ket, o'qiladigan tarzda yozish mumkin.
 
 ```javascript
 // ❌ Callback Hell
@@ -863,7 +833,9 @@ getUser(1)
 
 ### Nazariya
 
-Promise chain'da xato **bubbling** qiladi — catch topilmaguncha keyingi `.then()` lardan "o'tib ketadi":
+Promise chain'da xato **bubbling** qiladi — xuddi DOM event'lari kabi. Xato yuzaga kelganda, u eng yaqin `.catch()` yoki `.then()` ning reject handler'iga yetguncha keyingi `.then()` lardan **o'tib ketadi** (skip qiladi). Bu xatti-harakat sinxron koddagi `try/catch` bilan bir xil — `throw` qilingan xato eng yaqin `catch` blokiga "uchib" boradi.
+
+Error propagation nima uchun muhim? U callback hell'dagi eng katta muammolardan birini hal qiladi — har bir callback uchun alohida error handler yozish shart emas. Bitta `.catch()` ni chain'ning oxiriga qo'yish kifoya — u chain'ning istalgan qadamidagi xatoni ushlaydi. Bundan tashqari, `.catch()` dan keyin chain davom etishi mumkin (recovery pattern), bu esa dasturni xatolarga chidamli qiladi.
 
 ```javascript
 Promise.resolve(1)

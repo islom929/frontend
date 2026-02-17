@@ -28,9 +28,11 @@
 
 ### Nazariya
 
-`this` — har bir Execution Context ichida mavjud bo'lgan maxsus keyword. U **joriy funksiya qaysi kontekstda chaqirilganini** ko'rsatadi.
+`this` — JavaScript ning eng chalkash, eng ko'p xato qilinadigan, lekin eng muhim tushunchasidir. U har bir Execution Context ichida mavjud bo'lgan maxsus keyword bo'lib, **joriy funksiya qaysi kontekstda chaqirilganini** ko'rsatadi.
 
-Eng muhim narsa: `this` **funksiya qayerda yozilganiga** emas, **qanday chaqirilganiga** bog'liq. Bu JavaScript ni boshqa tillardan (Java, C#, Python) tubdan farq qiladi.
+Eng muhim narsa: `this` **funksiya qayerda yozilganiga** emas, **qanday chaqirilganiga** bog'liq. Bu JavaScript ni Java, C#, Python kabi tillardan tubdan farq qiladi — o'sha tillarda `this` (yoki `self`) doim joriy ob'ektga ishora qiladi va **compile-time** da aniqlanadi; JavaScript da esa `this` **runtime** da, call-site ga qarab aniqlanadi.
+
+Bu nima uchun muhim? `this` ni tushunmasdan React component'larda event handler'lar, Node.js da middleware'lar, va oddiy OOP kodda doimiy xatolarga duch kelasiz. `this` binding 4 ta qoida (new, explicit, implicit, default) va ularning priority tartibini bilish — JavaScript dasturchi uchun **fundamental skill**.
 
 ```javascript
 const user = {
@@ -167,7 +169,9 @@ funksiya chaqirildi
 
 ### Nazariya
 
-`new` keyword bilan funksiya chaqirilganda, `this` **yangi yaratilgan object** ga bog'lanadi. Bu **eng yuqori priority** ga ega.
+`new` keyword bilan funksiya chaqirilganda, `this` **yangi yaratilgan bo'sh ob'ektga** bog'lanadi. Bu 4 ta binding rule ichida **eng yuqori priority**ga ega — hatto `bind` bilan qotirilgan funksiyada ham `new` ishlatilsa, `new` binding ustun keladi.
+
+`new` binding aslida JavaScript'ning OOP mexanizmining asosi. U 4 muhim qadam bajaradi: yangi bo'sh ob'ekt yaratadi, uning `[[Prototype]]` ni constructor'ning `prototype` property'siga bog'laydi, constructor funksiyani shu yangi ob'ekt kontekstida (`this = yangiObyekt`) chaqiradi, va agar constructor object return qilmasa — yangi ob'ektni qaytaradi. ES6 `class` sintaksisi ham ichida aynan shu `new` binding mexanizmini ishlatadi.
 
 ```javascript
 function UserAccount(name, email) {
@@ -262,7 +266,9 @@ Bu haqda ko'proq [08-classes.md](08-classes.md) da.
 
 ### Nazariya
 
-Explicit binding — `this` ni **o'zimiz aniq belgilash**. Buning uchun 3 ta method bor: `call`, `apply`, `bind`. Barchasi `Function.prototype` da.
+Explicit binding — `this` ni **o'zimiz aniq belgilash** usuli. Buning uchun `Function.prototype` da 3 ta method bor: `call`, `apply`, va `bind`. Ularning barchasi birinchi argument sifatida `this` qiymatini qabul qiladi.
+
+Nima uchun explicit binding kerak? Implicit binding (obj.method()) har doim ishlamaydi — masalan, callback sifatida method berilganda `this` yo'qoladi. Bunday holatlarda `call`/`apply` bilan bir martalik, yoki `bind` bilan doimiy `this` bog'lash zarur bo'ladi. Bu ayniqsa event handler'lar, setTimeout callback'lari, va method'larni boshqa funksiyaga argument sifatida berishda ko'p uchraydi.
 
 ```javascript
 function introduce(greeting, punctuation) {
@@ -330,7 +336,9 @@ console.log(p2.name); // "Vali" — new BINDING USTUN! bind ni override qildi
 
 ### Nazariya
 
-Funksiya **object ning method** i sifatida chaqirilganda — `this` shu **object** ga bog'lanadi. Ya'ni `.` (dot) oldidagi object.
+Implicit binding — funksiya **ob'ektning method**i sifatida chaqirilganda `this` shu **ob'ektga** bog'lanadi. Ya'ni `.` (nuqta) operatorining **chap tarafidagi** ob'ekt `this` bo'ladi. Bu eng tabiiy va ko'p ishlatiladigan binding turi.
+
+Implicit binding **intuitiv** ko'rinadi, lekin uning bitta katta xavfi bor: method ni ob'ektdan ajratib olganingizda (masalan, variable ga assign qilsangiz yoki callback sifatida bersangiz), implicit binding **yo'qoladi** va default binding ishga tushadi. Bu "lost binding" muammosi JavaScript da eng ko'p uchraydigan bug'lardan biri. Shuningdek, nested ob'ektlarda faqat **eng yaqin** (oxirgi) ob'ekt hisobga olinadi.
 
 ```javascript
 const calculator = {
@@ -411,10 +419,9 @@ Nima uchun? Chunki `greetFn()` **oddiy funksiya chaqiruvi** — `.` oldida objec
 
 ### Nazariya
 
-Agar boshqa hech qaysi rule qo'llanilmasa — **default binding** ishlaydi:
+Default binding — 4 ta rule ichida **eng past priority**ga ega va boshqa hech qaysi rule mos kelmasa qo'llaniladi. Non-strict mode'da `this` global ob'ektga (`window` yoki `global`) bog'lanadi; strict mode'da esa `this` `undefined` bo'ladi.
 
-- **Non-strict mode:** `this` = global object (`window` browser da, `global` Node.js da)
-- **Strict mode:** `this` = `undefined`
+Default binding nima uchun xavfli? Non-strict mode'da `this` global ob'ektga bog'lanishi kutilmagan global o'zgaruvchilar yaratilishiga, boshqa kutubxonalar bilan nomlar to'qnashuviga, va qiyin topiladigan xatolarga olib keladi. Shu sababli zamonaviy kodda **strict mode** yoki **ES modules** (avtomatik strict) ishlatish qat'iy tavsiya etiladi — u `this = undefined` qiladi va xatoni tezda aniqlashga yordam beradi.
 
 ```javascript
 // Non-strict mode
@@ -660,7 +667,9 @@ console.log(person.age);  // 25
 
 ### Nazariya
 
-Arrow function — `this` bilan eng farqli funksiya turi. Arrow function **o'zining `this` iga ega emas**. U `this` ni **tashqi (lexical) scope** dan oladi — closure orqali.
+Arrow function — `this` bilan ishlashda eng farqli funksiya turi. Arrow function **o'zining `this`iga ega emas** — u `this` ni **tashqi (lexical) scope**dan oladi, xuddi closure orqali o'zgaruvchi olganidek. Shu sababli arrow function ning `this`ini `call`, `apply`, `bind` bilan **o'zgartirib bo'lmaydi**.
+
+Arrow function ES6 da aynan `this` binding muammosini hal qilish uchun kiritilgan. ES5 da `setTimeout`, `forEach`, va boshqa callback'larda `this` yo'qolishi juda keng tarqalgan muammo edi — dasturchilar `var self = this` yoki `.bind(this)` bilan vaqtincha yechim topishardi. Arrow function bu muammoni tilning o'zida hal qildi. Lekin arrow function'ni ob'ekt method yoki prototype method sifatida ishlatish **xato** — chunki u `this` ni lexical scope'dan oladi, ob'ektdan emas.
 
 ```javascript
 const team = {
@@ -1120,7 +1129,11 @@ speak(); // "undefined speaks" — this yo'qoldi
 
 ### Nazariya
 
-`"use strict"` directive `this` ning default binding'ini **tubdan o'zgartiradi**:
+`"use strict"` directive `this` ning **default binding** xulq-atvorini tubdan o'zgartiradi. Non-strict mode'da funksiya oddiy chaqirilganda `this = window/global` bo'ladi, lekin strict mode'da `this = undefined` bo'ladi. Bu farq juda muhim — chunki strict mode potentsial xatolarni runtime'da aniqlash imkonini beradi.
+
+Strict mode nima uchun `this` ni `undefined` qiladi? Non-strict mode'da `this = window` bo'lishi — bu JavaScript'ning dastlabki dizayn xatolaridan biri. U kutilmagan holda global ob'ektga property qo'shish, global o'zgaruvchilarni tasodifan o'zgartirish, va qiyin topiladigan bug'larga olib keladi. Strict mode bu muammoni hal qiladi — noto'g'ri `this` ishlatilsa darhol `TypeError` chiqadi.
+
+ES6 modullar (`import`/`export`) avtomatik strict mode'da ishlaydi, Class body'lari ham avtomatik strict. Shu sababli zamonaviy kodda strict mode'ni qo'lda yozish kamdan-kam kerak bo'ladi, lekin uning mexanizmini tushunish muhim.
 
 ```javascript
 // ===== Non-strict mode =====

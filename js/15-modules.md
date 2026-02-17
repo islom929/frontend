@@ -25,9 +25,9 @@
 
 ### Nazariya
 
-Modullar mavjud bo'lmasdan oldingi dunyoni tasavvur qilaylik. Barcha JavaScript bitta global scope'da yashaydi. Loyiha o'sgan sari muammolar ham o'sadi:
+Modullar mavjud bo'lmasdan oldingi dunyoni tasavvur qilaylik: barcha JavaScript bitta global scope'da yashaydi. Loyiha o'sgan sari muammolar ham eksponensial o'sadi — global scope pollution (o'zgaruvchilar bir-birini ustiga yozadi), namespace collision (turli fayllar bir xil nom ishlatadi), dependency management yo'qligi (qaysi fayl qaysi faylga bog'liq ekanini bilish imkonsiz), va maintainability pasayishi.
 
-**1. Global Scope Pollution** — hamma narsa `window` ga yopishadi:
+JavaScript dastlab modullar tizimisiz yaratilgan, chunki 1995-yilda u faqat oddiy browser skripting uchun mo'ljallangan edi. Lekin tilning popularlik ortishi bilan modul tizimlari paydo bo'ldi: 2009-da Node.js uchun CommonJS, 2015-da ES6 bilan rasmiy ES Modules standart. Har qanday modul tizimi uchta asosiy muammoni hal qiladi: **encapsulation** (private/public ajratish), **dependency management** (bog'liqliklarni aniq ifodalash), va **namespace isolation** (nomlar to'qnashmasligini ta'minlash).
 
 ```javascript
 // file1.js
@@ -125,11 +125,9 @@ Har qanday modul tizimi 3 ta muammoni hal qiladi:
 
 ### Nazariya
 
-ES Modules va CommonJS paydo bo'lmasdan oldin, JavaScript developerlar **IIFE** (Immediately Invoked Function Expression) yordamida modullar yaratishgan. Bu closure va function scope'ning kuchini ishlatgan aqlli pattern.
+ES Modules va CommonJS paydo bo'lmasdan oldin, JavaScript developerlar **IIFE** (Immediately Invoked Function Expression) yordamida modullar yaratishgan. Bu closure va function scope'ning kuchini ishlatgan aqlli pattern bo'lib, funksiya scope'da **private** o'zgaruvchilar yaratadi, faqat qaytarilgan narsalar **public** bo'ladi.
 
-> IIFE haqida batafsil: [09-functions.md](09-functions.md) | Closure mexanizmi: [05-closures.md](05-closures.md)
-
-Asosiy g'oya: funksiya scope **private** o'zgaruvchilar yaratadi, faqat qaytarilgan narsalar **public** bo'ladi.
+Revealing Module Pattern — bu yondashuvning yanada toza versiyasi bo'lib, barcha funksiyalar private yoziladi, keyin faqat kerakli nomlar ochiq ko'rsatiladi. Bu pattern hali ham foydali bilim — closure mexanizmini, data privacy asoslarini tushunish uchun muhim. Lekin uning kamchiliklari (dependency management yo'qligi, async loading yo'qligi, static analysis mumkin emasligi) CommonJS va ES Modules paydo bo'lishiga sabab bo'ldi.
 
 ```javascript
 // Eng oddiy module pattern
@@ -285,7 +283,9 @@ MyApp.getVersion(); // "2.0.0"
 
 ### Nazariya
 
-CommonJS (CJS) — Node.js yaratilganda (2009) modullar tizimi sifatida tanlangan standart. `require()` va `module.exports` — Node.js developerning kundalik qurollari.
+CommonJS (CJS) — Node.js yaratilganda (2009) uning modul tizimi sifatida tanlangan standart. `require()` va `module.exports` — Node.js developerning kundalik qurollari. CJS **sinxron** yuklaydi — `require()` faylni o'qiydi, parse qiladi, bajaradi, va natijani qaytaradi. Bu server (Node.js) uchun yaxshi, chunki fayllar diskda tez o'qiladi, lekin browser'da muammo bo'ladi.
+
+CJS ning muhim xususiyatlari: modullar **faqat birinchi marta** bajariladi, keyingi `require()` lar **cache**'dan oladi (singleton pattern uchun ideal); `module.exports` va `exports` farqini bilish muhim — `exports` faqat shortcut, uni qayta tayinlash xato; va `require()` ichdida faylni wrapper function'ga o'rab bajaradi, shu sababli har bir modulda `__filename`, `__dirname`, `require`, `module` mavjud bo'ladi.
 
 ```javascript
 // math.js — module yaratish
@@ -612,7 +612,9 @@ module.exports = UserService;
 
 ### Nazariya
 
-ES Modules (ESM) — ECMAScript 2015 (ES6) da standartlashtirilgan rasmiy JavaScript modul tizimi. Bu **til darajasida** qo'llab-quvvatlanadigan yagona modul standart — CommonJS Node.js ning o'zi edi, ESM esa JavaScript **tilining** qismi.
+ES Modules (ESM) — ECMAScript 2015 (ES6) da standartlashtirilgan rasmiy JavaScript modul tizimi. Bu **til darajasida** qo'llab-quvvatlanadigan yagona modul standart — CommonJS Node.js ning o'zi edi, ESM esa JavaScript **tilining** qismi. ESM `import`/`export` statement'lar bilan ishlaydi va **statik struktura**ga ega — import'lar fayl boshida, compile-time da aniqlanadi.
+
+ESM ning asosiy afzalliklari: **static analysis** mumkin (tree shaking, IDE intellisense), **named va default export**'lar, **re-exporting** (barrel files), **asinxron yuklash** (browser uchun ideal), va **live bindings** (export qilingan qiymat o'zgarganda import ham yangilanadi). Browser'larda `<script type="module">`, Node.js da `.mjs` yoki `"type": "module"` package.json orqali ishlatiladi.
 
 ```javascript
 // math.js — Named exports
@@ -1164,9 +1166,9 @@ const __dirname = dirname(__filename);
 
 ### Nazariya
 
-Static `import` doim fayl boshida bo'lishi kerak va compile-time da aniqlanadi. Lekin ba'zan modulni **shart bo'yicha** yoki **keyin** yuklash kerak bo'ladi. Buning uchun **dynamic `import()`** mavjud.
+Static `import` doim fayl boshida bo'lishi kerak va compile-time da aniqlanadi. Lekin ba'zan modulni **shart bo'yicha**, **keyin**, yoki **foydalanuvchi harakati asosida** yuklash kerak bo'ladi. Buning uchun **dynamic `import()`** mavjud — bu funksiya emas, bu **operator** bo'lib, **Promise** qaytaradi.
 
-`import()` — bu funksiya emas, bu **operator** bo'lib, **Promise** qaytaradi:
+Dynamic import ayniqsa **code splitting** (sahifa bo'yicha kod ajratish), **lazy loading** (kerak bo'lganda yuklash), **conditional loading** (platforma yoki tilga qarab modul tanlash), va **plugin architecture** (runtime da modul qo'shish) uchun ishlatiladi. Bundler'lar (Webpack, Vite) dynamic import'ni avtomatik code splitting nuqtasi sifatida tan oladi.
 
 ```javascript
 // Dynamic import — basic
@@ -1363,19 +1365,9 @@ const { default: MyClass } = await import('./MyClass.js');
 
 ### Nazariya
 
-Circular dependency — ikki yoki undan ortiq modul **bir-biriga bog'liq** bo'lganda:
+Circular dependency — ikki yoki undan ortiq modul **bir-biriga bog'liq** bo'lganda paydo bo'ladi (A imports B, B imports A). Bu **xato emas** — JavaScript buni handle qiladi, lekin natija kutilganidek bo'lmasligi mumkin va debug qilish juda qiyin.
 
-```
-A imports B
-B imports A
-→ CIRCULAR!
-
-Yoki murakkab zanjir:
-A → B → C → A  (circular)
-A → B → C → D → B  (circular)
-```
-
-Bu **xato emas** — JavaScript buni handle qiladi, lekin natija kutilganidek bo'lmasligi mumkin.
+CommonJS va ESM circular dependency'ni turlicha handle qiladi. CJS da modul bajarilish jarayonida cache ga qo'yiladi, shuning uchun circular `require()` **to'liq emas** (partially loaded) exports oladi. ESM da esa live bindings tufayli vaziyat biroz yaxshiroq — lekin `undefined` qiymatlar olish xavfi bor. Eng yaxshi yechim — circular dependency'dan **umuman qochish**, arxitekturani qayta ko'rib chiqish, yoki bog'liqlikni uchinchi modulga chiqarish.
 
 ### CommonJS da Circular Dependency
 
@@ -1557,14 +1549,9 @@ export async function getOrderWithUser(orderId) {
 
 ### Nazariya
 
-Module bundler — bir nechta JavaScript fayllarni **bitta** (yoki bir nechta) faylga birlashtiruvchi vosita.
+Module bundler — bir nechta JavaScript fayllarni **bitta** (yoki bir nechta optimallashtirilgan) faylga birlashtiruvchi vosita. Nima uchun kerak? HTTP/1.1 da 100 ta fayl o'rniga 1 ta yuklash ancha tez, eski browserlar ESM ni qo'llab-quvvatlamaydi, TypeScript/JSX/Sass kabi tillarni transform qilish kerak, va minification, tree shaking, code splitting kabi optimizatsiyalar zarur.
 
-**Nima uchun kerak?**
-
-1. **HTTP Requests** — 100 ta fayl o'rniga 1 ta yuklash ancha tez (HTTP/1.1 da)
-2. **Browser Support** — eski browserlar ESM ni qo'llab-quvvatlamaydi
-3. **Transformations** — TypeScript, JSX, Sass kabi tillarni JavaScript/CSS ga o'girish
-4. **Optimizations** — minification, tree shaking, code splitting
+Bundler'lar ishlash prinsipi: entry point fayldan boshlab dependency graph quriladi, keyin barcha modullar bitta (yoki bir nechta) bundle faylga birlashtiriladi. Zamonaviy bundler'lar — **Webpack** (eng keng tarqalgan, konfiguratsiyaga boy), **Vite** (development da tezkor, ESM-based), **esbuild** (Go'da yozilgan, juda tez), **Rollup** (library'lar uchun ideal, yaxshi tree shaking), va **Parcel** (zero-config).
 
 ```
 Bundler Ishlash Prinsipi:
@@ -1755,7 +1742,9 @@ await esbuild.build({
 
 ### Nazariya
 
-Tree shaking — **ishlatilmagan kodni** final bundle dan olib tashlash. Nomlanishi: "daraxtni silkitish — quruq barglar tushadi."
+Tree shaking — **ishlatilmagan kodni** final bundle dan olib tashlash texnologiyasi. Nomi: "daraxtni silkitish — quruq barglar tushadi." Bu faqat ES Modules bilan ishlaydi, chunki ESM ning **statik struktura**si bundler'ga compile-time da qaysi export ishlatilganini aniqlash imkonini beradi.
+
+Tree shaking ishlashi uchun: ESM `import`/`export` ishlatish kerak (CommonJS `require()` statik analiz qilib bo'lmaydi), side-effect-free kodlar yozish kerak (modul import qilinganda global state o'zgarmasligi), va `package.json` da `"sideEffects": false` belgilash kerak. `import *` yoki default export o'rniga **named export**'lar ishlatish ham tree shaking'ni yaxshilaydi.
 
 ```javascript
 // utils.js — 4 ta funksiya bor

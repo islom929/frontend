@@ -21,7 +21,7 @@
 
 ### Nazariya
 
-`Proxy` — object ga "o'rash" (wrapper) qo'yib, uning asosiy operatsiyalarini (o'qish, yozish, o'chirish, funksiya chaqirish) **ushlash va qayta belgilash** imkonini beradi.
+`Proxy` — JavaScript ning meta-programming vositasi bo'lib, object ga "o'rash" (wrapper) qo'yib, uning asosiy operatsiyalarini (o'qish, yozish, o'chirish, funksiya chaqirish, `in` tekshirish va boshqalar) **ushlash va qayta belgilash** imkonini beradi. `new Proxy(target, handler)` bilan yaratiladi: `target` — asl object, `handler` — trap'lar (13 ta operatsiyani ushlash mumkin). Proxy orqali validatsiya, logging, caching, computed property'lar, va reactivity tizimlarini (Vue 3) qurish mumkin.
 
 ### Sintaksis
 
@@ -197,7 +197,7 @@ const u = new TrackedUser("Ali"); // "Yangi User: Ali"
 
 ### Nazariya
 
-`Reflect` — object operatsiyalarini **standart va xavfsiz** usulda bajarish uchun API. Proxy trap'lari ichida `Reflect` ishlatish — **best practice**.
+`Reflect` — object operatsiyalarini **standart va xavfsiz** usulda bajarish uchun API. Har bir Proxy trap'iga mos Reflect metodi bor. Proxy trap'lari ichida `Reflect` ishlatish — **best practice**, chunki `target[prop]` bilan ishlash prototype chain, getter/setter va `receiver` (to'g'ri `this` konteksti) bilan bog'liq edge case'larda xato berishi mumkin. Reflect metodlari boolean qaytaradi (muvaffaqiyat/muvaffaqiyatsizlik), `Object` metodlari esa xato tashlaydi.
 
 ### Nima Uchun Reflect?
 
@@ -417,7 +417,7 @@ console.log(arr[0]);  // 10 — oddiy access ishlaydi
 
 ### Nazariya
 
-Vue 3 reactivity tizimi `Proxy` ga asoslangan. Property o'qilganda **track** (kuzatish), yozilganda **trigger** (yangilash) qilinadi.
+Vue 3 reactivity tizimi `Proxy` ga asoslangan. Property o'qilganda **track** (dependency sifatida kuzatishga olish), yozilganda **trigger** (bog'liq effect'larni qayta ishga tushirish) qilinadi. Bu Vue 2 ning `Object.defineProperty` asosidagi tizimidan ustun: dynamic property qo'shish/o'chirish, array index o'zgarishi, Map/Set qo'llab-quvvatlanadi, va tezroq ishlaydi.
 
 ### Soddalashtirilgan Vue Reactivity
 
