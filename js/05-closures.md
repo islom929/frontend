@@ -23,9 +23,11 @@
 
 ### Nazariya
 
-Closure — bu funksiya + uning **tashqi scope o'zgaruvchilariga** havola. Funksiya qaytarilgandan keyin ham, tashqi funksiya tugagandan keyin ham, ichki funksiya tashqi scope'dagi o'zgaruvchilarni **ko'ra oladi va ishlatishi mumkin**.
+Closure — JavaScript'ning eng kuchli va eng muhim tushunchalaridan biri. Closure bu funksiya va u yaratilgan **Lexical Environment** ning birikmasidir. Funksiya tashqi scope'dan qaytarilgandan keyin ham, tashqi funksiya tugagandan keyin ham, ichki funksiya tashqi scope'dagi o'zgaruvchilarni **ko'ra oladi va ishlatishi mumkin**.
 
-Oddiy qilib: funksiya "tug'ilgan muhitini" eslab qoladi.
+Nima uchun bu g'ayrioddiy? Oddiy holda funksiya tugaganda uning barcha local o'zgaruvchilari yo'qoladi — Execution Context stack'dan olib tashlanadi, o'zgaruvchilar garbage collection uchun tayyor bo'ladi. Lekin closure bor bo'lganda bu qoida buziladi: ichki funksiya tashqi o'zgaruvchiga **reference** saqlaydi va shu sababli Garbage Collector bu o'zgaruvchini tozalay olmaydi. Bu xuddi **quti ichidagi kalitli sandiq**ga o'xshaydi — quti (tashqi funksiya) ochildi va yopildi, lekin sandiq (closure) kalitni (tashqi o'zgaruvchilarni) ichida saqlab qoldi.
+
+Closure'lar nima uchun muhim? Zamonaviy JavaScript'dagi deyarli barcha muhim patternlar closure'ga asoslanadi: React Hooks (useState, useEffect), data privacy (private o'zgaruvchilar), factory function'lar, memoization, event handler'lar, callback'lar — bularning barchasi closure mexanizmi orqali ishlaydi. Closure'siz JavaScript bugungi ko'rinishidagi kuchli til bo'la olmasdi.
 
 ```javascript
 function outer() {
@@ -416,7 +418,11 @@ expensiveCalc(1000000); // "Cache dan olindi" → 499999500000 (tez!)
 
 ### Nazariya
 
-Closure tashqi scope'ning LexicalEnvironment'iga reference saqlaydi. Bu degani — Garbage Collector bu environment'ni **yo'qota olmaydi** (chunki reference bor).
+Closure kuchli mexanizm, lekin u **bepul kelmaydi** — har bir closure xotira resursini sarflaydi. Closure tashqi scope'ning LexicalEnvironment'iga reference saqlaydi va bu degani Garbage Collector bu environment'dagi o'zgaruvchilarni **yo'qota olmaydi** — chunki ularga hali tirik reference bor.
+
+Bu xotira muammosi kichik dasturlarda sezilmaydi, lekin katta ilovalar — masalan, real-time dashboard'lar, chat ilovalar, yoki uzoq vaqt ochiq turadigan SPA (Single Page Application) larda jiddiy muammoga aylanishi mumkin. Agar closure'lar to'g'ri boshqarilmasa, ular **memory leak** (xotira oqishi) ga sabab bo'ladi: tozalanishi kerak bo'lgan katta ma'lumotlar (massivlar, ob'ektlar, DOM elementlari) closure orqali hayotda qoladi va xotira asta-sekin to'lib boradi.
+
+Shuning uchun closure bilan ishlashda **xotira bo'shatish** haqida ham o'ylash kerak. Agar closure'ga endi ehtiyoj qolmasa — uning reference'ini `null` ga o'zgartiring yoki event listener'ni `removeEventListener` bilan olib tashlang. Zamonaviy engine'lar (V8) aqlli — agar closure faqat tashqi scope'ning **ba'zi** o'zgaruvchilarini ishlatsa, faqat shu o'zgaruvchilar saqlanadi (butun environment emas). Lekin bu optimizatsiya har doim ishlamaydi, shuning uchun dasturchi o'zi ham ehtiyot bo'lishi kerak.
 
 ### GC Qachon Tozalaydi
 

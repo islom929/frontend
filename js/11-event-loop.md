@@ -27,9 +27,11 @@
 
 ### Nazariya
 
-JavaScript **single-threaded** til — ya'ni bir vaqtda faqat **bitta** operatsiyani bajaradi. Bitta Call Stack, bitta execution context, bitta code path.
+JavaScript **single-threaded** til — ya'ni bir vaqtda faqat **bitta** operatsiyani bajaradi. Bitta Call Stack, bitta execution context, bitta code path. Buni bir qo'lli oshpazga o'xshatish mumkin: u bir vaqtda faqat bitta idishni tayyorlay oladi, lekin aqlli rejalashtirish orqali — bitta narsa pishib turganida boshqa ingredientlarni tayyorlashga o'tadi.
 
-Oddiy qilib aytganda: JavaScript bir qo'lli oshpaz. U bir vaqtda faqat bitta idishni tayyorlay oladi. Lekin aqlli tarzda — bitta narsa pishib turganida, boshqa ingredientlarni tayyorlashga o'tadi.
+Nima uchun JavaScript single-threaded qilib yaratildi? U dastlab browser uchun yaratilgan — DOM ni manipulatsiya qilish uchun. Agar ikkita thread bir vaqtda bitta DOM elementni o'zgartirmoqchi bo'lsa — **race condition** yuzaga keladi va natija oldindan aytib bo'lmas edi. Brendan Eich single-threaded dizaynni tanladi: DOM safety (conflict yo'q), simplicity (deadlock/mutex muammolari yo'q), va predictability (kod ketma-ket bajariladi, debug oson).
+
+Lekin single-threaded degani sekin degani emas. JavaScript o'zi single-threaded bo'lsa-da, u ishlaydigan muhit (browser yoki Node.js) **multi-threaded**. `setTimeout`, `fetch`, `fs.readFile` kabi operatsiyalar aslida browser/Node.js ning boshqa thread'larida bajariladi — JavaScript faqat natijalarni qaytarib oladi. Shu mexanizm tufayli JavaScript non-blocking tarzda ishlaydi.
 
 **Nima uchun single-threaded?**
 
@@ -140,15 +142,9 @@ console.log("Fetch yuborildi, boshqa ishlar davom etadi");
 
 ### Nazariya
 
-JavaScript o'zi single-threaded bo'lsa-da, u **yolg'iz ishlamaydi**. Browser yoki Node.js uni o'rab turgan muhitni ta'minlaydi — bu muhit **Runtime Environment** deyiladi.
+JavaScript o'zi single-threaded bo'lsa-da, u **yolg'iz ishlamaydi**. Browser yoki Node.js uni o'rab turgan muhitni ta'minlaydi — bu muhit **Runtime Environment** deyiladi. Runtime Environment beshta asosiy komponentdan tashkil topgan: Call Stack (hozir bajarilayotgan funksiyalar), Web APIs (browser bergan asinxron API'lar), Macrotask Queue (tayyor callback'lar navbati), Microtask Queue (yuqori prioritetli navbat), va Event Loop (bularning barchasini boshqaradigan "dirigyor").
 
-Runtime Environment quyidagilardan tashkil topgan:
-
-1. **Call Stack** — hozir bajarilayotgan funksiyalar stack'i (LIFO)
-2. **Web APIs / C++ APIs** — browser yoki Node.js bergan asinxron API'lar
-3. **Callback Queue (Task Queue / Macrotask Queue)** — tayyor bo'lgan callback'lar navbati
-4. **Microtask Queue** — promise va boshqa microtask'lar navbati (yuqori priority)
-5. **Event Loop** — bularning barchasini boshqaradigan "dirigyor"
+Bu arxitekturani tushunish muhim chunki ko'p dasturchilar "JavaScript asinxron til" deb o'ylaydi — aslida JavaScript **sinxron** til, lekin runtime environment asinxron imkoniyatlarni beradi. V8 engine o'zi Event Loop ni implement qilmaydi — u faqat JavaScript kodni compile va execute qiladi. Event Loop, timer'lar, network request'lar — bularning barchasi runtime tomonidan ta'minlanadi.
 
 ### Under the Hood
 
@@ -362,7 +358,9 @@ console.log("4: Synchronous — Call Stack");
 
 ### Nazariya
 
-Event Loop algoritmi quyidagi tartibda ishlaydi. Bu algoritmni to'liq tushunish — JavaScript asinxronligini tushunish demak.
+Event Loop algoritmi — JavaScript asinxronligini tushunishning **kaliti**. Bu algoritmni bilish degani — istalgan asinxron kodning output tartibini oldindan aytib bera olish demak. Event Loop algoritmining mohiyati 4 qadamdan iborat cheksiz sikl: Call Stack bo'shmi tekshir, Microtask Queue ni **to'liq** bo'shat, Macrotask Queue dan **bitta** task ol, kerak bo'lsa render qil va boshidan boshla.
+
+Bu algoritmning eng muhim nuqtasi — microtask va macrotask orasidagi **asimmetriya**: microtask'lar **barchasi** bajariladi (ichidan yangi microtask qo'shilsa ham), lekin macrotask'dan faqat **bittasi** olinadi. Shu sababli Promise callback'lari doim setTimeout callback'laridan oldin ishlaydi.
 
 ### Event Loop Sikli (To'liq)
 
@@ -556,19 +554,9 @@ Macrotask Queue dan bitta: D_callback
 
 ### Nazariya
 
-Macrotask (yoki oddiy "task") — bu Event Loop ning asosiy ish birligi. Har bir Event Loop iteration'da **bitta** macrotask olinadi va bajariladi.
+Macrotask (yoki oddiy "task") — bu Event Loop ning **asosiy ish birligi**. Har bir Event Loop iteration'da faqat **bitta** macrotask olinadi va bajariladi — keyin esa microtask checkpoint bo'ladi. `setTimeout`, `setInterval`, I/O operatsiyalar, UI rendering events, `MessageChannel` — bularning barchasi macrotask.
 
-**Macrotask turlari:**
-
-| Macrotask | Qayerdan keladi |
-|-----------|----------------|
-| `setTimeout(callback, delay)` | Timer Web API |
-| `setInterval(callback, delay)` | Timer Web API |
-| `setImmediate(callback)` | Node.js only |
-| I/O operatsiyalar | File system, network |
-| UI rendering events | Browser |
-| `MessageChannel` `onmessage` | Browser/Worker |
-| `requestIdleCallback` | Browser (idle vaqtda) |
+Macrotask nima uchun bittadan olinadi? Bu dizayn qaror browser'ning responsive bo'lishi uchun qilingan — agar barcha macrotask'lar bir yo'la bajarilsa, ular orasida render va microtask tekshiruvi bo'lmasdi. Bittadan olish orqali Event Loop har bir macrotask'dan keyin microtask'larni bajarishga, render qilishga va boshqa muhim ishlarga vaqt ajratadi.
 
 ### Under the Hood
 
@@ -665,20 +653,11 @@ setTimeout(() => {
 
 ### Nazariya
 
-Microtask — macrotask'dan **kichikroq** va **tezroq** bajariladigan task. Microtask Queue macrotask'larga nisbatan **yuqori priority**ga ega.
+Microtask — macrotask'dan **kichikroq** va **yuqoriroq priority**ga ega task turi. Event Loop har bir macrotask'dan keyin Microtask Queue ni **TO'LIQ BO'SHATADI** — bu microtask'larning eng muhim xususiyati.
 
-**Asosiy qoida: Event Loop har bir macrotask'dan keyin Microtask Queue ni TO'LIQ BO'SHATADI.**
+Microtask'lar orasida eng ko'p ishlatiladiganlari: `Promise.then()/.catch()/.finally()` callback'lari, `queueMicrotask()` va `MutationObserver`. Node.js da `process.nextTick()` ham microtask hisoblanadi (hatto oddiy microtask'lardan ham yuqoriroq priority bilan).
 
-**Microtask turlari:**
-
-| Microtask | Qayerdan keladi |
-|-----------|----------------|
-| `Promise.then()` callback | Promise resolve/reject |
-| `Promise.catch()` callback | Promise reject |
-| `Promise.finally()` callback | Promise settle |
-| `queueMicrotask(callback)` | Maxsus API |
-| `MutationObserver` callback | DOM o'zgarishlarini kuzatish |
-| `process.nextTick()` | Node.js only (microtask'dan ham yuqori!) |
+Nima uchun microtask tushunchasi muhim? U `Promise` asosidagi butun asinxron dasturlashning ishlash tartibini belgilaydi. Microtask checkpoint algoritmining jiddiy oqibati — agar har bir microtask yangi microtask qo'shsa, bu loop **hech qachon tugamaydi** va macrotask'lar hamda rendering to'xtab qoladi (starvation).
 
 ### Under the Hood
 
@@ -829,13 +808,9 @@ targetNode.appendChild(document.createElement("div"));
 
 ### Nazariya
 
-`setTimeout(fn, 0)` deganda ko'pchilik "0 millisekund = darhol" deb o'ylaydi. Lekin bu **NOTO'G'RI**. `setTimeout(fn, 0)` callback'ni **Macrotask Queue** ga qo'yadi, va u faqat:
+`setTimeout(fn, 0)` deganda ko'pchilik "0 millisekund = darhol" deb o'ylaydi. Lekin bu **noto'g'ri**. `setTimeout(fn, 0)` callback'ni **Macrotask Queue**ga qo'yadi, va u faqat hozirgi sinxron kod tugagandan keyin, barcha microtask'lar bajarilgandan keyin, va Event Loop macrotask queue'ga navbat kelganda bajariladi.
 
-1. Hozirgi synchronous kod tugaganda
-2. Barcha microtask'lar bajarilganda
-3. Event Loop macrotask queue ga navbat kelganda
-
-bajariladi.
+Bu tushuncha nima uchun muhim? `setTimeout(fn, 0)` aslida "ushbu kodni joriy execution kontekstidan keyin, keyingi Event Loop tick'da bajarin" degani. Bu ayniqsa UI ni blokirovka qilmaslik uchun og'ir hisoblashlarni bo'laklarga ajratishda, va render sikliga imkon berishda ishlatiladi. HTML spetsifikatsiyasiga ko'ra nested setTimeout 5+ marta chaqirilganda minimum delay **4ms** bo'ladi (clamping), shuning uchun haqiqiy kechikish doim 0ms dan ko'proq.
 
 ### Under the Hood
 
@@ -957,7 +932,9 @@ setTimeout(function tick() {
 
 ### Nazariya
 
-`requestAnimationFrame(callback)` (qisqacha **rAF**) — na microtask, na macrotask. U **rendering bosqichida** ishlaydi — browser har gal ekranga chizishdan (paint) oldin rAF callback'larini chaqiradi.
+`requestAnimationFrame(callback)` (qisqacha **rAF**) — na microtask, na macrotask. U Event Loop'ning **rendering bosqichida** ishlaydi — browser har gal ekranga chizishdan (paint) oldin rAF callback'larini chaqiradi. Bu uni animatsiyalar uchun ideal qiladi chunki u browser'ning render sikli bilan sinxronlashtirilgan (odatda 60fps = har 16.6ms).
+
+Nima uchun `setTimeout` emas, `rAF` ishlatish kerak? `setTimeout` macrotask bo'lib, u render sikli bilan sinxronlashtirilmagan — natijada animatsiyalar "jitter" qilishi mumkin. `rAF` esa browser o'zi render qilmoqchi bo'lganida aynan o'sha paytda chaqiriladi — silliq, 60fps animatsiya uchun optimal. Bundan tashqari, tab ko'rinmayotganda rAF avtomatik to'xtaydi — bu battery va CPU tejaydi.
 
 **rAF Event Loop'da qayerda turadi:**
 
@@ -1088,7 +1065,9 @@ document.getElementById("topBtn").addEventListener("click", () => {
 
 ### Nazariya
 
-Node.js Event Loop browser'nikidan farq qiladi. Node.js **libuv** kutubxonasini ishlatadi — bu C da yozilgan cross-platform asinxron I/O kutubxonasi. Node.js Event Loop **6 ta faza (phase)** dan iborat.
+Node.js Event Loop browser'nikidan sezilarli farq qiladi. Node.js **libuv** kutubxonasini ishlatadi — bu C da yozilgan cross-platform asinxron I/O kutubxonasi. Browser'dagi oddiy "macrotask → microtask → render" siklidan farqli o'laroq, Node.js Event Loop **6 ta faza (phase)** dan iborat: Timers, Pending Callbacks, Idle/Prepare, Poll, Check, Close Callbacks.
+
+Bu farqlarni bilish nima uchun muhim? Agar siz Node.js server yozayotgan bo'lsangiz, `setImmediate` vs `setTimeout(fn, 0)` ning farqi, `process.nextTick()` ning boshqa microtask'lardan yuqori priority'si, va Poll phase'ning I/O event'larni kutishi — bularning barchasi dasturingizning to'g'ri ishlashiga ta'sir qiladi.
 
 ### Under the Hood
 
@@ -1276,9 +1255,9 @@ setImmediate(() => console.log("setImmediate"));
 
 ### Nazariya
 
-**Starvation** — bu microtask queue hech qachon bo'sh bo'lmaydigan holat. Har bir microtask yangi microtask qo'shsa, Event Loop **hech qachon** macrotask'larga yoki rendering'ga o'tmaydi.
+**Starvation** — bu microtask queue hech qachon bo'sh bo'lmaydigan xavfli holat. Har bir microtask yangi microtask qo'shsa, Event Loop **hech qachon** macrotask'larga yoki rendering'ga o'tmaydi — natijada UI muzlab qoladi, setTimeout callback'lari ishlamaydi, va browser "Not Responding" holatiga tushadi.
 
-Buni eslang: Event Loop **barcha** microtask'larni bajaradi macrotask'ga o'tishdan oldin. Agar microtask'lar cheksiz qo'shilsa — macrotask'lar va rendering **ochliqdan o'ladi** (starve).
+Bu muammo aynan microtask'larning "barchasini bo'shat" qoidasidan kelib chiqadi. Macrotask'larda bu muammo yo'q chunki ular bittadan olinadi. Lekin microtask'lar rekursiv qo'shilsa — Event Loop ularni tugatishga urinib qoladi. Shuning uchun microtask ichida yangi microtask qo'shishda ehtiyot bo'lish kerak, ayniqsa tsikl yoki rekursiya ishlatilganda.
 
 ### Under the Hood
 
@@ -1389,7 +1368,9 @@ function goodRecursion() {
 
 ### Nazariya
 
-UI blocking — bu JavaScript ning single-threaded tabiatidan kelib chiqadigan eng katta muammo. Agar Call Stack da og'ir hisoblash bajarilayotgan bo'lsa — browser **hech narsani** qila olmaydi: button click'lar, scroll, animation, render — HAMMA narsa to'xtaydi.
+UI blocking — bu JavaScript ning single-threaded tabiatidan kelib chiqadigan **eng katta amaliy muammo**. Agar Call Stack da og'ir hisoblash bajarilayotgan bo'lsa — browser **hech narsani** qila olmaydi: button click'lar, scroll, animatsiyalar, render — HAMMA narsa to'xtaydi. Bu muammoni hal qilishning bir nechta usuli bor: ishni kichik bo'laklarga ajratish (`setTimeout` yoki `requestAnimationFrame` bilan), `Web Worker` ishlatish (haqiqiy parallel thread), yoki `requestIdleCallback` bilan browser bo'sh paytida ishlash.
+
+Bu tushuncha nima uchun muhim? Real-world dasturlarda ko'pincha katta ma'lumotlarni filterlash, murakkab hisoblashlar, yoki katta ro'yxatlarni render qilish kerak bo'ladi. Bularni to'g'ri boshqarmasangiz — foydalanuvchi interfeysi 3-5 soniya muzlab qoladi va bu foydalanuvchi tajribasini buzadi. Zamonaviy framework'lar (React Fiber, Vue 3) bu muammoni ichki optimizatsiyalar bilan hal qiladi, lekin mexanizmni tushunish har qanday dasturchi uchun muhim.
 
 ### Kod Misollari
 

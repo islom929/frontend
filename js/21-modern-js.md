@@ -25,7 +25,7 @@
 
 ### Nazariya
 
-Destructuring — object yoki array dan qiymatlarni alohida o'zgaruvchilarga **qulay** ajratib olish. ES6 dan beri mavjud.
+Destructuring — object yoki array dan qiymatlarni alohida o'zgaruvchilarga **qulay** ajratib olish (ES6). Object destructuring da property nomi bo'yicha, array destructuring da pozitsiya bo'yicha ajratiladi. Alias (nom o'zgartirish), default qiymat, nested destructuring, rest (`...`) bilan qolganlarini yig'ish, va computed property names qo'llab-quvvatlanadi. Funksiya parametrlarida destructuring — ko'p parametrli funksiyalarni o'qiluvchan qiladi va options pattern'ni amalga oshiradi.
 
 ### Object Destructuring
 
@@ -146,9 +146,7 @@ async function getUser() {
 
 ### Nazariya
 
-`...` operatori ikki xil kontekstda ishlatiladi:
-- **Spread** — array/object ni "yoyish" (expand)
-- **Rest** — qolgan elementlarni "yig'ish" (collect)
+`...` operatori ikki xil kontekstda ishlatiladi: **Spread** — array/object ni "yoyish" (expand qilish, nusxa ko'chirish, birlashtirish), va **Rest** — qolgan elementlarni "yig'ish" (collect qilish, funksiya parametrlarida yoki destructuring'da). Spread shallow copy yaratadi (nested object'lar reference saqlaydi). Rest operator haqiqiy `Array` qaytaradi — eski `arguments` object'dan farqli o'laroq barcha array method'lari ishlaydi. Arrow funksiyada `arguments` yo'q, faqat rest operator ishlaydi.
 
 ### Spread Operator
 
@@ -252,7 +250,7 @@ const arrow = (...args) => {
 
 ### Nazariya
 
-Template literals (`` ` ` ``) — stringlarni qulayroq yozish. Ichida expression, multi-line va tag'lar ishlatish mumkin.
+Template literals (backtick `` ` ``) — stringlarni qulayroq yozish. `${expression}` bilan interpolation (har qanday JS expression), haqiqiy multi-line (\n kerak emas), va **tagged templates** (template literal'ni funksiya orqali qayta ishlash — SQL injection himoyasi, CSS-in-JS, i18n uchun ishlatiladi) qo'llab-quvvatlanadi. `String.raw` tag escape sequence'larni ishlatmaslik uchun foydali (regex yozishda).
 
 ### Kod Misollari
 
@@ -350,7 +348,7 @@ const regex = new RegExp(String.raw`\d+\.\d+`);
 
 ### Nazariya
 
-Default parametrlar — funksiya argumenti berilmasa yoki `undefined` bo'lsa, ishlatilshi kerak bo'lgan qiymat.
+Default parametrlar — funksiya argumenti berilmasa yoki `undefined` bo'lsa ishlatiladi. Faqat `undefined` da ishlaydi, `null` da **emas** (bu `||` dan asosiy farqi). Default qiymat sifatida avvalgi parametrdan foydalanish, funksiya chaqirish (lazy evaluation — faqat kerak bo'lganda chaqiriladi), va destructuring + default kombinatsiyasi mumkin. Eski `||` usuli `0`, `""`, `false` kabi falsy qiymatlarni ham default bilan almashtirardi — default parametrlar bu muammoni hal qiladi.
 
 ### Kod Misollari
 
@@ -435,7 +433,7 @@ function best(name) {
 
 ### Nazariya
 
-`?.` operatori — xavfsiz property access. Agar oraliq qiymat `null` yoki `undefined` bo'lsa, xato bermaydi, `undefined` qaytaradi.
+`?.` operatori (ES2020) — xavfsiz property access. Agar oraliq qiymat `null` yoki `undefined` bo'lsa, xato bermaydi, darhol `undefined` qaytaradi (short-circuit). Property access (`a?.b`), method chaqirish (`a?.method()`), array element (`a?.[0]`), va dynamic property (`a?.[key]`) da ishlaydi. `??` (nullish coalescing) bilan birgalikda ishlatiladi: `data?.user?.name ?? "Noma'lum"`. Chap tomonda (left-hand side) ishlatib bo'lmaydi: `a?.b = 5` — SyntaxError.
 
 ### Kod Misollari
 
@@ -520,7 +518,7 @@ a?.b?.c?.d
 
 ### Nazariya
 
-`??` operatori — **faqat** `null` yoki `undefined` bo'lganda default qiymat beradi. `||` dan farqi — `0`, `""`, `false` kabi falsy qiymatlarni saqlab qoladi.
+`??` operatori (ES2020) — **faqat** `null` yoki `undefined` bo'lganda default qiymat beradi. `||` dan asosiy farqi: `0`, `""`, `false` kabi falsy qiymatlarni **saqlab qoladi**. `??=` (nullish coalescing assignment) faqat null/undefined bo'lganda yangi qiymat tayinlaydi. Muhim cheklov: `||` va `&&` bilan to'g'ridan-to'g'ri aralashtirib bo'lmaydi — qavslar bilan aniqlashtirish kerak.
 
 ### Kod Misollari
 
@@ -591,12 +589,7 @@ const y = a || (b ?? c);
 
 ### Nazariya
 
-| | `for...of` | `for...in` |
-|---|-----------|-----------|
-| **Nima beradi** | **Qiymat** (value) | **Kalit** (key/index) |
-| **Nima uchun** | Iterable (Array, String, Map, Set) | Object property'lari |
-| **Prototype** | ❌ Ko'rmaydi | ✅ Prototype ni ham ko'radi |
-| **Tartib** | Insertion tartibida | Kafolatlanmagan (odatda to'g'ri) |
+`for...of` — **qiymatlarni** iteratsiya qiladi (Array, String, Map, Set, va boshqa iterable'lar uchun), prototype'ni ko'rmaydi. `for...in` — **kalitlarni** (key/index) iteratsiya qiladi (object property'lari uchun), lekin prototype chain'dagi property'larni ham ko'radi. **Qoida**: array'da hech qachon `for...in` ishlatmang (prototype property'lar va string index muammolari), object uchun `for...in` yoki `Object.entries()` + `for...of` ishlatish mumkin.
 
 ### Kod Misollari
 
@@ -661,7 +654,7 @@ for (const val of set) {
 
 ### Nazariya
 
-Regular Expression (RegExp) — matn ichida pattern (andoza) qidirish, tekshirish va almashtirish uchun.
+Regular Expression (RegExp) — matn ichida pattern (andoza) qidirish, tekshirish va almashtirish uchun kuchli vosita. Literal (`/pattern/flags`) yoki constructor (`new RegExp()`) bilan yaratiladi. Asosiy flag'lar: `g` (global), `i` (case-insensitive), `m` (multiline), `s` (dotAll), `u` (unicode), `d` (indices). Named groups (`(?<name>...)`) va `matchAll()` (ES2020) zamonaviy qo'shimchalar. Asosiy usullar: `test()` (boolean tekshirish), `match()` (qidirish), `replace()`/`replaceAll()` (almashtirish), `split()` (bo'lish).
 
 ### Asosiy Sintaksis
 
@@ -751,7 +744,7 @@ for (const match of text.matchAll(priceRegex)) {
 
 ### Nazariya
 
-JSON (JavaScript Object Notation) — ma'lumot almashish formati. JavaScript da `JSON.parse()` va `JSON.stringify()` bilan ishlatiladi.
+JSON (JavaScript Object Notation) — tildan mustaqil ma'lumot almashish formati. `JSON.stringify()` object'ni string'ga aylantiradi (replacer funksiyasi va space parametri bilan), `JSON.parse()` string'ni object'ga aylantiradi (reviver funksiyasi bilan — masalan, Date string'larni Date object'ga aylantirish). JSON da saqlanmaydi: funksiyalar, `undefined`, `Symbol`, `Infinity`, `NaN`, circular reference'lar. `toJSON()` metodi qo'shilsa, stringify chaqirilganda custom serialization qilinadi.
 
 ### JSON.stringify — Object → String
 

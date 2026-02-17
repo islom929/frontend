@@ -32,7 +32,7 @@
 
 ### Nazariya
 
-JavaScript da **7 ta primitive type** va **1 ta reference type** bor:
+JavaScript da **7 ta primitive type** (string, number, boolean, null, undefined, symbol, bigint) va **1 ta reference type** (object — Object, Array, Function, Date, RegExp, Map, Set va boshqalar shu kategoriyaga kiradi) bor. Primitive qiymatlar **immutable** (o'zgarmas) va **copy by value** (nusxa ko'chiriladi), reference turlari esa **mutable** va **copy by reference** (address ko'chiriladi). Bu farq `===` taqqoslash, funksiya argumentlari, va xotira boshqaruvida fundamental ahamiyatga ega.
 
 ```
 ┌───────────────────────────────────────────────┐
@@ -91,7 +91,7 @@ Batafsil xotira haqida: [16-memory.md](16-memory.md)
 
 ### Nazariya
 
-`typeof` operatori qiymatning type'ini **string** sifatida qaytaradi:
+`typeof` operatori qiymatning type'ini **string** sifatida qaytaradi. U 8 ta mumkin bo'lgan natija beradi: `"string"`, `"number"`, `"boolean"`, `"undefined"`, `"symbol"`, `"bigint"`, `"object"`, va `"function"`. Eng mashhur bug: `typeof null === "object"` — bu 1995 yildagi ichki type tag tizimidagi xato bo'lib, hech qachon tuzatilmadi. Array ham `"object"` qaytaradi, shuning uchun array tekshirish uchun `Array.isArray()` ishlatish kerak. Eng aniq type aniqlash usuli — `Object.prototype.toString.call(value)`.
 
 ```javascript
 typeof "salom"      // "string"
@@ -159,7 +159,7 @@ console.log(preciseType(new Map()));  // "map"
 
 ### Nazariya
 
-**Type coercion** — JavaScript engine bir type'ni boshqasiga avtomatik yoki qo'lda o'zgartirishi. Ikki turi bor:
+**Type coercion** — JavaScript engine bir type'ni boshqasiga avtomatik yoki qo'lda o'zgartirishi. **Explicit (qo'lda)** coercion — dasturchi `Number()`, `String()`, `Boolean()` kabi funksiyalar orqali aylantiradi. **Implicit (avtomatik)** coercion — engine o'zi aylantiradi, masalan `"5" + 3` da number string'ga aylanadi. ECMAScript spec'da bu jarayon **Abstract Operations** (ToString, ToNumber, ToBoolean, ToPrimitive) deb ataladi — bu ichki operatsiyalar engine tomonidan har doim ishlatiladi.
 
 **1. Explicit (Qo'lda) Coercion** — dasturchi o'zi aylantiradi:
 
@@ -209,11 +209,7 @@ Har birini batafsil ko'rib chiqamiz.
 
 ### Nazariya
 
-`ToString` — qiymatni **string** ga aylantirish. Qachon sodir bo'ladi:
-
-1. `String(value)` — explicit
-2. Template literal: `` `${value}` ``
-3. `+` operator agar **bir tomon string** bo'lsa
+`ToString` — qiymatni **string** ga aylantirish abstract operatsiyasi. U `String(value)`, template literal (`` `${value}` ``), va `+` operatori agar bir tomon string bo'lsa — shu hollarda ishga tushadi. Muhim nuanslar: `-0` `"0"` ga aylanadi (lekin `Object.is(-0, 0)` ularni farqlaydi), bo'sh array `""` ga (ya'ni bo'sh string'ga) aylanadi, oddiy object `"[object Object]"` ga aylanadi, va Symbol faqat explicit (`String()`) bilan aylanadi — implicit da TypeError beradi.
 
 ### To'liq Konversiya Jadvali
 
@@ -298,13 +294,7 @@ Array uchun `ToString` aslida `.join(",")` ni chaqiradi:
 
 ### Nazariya
 
-`ToNumber` — qiymatni **number** ga aylantirish. Qachon sodir bo'ladi:
-
-1. `Number(value)` — explicit
-2. Matematik operatorlar: `-`, `*`, `/`, `%`, `**`
-3. Comparison: `>`, `<`, `>=`, `<=`
-4. `==` (ba'zi holatlarda)
-5. Unary `+` operator: `+value`
+`ToNumber` — qiymatni **number** ga aylantirish abstract operatsiyasi. U `Number(value)`, matematik operatorlar (`-`, `*`, `/`, `%`, `**`), comparison (`>`, `<`), `==` (ba'zi holatlarda), va unary `+` operator (`+value`) da ishga tushadi. Eng ko'p xato keltiradigan nuanslar: `null` `0` ga, `undefined` esa `NaN` ga aylanadi; bo'sh string `""` `0` ga aylanadi; `parseInt()` esa `Number()` dan farqli ishlaydi — u string'ni boshidan o'qiydi va birinchi raqam bo'lmagan belgida to'xtaydi (`parseInt("42px")` → `42`).
 
 ### To'liq Konversiya Jadvali
 
@@ -395,7 +385,7 @@ undefined + 5  // NaN — NaN + 5 = NaN
 
 ### Nazariya
 
-`ToBoolean` — qiymatni **boolean** ga aylantirish. **Eng oddiy qoida** — falsy ro'yxatda bo'lmagan HAMMA narsa truthy:
+`ToBoolean` — qiymatni **boolean** ga aylantirish abstract operatsiyasi. **Eng oddiy qoida**: JavaScript'da faqat **8 ta falsy** qiymat bor (`false`, `0`, `-0`, `0n`, `""`, `null`, `undefined`, `NaN`) — bu ro'yxatda **bo'lmagan** har qanday narsa **truthy**. Ko'pchilik kutmagan holatlar: bo'sh array `[]` va bo'sh object `{}` **truthy**, string `"0"` va `"false"` ham **truthy**. Muhim: `||` va `&&` operatorlari boolean emas, **qiymatni** qaytaradi; `??` (nullish coalescing) esa faqat `null`/`undefined` ni tekshiradi (0 va "" ni o'tkazib yuboradi).
 
 ### To'liq Falsy Ro'yxat (FAQAT 8 TA!)
 
@@ -466,7 +456,7 @@ undefined ?? "default" // "default"
 
 ### Nazariya
 
-Object primitive emas — lekin ba'zan engine object'ni primitive qiymatga aylantirishi kerak (masalan, `+`, `==`, template literal). Buning uchun **ToPrimitive** abstract operation ishlatiladi.
+Object primitive emas — lekin ba'zan engine object'ni primitive qiymatga aylantirishi kerak (masalan, `+`, `==`, template literal). Buning uchun **ToPrimitive** abstract operation ishlatiladi. U **hint** parametri oladi: `"string"` (toString birinchi), `"number"` (valueOf birinchi), yoki `"default"` (odatda number kabi, lekin Date uchun string kabi). Agar object'da `Symbol.toPrimitive` method bo'lsa, u eng **yuqori prioritet**ga ega va hint bilan chaqiriladi. Bu mexanizmni tushunish `[] + []`, `{} + []`, `[1,2] + [3,4]` kabi "sehrli" natijalarni tushuntiradi.
 
 ### ToPrimitive Algorithm
 
@@ -602,10 +592,7 @@ String(d)        // "Fri Feb 06 2026 ..."
 
 ### Nazariya
 
-Bu JavaScript ning **eng chalkash** qismi. Keling, aniq tushuntiramiz:
-
-- **`===` (Strict Equality)** — type va qiymatni tekshiradi. **Coercion yo'q.**
-- **`==` (Loose/Abstract Equality)** — agar type'lar farqli bo'lsa, coercion qiladi, keyin taqqoslaydi.
+Bu JavaScript ning **eng chalkash** qismi. `===` (Strict Equality) — type va qiymatni tekshiradi, **coercion yo'q**. `==` (Abstract Equality) — agar type'lar farqli bo'lsa, ECMAScript spec'dagi murakkab algoritm bo'yicha coercion qiladi, keyin taqqoslaydi. Bu algoritmda: `null == undefined` maxsus qoida bilan `true`; Boolean bor bo'lsa avval Number'ga aylanadi; Object bor bo'lsa ToPrimitive chaqiriladi; String vs Number bo'lsa String Number'ga aylanadi. **Amaliy qoida**: doim `===` ishlating, yagona foydali `==` holat — `x == null` (bu `x === null || x === undefined` ning qisqa yozilishi).
 
 ```javascript
 // === — type ham, qiymat ham teng bo'lishi kerak:
@@ -849,7 +836,7 @@ Boolean(document.all) // false — object, lekin falsy!
 
 ### Nazariya
 
-`instanceof` — object qaysi constructor yordamida yaratilganligini tekshiradi. Lekin aslida **prototype chain** bo'ylab tekshiradi.
+`instanceof` — object qaysi constructor yordamida yaratilganligini tekshiradi, lekin aslida **prototype chain** bo'ylab tekshiradi: `Constructor.prototype` object'ning prototype chain'ida bormi? `Symbol.hasInstance` orqali bu xatti-harakatni customize qilish mumkin. Cross-frame/realm muammosi bor — turli iframe'larda yaratilgan Array'lar bir-birining `instanceof Array` testidan o'tmaydi, shuning uchun `Array.isArray()` ishlatish kerak.
 
 ```javascript
 class Animal {}
@@ -937,7 +924,7 @@ Prototype chain haqida batafsil: [07-prototypes.md](07-prototypes.md)
 
 ### Nazariya
 
-**Symbol** — ES6 da qo'shilgan primitive type. Har bir Symbol **unique** — hech ikki Symbol teng emas.
+**Symbol** — ES6 da qo'shilgan primitive type. Har bir Symbol **unique** — hech ikki Symbol teng emas, hatto bir xil tavsif bilan yaratilgan bo'lsa ham. Symbollar asosan object property key sifatida ishlatiladi — bu nom to'qnashuvining oldini oladi. JavaScript o'zida `Symbol.iterator`, `Symbol.toPrimitive`, `Symbol.hasInstance` kabi **well-known Symbol**'lar bor — ular engine'ning ichki mexanizmlarini customize qilish imkonini beradi. `Symbol.for()` esa **global Symbol registry** orqali bir xil kalit bilan bir xil Symbol qaytaradi — bu cross-module shared Symbol uchun foydali.
 
 ```javascript
 const s1 = Symbol();
@@ -1056,7 +1043,7 @@ if (sym) {}     // OK — truthy
 
 ### Nazariya
 
-**BigInt** — ES2020 da qo'shilgan type. `Number.MAX_SAFE_INTEGER` (2^53 - 1) dan katta sonlar bilan ishlash uchun.
+**BigInt** — ES2020 da qo'shilgan primitive type. `Number.MAX_SAFE_INTEGER` (2^53 - 1 = 9007199254740991) dan katta sonlar bilan ishlash uchun mo'ljallangan — bu chegaradan oshganda oddiy Number noto'g'ri natijalar beradi. BigInt sonning oxiriga `n` qo'shiladi yoki `BigInt()` funksiyasi bilan yaratiladi. Muhim cheklov: BigInt va Number aralashtirib arifmetika qilib bo'lmaydi (`TypeError`), shuning uchun explicit konversiya kerak (`BigInt(num)` yoki `Number(big)`, lekin aniqlik yo'qolishi mumkin).
 
 ```javascript
 // Number cheklovi:
@@ -1146,7 +1133,7 @@ JSON.stringify({ id: 123n }, (key, val) =>
 
 ### Nazariya
 
-`Map` — ES6 da qo'shilgan data structure. Object ga o'xshaydi, lekin muhim farqlari bor.
+`Map` — ES6 da qo'shilgan data structure bo'lib, Object ga o'xshasa-da muhim farqlari bor: Map'da key **har qanday type** bo'lishi mumkin (Object, Function, primitive), key tartibi **insertion order** bilan kafolatlanadi, `size` property'si O(1), va u to'g'ridan-to'g'ri iterable. Object esa key faqat string/symbol bo'lishi mumkin, prototype pollution xavfi bor, va tez-tez qo'shish/o'chirish uchun optimallashtirilmagan. **Amaliy qoida**: tez-tez o'zgaradigan key-value ma'lumotlar uchun Map, tuzilishi oldindan ma'lum konfiguratsiya uchun Object ishlatish kerak.
 
 ### Taqqoslash Jadvali
 
@@ -1274,7 +1261,7 @@ console.timeEnd("Object delete"); // ancha sekinroq
 
 ### Nazariya
 
-`Set` — faqat **unique** qiymatlarni saqlaydi. Array da dublikatlar bo'lishi mumkin.
+`Set` — faqat **unique** qiymatlarni saqlaydigan ES6 data structure. Array'dan farqi: dublikat qo'shilmaydi, `has()` metodi O(1) (Array'ning `includes()` O(n)), va `delete()` ham O(1) (Array'ning `splice()` O(n)). Set ayniqsa duplikatlarni olib tashlash (`[...new Set(arr)]`), unique qiymatlarni saqlash, va to'plam operatsiyalari (union, intersection, difference) uchun ideal.
 
 ### Taqqoslash
 
@@ -1341,7 +1328,7 @@ const diff = new Set([...a].filter(x => !b.has(x)));  // {1, 2}
 
 ### Nazariya
 
-**WeakMap** va **WeakSet** — ularning key'lari (WeakMap) yoki qiymatlari (WeakSet) **weakly referenced** — garbage collector ularni o'chirishi mumkin.
+**WeakMap** va **WeakSet** — ularning key'lari (WeakMap) yoki qiymatlari (WeakSet) **weakly referenced** — garbage collector ularni istalgan vaqtda o'chirishi mumkin. Key faqat object bo'lishi mumkin (primitive emas), iterable emas (size, keys(), values() yo'q), chunki GC noaniq vaqtda ishlaydi. Asosiy foydalanish holatlari: DOM element'larga meta-data biriktirish, private data saqlash, va cache tizimlari. Batafsil: [16-memory.md](16-memory.md).
 
 ### WeakMap
 
@@ -1453,7 +1440,7 @@ Batafsil memory management: [16-memory.md](16-memory.md)
 
 ### Nazariya
 
-**`structuredClone()`** — ES2022 da qo'shilgan built-in deep copy funksiyasi. JSON hack dan ancha kuchli.
+**`structuredClone()`** — ES2022 da qo'shilgan built-in **deep copy** funksiyasi. `JSON.parse(JSON.stringify())` hack'idan ancha kuchli: Date, RegExp, Map, Set, ArrayBuffer, Blob, circular references ni to'g'ri handle qiladi. Lekin cheklovi bor: Function, DOM element, va Error object'larini clone qilib bo'lmaydi. Deep copy kerak bo'lgan har qanday joyda `structuredClone()` ishlatish eng to'g'ri yondashuv.
 
 ### structuredClone vs JSON Hack
 

@@ -28,9 +28,7 @@
 
 ### Nazariya
 
-Event (hodisa) — brauzerda sodir bo'ladigan har qanday narsa: foydalanuvchi click qilishi, klaviatura bosishi, sahifa yuklanganligi, scroll, formani jo'natishi va hokazo. JavaScript orqali biz bu hodisalarni ushlash va ularga javob berish mumkin.
-
-Event bilan ishlashning 3 ta usuli bor:
+Event (hodisa) — brauzerda sodir bo'ladigan har qanday narsa: foydalanuvchi click qilishi, klaviatura bosishi, sahifa yuklanganligi, scroll, formani jo'natishi va hokazo. JavaScript orqali biz bu hodisalarni ushlash va ularga javob berish mumkin. Event bilan ishlashning 3 usuli bor: HTML attribute (eski, tavsiya qilinmaydi — HTML va JS aralashib ketadi), DOM property (`onclick` — cheklangan, faqat bitta handler), va `addEventListener` (zamonaviy, to'g'ri — ko'p handler, remove qilish, options qo'llab-quvvatlash).
 
 ### 1. HTML Attribute (eski, tavsiya qilinmaydi)
 
@@ -84,7 +82,7 @@ btn.addEventListener("click", function(event) {
 
 ### Nazariya
 
-Event Bubbling — hodisa **ichki** elementdan **tashqi** elementlarga qarab ko'tarilishi. Bu DOM ning default xulq-atvori.
+Event Bubbling — hodisa **ichki** elementdan **tashqi** elementlarga qarab ko'tarilishi. Bu DOM ning default xulq-atvori bo'lib, deyarli barcha event'lar bubble qiladi (click, keydown, input, submit). Lekin ba'zi event'lar — `focus`/`blur`, `mouseenter`/`mouseleave`, `load`/`error` — **bubble qilmaydi**. `focus`/`blur` ning bubble versiyalari `focusin`/`focusout`, `mouseenter`/`mouseleave` ning bubble versiyalari `mouseover`/`mouseout` dir.
 
 ### Kod Misollari
 
@@ -158,7 +156,7 @@ Deyarli barcha event'lar bubble qiladi. Lekin ba'zi event'lar **bubble qilmaydi*
 
 ### Nazariya
 
-Event Capturing (yoki "trickling") — hodisa **tashqi** elementdan **ichki** elementga qarab tushishi. Bu bubbling ning teskarisi. Capturing faqat `addEventListener` ning uchinchi argumenti orqali yoqiladi.
+Event Capturing (yoki "trickling") — hodisa **tashqi** elementdan **ichki** elementga qarab tushishi, ya'ni bubbling ning teskarisi. Capturing faqat `addEventListener` ning uchinchi argumenti `true` yoki `{ capture: true }` qilib berilganda yoqiladi. Amalda capturing kamdan-kam ishlatiladi, lekin ba'zi hollarda (masalan, hodisani barcha child'lardan oldin ushlab olish) foydali.
 
 ### Kod Misollari
 
@@ -188,11 +186,7 @@ document.getElementById("inner").addEventListener("click", () => {
 
 ### Nazariya
 
-Har bir DOM event **3 ta fazadan** o'tadi:
-
-1. **Capturing Phase** — `document` dan target element gacha (tashqaridan ichga)
-2. **Target Phase** — target element o'zida
-3. **Bubbling Phase** — target dan `document` gacha (ichdan tashqiga)
+Har bir DOM event **3 ta fazadan** o'tadi: **Capturing Phase** (document dan target gacha, tashqaridan ichga), **Target Phase** (target element o'zida), va **Bubbling Phase** (target dan document gacha, ichdan tashqiga). Target element'da capturing va bubbling handler'larning ishlash tartibi — kod'da **yozilgan tartibda** bajariladi. Bu 3-fazali model W3C DOM Level 2 Events spetsifikatsiyasida belgilangan.
 
 ### ASCII Diagram
 
@@ -252,7 +246,7 @@ Target element da capturing va bubbling handler'larning ishlash tartibi — **yo
 
 ### Nazariya
 
-`addEventListener` — event handler qo'shishning zamonaviy va mos usuli.
+`addEventListener` — event handler qo'shishning zamonaviy va to'g'ri usuli. U 3 argument qabul qiladi: event type (string), handler (funksiya), va options (boolean yoki object). Options object'da: `capture` (capturing fazada ushlash), `once` (bir marta ishlab avtomatik o'chiriladi), `passive` (preventDefault chaqirmaslik kafolati — scroll performance uchun), va `signal` (AbortController bilan ko'p listener'larni bir vaqtda o'chirish). `removeEventListener` uchun **ayni funksiya reference** va **ayni capture qiymati** kerak.
 
 ### Sintaksis
 
@@ -328,8 +322,7 @@ button.removeEventListener("click", handler);       // ❌ ishlamaydi — defaul
 
 ### Nazariya
 
-- `stopPropagation()` — hodisa boshqa elementlarga **tarqalishini** to'xtatadi (bubble/capture to'xtaydi)
-- `stopImmediatePropagation()` — tarqalishni to'xtatadi VA shu elementdagi **qolgan** handler'lar ham bajarilmaydi
+`stopPropagation()` — hodisa boshqa elementlarga **tarqalishini** to'xtatadi (bubble/capture to'xtaydi), lekin shu elementdagi boshqa handler'lar bajariladi. `stopImmediatePropagation()` — tarqalishni to'xtatadi **VA** shu elementdagi **qolgan** handler'lar ham bajarilmaydi. Muhim: ikkalasi ham `preventDefault()` bilan aralashtirilmasligi kerak — ular propagation'ni boshqaradi, default behavior'ni emas.
 
 ### Kod Misollari
 
@@ -378,7 +371,7 @@ stopImmediatePropagation:
 
 ### Nazariya
 
-`preventDefault()` — brauzerning **standart xulq-atvorini** bekor qiladi. Lekin hodisa propagation sini TO'XTATMAYDI — hodisa davom etadi.
+`preventDefault()` — brauzerning **standart xulq-atvorini** bekor qiladi (link navigatsiyasi, form submit, checkbox toggle, kontekst menyu va boshqalar). Muhim: u hodisa propagation'ini **TO'XTATMAYDI** — hodisa bubble qilishda davom etadi. `return false` faqat `onclick` property'da ishlaydi (preventDefault + stopPropagation), `addEventListener` da hech nima qilmaydi.
 
 ### Kod Misollari
 
@@ -442,7 +435,7 @@ button.onclick = () => { return false; }; // preventDefault + stopPropagation
 
 ### Nazariya
 
-Event Delegation — har bir elementga alohida handler qo'shish o'rniga, **ota elementga bitta** handler qo'yish va `event.target` orqali qaysi element bosilganini aniqlash. Bu pattern bubbling asosida ishlaydi.
+Event Delegation — har bir elementga alohida handler qo'shish o'rniga, **ota elementga bitta** handler qo'yish va `event.target`/`closest()` orqali qaysi element bosilganini aniqlash. Bu pattern bubbling asosida ishlaydi. Afzalliklari: memory tejash (1000 ta handler o'rniga 1 ta), **dinamik elementlar** ham avtomatik ishlaydi (keyinroq qo'shilgan elementlar uchun alohida handler kerak emas), va kod soddaligi. Bu React kabi framework'larning event tizimiga asos bo'lgan pattern.
 
 ### Nima Uchun Kerak?
 
@@ -558,10 +551,7 @@ Event delegation nima uchun ishlaydi:
 
 ### Nazariya
 
-| Property | Ma'no | O'zgaradimi? |
-|----------|-------|-------------|
-| `event.target` | Hodisa **sodir bo'lgan** element (click qilingan) | ❌ O'zgarmaydi |
-| `event.currentTarget` | Handler **qo'yilgan** element | ✅ Har bosqichda o'zgaradi |
+`event.target` — hodisa **sodir bo'lgan** element (masalan, click qilingan button), u propagation davomida **o'zgarmaydi**. `event.currentTarget` — handler **qo'yilgan** element, har bubbling/capturing bosqichida o'zgaradi. Oddiy funksiyada `this === event.currentTarget`, lekin arrow function'da `this` tashqi scope'dan olinadi, shuning uchun arrow function'da `event.currentTarget` ishlatish kerak.
 
 ### Kod Misollari
 
@@ -599,7 +589,7 @@ parent.addEventListener("click", (e) => {
 
 ### Nazariya
 
-JavaScript orqali o'z hodisalarimizni yaratish va dispatch qilish mumkin. Bu component'lar orasidagi kommunikatsiya uchun juda foydali — ayniqsa loosely coupled arxitekturada.
+JavaScript orqali o'z hodisalarimizni yaratish va `dispatchEvent()` bilan yuborish mumkin. `CustomEvent` constructor'i `detail` property orqali ixtiyoriy data uzatish imkonini beradi. `bubbles: true` qo'yilsa hodisa yuqoriga ko'tariladi, `cancelable: true` qo'yilsa `preventDefault()` bilan bekor qilish mumkin. Bu component'lar orasidagi **loosely coupled** kommunikatsiya uchun juda foydali — Event Bus pattern asosi.
 
 ### Kod Misollari
 
@@ -670,7 +660,7 @@ bus.emit("cart-update", { items: ["telefon", "quloqchin"] });
 
 ### Nazariya
 
-Event listener'lar xotirada joy egallaydi. Agar to'g'ri tozalanmasa — memory leak bo'lishi mumkin. Ayniqsa **SPA** (Single Page Application) larda bu katta muammo.
+Event listener'lar xotirada joy egallaydi. Agar to'g'ri tozalanmasa — memory leak bo'lishi mumkin, ayniqsa **SPA** (Single Page Application) larda sahifa qayta yuklanmagani uchun muammo kuchayadi. Element DOM dan o'chirilsa, unga qo'yilgan listener'lar element bilan yo'qoladi, **LEKIN** global listener'lar (window, document) alohida o'chirilishi kerak. Eng zamonaviy cleanup usuli — `AbortController`: bitta `controller.abort()` bilan ko'p listener'larni bir vaqtda o'chirish mumkin.
 
 ### Memory Leak Holatlari
 
@@ -750,7 +740,7 @@ element.remove();
 
 ### Nazariya
 
-`passive: true` brauzerga aytadi: "Bu handler `preventDefault()` chaqirmaydi." Bu scroll va touch event'lar uchun performanceni sezilarli oshiradi.
+`passive: true` brauzerga kafolatli aytadi: "Bu handler `preventDefault()` chaqirmaydi." Bu scroll va touch event'lar uchun performance'ni sezilarli oshiradi — chunki brauzer handler tugashini **kutmasdan** scroll'ni darhol boshlaydi. `passive: false` (default) da brauzer handler ichida `preventDefault()` chaqirilishi mumkinligini tekshirish uchun kutishi kerak, bu esa scroll'ni 100ms+ kechiktiradi. Zamonaviy brauzerlar `touchstart`, `touchmove`, `wheel`, va `scroll` event'larini `document` va `window` da **default passive** qilgan.
 
 ### Nima Uchun Kerak?
 

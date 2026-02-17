@@ -24,7 +24,7 @@
 
 ### Nazariya
 
-Module pattern — kodni inkapsulatsiya qilib, faqat kerakli qismlarni ochish. ES6 modullardan oldingi asosiy pattern.
+Module pattern — kodni inkapsulatsiya qilib, faqat kerakli qismlarni (public API) ochish, qolganini yashirish (private). IIFE (Immediately Invoked Function Expression) bilan closure orqali amalga oshirilgan — ES6 modullardan oldingi asosiy pattern. Revealing Module Pattern — barcha funksiyalarni private yozib, oxirida qaysilari public ekanligini aniq ko'rsatish. Zamonaviy JavaScript da `export`/`import` bilan modul scope avtomatik ta'minlanadi.
 
 ### Kod Misollari
 
@@ -84,7 +84,7 @@ export const getCount = () => count;
 
 ### Nazariya
 
-Singleton — faqat **bitta instance** (namuna) mavjud bo'lishini ta'minlash. Global state, config, database connection uchun.
+Singleton — faqat **bitta instance** (namuna) mavjud bo'lishini ta'minlash. Global state, config, database connection, logger kabi resurslar uchun ishlatiladi. Class'da static private field + `getInstance()` metodi, yoki IIFE + closure bilan amalga oshiriladi. ES Module'larda har bir modul birinchi import'da execute bo'lib, keyin cache'lanadi — shuning uchun `export default {}` eng oddiy singleton hisoblanadi.
 
 ### Kod Misollari
 
@@ -158,7 +158,7 @@ export default config; // har doim BIR XIL object
 
 ### Nazariya
 
-Factory — object yaratish logikasini yashirish. Client qaysi class yaratilishini bilmasligi kerak.
+Factory — object yaratish logikasini bitta joyga markazlashtirish. Client qaysi aniq class yoki konfiguratsiya yaratilishini bilmasligi kerak — faqat turni aytadi, factory tegishli object qaytaradi. Simple Factory (switch/if bilan), Abstract Factory (bir necha bog'liq object'larni bir xil tema/style'da yaratish), va Factory Method (subclass'larda override qilish) variantlari bor.
 
 ### Kod Misollari
 
@@ -235,7 +235,7 @@ const btn = factory.createButton("Yuborish");
 
 ### Nazariya
 
-Observer (Pub/Sub) — bir object (publisher) o'zgarganda, barcha bog'liq object'lar (subscribers) avtomatik xabardor bo'ladi.
+Observer (Pub/Sub) — bir object (publisher/emitter) o'zgarganda yoki event emit qilganda, barcha bog'liq object'lar (subscribers/listeners) avtomatik xabardor bo'ladi. EventEmitter class: `on()` (subscribe + unsubscribe funksiya qaytarish), `once()` (bir marta ishlash), `off()` (unsubscribe), `emit()` (event trigger). State management, DOM events, WebSocket, va komponentlar arasi aloqa uchun asosiy pattern.
 
 ### Kod Misollari
 
@@ -343,7 +343,7 @@ store.setState(s => ({ count: s.count + 1 })); // State o'zgardi: { count: 2, ..
 
 ### Nazariya
 
-Strategy — algoritmni alohida qilib, runtime da almashtirish imkonini beradi.
+Strategy — algoritmni alohida funksiya/class sifatida ifodalab, **runtime** da almashtirish imkonini beradi. if/else zanjiri o'rniga object'da strategiyalarni saqlash va key bo'yicha tanlash. Yangi strategiya qo'shish uchun mavjud kodni o'zgartirish shart emas (Open/Closed Principle). Validatsiya, narx hisoblash, tartiblash, autentifikatsiya usullari kabi holatlarda ishlatiladi.
 
 ### Kod Misollari
 
@@ -420,7 +420,7 @@ calculatePrice(100, 150, "wholesale"); // 10500
 
 ### Nazariya
 
-Decorator — mavjud object yoki funksiyaga yangi xulq-atvor qo'shish, original kodni o'zgartirmasdan.
+Decorator — mavjud object yoki funksiyaga yangi xulq-atvor (logging, timing, caching, retry) qo'shish, **original kodni o'zgartirmasdan**. JavaScript da higher-order function sifatida amalga oshiriladi: original funksiyani oladi, yangi funksiya qaytaradi. Bir necha decorator'ni compose qilish mumkin (nesting yoki pipe). TC39 Decorator Proposal (Stage 3) class method'lar uchun `@decorator` sintaksisini taklif qiladi.
 
 ### Kod Misollari
 
@@ -508,7 +508,7 @@ const fetchUser = withRetry(
 
 ### Nazariya
 
-Command — operatsiyani object sifatida ifodalash. Undo/redo, queue, history kabi imkoniyatlar beradi.
+Command — operatsiyani (action) object sifatida ifodalash. Har bir command `execute()` va `undo()` metodlariga ega. Bu Undo/Redo, transaction queue, history, macro recording kabi imkoniyatlarni beradi. CommandManager command'lar stack'ini boshqaradi: execute (bajarish + history ga qo'shish), undo (oxirgi command'ni bekor qilish), redo (bekor qilingan command'ni qayta bajarish).
 
 ### Kod Misollari
 
@@ -599,7 +599,7 @@ console.log(editor.content); // "Salom Dunyo"
 
 ### Nazariya
 
-Middleware — so'rov/ma'lumotni zanjir bo'ylab qayta ishlash. Express.js, Redux ning asosi.
+Middleware — so'rov/ma'lumotni funksiyalar zanjiri bo'ylab ketma-ket qayta ishlash. Har bir middleware context va `next()` funksiyasini oladi — `next()` chaqirilsa keyingi middleware ishlaydi, chaqirilmasa zanjir to'xtaydi. Express.js, Koa, Redux ning asosiy arxitekturasi. Logging, autentifikatsiya, validatsiya, error handling kabi cross-cutting concern'larni ajratish uchun ideal.
 
 ### Kod Misollari
 

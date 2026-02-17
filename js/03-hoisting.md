@@ -25,9 +25,11 @@
 
 ### Nazariya
 
-Hoisting — bu JavaScript'ning o'ziga xos xususiyati: o'zgaruvchi va funksiya e'lonlarini kodda yozilgan joyidan **oldin** ishlatish mumkinligi.
+Hoisting — bu JavaScript'ning o'ziga xos xususiyati bo'lib, o'zgaruvchi va funksiya e'lonlarini kodda yozilgan joyidan **oldin** ishlatish imkoniyatini beradi. Bu xususiyat boshqa ko'plab dasturlash tillarida (Python, Java, C++) mavjud emas va shuning uchun JavaScript'ga o'tgan dasturchilarni ko'pincha chalkashtirib yuboradi.
 
-Ko'pchilik "hoisting = declaration yuqoriga ko'tariladi" deb tushunadi. Bu **oddiy model** — tushunish uchun yaxshi, lekin texnik jihatdan **noto'g'ri**.
+Ko'pchilik "hoisting = declaration yuqoriga ko'tariladi" deb tushunadi. Bu **oddiy mental model** — boshlang'ich darajada tushunish uchun foydali, lekin texnik jihatdan **mutlaqo noto'g'ri**. Hech qanday kod jismonan ko'tarilmaydi yoki qayta joylashtirilmaydi. Aslida sodir bo'layotgan narsa — bu [02-execution-context.md](02-execution-context.md) da o'rgangan **Creation Phase** mexanizmimiz. Engine kodni bajarishdan **oldin** avval butun scope'ni skanerlab, barcha e'lonlarni topadi va ularni xotiraga yozadi. Shu sababli e'londan oldingi satrlarda ham o'zgaruvchi yoki funksiyaga murojaat qilish mumkin.
+
+Nima uchun bu muhim? Real-world kodda hoisting'ni tushunmaslik kutilmagan xatolarga olib keladi. Masalan, `var` bilan e'lon qilingan o'zgaruvchi e'londan oldin `undefined` qaytaradi (xato bermaydi!), `let`/`const` esa `ReferenceError` tashlab dasturni to'xtatadi. Function declaration'lar to'liq hoist bo'ladi va e'londan oldin chaqirish mumkin, lekin function expression'lar faqat o'zgaruvchi sifatida hoist bo'ladi. Bu farqlarni bilmaslik React, Express va boshqa framework'larda nozik bug'larga sabab bo'lishi mumkin.
 
 ```javascript
 console.log(name); // undefined — hali e'lon qilinmagan ko'rinadi, lekin xato bermaydi!
@@ -95,10 +97,9 @@ var x = 5;
 
 ### Nazariya
 
-`var` bilan e'lon qilingan o'zgaruvchi Creation Phase da:
-1. Xotiraga yoziladi ✅
-2. `undefined` bilan **initialize** qilinadi ✅
-3. Qiymati Execution Phase da beriladi
+`var` — JavaScript'ning eng qadimgi o'zgaruvchi e'lon qilish usuli bo'lib, uning hoisting xulq-atvori boshqa e'lon turlaridan tubdan farq qiladi. `var` bilan e'lon qilingan o'zgaruvchi Creation Phase da xotiraga yoziladi **va** darhol `undefined` qiymati bilan **initialize** qilinadi. Shuning uchun e'londan oldingi satrlarda ham `var` o'zgaruvchisiga murojaat qilsangiz, xato emas, `undefined` qaytaradi.
+
+Bu xulq-atvor ko'pincha nozik va topish qiyin bo'lgan bug'larga sabab bo'ladi. Tasavvur qiling, katta loyihada 200-verstalik faylda biror joyda `var total` e'lon qilingan, lekin siz kodni o'qiyotib yuqori qismda `total` ni ishlatmoqchisiz — `undefined` qaytaradi va hech qanday xato bermaydi. Bu **jim xato** (silent bug) — dastur ishlab turadi, lekin noto'g'ri natija beradi. Aynan shu muammo `let`/`const` ni yaratishga sabab bo'lgan asosiy motivatsiyalardan biri edi.
 
 ```javascript
 console.log(a); // undefined — mavjud, lekin hali qiymat berilmagan
@@ -157,9 +158,11 @@ console.log(i); // 3 — var function/global scope, for block emas
 
 ### Nazariya
 
-**Ko'pchilik o'ylaydi:** "let va const hoist bo'lmaydi"
+`let` va `const` hoisting mavzusida eng keng tarqalgan noto'g'ri tushuncha: **"let va const hoist bo'lmaydi"**. Bu **noto'g'ri**. `let` va `const` ham xuddi `var` kabi **hoist bo'ladi** — ya'ni Creation Phase da engine ularning mavjudligini biladi va xotiraga yozadi. Lekin muhim farq shundaki — ular `undefined` bilan **initialize qilinmaydi**. Ular e'lon qilingan satrgacha **TDZ (Temporal Dead Zone)** holatida turadi va bu vaqt ichida ularga murojaat qilish `ReferenceError` tashlanishiga sabab bo'ladi.
 
-**Haqiqat:** let va const **HOIST BO'LADI**, lekin `undefined` bilan initialize **QILINMAYDI**
+Bu farq sun'iy emas — u dizayn bo'yicha ataylab qilingan qaror. `var` ning `undefined` bilan initialize bo'lishi ko'p yillar davomida **jim xatolar**ga (silent bugs) sabab bo'ldi. Dasturchi o'zgaruvchini e'lon qilishni unutardi yoki noto'g'ri joyda ishlatardi, lekin JavaScript xato bermasdi — `undefined` qaytarib dasturchini chalg'itardi. `let`/`const` ning TDZ mexanizmi aynan shu muammoni hal qiladi: agar o'zgaruvchini e'londan oldin ishlatsangiz, JavaScript darhol **xato beradi** va siz muammoni deployment'ga chiqishidan oldin topasiz.
+
+Quyidagi misol `let` ning hoist bo'lishini **isbotlaydi**:
 
 ```javascript
 // ❌ Agar let hoist bo'lmaganida, bu global x ni ko'rishi kerak edi:
@@ -193,9 +196,11 @@ const → xotiraga yoziladi + INITIALIZE QILINMAYDI (TDZ)
 
 ### Nazariya
 
-TDZ — **Temporal Dead Zone** — bu `let`/`const` o'zgaruvchining hoist bo'lgan nuqtasidan to e'lon qilingan satrgacha bo'lgan **"o'lik zona"**.
+TDZ — **Temporal Dead Zone** ("vaqtinchalik o'lik zona") — bu `let` va `const` o'zgaruvchining scope'ga kirgan nuqtasidan (hoist bo'lgan joydan) to e'lon qilingan satrgacha bo'lgan **xavfli hudud**. Bu hudud ichida o'zgaruvchi xotiraga yozilgan (engine uning mavjudligini biladi), lekin hali initialize qilinmagan — shuning uchun har qanday murojaat `ReferenceError` bilan tugaydi.
 
-Bu zona ichida o'zgaruvchiga **kirish taqiqlangan** — ReferenceError tashlanadi.
+"Temporal" so'zi bu yerda kalit: TDZ **vaqtga** asoslangan, **koddagi pozitsiyaga** emas. Bu nozik, lekin juda muhim farq. Funksiya ichida `let x` dan oldin `x` ga murojaat qilgan bo'lsangiz ham, agar bu funksiya `let x` dan **keyin** chaqirilsa — xato bo'lmaydi, chunki chaqirilish vaqtida `x` allaqachon initialize bo'lgan. Aksincha, funksiya `let x` dan oldin chaqirilsa — TDZ ishlaydi va `ReferenceError` tashlanadi. Shu sababli "temporal" — ya'ni vaqtga bog'liq.
+
+TDZ ni tushunish amaliy jihatdan muhim, chunki zamonaviy JavaScript kodda `let`/`const` standart hisoblanadi va TDZ xatolari production'da eng ko'p uchraydigan runtime xatolardan biri. TypeScript ham TDZ ni tekshiradi va compile vaqtida ogohlantiradi.
 
 ### Vizualizatsiya
 
@@ -287,7 +292,11 @@ console.log(typeof neverDeclared); // "undefined" — xato bermaydi
 
 ### Nazariya
 
-Function declaration — eng kuchli hoisting. To'liq funksiya Creation Phase da xotiraga yoziladi:
+Function declaration — bu hoisting'ning eng **kuchli** turi. Creation Phase da funksiya to'liq — tanasi, parametrlari va hamma narsasi bilan birga xotiraga yoziladi. Shuning uchun function declaration'ni kodda e'lon qilingan joyidan **oldin** chaqirish mumkin — engine allaqachon uni biladi.
+
+Bu xususiyat amaliy jihatdan juda qulay: kodni yuqoridan pastga o'qiyotganda avval **nima qilinayotganini** (funksiya chaqiruvlari) ko'rib, keyin pastda **qanday qilinayotganini** (funksiya tanasi) o'qish mumkin. Ko'p tajribali dasturchilar aynan shu sababli fayl yuqori qismida asosiy logikani, pastda esa yordamchi funksiyalarni joylashtiradi.
+
+Lekin muhim ogohlantiradigan narsa bor: bu xususiyat **faqat function declaration** uchun ishlaydi. Function expression'lar (`var f = function() {}`) va arrow function'lar (`const f = () => {}`) bu yerda **istisno** — ular o'zgaruvchi hoisting qoidalariga bo'ysunadi (ya'ni `var` bilan `undefined`, `let`/`const` bilan TDZ). Bu farqni bilmaslik ko'pincha `TypeError: ... is not a function` xatosiga olib keladi.
 
 ```javascript
 // Funksiyani e'lon qilishdan OLDIN chaqirish mumkin:
@@ -332,7 +341,9 @@ const greet = function() { console.log("Greet!"); };
 
 ### Nazariya
 
-Function expression — bu funksiyani o'zgaruvchiga assign qilish. Bu holda faqat **o'zgaruvchi** hoist bo'ladi, funksiyaning o'zi **emas**.
+Function expression — bu funksiyani o'zgaruvchiga assign qilish (`var add = function() {}` yoki `const add = () => {}`). Bu holda hoisting qoidasi **funksiyaga** emas, **o'zgaruvchiga** taalluqli bo'ladi. Ya'ni, `var` bilan yozilgan function expression'da faqat o'zgaruvchi nomi hoist bo'ladi (`undefined` bilan), funksiyaning o'zi esa Execution Phase da assign qilinadi.
+
+Bu farq amaliy jihatdan katta ahamiyatga ega. Ko'p dasturchilar function declaration va function expression'ni bir xil deb o'ylaydi, lekin ularning hoisting xulq-atvori butunlay farqli. `var` bilan yozilgan function expression'ni e'londan oldin chaqirsangiz `TypeError` olasiz (chunki `undefined` ni funksiya sifatida chaqirib bo'lmaydi), `let`/`const` bilan yozilganda esa `ReferenceError` (TDZ) olasiz. Zamonaviy JavaScript kodda `const` bilan function expression yozish tavsiya etiladi — bu TDZ orqali xatoni darhol ko'rsatadi va `undefined` ning "jim" muammosidan qochadi.
 
 ### var bilan Function Expression
 
@@ -393,7 +404,11 @@ Named function expression'ning nomi faqat funksiya ichidan ko'rinadi — recursi
 
 ### Nazariya
 
-Agar bir xil nomda `var` va `function declaration` e'lon qilinsa, kim yutadi?
+Agar bir xil nomda `var` va `function declaration` e'lon qilinsa, kim yutadi? Bu savol intervyu'da tez-tez so'raladi va uning javobi hoisting mexanizmini qanchalik chuqur tushunishingizni ko'rsatadi.
+
+**Qoida oddiy: Function declaration har doim `var` declaration'dan ustun turadi.** Creation Phase da engine avval barcha `var` declaration'larni xotiraga yozadi (`undefined` bilan), keyin function declaration'larni yozadi (to'liq funksiya bilan). Agar nomlar bir xil bo'lsa — function declaration ikkinchi bo'lib yoziladi va oldingi `undefined` qiymatini **qayta yozadi** (overwrite). Shuning uchun aynan bitta bosqich ichida function declaration va `var` bir xil nomga ega bo'lsa, function har doim g'alaba qozonadi.
+
+Bu qoidani bilish nima uchun muhim? Real-world loyihalarda, ayniqsa katta jamoalarda, turli dasturchilar bir xil fayl yoki global scope'da bir xil nomli o'zgaruvchi va funksiya yaratishi mumkin. Bu holda hoisting priority'si qaysi qiymat qolishini belgilaydi. Zamonaviy kodda bu muammo kam uchraydi (chunki `let`/`const` va modullar ishlatiladi), lekin legacy code bilan ishlashda bu bilim juda zarur.
 
 **Qoida: Function declaration > var declaration**
 

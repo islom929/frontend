@@ -24,7 +24,7 @@
 
 ### Nazariya
 
-JavaScript da bir nechta built-in error turlari mavjud. Har biri turli xil muammoni bildiradi:
+JavaScript da bir nechta built-in error turlari mavjud, barchasi `Error` base class'idan meros oladi. Asosiy turlar: `SyntaxError` (kod noto'g'ri yozilgan, JSON parse xatosi), `ReferenceError` (mavjud bo'lmagan o'zgaruvchiga murojaat), `TypeError` (noto'g'ri type da operatsiya, null/undefined property o'qish), `RangeError` (qiymat ruxsat etilgan oraliqdan tashqari, stack overflow), `URIError` (noto'g'ri URI), va `AggregateError` (ES2021 — bir necha xatoni birlashtirish, `Promise.any()` qo'llaydi). Har bir error obyekti `name`, `message`, va `stack` (debugging uchun stack trace) xususiyatlariga ega.
 
 ### Built-in Error Turlari
 
@@ -104,7 +104,7 @@ console.log(err.stack);   // Stack trace — debugging uchun
 
 ### Nazariya
 
-`try/catch/finally` — xatolarni ushlab, dastur to'xtamasdan davom etish imkonini beradi.
+`try/catch/finally` — xatolarni ushlab, dastur to'xtamasdan davom etish imkonini beradi. `try` blokida xato bo'lishi mumkin bo'lgan kod yoziladi, `catch` faqat xato bo'lganda ishlaydi (error obyektini parametr sifatida oladi), `finally` **doim** ishlaydi — xato bo'lsa ham, return bo'lsa ham (resource cleanup uchun ideal). `catch` da `instanceof` bilan error turini tekshirish va kutilmagan xatolarni qayta `throw` qilish — professional error handling pattern. **Muhim**: `finally` ichida hech qachon `return` yozmang — u try/catch dagi return va throw'ni override qiladi!
 
 ### Sintaksis va Ishlash Tartibi
 
@@ -231,7 +231,7 @@ console.log(trickier()); // "finally" — error hech qachon tashqariga chiqmaydi
 
 ### Nazariya
 
-Error obyekti xato haqida to'liq ma'lumot beradi. Uni yaratish va tashlab (throw) mumkin.
+`Error` obyekti xato haqida to'liq ma'lumot beradi: `name` (xato turi), `message` (xabar), `stack` (qayerda sodir bo'lgani — debugging uchun juda muhim). `throw` statement bilan Error (yoki uning subclass'i) throw qilish kerak — string yoki number throw qilish yomon amaliyot (stack trace yo'qoladi). ES2022 da `cause` option qo'shildi — bu xatoning asl sababini zanjir qilib saqlash imkonini beradi (`new Error("yuqori", { cause: originalError })`).
 
 ### Kod Misollari
 
@@ -296,7 +296,7 @@ try {
 
 ### Nazariya
 
-O'z xato class'larimizni yaratish — katta dasturlarda xatolarni kategoriyalash va boshqarish uchun juda muhim.
+O'z xato class'larimizni yaratish — katta dasturlarda xatolarni kategoriyalash va boshqarish uchun juda muhim. `extends Error` bilan custom class yaratiladi, `super(message)` chaqiriladi, `this.name` o'rnatiladi, va qo'shimcha property'lar (field, statusCode, isOperational) qo'shiladi. Bu `instanceof` bilan aniq error turini tekshirish, operational vs programmer error'larni ajratish, va error hierarchy qurilish imkonini beradi.
 
 ### Kod Misollari
 
@@ -436,7 +436,7 @@ Error
 
 ### Nazariya
 
-Error propagation — xato funksiya zanjiri bo'ylab yuqoriga ko'tarilishi. Agar funksiya ichida try/catch bo'lmasa, xato chaqiruvchi funksiyaga qaytadi — to'xtaguncha yoki ushlanguncha.
+Error propagation — xato funksiya zanjiri bo'ylab (call stack bo'ylab) yuqoriga ko'tarilishi. Agar funksiya ichida try/catch bo'lmasa, xato chaqiruvchi funksiyaga qaytadi — stack'ning eng yuqorisidagi try/catch'da ushlanguncha yoki dastur to'xtaguncha. Re-throwing pattern (kutilgan xatolarni ushlash, qolganlarini qayta throw qilish) va Error Translation pattern (past darajadagi xatoni yuqori darajadagi business logic xatoga aylantirish) — professional dasturlashning muhim texnikalari.
 
 ### Kod Misollari
 
@@ -527,7 +527,7 @@ async function getUserProfile(userId) {
 
 ### Nazariya
 
-Asinxron koddagi xatolarni boshqarish sinxron koddan farq qiladi. Callbacks, Promises va async/await har birida o'z usuli bor.
+Asinxron koddagi xatolarni boshqarish sinxron koddan farq qiladi. Callback'larda **error-first pattern** (birinchi argument — error), Promise'larda `.catch()` va `Promise.allSettled()`, async/await'da `try/catch` ishlatiladi. **Muhim**: ushlanmagan Promise rejection'lar (`unhandledrejection` event) dasturni buzishi mumkin — har bir async operatsiyada error handling bo'lishi kerak. `Promise.allSettled()` barcha natijalarni (fulfilled va rejected) qaytaradi — `Promise.all()` dan farqli birinchi rejection'da to'xtamaydi.
 
 ### Callback Error Handling (Node.js pattern)
 
@@ -684,7 +684,7 @@ forgotCatch().catch(console.error);
 
 ### Nazariya
 
-Global error handler'lar — ushlanmagan xatolar uchun **oxirgi himoya qatlami**. Production dasturlarda logging va monitoring uchun juda muhim.
+Global error handler'lar — ushlanmagan xatolar uchun **oxirgi himoya qatlami**. Production dasturlarda logging va monitoring uchun juda muhim. Browser'da `window.onerror` (sinxron xatolar) va `window.onunhandledrejection` (ushlanmagan promise rejection), Node.js'da `process.on('uncaughtException')` va `process.on('unhandledRejection')` ishlatiladi. Bu handler'lar xatoni log qilish va monitoring servisiga (Sentry, LogRocket) yuborish uchun — lekin dasturni crash'dan to'liq himoya qilmaydi.
 
 ### Browser
 

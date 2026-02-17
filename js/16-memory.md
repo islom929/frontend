@@ -26,9 +26,9 @@
 
 JavaScript engine (V8) xotirani ikki asosiy joyda saqlaydi: **Stack** va **Heap**. Bularni tushunish — memory management ning asosi.
 
-**Stack** — tez, tartibli, kichik. LIFO (Last In, First Out) printsipida ishlaydi. Har bir funksiya chaqiruvi uchun yangi "frame" qo'shiladi, funksiya tugaganda olib tashlanadi. Stack da primitiv qiymatlar va heap'dagi object'larga **pointer (reference)** lar saqlanadi.
+**Stack** — tez, tartibli, kichik (~1MB). LIFO (Last In, First Out) printsipida ishlaydi — har bir funksiya chaqiruvi uchun yangi "frame" qo'shiladi, funksiya tugaganda olib tashlanadi. Stack da primitiv qiymatlar va heap'dagi object'larga **pointer (reference)** lar saqlanadi. Stack overflow — juda chuqur recursion natijasi.
 
-**Heap** — katta, tartibsiz, dynamic. Object'lar, array'lar, function'lar — barchasi heap'da saqlanadi. Garbage Collector aynan heap'ni boshqaradi.
+**Heap** — katta (gigabyte'lab), tartibsiz, dynamic. Object'lar, array'lar, function'lar — barchasi heap'da saqlanadi. Garbage Collector aynan heap'ni boshqaradi. V8 da heap bir nechta bo'limlarga bo'lingan: **New Space** (yangi object'lar uchun, Scavenger GC), **Old Space** (uzoq yashagan object'lar, Mark-Compact GC), **Large Object Space**, **Code Space** (JIT compiled kod), va **Map Space** (Hidden Classes).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -173,7 +173,9 @@ V8 engine da heap bir nechta bo'limlarga (spaces) bo'lingan:
 
 ### Nazariya
 
-JavaScript da qiymatlar ikki turga bo'linadi:
+JavaScript da qiymatlar ikki turga bo'linadi: **primitive** (number, string, boolean, undefined, null, symbol, bigint) va **reference** (Object, Array, Function, Map, Set, va boshqalar). Bu farq xotira boshqaruvi uchun fundamental ahamiyatga ega.
+
+Primitive qiymatlar **copy by value** — o'zgaruvchiga tayinlanganda qiymatning mustaqil nusxasi yaratiladi, shuning uchun birini o'zgartirish ikkinchisiga ta'sir qilmaydi. Reference turlari esa **copy by reference (pointer copy)** — o'zgaruvchiga tayinlanganda faqat heap'dagi object'ga pointer nusxa olinadi, ya'ni ikki o'zgaruvchi **bitta** object'ga ishora qiladi. Bu React/Redux da immutability muhimligini tushuntiradi — state'ni mutate qilsangiz reference bir xil qoladi va `===` true beradi, natijada re-render bo'lmaydi.
 
 | Primitive Types | Reference Types |
 |----------------|-----------------|
@@ -372,9 +374,9 @@ setState({ ...state, items: [...state.items, newItem] }); // yangi reference
 
 ### Nazariya
 
-JavaScript da biz xotirani qo'lda bo'shatmaymiz (C/C++ dagi `free()` yoki `delete` kabi). Buning o'rniga **Garbage Collector (GC)** avtomatik ravishda keraksiz object'larni topadi va xotirani tozalaydi.
+JavaScript da biz xotirani qo'lda bo'shatmaymiz (C/C++ dagi `free()` yoki `delete` kabi). Buning o'rniga **Garbage Collector (GC)** avtomatik ravishda keraksiz object'larni topadi va xotirani tozalaydi. Lekin "avtomatik" degani "mukammal" degani emas — GC qanday ishlashini tushunmasak, **memory leak**'lar paydo bo'ladi.
 
-Lekin "avtomatik" degani "mukammal" degani emas. GC qanday ishlashini tushunmasak, **memory leak** lar paydo bo'ladi.
+GC ning asosiy algoritmlari: **Reference Counting** (eski usul — har bir object'ga nechta reference borligini sanaydi, lekin circular reference muammosi bor) va **Mark-and-Sweep** (zamonaviy standart — root'dan yetib bo'ladigan object'larni belgilaydi, yetib bo'lmaydiganlarni tozalaydi, circular reference muammosini hal qiladi). V8 **Generational GC** ishlatadi: Young Generation (Scavenger — tez, ~1-5ms) va Old Generation (Mark-Compact — chuqurroq). V8 ning **Orinoco** tizimi incremental, concurrent, va parallel GC ni birlashtiradi — UI qotib qolmasdan ~60fps saqlab turadi.
 
 ### Reference Counting — Eski Usul
 
@@ -692,7 +694,9 @@ function stress() {
 
 ### Nazariya
 
-**Memory leak** — dastur ishlayotgan paytda xotira to'planib ketishi, lekin GC uni tozalay olmasligi. Chunki object'ga hali ham reference bor (biz unutgan reference), lekin biz uni boshqa ishlatmaymiz.
+**Memory leak** — dastur ishlayotgan paytda xotira to'planib ketishi, lekin GC uni tozalay olmasligi. Buning sababi: object'ga hali ham reference bor (biz unutgan reference), lekin biz uni boshqa ishlatmaymiz — GC esa "reference bor ekan, kerakli" deb o'ylaydi.
+
+Eng keng tarqalgan memory leak turlari: **tasodifiy global o'zgaruvchilar** (strict mode ishlatmaslik), **tozalanmagan timer/interval** (clearInterval/clearTimeout qilmaslik), **olib tashlanmagan event listener'lar** (removeEventListener qilmaslik), **DOM reference'lar** (o'chirilgan element'ga JavaScript'dan reference qolishi), va **closure'larda keraksiz reference** (closure tashqi scope'dagi katta ma'lumotlarni ushlab turishi). SPA (Single Page Application) larda bu muammolar ayniqsa jiddiy — sahifa qayta yuklanmagani uchun xotira to'planib ketadi.
 
 ```
    Memory Leak Visualization
@@ -1204,11 +1208,9 @@ Real-time metrikalar — `Ctrl+Shift+P` → "Show Performance Monitor":
 
 ### Nazariya
 
-**ES2021** da kiritilgan — GC bilan ishlash uchun maxsus API'lar.
+**ES2021** da kiritilgan `WeakRef` va `FinalizationRegistry` — GC bilan ishlash uchun maxsus API'lar. **WeakRef** object'ga "kuchsiz" reference yaratadi — GC bu reference'ni hisobga olmaydi, ya'ni object'ga boshqa "kuchli" reference bo'lmasa, GC uni tozalashi mumkin. **FinalizationRegistry** esa object GC tomonidan tozalanganda callback chaqirish imkonini beradi.
 
-**WeakRef** — object ga "kuchsiz" reference. GC bu reference ni hisobga olmaydi — object ga boshqa "kuchli" reference bo'lmasa, GC uni tozalaydi.
-
-**FinalizationRegistry** — object GC tomonidan tozalanganda callback chaqirish.
+Bu API'lar ayniqsa **cache** tizimlari (katta object'larni kerak bo'lganda GC tozalashi uchun), **observer pattern** (kuzatilayotgan object o'chirilganda avtomatik unsubscribe), va **resource cleanup** (tashqi resurslarni bo'shatish) uchun foydali. Lekin muhim ogohlantirish: GC **qachon** ishlashi noaniq va engine'ga bog'liq, shuning uchun `WeakRef.deref()` natijasi har doim `undefined` bo'lishi mumkin — dastur logikasini bunga asoslamang.
 
 ### WeakRef
 
@@ -1358,7 +1360,9 @@ bigData = null; // tashqaridan reference yo'q
 
 ### Nazariya
 
-**WeakMap** va **WeakSet** — maxsus kolleksiyalar. Ularning kalitlari (key) **weak reference** bilan saqlanadi. Key ga boshqa reference bo'lmasa — GC entry'ni avtomatik olib tashlaydi.
+**WeakMap** va **WeakSet** — maxsus kolleksiyalar bo'lib, ularning kalitlari (key) **weak reference** bilan saqlanadi. Key'ga boshqa kuchli reference bo'lmasa — GC entry'ni avtomatik olib tashlaydi. Bu `WeakRef` dan farqli o'laroq ES6 dan beri mavjud va amalda ancha ko'p ishlatiladi.
+
+WeakMap va WeakSet ning muhim cheklovlari: key faqat **object** bo'lishi mumkin (primitive emas), **iterable emas** (size, keys(), values(), forEach() yo'q), chunki GC istalgan vaqtda entry olib tashlashi mumkin. Eng keng tarqalgan use case'lar: DOM element'larga qo'shimcha meta-data biriktirish, object'lar uchun private data saqlash, va cache tizimlari.
 
 ### WeakMap
 

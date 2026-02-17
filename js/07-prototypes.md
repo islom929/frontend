@@ -26,9 +26,11 @@
 
 ### Nazariya
 
-JavaScript da har bir object'ning ichki **`[[Prototype]]`** slot'i bor. Bu slot boshqa object'ga (yoki `null` ga) ishora qiladi. Biz bu object'ga **prototype** deymiz.
+JavaScript da har bir object'ning ichki **`[[Prototype]]`** slot'i bor. Bu maxsus ichki havola boshqa object'ga (yoki `null` ga) ishora qiladi va biz bu object'ga **prototype** deymiz. `[[Prototype]]` — bu ECMAScript spetsifikatsiyasidagi internal slot, ya'ni to'g'ridan-to'g'ri kodda ko'rinmaydi, lekin engine ichida mavjud va u JavaScript'dagi meros (inheritance) tizimining asosi.
 
-Object'da biror property topilmasa, engine **`[[Prototype]]`** bo'ylab yuqoriga qarab qidiradi.
+Nima uchun prototype kerak? Tasavvur qiling, 1000 ta foydalanuvchi ob'ekti yaratishingiz kerak va har birida `greet()` metodi bo'lishi kerak. Agar har bir ob'ektda alohida `greet` funksiya saqlansa — bu 1000 ta bir xil funksiya nusxasi xotirada yashaydi. Prototype bu muammoni hal qiladi: `greet` ni bitta prototype ob'ektda saqlaysiz va 1000 ta instance shu bitta funksiyani **share** qiladi.
+
+Object'da biror property topilmasa, engine avtomatik ravishda **`[[Prototype]]`** bo'ylab yuqoriga qarab qidiradi — bu **delegation** (vakolatni topshirish) prinsipi deb ataladi. Java yoki C++ dagi klassik meros dan farqli o'laroq, JavaScript'da property'lar nusxalanmaydi — balki prototype chain orqali **delegatsiya** qilinadi.
 
 ```javascript
 const animal = {
@@ -63,7 +65,7 @@ rabbit                    animal                  Object.prototype
 
 Bu ikki tushunchani aralashtirib yuborish — eng keng tarqalgan xato.
 
-### `__proto__` (dunderpropro)
+### `__proto__` (dunder proto)
 
 - Har bir **object** da bor
 - `[[Prototype]]` internal slot ga **accessor** (getter/setter)
@@ -127,7 +129,11 @@ prototype  = funksiya YARATADIGAN       (faqat funksiyalarda)
 
 ### Nazariya
 
-Object'da property topilmasa, engine `[[Prototype]]` zanjiri bo'ylab **yuqoriga** qidiradi — to `null` gacha.
+Prototype Chain — bu ob'ektlar bir-biriga `[[Prototype]]` orqali bog'langan **zanjir**. Object'da property topilmasa, engine bu zanjir bo'ylab **yuqoriga** qidiradi — to zanjirning oxiri (`null`) gacha. Bu mexanizm [04-scope.md](04-scope.md) da o'rgangan scope chain ga juda o'xshash — lekin scope chain o'zgaruvchilar uchun, prototype chain esa property va method'lar uchun ishlaydi.
+
+Har bir oddiy ob'ektning prototype chain oxiri **`Object.prototype`** ga taqaladi — bu JavaScript'dagi barcha ob'ektlarning "ota bobosi". `toString()`, `hasOwnProperty()`, `valueOf()` kabi universal method'lar aynan shu yerda turadi. `Object.prototype` ning prototypi esa `null` — bu zanjirning oxirgi nuqtasi.
+
+Prototype chain'ni **oilaviy shajara**ga o'xshatish mumkin: bola (child object) avval o'zida qidiradi, keyin otasidan (parent prototype), keyin bobosidan (grandparent prototype), va hokazo. Har bir avlod o'zining xususiyatlarini qo'shadi, lekin barcha ajdodlarning xususiyatlaridan ham foydalana oladi.
 
 ```javascript
 const grandparent = { a: 1 };
@@ -203,7 +209,11 @@ console.log(dict.hasOwnProperty);   // undefined
 
 ### Nazariya
 
-`Object.create(proto)` — yangi object yaratadi va uning `[[Prototype]]`ini `proto` ga bog'laydi.
+`Object.create(proto)` — bu JavaScript'da prototype chain'ni **eng aniq va to'g'ri** usulda quradigan method. U yangi bo'sh ob'ekt yaratadi va uning `[[Prototype]]` ini to'g'ridan-to'g'ri berilgan `proto` ob'ektga bog'laydi.
+
+Bu method nima uchun muhim? Constructor function va class — bular ham ichida `Object.create` ga o'xshash ish qiladi. Lekin `Object.create` sizga **to'g'ridan-to'g'ri** prototype chain'ni boshqarish imkonini beradi — hech qanday constructor funksiya yoki class kerak emas. Bu ayniqsa foydali: sof prototype-based meros (class'siz), `Object.create(null)` bilan prototype'siz "toza" ob'ekt (dictionary) yaratish, va polyfill'larda yangi ob'ektlarni to'g'ri prototype bilan yaratish uchun.
+
+Douglas Crockford (JSON ixtirochisi) `Object.create` ni JavaScript'ning eng muhim funksiyasi deb atagan — chunki u prototype-based meros'ni eng sof ko'rinishda ifodalaydi.
 
 ```javascript
 const vehicle = {
@@ -263,7 +273,11 @@ console.log(dog.alive);  // true (living)
 
 ### Nazariya
 
-ES6 dan oldin class yo'q edi. Object yaratish uchun **constructor function** ishlatilgan — oddiy funksiya, `new` bilan chaqiriladi.
+ES6 da `class` sintaksisi paydo bo'lishidan oldin, JavaScript'da ob'ekt yaratish uchun **constructor function** ishlatilgan. Bu oddiy funksiya bo'lib, `new` keyword bilan chaqirilganda maxsus xulq-atvor ko'rsatadi: avtomatik ravishda yangi bo'sh ob'ekt yaratadi, `this` ni shu ob'ektga bog'laydi va oxirida qaytaradi.
+
+Constructor function'larni tushunish zamonaviy JavaScript'da ham muhim. `class` sintaksisi aslida constructor function'ning **sintaktik qand** (syntactic sugar) i — ichida xuddi shu mexanizm ishlaydi. Ko'plab mavjud kutubxonalar va legacy kodlar constructor function ishlatadi. Shuningdek, `new` keyword qanday ishlashini bilmaslik ko'p intervyu savollarida xato javob berishga olib keladi.
+
+Muhim pattern: method'larni **prototype** da e'lon qilish kerak, har bir instance ichida emas. Agar method'ni constructor ichida `this.greet = function() {...}` deb yozsangiz, har bir yangi instance uchun alohida funksiya yaratiladi — bu xotirani behuda sarflaydi. `Person.prototype.greet = function() {...}` deb yozsangiz, barcha instance'lar bitta funksiyani share qiladi.
 
 ```javascript
 function Person(name, age) {
@@ -311,6 +325,10 @@ const cloneAli = new ali.constructor("Ali Clone", 25);
 ## new Keyword Ichidan
 
 ### Nazariya
+
+`new` keyword — bu JavaScript'da constructor function yoki class'ni chaqirganda **4 ta muhim qadam**ni avtomatik bajaradigan operator. Ko'p dasturchilar `new` ni oddiy deb o'ylaydi, lekin uning ichki mexanizmini tushunish prototype chain, `this` binding va ob'ekt yaratilish jarayonini to'liq anglash uchun zarur.
+
+`new` ning qadamlarini bilish nima uchun amaliy jihatdan foydali? Birinchidan, `new` siz constructor chaqirilsa nima bo'lishini tushunasiz (xavfli xato). Ikkinchidan, constructor dan ob'ekt qaytarish (return override) paytida kutilmagan xulq-atvorni oldindan ko'ra olasiz. Uchinchidan, `new` ni o'zingiz yoza olish — bu JavaScript prototip tizimini to'liq o'zlashtirganingizning isboti.
 
 `new` keyword nima qiladi — **4 qadam**:
 
@@ -419,7 +437,9 @@ console.log(p instanceof Person); // true ✅
 
 ### Nazariya
 
-`instanceof` operator object'ning prototype chain'ida berilgan constructor'ning `prototype`'i borligini tekshiradi.
+`instanceof` — bu operator bo'lib, u ob'ektning prototype chain'ida berilgan constructor'ning `prototype` property'si **borligini** tekshiradi. Ya'ni `obj instanceof Fn` degani — "obj ning prototype chain'ining istalgan nuqtasida `Fn.prototype` bormi?" degan savol.
+
+Bu operator qanday ishlashini bilish amaliy jihatdan muhim: birinchidan, u `typeof` dan farqli ravishda ob'ektning **aniq turini** aniqlash imkonini beradi (masalan, `typeof []` — `"object"`, lekin `[] instanceof Array` — `true`). Ikkinchidan, `instanceof` ning ba'zi kutilmagan xulq-atvorlari bor — masalan, prototype o'zgartirilsa yoki turli iframe'lardagi ob'ektlar bilan ishlansa noto'g'ri natija berishi mumkin. Shu sababli array'larni tekshirishda `Array.isArray()` ishlatish tavsiya etiladi.
 
 ```javascript
 function Animal() {}
@@ -499,7 +519,11 @@ obj.greet(); // "Hello"
 
 ### Nazariya
 
-Agar object'da va uning prototype'ida **bir xil nomli** property bo'lsa, object'ning o'zi **yutadi** (shadow qiladi).
+Property Shadowing — bu ob'ektda va uning prototype'ida **bir xil nomli** property mavjud bo'lganda, ob'ektning o'z property'si **ustunlik** qilib, prototype'dagi property'ni "yashirishi" (shadow qilishi). Bu [04-scope.md](04-scope.md) da o'rgangan variable shadowing ga juda o'xshash tushuncha, faqat bu scope'lar emas, prototype chain uchun ishlaydi.
+
+Muhim qoida: property **o'qish** prototype chain bo'ylab yuradi, lekin property **yozish** faqat ob'ektning o'ziga yozadi (agar prototype'da setter bo'lmasa). Ya'ni `child.name = "Ali"` deb yozganingizda, bu `parent.name` ni o'zgartirmaydi — `child` da yangi `name` property yaratiladi va u `parent.name` ni shadow qiladi.
+
+Shadowing'ning bitta nozik va ko'p dasturchilar bilmaydigan edge case'i bor: agar prototype'dagi property `writable: false` bo'lib belgilangan bo'lsa, child ob'ektda ham shadow yaratish **taqiqlanadi**. Bu kutilmagan xulq-atvor ko'pgina xatolarga sabab bo'lishi mumkin.
 
 ```javascript
 const parent = {
