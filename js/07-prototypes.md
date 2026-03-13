@@ -1,6 +1,6 @@
 # Bo'lim 7: Prototypal Inheritance
 
-> JavaScript da klassik inheritance yo'q — uning o'rniga prototypal inheritance bor. Har bir object boshqa object'dan meros oladi.
+> JavaScript da klassik (class-based) inheritance o'rniga prototypal inheritance ishlaydi. Har bir object ichki `[[Prototype]]` havola orqali boshqa object'dan property va method'larni meros oladi. Bu bo'limda prototype chain, constructor function'lar, `new` keyword va `instanceof` mexanizmlari chuqur yoritiladi.
 
 ---
 
@@ -9,6 +9,7 @@
 - [[[Prototype]] Internal Slot](#prototype-internal-slot)
 - [__proto__ vs prototype](#__proto__-vs-prototype)
 - [Prototype Chain](#prototype-chain)
+- [Object.prototype — Barcha Object'larning Ajdodi](#objectprototype--barcha-objectlarning-ajdodi)
 - [Object.create()](#objectcreate)
 - [Constructor Functions](#constructor-functions)
 - [new Keyword Ichidan](#new-keyword-ichidan)
@@ -26,11 +27,40 @@
 
 ### Nazariya
 
-JavaScript da har bir object'ning ichki **`[[Prototype]]`** slot'i bor. Bu maxsus ichki havola boshqa object'ga (yoki `null` ga) ishora qiladi va biz bu object'ga **prototype** deymiz. `[[Prototype]]` — bu ECMAScript spetsifikatsiyasidagi internal slot, ya'ni to'g'ridan-to'g'ri kodda ko'rinmaydi, lekin engine ichida mavjud va u JavaScript'dagi meros (inheritance) tizimining asosi.
+JavaScript da har bir object'ning ichki **`[[Prototype]]`** slot'i bor. Bu ECMAScript spetsifikatsiyasidagi internal slot bo'lib, u boshqa object'ga (yoki `null` ga) ishora qiladi. `[[Prototype]]` to'g'ridan-to'g'ri kodda ko'rinmaydi — u engine ichida mavjud va JavaScript'ning meros (inheritance) tizimining asosi.
 
-Nima uchun prototype kerak? Tasavvur qiling, 1000 ta foydalanuvchi ob'ekti yaratishingiz kerak va har birida `greet()` metodi bo'lishi kerak. Agar har bir ob'ektda alohida `greet` funksiya saqlansa — bu 1000 ta bir xil funksiya nusxasi xotirada yashaydi. Prototype bu muammoni hal qiladi: `greet` ni bitta prototype ob'ektda saqlaysiz va 1000 ta instance shu bitta funksiyani **share** qiladi.
+`[[Prototype]]` nima uchun kerak? Agar 1000 ta foydalanuvchi ob'ekti yaratish kerak bo'lsa va har birida `greet()` metodi bo'lishi kerak bo'lsa, har bir ob'ektda alohida `greet` funksiya saqlash — 1000 ta bir xil funksiya nusxasini xotirada saqlash degani. Prototype bu muammoni hal qiladi: `greet` ni bitta prototype ob'ektda saqlash va 1000 ta instance shu bitta funksiyani **share** qilishi mumkin.
 
-Object'da biror property topilmasa, engine avtomatik ravishda **`[[Prototype]]`** bo'ylab yuqoriga qarab qidiradi — bu **delegation** (vakolatni topshirish) prinsipi deb ataladi. Java yoki C++ dagi klassik meros dan farqli o'laroq, JavaScript'da property'lar nusxalanmaydi — balki prototype chain orqali **delegatsiya** qilinadi.
+Object'da biror property topilmasa, engine avtomatik ravishda `[[Prototype]]` bo'ylab yuqoriga qarab qidiradi — bu **delegation** (vakolatni topshirish) prinsipi. Java yoki C++ dagi klassik meros dan farqli o'laroq, JavaScript'da property'lar nusxalanmaydi — prototype chain orqali **delegatsiya** qilinadi. Ya'ni child object'da method fizik ravishda mavjud emas — u parent'dan so'rab oladi.
+
+### Under the Hood
+
+ECMAScript spec bo'yicha `[[Prototype]]` — bu **internal slot** (ichki yacheyka). Internal slot'lar spec dagi `[[ ]]` belgisi bilan yoziladi va to'g'ridan-to'g'ri JavaScript kodidan accessible emas. `[[Prototype]]` slot quyidagi hollarda o'rnatiladi:
+
+1. **Object literal `{}`** yaratilganda — `[[Prototype]]` = `Object.prototype`
+2. **`new Constructor()`** bilan yaratilganda — `[[Prototype]]` = `Constructor.prototype`
+3. **`Object.create(proto)`** bilan yaratilganda — `[[Prototype]]` = `proto`
+4. **`class` bilan** yaratilganda — `new Constructor()` bilan bir xil
+
+V8 engine ichida har bir object'ning **map** (hidden class) degan tuzilmasi bor. Bu map object'ning shape'ini (qaysi property'lari bor, qanday tartibda) saqlaydi va shu map ichida `[[Prototype]]` ga pointer ham mavjud. Shu sababli prototype lookup juda tez ishlaydi — engine har safar chain'ni yurmaydi, balki **inline cache** orqali avval topilgan natijani eslab qoladi.
+
+```
+V8 ichida object layout:
+
+┌────────────────────────┐
+│  JSObject              │
+│  ┌───────────────────┐ │
+│  │ Map (Hidden Class)│──────► Shape info + [[Prototype]] pointer
+│  ├───────────────────┤ │
+│  │ Properties        │ │       name: "Ali"
+│  │                   │ │       age: 25
+│  └───────────────────┘ │
+└────────────────────────┘
+```
+
+### Kod Misollari
+
+`[[Prototype]]` ga kirish uchun `Object.getPrototypeOf()` va `Object.setPrototypeOf()` ishlatiladi:
 
 ```javascript
 const animal = {
@@ -46,43 +76,81 @@ const rabbit = {
 Object.setPrototypeOf(rabbit, animal);
 
 console.log(rabbit.jumps); // true — o'zida bor
-console.log(rabbit.eats);  // true — prototype dan oldi!
-console.log(rabbit.walk()); // "Yurish..." — prototype dan
+console.log(rabbit.eats);  // true — [[Prototype]] orqali animal dan oldi
+console.log(rabbit.walk()); // "Yurish..." — [[Prototype]] orqali animal dan
+
+// [[Prototype]] ni tekshirish:
+console.log(Object.getPrototypeOf(rabbit) === animal); // true
 ```
 
 ```
 rabbit                    animal                  Object.prototype
-┌────────────────┐       ┌────────────────┐      ┌──────────────────┐
-│ jumps: true    │       │ eats: true     │      │ toString()       │
-│                │       │ walk()         │      │ hasOwnProperty() │
+┌────────────────┐       ┌────────────────┐      ┌───────────────────┐
+│ jumps: true    │       │ eats: true     │      │ toString()        │
+│                │       │ walk()         │      │ hasOwnProperty()  │
 │ [[Prototype]]──│──────►│ [[Prototype]]──│─────►│ [[Prototype]]:null│
-└────────────────┘       └────────────────┘      └──────────────────┘
+└────────────────┘       └────────────────┘      └───────────────────┘
+```
+
+`[[Prototype]]` ga `null` qo'yilsa, object'ning hech qanday prototype'i bo'lmaydi:
+
+```javascript
+const bare = Object.create(null);
+bare.key = "value";
+
+console.log(bare.toString); // undefined — Object.prototype ham yo'q
+// Bu "dictionary" pattern — prototype method collision xavfi yo'q
 ```
 
 ---
 
 ## __proto__ vs prototype
 
-Bu ikki tushunchani aralashtirib yuborish — eng keng tarqalgan xato.
+### Nazariya
 
-### `__proto__` (dunder proto)
+Bu ikki tushunchani aralashtirib yuborish JavaScript'dagi eng keng tarqalgan xatolardan biri. Ular butunlay farqli narsalar:
 
-- Har bir **object** da bor
-- `[[Prototype]]` internal slot ga **accessor** (getter/setter)
-- Object ning **meros ota**siga ishora
-- Zamonaviy kodda ishlatmang — `Object.getPrototypeOf()` ishlating
+**`__proto__`** — har bir **object** da mavjud accessor property. U `[[Prototype]]` internal slot'ga getter/setter sifatida kirish imkonini beradi. Ya'ni `obj.__proto__` deb yozganingizda, aslida `Object.getPrototypeOf(obj)` ga teng ish qilyapsiz. `__proto__` ECMAScript 2015 da standartlashtirilgan, lekin zamonaviy kodda bevosita ishlatish **tavsiya etilmaydi** — `Object.getPrototypeOf()` / `Object.setPrototypeOf()` ishlating.
+
+**`prototype`** — faqat **funksiya**larda mavjud oddiy property. Arrow function'larda yo'q. Bu property `new` bilan funksiya chaqirilganda, yangi yaratilgan object'ning `[[Prototype]]` iga aynan shu `prototype` object assign bo'ladi. Ya'ni `prototype` — funksiyaning **o'zi uchun** emas, u funksiya **yaratadigan instance'lar uchun** ota object.
+
+### Under the Hood
+
+`__proto__` aslida `Object.prototype` da `get __proto__()` / `set __proto__()` accessor sifatida aniqlangan. Shu sababli `Object.create(null)` bilan yaratilgan object'da `__proto__` mavjud emas — chunki `Object.prototype` chain'da yo'q.
 
 ```javascript
-const obj = {};
-console.log(obj.__proto__ === Object.prototype); // true
-// obj ning "otasi" — Object.prototype
+// __proto__ aslida Object.prototype dagi accessor:
+const descriptor = Object.getOwnPropertyDescriptor(Object.prototype, "__proto__");
+console.log(typeof descriptor.get); // "function"
+console.log(typeof descriptor.set); // "function"
+
+// Object.create(null) da __proto__ yo'q:
+const dict = Object.create(null);
+dict.__proto__ = "test"; // bu oddiy property sifatida yoziladi!
+console.log(dict.__proto__); // "test" — accessor emas, oddiy property
 ```
 
-### `prototype` property
+`prototype` property har bir oddiy funksiya yaratilganda avtomatik hosil bo'ladi. U ichida `constructor` property bo'ladi — bu yaratuvchi funksiyaning o'ziga ishora qiladi:
 
-- Faqat **funksiya**larda bor (arrow function'larda yo'q)
-- `new` bilan chaqirilganda, yangi object'ning `[[Prototype]]`i shu object bo'ladi
-- **Funksiyaning** o'zi emas, **yaratadigan instance'lar** uchun
+```javascript
+function Dog(name) {
+  this.name = name;
+}
+
+// Dog yaratilgan paytda avtomatik:
+// Dog.prototype = { constructor: Dog }
+
+console.log(Dog.prototype.constructor === Dog); // true
+console.log(typeof Dog.prototype); // "object"
+
+// Arrow function da prototype yo'q:
+const Arrow = () => {};
+console.log(Arrow.prototype); // undefined
+```
+
+### Kod Misollari
+
+Ikkalasining farqini aniq ko'rsatadigan misol:
 
 ```javascript
 function Dog(name) {
@@ -91,11 +159,17 @@ function Dog(name) {
 Dog.prototype.bark = function() { return "Hav!"; };
 
 const rex = new Dog("Rex");
-// rex.__proto__ === Dog.prototype ✅
-// rex.bark() — Dog.prototype dan olindi
-```
 
-### Farq — Diagramma
+// rex.__proto__ — rex ning "otasi" (Dog.prototype)
+console.log(rex.__proto__ === Dog.prototype); // true ✅
+
+// Dog.prototype — Dog YARATADIGAN instance'lar uchun ota
+// Dog.prototype ning o'zi esa — oddiy object
+console.log(Dog.prototype.__proto__ === Object.prototype); // true ✅
+
+// rex.prototype — MAVJUD EMAS (rex funksiya emas!)
+console.log(rex.prototype); // undefined
+```
 
 ```
                 Dog (function)
@@ -108,9 +182,9 @@ const rex = new Dog("Rex");
         │ __proto__: ───│─────►│ constructor: Dog  │
         └───────────────┘      │ __proto__: ───────│──► Object.prototype
                                └───────────────────┘
-        
-__proto__  = object'ning MEROS OTASI    (har bir object da)
-prototype  = funksiya YARATADIGAN       (faqat funksiyalarda)
+
+__proto__  = object ning MEROS OTASI     (har bir object da mavjud)
+prototype  = funksiya YARATADIGAN        (faqat funksiyalarda mavjud)
              instance'lar uchun ota
 ```
 
@@ -118,10 +192,11 @@ prototype  = funksiya YARATADIGAN       (faqat funksiyalarda)
 
 | | `__proto__` | `prototype` |
 |-|-------------|-------------|
-| **Kimda bor** | Har bir object | Faqat function'larda |
-| **Nima** | [[Prototype]] ga accessor | new bilan yaratiladigan instance'lar uchun ota |
-| **Ishlatish** | `Object.getPrototypeOf()` | Constructor function / class |
-| **O'zgartirish** | `Object.setPrototypeOf()` | `Fn.prototype.method = ...` |
+| **Kimda bor** | Har bir object | Faqat function'larda (arrow'dan tashqari) |
+| **Nima** | `[[Prototype]]` ga accessor (getter/setter) | `new` bilan yaratiladigan instance'lar uchun ota object |
+| **Ishlatish** | `Object.getPrototypeOf()` ishlating | Constructor function / class ichida |
+| **O'zgartirish** | `Object.setPrototypeOf()` ishlating | `Fn.prototype.method = ...` |
+| **Standart** | ES2015 da standart, lekin legacy | Boshidanoq til spetsifikatsiyasida |
 
 ---
 
@@ -129,11 +204,39 @@ prototype  = funksiya YARATADIGAN       (faqat funksiyalarda)
 
 ### Nazariya
 
-Prototype Chain — bu ob'ektlar bir-biriga `[[Prototype]]` orqali bog'langan **zanjir**. Object'da property topilmasa, engine bu zanjir bo'ylab **yuqoriga** qidiradi — to zanjirning oxiri (`null`) gacha. Bu mexanizm [04-scope.md](04-scope.md) da o'rgangan scope chain ga juda o'xshash — lekin scope chain o'zgaruvchilar uchun, prototype chain esa property va method'lar uchun ishlaydi.
+Prototype Chain — ob'ektlar bir-biriga `[[Prototype]]` orqali bog'langan **zanjir**. Object'da property topilmasa, engine bu zanjir bo'ylab **yuqoriga** qidiradi — to zanjirning oxiri (`null`) gacha. Bu mexanizm [04-scope.md](04-scope.md) da o'rgangan scope chain ga o'xshash: scope chain o'zgaruvchilar uchun, prototype chain esa property va method'lar uchun ishlaydi.
 
-Har bir oddiy ob'ektning prototype chain oxiri **`Object.prototype`** ga taqaladi — bu JavaScript'dagi barcha ob'ektlarning "ota bobosi". `toString()`, `hasOwnProperty()`, `valueOf()` kabi universal method'lar aynan shu yerda turadi. `Object.prototype` ning prototypi esa `null` — bu zanjirning oxirgi nuqtasi.
+Prototype chain'ni tushunish uchun lookup algoritmini bilish kerak. Object'da `obj.prop` deb murojaat qilinganida:
 
-Prototype chain'ni **oilaviy shajara**ga o'xshatish mumkin: bola (child object) avval o'zida qidiradi, keyin otasidan (parent prototype), keyin bobosidan (grandparent prototype), va hokazo. Har bir avlod o'zining xususiyatlarini qo'shadi, lekin barcha ajdodlarning xususiyatlaridan ham foydalana oladi.
+1. Engine avval `obj` ning **own property** larida `prop` ni qidiradi
+2. Topilmasa — `obj.[[Prototype]]` (ya'ni ota object) da qidiradi
+3. Unda ham topilmasa — ota'ning `[[Prototype]]` iga o'tadi (ya'ni bobo)
+4. Bu jarayon `[[Prototype]]` `null` bo'lguncha davom etadi
+5. `null` ga yetilsa va topilmasa — `undefined` qaytaradi
+
+Har bir oddiy ob'ektning prototype chain oxiri **`Object.prototype`** ga taqaladi — bu JavaScript'dagi barcha ob'ektlarning eng yuqori prototypi. `Object.prototype` ning `[[Prototype]]` esa `null` — bu zanjirning oxirgi nuqtasi.
+
+### Under the Hood
+
+V8 engine prototype lookup'ni tezlashtirish uchun **inline cache (IC)** mexanizmidan foydalanadi. Birinchi marta `obj.prop` murojaat qilinganida engine chain'ni yurib topadi va natijani cache'laydi. Keyingi murojaat'larda agar object'ning shape (hidden class/map) o'zgarmagan bo'lsa — cache'dan olinadi, chain'ni qayta yurish shart emas.
+
+Lekin agar chain juda uzun bo'lsa (5+ daraja), har bir lookup sekinlashadi — ayniqsa cache miss bo'lganda. Shuning uchun prototype chain'ni iloji boricha **qisqa** saqlash tavsiya etiladi (2-3 daraja optimal).
+
+```
+Property Lookup algoritmi (ECMAScript spec — OrdinaryGet):
+
+1. receiver = obj
+2. current = obj
+3. Loop:
+   a. Agar current === null → return undefined
+   b. current.[[OwnProperty]](key) mavjudmi?
+      - Ha → return value (getter bo'lsa — getter.call(receiver))
+      - Yo'q → current = current.[[Prototype]], davom et
+```
+
+### Kod Misollari
+
+Uch darajali prototype chain qurish va har bir daraja lookup'ni kuzatish:
 
 ```javascript
 const grandparent = { a: 1 };
@@ -142,22 +245,22 @@ parent.b = 2;
 const child = Object.create(parent);
 child.c = 3;
 
-console.log(child.c); // 3 — o'zida
-console.log(child.b); // 2 — parent da
-console.log(child.a); // 1 — grandparent da
+console.log(child.c); // 3 — o'zida (own property)
+console.log(child.b); // 2 — parent da topildi
+console.log(child.a); // 1 — grandparent da topildi
 console.log(child.d); // undefined — hech qayerda yo'q
 ```
 
-### Lookup Jarayoni
+Lookup jarayonini step-by-step kuzatamiz:
 
 ```
 child.a qidirish:
 
-child → { c: 3 }         a bor? YO'Q → yuqoriga
+child → { c: 3 }              a bor? YO'Q → yuqoriga
   ↓
-parent → { b: 2 }        a bor? YO'Q → yuqoriga
+parent → { b: 2 }             a bor? YO'Q → yuqoriga
   ↓
-grandparent → { a: 1 }   a bor? HA! → return 1
+grandparent → { a: 1 }        a bor? HA! → return 1
 ```
 
 ```
@@ -174,33 +277,106 @@ Object.prototype → {toString, hasOwnProperty, ...}  d bor? YO'Q
 null → ZANJIR TUGADI → return undefined
 ```
 
-### Har Bir Object'ning Oxirgi Otasi — Object.prototype
+Own property tekshirish — `hasOwnProperty` yoki `Object.hasOwn` (ES2022):
 
 ```javascript
-const obj = { x: 1 };
+console.log(child.hasOwnProperty("c")); // true — o'zida
+console.log(child.hasOwnProperty("a")); // false — prototype'da
 
-// Prototype chain:
-// obj → Object.prototype → null
-
-console.log(obj.toString());        // "[object Object]" — Object.prototype dan
-console.log(obj.hasOwnProperty("x")); // true — Object.prototype dan
-
-// Object.prototype ning prototypi — null
-console.log(Object.getPrototypeOf(Object.prototype)); // null
+// Zamonaviy usul (ES2022):
+console.log(Object.hasOwn(child, "c")); // true
+console.log(Object.hasOwn(child, "a")); // false
 ```
 
-### Maxsus: Object.create(null)
+---
+
+## Object.prototype — Barcha Object'larning Ajdodi
+
+### Nazariya
+
+`Object.prototype` — JavaScript'dagi prototype chain'ning eng yuqori nuqtasi (root). Deyarli barcha object'lar (faqat `Object.create(null)` dan tashqari) oxir-oqibat shu object'ga bog'lanadi. `Object.prototype` da aniqlangan method'lar barcha object'lar uchun accessible — chunki chain bo'ylab lookup shu yerga yetib keladi.
+
+`Object.prototype` ning `[[Prototype]]` qiymati — `null`. Bu zanjirning oxirgi nuqtasi. `null` dan keyin qidirish to'xtaydi.
+
+### Asosiy Metodlar
+
+`Object.prototype` da quyidagi muhim method'lar aniqlangan:
+
+**`toString()`** — object'ni string ko'rinishiga o'tkazadi. Default'da `"[object Object]"` qaytaradi. Ko'plab built-in type'lar buni override qiladi (Array, Date, RegExp).
 
 ```javascript
-// Prototype chain'siz object — "dictionary"
+const obj = { name: "Ali" };
+console.log(obj.toString()); // "[object Object]"
+
+// toString orqali aniq type aniqlash:
+console.log(Object.prototype.toString.call([]));    // "[object Array]"
+console.log(Object.prototype.toString.call(null));   // "[object Null]"
+console.log(Object.prototype.toString.call(/regex/)); // "[object RegExp]"
+
+// Custom toString — override:
+const user = {
+  name: "Ali",
+  toString() { return `User: ${this.name}`; }
+};
+console.log(`${user}`); // "User: Ali" — template literal toString() chaqiradi
+```
+
+**`valueOf()`** — object'ni primitive qiymatga o'tkazadi. Default'da object'ning o'zini qaytaradi. Arifmetik operatsiyalarda engine avval `valueOf()` ni chaqiradi.
+
+```javascript
+const price = {
+  amount: 100,
+  currency: "USD",
+  valueOf() { return this.amount; } // arifmetikada amount ishlatilsin
+};
+
+console.log(price + 50);   // 150 — valueOf() = 100
+console.log(price > 80);   // true
+console.log(`${price}`);   // "[object Object]" — toString() chaqiriladi (template literal)
+```
+
+**`hasOwnProperty(key)`** — property object'ning o'zida bormi (prototype chain'da emas). ES2022 dan beri `Object.hasOwn()` — xavfsizroq alternativa:
+
+```javascript
+const parent = { inherited: true };
+const child = Object.create(parent);
+child.own = true;
+
+console.log(child.hasOwnProperty("own"));       // true
+console.log(child.hasOwnProperty("inherited")); // false
+
+// Muammo: Object.create(null) da hasOwnProperty yo'q!
 const dict = Object.create(null);
-dict.key = "value";
+// dict.hasOwnProperty("key"); // ❌ TypeError
 
-console.log(dict.toString);         // undefined — Object.prototype yo'q!
-console.log(dict.hasOwnProperty);   // undefined
+// Xavfsiz alternativa (ES2022):
+console.log(Object.hasOwn(dict, "key")); // false ✅ — har doim ishlaydi
+```
 
-// Use case: sof key-value storage, method collision bo'lmaydi
-// Object.keys(dict) ishlaydi, lekin for...in da prototype'dan keluvchi property yo'q
+**`constructor`** — object'ni yaratgan constructor funksiyaga ishora. Default'da `Object.prototype.constructor === Object`:
+
+```javascript
+const obj = {};
+console.log(obj.constructor === Object); // true
+
+function User(name) { this.name = name; }
+const user = new User("Ali");
+console.log(user.constructor === User); // true — User.prototype.constructor dan
+
+// constructor orqali yangi instance yaratish:
+const user2 = new user.constructor("Vali");
+console.log(user2.name); // "Vali"
+```
+
+**`isPrototypeOf(obj)`** — joriy object `obj` ning prototype chain'ida bormi:
+
+```javascript
+const animal = { eats: true };
+const dog = Object.create(animal);
+
+console.log(animal.isPrototypeOf(dog)); // true
+console.log(Object.prototype.isPrototypeOf(dog)); // true
+console.log(dog.isPrototypeOf(animal)); // false — teskari emas
 ```
 
 ---
@@ -209,11 +385,35 @@ console.log(dict.hasOwnProperty);   // undefined
 
 ### Nazariya
 
-`Object.create(proto)` — bu JavaScript'da prototype chain'ni **eng aniq va to'g'ri** usulda quradigan method. U yangi bo'sh ob'ekt yaratadi va uning `[[Prototype]]` ini to'g'ridan-to'g'ri berilgan `proto` ob'ektga bog'laydi.
+`Object.create(proto)` — yangi bo'sh ob'ekt yaratadi va uning `[[Prototype]]` ini to'g'ridan-to'g'ri berilgan `proto` ob'ektga bog'laydi. Bu JavaScript'da prototype chain'ni **eng aniq va to'g'ridan-to'g'ri** usulda quradigan method.
 
-Bu method nima uchun muhim? Constructor function va class — bular ham ichida `Object.create` ga o'xshash ish qiladi. Lekin `Object.create` sizga **to'g'ridan-to'g'ri** prototype chain'ni boshqarish imkonini beradi — hech qanday constructor funksiya yoki class kerak emas. Bu ayniqsa foydali: sof prototype-based meros (class'siz), `Object.create(null)` bilan prototype'siz "toza" ob'ekt (dictionary) yaratish, va polyfill'larda yangi ob'ektlarni to'g'ri prototype bilan yaratish uchun.
+`Object.create` nima uchun muhim? Constructor function va class — bular ham ichida prototype bog'lash uchun shunga o'xshash mexanizm ishlatadi. Lekin `Object.create` sizga **hech qanday constructor funksiya yoki class kerak qilmay** bevosita prototype chain qurish imkonini beradi.
 
-Douglas Crockford (JSON ixtirochisi) `Object.create` ni JavaScript'ning eng muhim funksiyasi deb atagan — chunki u prototype-based meros'ni eng sof ko'rinishda ifodalaydi.
+Asosiy foydalanish holatlari:
+1. **Sof prototype-based meros** — class'siz object'dan object yaratish
+2. **`Object.create(null)`** — prototype'siz "toza dictionary" ob'ekt yaratish
+3. **Constructor inheritance** da prototype chain ulash: `Child.prototype = Object.create(Parent.prototype)`
+4. **Polyfill'larda** yangi ob'ektni to'g'ri prototype bilan yaratish
+
+### Under the Hood
+
+`Object.create(proto, descriptors)` ichida nima sodir bo'ladi (spec bo'yicha — OrdinaryObjectCreate):
+
+```
+Object.create(proto) algoritmik qadam:
+
+1. Agar proto null ham, object ham bo'lmasa → TypeError
+2. obj = {} — yangi bo'sh oddiy object yaratish
+3. obj.[[Prototype]] = proto — ichki slot'ni o'rnatish
+4. Agar descriptors berilgan bo'lsa → Object.defineProperties(obj, descriptors)
+5. return obj
+```
+
+Bu method `new` keyword'dan farqi — constructor funksiya chaqirilmaydi. Faqat prototype bog'lanadi va bo'sh object qaytariladi. Shu sababli property'larni qo'lda qo'shish kerak.
+
+### Kod Misollari
+
+Oddiy prototype chain qurish:
 
 ```javascript
 const vehicle = {
@@ -227,12 +427,12 @@ const car = Object.create(vehicle);
 car.type = "avtomobil";
 car.wheels = 4;
 
-console.log(car.describe()); // "Bu avtomobil"
-console.log(car.wheels);      // 4 — o'zida
-console.log(car.type);        // "avtomobil" — o'zida (vehicle.type ni shadow)
+console.log(car.describe()); // "Bu avtomobil" — this = car, method vehicle'dan
+console.log(car.wheels);     // 4 — o'zida
+console.log(car.type);       // "avtomobil" — o'zida (vehicle.type ni shadow qildi)
 ```
 
-### Property Descriptors bilan
+Property descriptors bilan yaratish (ikkinchi argument):
 
 ```javascript
 const car = Object.create(vehicle, {
@@ -244,17 +444,19 @@ const car = Object.create(vehicle, {
   },
   wheels: {
     value: 4,
-    writable: false,
+    writable: false,      // o'zgartirib bo'lmaydi
     enumerable: true,
     configurable: false
   }
 });
+
+car.wheels = 8; // ❌ silent fail (strict mode: TypeError)
+console.log(car.wheels); // 4
 ```
 
-### Prototype Chain Qurish
+Ko'p darajali prototype chain:
 
 ```javascript
-// 3 darajali chain:
 const living = { alive: true };
 const animal = Object.create(living);
 animal.eats = true;
@@ -262,9 +464,24 @@ const dog = Object.create(animal);
 dog.barks = true;
 
 // dog → animal → living → Object.prototype → null
-console.log(dog.barks);  // true (o'zida)
-console.log(dog.eats);   // true (animal)
-console.log(dog.alive);  // true (living)
+console.log(dog.barks); // true (o'zida)
+console.log(dog.eats);  // true (animal)
+console.log(dog.alive); // true (living)
+```
+
+`Object.create(null)` — prototype'siz toza dictionary:
+
+```javascript
+const dict = Object.create(null);
+dict.key = "value";
+dict.toString = "bu oddiy property"; // collision yo'q!
+
+console.log(dict.toString);       // "bu oddiy property" — method emas
+console.log("key" in dict);       // true
+console.log(dict.hasOwnProperty); // undefined — Object.prototype yo'q
+
+// Use case: konfiguratsiya yoki cache object'i —
+// prototype method nomlari bilan collision bo'lmaydi
 ```
 
 ---
@@ -273,23 +490,27 @@ console.log(dog.alive);  // true (living)
 
 ### Nazariya
 
-ES6 da `class` sintaksisi paydo bo'lishidan oldin, JavaScript'da ob'ekt yaratish uchun **constructor function** ishlatilgan. Bu oddiy funksiya bo'lib, `new` keyword bilan chaqirilganda maxsus xulq-atvor ko'rsatadi: avtomatik ravishda yangi bo'sh ob'ekt yaratadi, `this` ni shu ob'ektga bog'laydi va oxirida qaytaradi.
+ES6 da `class` sintaksisi paydo bo'lishidan oldin, JavaScript'da ob'ekt yaratish uchun **constructor function** ishlatilgan. Bu oddiy funksiya bo'lib, `new` keyword bilan chaqirilganda maxsus xulq-atvor ko'rsatadi: avtomatik ravishda yangi bo'sh ob'ekt yaratadi, `this` ni shu ob'ektga bog'laydi, prototype chain o'rnatadi va oxirida qaytaradi.
 
-Constructor function'larni tushunish zamonaviy JavaScript'da ham muhim. `class` sintaksisi aslida constructor function'ning **sintaktik qand** (syntactic sugar) i — ichida xuddi shu mexanizm ishlaydi. Ko'plab mavjud kutubxonalar va legacy kodlar constructor function ishlatadi. Shuningdek, `new` keyword qanday ishlashini bilmaslik ko'p intervyu savollarida xato javob berishga olib keladi.
+Constructor function'larni tushunish zamonaviy JavaScript'da ham muhim. `class` sintaksisi aslida constructor function'ning **syntactic sugar'i** — ichida xuddi shu mexanizm ishlaydi. Ko'plab mavjud kutubxonalar va legacy kodlar constructor function ishlatadi.
 
-Muhim pattern: method'larni **prototype** da e'lon qilish kerak, har bir instance ichida emas. Agar method'ni constructor ichida `this.greet = function() {...}` deb yozsangiz, har bir yangi instance uchun alohida funksiya yaratiladi — bu xotirani behuda sarflaydi. `Person.prototype.greet = function() {...}` deb yozsangiz, barcha instance'lar bitta funksiyani share qiladi.
+**Muhim pattern:** method'larni **prototype** da e'lon qilish kerak, har bir instance ichida emas. Agar method'ni constructor ichida `this.greet = function() {...}` deb yozsangiz, har bir yangi instance uchun **alohida funksiya** yaratiladi — bu xotirani sarflaydi. `Person.prototype.greet = function() {...}` deb yozsangiz, barcha instance'lar **bitta funksiyani share** qiladi.
+
+### Kod Misollari
+
+Constructor function bilan class yaratish:
 
 ```javascript
 function Person(name, age) {
   // new bilan chaqirilganda:
   // 1. this = {} (yangi bo'sh object)
-  // 2. this.__proto__ = Person.prototype
-  this.name = name;
-  this.age = age;
+  // 2. this.[[Prototype]] = Person.prototype
+  this.name = name; // instance property
+  this.age = age;   // instance property
   // 3. return this (avtomatik)
 }
 
-// Method'lar prototype da — barcha instance'lar share qiladi
+// Method'lar prototype da — barcha instance'lar share qiladi:
 Person.prototype.greet = function() {
   return `Salom, men ${this.name}, ${this.age} yoshdaman`;
 };
@@ -304,21 +525,26 @@ const vali = new Person("Vali", 17);
 ali.greet();    // "Salom, men Ali, 25 yoshdaman"
 vali.isAdult(); // false
 
-// Method'lar SHARE qilingan:
-console.log(ali.greet === vali.greet); // true — bitta funksiya!
+// Method'lar SHARE — bitta funksiya:
+console.log(ali.greet === vali.greet); // true ✅
 ```
 
 ### constructor Property
 
-Har bir `prototype` object'da `constructor` property bor — u yaratuvchi funksiyaga ishora qiladi:
+Har bir `prototype` object'da `constructor` property bor — u yaratuvchi funksiyaga ishora:
 
 ```javascript
 console.log(Person.prototype.constructor === Person); // true
-console.log(ali.constructor === Person);               // true (prototype dan)
+console.log(ali.constructor === Person);               // true (prototype dan oldi)
 
-// Yangi instance yaratish:
-const cloneAli = new ali.constructor("Ali Clone", 25);
+// constructor orqali dinamik instance yaratish:
+const aliClone = new ali.constructor("Ali Clone", 25);
+console.log(aliClone instanceof Person); // true
 ```
+
+### Convention: Nomlash
+
+Constructor function'lar **bosh harf** bilan boshlanadi: `Person`, `Car`, `HttpClient`. Bu `new` bilan chaqirilishi kerakligini bildiruvchi convention. Kichik harf bilan boshlangan funksiya — oddiy funksiya.
 
 ---
 
@@ -326,11 +552,11 @@ const cloneAli = new ali.constructor("Ali Clone", 25);
 
 ### Nazariya
 
-`new` keyword — bu JavaScript'da constructor function yoki class'ni chaqirganda **4 ta muhim qadam**ni avtomatik bajaradigan operator. Ko'p dasturchilar `new` ni oddiy deb o'ylaydi, lekin uning ichki mexanizmini tushunish prototype chain, `this` binding va ob'ekt yaratilish jarayonini to'liq anglash uchun zarur.
+`new` keyword — constructor function yoki class'ni chaqirganda **4 ta muhim qadam**ni avtomatik bajaradigan operator. Uning ichki mexanizmini tushunish prototype chain, `this` binding va ob'ekt yaratilish jarayonini to'liq anglash uchun zarur.
 
-`new` ning qadamlarini bilish nima uchun amaliy jihatdan foydali? Birinchidan, `new` siz constructor chaqirilsa nima bo'lishini tushunasiz (xavfli xato). Ikkinchidan, constructor dan ob'ekt qaytarish (return override) paytida kutilmagan xulq-atvorni oldindan ko'ra olasiz. Uchinchidan, `new` ni o'zingiz yoza olish — bu JavaScript prototip tizimini to'liq o'zlashtirganingizning isboti.
+`new` qadamlarini bilish amaliy jihatdan foydali: birinchidan, `new` siz constructor chaqirilsa nima bo'lishini tushunasiz (xavfli bug). Ikkinchidan, constructor dan ob'ekt qaytarish (return override) paytida kutilmagan xulq-atvorni oldindan ko'ra olasiz.
 
-`new` keyword nima qiladi — **4 qadam**:
+### Under the Hood — 4 Qadam
 
 ```javascript
 function User(name) {
@@ -341,33 +567,29 @@ User.prototype.greet = function() { return this.name; };
 const user = new User("Islom");
 ```
 
-### Step-by-Step
+`new User("Islom")` chaqirilganda engine ichida nima sodir bo'ladi:
 
 ```javascript
-// new User("Islom") ichidan:
-
-// 1. Bo'sh object yaratish
+// QADAM 1: Bo'sh object yaratish
 const obj = {};
 
-// 2. [[Prototype]] ni bog'lash
+// QADAM 2: [[Prototype]] ni bog'lash
 Object.setPrototypeOf(obj, User.prototype);
-// obj.__proto__ = User.prototype
+// obj.__proto__ === User.prototype
 
-// 3. Constructor ni obj bilan chaqirish (this = obj)
+// QADAM 3: Constructor ni obj bilan chaqirish (this = obj)
 const result = User.call(obj, "Islom");
-// obj.name = "Islom"
+// obj.name = "Islom" — chunki this = obj
 
-// 4. Return logic:
-//    - Agar constructor OBJECT qaytarsa → shu object
-//    - Agar primitive yoki hech narsa qaytarmasa → obj
-//    result = undefined (constructor hech narsa qaytarmadi)
-//    → return obj
+// QADAM 4: Return logic:
+//   - Agar constructor OBJECT qaytarsa → shu object return
+//   - Agar primitive yoki hech narsa qaytarmasa → obj return
+// result = undefined (User hech narsa qaytarmadi)
+// → return obj
 ```
 
-### Diagramma
-
 ```
-new User("Islom")
+new User("Islom") — step by step:
 
 Step 1:  obj = {}
 Step 2:  obj.[[Prototype]] = User.prototype
@@ -375,49 +597,62 @@ Step 3:  User.call(obj, "Islom") → obj.name = "Islom"
 Step 4:  return obj
 
 Natija:
-┌──────────────┐        ┌─────────────────┐
-│ user         │        │ User.prototype  │
-│ name: "Islom"│        │ greet()         │
-│ __proto__: ──│───────►│ constructor: User│
-└──────────────┘        └─────────────────┘
+┌───────────────┐        ┌──────────────────┐
+│ user          │        │ User.prototype   │
+│ name: "Islom" │        │ greet()          │
+│ __proto__: ───│───────►│ constructor: User│
+└───────────────┘        └──────────────────┘
 ```
 
 ### Return Override
 
+`new` keyword'ning 4-qadami eng nozik qismi. Constructor'dan qaytariladigan qiymat turiga qarab natija o'zgaradi:
+
 ```javascript
-// Primitive qaytarsa — IGNORED, this qaytariladi
+// 1. Primitive qaytarsa — IGNORED, this (yangi object) qaytariladi:
 function Foo() {
   this.a = 1;
-  return 42; // ← ignored! primitive
+  return 42; // ← primitive, new tomonidan ignored
 }
-console.log(new Foo()); // { a: 1 }
+console.log(new Foo()); // { a: 1 } — 42 emas
 
-// Object qaytarsa — shu object qaytariladi
+// 2. Object qaytarsa — shu object qaytariladi (this yo'qoladi):
 function Bar() {
   this.a = 1;
   return { b: 2 }; // ← object! this o'rniga shu qaytadi
 }
-console.log(new Bar()); // { b: 2 } — this yo'qoldi!
+console.log(new Bar()); // { b: 2 } — this.a yo'qoldi!
 
-// null — primitive hisoblanadi:
+// 3. null — typeof null === "object" bo'lsa ham, primitive hisoblanadi:
 function Baz() {
   this.a = 1;
-  return null; // ← ignored!
+  return null; // ← null primitive sifatida → ignored
 }
 console.log(new Baz()); // { a: 1 }
+
+// 4. Array, Function, Date — bular object → this o'rniga qaytadi:
+function Qux() {
+  this.a = 1;
+  return [1, 2, 3]; // ← array = object
+}
+console.log(new Qux()); // [1, 2, 3]
 ```
+
+**Qoida:** `typeof result === "object" && result !== null` — shu shart true bo'lsa, constructor'ning qaytargan object'i return bo'ladi. Aks holda — `this` (yangi yaratilgan object) return bo'ladi.
 
 ### new ni O'zimiz Yozamiz
 
+`new` keyword'ning polyfill'i — bu 4 qadamni qo'lda implement qilish:
+
 ```javascript
 function myNew(Constructor, ...args) {
-  // 1. Bo'sh object, prototype bog'lash
+  // Qadam 1 + 2: Bo'sh object yaratish va prototype bog'lash
   const obj = Object.create(Constructor.prototype);
 
-  // 2. Constructor chaqirish
+  // Qadam 3: Constructor ni chaqirish
   const result = Constructor.apply(obj, args);
 
-  // 3. Return logic
+  // Qadam 4: Return logic
   return (result !== null && typeof result === "object") ? result : obj;
 }
 
@@ -426,9 +661,36 @@ function Person(name) { this.name = name; }
 Person.prototype.greet = function() { return this.name; };
 
 const p = myNew(Person, "Ali");
-console.log(p.name);    // "Ali"
-console.log(p.greet()); // "Ali"
+console.log(p.name);              // "Ali"
+console.log(p.greet());           // "Ali"
 console.log(p instanceof Person); // true ✅
+console.log(p.constructor === Person); // true ✅
+```
+
+### new siz Chaqirish — Xavfli Bug
+
+Agar constructor function `new` siz chaqirilsa, `this` global object'ga (yoki strict mode'da `undefined` ga) bog'lanadi:
+
+```javascript
+function User(name) {
+  this.name = name;
+}
+
+// ❌ new siz — this = globalThis (yoki undefined strict mode'da)
+const user = User("Ali"); // return undefined
+console.log(user);         // undefined
+console.log(globalThis.name); // "Ali" — global scope ifloslanadi!
+
+// ✅ Himoya: new.target tekshiruvi
+function SafeUser(name) {
+  if (!new.target) {
+    return new SafeUser(name); // avtomatik new bilan chaqirish
+  }
+  this.name = name;
+}
+
+const safe = SafeUser("Ali"); // new siz ham ishlaydi
+console.log(safe.name); // "Ali"
 ```
 
 ---
@@ -437,14 +699,40 @@ console.log(p instanceof Person); // true ✅
 
 ### Nazariya
 
-`instanceof` — bu operator bo'lib, u ob'ektning prototype chain'ida berilgan constructor'ning `prototype` property'si **borligini** tekshiradi. Ya'ni `obj instanceof Fn` degani — "obj ning prototype chain'ining istalgan nuqtasida `Fn.prototype` bormi?" degan savol.
+`instanceof` — operator bo'lib, ob'ektning prototype chain'ida berilgan constructor'ning `prototype` property'si **borligini** tekshiradi. Ya'ni `obj instanceof Fn` savoli: "obj ning prototype chain'ining istalgan nuqtasida `Fn.prototype` bormi?"
 
-Bu operator qanday ishlashini bilish amaliy jihatdan muhim: birinchidan, u `typeof` dan farqli ravishda ob'ektning **aniq turini** aniqlash imkonini beradi (masalan, `typeof []` — `"object"`, lekin `[] instanceof Array` — `true`). Ikkinchidan, `instanceof` ning ba'zi kutilmagan xulq-atvorlari bor — masalan, prototype o'zgartirilsa yoki turli iframe'lardagi ob'ektlar bilan ishlansa noto'g'ri natija berishi mumkin. Shu sababli array'larni tekshirishda `Array.isArray()` ishlatish tavsiya etiladi.
+Bu operator `typeof` dan farqli ravishda ob'ektning **aniq turini** aniqlaydi. `typeof []` — `"object"` qaytaradi, lekin `[] instanceof Array` — `true`. Shu sababli reference type'larni aniqlash uchun `instanceof` ishlatiladi.
+
+### Under the Hood
+
+`instanceof` ning ichki algoritmi (ECMAScript spec — OrdinaryHasInstance):
+
+```javascript
+// obj instanceof Constructor
+// Engine quyidagilarni tekshiradi:
+
+function internalInstanceof(obj, Constructor) {
+  let proto = Object.getPrototypeOf(obj);
+  const target = Constructor.prototype;
+
+  while (proto !== null) {
+    if (proto === target) return true;
+    proto = Object.getPrototypeOf(proto);
+  }
+
+  return false;
+}
+```
+
+Ya'ni prototype chain bo'ylab yuqoriga yurib, har bir `[[Prototype]]` ni `Constructor.prototype` bilan solishtiradi. Topsak — `true`, `null` ga yetsak — `false`.
+
+### Kod Misollari
 
 ```javascript
 function Animal() {}
 function Dog() {}
 Dog.prototype = Object.create(Animal.prototype);
+Dog.prototype.constructor = Dog;
 
 const rex = new Dog();
 
@@ -453,65 +741,122 @@ console.log(rex instanceof Animal); // true
 console.log(rex instanceof Object); // true
 ```
 
-### Ichki Algoritm
-
-```javascript
-// rex instanceof Dog
-// Engine quyidagini tekshiradi:
-
-rex.__proto__ === Dog.prototype?
-// Ha → TRUE
-
-// rex instanceof Animal:
-rex.__proto__ === Animal.prototype?           // Yo'q (Dog.prototype)
-rex.__proto__.__proto__ === Animal.prototype?  // Ha → TRUE
-
-// rex instanceof Object:
-// ... chain bo'ylab Object.prototype gacha yuradi → TRUE
 ```
+Ichki tekshiruv:
 
-```
-rex.__proto__                = Dog.prototype       ✅ instanceof Dog
-rex.__proto__.__proto__      = Animal.prototype     ✅ instanceof Animal
-rex.__proto__.__proto__.__proto__ = Object.prototype ✅ instanceof Object
-rex.__proto__.__proto__.__proto__.__proto__ = null   ← chain tugadi
+rex instanceof Dog:
+  rex.__proto__ === Dog.prototype?    → HA → TRUE ✅
+
+rex instanceof Animal:
+  rex.__proto__ === Animal.prototype?           → YO'Q (Dog.prototype)
+  rex.__proto__.__proto__ === Animal.prototype?  → HA → TRUE ✅
+
+rex instanceof Object:
+  rex.__proto__ === Object.prototype?                        → YO'Q
+  rex.__proto__.__proto__ === Object.prototype?              → YO'Q
+  rex.__proto__.__proto__.__proto__ === Object.prototype?    → HA → TRUE ✅
 ```
 
 ### instanceof Muammolari
 
+**Muammo 1: Prototype o'zgartirilsa**
+
 ```javascript
-// 1. Prototype o'zgarsa:
 function Foo() {}
 const foo = new Foo();
 console.log(foo instanceof Foo); // true
 
-Foo.prototype = {}; // prototype ALMASHTIRILDI
-console.log(foo instanceof Foo); // false! — eski prototype endi chain da yo'q
+Foo.prototype = {}; // prototype ALMASHTIRILDI — yangi object
+console.log(foo instanceof Foo); // false! — eski prototype endi chain'da yo'q
+```
 
-// 2. Har xil realm (iframe):
-// iframe dagi Array !== asosiy sahifadagi Array
-// arr instanceof Array — false bo'lishi mumkin
-// Yechim: Array.isArray(arr)
+Bu sodir bo'lishining sababi: `foo.__proto__` hali ham **eski** `Foo.prototype` ga ishora qiladi. Yangi `Foo.prototype` boshqa object — shuning uchun `false`.
+
+**Muammo 2: Cross-realm (iframe/worker)**
+
+```javascript
+// iframe ichidagi Array !== asosiy sahifadagi Array
+// Shuning uchun iframe dan kelgan array uchun:
+// arr instanceof Array → false bo'lishi mumkin
+
+// Yechim — Array.isArray() realm-independent:
+Array.isArray(arr); // ✅ doim to'g'ri ishlaydi
+```
+
+**Muammo 3: Primitive qiymatlar**
+
+```javascript
+console.log(42 instanceof Number);     // false — primitive, object emas
+console.log("hello" instanceof String); // false — primitive
+console.log(true instanceof Boolean);   // false — primitive
+
+// Wrapper object bilan farq:
+console.log(new Number(42) instanceof Number); // true — object
+```
+
+### Symbol.hasInstance
+
+`instanceof` ni customize qilish uchun `Symbol.hasInstance` static method ishlatiladi:
+
+```javascript
+class EvenNumber {
+  static [Symbol.hasInstance](num) {
+    return typeof num === "number" && num % 2 === 0;
+  }
+}
+
+console.log(2 instanceof EvenNumber);  // true
+console.log(3 instanceof EvenNumber);  // false
+console.log(10 instanceof EvenNumber); // true
 ```
 
 ---
 
 ## Object.getPrototypeOf va setPrototypeOf
 
+### Nazariya
+
+Bu ikki static method `[[Prototype]]` internal slot'ni **o'qish** va **yozish** uchun standart API:
+
+- **`Object.getPrototypeOf(obj)`** — obj'ning `[[Prototype]]`ini qaytaradi (ya'ni uning prototype object'i)
+- **`Object.setPrototypeOf(obj, proto)`** — obj'ning `[[Prototype]]`ini `proto` ga o'zgartiradi
+
+### Kod Misollari
+
 ```javascript
 const proto = { greet() { return "Salom"; } };
 const obj = Object.create(proto);
 
 // O'qish:
-Object.getPrototypeOf(obj) === proto; // true
+console.log(Object.getPrototypeOf(obj) === proto); // true
 
-// O'zgartirish (tavsiya etilMAYDI — performance muammo):
+// O'zgartirish:
 const newProto = { greet() { return "Hello"; } };
 Object.setPrototypeOf(obj, newProto);
-obj.greet(); // "Hello"
+console.log(obj.greet()); // "Hello" — yangi prototype'dan
 ```
 
-⚠️ **`Object.setPrototypeOf`** ni production da ishlatmang! U juda **sekin** — V8 inline cache va hidden class optimizatsiyalarini buzadi. O'rniga `Object.create` bilan boshidanoq to'g'ri prototype chain quring.
+### Performance Ogohlantirish
+
+`Object.setPrototypeOf` ni production kodda ishlatish **tavsiya etilmaydi**. Sabablari:
+
+1. **V8 hidden class** (Map) optimizatsiyasini buzadi — engine object'ning shape'ini qayta hisoblashi kerak
+2. **Inline cache** invalidate bo'ladi — avval cache'langan property lookup'lar qaytadan bajariladi
+3. MDN ham buni **"extremely slow operation"** deb belgilagan
+
+```javascript
+// ❌ Runtime da prototype o'zgartirish:
+const obj = { a: 1 };
+const proto = { greet() { return "hi"; } };
+Object.setPrototypeOf(obj, proto); // SEKIN
+
+// ✅ Boshidanoq Object.create bilan to'g'ri qurish:
+const proto2 = { greet() { return "hi"; } };
+const obj2 = Object.create(proto2);
+obj2.a = 1; // TEZ — prototype boshidanoq to'g'ri
+```
+
+**Qoida:** Prototype chain'ni object yaratilayotgan paytda `Object.create` yoki `new` bilan o'rnating. Keyinchalik `setPrototypeOf` bilan o'zgartirmang.
 
 ---
 
@@ -519,11 +864,11 @@ obj.greet(); // "Hello"
 
 ### Nazariya
 
-Property Shadowing — bu ob'ektda va uning prototype'ida **bir xil nomli** property mavjud bo'lganda, ob'ektning o'z property'si **ustunlik** qilib, prototype'dagi property'ni "yashirishi" (shadow qilishi). Bu [04-scope.md](04-scope.md) da o'rgangan variable shadowing ga juda o'xshash tushuncha, faqat bu scope'lar emas, prototype chain uchun ishlaydi.
+Property Shadowing — ob'ektda va uning prototype'ida **bir xil nomli** property mavjud bo'lganda, ob'ektning o'z property'si **ustunlik qilib**, prototype'dagi property'ni "yashirishi". Bu [04-scope.md](04-scope.md) da o'rgangan variable shadowing ga o'xshash, faqat scope'lar emas, prototype chain uchun ishlaydi.
 
 Muhim qoida: property **o'qish** prototype chain bo'ylab yuradi, lekin property **yozish** faqat ob'ektning o'ziga yozadi (agar prototype'da setter bo'lmasa). Ya'ni `child.name = "Ali"` deb yozganingizda, bu `parent.name` ni o'zgartirmaydi — `child` da yangi `name` property yaratiladi va u `parent.name` ni shadow qiladi.
 
-Shadowing'ning bitta nozik va ko'p dasturchilar bilmaydigan edge case'i bor: agar prototype'dagi property `writable: false` bo'lib belgilangan bo'lsa, child ob'ektda ham shadow yaratish **taqiqlanadi**. Bu kutilmagan xulq-atvor ko'pgina xatolarga sabab bo'lishi mumkin.
+### Kod Misollari
 
 ```javascript
 const parent = {
@@ -539,7 +884,7 @@ console.log(parent.name);   // "Parent" — o'zgarmagan
 console.log(child.greet()); // "Salom, Child" — this = child
 ```
 
-### Shadowing va Write
+O'qish vs yozish farqi:
 
 ```javascript
 const parent = { count: 0 };
@@ -552,34 +897,81 @@ console.log(child.count); // 0 (parent dan)
 child.count = 10;
 console.log(child.count);  // 10 (o'zida — shadow)
 console.log(parent.count); // 0 — o'zgarmagan!
+
+// hasOwn bilan tekshirish:
+console.log(Object.hasOwn(child, "count")); // true — endi o'zida bor
 ```
 
-**Qoida:** Property **o'qish** prototype chain bo'ylab yuradi. Property **yozish** faqat o'z object'iga yozadi (agar setter bo'lmasa).
+### Edge Case — writable: false
 
-### Shadowing Edge Case — writable: false
+Shadowing'ning bitta nozik va ko'p dasturchilar bilmaydigan edge case'i: agar prototype'dagi property `writable: false` bo'lib belgilangan bo'lsa, child ob'ektda ham shadow yaratish **taqiqlanadi**:
 
 ```javascript
 const parent = {};
 Object.defineProperty(parent, "x", { value: 1, writable: false });
 
 const child = Object.create(parent);
-child.x = 10; // ❌ Silent fail! (strict: TypeError)
+child.x = 10; // ❌ Silent fail! (strict mode: TypeError)
 console.log(child.x); // 1 — parent'dan, child'da yaratilMADI
 
-// Nima uchun? Agar prototype'dagi property writable:false bo'lsa,
-// child'da shadow yaratish HAM taqiqlanadi.
-// Bu kutilmagan behavior — ko'pchilik bilmaydi.
+// Sababi: ECMAScript spec bo'yicha, agar prototype chain'da
+// writable:false property topilsa — assignment taqiqlanadi.
+// Bu child object'da shadow yaratishni ham bloklaydi.
+```
+
+### Edge Case — Setter bilan
+
+Agar prototype'da **setter** aniqlangan bo'lsa, assignment setter'ni chaqiradi — child'da yangi property yaratilmaydi:
+
+```javascript
+const parent = {
+  _name: "Parent",
+  get name() { return this._name; },
+  set name(val) { this._name = val; }
+};
+
+const child = Object.create(parent);
+child.name = "Child"; // setter chaqiriladi! child.name yaratilMAYDI!
+
+console.log(child.name);        // "Child"
+console.log(child._name);       // "Child" — setter this._name ni o'zgartirdi
+console.log(Object.hasOwn(child, "name")); // false — child'da name yo'q!
+console.log(Object.hasOwn(child, "_name")); // true — _name child'da yaratildi
+```
+
+### Shadow'ni O'chirish
+
+`delete` operatori faqat own property'ni o'chiradi. Shadow olib tashlangandan keyin prototype'dagi property yana ko'rinadi:
+
+```javascript
+const parent = { x: 1 };
+const child = Object.create(parent);
+child.x = 2; // shadow
+
+console.log(child.x); // 2 (own)
+delete child.x;        // shadow olib tashlandi
+console.log(child.x); // 1 (yana prototype'dan)
 ```
 
 ---
 
 ## Performance: Prototype vs Instance Method
 
+### Nazariya
+
+Method'larni qayerda aniqlash — prototype'da mi yoki constructor ichida mi — bu xotira va tezlikka bevosita ta'sir qiladi.
+
+**Instance method** — constructor ichida `this.method = function() {...}` deb aniqlanganda, har bir yangi instance uchun **alohida funksiya object'i** xotirada yaratiladi. 1000 ta instance = 1000 ta funksiya.
+
+**Prototype method** — `Constructor.prototype.method = function() {...}` deb aniqlanganda, **bitta funksiya** xotirada saqlanadi va barcha instance'lar prototype chain orqali shu bitta funksiyani share qiladi.
+
+### Kod Misollari
+
 ```javascript
 // Variant 1: Instance method — har bir object'da yangi funksiya
 function UserA(name) {
   this.name = name;
-  this.greet = function() { return this.name; }; // ← har instance uchun yangi!
+  this.greet = function() { return this.name; }; // ← har safar yangi fn!
 }
 
 // Variant 2: Prototype method — barcha instance share qiladi
@@ -590,28 +982,30 @@ UserB.prototype.greet = function() { return this.name; };
 ```
 
 ```
-UserA — 1000 ta instance:
+UserA — 1000 ta instance (1000 ta alohida funksiya):
 ┌──────────┐ ┌──────────┐ ┌──────────┐
 │name:"Ali" │ │name:"Bob"│ │name:"Kim"│  × 1000
-│greet: fn1 │ │greet: fn2│ │greet: fn3│  ← 1000 ta alohida funksiya!
+│greet: fn1 │ │greet: fn2│ │greet: fn3│  ← har biri alohida funksiya!
 └──────────┘ └──────────┘ └──────────┘
 
-UserB — 1000 ta instance:
-┌──────────┐ ┌──────────┐ ┌──────────┐
-│name:"Ali" │ │name:"Bob"│ │name:"Kim"│  × 1000
-│__proto__──│►│__proto__──│►│__proto__──│► UserB.prototype
-└──────────┘ └──────────┘ └──────────┘   │ greet: fn │ ← BITTA funksiya!
-                                          └───────────┘
+UserB — 1000 ta instance (BITTA funksiya share):
+┌──────────┐ ┌──────────┐ ┌──────────┐     UserB.prototype
+│name:"Ali" │ │name:"Bob"│ │name:"Kim"│ ──► ┌───────────┐
+│__proto__──│ │__proto__──│ │__proto__──│     │ greet: fn │ ← BITTA!
+└──────────┘ └──────────┘ └──────────┘     └───────────┘
 ```
+
+### Taqqoslash
 
 | | Instance Method | Prototype Method |
 |-|----------------|-----------------|
-| **Memory** | Har instance uchun yangi fn | Bitta fn, hammasi share |
-| **Tezlik (access)** | Biroz tezroq (o'zida) | Biroz sekinroq (chain lookup) |
-| **Tezlik (yaratish)** | Sekin (har safar fn yaratish) | Tez |
-| **Private access** | Closure orqali mumkin | Mumkin emas |
+| **Memory** | Har instance uchun yangi fn yaratiladi | Bitta fn, barcha instance share |
+| **Yaratish tezligi** | Sekinroq (har safar fn yaratish) | Tezroq |
+| **Access tezligi** | Biroz tezroq (o'zida, chain lookup yo'q) | Biroz sekinroq (chain lookup kerak) |
+| **Private data** | Closure orqali private mumkin | Closure orqali private mumkin emas |
+| **Memory 1000 instance** | ~1000 × fn size | ~1 × fn size |
 
-**Tavsiya:** Prototype/class method — default tanlov. Instance method faqat closure (private data) kerak bo'lganda.
+**Tavsiya:** Prototype/class method — default tanlov. Instance method faqat closure orqali private data kerak bo'lganda ishlatilsin.
 
 ---
 
@@ -621,20 +1015,16 @@ UserB — 1000 ta instance:
 
 ```javascript
 function Dog(name) { this.name = name; }
-
 const rex = new Dog("Rex");
 
-// ❌ NOTO'G'RI tushunish:
-// "rex.prototype da method'lar bor"
-console.log(rex.prototype); // undefined! — instance'da prototype yo'q!
+// ❌ NOTO'G'RI — instance da prototype yo'q:
+console.log(rex.prototype); // undefined!
 
-// ✅ TO'G'RI:
-// "rex.__proto__ (ya'ni Dog.prototype) da method'lar bor"
-console.log(rex.__proto__ === Dog.prototype); // true
+// ✅ TO'G'RI — instance ning otasi __proto__ (ya'ni Dog.prototype):
 console.log(Object.getPrototypeOf(rex) === Dog.prototype); // true
 ```
 
-**Nima uchun:** `prototype` faqat **funksiyalarda** bor. Instance (object)'da `__proto__` bor — bu uning prototype'iga ishora.
+**Nima uchun:** `prototype` faqat **funksiyalarda** bor. Instance (object)'da `[[Prototype]]` ga kirish uchun `Object.getPrototypeOf()` ishlating.
 
 ---
 
@@ -649,29 +1039,29 @@ User.prototype = {
 };
 
 const user = new User("Ali");
-console.log(user.constructor === User); // false! ❌
+console.log(user.constructor === User);   // false! ❌
 console.log(user.constructor === Object); // true — constructor yo'qoldi
 ```
 
 ### ✅ To'g'ri usul:
 
 ```javascript
-// Variant 1: constructor ni qaytarish
+// Variant 1: constructor ni qayta qo'shish
 User.prototype = {
   constructor: User, // ← qayta qo'shish
   greet() { return this.name; }
 };
 
-// Variant 2: prototype ga qo'shish, almashmaslik (tavsiya)
+// Variant 2 (tavsiya): prototype ga qo'shish, almashmaslik
 User.prototype.greet = function() { return this.name; };
 // constructor saqlanadi
 ```
 
-**Nima uchun:** Prototype ni `= {}` bilan almashtirganda, yangi object'da `constructor` yo'q. Default `Object.prototype.constructor` = `Object` bo'lib qoladi.
+**Nima uchun:** `= {}` bilan almashtirganda yangi object yaratiladi — unda `constructor` yo'q. Default `Object.prototype.constructor` = `Object` qaytadi.
 
 ---
 
-### ❌ Xato 3: Prototype da reference type (object/array)
+### ❌ Xato 3: Prototype da mutable reference type (object/array)
 
 ```javascript
 function Team(name) { this.name = name; }
@@ -681,7 +1071,7 @@ const team1 = new Team("Alpha");
 const team2 = new Team("Beta");
 
 team1.members.push("Ali");
-console.log(team2.members); // ["Ali"] — team2 ga ham tushdi! 😱
+console.log(team2.members); // ["Ali"] — team2 ga ham tushdi!
 ```
 
 ### ✅ To'g'ri usul:
@@ -698,19 +1088,18 @@ Team.prototype.addMember = function(name) {
 
 const team1 = new Team("Alpha");
 const team2 = new Team("Beta");
-
 team1.addMember("Ali");
 console.log(team2.members); // [] ✅ — alohida
 ```
 
-**Nima uchun:** Prototype'dagi object/array **shared** — barcha instance bitta reference orqali ko'radi. Mutable data har doim **constructor ichida** (instance'da) yarating.
+**Nima uchun:** Prototype'dagi object/array **shared** — barcha instance bitta reference orqali foydalanadi. `team1.members.push()` — bu **o'qish** (lookup prototype chain orqali members'ni topadi) va keyin **mutate** qilish. Shadow yaratilmaydi chunki `push` yangi property yozmayapti, mavjud array'ni o'zgartirmoqda. Mutable data har doim **constructor ichida** (instance property sifatida) yarating.
 
 ---
 
 ### ❌ Xato 4: setPrototypeOf ishlatish (performance)
 
 ```javascript
-// ❌ Runtime da prototype o'zgartirish
+// ❌ Runtime da prototype o'zgartirish:
 const obj = { a: 1 };
 const proto = { greet() { return "hi"; } };
 Object.setPrototypeOf(obj, proto); // SEKIN — V8 optimizatsiya buziladi
@@ -719,17 +1108,17 @@ Object.setPrototypeOf(obj, proto); // SEKIN — V8 optimizatsiya buziladi
 ### ✅ To'g'ri usul:
 
 ```javascript
-// ✅ Boshidanoq Object.create bilan
+// ✅ Boshidanoq Object.create bilan:
 const proto = { greet() { return "hi"; } };
 const obj = Object.create(proto);
 obj.a = 1;
 ```
 
-**Nima uchun:** `setPrototypeOf` V8 ning hidden class va inline cache optimizatsiyalarini buzadi. MDN ham "extremely slow operation" deb yozgan.
+**Nima uchun:** `setPrototypeOf` V8 ning hidden class (Map) va inline cache optimizatsiyalarini buzadi. Engine object'ning butun shape'ini qayta qurishga majbur bo'ladi.
 
 ---
 
-### ❌ Xato 5: for...in bilan prototype property olish
+### ❌ Xato 5: for...in bilan prototype property'larni olish
 
 ```javascript
 function User(name) { this.name = name; }
@@ -737,34 +1126,37 @@ User.prototype.role = "user";
 
 const ali = new User("Ali");
 
+// ❌ for...in prototype'dagi property'larni ham oladi:
 const copy = {};
 for (const key in ali) {
-  copy[key] = ali[key]; // role ham kiradi!
+  copy[key] = ali[key];
 }
-console.log(copy); // { name: "Ali", role: "user" } — keraksiz!
+console.log(copy); // { name: "Ali", role: "user" } — keraksiz role!
 ```
 
 ### ✅ To'g'ri usul:
 
 ```javascript
-// Object.keys — faqat own property
+// Object.keys — faqat own enumerable property'lar:
 const copy = {};
 for (const key of Object.keys(ali)) {
   copy[key] = ali[key];
 }
-// Yoki spread:
+console.log(copy); // { name: "Ali" } ✅
+
+// Yoki spread operator:
 const copy2 = { ...ali }; // { name: "Ali" } ✅
 ```
 
-**Nima uchun:** `for...in` prototype chain'ni ham yuradi. `Object.keys` va spread faqat own enumerable property'larni oladi.
+**Nima uchun:** `for...in` prototype chain'ni ham yuradi va barcha enumerable property'larni qaytaradi. `Object.keys`, `Object.values`, `Object.entries` va spread operator faqat **own enumerable** property'larni oladi.
 
 ---
 
 ## Amaliy Mashqlar
 
-### Mashq 1: Prototype Chain (Oson)
+### Mashq 1: Prototype Chain Lookup (Oson)
 
-**Savol:** Quyidagi kodda `d.toString()` chaqirilganda, engine qanday qidiradi?
+**Savol:** Quyidagi kodda `c.toString()` chaqirilganda engine qanday qidiradi? Prototype chain'ni yozing.
 
 ```javascript
 const a = { x: 1 };
@@ -790,21 +1182,28 @@ Object.prototype → { toString, ... }  toString bor? HA! → TOPILDI
 
 Prototype chain: c → b → a → Object.prototype → null
 ```
+
+**Tushuntirish:** `toString` hech bir oraliq object'da yo'q, shuning uchun engine `Object.prototype` gacha yurib shu yerda topdi.
 </details>
 
 ---
 
-### Mashq 2: new Keyword ni Implement Qiling (O'rta)
+### Mashq 2: new Keyword Polyfill (O'rta)
 
-**Savol:** `myNew(Constructor, ...args)` yozing.
+**Savol:** `myNew(Constructor, ...args)` funksiyasini yozing — u `new` keyword'ning barcha 4 qadamini bajarsin.
 
 <details>
 <summary>Javob</summary>
 
 ```javascript
 function myNew(Constructor, ...args) {
+  // 1 + 2. Bo'sh object yaratish va prototype bog'lash
   const obj = Object.create(Constructor.prototype);
+
+  // 3. Constructor ni chaqirish (this = obj)
   const result = Constructor.apply(obj, args);
+
+  // 4. Return logic — object qaytarsa shu, aks holda obj
   return (result !== null && typeof result === "object") ? result : obj;
 }
 
@@ -815,16 +1214,18 @@ Car.prototype.drive = function() { return `${this.brand} haydash`; };
 const car = myNew(Car, "BMW");
 console.log(car.brand);            // "BMW"
 console.log(car.drive());          // "BMW haydash"
-console.log(car instanceof Car);   // true
-console.log(car.constructor === Car); // true
+console.log(car instanceof Car);   // true ✅
+console.log(car.constructor === Car); // true ✅
 ```
+
+**Tushuntirish:** `Object.create(Constructor.prototype)` — 1 va 2-qadamni birgalikda bajaradi. `Constructor.apply(obj, args)` — 3-qadam, `this` = obj bilan chaqiradi. 4-qadam da return logic: agar constructor object qaytarsa — shu qaytariladi, aks holda yangi yaratilgan obj.
 </details>
 
 ---
 
 ### Mashq 3: Inheritance Chain (O'rta)
 
-**Savol:** `Animal → Dog → GuideDog` prototype chain yarating. Har birida method'lar, GuideDog barcha ota method'larini ishlatsin.
+**Savol:** `Animal → Dog → GuideDog` prototype chain yarating. Har birida method'lar bo'lsin, GuideDog barcha ota method'larini ishlatsin.
 
 <details>
 <summary>Javob</summary>
@@ -838,17 +1239,17 @@ Animal.prototype.eat = function() {
 };
 
 function Dog(name, breed) {
-  Animal.call(this, name); // super()
+  Animal.call(this, name); // parent constructor chaqirish
   this.breed = breed;
 }
 Dog.prototype = Object.create(Animal.prototype);
-Dog.prototype.constructor = Dog;
+Dog.prototype.constructor = Dog; // constructor ni qayta o'rnatish
 Dog.prototype.bark = function() {
   return `${this.name} havlayapti!`;
 };
 
 function GuideDog(name, breed, owner) {
-  Dog.call(this, name, breed);
+  Dog.call(this, name, breed); // parent constructor chaqirish
   this.owner = owner;
 }
 GuideDog.prototype = Object.create(Dog.prototype);
@@ -865,25 +1266,31 @@ console.log(buddy instanceof GuideDog); // true
 console.log(buddy instanceof Dog);      // true
 console.log(buddy instanceof Animal);   // true
 ```
+
+**Tushuntirish:** Har bir daraja uchun: `Parent.call(this, ...)` — parent constructor'ni chaqirish (instance property'larni olish). `Child.prototype = Object.create(Parent.prototype)` — prototype chain'ni ulash. `Child.prototype.constructor = Child` — constructor reference'ni qaytarish.
 </details>
 
 ---
 
-### Mashq 4: instanceof Implement Qilish (Qiyin)
+### Mashq 4: instanceof Polyfill (Qiyin)
 
-**Savol:** `myInstanceof(obj, Constructor)` yozing.
+**Savol:** `myInstanceof(obj, Constructor)` funksiyasini yozing.
 
 <details>
 <summary>Javob</summary>
 
 ```javascript
 function myInstanceof(obj, Constructor) {
-  if (obj === null || typeof obj !== "object") return false;
+  // Primitive uchun false — instanceof faqat object bilan ishlaydi
+  if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) {
+    return false;
+  }
 
   let proto = Object.getPrototypeOf(obj);
+  const target = Constructor.prototype;
 
   while (proto !== null) {
-    if (proto === Constructor.prototype) return true;
+    if (proto === target) return true;
     proto = Object.getPrototypeOf(proto);
   }
 
@@ -894,6 +1301,7 @@ function myInstanceof(obj, Constructor) {
 function A() {}
 function B() {}
 B.prototype = Object.create(A.prototype);
+B.prototype.constructor = B;
 
 const b = new B();
 console.log(myInstanceof(b, B));      // true
@@ -903,14 +1311,14 @@ console.log(myInstanceof(b, Array));  // false
 console.log(myInstanceof(42, Number)); // false (primitive)
 ```
 
-**Tushuntirish:** Prototype chain bo'ylab yuqoriga yurib, `Constructor.prototype` ni qidiramiz. Topsak — `true`, `null` ga yetsak — `false`.
+**Tushuntirish:** Prototype chain bo'ylab yuqoriga yurib, har bir `[[Prototype]]` ni `Constructor.prototype` bilan solishtiramiz. Topsak — `true`, `null` ga yetsak — `false`. Primitive qiymatlar uchun darhol `false` qaytaramiz chunki ularda prototype chain yo'q.
 </details>
 
 ---
 
 ### Mashq 5: Mixin Pattern (Qiyin)
 
-**Savol:** Bir nechta object'lardan method'larni birlashtiradigan `mixin` funksiyasi yozing.
+**Savol:** Bir nechta object'lardan method'larni birlashtiradigan `mixin(target, ...sources)` funksiyasini yozing.
 
 <details>
 <summary>Javob</summary>
@@ -918,12 +1326,12 @@ console.log(myInstanceof(42, Number)); // false (primitive)
 ```javascript
 function mixin(target, ...sources) {
   for (const source of sources) {
-    // Own enumerable property'larni olish (Symbol ham)
+    // Own property'larni olish (Symbol key'lar ham)
     for (const key of Reflect.ownKeys(source)) {
-      if (key === "constructor") continue; // constructor skip
+      if (key === "constructor") continue; // constructor'ni skip
 
       const desc = Object.getOwnPropertyDescriptor(source, key);
-      Object.defineProperty(target, desc ? key : key, desc || { value: source[key] });
+      Object.defineProperty(target, key, desc);
     }
   }
   return target;
@@ -931,8 +1339,7 @@ function mixin(target, ...sources) {
 
 // Use case:
 const Serializable = {
-  serialize()   { return JSON.stringify(this); },
-  deserialize(json) { return Object.assign(this, JSON.parse(json)); }
+  serialize() { return JSON.stringify(this); }
 };
 
 const Validatable = {
@@ -954,33 +1361,37 @@ function User(name, email) {
 mixin(User.prototype, Serializable, Validatable);
 
 const user = new User("Ali", "ali@mail.com");
-console.log(user.serialize());    // '{"name":"Ali","email":"ali@mail.com"}'
-console.log(user.validate());     // true
+console.log(user.serialize()); // '{"name":"Ali","email":"ali@mail.com"}'
+console.log(user.validate());  // true
 ```
 
-**Tushuntirish:** JavaScript single inheritance — faqat bitta prototype. Mixin pattern orqali bir nechta "trait" / "capability" ni qo'shish mumkin. Bu [08-classes.md](08-classes.md) da ko'proq.
+**Tushuntirish:** JavaScript single inheritance — faqat bitta prototype. Mixin pattern orqali bir nechta source object'lardan method'larni target prototype'ga ko'chirish mumkin. `Reflect.ownKeys` Symbol key'larni ham oladi. Bu pattern haqida ko'proq [08-classes.md](08-classes.md) da.
 </details>
 
 ---
 
 ## Xulosa
 
-1. **`[[Prototype]]`** — har bir object'ning internal slot'i. Boshqa object yoki null ga ishora. Property topilmasa shu zanjir bo'ylab qidiriladi.
+1. **`[[Prototype]]`** — har bir object'ning internal slot'i. Boshqa object yoki null ga ishora qiladi. Property topilmasa shu zanjir bo'ylab qidiriladi (delegation prinsipi).
 
-2. **`__proto__` vs `prototype`:** `__proto__` = object'ning otasi (har kimda bor). `prototype` = funksiya yaratadigan instance'lar uchun ota (faqat function'da).
+2. **`__proto__` vs `prototype`:** `__proto__` = object'ning otasi (har bir object'da bor, `Object.getPrototypeOf()` ishlating). `prototype` = funksiya yaratadigan instance'lar uchun ota (faqat function'larda bor).
 
-3. **Prototype Chain:** object → prototype → prototype → ... → Object.prototype → null. Property o'qishda chain bo'ylab yuradi, yozishda faqat o'z object'iga.
+3. **Prototype Chain:** `object → prototype → prototype → ... → Object.prototype → null`. Property o'qishda chain bo'ylab yuradi, yozishda faqat o'z object'iga yozadi (shadowing).
 
-4. **`new` keyword 4 qadam:** bo'sh object → prototype bog'lash → constructor chaqirish → return (object yoki this).
+4. **Object.prototype** — barcha object'larning ajdodi. `toString()`, `valueOf()`, `hasOwnProperty()`, `constructor`, `isPrototypeOf()` shu yerda turadi.
 
-5. **`instanceof`:** prototype chain bo'ylab `Constructor.prototype` ni qidiradi.
+5. **`Object.create(proto)`** — prototype chain'ni eng aniq qurish usuli. `null` berilsa — prototype'siz "dictionary" yaratadi.
 
-6. **Property Shadowing:** o'zidagi property prototype'dagi bir xil nomlini "yashiradi".
+6. **`new` keyword 4 qadam:** bo'sh object yaratish → `[[Prototype]]` bog'lash → constructor chaqirish → return (object qaytarsa shu, aks holda this).
 
-7. **Performance:** Prototype method'lar memory tejaydi (shared). `setPrototypeOf` sekin — boshidanoq `Object.create` ishlating.
+7. **`instanceof`** — prototype chain bo'ylab `Constructor.prototype` ni qidiradi. Primitive'lar uchun `false`. Cross-realm muammolari bor (array uchun `Array.isArray()` ishlating).
 
-8. **Prototype'da mutable data qo'ymang** (array, object). Constructor ichida yarating.
+8. **Property Shadowing** — o'z property prototype'dagi bir xil nomlini yashiradi. `writable: false` bo'lsa shadow yaratish ham taqiqlanadi.
+
+9. **Performance:** Prototype method'lar memory tejaydi (bitta fn, barcha instance share). `setPrototypeOf` sekin — boshidanoq `Object.create` yoki `new` ishlating.
+
+10. **Prototype'da mutable data (array, object) qo'ymang** — barcha instance share qiladi. Constructor ichida yarating.
 
 ---
 
-> **Keyingi bo'lim:** [08-classes.md](08-classes.md) — ES6 Classes — syntactic sugar over prototypes, extends, super, private fields.
+> **Keyingi bo'lim:** [08-classes.md](08-classes.md) — ES6 Classes: syntactic sugar over prototypes, class anatomy, extends va super, private fields (#), static members, accessor'lar, mixins va composition vs inheritance.

@@ -1,18 +1,22 @@
 # Bo'lim 2: Execution Context
 
-> JavaScript kodni bajarishdan oldin "sahna tayyorlaydi" — Execution Context aynan shu sahna.
+> Execution Context — JavaScript engine kod bajarishdan oldin yaratiladigan ichki muhit bo'lib, o'zgaruvchilar, funksiyalar, scope chain va `this` qiymati qanday aniqlanishini belgilaydigan tuzilma.
 
 ---
 
 ## Mundarija
 
-- [Execution Context Nima?](#execution-context-nima)
+- [Execution Context Nima](#execution-context-nima)
 - [Execution Context Turlari](#execution-context-turlari)
 - [Global Execution Context (GEC)](#global-execution-context-gec)
 - [Function Execution Context (FEC)](#function-execution-context-fec)
+- [Eval Execution Context](#eval-execution-context)
 - [Execution Context Phases](#execution-context-phases)
+- [Creation Phase](#creation-phase)
+- [Execution Phase](#execution-phase)
 - [Variable Environment vs Lexical Environment](#variable-environment-vs-lexical-environment)
 - [Environment Record](#environment-record)
+- [Outer Environment Reference va Scope Chain](#outer-environment-reference-va-scope-chain)
 - [this Binding](#this-binding)
 - [Execution Context Stack](#execution-context-stack)
 - [Common Mistakes](#common-mistakes)
@@ -21,29 +25,31 @@
 
 ---
 
-## Execution Context Nima?
+## Execution Context Nima
 
 ### Nazariya
 
-Execution Context — bu JavaScript engine kodni bajarish uchun yaratadigan **muhit (environment)** bo'lib, u dasturning istalgan nuqtasida qaysi o'zgaruvchilar mavjud, ularning qiymatlari nima, qaysi scope'larga kirish mumkin va `this` nimaga ishora qilayotganini belgilaydi.
+Execution Context (EC) — JavaScript engine har bir kod bo'lagini bajarishdan oldin yaratiladigan ichki muhit (environment). Bu muhit ichida engine quyidagilarni aniqlaydi:
 
-Buni **teatr sahnasi**ga o'xshatish mumkin. Har bir sahna (Execution Context) o'zining dekoratsiyalari (o'zgaruvchilar), aktyorlari (funksiyalar) va rejissyori (engine) ga ega. Yangi sahna o'ynalsa — yangi dekoratsiya o'rnatiladi. Eski sahna tugasa — dekoratsiya yig'ishtiriladi. Global kod — bu asosiy sahna, har bir funksiya chaqiruvi esa yangi kichik sahna ochadi.
+1. **Qaysi o'zgaruvchilar va funksiyalar mavjud** — o'zgaruvchilar e'lon qilinadi, funksiya declaration'lar to'liq saqlanadi
+2. **Scope chain** — joriy scope'dan tashqi scope'larga yo'l (o'zgaruvchi qidiruv zanjiri)
+3. **`this` qiymati** — joriy kontekstda `this` nimaga teng
 
-Execution Context tushunchasi nima uchun muhim? Chunki JavaScript'dagi eng ko'p uchraydigan tushunmovchiliklar — hoisting, scope, closure, `this` ning kutilmagan qiymati — bularning barchasi Execution Context mexanizmini bilmaslikdan kelib chiqadi. Agar siz EC qanday yaratilishini, uning ichida nima borligini va qachon yo'q qilinishini tushunsangiz, bu tushunchalarning barchasi o'z joyiga tushadi.
+JavaScript da har qanday kod — global scope'dagi kod, funksiya ichidagi kod, yoki `eval` ichidagi kod — faqat execution context ichida bajariladi. Hech qanday kod execution context siz ishlamaydi.
 
-ECMAScript spetsifikatsiyasiga ko'ra har bir Execution Context uchta asosiy komponentdan iborat: **LexicalEnvironment** (`let`, `const`, funksiya e'lonlari uchun), **VariableEnvironment** (`var` e'lonlari uchun) va **ThisBinding** (`this` qiymati). Bu komponentlarning har biri alohida va muhim rol o'ynaydi — ularni keyingi bo'limlarda batafsil ko'rib chiqamiz.
+Execution context'ni tushunish nima uchun kerak: hoisting, scope chain, closure, `this` keyword — bularning barchasi execution context mexanizmiga bog'liq. Bu tushunchalarni chuqur anglash uchun avval execution context'ning ichki tuzilmasini bilish zarur.
 
 ### Under the Hood
 
-ECMAScript spec bo'yicha Execution Context quyidagi komponentlardan iborat:
+ECMAScript spetsifikatsiyasiga ko'ra, har bir execution context quyidagi komponentlarga ega:
 
 ```
 ┌──────────────────────────────────────┐
-│        EXECUTION CONTEXT             │
+│        Execution Context             │
 │                                      │
 │  ┌────────────────────────────────┐  │
 │  │  LexicalEnvironment            │  │
-│  │  (let, const, functions)       │  │
+│  │  (let, const, function, class) │  │
 │  └────────────────────────────────┘  │
 │                                      │
 │  ┌────────────────────────────────┐  │
@@ -59,17 +65,64 @@ ECMAScript spec bo'yicha Execution Context quyidagi komponentlardan iborat:
 └──────────────────────────────────────┘
 ```
 
+- **LexicalEnvironment** — `let`, `const`, `function`, `class` declaration'lar saqlanadigan muhit
+- **VariableEnvironment** — `var` declaration'lar saqlanadigan muhit
+- **ThisBinding** — joriy kontekstda `this` nimaga teng ekanligi
+
+ES6 dan oldin LexicalEnvironment va VariableEnvironment bir xil edi. ES6 da `let`/`const` kiritilgandan keyin ular ajraldi — bu block scoping va TDZ (Temporal Dead Zone) mexanizmini ta'minlash uchun.
+
 ---
 
 ## Execution Context Turlari
 
-JavaScript da **3 xil** Execution Context bor:
+### Nazariya
 
-| Turi | Qachon yaratiladi | Nechta bo'ladi |
-|------|-------------------|----------------|
-| **Global Execution Context (GEC)** | Dastur boshlanganda | Faqat **1 ta** |
-| **Function Execution Context (FEC)** | Har bir funksiya chaqirilganda | **Cheksiz** (har bir call uchun yangi) |
-| **Eval Execution Context** | `eval()` chaqirilganda | Kam ishlatiladi, e'tiborsiz qoldiramiz |
+JavaScript da uch xil execution context mavjud:
+
+1. **Global Execution Context (GEC)** — dastur boshlanganda birinchi bo'lib yaratiladi. Faqat **bitta** GEC bo'ladi
+2. **Function Execution Context (FEC)** — har bir funksiya **chaqirilganda** yangi FEC yaratiladi. Har bir chaqiruv uchun alohida
+3. **Eval Execution Context** — `eval()` funksiyasi chaqirilganda yaratiladi
+
+```
+┌───────────────────────────────────────────┐
+│  Dastur boshlanganda:                     │
+│                                           │
+│  1. Global Execution Context yaratiladi   │
+│     (faqat bitta, dastur davomida yashaydi)│
+│                                           │
+│  2. Funksiya chaqirilganda:               │
+│     → Yangi Function EC yaratiladi        │
+│     → Stack'ga qo'shiladi                 │
+│     → Funksiya tugaganda stack'dan chiqadi │
+│                                           │
+│  3. eval() chaqirilganda:                 │
+│     → Yangi Eval EC yaratiladi            │
+│     (ishlatish tavsiya etilMAYDI)         │
+└───────────────────────────────────────────┘
+```
+
+### Kod Misollari
+
+```javascript
+// 1. Global Execution Context — dastur boshlanganda yaratiladi
+var globalVar = "global";
+let globalLet = "global let";
+
+// 2. Function Execution Context — har bir chaqiruvda yangi EC
+function greet(name) {
+  // greet() chaqirilganda yangi FEC yaratiladi
+  var greeting = "Hello";
+  return greeting + ", " + name;
+}
+
+greet("Ali");   // FEC #1 yaratildi → tugadi → stack'dan chiqdi
+greet("Vali");  // FEC #2 yaratildi → tugadi → stack'dan chiqdi
+// ✅ Har bir chaqiruv YANGI execution context yaratadi
+// Oldingi chaqiruvning EC si allaqachon yo'q
+
+// 3. Eval — ISHLATMANG
+// eval("var x = 10"); // ❌ xavfsizlik va performance muammolari
+```
 
 ---
 
@@ -77,68 +130,77 @@ JavaScript da **3 xil** Execution Context bor:
 
 ### Nazariya
 
-GEC (Global Execution Context) — JavaScript dasturi ishga tushganda eng birinchi yaratiladigan Execution Context. U butun dastur davomida yashaydi va faqat **bitta** bo'ladi — dastur tugaguncha. GEC barcha global kodning "uyi" hisoblanadi.
+Global Execution Context — JavaScript dasturi boshlanganda eng birinchi yaratiladigan execution context. Butun dastur davomida faqat **bitta** GEC mavjud — u dastur tugaguncha yashaydi.
 
-GEC nima uchun muhim? Chunki u dasturning ishlash uchun zarur bo'lgan dastlabki muhitni tayyorlaydi. GEC yaratilganda uchta muhim ish sodir bo'ladi: birinchidan, **Global Object** yaratiladi (brauzerda `window`, Node.js da `global`, universal `globalThis`), ikkinchidan, `this` global ob'ektga bog'lanadi, uchinchidan, barcha global `var` e'lonlari va function declaration'lar **hoist** qilinadi — ya'ni xotiraga oldindan yoziladi.
+GEC yaratilganda quyidagilar sodir bo'ladi:
 
-Buni **ofis binosi**ga o'xshatish mumkin. GEC — bu binoning asosiy qavati (lobby). Bino qurilganda avval lobby tayyorlanadi. Lobby doimiy — bino yashayotgan ekan u bor. Barcha umumiy resurslar (receptsiya, lift, yo'laklar) shu yerda. Har bir xona (funksiya) o'z ichki muhitiga ega, lekin lobby'dagi resurslardan foydalanishi mumkin. Xuddi shunday, global scope'dagi o'zgaruvchi va funksiyalar istalgan joydan ko'rinadi.
+1. **Global object yaratiladi:**
+   - Brauzerda → `window` object
+   - Node.js da → `global` object
+   - Har qanday muhitda → `globalThis` (ES2020) orqali accessible
+2. **`this` qiymati global object'ga bog'lanadi** (non-strict mode da)
+3. **`var` bilan e'lon qilingan o'zgaruvchilar** global object'ning property'si bo'ladi
+4. **`let`/`const` bilan e'lon qilinganlar** global object'ga qo'shilMAYDI — ular alohida declarative environment record'da saqlanadi
 
-Amaliy nuqtai nazardan, GEC bilan ishlashda ikkita muhim narsani bilish kerak: `var` bilan global scope'da e'lon qilingan o'zgaruvchilar global ob'ektning property'siga aylanadi (`window.myVar`), lekin `let` va `const` bilan e'lon qilinganlar global scope'da mavjud bo'lsa-da, global ob'ektga **qo'shilmaydi**. Bu farq ko'p xatolarga sabab bo'ladi.
+### Under the Hood
+
+GEC'ning ichki tuzilmasi:
+
+```
+Global Execution Context:
+┌──────────────────────────────────────────────┐
+│  LexicalEnvironment:                         │
+│  ┌────────────────────────────────────────┐  │
+│  │  GlobalEnvironmentRecord:              │  │
+│  │  ├── ObjectEnvironmentRecord:          │  │
+│  │  │   └── [[BindingObject]]: window     │  │
+│  │  │       ├── var globalVar: undefined  │  │
+│  │  │       ├── function greet: <func>    │  │
+│  │  │       └── (built-ins: console, etc) │  │
+│  │  │                                     │  │
+│  │  └── DeclarativeEnvironmentRecord:     │  │
+│  │      ├── let globalLet: <uninitialized>│  │
+│  │      └── const PI: <uninitialized>     │  │
+│  │                                        │  │
+│  │  OuterRef: null (global — eng tashqi)  │  │
+│  └────────────────────────────────────────┘  │
+│                                              │
+│  ThisBinding: window (globalThis)            │
+└──────────────────────────────────────────────┘
+```
+
+Global scope'da ikki xil environment record ishlaydi:
+- **Object Environment Record** — `var` va function declaration'lar `window` (global object) ga property sifatida qo'shiladi
+- **Declarative Environment Record** — `let`, `const`, `class` declaration'lar alohida saqlanadi, `window`'ga qo'shilMAYDI
+
+### Kod Misollari
 
 ```javascript
-// Bu kod hali BIRORTA ham funksiya ichida emas
-// Shuning uchun Global Execution Context ichida bajariladi
+var name = "Ali";
+let age = 25;
+const PI = 3.14;
 
-var name = "Islom";          // GEC ning Variable Environment da
-let age = 25;                // GEC ning Lexical Environment da
-const ROLE = "developer";    // GEC ning Lexical Environment da
-
-function greet() {           // GEC da hoist qilingan
-  return "Salom!";
+function greet() {
+  return "Hello";
 }
 
-console.log(this);           // window (browser) / global (Node.js)
-console.log(this === window); // true (browser da)
+// var — global object'ning property'si bo'ladi
+console.log(window.name);     // "Ali" ✅
+console.log(globalThis.name); // "Ali" ✅
+
+// let/const — global object'ga qo'shilMAYDI
+console.log(window.age);      // undefined ❌
+console.log(window.PI);       // undefined ❌
+// ✅ Lekin global scope'da accessible:
+console.log(age);             // 25
+console.log(PI);              // 3.14
+
+// function declaration — global object'ga qo'shiladi
+console.log(window.greet);    // function greet() {...} ✅
+
+// this — global scope'da window'ga teng (non-strict)
+console.log(this === window); // true (brauzerda)
 ```
-
-### GEC Yaratilish Jarayoni
-
-```
-┌─────────────────────────────────────────────┐
-│          GLOBAL EXECUTION CONTEXT           │
-│                                             │
-│  ── Creation Phase ──                       │
-│  1. Global Object yaratildi (window)        │
-│  2. this = window                           │
-│  3. var name = undefined  (hoist)           │
-│  4. greet = function(){...}  (hoist)        │
-│  5. let age — TDZ da  (hoist, lekin init ❌)│
-│  6. const ROLE — TDZ da                     │
-│                                             │
-│  ── Execution Phase ──                      │
-│  1. name = "Islom"                          │
-│  2. age = 25  (TDZ tugadi)                  │
-│  3. ROLE = "developer"  (TDZ tugadi)        │
-│  4. greet() chaqirilsa — yangi FEC          │
-│                                             │
-└─────────────────────────────────────────────┘
-```
-
-### Global Object bilan munosabat
-
-```javascript
-var x = 10;
-let y = 20;
-
-console.log(window.x); // 10 — var global object ga property bo'lib qo'shiladi
-console.log(window.y); // undefined — let global object ga qo'shilMAYDI
-
-// Shuning uchun:
-console.log(x === window.x); // true
-console.log(y === window.y); // false
-```
-
-Bu muhim farq — `var` global scope da `window` ning property'si bo'ladi, `let`/`const` esa yo'q. Ular global scope da bor, lekin global **object** da emas.
 
 ---
 
@@ -146,169 +208,330 @@ Bu muhim farq — `var` global scope da `window` ning property'si bo'ladi, `let`
 
 ### Nazariya
 
-Har safar funksiya **chaqirilganda** (e'lon qilinganda emas, aynan **chaqirilganda**) yangi Function Execution Context yaratiladi. Bu JavaScript'ning eng fundamental mexanizmlaridan biri — har bir funksiya chaqiruvi mustaqil, izolyatsiyalangan muhitda bajariladi.
+Function Execution Context — har bir funksiya **chaqirilganda** (invoke/call) yangi yaratiladigan execution context. Funksiya necha marta chaqirilsa — shuncha yangi FEC yaratiladi. Har bir FEC o'zining alohida:
 
-Buni **restoran buyurtmasi**ga o'xshatish mumkin. Oshpaz (engine) har bir buyurtma (funksiya chaqiruvi) uchun yangi ish stolini tayyorlaydi: ingredientlarni qo'yadi (parametrlar), idishlarni joylashtiradi (local o'zgaruvchilar), retseptni ko'radi (kod). Taom tayyor bo'lganda (funksiya tugaganda) — stol tozalanadi va yangi buyurtma uchun bo'shatiladi.
+- Local o'zgaruvchilari (arguments, parameters, local variables)
+- Scope chain'i (tashqi scope'ga havola)
+- `this` qiymati
 
-Nima uchun har bir chaqiruv uchun yangi EC kerak? Chunki bir xil funksiya turli argumentlar bilan chaqirilishi mumkin. `calculate(3, 7)` va `calculate(10, 20)` turli natija beradi — har birining o'z muhiti bo'lishi kerak. Shuningdek, rekursiv funksiyalarda bir xil funksiya o'zini qayta-qayta chaqiradi — har bir chaqiruv o'z alohida EC'siga ega bo'lishi shart, aks holda o'zgaruvchilar bir-birini buzib yuboradi.
+FEC yaratilish tartibi GEC bilan bir xil — avval Creation Phase, keyin Execution Phase. Farqi — FEC da qo'shimcha ravishda:
+- **Arguments object** yaratiladi (arrow function'dan tashqari)
+- **Parameter'lar** local o'zgaruvchi sifatida e'lon qilinadi
+- **`this`** chaqirilish usulga qarab aniqlanadi (GEC da esa doim global object)
+
+### Under the Hood
 
 ```javascript
-function sayHi(name) {
-  let greeting = "Salom, " + name;
-  return greeting;
+function calculateTotal(price, taxRate) {
+  var discount = 0.1;
+  let finalPrice = price * (1 + taxRate) * (1 - discount);
+  return finalPrice;
 }
 
-// Har bir chaqiruv = yangi FEC
-sayHi("Ali");   // FEC #1 yaratildi → bajarildi → yo'q qilindi
-sayHi("Vali");  // FEC #2 yaratildi → bajarildi → yo'q qilindi
+calculateTotal(100, 0.2);
 ```
 
-### FEC Yaratilish Jarayoni
+`calculateTotal(100, 0.2)` chaqirilganda yaratiladigan FEC:
+
+```
+Function Execution Context (calculateTotal):
+┌──────────────────────────────────────────────┐
+│  LexicalEnvironment:                         │
+│  ┌────────────────────────────────────────┐  │
+│  │  DeclarativeEnvironmentRecord:         │  │
+│  │  ├── let finalPrice: <uninitialized>   │  │
+│  │  │                                     │  │
+│  │  OuterRef: → Global Environment        │  │
+│  └────────────────────────────────────────┘  │
+│                                              │
+│  VariableEnvironment:                        │
+│  ┌────────────────────────────────────────┐  │
+│  │  DeclarativeEnvironmentRecord:         │  │
+│  │  ├── var discount: undefined           │  │
+│  │  ├── arguments: { 0: 100, 1: 0.2 }    │  │
+│  │  ├── price: 100                        │  │
+│  │  └── taxRate: 0.2                      │  │
+│  └────────────────────────────────────────┘  │
+│                                              │
+│  ThisBinding: window (default binding)       │
+└──────────────────────────────────────────────┘
+```
+
+Creation Phase da:
+- `var discount` → `undefined` bilan initialize qilinadi
+- `let finalPrice` → **uninitialized** (TDZ da) — hali qiymat berilmagan
+- `price`, `taxRate` → argument qiymatlari bilan initialize
+- `arguments` object yaratiladi
+
+Execution Phase da:
+- `discount = 0.1` — qiymat beriladi
+- `finalPrice = 100 * 1.2 * 0.9` — hisob bajariladi, qiymat yoziladi
+- `return finalPrice` — natija qaytariladi, FEC stack'dan chiqadi
+
+### Kod Misollari
 
 ```javascript
-function calculate(a, b) {
-  var result = a + b;
-  let doubled = result * 2;
-  return doubled;
+// Har bir chaqiruv YANGI FEC yaratadi
+function counter() {
+  var count = 0;
+  count++;
+  return count;
 }
 
-calculate(3, 7);
-```
+console.log(counter()); // 1 — FEC #1: count = 0 → 1
+console.log(counter()); // 1 — FEC #2: count = 0 → 1 (yangi EC, yangi count)
+console.log(counter()); // 1 — FEC #3: count = 0 → 1
 
+// ✅ Har safar yangi EC — har safar count 0 dan boshlanadi
+// Bu closure bo'lmagani uchun oldingi count saqlanmaydi
 ```
-┌─────────────────────────────────────────────┐
-│    FUNCTION EXECUTION CONTEXT: calculate()  │
-│                                             │
-│  ── Creation Phase ──                       │
-│  1. arguments = { 0: 3, 1: 7, length: 2 }  │
-│  2. a = 3, b = 7  (parametrlar)            │
-│  3. var result = undefined  (hoist)         │
-│  4. let doubled — TDZ da                    │
-│  5. Scope Chain = [local scope, global]     │
-│  6. this = window (non-strict)              │
-│                                             │
-│  ── Execution Phase ──                      │
-│  1. result = 3 + 7 = 10                    │
-│  2. doubled = 10 * 2 = 20  (TDZ tugadi)   │
-│  3. return 20                               │
-│  4. FEC stack dan olib tashlanadi           │
-│                                             │
-└─────────────────────────────────────────────┘
-```
-
-### Nested Function Calls
-
-Har bir ichki funksiya chaqiruvi ham o'z FEC ini yaratadi:
 
 ```javascript
+// Nested function — ichki FEC tashqi FEC ga outer reference orqali bog'lanadi
 function outer() {
   var x = 10;
 
   function inner() {
     var y = 20;
-    return x + y; // x ni outer ning scope idan oladi
+    console.log(x + y); // ✅ x — outer scope'dan (scope chain orqali)
   }
 
-  return inner();
+  inner();
 }
 
 outer(); // 30
+
+// inner() ning FEC:
+// LexicalEnvironment:
+//   y: 20
+//   OuterRef: → outer() ning Environment
+//                x: 10
+//                OuterRef: → Global Environment
 ```
 
+---
+
+## Eval Execution Context
+
+### Nazariya
+
+`eval()` funksiyasi chaqirilganda yangi execution context yaratiladi. `eval()` string sifatida berilgan JavaScript kodni parse qiladi va bajaradi.
+
+```javascript
+eval("var x = 10; console.log(x);"); // 10
 ```
-Execution Context Stack:
 
-1)                  2)                   3)
-┌──────────┐       ┌──────────┐        ┌──────────┐
-│          │       │  inner() │        │          │
-│  outer() │       │  outer() │        │  outer() │
-│  global  │       │  global  │        │  global  │
-└──────────┘       └──────────┘        └──────────┘
- outer()            inner()             inner() tugadi
- chaqirildi         chaqirildi          pop, outer davom
+**`eval()` ni ishlatmaslik kerak.** Sabablari:
 
-4)
-┌──────────┐
-│          │
-│          │
-│  global  │
-└──────────┘
- outer() tugadi
- pop, return 30
+1. **Xavfsizlik** — tashqi source'dan kelgan string'ni eval qilish code injection xavfini yaratadi
+2. **Performance** — eval ichidagi kod engine tomonidan optimize qilinMAYDI. Engine eval mavjud bo'lgan scope'dagi barcha optimization'larni bekor qiladi, chunki eval ixtiyoriy o'zgaruvchilarni yaratishi/o'zgartirishi mumkin
+3. **Debugging** — eval ichidagi kod stack trace'da noma'lum ko'rinadi
+4. **Strict mode** — strict mode'da eval o'z scope'ini yaratadi (calling scope'ga ta'sir qilmaydi), lekin bu ham yetarli emas
+
+```javascript
+// ❌ eval ishlatmang
+eval("var injected = 'xavfli kod'");
+console.log(injected); // "xavfli kod" — calling scope'ga inject bo'ldi!
+
+// ✅ O'rniga: JSON.parse (data uchun), Function constructor (oxirgi chora), yoki boshqa pattern
+const data = JSON.parse('{"name": "Ali"}');
 ```
 
 ---
 
 ## Execution Context Phases
 
-Har bir Execution Context (GEC va FEC) **2 bosqichdan** o'tadi:
+### Nazariya
 
-### Phase 1: Creation Phase (Yaratish Bosqichi)
+Har bir execution context (GEC yoki FEC) **ikki bosqichda** yaratiladi va bajariladi:
 
-Kod **hali bajarilmagan** — engine faqat "tayyorgarlik" ko'radi:
+1. **Creation Phase** — EC yaratilish bosqichi. Kod hali bajarilMAYDI. Bu bosqichda engine muhitni tayyorlaydi
+2. **Execution Phase** — Kod qator-baqatar bajariladi. O'zgaruvchilarga qiymatlar beriladi, funksiyalar chaqiriladi
 
-1. **LexicalEnvironment** yaratiladi
-2. **VariableEnvironment** yaratiladi
-3. **`this`** binding aniqlanadi
-4. O'zgaruvchilar uchun xotira ajratiladi:
-   - `var` → `undefined` bilan initialize
-   - `let`/`const` → TDZ da (uninitialized)
-   - `function declaration` → to'liq funksiya bilan initialize (to'liq hoist)
+Bu ikki bosqichli mexanizm **hoisting** ning asosiy sababi. Creation Phase da `var` o'zgaruvchilar `undefined` bilan, function declaration'lar to'liq function bilan initialize qilinadi — shuning uchun ularni e'lon qilishdan oldin ishlatish mumkin.
 
-Bu bosqich **hoisting** deb ataladigan hodisaning sababi — keyingi bo'limda ([03-hoisting.md](03-hoisting.md)) batafsil.
+```
+┌─────────────────────────────────────────────┐
+│  Execution Context Lifecycle                │
+│                                             │
+│  1. CREATION PHASE (kod bajarilMAYDI):      │
+│     ├── LexicalEnvironment yaratiladi       │
+│     ├── VariableEnvironment yaratiladi       │
+│     ├── this binding aniqlanadi             │
+│     ├── var → undefined bilan initialize    │
+│     ├── let/const → uninitialized (TDZ)     │
+│     ├── function declaration → to'liq func  │
+│     └── Scope chain quriladi (outer ref)    │
+│                                             │
+│  2. EXECUTION PHASE (kod bajariladi):       │
+│     ├── Qator-baqatar kod bajariladi        │
+│     ├── var → haqiqiy qiymat beriladi       │
+│     ├── let/const → qiymat beriladi (TDZ    │
+│     │   tugaydi)                            │
+│     ├── Funksiyalar chaqiriladi             │
+│     └── Expression'lar evaluate qilinadi    │
+└─────────────────────────────────────────────┘
+```
 
-### Phase 2: Execution Phase (Bajarish Bosqichi)
+---
 
-Kod **satr-bosatr** bajariladi:
+## Creation Phase
 
-1. O'zgaruvchilarga qiymat beriladi
-2. Funksiyalar chaqiriladi
-3. Ifodalar hisoblanadi
+### Nazariya
 
-### Misol bilan Ko'rsatish
+Creation Phase — execution context'ning birinchi bosqichi. Bu bosqichda kod **hali bajarilmaydi**, faqat muhit tayyorlanadi. Engine source code'ni scan qiladi va quyidagilarni bajaradi:
+
+**1. LexicalEnvironment yaratiladi:**
+- `let`, `const` declaration'lar topiladi va **uninitialized** holatda ro'yxatga olinadi (TDZ boshlanadi)
+- `function` declaration'lar topiladi va **to'liq funksiya** bilan initialize qilinadi
+- `class` declaration'lar topiladi va **uninitialized** holatda ro'yxatga olinadi (TDZ)
+
+**2. VariableEnvironment yaratiladi:**
+- `var` declaration'lar topiladi va **`undefined`** bilan initialize qilinadi
+
+**3. this binding aniqlanadi:**
+- Global context'da → `globalThis` (window/global)
+- Function context'da → chaqirilish usulga qarab
+
+**4. Scope chain quriladi:**
+- Outer environment reference o'rnatiladi — tashqi scope'ga havola
+
+### Under the Hood
+
+Creation Phase ni qadam-baqadam ko'rsatadigan misol:
 
 ```javascript
-console.log(a);    // ?
-console.log(b);    // ?
-console.log(c);    // ?
-console.log(greet); // ?
+console.log(x);       // undefined (var — creation da undefined)
+console.log(y);       // ReferenceError (let — TDZ da)
+console.log(greet);   // function greet() {...} (to'liq hoist)
+console.log(MyClass); // ReferenceError (class — TDZ da)
 
+var x = 10;
+let y = 20;
+function greet() { return "Hello"; }
+class MyClass {}
+```
+
+Creation Phase da engine nima qiladi:
+
+```
+CREATION PHASE (kod bajarilmaydi):
+
+VariableEnvironment:
+  x: undefined          ← var → undefined bilan initialize
+
+LexicalEnvironment:
+  y: <uninitialized>    ← let → TDZ (Temporal Dead Zone)
+  greet: function() {}  ← function declaration → to'liq function
+  MyClass: <uninitialized> ← class → TDZ
+
+EXECUTION PHASE (kod bajariladi):
+  console.log(x)       → undefined (var allaqachon undefined)
+  console.log(y)       → ReferenceError! (y hali TDZ da)
+  console.log(greet)   → function greet() {...} (allaqachon to'liq)
+  console.log(MyClass) → ReferenceError! (hali TDZ da)
+  x = 10               → x endi 10
+  y = 20               → y endi 20, TDZ tugadi
+  MyClass = class {}   → MyClass endi class, TDZ tugadi
+```
+
+### Kod Misollari
+
+```javascript
+// Creation Phase'ni tushunish uchun muhim misol:
 var a = 1;
-let b = 2;
-const c = 3;
-function greet() { return "hi"; }
-```
+function b() {
+  return 2;
+}
+var c = function() {
+  return 3;
+};
 
-**Creation Phase da:**
-
+// Creation Phase tugaganda, Execution Phase boshlanishidan OLDIN:
+// a = undefined       (var → undefined)
+// b = function b(){}  (function declaration → to'liq)
+// c = undefined       (var → undefined, function EXPRESSION hoist bo'lmaydi)
 ```
-┌────────────────────────────────────────────────────┐
-│  CREATION PHASE                                     │
-│                                                     │
-│  VariableEnvironment:                               │
-│    a → undefined          (var: hoist + init)       │
-│                                                     │
-│  LexicalEnvironment:                                │
-│    b → <uninitialized>    (let: hoist, TDZ da)     │
-│    c → <uninitialized>    (const: hoist, TDZ da)   │
-│    greet → function(){...} (function: to'liq hoist) │
-│                                                     │
-│  ThisBinding: window                                │
-└────────────────────────────────────────────────────┘
-```
-
-**Execution Phase da (satr-bosatr):**
 
 ```javascript
-console.log(a);     // undefined — var hoist bo'lgan, lekin qiymat hali berilmagan
-console.log(b);     // ❌ ReferenceError — TDZ da!
-// console.log(c);  // ❌ ReferenceError — TDZ da! (bu satrga yetmaydi)
-// console.log(greet); // function greet(){...} — to'liq hoist
+// Function declaration vs Function expression hoisting farqi:
+console.log(sum(2, 3));      // ✅ 5 — function declaration to'liq hoist
+console.log(multiply(2, 3)); // ❌ TypeError: multiply is not a function
+// multiply hozir undefined (var hoist), function emas
 
-var a = 1;          // a = 1 (endi undefined emas)
-let b = 2;          // b = 2 (TDZ tugadi)
-const c = 3;        // c = 3 (TDZ tugadi)
-function greet() { return "hi"; } // allaqachon hoist bo'lgan
+function sum(a, b) {
+  return a + b;
+}
+
+var multiply = function(a, b) {
+  return a * b;
+};
+// ✅ sum — function declaration: Creation Phase da to'liq funksiya sifatida saqlanadi
+// ❌ multiply — var + function expression: Creation Phase da faqat var → undefined
+```
+
+---
+
+## Execution Phase
+
+### Nazariya
+
+Execution Phase — Creation Phase tugagandan keyin boshlanaladigan ikkinchi bosqich. Bu yerda JavaScript kodi **qator-baqatar** bajariladi:
+
+1. O'zgaruvchilarga haqiqiy qiymatlar beriladi (`var x = 10` → x endi 10)
+2. `let`/`const` ning TDZ tugaydi (qiymat berilganda)
+3. Funksiyalar chaqiriladi (har bir chaqiruv yangi FEC yaratadi)
+4. Expression'lar evaluate qilinadi
+5. Conditional va loop'lar bajariladi
+
+### Kod Misollari
+
+Creation va Execution Phase'larni birga ko'rsatish:
+
+```javascript
+var name = "Ali";
+let age = 25;
+
+function getInfo() {
+  var result = name + " - " + age;
+  return result;
+}
+
+var info = getInfo();
+console.log(info);
+```
+
+```
+=== GLOBAL EC — CREATION PHASE ===
+VariableEnvironment:
+  name: undefined
+  info: undefined
+LexicalEnvironment:
+  age: <uninitialized>
+  getInfo: function getInfo() {...}
+ThisBinding: window
+
+=== GLOBAL EC — EXECUTION PHASE ===
+Qator 1: name = "Ali"        → name endi "Ali"
+Qator 2: age = 25            → age endi 25 (TDZ tugadi)
+
+Qator 8: getInfo() chaqirildi
+  → Yangi FEC yaratiladi:
+
+    === getInfo FEC — CREATION PHASE ===
+    VariableEnvironment:
+      result: undefined
+    LexicalEnvironment:
+      OuterRef: → Global Environment
+    ThisBinding: window
+
+    === getInfo FEC — EXECUTION PHASE ===
+    result = "Ali" + " - " + 25  → result = "Ali - 25"
+    return "Ali - 25"
+    → FEC stack'dan chiqadi
+
+Qator 8 davomi: info = "Ali - 25"
+Qator 9: console.log("Ali - 25")  → "Ali - 25"
 ```
 
 ---
@@ -317,80 +540,69 @@ function greet() { return "hi"; } // allaqachon hoist bo'lgan
 
 ### Nazariya
 
-ES6 (ECMAScript 2015) dan boshlab Execution Context ichida ikkita alohida environment mavjud — **VariableEnvironment** va **LexicalEnvironment**. Bu ikki muhitning mavjudligi `var` va `let`/`const` ning tubdan farqli ishlash mexanizmini ta'minlaydi.
+ES6 dan boshlab har bir execution context'da **ikkita** environment bor:
 
-Nima uchun ikkita environment kerak bo'ldi? ES6 dan oldin JavaScript'da faqat `var` bor edi va u faqat function scope'ni tan olardi. Block scope (`if`, `for` ichida) tushunchasi umuman yo'q edi. ES6 da `let` va `const` block scope bilan kelganda, engine ichida muammo paydo bo'ldi: eski `var` behavior'ini buzmasdan, yangi block scope mexanizmini qanday qo'shish kerak? Javob — ikkita alohida muhit yaratish: `var` uchun VariableEnvironment (eski funksional scope qoidalari bilan), `let`/`const` uchun LexicalEnvironment (yangi block scope qoidalari bilan).
+**VariableEnvironment:**
+- Faqat `var` declaration'lar saqlanadi
+- `var` function-scoped — block'lar (if, for, while) ichida e'lon qilingan `var` ham shu yerda
+- Creation Phase da `undefined` bilan initialize qilinadi
 
-Bu tushunchani bilish nima uchun amaliy jihatdan muhim? Chunki ko'pgina murakkab xatolar — masalan, `var` ning loop'dan chiqib ketishi, `let` ning block ichida qolishi, TDZ (Temporal Dead Zone) — bularning barchasi shu ikki environment ning turli ishlash qoidalaridan kelib chiqadi. Agar siz VariableEnvironment va LexicalEnvironment ning farqini tushunsangiz, `var` vs `let`/`const` bilan bog'liq muammolarni tezda aniqlash va hal qilishingiz mumkin.
+**LexicalEnvironment:**
+- `let`, `const`, `function`, `class` declaration'lar saqlanadi
+- `let`/`const` block-scoped — har bir block uchun yangi LexicalEnvironment yaratilishi mumkin
+- Creation Phase da `let`/`const` **uninitialized** (TDZ)
+- `function` declaration → to'liq funksiya bilan initialize
 
-| Xususiyat | VariableEnvironment | LexicalEnvironment |
-|-----------|--------------------|--------------------|
-| **Nima saqlaydi** | `var` declarations | `let`, `const`, `function` declarations |
-| **Scope** | Function scope | Block scope |
-| **Hoisting** | `undefined` bilan | TDZ (uninitialized) |
-| **Global da** | `window` ga qo'shadi | `window` ga qo'shMAYDI |
+Nima uchun ikki alohida environment kerak: `var` function-scoped, `let`/`const` block-scoped. Agar hammasi bitta environment'da bo'lsa — block scoping mexanizmini implement qilish murakkablashadi. Alohida environment'lar tufayli engine block ichida yangi LexicalEnvironment yaratib, `let`/`const`'ni shu block'ga cheklash oson.
 
-### Nima Uchun Ikki Environment Kerak?
+### Under the Hood
 
 ```javascript
-function example() {
-  var x = 1;     // VariableEnvironment — function scope
-  let y = 2;     // LexicalEnvironment — block scope
-
-  if (true) {
-    var x2 = 10;  // VariableEnvironment — function scope (block dan chiqadi!)
-    let y2 = 20;  // YANGI LexicalEnvironment — faqat bu block ichida
-    const z = 30; // YANGI LexicalEnvironment — faqat bu block ichida
-
-    console.log(x);  // 1 ✅
-    console.log(y);  // 2 ✅
-    console.log(y2); // 20 ✅
-  }
-
-  console.log(x2); // 10 ✅ — var function scope, block dan chiqdi
-  console.log(y2); // ❌ ReferenceError — let block scope, if ichida qoldi
-}
-```
-
-### Under the Hood — Diagramma
-
-```
 function example() {
   var a = 1;
   let b = 2;
 
   if (true) {
-    var c = 3;
-    let d = 4;
-    ...
+    var c = 3;   // ← function scope (VariableEnvironment)
+    let d = 4;   // ← block scope (yangi LexicalEnvironment)
+    const e = 5; // ← block scope (yangi LexicalEnvironment)
   }
-}
 
-┌─────────────────────────────────────────────────────────┐
-│  FUNCTION EXECUTION CONTEXT: example()                   │
-│                                                          │
-│  VariableEnvironment (function scope):                   │
-│  ┌──────────────────────────────┐                        │
-│  │  a: 1                        │                        │
-│  │  c: 3  ← var, block dan chiqdi                       │
-│  └──────────────────────────────┘                        │
-│                                                          │
-│  LexicalEnvironment (function scope):                    │
-│  ┌──────────────────────────────┐                        │
-│  │  b: 2                        │                        │
-│  │  outer: → Global Environment │                        │
-│  │                              │                        │
-│  │  ┌──────────────────────┐   │  ← if block scope      │
-│  │  │  d: 4                │   │                         │
-│  │  │  outer: → function   │   │                         │
-│  │  └──────────────────────┘   │                         │
-│  └──────────────────────────────┘                        │
-│                                                          │
-│  ThisBinding: window                                     │
-└─────────────────────────────────────────────────────────┘
+  console.log(a); // 1 ✅
+  console.log(b); // 2 ✅
+  console.log(c); // 3 ✅ — var function-scoped, if block cheklamaydi
+  console.log(d); // ❌ ReferenceError — let block-scoped, if dan tashqarida yo'q
+  console.log(e); // ❌ ReferenceError — const block-scoped
+}
 ```
 
-**Muhim:** Har bir block (`if`, `for`, `while`, oddiy `{}`) yangi **LexicalEnvironment** yaratadi, lekin **VariableEnvironment** o'zgarmaydi (funksiya scope da qoladi).
+Ichki tuzilma:
+
+```
+example() FEC:
+
+VariableEnvironment (function scope):
+┌──────────────────────┐
+│  a: undefined → 1    │
+│  c: undefined → 3    │  ← if ichidagi var ham shu yerda!
+└──────────────────────┘
+
+LexicalEnvironment (function scope):
+┌──────────────────────┐
+│  b: <uninitialized>  │  → 2
+│  OuterRef: → Global  │
+└──────────────────────┘
+
+if block LexicalEnvironment (block scope):
+┌──────────────────────┐
+│  d: <uninitialized>  │  → 4
+│  e: <uninitialized>  │  → 5
+│  OuterRef: → Function│  ← tashqi function scope'ga
+│             LexEnv   │     bog'lanadi
+└──────────────────────┘
+```
+
+if block tugaganda, block LexicalEnvironment yo'qoladi — shuning uchun `d` va `e` block tashqarisida accessible emas.
 
 ---
 
@@ -398,78 +610,137 @@ function example() {
 
 ### Nazariya
 
-Environment Record — bu LexicalEnvironment va VariableEnvironment ning **ichki ma'lumotlar bazasi**. Har bir Environment o'z ichida Environment Record saqlaydi va aynan shu record o'zgaruvchilar, funksiyalar, parametrlar haqidagi barcha ma'lumotlarni o'z ichiga oladi. Buni **ma'lumotlar bazasining jadvali**ga o'xshatish mumkin: environment — bu baza, record — bu jadval, o'zgaruvchilar — bu jadval satrlari.
+Environment Record — har bir LexicalEnvironment ichidagi o'zgaruvchilar va binding'lar saqlanadigan tuzilma. Bu ECMAScript spec'dagi termin bo'lib, aslida "scope'dagi barcha o'zgaruvchilar ro'yxati" degani.
 
-ECMAScript spetsifikatsiyasiga ko'ra Environment Record ikki asosiy turga bo'linadi: **Declarative Environment Record** va **Object Environment Record**. Bu bo'linish sun'iy emas — u JavaScript'ning ichki arxitekturasidan kelib chiqadi. Funksiya va block scope'larda o'zgaruvchilar **to'g'ridan-to'g'ri** (optimallashtirilgan holda) saqlanadi — bu Declarative ER. Global scope'da esa `var` o'zgaruvchilari global ob'ekt (`window`) ning property'siga aylanadi — bu Object ER. Shu sababli `window.myVar` ishlaydi, lekin `window.myLet` ishlamaydi.
+Environment Record ikki asosiy turga bo'linadi:
 
-Bu farqni tushunish production kodda amaliy ahamiyatga ega. Masalan, kutubxona global `var` orqali o'zgaruvchi e'lon qilsa, u `window` ga tushadi va boshqa kutubxonalar bilan **nom to'qnashuvi** xavfi bor. `let`/`const` esa global ob'ektga qo'shilmaydi — bu muammoni bartaraf etadi. Shuning uchun zamonaviy kod doimo `let`/`const` ishlatadi.
+**1. Declarative Environment Record:**
+- `let`, `const`, `var`, `function`, `class`, `import`, `catch` parameter binding'lari saqlanadi
+- Funksiya va block scope'larda ishlatiladi
+- O'zgaruvchilar to'g'ridan-to'g'ri record ichida saqlanadi — tez
 
-ECMAScript spec da ikki turi bor:
+**2. Object Environment Record:**
+- Biror object'ning property'larini binding sifatida ko'rsatadi
+- Global scope'da `var` va function declaration'lar `window` object orqali — Object Environment Record
+- `with` statement'da ishlatiladi (taqiqlangan)
 
-### 1. Declarative Environment Record
+**3. Global Environment Record** (maxsus):
+- Object Environment Record + Declarative Environment Record birikmasi
+- `var` va function → Object ER (window'ga qo'shiladi)
+- `let`, `const`, `class` → Declarative ER (window'ga qo'shilMAYDI)
 
-Funksiya va block scope'lar uchun. `let`, `const`, `var`, `function`, `class`, `import` — barcha declaration'lar shu yerda.
+### Under the Hood
+
+```
+Global Environment Record:
+┌──────────────────────────────────────────┐
+│                                          │
+│  Object Environment Record:              │
+│  ┌────────────────────────────────────┐  │
+│  │  [[BindingObject]]: window         │  │
+│  │  ├── var name: "Ali"               │  │
+│  │  ├── function greet: <func>        │  │
+│  │  ├── parseInt: <built-in>          │  │
+│  │  ├── console: <built-in>           │  │
+│  │  └── ... (window properties)       │  │
+│  └────────────────────────────────────┘  │
+│                                          │
+│  Declarative Environment Record:         │
+│  ┌────────────────────────────────────┐  │
+│  │  let age: 25                       │  │
+│  │  const PI: 3.14                    │  │
+│  │  class User: <class>               │  │
+│  └────────────────────────────────────┘  │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+Function scope'larda faqat Declarative Environment Record ishlatiladi — bu engine uchun optimizatsiya imkonini beradi (o'zgaruvchi indexi oldindan ma'lum, hash lookup kerak emas).
+
+### Kod Misollari
 
 ```javascript
-function greet(name) {
-  // Declarative Environment Record:
-  // {
-  //   name: "Ali",          ← parameter
-  //   greeting: undefined,  ← var (creation phase)
-  //   LANG: <TDZ>,          ← const (creation phase)
-  // }
-  var greeting = "Salom";
-  const LANG = "uz";
-  return `${greeting}, ${name}! (${LANG})`;
+// Global scope'da var vs let farqi — Environment Record turlari tufayli
+var globalVar = "var bilan";
+let globalLet = "let bilan";
+
+// var → Object Environment Record → window property
+console.log(window.globalVar);    // "var bilan" ✅
+console.log('globalVar' in window); // true
+
+// let → Declarative Environment Record → window'da yo'q
+console.log(window.globalLet);    // undefined
+console.log('globalLet' in window); // false
+
+// Lekin ikkisi ham global scope'da accessible:
+console.log(globalVar); // "var bilan" ✅
+console.log(globalLet); // "let bilan" ✅
+```
+
+---
+
+## Outer Environment Reference va Scope Chain
+
+### Nazariya
+
+Har bir LexicalEnvironment'da **Outer Environment Reference** (outer ref) mavjud — bu tashqi (parent) scope'ning LexicalEnvironment'iga havola. Shu havola orqali **Scope Chain** quriladi.
+
+O'zgaruvchi qidirilganda engine quyidagi tartibda ishlaydi:
+
+1. Joriy Environment Record'da qidiradi
+2. Topilmasa → outer ref bo'ylab tashqi scope'ga o'tadi
+3. Tashqida ham topilmasa → yana tashqiga
+4. Global scope'gacha davom etadi
+5. Global scope'da ham topilmasa → `ReferenceError`
+
+Outer reference **statik** (lexical) — funksiya **yozilgan** joyga qarab aniqlanadi, **chaqirilgan** joyga emas. Bu lexical scoping'ning asosi.
+
+### Under the Hood
+
+```javascript
+var globalX = "global";
+
+function outer() {
+  var outerX = "outer";
+
+  function middle() {
+    var middleX = "middle";
+
+    function inner() {
+      var innerX = "inner";
+      console.log(innerX);   // "inner"   — o'z scope'ida
+      console.log(middleX);  // "middle"  — 1 ta tashqi
+      console.log(outerX);   // "outer"   — 2 ta tashqi
+      console.log(globalX);  // "global"  — 3 ta tashqi (global)
+    }
+
+    inner();
+  }
+
+  middle();
 }
 
-greet("Ali");
+outer();
 ```
 
-### 2. Object Environment Record
-
-**Faqat** Global Execution Context da `var` uchun ishlatiladi. `var` bilan e'lon qilingan global o'zgaruvchilar aslida global object (`window`) ning property'si bo'ladi.
-
-```javascript
-var globalVar = "salom";
-// Object Environment Record:
-// window.globalVar = "salom"
-
-let globalLet = "dunyo";
-// Declarative Environment Record:
-// globalLet = "dunyo" (window da emas!)
-```
-
-### Under the Hood — Global EC ning Ikki Record'i
+Scope Chain vizualizatsiya:
 
 ```
-┌──────────────────────────────────────────────────┐
-│         GLOBAL EXECUTION CONTEXT                  │
-│                                                   │
-│  VariableEnvironment:                             │
-│  ┌─────────────────────────────────────────┐      │
-│  │  Object Environment Record              │      │
-│  │  (global object = window)               │      │
-│  │  ┌───────────────────────────────────┐  │      │
-│  │  │  globalVar: "salom"               │  │      │
-│  │  │  myFunc: function(){...}          │  │      │
-│  │  │  (window.globalVar bilan bir xil) │  │      │
-│  │  └───────────────────────────────────┘  │      │
-│  └─────────────────────────────────────────┘      │
-│                                                   │
-│  LexicalEnvironment:                              │
-│  ┌─────────────────────────────────────────┐      │
-│  │  Declarative Environment Record         │      │
-│  │  ┌───────────────────────────────────┐  │      │
-│  │  │  globalLet: "dunyo"               │  │      │
-│  │  │  GLOBAL_CONST: 42                 │  │      │
-│  │  │  (window da EMAS)                 │  │      │
-│  │  └───────────────────────────────────┘  │      │
-│  └─────────────────────────────────────────┘      │
-│                                                   │
-│  ThisBinding: window                              │
-└──────────────────────────────────────────────────┘
+inner() Environment Record:
+  innerX: "inner"
+  outer ref ─────→ middle() Environment Record:
+                     middleX: "middle"
+                     outer ref ─────→ outer() Environment Record:
+                                        outerX: "outer"
+                                        outer ref ─────→ Global Environment Record:
+                                                           globalX: "global"
+                                                           outer ref: null (tugadi)
 ```
+
+`console.log(outerX)` bajarilganda:
+1. `inner()` → outerX yo'q
+2. `middle()` → outerX yo'q
+3. `outer()` → outerX = "outer" ✅ — topildi!
 
 ---
 
@@ -477,60 +748,57 @@ let globalLet = "dunyo";
 
 ### Nazariya
 
-`this` — JavaScript'ning eng ko'p chalkashlik keltiradigan tushunchalaridan biri. Har bir Execution Context yaratilganda `this` qiymati ham aniqlanadi. Bu **Creation Phase** da sodir bo'ladi va `this` qiymati **funksiya qanday chaqirilganiga** bog'liq — qayerda yozilganiga emas.
+Har bir execution context yaratilganda `this` qiymati aniqlanadi. `this` **compile-time** da emas, **runtime** da — funksiya **qanday chaqirilganiga** qarab belgilanadi (arrow function bundan mustasno).
 
-Bu yerda `this` haqida qisqacha umumiy ko'rinish beramiz, chunki u Execution Context'ning tarkibiy qismi. Lekin `this` ning to'liq mexanizmi, binding qoidalari, priority tartibi va amaliy jihatlari juda keng mavzu — shuning uchun alohida [10-this-keyword.md](10-this-keyword.md) bo'limida batafsil yoritilgan.
+Bu bo'limda faqat asosiy tushuncha beriladi — to'liq `this` keyword mexanizmi [10-this-keyword.md](10-this-keyword.md) da yoritiladi.
 
-`this` qanday aniqlanishi **kontekstga** bog'liq:
+**Global Execution Context da this:**
+- Non-strict mode: `this === globalThis` (window/global)
+- Strict mode: `this === globalThis`
+- Module scope: `this === undefined`
 
-| Kontekst | `this` qiymati |
-|----------|---------------|
-| **Global EC** (non-strict) | `window` (browser), `global` (Node.js) |
-| **Global EC** (strict mode) | `window` (global code da strict ham `window`) |
-| **Function EC** (non-strict) | `window` (oddiy chaqiruv) |
-| **Function EC** (strict mode) | `undefined` (oddiy chaqiruv) |
-| **Method chaqiruv** | Object o'zi (`.` oldidagi object) |
-| **Arrow function** | O'zining `this` i yo'q — tashqi scope dan oladi |
-| **`new` keyword** | Yangi yaratilgan object |
-| **`call`/`apply`/`bind`** | Berilgan object |
+**Function Execution Context da this:**
+- Default binding: `this === globalThis` (non-strict) yoki `undefined` (strict)
+- Method call: `this === object` (method chaqirgan object)
+- `new` binding: `this === yangi yaratilgan object`
+- Explicit binding: `call`/`apply`/`bind` bilan belgilangan qiymat
+- Arrow function: o'zining `this` i yo'q — tashqi scope'dan oladi (lexical this)
+
+### Kod Misollari
 
 ```javascript
-// Global
-console.log(this); // window
+// Global context'da this
+console.log(this === window); // true (brauzer, non-strict)
 
-// Function (non-strict)
-function show() {
-  console.log(this); // window
+// Function context'da this
+function showThis() {
+  console.log(this);
 }
-show();
 
-// Function (strict)
-"use strict";
-function showStrict() {
-  console.log(this); // undefined
-}
-showStrict();
+showThis();           // window (non-strict) / undefined (strict)
 
-// Method
 const user = {
   name: "Ali",
   greet() {
-    console.log(this); // user object
+    console.log(this.name); // ✅ "Ali" — method call, this = user
   }
 };
-user.greet();
 
-// Arrow function
-const obj = {
-  name: "Vali",
-  greet: () => {
-    console.log(this); // window — arrow function o'z this'i yo'q
+user.greet(); // "Ali"
+
+// Arrow function — this ni tashqi scope'dan oladi
+const team = {
+  name: "Dev Team",
+  getMembers() {
+    const arrow = () => {
+      console.log(this.name); // ✅ "Dev Team" — tashqi scope (getMembers) dan
+    };
+    arrow();
   }
 };
-obj.greet();
+
+team.getMembers(); // "Dev Team"
 ```
-
-Bu mavzu juda keng — to'liq [10-this-keyword.md](10-this-keyword.md) da.
 
 ---
 
@@ -538,391 +806,329 @@ Bu mavzu juda keng — to'liq [10-this-keyword.md](10-this-keyword.md) da.
 
 ### Nazariya
 
-Execution Context Stack (yoki **Call Stack**) — bu engine'ning barcha Execution Context'larni tartib bilan saqlash va boshqarish uchun ishlatiladigan asosiy tuzilmasi. [01-js-engine.md](01-js-engine.md) da Call Stack haqida gaplangan edik — Execution Context Stack ham **aynan o'sha narsa**, faqat boshqa nom bilan.
+Execution Context Stack (Call Stack bilan bir xil narsa) — barcha execution context'larni LIFO tartibida saqlaydigan stack. JavaScript single-threaded — bir vaqtda faqat bitta EC bajariladi (stack'ning eng tepasidagi).
 
-```
-Execution Context Stack = Call Stack
-```
+Ishlash tartibi:
+1. Dastur boshlanganda → GEC yaratiladi va stack'ga qo'shiladi
+2. Funksiya chaqirilganda → yangi FEC yaratiladi va stack'ning tepasiga qo'shiladi
+3. Funksiya tugaganda → uning FEC'i stack'dan olib tashlanadi
+4. Boshqaruv oldingi EC'ga qaytadi
+5. Dastur tugaganda → GEC ham stack'dan chiqadi
 
-Bu tushunchani to'liq anglash muhim, chunki JavaScript'ning **single-threaded** tabiati aynan shu stack orqali namoyon bo'ladi. Engine har doim stack'ning **eng tepasidagi** context'ni bajaradi. Yangi funksiya chaqirilganda — uning EC'si tepaga qo'yiladi (push), funksiya tugaganda — olib tashlanadi (pop). Global EC har doim stack'ning eng pastida turadi va dastur yakunlanguncha yo'qolmaydi.
-
-### To'liq Misol
+### Under the Hood
 
 ```javascript
-var language = "JavaScript";
+var x = 10;
 
 function first() {
-  var a = 10;
+  var a = 20;
   second();
-  var d = 40;
+  console.log(a);
 }
 
 function second() {
-  var b = 20;
+  var b = 30;
   third();
-  var e = 50;
 }
 
 function third() {
-  var c = 30;
+  var c = 40;
   console.log(c);
 }
 
 first();
-console.log(language);
+console.log(x);
 ```
 
-### Qadam-Baqadam Vizualizatsiya
-
-**1-qadam: Dastur boshlandi — GEC yaratildi**
+EC Stack holati qadam-baqadam:
 
 ```
-┌─────────────────────────────────────┐
-│  GLOBAL EC                          │
-│                                     │
-│  Creation Phase:                    │
-│    language: undefined              │
-│    first: function(){...}           │
-│    second: function(){...}          │
-│    third: function(){...}           │
-│    this: window                     │
-│                                     │
-│  Execution Phase:                   │
-│    language = "JavaScript"          │
-└─────────────────────────────────────┘
+Boshlang'ich:
+┌───────────┐
+│  GEC      │ ← x: undefined → 10
+└───────────┘
 
-Stack: [Global EC]
+first() chaqirildi:
+┌───────────┐
+│  first()  │ ← a: undefined → 20
+│  GEC      │
+└───────────┘
+
+second() chaqirildi (first ichidan):
+┌───────────┐
+│  second() │ ← b: undefined → 30
+│  first()  │
+│  GEC      │
+└───────────┘
+
+third() chaqirildi (second ichidan):
+┌───────────┐
+│  third()  │ ← c: undefined → 40
+│  second() │
+│  first()  │
+│  GEC      │
+└───────────┘
+
+third() console.log(40) → tugadi:
+┌───────────┐
+│  second() │
+│  first()  │
+│  GEC      │
+└───────────┘
+
+second() tugadi:
+┌───────────┐
+│  first()  │
+│  GEC      │
+└───────────┘
+
+first() console.log(20) → tugadi:
+┌───────────┐
+│  GEC      │
+└───────────┘
+
+console.log(10) → dastur tugadi:
+┌───────────┐
+│  (bo'sh)  │
+└───────────┘
+
+Output: 40, 20, 10
 ```
 
-**2-qadam: `first()` chaqirildi — FEC yaratildi**
-
-```
-┌─────────────────────────────┐
-│  first() EC                 │
-│  Creation: a=undefined,     │
-│            d=undefined      │
-│  Execution: a=10            │
-│  → second() chaqirildi...   │
-└─────────────────────────────┘
-┌─────────────────────────────┐
-│  GLOBAL EC                  │
-│  language: "JavaScript"     │
-└─────────────────────────────┘
-
-Stack: [Global EC, first EC]
-```
-
-**3-qadam: `second()` chaqirildi**
-
-```
-┌─────────────────────────────┐
-│  second() EC                │
-│  Creation: b=undefined,     │
-│            e=undefined      │
-│  Execution: b=20            │
-│  → third() chaqirildi...    │
-└─────────────────────────────┘
-┌─────────────────────────────┐
-│  first() EC                 │
-│  a=10, d=undefined          │
-└─────────────────────────────┘
-┌─────────────────────────────┐
-│  GLOBAL EC                  │
-│  language: "JavaScript"     │
-└─────────────────────────────┘
-
-Stack: [Global EC, first EC, second EC]
-```
-
-**4-qadam: `third()` chaqirildi**
-
-```
-┌─────────────────────────────┐
-│  third() EC                 │
-│  Creation: c=undefined      │
-│  Execution: c=30            │
-│  console.log(30) → "30"     │
-└─────────────────────────────┘
-┌─────────────────────────────┐
-│  second() EC  (b=20)        │
-└─────────────────────────────┘
-┌─────────────────────────────┐
-│  first() EC   (a=10)        │
-└─────────────────────────────┘
-┌─────────────────────────────┐
-│  GLOBAL EC                  │
-└─────────────────────────────┘
-
-Stack: [Global EC, first EC, second EC, third EC]
-```
-
-**5-qadam: `third()` tugadi — pop**
-
-```
-Stack: [Global EC, first EC, second EC]
-→ second() davom etadi: e = 50
-```
-
-**6-qadam: `second()` tugadi — pop**
-
-```
-Stack: [Global EC, first EC]
-→ first() davom etadi: d = 40
-```
-
-**7-qadam: `first()` tugadi — pop**
-
-```
-Stack: [Global EC]
-→ console.log("JavaScript") bajariladi
-```
-
-**8-qadam: Dastur tugadi**
-
-```
-Stack: [] (bo'sh — dastur yakunlandi)
-```
-
-Output:
-```
-30
-JavaScript
-```
+**Execution Context Stack = Call Stack.** [01-js-engine.md](01-js-engine.md) da call stack haqida asosiy tushuncha berilgan edi — bu bo'limda EC tafsilotlari qo'shildi.
 
 ---
 
 ## Common Mistakes
 
-### ❌ Xato 1: var va let/const ning scope farqini bilmaslik
+### ❌ Xato 1: var hoisting'ni tushunmaslik
 
 ```javascript
-function test() {
-  if (true) {
-    var x = 10;   // function scope — if dan tashqarida ham bor
-    let y = 20;   // block scope — faqat if ichida
-  }
-  console.log(x); // 10 ✅
-  console.log(y); // ❌ ReferenceError: y is not defined
-}
+// ❌ Noto'g'ri kutish — "x hali e'lon qilinmagan, xato beradi"
+console.log(x); // undefined — xato emas!
+var x = 5;
+// Ko'pchilik ReferenceError kutadi, lekin aslida undefined chiqadi
 ```
 
 ### ✅ To'g'ri tushunish:
 
 ```javascript
-function test() {
-  // var → VariableEnvironment (function scope)
-  // Shuning uchun if block'dan chiqadi
+// ✅ Creation Phase da var x undefined bilan initialize qilinadi
+// Shuning uchun console.log(x) → undefined (xato emas)
+// Execution Phase da x = 5 beriladi
 
-  // let/const → LexicalEnvironment (block scope)
-  // Shuning uchun if block ichida qoladi
-
-  let y; // Agar tashqarida kerak bo'lsa — tashqarida e'lon qiling
-  if (true) {
-    var x = 10;
-    y = 20;
-  }
-  console.log(x); // 10
-  console.log(y); // 20
-}
+// Agar let/const bo'lsa — ReferenceError berardi:
+console.log(y); // ❌ ReferenceError: Cannot access 'y' before initialization
+let y = 5;
+// let Creation Phase da <uninitialized> — TDZ da
 ```
 
-**Nima uchun:** `var` VariableEnvironment ga tushadi (function scope), `let`/`const` LexicalEnvironment ga (block scope). If blokning o'z LexicalEnvironment'i bor, lekin VariableEnvironment tashqi funksiyadan keladi.
+**Nima uchun:** Creation Phase da `var` → `undefined`, `let`/`const` → `uninitialized` (TDZ). `undefined` o'qish mumkin, `uninitialized` o'qish `ReferenceError` beradi.
 
 ---
 
-### ❌ Xato 2: Creation Phase da TDZ ni tushunmaslik
+### ❌ Xato 2: var'ni block-scoped deb o'ylash
 
 ```javascript
-// Kop odamlar "let hoist bo'lmaydi" deb o'ylaydi — bu NOTO'G'RI
-console.log(a); // undefined (var hoist + undefined init)
-console.log(b); // ❌ ReferenceError (let hoist qiladi, lekin TDZ da)
-
-var a = 1;
-let b = 2;
+// ❌ Noto'g'ri — var block scope'da cheklanadi deb kutish
+if (true) {
+  var secret = "hidden";
+}
+console.log(secret); // "hidden" — ❌ ko'pchilik undefined yoki xato kutadi
 ```
 
 ### ✅ To'g'ri tushunish:
 
 ```javascript
-// let va const HAM hoist bo'ladi!
-// Lekin ular TDZ (Temporal Dead Zone) da turadi
-// — ya'ni hoist bo'lgan, lekin initialize qilinMAGAN
+// ✅ var function-scoped — faqat function chegarasida qoladi, block emas
+// if, for, while ichidagi var → function scope'ga ko'tariladi
 
-// Creation Phase:
-// a → undefined (var: hoist + init)
-// b → <uninitialized> (let: hoist, init YO'Q → TDZ)
-
-// Execution Phase:
-// console.log(a) → undefined (a mavjud, qiymati undefined)
-// console.log(b) → ReferenceError (b mavjud, lekin TDZ da — kirish TAQIQLANGAN)
+if (true) {
+  let blockScoped = "hidden";
+}
+console.log(blockScoped); // ✅ ReferenceError — let block-scoped
 ```
 
-**Nima uchun:** Bu ko'proq [03-hoisting.md](03-hoisting.md) da, lekin asosiy tushuncha — TDZ "o'zgaruvchi yo'q" degani emas, "o'zgaruvchi bor, lekin hali kirish mumkin emas" degani.
+**Nima uchun:** `var` VariableEnvironment'da saqlanadi — bu function-level. `let`/`const` LexicalEnvironment'da — block-level. If block o'z VariableEnvironment'ini yaratMAYDI, faqat LexicalEnvironment yaratadi.
 
 ---
 
-### ❌ Xato 3: Global var va let farqini bilmaslik
+### ❌ Xato 3: Function expression'ni declaration kabi hoist bo'ladi deb o'ylash
 
 ```javascript
-var globalVar = "salom";
-let globalLet = "dunyo";
+// ❌ Noto'g'ri kutish
+greet(); // ✅ ishlaydi
+hello(); // ❌ TypeError: hello is not a function
 
-console.log(window.globalVar); // "salom" ✅
-console.log(window.globalLet); // undefined ❌ (kutilganday "dunyo" emas!)
+function greet() { console.log("Hi"); }     // declaration
+var hello = function() { console.log("Hello"); }; // expression
 ```
 
 ### ✅ To'g'ri tushunish:
 
 ```javascript
-// var global scope da → Object Environment Record → window ga qo'shiladi
-var globalVar = "salom";
-console.log(window.globalVar);       // "salom"
-console.log(globalVar);              // "salom"
-console.log(window.globalVar === globalVar); // true
+// ✅ Creation Phase da:
+// greet → function greet() {...}  (to'liq hoist — function declaration)
+// hello → undefined               (faqat var hoist — expression emas)
 
-// let global scope da → Declarative Environment Record → window ga QO'SHILMAYDI
-let globalLet = "dunyo";
-console.log(window.globalLet);       // undefined
-console.log(globalLet);              // "dunyo"
-console.log(window.globalLet === globalLet); // false
+// shuning uchun greet() ishlaydi, hello() esa TypeError beradi
+// TypeError, ReferenceError emas — chunki hello MAVJUD (undefined), lekin function emas
 ```
 
-**Nima uchun:** Global EC da ikki xil Environment Record bor. `var` → Object ER (window bilan bog'liq), `let`/`const` → Declarative ER (window bilan aloqasi yo'q).
+**Nima uchun:** Function declaration'lar Creation Phase da to'liq funksiya sifatida saqlanadi. Function expression'lar — faqat o'zgaruvchi sifatida (`var` → `undefined`), funksiya qiymati Execution Phase da beriladi.
 
 ---
 
-### ❌ Xato 4: Funksiya har chaqirilganda yangi EC yaratilishini unutish
+### ❌ Xato 4: Global scope'da let/const window'da bor deb o'ylash
 
 ```javascript
-function counter() {
-  var count = 0;
-  count++;
-  return count;
+// ❌ Noto'g'ri kutish
+let apiKey = "abc123";
+console.log(window.apiKey); // undefined — ❌ topilmaydi!
+```
+
+### ✅ To'g'ri tushunish:
+
+```javascript
+// ✅ let/const Global Environment Record'ning
+// Declarative qismida saqlanadi — Object (window) da emas
+
+var oldStyle = "window da";
+let newStyle = "window da emas";
+
+console.log(window.oldStyle); // "window da" ✅
+console.log(window.newStyle); // undefined ❌
+// ✅ Lekin ikkisi ham global scope'da accessible:
+console.log(oldStyle); // "window da" ✅
+console.log(newStyle); // "window da emas" ✅
+```
+
+**Nima uchun:** Global scope'da `var` → Object Environment Record (window ga property bo'ladi). `let`/`const` → Declarative Environment Record (window ga qo'shilMAYDI). Bu spec'da belgilangan farq.
+
+---
+
+### ❌ Xato 5: Execution context va scope'ni adashtirib yuborish
+
+```javascript
+// ❌ Noto'g'ri tushuncha: "funksiya chaqirilgan joyning scope'i ishlatiladi"
+var x = "global";
+
+function showX() {
+  console.log(x);
 }
 
-console.log(counter()); // 1
-console.log(counter()); // 1 — 2 emas!
-console.log(counter()); // 1 — 3 emas!
-```
-
-### ✅ To'g'ri tushunish:
-
-```javascript
-// Har bir counter() chaqiruvi YANGI EC yaratadi
-// Creation Phase: count = undefined
-// Execution Phase: count = 0, count++, return 1
-// EC yo'q qilinadi — count yo'qoladi
-
-// Keyingi chaqiruvda yana YANGI EC — yana count = 0 dan boshlanadi
-
-// Agar holatni saqlamoqchi bo'lsangiz — CLOSURE ishlatish kerak:
-function makeCounter() {
-  var count = 0;
-  return function() {
-    count++;
-    return count;
-  };
+function wrapper() {
+  var x = "wrapper";
+  showX(); // "global" — "wrapper" emas!
 }
 
-const counter2 = makeCounter();
-console.log(counter2()); // 1
-console.log(counter2()); // 2 ← closure tufayli count saqlanadi
-console.log(counter2()); // 3
-```
-
-**Nima uchun:** Har bir funksiya chaqiruvi yangi FEC yaratadi, yangi VariableEnvironment bilan. Oldingi chaqiruvning o'zgaruvchilari yo'qoladi. Closure bu muammoni hal qiladi — [05-closures.md](05-closures.md) da batafsil.
-
----
-
-### ❌ Xato 5: Execution order va async ni aralashtirib yuborish
-
-```javascript
-console.log("1");
-
-setTimeout(function() {
-  console.log("2");
-}, 0);
-
-console.log("3");
-
-// Ko'pchilik kutadi: 1, 2, 3
-// Aslida:           1, 3, 2
+wrapper();
 ```
 
 ### ✅ To'g'ri tushunish:
 
 ```javascript
-// 1. console.log("1") — Call Stack da bajariladi → "1"
-// 2. setTimeout — Web API ga beriladi (0ms bo'lsa ham!)
-//    Callback Queue ga qo'yiladi
-// 3. console.log("3") — Call Stack da bajariladi → "3"
-// 4. Call Stack bo'shadi
-// 5. Event Loop: "Stack bo'shmi? Ha. Queue da bor? Ha."
-//    → callback Stack ga qo'yiladi → "2"
+// ✅ JavaScript LEXICAL scoping ishlatadi
+// showX() YOZILGAN joyda global scope'da — outer ref: Global Environment
+// showX() CHAQIRILGAN joy (wrapper ichida) ahamiyatsiz
+
+// Creation Phase da showX ning outer ref = Global Environment
+// Execution Phase da x qidiradi: showX scope'ida yo'q → Global da x = "global"
+// wrapper'dagi x ga hech qachon bormaydi
 ```
 
-**Nima uchun:** `setTimeout(fn, 0)` darhol bajarmaydi — u Web API orqali Callback Queue ga tushadi, faqat Call Stack to'liq bo'shagandan keyin bajariladi. Bu Event Loop mavzusi — [11-event-loop.md](11-event-loop.md) da to'liq.
+**Nima uchun:** Scope chain funksiya **yozilgan** joyga qarab quriladi (lexical scoping), **chaqirilgan** joyga emas (dynamic scoping). JavaScript lexical scoping ishlatadi.
 
 ---
 
 ## Amaliy Mashqlar
 
-### Mashq 1: Creation Phase ni Aniqlang (Oson)
+### Mashq 1: Creation Phase (Oson)
 
-**Savol:** Quyidagi kodning Creation Phase da VariableEnvironment va LexicalEnvironment nimaga teng?
+**Savol:** Quyidagi kodda Creation Phase tugaganda har bir o'zgaruvchining holati qanday bo'ladi?
 
 ```javascript
-function test() {
-  var a = 10;
-  let b = 20;
-  const c = 30;
-  function inner() { return "hi"; }
-}
+var a = 1;
+let b = 2;
+const c = 3;
+function d() { return 4; }
+var e = function() { return 5; };
 ```
 
 <details>
 <summary>Javob</summary>
 
 ```
-Creation Phase:
+Creation Phase tugaganda (kod hali bajarilMAGAN):
 
 VariableEnvironment:
-  a → undefined
+  a: undefined         ← var → undefined
+  e: undefined         ← var → undefined (function expression — faqat var hoist)
 
 LexicalEnvironment:
-  b → <uninitialized> (TDZ)
-  c → <uninitialized> (TDZ)
-  inner → function() { return "hi"; }
+  b: <uninitialized>   ← let → TDZ
+  c: <uninitialized>   ← const → TDZ
+  d: function d() {}   ← function declaration → to'liq function
 ```
 
 **Tushuntirish:**
-- `var a` → VariableEnvironment ga tushadi, `undefined` bilan initialize
-- `let b`, `const c` → LexicalEnvironment ga, TDZ da (uninitialized)
-- `function inner` → LexicalEnvironment ga, to'liq funksiya bilan (function hoisting)
+- `var` → `undefined` bilan initialize
+- `let`/`const` → `uninitialized` (TDZ da — o'qilsa ReferenceError)
+- function declaration → to'liq funksiya
+- function expression (`var e = function...`) → faqat `var e = undefined`
 </details>
 
 ---
 
-### Mashq 2: Output ni Aniqlang (O'rta)
+### Mashq 2: Execution Order (Oson)
 
-**Savol:** Quyidagi kodning output ini aniqlang:
+**Savol:** Output nima bo'ladi?
 
 ```javascript
-var x = 1;
+console.log(typeof greet);
+console.log(typeof hello);
+
+function greet() { return "Hi"; }
+var hello = function() { return "Hello"; };
+
+console.log(typeof greet);
+console.log(typeof hello);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+"function"
+"undefined"
+"function"
+"function"
+```
+
+**Tushuntirish:**
+- 1-qator: `greet` — function declaration, Creation Phase da to'liq hoist → `typeof` = `"function"`
+- 2-qator: `hello` — `var` bilan, Creation Phase da `undefined` → `typeof undefined` = `"undefined"`
+- 3-qator: hech narsa o'zgarmadi — `greet` hali ham function → `"function"`
+- 4-qator: Execution Phase da `hello = function(){}` assign bo'ldi → `typeof` = `"function"`
+</details>
+
+---
+
+### Mashq 3: Scope Chain (O'rta)
+
+**Savol:** Har bir `console.log` ning natijasini ayting.
+
+```javascript
+var x = 10;
 
 function outer() {
-  console.log(x); // ?
-  var x = 2;
-  console.log(x); // ?
+  var x = 20;
 
   function inner() {
-    console.log(x); // ?
-    var x = 3;
     console.log(x); // ?
   }
 
   inner();
-  console.log(x); // ?
 }
 
 outer();
@@ -932,242 +1138,132 @@ console.log(x); // ?
 <details>
 <summary>Javob</summary>
 
-```javascript
-// Output:
-// undefined
-// 2
-// undefined
-// 3
-// 2
-// 1
+```
+20
+10
 ```
 
 **Tushuntirish:**
-
-1. `outer()` ning Creation Phase da **local** `var x = undefined` (hoist). Shuning uchun birinchi `console.log(x)` = `undefined` (global `x=1` ni emas, o'zining hoist qilingan `x` ini ko'radi — variable shadowing)
-2. `x = 2` — outer ning `x` endi 2
-3. `inner()` da ham **local** `var x = undefined` (hoist). Shuning uchun `console.log(x)` = `undefined`
-4. `x = 3` — inner ning `x` endi 3
-5. `inner()` tugadi — outer'ga qaytamiz. Outer ning `x` hali 2
-6. Global'ga qaytamiz. Global `x` hali 1
-
-```
-Global EC:        outer() EC:       inner() EC:
-x: 1              x: 2              x: 3
-```
-
-Har bir scope o'zining `x` ini yaratdi — bir-biriga ta'sir qilmaydi.
+- `inner()` ichida `x` qidiriladi → inner'da yo'q → outer ref bo'ylab outer'ga → `x = 20` topildi
+- Global scope'da `console.log(x)` → global `x = 10`
+- inner() outer() ichida **yozilgan** — shuning uchun outer scope'ga bog'langan (lexical scoping)
 </details>
 
 ---
 
-### Mashq 3: Global Object bilan Ishlash (O'rta)
+### Mashq 4: var vs let block scope (O'rta)
 
-**Savol:** Quyidagi kodning har bir `console.log` natijasini ayting:
-
-```javascript
-var a = "hello";
-let b = "world";
-const c = "!";
-
-console.log(window.a); // ?
-console.log(window.b); // ?
-console.log(window.c); // ?
-console.log(a);        // ?
-console.log(b);        // ?
-
-window.d = "test";
-console.log(d);        // ?
-```
-
-<details>
-<summary>Javob</summary>
+**Savol:** Output nima bo'ladi?
 
 ```javascript
-console.log(window.a); // "hello" — var global object ga qo'shiladi
-console.log(window.b); // undefined — let qo'shilMAYDI
-console.log(window.c); // undefined — const qo'shilMAYDI
-console.log(a);        // "hello"
-console.log(b);        // "world"
+function test() {
+  console.log(a); // ?
+  console.log(b); // ?
 
-window.d = "test";
-console.log(d);        // "test" — window.d = global property
-```
-
-**Tushuntirish:**
-- `var` → Object Environment Record → `window` ning property'si
-- `let`/`const` → Declarative Environment Record → `window` da yo'q
-- `window.d = "test"` to'g'ridan-to'g'ri global object ga property qo'shadi — `var d` deb e'lon qilmasdan ham global da ko'rinadi
-</details>
-
----
-
-### Mashq 4: EC Stack Vizualizatsiya (Qiyin)
-
-**Savol:** Quyidagi kodning output ini ayting va har bir qadam da EC Stack ni chizing:
-
-```javascript
-function a() {
-  console.log("a start");
-  b();
-  console.log("a end");
-}
-
-function b() {
-  console.log("b start");
-  c();
-  console.log("b end");
-}
-
-function c() {
-  console.log("c");
-  throw new Error("boom");
-}
-
-try {
-  a();
-} catch(e) {
-  console.log("error caught");
-}
-console.log("done");
-```
-
-<details>
-<summary>Javob</summary>
-
-```
-a start
-b start
-c
-error caught
-done
-```
-
-**EC Stack vizualizatsiya:**
-
-```
-1. [Global]                     → try { a(); }
-2. [Global, a()]                → "a start"
-3. [Global, a(), b()]           → "b start"
-4. [Global, a(), b(), c()]      → "c"
-5. throw Error("boom")!
-   → c() unwind (pop)
-   → b() unwind (pop) — "b end" BAJARILMAYDI
-   → a() unwind (pop) — "a end" BAJARILMAYDI
-   → Global'dagi catch ushladi
-6. [Global]                     → "error caught"
-7. [Global]                     → "done"
-```
-
-**Tushuntirish:**
-- `throw` bo'lganda engine stack bo'ylab yuqoriga qarab `try/catch` qidiradi
-- `c()`, `b()`, `a()` — hech birida `try/catch` yo'q, barchasi pop bo'ladi
-- Global'dagi `try/catch` topildi — error ushlandi
-- `b()` va `a()` ning qolgan kodlari ("b end", "a end") **bajarilmaydi**
-</details>
-
----
-
-### Mashq 5: Murakkab Hoisting + EC (Qiyin)
-
-**Savol:** Quyidagi kodning output ini aniqlang:
-
-```javascript
-var x = 10;
-
-function foo() {
-  console.log(x);
-  console.log(y);
-  var x = 20;
-  var y = 30;
-  console.log(x);
-
-  function bar() {
-    console.log(x);
-    var x = 40;
-    console.log(x);
+  if (true) {
+    var a = 1;
+    let b = 2;
   }
 
-  bar();
-  console.log(x);
+  console.log(a); // ?
+  console.log(b); // ?
 }
 
-foo();
-console.log(x);
+test();
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+undefined
+ReferenceError: Cannot access 'b' before initialization
+```
+
+Kod 2-qatorda to'xtaydi — ReferenceError tufayli 3 va 4-qatorgacha yetmaydi.
+
+Agar 2-qatordagi `console.log(b)` o'chirilsa:
+
+```
+undefined     ← var a hoist bo'ldi, undefined
+1             ← if ichidagi var a = 1 function scope'da
+ReferenceError ← let b block scope'da — if tashqarisida yo'q
+```
+
+**Tushuntirish:**
+- `var a` function scope'ga hoist bo'ladi → if tashqarisida ham accessible (undefined, keyin 1)
+- `let b` block scope → faqat if ichida accessible, tashqarida ReferenceError
+
+Birinchi `console.log(b)` da: `b` function scope'da yo'q. Test function scope'ining LexicalEnvironment'ida `b` qidiriladi — topilmaydi. Global'da ham yo'q → ReferenceError.
+</details>
+
+---
+
+### Mashq 5: Execution Context Stack (Qiyin)
+
+**Savol:** EC Stack'ning holatini har bir qadam uchun chizing. Output nima?
+
+```javascript
+var result = [];
+
+function first() {
+  result.push("first start");
+  second();
+  result.push("first end");
+}
+
+function second() {
+  result.push("second start");
+  third();
+  result.push("second end");
+}
+
+function third() {
+  result.push("third");
+}
+
+first();
+console.log(result);
 ```
 
 <details>
 <summary>Javob</summary>
 
 ```javascript
-// Output:
-// undefined
-// undefined
-// 20
-// undefined
-// 40
-// 20
-// 10
+["first start", "second start", "third", "second end", "first end"]
 ```
 
-**Qadam-baqadam:**
+EC Stack holati:
 
 ```
-1. Global EC Creation:
-   x = undefined, foo = function(){...}
-   Global EC Execution:
-   x = 10
-
-2. foo() EC Creation:
-   x = undefined (LOCAL var, global x ni shadow qiladi)
-   y = undefined
-   bar = function(){...}
-
-3. foo() EC Execution:
-   console.log(x) → undefined (local x hali assign bo'lmagan)
-   console.log(y) → undefined (local y hali assign bo'lmagan)
-   x = 20
-   y = 30
-   console.log(x) → 20
-
-4. bar() EC Creation:
-   x = undefined (LOCAL var, foo ning x ini shadow qiladi)
-
-5. bar() EC Execution:
-   console.log(x) → undefined (local x hali assign bo'lmagan)
-   x = 40
-   console.log(x) → 40
-
-6. bar() tugadi, foo() davom:
-   console.log(x) → 20 (foo ning x i, bar ta'sir qilmagan)
-
-7. foo() tugadi, Global davom:
-   console.log(x) → 10 (global x, foo ta'sir qilmagan)
+1. first()  chaqirildi  → Stack: [GEC, first]    → "first start"
+2. second() chaqirildi  → Stack: [GEC, first, second] → "second start"
+3. third()  chaqirildi  → Stack: [GEC, first, second, third] → "third"
+4. third()  tugadi      → Stack: [GEC, first, second] → "second end"
+5. second() tugadi      → Stack: [GEC, first] → "first end"
+6. first()  tugadi      → Stack: [GEC]
 ```
 
-**Kalit tushuncha:** Har bir `var x` o'z scope da yangi `x` yaratadi — tashqi `x` ni o'zgartirmaydi (variable shadowing).
+**Tushuntirish:** Call stack (EC Stack) LIFO — eng oxirgi qo'shilgan birinchi tugaydi. `third()` birinchi tugaydi, keyin `second()`, keyin `first()`. Har bir funksiya o'zidan keyingi kodni faqat chaqirgan funksiya qaytgandan keyin davom ettiradi.
 </details>
 
 ---
 
 ## Xulosa
 
-1. **Execution Context** — kod bajarilish muhiti: o'zgaruvchilar, scope chain, `this` haqidagi ma'lumotlar.
+Bu bo'limda Execution Context'ning ichki tuzilmasini o'rgandik:
 
-2. **3 turi** bor: Global EC (1 ta), Function EC (har bir chaqiruvda yangi), Eval EC.
+- **Execution Context** — JavaScript engine har bir kod bo'lagini bajarish uchun yaratiladigan muhit. Uch turi bor: Global, Function, Eval
+- **Creation Phase** — kod bajarilmasdan oldin muhit tayyorlanadi: `var` → `undefined`, `let`/`const` → TDZ, function declaration → to'liq function
+- **Execution Phase** — kod qator-baqatar bajariladi, o'zgaruvchilarga qiymat beriladi
+- **Variable Environment** — `var` declaration'lar saqlanadi (function-scoped)
+- **Lexical Environment** — `let`, `const`, `function`, `class` saqlanadi (block-scoped)
+- **Environment Record** — o'zgaruvchilar va binding'lar saqlanadigan tuzilma (Declarative va Object turlari)
+- **Scope Chain** — outer environment reference orqali quriladi, o'zgaruvchi ichidan tashqariga qidiriladi
+- **EC Stack** — Call Stack bilan bir xil — execution context'larni LIFO tartibida boshqaradi
 
-3. **2 Phase:** Creation Phase (xotira ajratish, hoisting) va Execution Phase (kod bajarish).
-
-4. **VariableEnvironment** — `var` uchun (function scope). **LexicalEnvironment** — `let`/`const`/`function` uchun (block scope).
-
-5. **Environment Record** — o'zgaruvchilar haqiqatda shu yerda. Global da ikki xil: Object ER (`var` → window) va Declarative ER (`let`/`const`).
-
-6. **`this`** Creation Phase da aniqlanadi — kontekstga bog'liq (global, function, method, arrow, new, call/apply/bind).
-
-7. **EC Stack = Call Stack** — LIFO. Engine doim tepada turgan EC ni bajaradi.
-
-8. Har bir funksiya chaqiruvi **yangi EC** yaratadi — o'z o'zgaruvchilari, o'z scope'i. Funksiya tugaganda EC yo'q qilinadi.
+Creation Phase'ni tushunish hoisting'ni tushunishning kaliti — keyingi bo'limda aynan hoisting mexanizmini chuqur o'rganamiz.
 
 ---
 
-> **Keyingi bo'lim:** [03-hoisting.md](03-hoisting.md) — Hoisting — Creation Phase ning amaliy natijasi. var, let, const, function — kim qanday hoist bo'ladi.
+**Keyingi bo'lim:** [03-hoisting.md](03-hoisting.md) — Hoisting ichki mexanizmi, var/let/const hoisting farqlari, Temporal Dead Zone (TDZ), function vs variable hoisting priority.

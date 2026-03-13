@@ -52,8 +52,13 @@
 - [Bo'lim 23: Proxy va Reflect](23-proxy-reflect.md)
 - [Bo'lim 24: Design Patterns](24-design-patterns.md)
 
+### QISM 11: ZAMONAVIY JS VA API'LAR
+- [Bo'lim 25: String Methods](25-string-methods.md)
+- [Bo'lim 26: Date va Intl API](26-date-intl.md)
+- [Bo'lim 27: ES2024+ va Kelgusi Standartlar](27-es2024-beyond.md)
+
 ### INTERVIEW
-- [Interview Savollari](interview.md)
+- [Interview Savollari](interview/00-index.md)
 
 ---
 
@@ -86,4 +91,7 @@
 | 22 | Array Methods | ✅ |
 | 23 | Proxy & Reflect | ✅ |
 | 24 | Design Patterns | ✅ |
-| -- | Interview Savollari | ✅ |
+| 25 | String Methods | ✅ |
+| 26 | Date va Intl API | ✅ |
+| 27 | ES2024+ va Kelgusi Standartlar | ✅ |
+| -- | Interview Savollari | ⬜ |

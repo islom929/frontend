@@ -1,15 +1,17 @@
 # Bo'lim 20: Error Handling
 
-> Xatolar — dasturning tabiiy qismi. Ularni to'g'ri boshqarish — professional dasturchi va boshlang'ich o'rtasidagi asosiy farq.
+> Error handling — dastur bajarilishi vaqtida yuzaga keladigan kutilgan va kutilmagan xatolarni aniqlash, ushlash va boshqarish mexanizmi.
 
 ---
 
 ## Mundarija
 
 - [Error Types](#error-types)
-- [try/catch/finally](#trycatchfinally)
 - [Error Object](#error-object)
-- [Custom Errors](#custom-errors)
+- [Error cause (ES2022)](#error-cause-es2022)
+- [try/catch/finally](#trycatchfinally)
+- [throw Statement](#throw-statement)
+- [Custom Error Classes](#custom-error-classes)
 - [Error Propagation](#error-propagation)
 - [Async Error Handling](#async-error-handling)
 - [Global Error Handlers](#global-error-handlers)
@@ -24,78 +26,224 @@
 
 ### Nazariya
 
-JavaScript da bir nechta built-in error turlari mavjud, barchasi `Error` base class'idan meros oladi. Asosiy turlar: `SyntaxError` (kod noto'g'ri yozilgan, JSON parse xatosi), `ReferenceError` (mavjud bo'lmagan o'zgaruvchiga murojaat), `TypeError` (noto'g'ri type da operatsiya, null/undefined property o'qish), `RangeError` (qiymat ruxsat etilgan oraliqdan tashqari, stack overflow), `URIError` (noto'g'ri URI), va `AggregateError` (ES2021 — bir necha xatoni birlashtirish, `Promise.any()` qo'llaydi). Har bir error obyekti `name`, `message`, va `stack` (debugging uchun stack trace) xususiyatlariga ega.
+JavaScript da barcha xatolar `Error` base class'idan meros oladigan built-in error turlari bilan ifodalanadi. Har bir tur muayyan xato kategoriyasini bildiradi — bu `catch` blokda xato turini `instanceof` bilan aniqlash va har bir turga mos javob berish imkonini beradi. Engine ma'lum xatolarni avtomatik throw qiladi (runtime errors), ba'zilarini esa dasturchi o'zi throw qiladi (programmatic errors).
 
-### Built-in Error Turlari
+**SyntaxError** — kod sintaktik jihatdan noto'g'ri yozilganda. Bu xato **parse vaqtida** sodir bo'ladi — ya'ni kod hali bajarilmagan, engine kodni o'qiyotgan paytda. `try/catch` bilan ushlash mumkin emas (chunki kod umuman ishga tushmaydi), lekin `eval()` yoki `JSON.parse()` ichidagi syntax xatolarni ushlash mumkin — chunki ular runtime da parse qiladi.
+
+**ReferenceError** — mavjud bo'lmagan o'zgaruvchiga murojaat qilinganda. Engine scope chain bo'ylab o'zgaruvchini qidirib, global scope'gacha yetib topmaganda bu xatoni throw qiladi. `typeof` operatori istisno — u mavjud bo'lmagan o'zgaruvchi uchun `"undefined"` qaytaradi, xato bermaydi.
+
+**TypeError** — qiymat kutilgan type'da bo'lmaganda yoki noto'g'ri type'da operatsiya bajarilganda: `null`/`undefined` ning property'sini o'qish, funksiya bo'lmagan narsani chaqirish, `const` ga qayta assign qilish, read-only property'ga yozish.
+
+**RangeError** — qiymat ruxsat etilgan oraliqdan tashqariga chiqqanda: manfiy array uzunlik, `toFixed(200)` (0-100 orasida bo'lishi kerak), cheksiz rekursiya (Maximum call stack size exceeded).
+
+**URIError** — `decodeURIComponent()`, `encodeURI()` kabi URI funksiyalari noto'g'ri formatdagi string bilan chaqirilganda.
+
+**EvalError** — `eval()` bilan bog'liq xato. Hozirgi spec'da amalda throw qilinmaydi, lekin backwards compatibility uchun mavjud.
+
+**AggregateError** (ES2021) — bir nechta xatoni bitta obyektda saqlash uchun. `errors` property'si xatolar array'ini saqlaydi. `Promise.any()` barcha promise'lar reject bo'lganda shu xatoni throw qiladi.
+
+### Under the Hood
+
+Barcha error turlari prototype chain orqali `Error.prototype`'dan meros oladi. Bu shuni anglatadi: har qanday custom yoki built-in xato `instanceof Error` tekshiruvidan `true` qaytaradi.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Error Hierarchy                        │
-│                                                          │
-│  Error (base class)                                      │
-│   ├── SyntaxError     — kod yozilishi noto'g'ri          │
-│   ├── ReferenceError  — mavjud bo'lmagan o'zgaruvchi     │
-│   ├── TypeError       — noto'g'ri type da operatsiya     │
-│   ├── RangeError      — qiymat ruxsat etilgan oraliqdan  │
-│   ├── URIError        — noto'g'ri URI funksiya ishlatish │
-│   ├── EvalError       — eval() bilan bog'liq (eski)      │
-│   └── AggregateError  — bir necha xatoni birlashtirish   │
-└─────────────────────────────────────────────────────────┘
+Error.prototype
+ ├── SyntaxError.prototype   → SyntaxError instance'lari
+ ├── ReferenceError.prototype → ReferenceError instance'lari
+ ├── TypeError.prototype     → TypeError instance'lari
+ ├── RangeError.prototype    → RangeError instance'lari
+ ├── URIError.prototype      → URIError instance'lari
+ ├── EvalError.prototype     → EvalError instance'lari
+ └── AggregateError.prototype → AggregateError instance'lari
+
+Prototype chain:
+TypeError instance → TypeError.prototype → Error.prototype → Object.prototype → null
 ```
+
+Engine xato throw qilganda ichki jarayon: (1) mos Error subclass'ining yangi instance'ini yaratadi, (2) `message` property'ga xato xabarini yozadi, (3) `stack` property'ga joriy call stack snapshot'ini yozadi (non-standard, lekin barcha zamonaviy engine'lar qo'llaydi), (4) bu obyektni throw qiladi — execution to'xtaydi va eng yaqin catch blok qidiriladi.
 
 ### Kod Misollari
 
 ```javascript
-// === SyntaxError — kod noto'g'ri yozilgan ===
-// eval("if("); // SyntaxError: Unexpected end of input
+// === SyntaxError — parse vaqtida ===
+// eval("if(");           // SyntaxError: Unexpected end of input
 // JSON.parse("{invalid}"); // SyntaxError: Unexpected token i
-JSON.parse("{'key': 'value'}"); // SyntaxError — single quotes!
+JSON.parse("{'key': 'val'}"); // SyntaxError: Expected property name or '}'
+// JSON faqat double quotes qabul qiladi
 
 // === ReferenceError — o'zgaruvchi topilmadi ===
 // console.log(notDefined); // ReferenceError: notDefined is not defined
-// ⚠️ typeof ishlatsa — xato bermaydi:
-typeof notDefined; // "undefined" — xatosiz
+typeof notDefined; // "undefined" — typeof xato bermaydi, scope tekshiruv uchun qulay
 
-// === TypeError — noto'g'ri type ===
-// null.toString();           // TypeError: Cannot read properties of null
-// undefined.name;            // TypeError: Cannot read properties of undefined
-// "string"();                // TypeError: "string" is not a function
-// const x = 5; x = 10;      // TypeError: Assignment to constant variable
+// === TypeError — noto'g'ri type da operatsiya ===
+// null.toString();        // TypeError: Cannot read properties of null
+// undefined.name;         // TypeError: Cannot read properties of undefined
+// "string"();             // TypeError: "string" is not a function
+// const x = 5; x = 10;   // TypeError: Assignment to constant variable
 
-// === RangeError — qiymat chegaradan tashqari ===
-// new Array(-1);             // RangeError: Invalid array length
-// (1).toFixed(200);          // RangeError: toFixed() digits argument must be between 0 and 100
-// function f() { f(); } f(); // RangeError: Maximum call stack size exceeded (stack overflow)
+// === RangeError — chegaradan tashqari ===
+// new Array(-1);          // RangeError: Invalid array length
+// (1).toFixed(200);       // RangeError: toFixed() digits argument must be between 0 and 100
+// function f() { f(); } f(); // RangeError: Maximum call stack size exceeded
 
-// === URIError — URI funksiyalari ===
-// decodeURIComponent("%");   // URIError: URI malformed
+// === URIError ===
+// decodeURIComponent("%"); // URIError: URI malformed
 
-// === AggregateError — bir necha xato (ES2021) ===
+// === AggregateError (ES2021) ===
 const errors = [
   new TypeError("type xato"),
   new RangeError("range xato")
 ];
-const aggError = new AggregateError(errors, "Ko'p xato");
-console.log(aggError.errors); // [TypeError, RangeError]
-// Promise.any() AggregateError tashlashi mumkin
+const aggError = new AggregateError(errors, "Bir necha xato yuz berdi");
+console.log(aggError.message); // "Bir necha xato yuz berdi"
+console.log(aggError.errors);  // [TypeError, RangeError]
+console.log(aggError.errors[0] instanceof TypeError); // true
+
+// Promise.any() — barcha reject bo'lganda AggregateError
+// const result = await Promise.any([
+//   Promise.reject(new Error("1")),
+//   Promise.reject(new Error("2"))
+// ]);
+// AggregateError: All promises were rejected
 ```
+
+```javascript
+// instanceof bilan xato turini aniqlash
+const err = new TypeError("noto'g'ri type");
+
+console.log(err instanceof TypeError); // true
+console.log(err instanceof Error);     // true — barcha xatolar Error dan meros
+console.log(err instanceof RangeError); // false — boshqa subclass
+
+// Prototype chain tekshiruv:
+console.log(Object.getPrototypeOf(TypeError.prototype) === Error.prototype); // true
+```
+
+---
+
+## Error Object
+
+### Nazariya
+
+`Error` obyekti xato haqida diagnostik ma'lumot saqlaydi. 3 ta asosiy property:
+
+1. **`name`** — xato turi nomi (string). Built-in xatolar uchun constructor nomi bilan bir xil: `"TypeError"`, `"SyntaxError"`. Custom xatolarda o'zgartirish mumkin va kerak.
+
+2. **`message`** — xato haqida odam tushunadigan xabar (string). `new Error("xabar")` constructor'ga berilgan birinchi argument.
+
+3. **`stack`** — xato sodir bo'lgan joydagi call stack snapshot'i (string). ECMAScript spec'da rasman yo'q (non-standard), lekin barcha zamonaviy engine'lar (V8, SpiderMonkey, JavaScriptCore) qo'llaydi. Debugging uchun eng muhim ma'lumot — qaysi fayl, qaysi qator, qaysi funksiya zanjirida xato sodir bo'lganini ko'rsatadi.
+
+`Error` obyekti `new Error(message)` yoki `Error(message)` (new'siz ham ishlaydi) bilan yaratiladi. Lekin doim `new` bilan yaratish tavsiya qilinadi — aniqlik uchun.
 
 ### Under the Hood
 
+V8 engine'da `Error` obyekti yaratilganda `stack` property **lazy** hisoblanadi — ya'ni darhol string sifatida hisoblanmaydi. Stack trace aslida `Error.captureStackTrace()` (V8-specific) orqali capture qilinadi va faqat `.stack` property'ga birinchi marta murojaat qilinganda string'ga aylantiriladi. Bu performance uchun muhim — agar error catch qilinib, stack hech qachon o'qilmasa, string formatlash sarflanmaydi.
+
+```
+Stack trace formati (V8):
+Error: Xato xabari
+    at functionName (fileName:lineNumber:columnNumber)
+    at callerFunction (fileName:lineNumber:columnNumber)
+    at main (fileName:lineNumber:columnNumber)
+```
+
+`Error.stackTraceLimit` (V8-specific) — stack trace da nechta frame saqlanishini belgilaydi. Default: 10. Production da ko'proq qilish mumkin: `Error.stackTraceLimit = 50`.
+
+### Kod Misollari
+
 ```javascript
-// Barcha Error lar Error.prototype dan meros oladi
-const err = new TypeError("xato");
+// Error yaratish va xususiyatlarini o'qish
+const error = new Error("Foydalanuvchi topilmadi");
 
-console.log(err instanceof TypeError); // true
-console.log(err instanceof Error);     // true — barcha errorlar Error dan meros
+console.log(error.name);    // "Error"
+console.log(error.message); // "Foydalanuvchi topilmadi"
+console.log(error.stack);
+// Error: Foydalanuvchi topilmadi
+//     at Object.<anonymous> (app.js:1:15)
+//     at Module._compile (node:internal/modules/cjs/loader:1241:14)
+//     ...
 
-// Error zanjiri:
-// TypeError.prototype → Error.prototype → Object.prototype → null
+// Error obyekti plain object emas — toString() override qilingan
+console.log(String(error));  // "Error: Foydalanuvchi topilmadi"
+console.log(`${error}`);     // "Error: Foydalanuvchi topilmadi"
 
-// Error obyektining xususiyatlari:
-console.log(err.name);    // "TypeError"
-console.log(err.message); // "xato"
-console.log(err.stack);   // Stack trace — debugging uchun
+// Subclass'lar name ni avtomatik o'rnatadi
+const typeErr = new TypeError("noto'g'ri tip");
+console.log(typeErr.name);    // "TypeError"
+console.log(typeErr.message); // "noto'g'ri tip"
+```
+
+---
+
+## Error cause (ES2022)
+
+### Nazariya
+
+`cause` option — xatoning asl sababini saqlash mexanizmi. `new Error(message, { cause })` ikkinchi argument sifatida options obyekti qabul qiladi. Bu **error chaining** imkonini beradi — yuqori darajadagi xato ichida past darajadagi asl xato saqlanadi.
+
+Bu nima uchun kerak: ko'p qatlamli dasturlarda past darajadagi xato (network timeout, JSON parse, database connection) yuqori darajadagi xatoga aylantiriladi (foydalanuvchi yuklanmadi, buyurtma saqlanmadi). `cause` yo'q bo'lganda asl xato yo'qoladi — debugging qiyinlashadi. `cause` bilan xatolar zanjiri saqlanadi.
+
+`cause` property `Error.prototype` da emas — har bir instance'ning own property'si sifatida saqlanadi. Har qanday qiymat bo'lishi mumkin (Error, string, number, object), lekin Error instance berish tavsiya qilinadi.
+
+### Kod Misollari
+
+```javascript
+// Past darajadagi xatoni yuqori darajadagi xatoga o'rash
+async function fetchUserProfile(userId) {
+  try {
+    const response = await fetch(`/api/users/${userId}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return await response.json();
+  } catch (networkError) {
+    // Asl xatoni cause sifatida saqlash
+    throw new Error(`Foydalanuvchi #${userId} profili yuklanmadi`, {
+      cause: networkError // ← asl xato saqlanadi
+    });
+  }
+}
+
+// Xatolar zanjirini o'qish
+try {
+  await fetchUserProfile(42);
+} catch (error) {
+  console.log(error.message);       // "Foydalanuvchi #42 profili yuklanmadi"
+  console.log(error.cause);          // Error: HTTP 404
+  console.log(error.cause.message);  // "HTTP 404"
+  // Zanjirni chuqurroq kuzatish:
+  // error.cause.cause — agar yana o'ralgan bo'lsa
+}
+
+// Ko'p qatlamli error chaining
+function parseConfig(rawData) {
+  try {
+    return JSON.parse(rawData);
+  } catch (parseError) {
+    throw new Error("Konfiguratsiya fayli noto'g'ri formatda", {
+      cause: parseError
+    });
+  }
+}
+
+function loadApp() {
+  try {
+    const config = parseConfig("invalid json");
+  } catch (configError) {
+    throw new Error("Dastur ishga tushmadi", {
+      cause: configError // zanjir: App → Config → JSON.parse
+    });
+  }
+}
+
+try {
+  loadApp();
+} catch (error) {
+  // To'liq zanjir:
+  console.log(error.message);             // "Dastur ishga tushmadi"
+  console.log(error.cause.message);        // "Konfiguratsiya fayli noto'g'ri formatda"
+  console.log(error.cause.cause.message);  // "Unexpected token i in JSON..."
+}
 ```
 
 ---
@@ -104,102 +252,21 @@ console.log(err.stack);   // Stack trace — debugging uchun
 
 ### Nazariya
 
-`try/catch/finally` — xatolarni ushlab, dastur to'xtamasdan davom etish imkonini beradi. `try` blokida xato bo'lishi mumkin bo'lgan kod yoziladi, `catch` faqat xato bo'lganda ishlaydi (error obyektini parametr sifatida oladi), `finally` **doim** ishlaydi — xato bo'lsa ham, return bo'lsa ham (resource cleanup uchun ideal). `catch` da `instanceof` bilan error turini tekshirish va kutilmagan xatolarni qayta `throw` qilish — professional error handling pattern. **Muhim**: `finally` ichida hech qachon `return` yozmang — u try/catch dagi return va throw'ni override qiladi!
+`try/catch/finally` — sinxron koddagi xatolarni ushlash konstruksiyasi. 3 blokdan iborat:
 
-### Sintaksis va Ishlash Tartibi
+1. **`try`** — xato bo'lishi mumkin bo'lgan kod. Engine bu blok ichida throw sodir bo'lsa, qolgan kodni to'xtatib, catch blokga o'tadi.
 
-```javascript
-try {
-  // ① Xato bo'lishi mumkin bo'lgan kod
-  riskyOperation();
-} catch (error) {
-  // ② Xato bo'lsa — shu yerga tushadi
-  console.error("Xato:", error.message);
-} finally {
-  // ③ DOIM ishlaydi — xato bo'lsa ham, bo'lmasa ham
-  cleanup();
-}
-```
+2. **`catch (error)`** — faqat try blokda xato bo'lganda ishlaydi. `error` parametri throw qilingan qiymatni oladi. ES2019 dan boshlab `catch` parametrsiz ham bo'lishi mumkin: `catch { }` — agar error obyekti kerak bo'lmasa.
 
-### Kod Misollari
+3. **`finally`** — **doim** ishlaydi: xato bo'lsa ham, bo'lmasa ham, `return` bo'lsa ham, `throw` bo'lsa ham. Resurs tozalash (file close, connection release, timer clear) uchun ideal. **MUHIM**: `finally` ichida `return` yozish catch/try dagi `return` va `throw`'ni override qiladi — bu juda xavfli va hech qachon qilinmasligi kerak.
 
-```javascript
-// === Asosiy ishlatish ===
-try {
-  const data = JSON.parse("invalid json");
-} catch (error) {
-  console.log(error.name);    // "SyntaxError"
-  console.log(error.message); // "Unexpected token i in JSON at position 0"
-}
-console.log("Dastur davom etadi!"); // ✅ To'xtamaydi
+Kombinatsiyalar: `try/catch`, `try/finally` (catch'siz — xato propagation davom etadi, lekin cleanup ishlaydi), `try/catch/finally` (to'liq).
 
-// === finally — doim ishlaydi ===
-function readFile() {
-  const file = openFile("data.txt");
-  try {
-    const data = file.read();
-    return data;
-  } catch (error) {
-    console.error("Fayl o'qishda xato:", error);
-    return null;
-  } finally {
-    file.close(); // ✅ DOIM yopiladi — xato bo'lsa ham, return bo'lsa ham
-  }
-}
+### Under the Hood
 
-// === catch siz try/finally ===
-function alwaysCleanup() {
-  const resource = acquire();
-  try {
-    useResource(resource);
-  } finally {
-    resource.release(); // xato bo'lsa throw davom etadi, lekin cleanup ishlaydi
-  }
-}
+Engine try blokga kirganda joriy execution state'ni saqlaydi (stack pointer, scope chain). Agar throw sodir bo'lsa: (1) execution to'xtatiladi, (2) engine call stack bo'ylab eng yaqin catch blokni qidiradi, (3) catch topilsa — throw qilingan qiymat catch parametriga bind qilinadi va catch blok bajariladi, (4) topilmasa — xato global handler'ga yetadi yoki dastur crash qiladi.
 
-// === Specific error type tekshirish ===
-try {
-  someOperation();
-} catch (error) {
-  if (error instanceof TypeError) {
-    console.log("Type xatosi:", error.message);
-  } else if (error instanceof RangeError) {
-    console.log("Range xatosi:", error.message);
-  } else if (error instanceof SyntaxError) {
-    console.log("Sintaksis xatosi:", error.message);
-  } else {
-    throw error; // kutilmagan xato — qayta throw
-  }
-}
-```
-
-### Under the Hood — finally va return
-
-```javascript
-// ⚠️ finally ichida return — catch ni qaytaradi!
-function tricky() {
-  try {
-    return "try";
-  } finally {
-    return "finally"; // ⚠️ "try" ni OVERRIDE qiladi!
-  }
-}
-console.log(tricky()); // "finally" — try dagi return yo'qoldi!
-
-// ⚠️ finally ichida return — throw ni ham yo'qotadi!
-function trickier() {
-  try {
-    throw new Error("xato!");
-  } finally {
-    return "finally"; // ⚠️ Error yo'qoldi — XAVFLI!
-  }
-}
-console.log(trickier()); // "finally" — error hech qachon tashqariga chiqmaydi
-
-// ✅ QOIDA: finally ichida HECH QACHON return yozmang!
-```
-
-### ASCII Diagram — try/catch/finally Flow
+`finally` implementation: engine try/catch bajarilgandan keyin (yoki throw bo'lgandan keyin) completion record'ni vaqtincha saqlaydi, finally blokni bajaradi, keyin saqlangan completion'ni qaytaradi. Shuning uchun finally ichida `return` yozsangiz — saqlangan completion (asl return yoki throw) yo'qoladi.
 
 ```
   try bloku
@@ -221,92 +288,199 @@ console.log(trickier()); // "finally" — error hech qachon tashqariga chiqmaydi
               finally bloku (DOIM)
                    │           │
                    ▼           ▼
-              return        throw
-             (normal)      (re-throw)
+              normal         re-throw
+             davom etadi    yuqoriga
 ```
-
----
-
-## Error Object
-
-### Nazariya
-
-`Error` obyekti xato haqida to'liq ma'lumot beradi: `name` (xato turi), `message` (xabar), `stack` (qayerda sodir bo'lgani — debugging uchun juda muhim). `throw` statement bilan Error (yoki uning subclass'i) throw qilish kerak — string yoki number throw qilish yomon amaliyot (stack trace yo'qoladi). ES2022 da `cause` option qo'shildi — bu xatoning asl sababini zanjir qilib saqlash imkonini beradi (`new Error("yuqori", { cause: originalError })`).
 
 ### Kod Misollari
 
 ```javascript
-// Error yaratish
-const error = new Error("Nimadir noto'g'ri ketdi");
-console.log(error.name);     // "Error"
-console.log(error.message);  // "Nimadir noto'g'ri ketdi"
-console.log(error.stack);    // Stack trace — qayerda sodir bo'lgani
+// === Asosiy try/catch ===
+try {
+  const data = JSON.parse("noto'g'ri json");
+} catch (error) {
+  console.log(error.name);    // "SyntaxError"
+  console.log(error.message); // "Unexpected token n in JSON at position 0"
+}
+console.log("Dastur davom etadi"); // ✅ try/catch tufayli dastur to'xtamadi
 
-// Stack trace misoli:
-/*
-Error: Nimadir noto'g'ri ketdi
-    at calculateTotal (app.js:15:11)
-    at processOrder (app.js:42:5)
-    at main (app.js:67:3)
-*/
-
-// throw — har qanday narsa throw qilish mumkin (lekin Error tavsiya!)
-throw new Error("xato xabari");
-throw new TypeError("type xato");
-throw new RangeError("range xato");
-
-// ⚠️ Texnik jihatdan string ham throw qilish mumkin — lekin YOMON AMALIYOT
-// throw "xato!";          // ❌ stack trace yo'q
-// throw 42;               // ❌ stack trace yo'q
-// throw { code: 500 };    // ❌ stack trace yo'q
-// DOIM Error yoki uning subclass ini throw qiling!
-```
-
-### Error cause (ES2022)
-
-```javascript
-// cause — xatoning asl sababini saqlash
-async function fetchUser(id) {
+// === finally — doim ishlaydi ===
+function readConfig(path) {
+  const connection = openConnection();
   try {
-    const response = await fetch(`/api/users/${id}`);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    return await response.json();
+    const data = connection.read(path);
+    return data; // return bo'lsa ham finally ishlaydi
   } catch (error) {
-    // Asl xatoni cause sifatida saqlash
-    throw new Error(`Foydalanuvchi ${id} yuklanmadi`, {
-      cause: error // ← ES2022
-    });
+    console.error("O'qishda xato:", error.message);
+    return null;
+  } finally {
+    connection.close(); // ✅ DOIM yopiladi — xato bo'lsa ham, return bo'lsa ham
   }
 }
 
+// === catch'siz try/finally — cleanup bilan re-throw ===
+function processWithCleanup(resource) {
+  const lock = resource.acquire();
+  try {
+    return resource.process(); // xato bo'lsa throw davom etadi
+  } finally {
+    lock.release(); // lekin cleanup albatta ishlaydi
+  }
+  // catch yo'q — xato yuqoriga propagate qiladi, lekin lock release bo'ldi
+}
+
+// === catch parametrsiz (ES2019) ===
+function isValidJSON(str) {
+  try {
+    JSON.parse(str);
+    return true;
+  } catch { // ← error parametri kerak emas
+    return false;
+  }
+}
+
+// === Error turini tekshirish — instanceof bilan ===
 try {
-  await fetchUser(42);
+  someOperation();
 } catch (error) {
-  console.log(error.message);     // "Foydalanuvchi 42 yuklanmadi"
-  console.log(error.cause);        // Error: HTTP 404
-  console.log(error.cause.message); // "HTTP 404"
+  if (error instanceof TypeError) {
+    console.log("Type xatosi:", error.message);
+  } else if (error instanceof RangeError) {
+    console.log("Range xatosi:", error.message);
+  } else if (error instanceof SyntaxError) {
+    console.log("Sintaksis xatosi:", error.message);
+  } else {
+    throw error; // ← kutilmagan xatolarni qayta throw qilish — MUHIM!
+  }
+}
+```
+
+```javascript
+// ⚠️ finally ichida return — XAVFLI
+function dangerousFinally() {
+  try {
+    return "try natijasi";
+  } finally {
+    return "finally natijasi"; // ⚠️ try dagi return ni OVERRIDE qiladi!
+  }
+}
+console.log(dangerousFinally()); // "finally natijasi" — try dagi return yo'qoldi!
+
+// ⚠️ finally ichida return — throw ni ham yo'qotadi
+function swallowedError() {
+  try {
+    throw new Error("muhim xato!");
+  } finally {
+    return "finally"; // ⚠️ Error yo'qoldi — hech qachon tashqariga chiqmaydi!
+  }
+}
+console.log(swallowedError()); // "finally" — error yutildi, debugging mumkin emas
+
+// ✅ QOIDA: finally ichida HECH QACHON return yozmang!
+// finally — faqat cleanup uchun: close, release, clear
+```
+
+---
+
+## throw Statement
+
+### Nazariya
+
+`throw` statement joriy execution'ni to'xtatib, berilgan qiymatni xato sifatida tashqariga chiqaradi. Texnik jihatdan JavaScript da **har qanday qiymat** throw qilish mumkin — string, number, boolean, object, `null`, `undefined`. Lekin doim `Error` yoki uning subclass'ini throw qilish kerak. Sabab: faqat `Error` instance'larida `stack` property bor — xato qayerda sodir bo'lganini ko'rsatuvchi stack trace. String throw qilsangiz — `catch` da `error.stack` `undefined` bo'ladi, debugging juda qiyinlashadi.
+
+`throw` expression emas, statement — ya'ni ternary ichida, yoki arrow function'da `=>` dan keyin to'g'ridan-to'g'ri ishlatib bo'lmaydi. Lekin IIFE yoki helper function orqali shu effektga erishish mumkin.
+
+### Kod Misollari
+
+```javascript
+// ✅ Error obyekti throw qilish — DOIM shu usulda
+throw new Error("Nimadir noto'g'ri ketdi");
+throw new TypeError("Argument string bo'lishi kerak");
+throw new RangeError("Yosh 0-150 orasida bo'lishi kerak");
+
+// ❌ String throw qilish — stack trace yo'qoladi
+// throw "xato!";           // ❌ typeof error === "string", stack yo'q
+// throw 42;                // ❌ number, stack yo'q
+// throw { code: 500 };     // ❌ plain object, stack yo'q
+// throw null;              // ❌ catch da error === null, message/stack yo'q
+
+// Farqni ko'rish:
+try {
+  throw "string xato";
+} catch (error) {
+  console.log(typeof error);  // "string" — Error obyekti emas
+  console.log(error.stack);   // undefined — stack trace yo'q!
+  console.log(error.message); // undefined — message property yo'q!
+}
+
+try {
+  throw new Error("Error obyekti");
+} catch (error) {
+  console.log(typeof error);  // "object"
+  console.log(error.stack);   // ✅ to'liq stack trace
+  console.log(error.message); // ✅ "Error obyekti"
+}
+```
+
+```javascript
+// throw ni validatsiyada ishlatish
+function createUser(name, age) {
+  if (typeof name !== "string" || name.trim().length === 0) {
+    throw new TypeError("name string bo'lishi va bo'sh bo'lmasligi kerak");
+  }
+  if (typeof age !== "number" || age < 0 || age > 150) {
+    throw new RangeError("age 0-150 orasidagi son bo'lishi kerak");
+  }
+  return { name: name.trim(), age };
+}
+
+try {
+  const user = createUser("", 25);
+} catch (error) {
+  if (error instanceof TypeError) {
+    console.log("Validatsiya:", error.message);
+    // "name string bo'lishi va bo'sh bo'lmasligi kerak"
+  }
 }
 ```
 
 ---
 
-## Custom Errors
+## Custom Error Classes
 
 ### Nazariya
 
-O'z xato class'larimizni yaratish — katta dasturlarda xatolarni kategoriyalash va boshqarish uchun juda muhim. `extends Error` bilan custom class yaratiladi, `super(message)` chaqiriladi, `this.name` o'rnatiladi, va qo'shimcha property'lar (field, statusCode, isOperational) qo'shiladi. Bu `instanceof` bilan aniq error turini tekshirish, operational vs programmer error'larni ajratish, va error hierarchy qurilish imkonini beradi.
+Katta dasturlarda built-in error turlaridan tashqari o'z xato class'larimiz kerak bo'ladi — bu xatolarni kategoriyalash, `instanceof` bilan aniq tekshirish, qo'shimcha ma'lumot (field, statusCode, resource) biriktirish imkonini beradi. Custom error class yaratish: `extends Error` bilan meros olish, `super(message)` chaqirish, `this.name` ni o'rnatish (debugging da stack trace'da ko'rinadi). `this.name = this.constructor.name` pattern barcha subclass'lar uchun avtomatik to'g'ri nom beradi.
+
+Custom error'lar ikki muhim kategoriyaga bo'linadi:
+- **Operational errors** — kutilgan, boshqarish mumkin: validatsiya xatosi, 404 not found, network timeout. Dastur davom etishi mumkin.
+- **Programmer errors** — koddagi bug: undefined property o'qish, noto'g'ri argument. Dasturni to'xtatish va tuzatish kerak.
+
+### Under the Hood
+
+`extends Error` bilan class yaratilganda prototype chain to'g'ri quriladi:
+
+```
+CustomError instance
+  → CustomError.prototype (name, custom methods)
+    → Error.prototype (toString, stack capture)
+      → Object.prototype
+        → null
+```
+
+`super(message)` chaqirilganda `Error` constructor ichida `this.message` o'rnatiladi va `Error.captureStackTrace(this, this.constructor)` (V8) chaqiriladi — bu custom class'ning constructor'ini stack trace'dan olib tashlaydi, faqat throw bo'lgan joyni ko'rsatadi.
+
+ES2022 dan oldin `Error` subclass'larida prototype chain muammosi bor edi — `new.target` va `Object.setPrototypeOf` kerak bo'lardi. ES6 `class`/`extends` buni avtomatik hal qiladi.
 
 ### Kod Misollari
 
 ```javascript
-// === Custom Error class ===
+// === Oddiy custom error ===
 class ValidationError extends Error {
   constructor(message, field) {
     super(message);
-    this.name = "ValidationError";
-    this.field = field;
+    this.name = "ValidationError"; // stack trace da ko'rinadi
+    this.field = field;            // qaysi field xato ekani
   }
 }
 
@@ -320,114 +494,132 @@ class NotFoundError extends Error {
   }
 }
 
-class AuthorizationError extends Error {
-  constructor(message = "Ruxsat yo'q") {
-    super(message);
-    this.name = "AuthorizationError";
-    this.statusCode = 403;
+// Ishlatish
+function findUser(id) {
+  const user = database.get(id);
+  if (!user) {
+    throw new NotFoundError("Foydalanuvchi", id);
   }
+  return user;
 }
 
-// === Ishlatish ===
-function validateUser(data) {
-  if (!data.name || data.name.length < 2) {
-    throw new ValidationError("Ism kamida 2 ta harf bo'lishi kerak", "name");
-  }
-  if (!data.email || !data.email.includes("@")) {
-    throw new ValidationError("Email noto'g'ri formatda", "email");
-  }
-  if (data.age < 0 || data.age > 150) {
-    throw new RangeError("Yosh 0-150 orasida bo'lishi kerak");
-  }
-}
-
-// === Error ni ushlash ===
 try {
-  validateUser({ name: "A", email: "invalid", age: 200 });
+  findUser(42);
 } catch (error) {
-  if (error instanceof ValidationError) {
-    console.log(`Validatsiya xatosi [${error.field}]: ${error.message}`);
-    // Form da shu field ni qizil qilish
-  } else if (error instanceof RangeError) {
-    console.log("Qiymat chegaradan tashqari:", error.message);
-  } else {
-    throw error; // boshqa xatolarni qayta throw
+  if (error instanceof NotFoundError) {
+    console.log(error.message);    // "Foydalanuvchi #42 topilmadi"
+    console.log(error.resource);   // "Foydalanuvchi"
+    console.log(error.statusCode); // 404
   }
 }
 ```
 
-### Error Hierarchy Pattern
-
 ```javascript
-// Katta loyihalar uchun xato hierarchy
+// === Error Hierarchy — katta loyihalar uchun ===
 class AppError extends Error {
   constructor(message, statusCode = 500, cause) {
     super(message, { cause });
-    this.name = this.constructor.name;
+    this.name = this.constructor.name; // ← subclass nomi avtomatik
     this.statusCode = statusCode;
-    this.isOperational = true; // operational vs programming error
+    this.isOperational = true; // operational error — dastur davom etishi mumkin
   }
 }
 
+// Client tomonidan kelgan xatolar (4xx)
 class ClientError extends AppError {
   constructor(message, statusCode = 400, cause) {
     super(message, statusCode, cause);
   }
 }
 
+// Server ichki xatolari (5xx)
 class ServerError extends AppError {
   constructor(message, cause) {
     super(message, 500, cause);
-    this.isOperational = false; // server xatosi — critical
+    this.isOperational = false; // programmer error — critical, restart kerak bo'lishi mumkin
   }
 }
 
-// Aniq error turlari
+// Aniq xato turlari
 class BadRequestError extends ClientError {
-  constructor(message) { super(message, 400); }
+  constructor(message, field) {
+    super(message, 400);
+    this.field = field;
+  }
 }
 
 class UnauthorizedError extends ClientError {
-  constructor(message = "Autentifikatsiya kerak") { super(message, 401); }
+  constructor(message = "Autentifikatsiya kerak") {
+    super(message, 401);
+  }
 }
 
 class ForbiddenError extends ClientError {
-  constructor(message = "Ruxsat yo'q") { super(message, 403); }
+  constructor(message = "Ruxsat yo'q") {
+    super(message, 403);
+  }
 }
 
 class NotFoundError extends ClientError {
-  constructor(resource = "Resurs") { super(`${resource} topilmadi`, 404); }
+  constructor(resource = "Resurs") {
+    super(`${resource} topilmadi`, 404);
+  }
 }
 
-// instanceof bilan tekshirish
-try {
-  throw new NotFoundError("Foydalanuvchi");
-} catch (error) {
-  console.log(error instanceof NotFoundError);  // true
-  console.log(error instanceof ClientError);    // true
-  console.log(error instanceof AppError);       // true
-  console.log(error instanceof Error);          // true
-  console.log(error.statusCode);                // 404
-  console.log(error.isOperational);             // true
-}
+// instanceof zanjir tekshiruv
+const error = new NotFoundError("Foydalanuvchi");
+console.log(error instanceof NotFoundError); // true
+console.log(error instanceof ClientError);   // true
+console.log(error instanceof AppError);      // true
+console.log(error instanceof Error);         // true
+console.log(error.statusCode);               // 404
+console.log(error.isOperational);            // true
+console.log(error.name);                     // "NotFoundError" — constructor.name tufayli
 ```
 
-### Under the Hood
-
 ```
-Error Hierarchy:
+Error Hierarchy diagramma:
 
 Error
- └── AppError (isOperational, statusCode)
+ └── AppError (statusCode, isOperational)
       ├── ClientError (4xx)
-      │    ├── BadRequestError (400)
+      │    ├── BadRequestError (400, field)
       │    ├── UnauthorizedError (401)
       │    ├── ForbiddenError (403)
-      │    └── NotFoundError (404)
+      │    └── NotFoundError (404, resource)
       │
       └── ServerError (5xx, isOperational: false)
            ├── DatabaseError
            └── ExternalServiceError
+```
+
+```javascript
+// Error handler — Express middleware pattern
+function errorHandler(error, req, res, next) {
+  // Logging
+  if (!error.isOperational) {
+    console.error("CRITICAL ERROR:", error); // alert yuborish kerak
+  }
+
+  // Client ga javob
+  if (error instanceof BadRequestError) {
+    return res.status(400).json({
+      error: error.message,
+      field: error.field
+    });
+  }
+  if (error instanceof NotFoundError) {
+    return res.status(404).json({ error: error.message });
+  }
+  if (error instanceof UnauthorizedError) {
+    return res.status(401).json({ error: error.message });
+  }
+
+  // Default: 500
+  res.status(error.statusCode || 500).json({
+    error: error.isOperational ? error.message : "Server xatosi"
+  });
+}
 ```
 
 ---
@@ -436,28 +628,53 @@ Error
 
 ### Nazariya
 
-Error propagation — xato funksiya zanjiri bo'ylab (call stack bo'ylab) yuqoriga ko'tarilishi. Agar funksiya ichida try/catch bo'lmasa, xato chaqiruvchi funksiyaga qaytadi — stack'ning eng yuqorisidagi try/catch'da ushlanguncha yoki dastur to'xtaguncha. Re-throwing pattern (kutilgan xatolarni ushlash, qolganlarini qayta throw qilish) va Error Translation pattern (past darajadagi xatoni yuqori darajadagi business logic xatoga aylantirish) — professional dasturlashning muhim texnikalari.
+Error propagation — xatoning call stack bo'ylab yuqoriga ko'tarilish mexanizmi. Agar funksiya ichida throw sodir bo'lsa va o'sha funksiyada `try/catch` bo'lmasa — xato chaqiruvchi (caller) funksiyaga qaytadi. Chaqiruvchida ham catch bo'lmasa — uning chaqiruvchisiga qaytadi. Bu jarayon eng yuqori darajadagi `try/catch` topilguncha yoki call stack'ning oxirigacha davom etadi. Agar hech qayerda catch topilmasa — dastur crash qiladi (browser'da console error, Node.js da process exit).
+
+Bu mexanizmning 2 ta muhim pattern'i bor:
+
+1. **Re-throwing** — catch'da faqat bilgan xatolarni boshqarish, qolganlarini qayta `throw` qilish. Bu eng yaxshi amaliyot — faqat boshqara oladigan xatolarni ushlash, boshqalarini yuqoriga uzatish.
+
+2. **Error Translation** — past darajadagi texnik xatoni (HTTP 404, ECONNREFUSED) yuqori darajadagi business logic xatoga aylantirish (NotFoundError, ServiceUnavailableError). Bu abstraction darajalarini saqlaydi — controller HTTP xato haqida o'ylamasligi kerak.
+
+### Under the Hood
+
+```
+  Call Stack               Error Propagation yo'nalishi
+
+  ┌──────────┐
+  │  step3() │ ──throw──▶ Error yaratildi
+  ├──────────┤            │
+  │  step2() │ ◀──────────┘ catch yo'q → yuqoriga
+  ├──────────┤            │
+  │  step1() │ ◀──────────┘ catch yo'q → yuqoriga
+  ├──────────┤            │
+  │ try/catch│ ◀──────────┘ ✅ USHLANDI!
+  └──────────┘
+```
+
+Engine xato throw bo'lganda har bir stack frame'ni tekshiradi — agar frame'da exception handler (catch) ro'yxatga olingan bo'lsa, execution o'sha catch blokdan davom etadi. Agar yo'q bo'lsa — frame stack'dan chiqariladi (unwinding) va keyingi frame tekshiriladi. Bu "stack unwinding" deyiladi.
 
 ### Kod Misollari
 
 ```javascript
+// === Propagation misoli ===
 function step3() {
-  throw new Error("step3 da xato!"); // ① Xato sodir bo'ldi
+  throw new Error("step3 da xato!"); // ① xato yaratildi
 }
 
 function step2() {
-  step3(); // ② try/catch yo'q — xato yuqoriga ko'tariladi
+  step3(); // ② catch yo'q — xato yuqoriga
 }
 
 function step1() {
-  step2(); // ③ Bu yerda ham yo'q — yana yuqoriga
+  step2(); // ③ catch yo'q — yana yuqoriga
 }
 
 try {
-  step1(); // ④ Eng yuqori — shu yerda ushlanadi
+  step1(); // ④ shu yerda ushlanadi
 } catch (error) {
   console.log(error.message); // "step3 da xato!"
-  console.log(error.stack);
+  // Stack trace to'liq zanjirni ko'rsatadi:
   // Error: step3 da xato!
   //   at step3 (...)
   //   at step2 (...)
@@ -465,58 +682,42 @@ try {
 }
 ```
 
-### ASCII Diagram
-
-```
-  Call Stack               Error Propagation
-  
-  ┌──────────┐            ┌──────────┐
-  │  step3   │ ──throw──▶ │  Error!  │
-  ├──────────┤            └────┬─────┘
-  │  step2   │ ◀──────────────┘ catch yo'q → yuqoriga
-  ├──────────┤            ┌────┴─────┐
-  │  step1   │ ◀──────────┘ catch yo'q → yuqoriga
-  ├──────────┤            ┌────┴─────┐
-  │ try/catch│ ◀──────────┘ ✅ USHLANDI!
-  └──────────┘
-```
-
-### Re-throwing Pattern
-
 ```javascript
-// Kerakli xatolarni ushlash, qolganlarini qayta throw
+// === Re-throwing pattern ===
 function processData(data) {
   try {
     return JSON.parse(data);
   } catch (error) {
     if (error instanceof SyntaxError) {
-      // JSON parse xatosini boshqarish
+      // JSON xatosini boshqaramiz — fallback qaytaramiz
       console.warn("Noto'g'ri JSON:", data);
       return null;
     }
-    throw error; // boshqa xatolarni qayta throw — yuqoriga ko'tariladi
+    // Boshqa barcha xatolarni qayta throw — bu bizning mas'uliyatimiz emas
+    throw error;
   }
 }
 ```
 
-### Error Translation Pattern
-
 ```javascript
-// Past darajadagi xatoni yuqori darajadagi xatoga aylantirish
+// === Error Translation pattern ===
 async function getUserProfile(userId) {
   try {
     const response = await fetch(`/api/users/${userId}`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
     return await response.json();
   } catch (error) {
-    // HTTP xatoni business logic xatoga aylantirish
+    // Past darajadagi HTTP xatoni yuqori darajadagi xatoga aylantirish
     if (error.message.includes("404")) {
       throw new NotFoundError("Foydalanuvchi");
     }
     if (error.message.includes("403")) {
       throw new ForbiddenError();
     }
-    throw new ServerError("Profil yuklanmadi", error);
+    // Barcha boshqa xatolar uchun umumiy server xatosi
+    throw new ServerError("Profil yuklanmadi", error); // cause sifatida asl xato
   }
 }
 ```
@@ -527,108 +728,100 @@ async function getUserProfile(userId) {
 
 ### Nazariya
 
-Asinxron koddagi xatolarni boshqarish sinxron koddan farq qiladi. Callback'larda **error-first pattern** (birinchi argument — error), Promise'larda `.catch()` va `Promise.allSettled()`, async/await'da `try/catch` ishlatiladi. **Muhim**: ushlanmagan Promise rejection'lar (`unhandledrejection` event) dasturni buzishi mumkin — har bir async operatsiyada error handling bo'lishi kerak. `Promise.allSettled()` barcha natijalarni (fulfilled va rejected) qaytaradi — `Promise.all()` dan farqli birinchi rejection'da to'xtamaydi.
+Asinxron koddagi xatolar sinxron koddan tubdan farq qiladi — `try/catch` faqat sinxron throw'ni ushlaydi, asinxron callback ichidagi throw'ni ushlamaydi. Asinxron xatolarni boshqarishning 3 ta usuli bor:
 
-### Callback Error Handling (Node.js pattern)
+1. **Callback'lar** — error-first pattern (Node.js convention): callback'ning birinchi argumenti `error` (xato bo'lsa Error, bo'lmasa `null`), ikkinchi argumenti `data`. Bu pattern Promise'lardan oldingi standart edi.
+
+2. **Promise** — `.catch()` methodi rejected promise'ni ushlaydi. `.catch()` pozitsiyasi muhim — u faqat o'zidan **oldingi** `.then()` larni ushlaydi. `Promise.allSettled()` barcha natijalarni (fulfilled va rejected) qaytaradi — `Promise.all()`'dan farqli birinchi rejection'da to'xtamaydi.
+
+3. **async/await** — `try/catch` bilan eng qulay usul. `await` expression reject bo'lgan promise'ni sinxron `throw` ga aylantiradi — shuning uchun oddiy `try/catch` ishlaydi. **MUHIM**: har bir `async` funksiya chaqiruvi natijasida `.catch()` qo'yish yoki `try/catch` ichida chaqirish kerak — aks holda `UnhandledPromiseRejection` bo'ladi.
+
+### Kod Misollari
 
 ```javascript
-// Error-first callback pattern
-function readFile(path, callback) {
-  // ... asinxron operatsiya
-  if (error) {
-    callback(new Error("Fayl o'qib bo'lmadi"), null); // ① xato birinchi
-  } else {
-    callback(null, data); // ② xato yo'q = null
-  }
-}
+// === 1. Error-first callback (Node.js) ===
+const fs = require("fs");
 
-readFile("data.txt", (error, data) => {
+fs.readFile("data.txt", "utf8", (error, data) => {
   if (error) {
-    console.error("Xato:", error.message);
-    return;
+    // ← birinchi argument error
+    console.error("Fayl o'qib bo'lmadi:", error.message);
+    return; // ← early return — data bilan ishlamaslik uchun
   }
-  console.log("Data:", data);
+  console.log("Fayl:", data); // ← error null bo'lganda
 });
 ```
 
-### Promise Error Handling
-
 ```javascript
-// === .catch() bilan ===
+// === 2. Promise — .catch() bilan ===
 fetch("/api/users")
   .then(response => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   })
-  .then(data => {
-    console.log("Users:", data);
+  .then(users => {
+    console.log("Foydalanuvchilar:", users);
   })
   .catch(error => {
+    // fetch xatosi YOKI json parse xatosi YOKI HTTP xatosi — barchasi shu yerga
     console.error("Xato:", error.message);
   });
 
-// === catch pozitsiyasi muhim! ===
+// catch pozitsiyasi — recovery pattern
 fetch("/api/data")
   .then(response => response.json())
   .catch(error => {
-    console.log("fetch yoki json xatosi");
-    return { fallback: true }; // ✅ recovery — keyingi then ga o'tadi
+    console.warn("API xatosi, fallback ishlatiladi");
+    return { items: [], fallback: true }; // ✅ recovery — keyingi then'ga o'tadi
   })
   .then(data => {
-    console.log("Data:", data); // fallback data bilan ishlaydi
-  })
-  .catch(error => {
-    console.log("Oxirgi xato handler");
+    // data — yoki API natijasi, yoki fallback obyekti
+    console.log("Data:", data);
   });
 
-// === Promise.all — bitta xato BARCHASINI reject qiladi ===
+// Promise.all — birinchi rejection da BARCHA natija yo'qoladi
 Promise.all([
-  fetch("/api/users"),
-  fetch("/api/posts"),
-  fetch("/api/comments")
+  fetch("/api/users").then(r => r.json()),
+  fetch("/api/posts").then(r => r.json()),
+  fetch("/api/comments").then(r => r.json())
 ])
 .then(([users, posts, comments]) => {
-  // barchasi muvaffaqiyatli
+  // faqat barcha muvaffaqiyatli bo'lganda
 })
 .catch(error => {
-  // BITTA xato bo'lsa ham shu yerga tushadi
-  // boshqa promise'lar natijasi yo'qoladi!
+  // BITTA xato bo'lsa ham shu yerga — boshqalarning natijasi yo'qoldi
 });
 
-// === Promise.allSettled — barcha natijalarni olish ===
+// Promise.allSettled — barcha natijalarni olish, hech biri yo'qolmaydi
 const results = await Promise.allSettled([
-  fetch("/api/users"),
-  fetch("/api/posts"),
-  fetch("/api/comments")
+  fetch("/api/users").then(r => r.json()),
+  fetch("/api/posts").then(r => r.json()),
+  fetch("/api/comments").then(r => r.json())
 ]);
 
-results.forEach((result, i) => {
+results.forEach((result, index) => {
   if (result.status === "fulfilled") {
-    console.log(`#${i} muvaffaqiyatli:`, result.value);
+    console.log(`#${index} muvaffaqiyatli:`, result.value);
   } else {
-    console.log(`#${i} xato:`, result.reason);
+    console.error(`#${index} xato:`, result.reason.message);
   }
 });
 ```
 
-### Async/Await Error Handling
-
 ```javascript
-// === try/catch bilan — eng qulay ===
+// === 3. async/await — try/catch bilan ===
 async function loadDashboard() {
   try {
     const user = await fetchUser();
     const posts = await fetchPosts(user.id);
-    const comments = await fetchComments(posts[0].id);
-    
-    return { user, posts, comments };
+    return { user, posts };
   } catch (error) {
-    console.error("Dashboard yuklanmadi:", error);
+    console.error("Dashboard yuklanmadi:", error.message);
     return null; // fallback
   }
 }
 
-// === Har bir await uchun alohida xato boshqarish ===
+// Har bir await uchun alohida error handling — qaysi qadam xato berganini aniqlash
 async function loadData() {
   let user, posts;
 
@@ -642,13 +835,13 @@ async function loadData() {
     posts = await fetchPosts(user.id);
   } catch (error) {
     console.warn("Postlar yuklanmadi, bo'sh array qaytariladi");
-    posts = []; // recovery
+    posts = []; // partial recovery — foydalanuvchi bor, postlar yo'q
   }
 
   return { user, posts };
 }
 
-// === Parallel async — Promise.all + try/catch ===
+// Parallel async — Promise.all + try/catch
 async function loadAll() {
   try {
     const [users, posts] = await Promise.all([
@@ -657,25 +850,33 @@ async function loadAll() {
     ]);
     return { users, posts };
   } catch (error) {
-    console.error("Parallel yuklashda xato:", error);
+    console.error("Parallel yuklashda xato:", error.message);
   }
 }
 ```
 
-### Unhandled Promise Rejection
-
 ```javascript
-// ⚠️ XAVFLI — catch bo'lmasa:
-async function forgotCatch() {
-  const data = await fetch("/api/404"); // reject bo'lishi mumkin
-  // catch yo'q!
+// ⚠️ try/catch SINXRON throw'ni ushlaydi — asinxron callback'ni EMAS!
+try {
+  setTimeout(() => {
+    throw new Error("Async xato!"); // ❌ try/catch buni ushlamaydi!
+  }, 1000);
+} catch (error) {
+  // Bu yerga HECH QACHON tushmaydi — setTimeout callback
+  // boshqa execution context'da ishlaydi
+  console.log("Ushlandimi?", error); // ❌ ishlamaydi
 }
 
-forgotCatch(); // UnhandledPromiseRejection warning!
+// ⚠️ async funksiyani catch'siz chaqirish
+async function riskyAsync() {
+  throw new Error("Async xato!");
+}
+riskyAsync(); // ❌ UnhandledPromiseRejection! catch yo'q
 
-// ✅ Doim catch qo'ying:
-forgotCatch().catch(console.error);
-// Yoki: try/catch ichida chaqiring
+// ✅ To'g'ri usullar:
+riskyAsync().catch(console.error);
+// Yoki:
+try { await riskyAsync(); } catch (error) { console.error(error); }
 ```
 
 ---
@@ -684,69 +885,89 @@ forgotCatch().catch(console.error);
 
 ### Nazariya
 
-Global error handler'lar — ushlanmagan xatolar uchun **oxirgi himoya qatlami**. Production dasturlarda logging va monitoring uchun juda muhim. Browser'da `window.onerror` (sinxron xatolar) va `window.onunhandledrejection` (ushlanmagan promise rejection), Node.js'da `process.on('uncaughtException')` va `process.on('unhandledRejection')` ishlatiladi. Bu handler'lar xatoni log qilish va monitoring servisiga (Sentry, LogRocket) yuborish uchun — lekin dasturni crash'dan to'liq himoya qilmaydi.
+Global error handler'lar — ushlanmagan xatolar uchun **oxirgi himoya qatlami**. Ular asosiy error handling mexanizmi o'rniga emas, qo'shimcha sifatida ishlatiladi. Asosiy vazifasi: (1) xatoni log qilish, (2) monitoring servisiga (Sentry, LogRocket, Datadog) yuborish, (3) foydalanuvchiga umumiy xato xabari ko'rsatish.
 
-### Browser
+**Browser'da:**
+- `window.onerror` — sinxron runtime xatolar (TypeError, ReferenceError)
+- `window.addEventListener("error", ...)` — runtime xatolar + resurs yuklash xatolari (img, script, link)
+- `window.addEventListener("unhandledrejection", ...)` — ushlanmagan Promise rejection'lar
+
+**Node.js'da:**
+- `process.on("uncaughtException", ...)` — ushlanmagan sinxron xatolar
+- `process.on("unhandledRejection", ...)` — ushlanmagan Promise rejection'lar
+
+`uncaughtException` dan keyin Node.js process'ni to'xtatish (exit) tavsiya qilinadi — chunki application state noaniq holatda bo'lishi mumkin.
+
+### Kod Misollari
 
 ```javascript
-// === Sinxron xatolar ===
+// === Browser — sinxron xatolar ===
 window.onerror = function(message, source, lineno, colno, error) {
-  console.log("Global xato:", {
-    message,           // xato xabari
-    source,            // fayl nomi
-    lineno,            // qaysi qator
-    colno,             // qaysi ustun
-    error              // Error obyekti
+  // error — Error obyekti (yoki null)
+  sendToMonitoring({
+    type: "runtime_error",
+    message,
+    source,        // fayl URL
+    lineno,        // qaysi qator
+    colno,         // qaysi ustun
+    stack: error?.stack
   });
-  
-  // Xatoni logging servisga yuborish
-  sendToLogging({ message, source, lineno, colno, stack: error?.stack });
-  
-  return true; // true — brauzer console da ko'rsatmaydi
-  // return false yoki undefined — default xulq (console da ko'rsatadi)
+
+  return true; // true — brauzer console da error ko'rsatmaydi
+  // false/undefined — default xulq (console da ko'rsatadi)
 };
 
-// Yoki addEventListener bilan:
+// addEventListener versiya — ko'proq imkoniyat beradi
 window.addEventListener("error", (event) => {
-  console.log("Error event:", event.error);
-  // event.preventDefault(); // default console log ni to'xtatish
+  // event.error — Error obyekti
+  // event.message, event.filename, event.lineno, event.colno
+  console.log("Global error:", event.error);
+
+  // Resurs yuklash xatolarini aniqlash (img, script):
+  if (event.target !== window) {
+    console.log("Resurs yuklanmadi:", event.target.src || event.target.href);
+  }
 });
 
-// === Ushlanmagan Promise rejection ===
+// === Browser — ushlanmagan Promise rejection ===
 window.addEventListener("unhandledrejection", (event) => {
-  console.log("Ushlanmagan rejection:", event.reason);
-  
-  // Logging
-  sendToLogging({
-    type: "unhandledRejection",
+  // event.reason — reject qilingan qiymat (odatda Error)
+  // event.promise — reject bo'lgan Promise
+  sendToMonitoring({
+    type: "unhandled_rejection",
     reason: event.reason?.message || String(event.reason),
     stack: event.reason?.stack
   });
 
-  event.preventDefault(); // default console warning ni to'xtatish
+  event.preventDefault(); // default console warning'ni to'xtatish
 });
 
-// === Rejection ushlangandan keyin ===
+// Rejection keyinroq ushlanganda — monitoring uchun foydali
 window.addEventListener("rejectionhandled", (event) => {
   console.log("Rejection keyin ushlandi:", event.reason);
 });
 ```
 
-### Node.js
-
 ```javascript
-// === Ushlanmagan exception ===
-process.on("uncaughtException", (error) => {
-  console.error("Ushlanmagan xato:", error);
-  // Logging
-  // ⚠️ Keyin process ni to'xtatish TAVSIYA QILINADI
+// === Node.js ===
+
+// Ushlanmagan sinxron xatolar
+process.on("uncaughtException", (error, origin) => {
+  console.error(`Ushlanmagan xato [${origin}]:`, error);
+  // Logging service ga yuborish
+  sendToMonitoring({ type: "uncaught_exception", error: error.stack });
+
+  // ⚠️ Process ni to'xtatish TAVSIYA QILINADI
+  // Application state noaniq — davom etish xavfli
   process.exit(1);
 });
 
-// === Ushlanmagan Promise rejection ===
+// Ushlanmagan Promise rejection
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Ushlanmagan rejection:", reason);
   // Logging
+  sendToMonitoring({ type: "unhandled_rejection", reason: String(reason) });
+  // Node.js 15+ da default behavior: process exit
 });
 ```
 
@@ -756,23 +977,28 @@ process.on("unhandledRejection", (reason, promise) => {
 
 ### Pattern 1: Result Type (Go-style)
 
+### Nazariya
+
+Error throw qilish o'rniga natija obyekti qaytarish — `{ ok: true, data }` yoki `{ ok: false, error }`. Bu pattern `try/catch` kerak qilmaydi va xato boshqarishni explicit qiladi. Go tilida standart pattern, JavaScript da kutilgan xatolar uchun foydali — ayniqsa xato "exception" emas, "normal control flow" bo'lganda (validatsiya, tekshiruv).
+
+### Kod Misollari
+
 ```javascript
-// Xato throw qilish o'rniga — natija obyekti qaytarish
 function safeDivide(a, b) {
   if (b === 0) {
     return { ok: false, error: "Nolga bo'lish mumkin emas" };
   }
-  return { ok: true, value: a / b };
+  return { ok: true, data: a / b };
 }
 
 const result = safeDivide(10, 0);
 if (!result.ok) {
-  console.log("Xato:", result.error);
+  console.log("Xato:", result.error); // explicit error handling
 } else {
-  console.log("Natija:", result.value);
+  console.log("Natija:", result.data);
 }
 
-// Asinxron versiya
+// Asinxron versiya — wrapper funksiya
 async function safeAsync(fn) {
   try {
     const data = await fn();
@@ -782,54 +1008,74 @@ async function safeAsync(fn) {
   }
 }
 
-const { ok, data, error } = await safeAsync(() => fetch("/api").then(r => r.json()));
-if (!ok) console.error(error);
+const { ok, data, error } = await safeAsync(() =>
+  fetch("/api/users").then(r => r.json())
+);
+if (!ok) {
+  console.error("API xatosi:", error.message);
+}
 ```
 
-### Pattern 2: Retry Pattern
+### Pattern 2: Retry with Exponential Backoff
+
+### Nazariya
+
+Vaqtinchalik xatolar (network timeout, rate limiting, server overload) uchun qayta urinish. Har safar kutish vaqti eksponensial oshadi (1s → 2s → 4s → 8s) — bu server'ni haddan tashqari yuklashni oldini oladi. Doimiy xatolar uchun emas — faqat vaqtinchalik (transient) xatolar uchun.
+
+### Kod Misollari
 
 ```javascript
-// Xato bo'lganda qayta urinish
-async function withRetry(fn, maxRetries = 3, delay = 1000) {
+async function withRetry(fn, { maxRetries = 3, delay = 1000, backoff = 2 } = {}) {
   let lastError;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await fn();
+      return await fn(attempt);
     } catch (error) {
       lastError = error;
-      console.warn(`Urinish ${attempt}/${maxRetries} muvaffaqiyatsiz:`, error.message);
-      
-      if (attempt < maxRetries) {
-        // Exponential backoff
-        const waitTime = delay * Math.pow(2, attempt - 1);
-        await new Promise(r => setTimeout(r, waitTime));
-      }
+
+      if (attempt === maxRetries) break; // oxirgi urinish — loop'dan chiqish
+
+      const waitTime = delay * Math.pow(backoff, attempt);
+      console.warn(`Urinish ${attempt + 1}/${maxRetries + 1} muvaffaqiyatsiz, ${waitTime}ms kutilmoqda...`);
+
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
-  
-  throw new Error(`${maxRetries} urinishdan keyin ham xato`, { cause: lastError });
+
+  throw new Error(`${maxRetries + 1} urinishdan keyin muvaffaqiyatsiz`, {
+    cause: lastError
+  });
 }
 
 // Ishlatish
 const data = await withRetry(
-  () => fetch("/api/unstable").then(r => r.json()),
-  3,    // 3 marta urinish
-  1000  // 1s, 2s, 4s kutish
+  () => fetch("/api/unstable-endpoint").then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }),
+  { maxRetries: 3, delay: 1000, backoff: 2 }
+  // Kutish: 1s, 2s, 4s
 );
 ```
 
 ### Pattern 3: Circuit Breaker
 
+### Nazariya
+
+Tashqi servisga ko'p marta muvaffaqiyatsiz so'rov yuborilgandan keyin — yangi so'rovlarni butunlay to'xtatish pattern'i. 3 ta holat: **CLOSED** (normal ishlaydi), **OPEN** (so'rovlar rad etiladi — servisga yuklanish bermaydi), **HALF_OPEN** (timeout o'tgandan keyin bitta sinov so'rov yuboriladi). Muvaffaqiyatli bo'lsa CLOSED ga qaytadi, xato bo'lsa yana OPEN.
+
+### Kod Misollari
+
 ```javascript
 class CircuitBreaker {
   constructor(fn, { threshold = 5, timeout = 30000 } = {}) {
     this.fn = fn;
-    this.threshold = threshold;
-    this.timeout = timeout;
+    this.threshold = threshold; // nechta xatodan keyin circuit ochiladi
+    this.timeout = timeout;     // OPEN dan HALF_OPEN ga o'tish vaqti
     this.failures = 0;
-    this.state = "CLOSED"; // CLOSED → OPEN → HALF_OPEN
-    this.nextAttempt = 0;
+    this.state = "CLOSED";
+    this.nextAttempt = 0;       // HALF_OPEN ga o'tish vaqti (timestamp)
   }
 
   async execute(...args) {
@@ -837,19 +1083,18 @@ class CircuitBreaker {
       if (Date.now() < this.nextAttempt) {
         throw new Error("Circuit OPEN — so'rov rad etildi");
       }
-      this.state = "HALF_OPEN";
+      this.state = "HALF_OPEN"; // timeout o'tdi — sinov so'rov
     }
 
     try {
       const result = await this.fn(...args);
-      this.reset();
+      this.reset(); // muvaffaqiyatli — CLOSED ga qaytish
       return result;
     } catch (error) {
       this.failures++;
       if (this.failures >= this.threshold) {
         this.state = "OPEN";
         this.nextAttempt = Date.now() + this.timeout;
-        console.warn("Circuit OCHILDI — so'rovlar to'xtatildi");
       }
       throw error;
     }
@@ -863,42 +1108,80 @@ class CircuitBreaker {
 
 // Ishlatish
 const apiBreaker = new CircuitBreaker(
-  (url) => fetch(url).then(r => r.json()),
-  { threshold: 3, timeout: 10000 }
+  (url) => fetch(url).then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }),
+  { threshold: 3, timeout: 10000 } // 3 xatodan keyin 10s to'xtatish
 );
 
 try {
-  const data = await apiBreaker.execute("/api/data");
+  const data = await apiBreaker.execute("/api/external-service");
 } catch (error) {
-  console.log("API xatosi yoki circuit ochiq");
+  // "Circuit OPEN" yoki haqiqiy API xatosi
+  console.error(error.message);
 }
 ```
 
 ### Pattern 4: Graceful Degradation
 
+### Nazariya
+
+Asosiy funksiya ishlamasa — bir necha bosqichda fallback'larga o'tish. Foydalanuvchi xech narsa sezmaydi yoki kamida qisman natija oladi. API ishlamasa → cache'dan, cache ishlamasa → default qiymat. Bu UX uchun juda muhim — foydalanuvchi "500 Server Error" ko'rmasligi kerak.
+
+### Kod Misollari
+
 ```javascript
-// Asosiy funksiya ishlamasa — fallback
 async function getUserData(userId) {
-  // 1. API dan olishga harakat
+  // 1-bosqich: API dan olish
   try {
-    return await fetchFromAPI(userId);
+    const response = await fetch(`/api/users/${userId}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
   } catch (apiError) {
-    console.warn("API ishlamadi, cache tekshirilmoqda...");
+    console.warn("API ishlamadi:", apiError.message);
   }
 
-  // 2. Cache dan olishga harakat
+  // 2-bosqich: Cache dan olish
   try {
-    return await getFromCache(userId);
+    const cached = localStorage.getItem(`user_${userId}`);
+    if (cached) return JSON.parse(cached);
   } catch (cacheError) {
-    console.warn("Cache ham ishlamadi, default qaytarilmoqda...");
+    console.warn("Cache ham ishlamadi:", cacheError.message);
   }
 
-  // 3. Default qiymat
+  // 3-bosqich: Default qiymat
   return {
     id: userId,
-    name: "Noma'lum",
-    avatar: "/default-avatar.png"
+    name: "Noma'lum foydalanuvchi",
+    avatar: "/images/default-avatar.png"
   };
+}
+```
+
+### Pattern 5: Fail Fast
+
+### Nazariya
+
+Xatolarni imkon qadar erta aniqlash — funksiya boshida argumentlarni tekshirish, noto'g'ri bo'lsa darhol throw qilish. Bu chuqur call stack ichida g'alati xato xabarlar o'rniga, aniq va tushunarli xabar beradi. "Guard clauses" deb ham ataladi.
+
+### Kod Misollari
+
+```javascript
+function processOrder(order) {
+  // Guard clauses — boshida tekshirish, xato bo'lsa darhol throw
+  if (!order) {
+    throw new TypeError("order argument kerak");
+  }
+  if (!Array.isArray(order.items) || order.items.length === 0) {
+    throw new ValidationError("Buyurtmada kamida 1 ta mahsulot bo'lishi kerak", "items");
+  }
+  if (typeof order.total !== "number" || order.total <= 0) {
+    throw new RangeError("Buyurtma summasi musbat son bo'lishi kerak");
+  }
+
+  // Asosiy logika — faqat validatsiya o'tgandan keyin
+  return submitOrder(order);
 }
 ```
 
@@ -906,15 +1189,15 @@ async function getUserData(userId) {
 
 ## Common Mistakes
 
-### ❌ Xato 1: Barcha xatolarni yutib yuborish
+### ❌ Xato 1: Barcha xatolarni yutib yuborish (empty catch)
 
 ```javascript
 // ❌ Noto'g'ri — xato haqida hech narsa qilinmaydi
 try {
   criticalOperation();
 } catch (error) {
-  // bo'sh catch — "swallowing errors"
-  // xato yo'qoldi — debugging mumkin emas!
+  // Bo'sh catch — "swallowing errors"
+  // Xato yo'qoldi — dastur noto'g'ri ishlaydi, lekin sababi noma'lum
 }
 ```
 
@@ -926,12 +1209,12 @@ try {
   criticalOperation();
 } catch (error) {
   console.error("Critical operation failed:", error);
-  // yoki logging service ga yuborish
-  // yoki foydalanuvchiga xabar berish
+  // Yoki monitoring service ga yuborish
+  // Yoki foydalanuvchiga xabar berish
 }
 ```
 
-**Nima uchun:** Bo'sh catch blok xatolarni "yutib yuboradi" — dastur noto'g'ri ishlaydi, lekin siz hech qachon bilmaysiz nima uchun. Eng kamida `console.error` qiling.
+**Nima uchun:** Bo'sh catch blok xatolarni "yutib yuboradi" — dastur kutilmagan holatda ishlaydi, lekin siz hech qachon bilmaysiz nima uchun. Eng kamida `console.error` qiling — production da bu log'lar debugging uchun yagona manba bo'lishi mumkin.
 
 ---
 
@@ -940,7 +1223,7 @@ try {
 ```javascript
 // ❌ Noto'g'ri — string throw
 throw "Nimadir noto'g'ri ketdi!";
-// Stack trace yo'q — debugging qiyin
+// catch da: typeof error === "string", error.stack === undefined
 ```
 
 ### ✅ To'g'ri usul:
@@ -948,30 +1231,30 @@ throw "Nimadir noto'g'ri ketdi!";
 ```javascript
 // ✅ Error obyekti throw
 throw new Error("Nimadir noto'g'ri ketdi!");
-// Stack trace bor — qayerda sodir bo'lgani aniq
+// catch da: error.stack — to'liq stack trace, error.message — xabar
 ```
 
-**Nima uchun:** `Error` obyekti `stack` property beradi — xato qayerda, qaysi funksiyada sodir bo'lganini ko'rsatadi. String da bu ma'lumot yo'q.
+**Nima uchun:** `Error` obyekti `stack` property beradi — xato qayerda, qaysi funksiyalar zanjirida sodir bo'lganini ko'rsatadi. String'da bu ma'lumot yo'q — debugging deyarli mumkin emas. `instanceof` tekshiruvi ham ishlamaydi.
 
 ---
 
-### ❌ Xato 3: async funksiyaning xatosini ushlamaslik
+### ❌ Xato 3: async funksiya xatosini ushlamaslik
 
 ```javascript
-// ❌ Noto'g'ri — async funksiya natijasini kutmaslik
+// ❌ Noto'g'ri — async funksiya natijasi catch'siz
 async function riskyAsync() {
   throw new Error("Async xato!");
 }
-riskyAsync(); // UnhandledPromiseRejection! catch yo'q
+riskyAsync(); // ❌ UnhandledPromiseRejection warning/error!
 ```
 
 ### ✅ To'g'ri usul:
 
 ```javascript
-// ✅ catch bilan
-riskyAsync().catch(console.error);
+// ✅ .catch() bilan
+riskyAsync().catch(error => console.error(error));
 
-// ✅ Yoki try/catch ichida
+// ✅ Yoki try/catch + await
 try {
   await riskyAsync();
 } catch (error) {
@@ -979,28 +1262,28 @@ try {
 }
 ```
 
-**Nima uchun:** `async` funksiya **Promise** qaytaradi. Agar Promise reject bo'lsa va hech qayerda catch bo'lmasa — `UnhandledPromiseRejection` warning chiqadi. Node.js da bu process crash qilishi mumkin.
+**Nima uchun:** `async` funksiya **Promise** qaytaradi. Promise reject bo'lganda catch bo'lmasa — `UnhandledPromiseRejection` sodir bo'ladi. Node.js 15+ da bu process'ni crash qiladi. Browser'da console warning chiqadi va xato yo'qoladi.
 
 ---
 
 ### ❌ Xato 4: finally ichida return
 
 ```javascript
-// ❌ Noto'g'ri — finally ichida return
+// ❌ finally ichida return — throw ni yo'qotadi
 function getData() {
   try {
     throw new Error("muhim xato!");
   } finally {
-    return "default"; // ❌ Error yo'qoldi!
+    return "default"; // ❌ Error yo'qoldi — hech qachon tashqariga chiqmaydi!
   }
 }
-console.log(getData()); // "default" — xato hech qachon ko'rinmaydi
+console.log(getData()); // "default" — xato sezilmaydi
 ```
 
 ### ✅ To'g'ri usul:
 
 ```javascript
-// ✅ finally da faqat cleanup — return yo'q
+// ✅ finally da faqat cleanup, return yo'q
 function getData() {
   try {
     throw new Error("muhim xato!");
@@ -1008,12 +1291,54 @@ function getData() {
     console.error(error);
     return "default"; // catch da return — xavfsiz
   } finally {
-    // faqat cleanup: file.close(), connection.end(), etc.
+    // Faqat cleanup: file.close(), connection.end(), timer clear
   }
 }
 ```
 
-**Nima uchun:** `finally` ichidagi `return` try/catch dagi **barcha** return va throw larni override qiladi. Xatolar "yo'qoladi" — debugging deyarli mumkin emas.
+**Nima uchun:** `finally` ichidagi `return` try/catch'dagi barcha `return` va `throw`'ni override qiladi. Xatolar "yo'qoladi" — dastur noto'g'ri ishlaydi va sababi topilmaydi.
+
+---
+
+### ❌ Xato 5: try/catch'ni asinxron callback ichida kutish
+
+```javascript
+// ❌ try/catch asinxron callback ni ushlamaydi
+try {
+  setTimeout(() => {
+    throw new Error("Bu ushlanmaydi!"); // ❌ boshqa execution context
+  }, 0);
+} catch (error) {
+  console.log("Ushlandimi?"); // ❌ Bu yerga hech qachon tushmaydi
+}
+```
+
+### ✅ To'g'ri usul:
+
+```javascript
+// ✅ Callback ichida o'zining try/catch'ini qo'yish
+setTimeout(() => {
+  try {
+    throw new Error("Bu ushlanadi!");
+  } catch (error) {
+    console.error("Ushlandi:", error.message); // ✅ ishlaydi
+  }
+}, 0);
+
+// ✅ Yoki Promise + async/await ishlatish
+await new Promise((resolve, reject) => {
+  setTimeout(() => {
+    try {
+      riskyOperation();
+      resolve();
+    } catch (error) {
+      reject(error); // ← Promise reject orqali xatoni uzatish
+    }
+  }, 0);
+});
+```
+
+**Nima uchun:** `setTimeout` callback'i boshqa execution context'da (keyingi event loop tick'da) bajariladi. O'sha paytda try/catch allaqachon tugagan. Har bir asinxron callback o'zining xato boshqaruv mexanizmiga ega bo'lishi kerak.
 
 ---
 
@@ -1021,7 +1346,7 @@ function getData() {
 
 ### Mashq 1: Safe JSON Parse (Oson)
 
-**Savol:** `safeJsonParse(str, fallback)` funksiyasi yarating. JSON parse muvaffaqiyatli bo'lsa natijani, bo'lmasa fallback ni qaytarsin.
+**Savol:** `safeJsonParse(str, fallback)` funksiyasi yarating. JSON parse muvaffaqiyatli bo'lsa natijani, xato bo'lsa `fallback` ni qaytarsin. Faqat `SyntaxError` ni ushlang — boshqa xatolarni qayta throw qiling.
 
 <details>
 <summary>Javob</summary>
@@ -1032,19 +1357,21 @@ function safeJsonParse(str, fallback = null) {
     return JSON.parse(str);
   } catch (error) {
     if (error instanceof SyntaxError) {
-      console.warn("JSON parse xatosi:", error.message);
       return fallback;
     }
-    throw error; // boshqa xatolarni qayta throw
+    throw error; // SyntaxError bo'lmasa — qayta throw
   }
 }
 
 // Test:
-console.log(safeJsonParse('{"name":"Ali"}')); // { name: "Ali" }
-console.log(safeJsonParse("invalid", {}));     // {}
-console.log(safeJsonParse("null"));            // null (valid JSON)
-console.log(safeJsonParse(undefined, []));     // []
+console.log(safeJsonParse('{"name":"Ali"}'));   // { name: "Ali" }
+console.log(safeJsonParse("invalid", {}));      // {}
+console.log(safeJsonParse("null"));             // null (valid JSON)
+console.log(safeJsonParse(undefined, []));      // [] (undefined parse → SyntaxError)
+console.log(safeJsonParse('"hello"'));           // "hello" (valid JSON string)
 ```
+
+**Tushuntirish:** `JSON.parse` faqat `SyntaxError` throw qiladi — shuning uchun boshqa xatolarni qayta throw qilish to'g'ri. `null`, `"hello"`, `42` — valid JSON qiymatlari, xato bermaydi.
 
 </details>
 
@@ -1052,11 +1379,11 @@ console.log(safeJsonParse(undefined, []));     // []
 
 ### Mashq 2: Custom Error Hierarchy (O'rta)
 
-**Savol:** API dasturingiz uchun quyidagi error hierarchy yarating:
-- `AppError` (base) — `statusCode`, `isOperational`
-- `ValidationError` — `field`, statusCode: 400
-- `NotFoundError` — `resource`, statusCode: 404
-- `DatabaseError` — statusCode: 500, isOperational: false
+**Savol:** Quyidagi error hierarchy yarating va `handleError(error)` funksiyasi bilan HTTP response qaytaring:
+- `AppError` — base: `statusCode`, `isOperational`
+- `ValidationError` — `field` property, statusCode: 400
+- `NotFoundError` — `resource` property, statusCode: 404
+- `DatabaseError` — statusCode: 500, `isOperational: false`
 
 <details>
 <summary>Javob</summary>
@@ -1088,12 +1415,11 @@ class NotFoundError extends AppError {
 class DatabaseError extends AppError {
   constructor(message, cause) {
     super(message, 500);
-    this.isOperational = false; // critical!
-    this.cause = cause;
+    this.isOperational = false; // critical — restart kerak bo'lishi mumkin
+    if (cause) this.cause = cause;
   }
 }
 
-// Error handler middleware
 function handleError(error) {
   if (error instanceof ValidationError) {
     return { status: 400, body: { error: error.message, field: error.field } };
@@ -1103,16 +1429,24 @@ function handleError(error) {
   }
   if (!error.isOperational) {
     console.error("CRITICAL:", error);
-    // Alert yuborish, process restart
+    // Alert yuborish, process restart ko'rib chiqish
   }
-  return { status: error.statusCode || 500, body: { error: "Server xatosi" } };
+  return {
+    status: error.statusCode || 500,
+    body: { error: error.isOperational ? error.message : "Server xatosi" }
+  };
 }
 
 // Test:
 console.log(handleError(new ValidationError("Email noto'g'ri", "email")));
 // { status: 400, body: { error: "Email noto'g'ri", field: "email" } }
+
 console.log(handleError(new NotFoundError("Foydalanuvchi")));
 // { status: 404, body: { error: "Foydalanuvchi topilmadi" } }
+
+console.log(handleError(new DatabaseError("Connection lost")));
+// CRITICAL: DatabaseError: Connection lost
+// { status: 500, body: { error: "Server xatosi" } }
 ```
 
 </details>
@@ -1121,11 +1455,7 @@ console.log(handleError(new NotFoundError("Foydalanuvchi")));
 
 ### Mashq 3: Retry with Backoff (O'rta)
 
-**Savol:** `retry(fn, options)` funksiyasi yarating:
-- `maxRetries` — necha marta urinish (default: 3)
-- `delay` — boshlang'ich kutish ms (default: 1000)
-- `backoff` — har safar delay ni ko'paytirish koeffitsienti (default: 2)
-- `onRetry(attempt, error)` — callback
+**Savol:** `retry(fn, options)` funksiyasi yarating: `maxRetries` (default: 3), `delay` (default: 1000ms), `backoff` koeffitsienti (default: 2), `onRetry(attempt, error, waitTime)` callback.
 
 <details>
 <summary>Javob</summary>
@@ -1146,20 +1476,17 @@ async function retry(fn, options = {}) {
       return await fn(attempt);
     } catch (error) {
       lastError = error;
-
       if (attempt === maxRetries) break;
 
       const waitTime = delay * Math.pow(backoff, attempt);
       onRetry(attempt + 1, error, waitTime);
-
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
 
-  throw new Error(
-    `${maxRetries + 1} urinishdan keyin muvaffaqiyatsiz`,
-    { cause: lastError }
-  );
+  throw new Error(`${maxRetries + 1} urinishdan keyin muvaffaqiyatsiz`, {
+    cause: lastError
+  });
 }
 
 // Test:
@@ -1167,92 +1494,91 @@ let callCount = 0;
 const result = await retry(
   async () => {
     callCount++;
-    if (callCount < 3) throw new Error(`Urinish ${callCount} muvaffaqiyatsiz`);
+    if (callCount < 3) throw new Error(`Urinish ${callCount} xato`);
     return "Muvaffaqiyat!";
   },
   {
     maxRetries: 5,
     delay: 100,
     onRetry: (attempt, error, wait) => {
-      console.log(`Urinish ${attempt} muvaffaqiyatsiz, ${wait}ms kutilmoqda...`);
+      console.log(`#${attempt} xato: ${error.message}, ${wait}ms kutilmoqda`);
     }
   }
 );
-console.log(result); // "Muvaffaqiyat!" (3-chi urinishda)
+console.log(result); // "Muvaffaqiyat!" — 3-chi urinishda
+// Output:
+// #1 xato: Urinish 1 xato, 100ms kutilmoqda
+// #2 xato: Urinish 2 xato, 200ms kutilmoqda
+// Muvaffaqiyat!
 ```
+
+**Tushuntirish:** `attempt` 0 dan boshlanadi, `maxRetries` marta qayta urinadi. Exponential backoff: `delay * 2^attempt` — 100ms, 200ms, 400ms, 800ms, ... Server'ni haddan tashqari yuklamaslik uchun.
 
 </details>
 
 ---
 
-### Mashq 4: Error Boundary (Qiyin)
+### Mashq 4: Error Boundary Wrapper (Qiyin)
 
-**Savol:** `ErrorBoundary` class yarating:
-- `wrap(fn)` — funksiyani wrap qilib, xatolarni ushlaydi
-- `onError(callback)` — xato handler ro'yxatga olish
-- `getErrors()` — barcha xatolar ro'yxatini olish
-- Async funksiyalarni ham qo'llab-quvvatlash
+**Savol:** `ErrorBoundary` class yarating: `wrap(fn)` — funksiyani wrap qilib xatolarni ushlaydi (sync va async), `onError(callback)` — xato handler, `getErrors()` — barcha xatolar ro'yxati.
 
 <details>
 <summary>Javob</summary>
 
 ```javascript
 class ErrorBoundary {
-  constructor() {
-    this.errors = [];
-    this.handlers = [];
-  }
+  #errors = [];
+  #handlers = [];
 
   onError(callback) {
-    this.handlers.push(callback);
-    return this; // chaining
+    this.#handlers.push(callback);
+    return this; // chaining uchun
   }
 
-  _handleError(error, context) {
+  #handleError(error, context) {
     const entry = {
       error,
       context,
       timestamp: new Date().toISOString()
     };
-    this.errors.push(entry);
-    this.handlers.forEach(handler => {
+    this.#errors.push(entry);
+
+    for (const handler of this.#handlers) {
       try {
         handler(entry);
       } catch (handlerError) {
         console.error("Error handler da xato:", handlerError);
       }
-    });
+    }
   }
 
   wrap(fn, context = fn.name || "anonymous") {
-    const self = this;
-
-    return function(...args) {
+    return (...args) => {
       try {
-        const result = fn.apply(this, args);
+        const result = fn.apply(null, args);
 
-        // Agar Promise qaytarsa — async error ham ushlash
+        // Agar Promise qaytarsa — async xatolarni ham ushlash
         if (result && typeof result.catch === "function") {
           return result.catch(error => {
-            self._handleError(error, context);
+            this.#handleError(error, context);
             return undefined;
           });
         }
 
         return result;
       } catch (error) {
-        self._handleError(error, context);
+        this.#handleError(error, context);
         return undefined;
       }
     };
   }
 
   getErrors() {
-    return [...this.errors];
+    return [...this.#errors]; // copy qaytarish — tashqi o'zgartirish oldini olish
   }
 
   clear() {
-    this.errors = [];
+    this.#errors = [];
   }
 }
 
@@ -1262,22 +1588,24 @@ boundary.onError(({ error, context, timestamp }) => {
   console.log(`[${timestamp}] ${context}: ${error.message}`);
 });
 
-// Sinxron funksiya
+// Sinxron
 const safeParse = boundary.wrap(JSON.parse, "JSON.parse");
-safeParse("valid json olmas");  // xato ushlandi, undefined qaytardi
-safeParse('{"ok": true}');      // { ok: true }
+safeParse("noto'g'ri json"); // xato ushlandi, undefined qaytardi
+safeParse('{"ok": true}');    // { ok: true }
 
-// Async funksiya
+// Async
 const safeFetch = boundary.wrap(async (url) => {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
-}, "safeFetch");
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}, "fetchData");
 
 await safeFetch("/api/404"); // xato ushlandi
 
 console.log(boundary.getErrors().length); // 2
 ```
+
+**Tushuntirish:** `wrap()` return qilgan funksiya sync va async xatolarni ushlaydi. Sync — try/catch bilan, async — `.catch()` bilan (Promise duck typing: `typeof result.catch === "function"`). Private `#errors` va `#handlers` — tashqi koddan himoyalangan.
 
 </details>
 
@@ -1287,17 +1615,21 @@ console.log(boundary.getErrors().length); // 2
 
 | Mavzu | Asosiy Fikr |
 |-------|-------------|
-| **Error Types** | SyntaxError, TypeError, ReferenceError, RangeError — har biri alohida muammo |
-| **try/catch/finally** | finally DOIM ishlaydi. finally da return yozmang! |
-| **Custom Errors** | Error dan extend qilish — `instanceof` bilan tekshirish mumkin |
-| **Error Propagation** | Xato catch bo'lmaguncha yuqoriga ko'tariladi |
-| **Async Errors** | `.catch()`, `try/catch` + `await`, `Promise.allSettled` |
-| **Global Handlers** | `window.onerror`, `unhandledrejection` — oxirgi himoya |
-| **Result Type** | `{ ok, data, error }` — throw o'rniga natija qaytarish |
-| **Retry** | Exponential backoff — vaqtinchalik xatolar uchun |
-| **Circuit Breaker** | Ko'p xatodan keyin — so'rovlarni to'xtatish |
-| **Error cause** | `new Error("msg", { cause })` — xato zanjirini saqlash (ES2022) |
+| **Error Types** | SyntaxError, TypeError, ReferenceError, RangeError — har biri aniq xato kategoriyasi, `instanceof` bilan tekshiriladi |
+| **Error Object** | `name`, `message`, `stack` — stack trace debugging uchun eng muhim ma'lumot |
+| **Error cause** | `new Error("msg", { cause })` — xato zanjirini saqlash, debugging osonlashtirish (ES2022) |
+| **try/catch/finally** | finally DOIM ishlaydi, finally da return YOZMANG — throw/return ni override qiladi |
+| **throw** | Doim `Error` yoki subclass throw qiling — string throw qilish stack trace yo'qotadi |
+| **Custom Errors** | `extends Error` — `instanceof` zanjir tekshiruv, operational vs programmer error ajratish |
+| **Propagation** | Xato catch bo'lmaguncha call stack bo'ylab yuqoriga ko'tariladi (stack unwinding) |
+| **Async Errors** | `.catch()`, `try/catch` + `await`, `Promise.allSettled` — har bir async operatsiyada error handling |
+| **Global Handlers** | `window.onerror`, `unhandledrejection` — oxirgi himoya qatlami, monitoring uchun |
+| **Result Type** | `{ ok, data, error }` — throw o'rniga explicit natija, control flow xatolari uchun |
+| **Retry** | Exponential backoff — vaqtinchalik (transient) xatolar uchun qayta urinish |
+| **Circuit Breaker** | Ko'p xatodan keyin so'rovlarni to'xtatish — tashqi servisni himoya qilish |
+| **Graceful Degradation** | API → cache → default — foydalanuvchi xato ko'rmasligi uchun |
+| **Fail Fast** | Guard clauses — argumentlarni boshida tekshirish, erta va aniq xato xabari |
 
-> **Keyingi bo'lim:** [21-modern-js.md](21-modern-js.md) — Destructuring, spread/rest, optional chaining, nullish coalescing va boshqa zamonaviy xususiyatlar.
+> **Keyingi bo'lim:** [21-modern-js.md](21-modern-js.md) — Destructuring, spread/rest, template literals, optional chaining, nullish coalescing, RegExp, JSON va boshqa zamonaviy ES6+ xususiyatlar.
 
-> **Cross-references:** [12-async.md](12-async.md) (Promise, async/await — async error handling), [08-classes.md](08-classes.md) (class, extends — Custom Error hierarchy), [13-event-loop.md](13-event-loop.md) (microtask — unhandled rejection), [19.5-browser-apis.md](19.5-browser-apis.md) (Fetch — network errors, AbortController)
+> **Cross-references:** [12-promises.md](12-promises.md) (Promise rejection, async error flow), [13-async-await.md](13-async-await.md) (try/catch + await, retry pattern), [08-classes.md](08-classes.md) (class extends — custom error hierarchy), [11-event-loop.md](11-event-loop.md) (microtask — unhandledrejection timing), [19.5-browser-apis.md](19.5-browser-apis.md) (Fetch — network errors, AbortController)

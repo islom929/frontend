@@ -1,6 +1,6 @@
 # Bo'lim 14: Iterators va Generators
 
-> Iterator — ma'lumotlarni ketma-ket olish uchun standart protocol. Generator — funksiyani o'rtasida to'xtatib, keyin davom ettiradigan mexanizm. Birgalikda ular lazy evaluation, infinite sequences, async streaming va state machine kabi kuchli patternlarni mumkin qiladi.
+> Iterator — ma'lumotlarni ketma-ket olish uchun standart protocol. Generator — funksiyani o'rtasida to'xtatib, keyin davom ettiradigan maxsus funksiya. Birgalikda ular lazy evaluation, infinite sequences, async streaming va state machine kabi patternlarni amalga oshiradi.
 
 ---
 
@@ -10,20 +10,16 @@
 - [Symbol.iterator](#symboliterator)
 - [Built-in Iterables](#built-in-iterables)
 - [Custom Iterator Yaratish](#custom-iterator-yaratish)
-- [`for...of` Under the Hood](#forof-under-the-hood)
-- [Generator Functions (`function*`)](#generator-functions-function)
-- [`yield` Keyword — Pause/Resume](#yield-keyword--pauseresume)
+- [for...of Under the Hood](#forof-under-the-hood)
+- [Spread va Destructuring — Iterator Protocol](#spread-va-destructuring--iterator-protocol)
+- [Generator Functions (function*)](#generator-functions-function)
+- [yield Keyword — Pause/Resume](#yield-keyword--pauseresume)
 - [Generator as Iterator](#generator-as-iterator)
-- [`yield*` — Delegation](#yield--delegation)
-- [Two-Way Communication: `next(value)`](#two-way-communication-nextvalue)
-- [Async Generators va `for await...of`](#async-generators-va-for-awaitof)
+- [yield* — Delegation](#yield--delegation)
+- [Two-Way Communication: next(value)](#two-way-communication-nextvalue)
+- [Generator return() va throw()](#generator-return-va-throw)
+- [Async Generators va for await...of](#async-generators-va-for-awaitof)
 - [Use Cases](#use-cases)
-  - [Lazy Evaluation](#lazy-evaluation)
-  - [Infinite Sequences](#infinite-sequences)
-  - [State Machines](#state-machines)
-  - [Async Flow Control](#async-flow-control)
-  - [Data Streaming / Pagination](#data-streaming--pagination)
-  - [Tree Traversal](#tree-traversal)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -34,161 +30,90 @@
 
 ### Nazariya
 
-JavaScript da **iteration protocol** — bu ma'lumotlarni ketma-ket (sequential) olish uchun standart shartnoma. Bu protocol ikki qismdan iborat: **Iterable Protocol** ("men ustimda iteratsiya qilsa bo'ladi") va **Iterator Protocol** ("men qiymatlarni birma-bir beraman").
+JavaScript da **iteration protocol** — ma'lumotlarni ketma-ket olish uchun standart shartnoma (interface). Bu protocol ikki qismdan iborat:
 
-Nima uchun bu protocol kerak? ES6 dan oldin, turli data structure'lar (Array, arguments, NodeList) ustida iteratsiya qilishning yagona universal usuli yo'q edi — hamma narsa indeks bilan bo'lardi. Iteration protocol yagona, standart interfeys yaratadi, shunda `for...of`, spread operator, destructuring, `Promise.all`, `Array.from` kabi mexanizmlar **istalgan** iterable bilan ishlashi mumkin. Bu protocol'ni tushunish JavaScript'ning data access modelining asosiy tushunchasi hisoblanadi.
+1. **Iterable Protocol** — "men ustimda iteratsiya qilsa bo'ladi" degan shartnoma. Object'da `[Symbol.iterator]()` method'i bo'lishi kerak va u **iterator** qaytarishi kerak.
 
-```javascript
-// Array — iterable (ustida for...of ishlaydi)
-const fruits = ["olma", "nok", "uzum"];
+2. **Iterator Protocol** — "men qiymatlarni birma-bir beraman" degan shartnoma. Object'da `next()` method'i bo'lishi kerak va u har safar `{ value, done }` formatidagi ob'ekt qaytarishi kerak.
 
-for (const fruit of fruits) {
-  console.log(fruit);
-}
-// "olma"
-// "nok"
-// "uzum"
+Bu protocol nima muammoni hal qiladi? ES6 dan oldin turli data structure'lar (Array, arguments, NodeList) ustida iteratsiya qilishning yagona universal usuli yo'q edi — har biri o'z usuli bilan ishlardi. Iteration protocol **yagona standart interfeys** yaratadi — `for...of`, spread operator, destructuring, `Promise.all`, `Array.from` kabi mexanizmlar **istalgan** iterable bilan ishlaydi. Yangi data structure yaratganingizda ham — shu protocol'ni implement qilsangiz, barcha til mexanizmlari avtomatik ishlaydi.
 
-// Oddiy object — iterable EMAS (for...of ishlamaydi)
-const user = { name: "Ali", age: 25 };
+### Under the Hood
 
-for (const value of user) {
-  console.log(value);
-}
-// ❌ TypeError: user is not iterable
-```
-
-**Nima uchun Array ishlaydi, lekin oddiy object ishlamaydi?**
-
-Chunki Array da `Symbol.iterator` method'i bor — bu uni **iterable** qiladi. Oddiy object da bu method yo'q.
+ECMAScript spec da iteration protocol aniq belgilangan:
 
 ```
 Iteration Protocol — Ikki Shartnoma:
 
 ┌──────────────────────────────────────────────────────────┐
-│                    ITERABLE PROTOCOL                      │
-│                                                           │
+│                    ITERABLE PROTOCOL                     │
+│                                                          │
 │  Object'da [Symbol.iterator]() method'i bo'lishi kerak   │
-│  Bu method ITERATOR qaytarishi kerak                      │
-│                                                           │
-│  Misol: Array, String, Map, Set, arguments                │
+│  Bu method ITERATOR qaytarishi kerak                     │
+│                                                          │
+│  Bunga amal qiladiganlar:                                │
+│  Array, String, Map, Set, arguments, NodeList, TypedArray│
 └──────────────────────────┬───────────────────────────────┘
                            │
                            │ [Symbol.iterator]() chaqiriladi
-                           │
                            ▼
 ┌──────────────────────────────────────────────────────────┐
-│                    ITERATOR PROTOCOL                      │
-│                                                           │
+│                    ITERATOR PROTOCOL                     │
+│                                                          │
 │  Object'da next() method'i bo'lishi kerak                │
-│  next() har safar { value: any, done: boolean } qaytaradi│
-│                                                           │
+│  next() → { value: any, done: boolean }                  │
+│                                                          │
 │  done: false → yana qiymat bor                           │
-│  done: true  → iteratsiya tugadi                          │
+│  done: true  → iteratsiya tugadi (value = undefined)     │
+│                                                          │
+│  Ixtiyoriy: return() va throw() method'lari              │
 └──────────────────────────────────────────────────────────┘
 ```
 
-Farqni aniq ko'raylik:
+Spec dagi **GetIterator(obj)** abstract operation:
+1. `method = obj[Symbol.iterator]` — method olish
+2. `iterator = method.call(obj)` — chaqirish → iterator object olish
+3. Agar iterator object bo'lmasa → `TypeError`
+4. `nextMethod = iterator.next` — next method'ini olish
+5. Return: `IteratorRecord { [[Iterator]], [[NextMethod]], [[Done]]: false }`
+
+Iterator object'da `next()` dan tashqari ixtiyoriy `return()` va `throw()` method'lari ham bo'lishi mumkin:
+- **`return(value)`** — iterator erta tugatilganda chaqiriladi (`break`, `return`, `throw` for...of ichida). Cleanup logic uchun ishlatiladi.
+- **`throw(error)`** — generator'larda xato tashish uchun ishlatiladi.
+
+### Kod Misollari
+
+Iterable va Iterator farqini ko'rsatadigan misol:
 
 ```javascript
-// ITERABLE — [Symbol.iterator] method'i bor object
-// ITERATOR — next() method'i bor object
-
 const arr = [10, 20, 30];
 
 // 1. arr — ITERABLE (Symbol.iterator method'i bor)
 console.log(typeof arr[Symbol.iterator]); // "function"
 
-// 2. Symbol.iterator ni chaqirsak — ITERATOR olamiz
+// 2. Symbol.iterator chaqirsak — ITERATOR olamiz
 const iterator = arr[Symbol.iterator]();
 
 // 3. iterator — ITERATOR (next() method'i bor)
-console.log(typeof iterator.next); // "function"
-
-// 4. next() ni chaqirsak — IteratorResult olamiz
 console.log(iterator.next()); // { value: 10, done: false }
 console.log(iterator.next()); // { value: 20, done: false }
 console.log(iterator.next()); // { value: 30, done: false }
 console.log(iterator.next()); // { value: undefined, done: true } ← tugadi
-console.log(iterator.next()); // { value: undefined, done: true } ← yana chaqirsak ham shu
+console.log(iterator.next()); // { value: undefined, done: true } ← qayta chaqirsa ham shu
 ```
 
-### Under the Hood
-
-ECMAScript spec da bu protocol aniq belgilangan:
-
-**IterableRecord** — `[[Iterator]]`, `[[NextMethod]]`, `[[Done]]` field'lardan iborat internal record. `for...of`, spread, destructuring — barchasi shu record orqali ishlaydi.
+Oddiy object iterable emas:
 
 ```javascript
-// ECMAScript spec: GetIterator(obj) abstract operation
-// 1. obj[Symbol.iterator]() chaqiriladi
-// 2. Qaytgan object "iterator" deb qabul qilinadi
-// 3. iterator.next() orqali qiymatlar olinadi
+const user = { name: "Ali", age: 25 };
 
-// Spec pseudocode:
-// GetIterator(obj, kind):
-//   1. method = GetMethod(obj, @@iterator)
-//   2. iterator = Call(method, obj)
-//   3. if iterator is not Object → throw TypeError
-//   4. nextMethod = GetV(iterator, "next")
-//   5. return IteratorRecord { [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false }
-
-// IteratorNext(iteratorRecord, value):
-//   1. result = Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]], [value])
-//   2. if result is not Object → throw TypeError
-//   3. return result
-```
-
-**Muhim nuance:** Iterator object `next()` dan tashqari ixtiyoriy (optional) `return()` va `throw()` method'lariga ham ega bo'lishi mumkin:
-
-```javascript
-// To'liq Iterator interface:
-const fullIterator = {
-  next(value) {
-    // Keyingi qiymatni qaytaradi
-    return { value: "...", done: false };
-  },
-  return(value) {
-    // Iterator erta tugatilganda chaqiriladi
-    // (break, return, throw for...of ichida)
-    // Cleanup logic shu yerda
-    console.log("Cleanup: resurlar tozalandi");
-    return { value, done: true };
-  },
-  throw(error) {
-    // Generator'larda ishlatiladi
-    // Tashqaridan xato yuborish uchun
-    return { value: undefined, done: true };
-  }
-};
-```
-
-### Kod Misollari
-
-```javascript
-// Iterator protocol ni qo'lda implement qilish
-function createCountIterator(start, end) {
-  let current = start;
-
-  // Bu ITERATOR (next() method'i bor)
-  return {
-    next() {
-      if (current <= end) {
-        return { value: current++, done: false };
-      }
-      return { value: undefined, done: true };
-    }
-  };
+// ❌ TypeError: user is not iterable
+for (const value of user) {
+  console.log(value);
 }
 
-const counter = createCountIterator(1, 3);
-console.log(counter.next()); // { value: 1, done: false }
-console.log(counter.next()); // { value: 2, done: false }
-console.log(counter.next()); // { value: 3, done: false }
-console.log(counter.next()); // { value: undefined, done: true }
-
-// ⚠️ Lekin bu ITERABLE emas — for...of ishlamaydi
-// for (const n of counter) {} // ❌ TypeError
+// Oddiy object da Symbol.iterator YO'Q
+console.log(user[Symbol.iterator]); // undefined
 ```
 
 ---
@@ -197,138 +122,49 @@ console.log(counter.next()); // { value: undefined, done: true }
 
 ### Nazariya
 
-`Symbol.iterator` — JavaScript ning well-known symbol'laridan biri bo'lib, ob'ektni **iterable** qilish uchun mo'ljallangan. Object'da shu symbol key'ga method berish kifoya — bu method chaqirilganda **iterator** qaytarishi kerak.
+`Symbol.iterator` — bu **well-known symbol** bo'lib, iterable protocol'ning kaliti. Object'da shu symbol nomli method bo'lsa — u iterable hisoblanadi. Bu method chaqirilganda **iterator** qaytarishi kerak — ya'ni `next()` method'i bor ob'ekt.
 
-`Symbol.iterator` ni kim ishlatadi? `for...of`, spread operator (`...`), destructuring assignment, `Array.from()`, `Promise.all()`, `Map`/`Set` constructor'lari, va `yield*` — bularning barchasi ichida `Symbol.iterator` ni chaqiradi. Shuning uchun o'z ob'ektingizga bu method'ni qo'shsangiz, u barcha bu mexanizmlar bilan **avtomatik** ishlaydi.
-
-```javascript
-// Symbol.iterator — built-in, unique symbol
-console.log(Symbol.iterator); // Symbol(Symbol.iterator)
-console.log(typeof Symbol.iterator); // "symbol"
-
-// Array da Symbol.iterator mavjud
-const arr = [1, 2, 3];
-console.log(arr[Symbol.iterator]); // ƒ values() { [native code] }
-
-// String da ham bor
-const str = "salom";
-console.log(str[Symbol.iterator]); // ƒ [Symbol.iterator]() { [native code] }
-
-// Oddiy object da YO'Q
-const obj = { a: 1 };
-console.log(obj[Symbol.iterator]); // undefined
-```
-
-**Symbol.iterator ni kim ishlatadi?**
-
-Bu symbol ko'plab JavaScript mexanizmlari tomonidan ishlatiladi:
-
-```javascript
-const data = [10, 20, 30];
-
-// 1. for...of — ichida Symbol.iterator chaqiradi
-for (const item of data) { /* ... */ }
-
-// 2. Spread operator
-const copy = [...data]; // [10, 20, 30]
-
-// 3. Destructuring assignment
-const [a, b, c] = data;
-
-// 4. Array.from()
-const fromData = Array.from(data);
-
-// 5. Promise.all(), Promise.race() — iterable kutadi
-await Promise.all(data.map(x => Promise.resolve(x)));
-
-// 6. Map, Set constructor — iterable oladi
-const set = new Set(data);
-const map = new Map([["a", 1], ["b", 2]]);
-
-// 7. yield* — iterable'ni delegate qiladi
-function* gen() { yield* data; }
-```
-
-### Under the Hood
-
-V8 engine da `Symbol.iterator` check qilish jarayoni:
-
-```
-for (const item of obj) { ... }
-                │
-                ▼
-┌───────────────────────────────────┐
-│  1. obj[Symbol.iterator] bormi?   │
-│     typeof === "function" ?       │
-│                                   │
-│     ❌ Yo'q → TypeError:          │
-│        "obj is not iterable"      │
-│                                   │
-│     ✅ Ha → keyingi qadam         │
-└───────────────┬───────────────────┘
-                │
-                ▼
-┌───────────────────────────────────┐
-│  2. iterator = obj[@@iterator]()  │
-│     Funksiya chaqiriladi          │
-│                                   │
-│     Qaytgan natija Object emasmi? │
-│     → TypeError                   │
-│                                   │
-│     Object → keyingi qadam        │
-└───────────────┬───────────────────┘
-                │
-                ▼
-┌───────────────────────────────────┐
-│  3. LOOP:                         │
-│     result = iterator.next()      │
-│                                   │
-│     result.done === true?         │
-│     → LOOP TUGAYDI                │
-│                                   │
-│     result.done === false?        │
-│     → item = result.value         │
-│     → loop body bajariladi        │
-│     → keyingi next() ga o'tadi    │
-└───────────────────────────────────┘
-```
-
-**Spec da:** `Symbol.iterator` `@@iterator` deb yoziladi. Bu **well-known symbol** — engine tomonidan maxsus ma'noda ishlatiladi. Boshqa well-known symbol'lar: `Symbol.toPrimitive`, `Symbol.hasInstance`, `Symbol.toStringTag`, va boshqalar.
+`Symbol.iterator` nima uchun symbol? Chunki oddiy string key bo'lsa (masalan `"iterator"`) — mavjud ob'ektlardagi shu nomdagi property bilan to'qnashishi mumkin edi (naming collision). Symbol'lar unique — bu muammoni hal qiladi. Shu sababli ECMAScript spec da barcha well-known method'lar Symbol orqali aniqlangan.
 
 ### Kod Misollari
 
+Symbol.iterator'ni qo'lda chaqirish:
+
 ```javascript
-// ❌ Anti-pattern: oddiy object ni for...of da ishlatmoqchi bo'lish
-const config = { host: "localhost", port: 3000, db: "mydb" };
+// String ham iterable — har bir character ustida iteratsiya
+const str = "salom";
+const strIterator = str[Symbol.iterator]();
 
-// for (const val of config) {} // TypeError: config is not iterable
+console.log(strIterator.next()); // { value: "s", done: false }
+console.log(strIterator.next()); // { value: "a", done: false }
+console.log(strIterator.next()); // { value: "l", done: false }
+console.log(strIterator.next()); // { value: "o", done: false }
+console.log(strIterator.next()); // { value: "m", done: false }
+console.log(strIterator.next()); // { value: undefined, done: true }
 
-// ✅ Correct: Object.entries() yoki Object.values() bilan iterable qilish
-for (const [key, val] of Object.entries(config)) {
-  console.log(`${key}: ${val}`);
-}
-// host: localhost
-// port: 3000
-// db: mydb
+// Map ham iterable — [key, value] pairlar qaytaradi
+const map = new Map([["a", 1], ["b", 2]]);
+const mapIterator = map[Symbol.iterator]();
 
-// 🔍 Nima uchun? Object.entries() ARRAY qaytaradi — Array esa iterable.
-// Oddiy object da Symbol.iterator yo'q, shuning uchun for...of ishlamaydi.
-// Object.keys(), Object.values(), Object.entries() — barchasi Array qaytaradi.
+console.log(mapIterator.next()); // { value: ["a", 1], done: false }
+console.log(mapIterator.next()); // { value: ["b", 2], done: false }
+console.log(mapIterator.next()); // { value: undefined, done: true }
 ```
 
+Iterable tekshirish:
+
 ```javascript
-// Iterable'ni tekshirish utility
 function isIterable(obj) {
-  return obj != null && typeof obj[Symbol.iterator] === "function";
+  return obj != null && typeof obj[Symbol.iterator] === 'function';
 }
 
-console.log(isIterable([1, 2, 3]));       // true  — Array
-console.log(isIterable("hello"));          // true  — String
-console.log(isIterable(new Map()));        // true  — Map
-console.log(isIterable(new Set()));        // true  — Set
-console.log(isIterable({ a: 1 }));         // false — oddiy object
-console.log(isIterable(42));               // false — number
-console.log(isIterable(null));             // false — null
+console.log(isIterable([1, 2]));       // true — Array
+console.log(isIterable("hello"));      // true — String
+console.log(isIterable(new Map()));    // true — Map
+console.log(isIterable(new Set()));    // true — Set
+console.log(isIterable(123));          // false — Number
+console.log(isIterable({ a: 1 }));    // false — oddiy Object
+console.log(isIterable(null));         // false — null
 ```
 
 ---
@@ -337,160 +173,84 @@ console.log(isIterable(null));             // false — null
 
 ### Nazariya
 
-JavaScript da bir qancha **built-in iterable** turlar bor — Array, String, Map, Set, TypedArray, arguments, va NodeList. Bular tayyor holda `Symbol.iterator` ga ega bo'lib, `for...of`, spread, destructuring bilan to'g'ridan-to'g'ri ishlaydi.
+JavaScript da quyidagi built-in turlar iterable protocol'ni implement qiladi:
 
-Bu turlardan har birining iterator'i o'ziga xos xatti-harakatga ega. Masalan, String iterator Unicode code point bo'yicha ishlaydi (surrogate pair'larni to'g'ri handle qiladi), Map iterator `[key, value]` juftlarini beradi, Set esa qiymatlarni kiritilgan tartibda beradi. Muhim istisno: oddiy Object (`{}`), `WeakMap`, va `WeakSet` iterable **emas**.
+| Iterable | `[Symbol.iterator]()` qaytaradi | Qiymatlar |
+|----------|-------------------------------|-----------|
+| **Array** | Array Iterator | Elementlar (qiymatlari) |
+| **String** | String Iterator | Character'lar (Unicode-safe) |
+| **Map** | Map Iterator | `[key, value]` pair'lar |
+| **Set** | Set Iterator | Unique qiymatlar |
+| **TypedArray** | TypedArray Iterator | Elementlar |
+| **arguments** | Array Iterator | Funksiya argumentlari |
+| **NodeList** | NodeList Iterator | DOM node'lari |
 
-```javascript
-// 1. ARRAY — eng ko'p ishlatiladigan iterable
-const arr = ["a", "b", "c"];
-for (const item of arr) console.log(item); // "a", "b", "c"
+Har bir built-in iterable'ning **alohida iterator method'lari** ham bor — masalan, Array va Map da `.keys()`, `.values()`, `.entries()` — bular turli ko'rinishdagi iterator'larni qaytaradi.
 
-// Array ning 3 ta iterator method'i:
-const keysIter   = arr.keys();    // index'larni beradi: 0, 1, 2
-const valuesIter = arr.values();  // qiymatlarni beradi: "a", "b", "c"
-const entriesIter = arr.entries(); // [index, value] juftlarini beradi
+### Kod Misollari
 
-for (const [i, val] of arr.entries()) {
-  console.log(`${i}: ${val}`);
-}
-// 0: a
-// 1: b
-// 2: c
-```
+Turli built-in iterable'larning iterator'larini ko'rsatadigan misol:
 
 ```javascript
-// 2. STRING — har bir character alohida iterable element
-const str = "Salom";
-for (const char of str) console.log(char);
-// "S", "a", "l", "o", "m"
+// Array — values (default)
+const arr = [10, 20, 30];
+for (const val of arr) console.log(val);       // 10, 20, 30
+for (const [i, v] of arr.entries()) console.log(i, v); // 0 10, 1 20, 2 30
 
-// ⚠️ Muhim: String iterator Unicode-aware!
-// Emoji va surrogate pair'larni to'g'ri handle qiladi
-const emoji = "Hello 👋🏽";
+// String — Unicode-safe character iteration
+const emoji = "Hi 👋🏻";
+console.log(emoji.length);      // 7 — yomon! Surrogate pairs hisobga olinmaydi
+console.log([...emoji].length); // 5 — to'g'ri! Iterator Unicode code point beradi
 
-// ❌ for loop — surrogate pair'ni buzadi
+// Bu muhim farq:
 for (let i = 0; i < emoji.length; i++) {
-  console.log(emoji[i]); // "H","e","l","l","o"," ","�","�","�","�"
+  console.log(emoji[i]); // H, i, ' ', '\uD83D', '\uDC4B', '\uD83C', '\uDFFB'
+  // ❌ Emoji 4 ta char sifatida ko'rinadi (2 ta surrogate pair)
 }
 
-// ✅ for...of — Unicode code point bo'yicha ishlaydi
 for (const char of emoji) {
-  console.log(char); // "H","e","l","l","o"," ","👋","🏽"
+  console.log(char); // H, i, ' ', '👋', '🏻'
+  // ✅ Iterator Unicode code point bo'yicha ishlaydi
 }
 
-// 🔍 Nima uchun? String[Symbol.iterator] UTF-16 emas, code point bo'yicha iteratsiya qiladi.
-// Bu surrogate pair (emoji, CJK characters) ni to'g'ri ko'rsatadi.
-```
-
-```javascript
-// 3. MAP — [key, value] juftlarini beradi
-const map = new Map([
-  ["ism", "Ali"],
-  ["yosh", 25],
-  ["shahar", "Toshkent"]
+// Map — [key, value] pairs
+const userRoles = new Map([
+  ["Ali", "admin"],
+  ["Vali", "editor"],
 ]);
-
-for (const [key, value] of map) {
-  console.log(`${key} → ${value}`);
+for (const [name, role] of userRoles) {
+  console.log(`${name}: ${role}`);
 }
-// ism → Ali
-// yosh → 25
-// shahar → Toshkent
 
-// Map ning alohida iterator'lari:
-// map.keys()    → "ism", "yosh", "shahar"
-// map.values()  → "Ali", 25, "Toshkent"
-// map.entries() → ["ism","Ali"], ["yosh",25], ["shahar","Toshkent"]
-```
-
-```javascript
-// 4. SET — unique qiymatlarni beradi
-const set = new Set([10, 20, 30, 20, 10]);
-
-for (const num of set) {
-  console.log(num);
+// Set — unique values
+const uniqueNums = new Set([1, 2, 2, 3, 3, 3]);
+for (const num of uniqueNums) {
+  console.log(num); // 1, 2, 3
 }
-// 10, 20, 30 (takrorlanmaydi, kiritilgan tartibda)
 
-// Set.keys() === Set.values() — ikkalasi ham bir xil
-// Set.entries() → [value, value] juftlarini beradi (Map bilan consistency uchun)
-```
-
-```javascript
-// 5. ARGUMENTS object — function ichida
-function showArgs() {
-  for (const arg of arguments) {
-    console.log(arg);
+// arguments — funksiya ichida
+function sum() {
+  let total = 0;
+  for (const num of arguments) {
+    total += num;
   }
+  return total;
 }
-showArgs("olma", "nok", "uzum"); // "olma", "nok", "uzum"
-
-// ⚠️ Arrow function da arguments yo'q!
-// const show = () => { for (const a of arguments) {} } // ReferenceError
+console.log(sum(1, 2, 3, 4)); // 10
 ```
 
+**Muhim:** `Object` iterable **emas**. Object ustida iteratsiya qilish uchun `Object.keys()`, `Object.values()`, `Object.entries()` ishlatiladi — bular **Array** qaytaradi, Array esa iterable.
+
 ```javascript
-// 6. TypedArray — Int8Array, Uint32Array, Float64Array, etc.
-const buffer = new Uint8Array([72, 101, 108, 108, 111]);
-for (const byte of buffer) {
-  console.log(String.fromCharCode(byte));
+const config = { host: "localhost", port: 3000, debug: true };
+
+// ❌ Object iterable emas
+// for (const val of config) {} // TypeError
+
+// ✅ Object.entries() → Array (iterable)
+for (const [key, value] of Object.entries(config)) {
+  console.log(`${key}: ${value}`);
 }
-// "H", "e", "l", "l", "o"
-```
-
-```javascript
-// 7. NodeList (Browser) — DOM query natijalari
-// const elements = document.querySelectorAll(".item");
-// for (const el of elements) {
-//   el.classList.add("active");
-// }
-// ☝️ NodeList iterable — for...of to'g'ridan-to'g'ri ishlaydi
-// ⚠️ HTMLCollection (getElementsByClassName) BA'ZI browser'larda iterable EMAS
-```
-
-### Under the Hood
-
-Har bir built-in iterable o'zining `Symbol.iterator` implementation'iga ega:
-
-```javascript
-// Array.prototype[Symbol.iterator] === Array.prototype.values
-console.log(Array.prototype[Symbol.iterator] === Array.prototype.values); // true
-
-// String — StringIterator yaratadi (V8 internal)
-// Map — MapIterator yaratadi
-// Set — SetIterator yaratadi
-
-// V8 da bu iterator'lar %ArrayIteratorPrototype%, %MapIteratorPrototype%
-// kabi internal prototype'larga ega — bular JavaScript dan to'g'ridan-to'g'ri
-// accessible emas, lekin Object.getPrototypeOf() orqali ko'rish mumkin.
-
-const arrIter = [1, 2][Symbol.iterator]();
-const proto = Object.getPrototypeOf(arrIter);
-console.log(proto); // Array Iterator {}
-console.log(proto[Symbol.toStringTag]); // "Array Iterator"
-```
-
-```
-Built-in Iterables xaritasi:
-
-┌──────────────┬──────────────────────────────────────────┐
-│ Type         │ [Symbol.iterator] qaytaradi              │
-├──────────────┼──────────────────────────────────────────┤
-│ Array        │ ArrayIterator (values bo'yicha)          │
-│ String       │ StringIterator (code point bo'yicha)     │
-│ Map          │ MapIterator ([key, value] juftlari)      │
-│ Set          │ SetIterator (value bo'yicha)             │
-│ TypedArray   │ ArrayIterator                            │
-│ arguments    │ ArrayIterator                            │
-│ NodeList     │ ArrayIterator                            │
-│ Generator    │ Generator o'zi (iterator ham)            │
-└──────────────┴──────────────────────────────────────────┘
-
-❌ Iterable EMAS:
-- Oddiy Object ({})
-- WeakMap, WeakSet (garbage collection sabab)
-- Number, Boolean
 ```
 
 ---
@@ -499,107 +259,40 @@ Built-in Iterables xaritasi:
 
 ### Nazariya
 
-O'z ob'ektlarimizni iterable qilish uchun `Symbol.iterator` method'ini implement qilishimiz kerak. Bu method **iterator object** qaytarishi shart — ya'ni `next()` method'i bo'lib, `{ value, done }` qaytaradigan ob'ekt.
+Har qanday ob'ektni iterable qilish mumkin — faqat `[Symbol.iterator]()` method'ini implement qilish kerak. Bu method iterator qaytarishi kerak — ya'ni `next()` method'i bo'lgan ob'ekt. Bu qobiliyat o'z data structure'laringizni yaratishda va ularni til mexanizmlari (`for...of`, spread, destructuring) bilan integratsiya qilishda muhim.
 
-Muhim qoida: har safar `Symbol.iterator` chaqirilganda **yangi** iterator yaratilishi kerak — shunda bir nechta `for...of` loop mustaqil ishlaydi. Agar ob'ekt o'zini qaytarsa (singleton iterator), ikkinchi loop ishlamaydi. Custom iterator'larda ixtiyoriy `return()` method ham implement qilish mumkin — bu `for...of` dagi `break`, `return`, yoki `throw` da cleanup logic bajarish uchun kerak.
-
-```javascript
-// Custom Range iterable — [start, end] oraliqda son beradi
-const range = {
-  from: 1,
-  to: 5,
-
-  // Bu method Range ni ITERABLE qiladi
-  [Symbol.iterator]() {
-    let current = this.from;
-    const last = this.to;
-
-    // ITERATOR object qaytaramiz
-    return {
-      next() {
-        if (current <= last) {
-          return { value: current++, done: false };
-        }
-        return { value: undefined, done: true };
-      }
-    };
-  }
-};
-
-// Endi for...of ishlaydi!
-for (const num of range) {
-  console.log(num);
-}
-// 1, 2, 3, 4, 5
-
-// Spread ham ishlaydi!
-console.log([...range]); // [1, 2, 3, 4, 5]
-
-// Destructuring ham!
-const [a, b, c] = range;
-console.log(a, b, c); // 1 2 3
-```
-
-**Muhim:** Har safar `Symbol.iterator` chaqirilganda **yangi** iterator yaratilishi kerak — shunda bir nechta `for...of` mustaqil ishlaydi:
-
-```javascript
-// ✅ Har safar yangi iterator — to'g'ri
-for (const n of range) console.log(n); // 1, 2, 3, 4, 5
-for (const n of range) console.log(n); // 1, 2, 3, 4, 5 ← yana ishlaydi!
-
-// ❌ Agar bitta iterator qayta ishlatilsa — ikkinchi loop ishlamaydi
-const badRange = {
-  from: 1, to: 3,
-  current: 1,
-  [Symbol.iterator]() { return this; }, // O'ZINI qaytaradi
-  next() {
-    if (this.current <= this.to) {
-      return { value: this.current++, done: false };
-    }
-    return { value: undefined, done: true };
-  }
-};
-
-for (const n of badRange) console.log(n); // 1, 2, 3
-for (const n of badRange) console.log(n); // ⚠️ HECH NARSA — current allaqachon 4
-```
+Ikki xil yondashuv bor:
+1. **Alohida iterator ob'ekt** — har safar `[Symbol.iterator]()` chaqirilganda yangi iterator yaratiladi
+2. **Self-iterator** — ob'ektning o'zi ham iterable, ham iterator (`next()` va `[Symbol.iterator]()` bitta ob'ektda)
 
 ### Kod Misollari
 
+Range — berilgan oraliqda raqamlar generatsiya qiluvchi custom iterable:
+
 ```javascript
-// Class bilan iterable LinkedList
-class LinkedList {
-  #head = null;
-  #size = 0;
+class Range {
+  #start;
+  #end;
+  #step;
 
-  append(value) {
-    const node = { value, next: null };
-    if (!this.#head) {
-      this.#head = node;
-    } else {
-      let current = this.#head;
-      while (current.next) {
-        current = current.next;
-      }
-      current.next = node;
-    }
-    this.#size++;
-    return this;
+  constructor(start, end, step = 1) {
+    this.#start = start;
+    this.#end = end;
+    this.#step = step;
   }
 
-  get size() {
-    return this.#size;
-  }
-
-  // LinkedList ni ITERABLE qilish
+  // Iterable protocol — Symbol.iterator method
   [Symbol.iterator]() {
-    let current = this.#head;
+    let current = this.#start;
+    const end = this.#end;
+    const step = this.#step;
 
+    // Yangi iterator ob'ekt qaytarish — har safar boshidan boshlanadi
     return {
       next() {
-        if (current) {
-          const value = current.value;
-          current = current.next;
+        if (current <= end) {
+          const value = current;
+          current += step;
           return { value, done: false };
         }
         return { value: undefined, done: true };
@@ -608,566 +301,534 @@ class LinkedList {
   }
 }
 
-const list = new LinkedList();
-list.append("A").append("B").append("C");
+const range = new Range(1, 5);
 
-// for...of ishlaydi!
-for (const item of list) {
-  console.log(item);
+// for...of ishlaydi
+for (const num of range) {
+  console.log(num); // 1, 2, 3, 4, 5
 }
-// "A", "B", "C"
 
-// Spread ishlaydi!
-console.log([...list]); // ["A", "B", "C"]
+// Spread ishlaydi
+console.log([...range]); // [1, 2, 3, 4, 5]
 
-// Array.from ishlaydi!
-console.log(Array.from(list)); // ["A", "B", "C"]
+// Destructuring ishlaydi
+const [first, second, ...rest] = range;
+console.log(first, second, rest); // 1 2 [3, 4, 5]
 
-// Destructuring ishlaydi!
-const [first, second] = list;
-console.log(first, second); // "A" "B"
+// Har safar boshidan — chunki [Symbol.iterator]() yangi iterator yaratadi
+console.log([...range]); // [1, 2, 3, 4, 5] — yana boshidan
 ```
 
-```javascript
-// return() method — cleanup logic
-class DatabaseCursor {
-  #connection;
-  #query;
-  #position = 0;
-  #data;
+Step bilan Range:
 
-  constructor(connection, query) {
-    this.#connection = connection;
-    this.#query = query;
-    this.#data = [
-      { id: 1, name: "Ali" },
-      { id: 2, name: "Vali" },
-      { id: 3, name: "Gani" },
-    ]; // Simulated data
+```javascript
+const evenNumbers = new Range(0, 20, 2);
+console.log([...evenNumbers]); // [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+
+// Array.from ham ishlaydi
+const arr = Array.from(new Range(1, 10));
+console.log(arr); // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+// Promise.all bilan
+const promises = [...new Range(1, 5)].map(id => fetch(`/api/item/${id}`));
+const results = await Promise.all(promises);
+```
+
+Linked List — custom data structure:
+
+```javascript
+class Node {
+  constructor(value, next = null) {
+    this.value = value;
+    this.next = next;
+  }
+}
+
+class LinkedList {
+  #head = null;
+  #size = 0;
+
+  push(value) {
+    this.#head = new Node(value, this.#head);
+    this.#size++;
+    return this;
   }
 
   [Symbol.iterator]() {
-    let pos = 0;
-    const data = this.#data;
-    const conn = this.#connection;
+    let current = this.#head;
 
     return {
       next() {
-        if (pos < data.length) {
-          return { value: data[pos++], done: false };
+        if (current !== null) {
+          const value = current.value;
+          current = current.next;
+          return { value, done: false };
         }
-        console.log(`Cursor yopildi (tugadi) — connection: ${conn}`);
-        return { value: undefined, done: true };
-      },
-
-      // for...of ichida break, return, throw bo'lganda chaqiriladi
-      return() {
-        console.log(`Cursor ERTA yopildi — connection: ${conn} freed`);
         return { value: undefined, done: true };
       }
     };
   }
+
+  get size() { return this.#size; }
 }
 
-const cursor = new DatabaseCursor("db-conn-1", "SELECT * FROM users");
+const list = new LinkedList();
+list.push(3).push(2).push(1);
 
-for (const row of cursor) {
-  console.log(row);
-  if (row.id === 2) break; // ← return() chaqiriladi!
+for (const val of list) {
+  console.log(val); // 1, 2, 3
 }
-// { id: 1, name: "Ali" }
-// { id: 2, name: "Vali" }
-// "Cursor ERTA yopildi — connection: db-conn-1 freed" ← cleanup ishladi
+
+console.log([...list]); // [1, 2, 3]
+```
+
+Iterator'da `return()` method — cleanup uchun:
+
+```javascript
+function createResourceIterator(items) {
+  console.log("Resource opened");
+  let index = 0;
+
+  return {
+    [Symbol.iterator]() { return this; }, // self-iterator
+    next() {
+      if (index < items.length) {
+        return { value: items[index++], done: false };
+      }
+      console.log("Resource closed (normal)");
+      return { value: undefined, done: true };
+    },
+    return() {
+      // for...of ichida break, return, throw bo'lganda chaqiriladi
+      console.log("Resource closed (early exit)");
+      return { value: undefined, done: true };
+    }
+  };
+}
+
+const iter = createResourceIterator([1, 2, 3, 4, 5]);
+
+for (const val of iter) {
+  console.log(val);
+  if (val === 3) break; // return() chaqiriladi!
+}
+// Output:
+// Resource opened
+// 1
+// 2
+// 3
+// Resource closed (early exit)
 ```
 
 ---
 
-## `for...of` Under the Hood
+## for...of Under the Hood
 
 ### Nazariya
 
-`for...of` loop — bu **syntactic sugar**. Ichida u iterator protocol ishlatadi: avval `Symbol.iterator` chaqirib iterator oladi, keyin `next()` ni loop qilib, `done: true` bo'lguncha har bir qiymatni o'zgaruvchiga beradi. `break`, `return`, yoki `throw` bo'lganda esa iterator'ning `return()` method'i chaqiriladi (agar mavjud bo'lsa) — bu cleanup logic uchun muhim.
+`for...of` — iteration protocol'ning asosiy consumer'i. U istalgan iterable ustida iteratsiya qiladi. Ichida nima sodir bo'layotganini tushunish — protocol'ni to'liq anglash degani.
 
-`for...of` vs `for...in` farqini tushunish ham muhim: `for...in` barcha enumerable property **key'larini** (string) beradi (prototypedan ham), `for...of` esa faqat iterable **value'larni** beradi.
+`for...of` quyidagi qadam-baqadam jarayonni bajaradi:
+1. Object'ning `[Symbol.iterator]()` method'ini chaqiradi → iterator oladi
+2. Iterator'ning `next()` method'ini chaqiradi → `{ value, done }` oladi
+3. `done === true` bo'lsa — tsikl to'xtaydi
+4. `done === false` bo'lsa — `value` ni loop variable'ga assign qiladi va body bajaradi
+5. 2-qadamga qaytadi
 
-```javascript
-// Biz yozamiz:
-const fruits = ["olma", "nok", "uzum"];
-
-for (const fruit of fruits) {
-  console.log(fruit);
-}
-```
-
-Bu aslida quyidagicha ishlaydi:
-
-```javascript
-// "Desugared" ko'rinish — for...of ning ichki mexanizmi
-const fruits = ["olma", "nok", "uzum"];
-
-// 1. Iterator olamiz
-const _iterator = fruits[Symbol.iterator]();
-let _result;
-
-// 2. Loop — har safar next() chaqiramiz
-while (!(_result = _iterator.next()).done) {
-  const fruit = _result.value; // 3. value ni o'zgaruvchiga beramiz
-  console.log(fruit);
-}
-```
-
-```
-for...of DESUGARED — qadam-baqadam:
-
-for (const item of iterable) {       const _iter = iterable[Symbol.iterator]();
-  console.log(item);           ═══►  let _result;
-}                                     while (!(_result = _iter.next()).done) {
-                                        const item = _result.value;
-                                        console.log(item);
-                                      }
-```
+Agar tsikl erta to'xtasa (`break`, `return`, `throw`) — iterator'ning `return()` method'i chaqiriladi (agar mavjud bo'lsa).
 
 ### Under the Hood
 
-`for...of` ning to'liq "desugared" versiyasi — `break`, `return`, `throw` bilan:
-
 ```javascript
-// To'liq desugared for...of (break va error handling bilan)
-function forOfDesugared(iterable, callback) {
-  // 1. Iterator olish
-  const method = iterable[Symbol.iterator];
-  if (typeof method !== "function") {
-    throw new TypeError(`${iterable} is not iterable`);
-  }
+// for...of ni desugarlash — engine ichida shu ishlaydi:
 
-  const iterator = method.call(iterable);
-  if (typeof iterator !== "object" || iterator === null) {
-    throw new TypeError("Result of the Symbol.iterator method is not an object");
-  }
-
-  let result;
-  try {
-    while (true) {
-      // 2. Keyingi qiymatni olish
-      result = iterator.next();
-
-      if (typeof result !== "object" || result === null) {
-        throw new TypeError("Iterator result is not an object");
-      }
-
-      // 3. done tekshirish
-      if (result.done) break;
-
-      // 4. Callback (loop body) chaqirish
-      const shouldBreak = callback(result.value);
-      if (shouldBreak === "BREAK") break; // break simulyatsiyasi
-    }
-  } catch (err) {
-    // 5. Error bo'lsa — iterator.return() chaqirish (agar bor bo'lsa)
-    if (typeof iterator.return === "function") {
-      try { iterator.return(); } catch (e) { /* ignore */ }
-    }
-    throw err;
-  }
-
-  // 6. Break bo'lsa — iterator.return() chaqirish
-  if (result && !result.done && typeof iterator.return === "function") {
-    iterator.return();
-  }
+// Biz yozamiz:
+for (const item of iterable) {
+  if (item === 3) break;
+  console.log(item);
 }
 
-// Ishlatish:
-forOfDesugared([10, 20, 30], (value) => {
-  console.log(value);
-});
-// 10, 20, 30
+// Engine shu ko'rinishda bajaradi:
+const _iterator = iterable[Symbol.iterator]();
+let _result;
+
+try {
+  while (!(_result = _iterator.next()).done) {
+    const item = _result.value;
+
+    if (item === 3) {
+      break; // → finally bloki return() ni chaqiradi
+    }
+    console.log(item);
+  }
+} finally {
+  // Agar tsikl erta tugatilsa (break/return/throw) VA
+  // iterator'da return() method'i bo'lsa — uni chaqir
+  if (_result && !_result.done && _iterator.return) {
+    _iterator.return();
+  }
+}
 ```
 
 ```
-for...of ichki flow:
+for...of execution flow:
 
-    iterable
-       │
-       ▼
-  [Symbol.iterator]()
-       │
-       ▼
-    iterator ◄─────────────────────┐
-       │                            │
-       ▼                            │
-    next()                          │
-       │                            │
-       ▼                            │
-  ┌──────────┐     ┌──────────┐    │
-  │done: true│     │done:false│    │
-  │          │     │          │    │
-  │  EXIT ◄──┘     │ value ───┼────┤
-  │  LOOP          │          │    │
-  └──────────┘     │ loop     │    │
-                   │ body     │    │
-                   │ execute  │    │
-                   └──────────┘    │
-                        │          │
-                        │  break?──┼──► iterator.return()
-                        │  throw?──┼──► iterator.return()
-                        │          │
-                        └──────────┘
+iterable ──[Symbol.iterator]()──► iterator
+                                     │
+                              ┌──────┴──────┐
+                              │   next()    │◄──────────────┐
+                              └──────┬──────┘               │
+                                     │                      │
+                              { value, done }               │
+                                     │                      │
+                              ┌──────┴──────┐               │
+                              │ done=true?  │               │
+                              └──┬──────┬───┘               │
+                                 │      │                   │
+                              YES│    NO│                   │
+                                 │      ▼                   │
+                              STOP  value → loop var        │
+                                     body bajariladi ───────┘
+                                        │
+                                  break? ──YES──► return() → STOP
 ```
 
-**`for...of` vs `for...in` farqi:**
+### Kod Misollari
+
+`for...of` va boshqa tsikllar farqi:
 
 ```javascript
 const arr = [10, 20, 30];
-arr.custom = "test"; // Array ga extra property
 
-// for...in — BARCHA enumerable property KEY'larini beradi (prototype chain ham!)
+// for...of — qiymatlarni oladi (iterable KERAK)
+for (const value of arr) {
+  console.log(value); // 10, 20, 30
+}
+
+// for...in — KALITLARNI (index/property) oladi (iterable shart emas)
 for (const key in arr) {
-  console.log(key); // "0", "1", "2", "custom" ← string key'lar!
+  console.log(key); // "0", "1", "2" — STRING indekslar
 }
 
-// for...of — faqat ITERABLE VALUE'larni beradi
-for (const val of arr) {
-  console.log(val); // 10, 20, 30 ← qiymatlar! "custom" yo'q
+// for...in prototype chain'ni ham o'qiydi — ko'pincha xato natija beradi:
+Array.prototype.customMethod = function() {};
+for (const key in arr) {
+  console.log(key); // "0", "1", "2", "customMethod" ← kutilmagan!
 }
-
-// 🔍 for...in — object uchun (key'lar)
-// 🔍 for...of — iterable uchun (value'lar)
 ```
+
+| Xususiyat | `for...of` | `for...in` | `forEach` |
+|-----------|-----------|-----------|-----------|
+| Nima qaytaradi | **Qiymat** | **Kalit** (string) | Qiymat (callback) |
+| Iterable kerak? | Ha | Yo'q | Array method |
+| Prototype chain | Yo'q | **Ha** | Yo'q |
+| `break` ishlaydi? | Ha | Ha | **Yo'q** |
+| `await` ishlaydi? | Ha | Ha | **Yo'q** |
+| Ishlatiladigan joy | Iterable'lar | Object property'lari | Array |
 
 ---
 
-## Generator Functions (`function*`)
+## Spread va Destructuring — Iterator Protocol
 
 ### Nazariya
 
-Generator — bu **to'xtatib turiladigan** (pausable) funksiya. Oddiy funksiya bir marta chaqiriladi va to'liq bajariladi. Generator esa `yield` orqali **o'rtasida to'xtaydi** va `next()` chaqirilganda **davom etadi**. Generator funksiya `function*` bilan belgilanadi va chaqirilganda **bajarilmaydi** — faqat Generator object yaratadi.
+Spread operator (`...`) va destructuring assignment ham iterator protocol'dan foydalanadi. Ular `for...of` kabi `[Symbol.iterator]()` ni chaqiradi va `next()` orqali qiymatlarni oladi. Shu sababli ular faqat **iterable** ob'ektlar bilan ishlaydi.
 
-Generator'ning eng katta kuchi — **lazy evaluation**. Qiymatlar faqat so'ralganda hisoblanadi, shuning uchun cheksiz ketma-ketliklar (Fibonacci, random sonlar) ham xavfsiz. Generator object ham iterable, ham iterator — `Symbol.iterator` o'zini qaytaradi. Muhim cheklov: arrow function generator bo'la olmaydi, chunki generator alohida execution context talab qiladi.
-
-```javascript
-// Oddiy funksiya — bir marta bajariladi
-function regular() {
-  console.log("1");
-  console.log("2");
-  console.log("3");
-  return "done";
-}
-regular(); // 1, 2, 3 — hammasi ketma-ket, to'xtamasdan
-
-// Generator funksiya — * belgisi bilan
-function* generator() {
-  console.log("1");
-  yield "birinchi";    // ← TO'XTAYDI
-  console.log("2");
-  yield "ikkinchi";    // ← YANA TO'XTAYDI
-  console.log("3");
-  return "done";
-}
-
-// Generator chaqirilganda — funksiya BAJARILMAYDI!
-// Faqat Generator object yaratiladi
-const gen = generator();
-console.log(gen); // Object [Generator] {}
-
-// next() chaqirilganda — keyingi yield gacha bajariladi
-console.log(gen.next()); // "1" → { value: "birinchi", done: false }
-console.log(gen.next()); // "2" → { value: "ikkinchi", done: false }
-console.log(gen.next()); // "3" → { value: "done",    done: true  }
-console.log(gen.next()); //      → { value: undefined, done: true  }
-```
-
-```
-Generator Pause/Resume vizualizatsiya:
-
-function* gen() {              next()        next()        next()
-  console.log("A");           ═══════►
-  yield 1;                      ◄═══ {1,F}
-  console.log("B");                         ═══════►
-  yield 2;                                    ◄═══ {2,F}
-  console.log("C");                                         ═══════►
-  return 3;                                                   ◄═══ {3,T}
-}
-
-Execution timeline:
-───┬──────┬──────────────┬──────┬──────────────┬──────┬──────────┬───
-   │next()│  "A", yield 1│next()│  "B", yield 2│next()│ "C", ret 3│
-   │      │  PAUSE ■■■■■■│      │  PAUSE ■■■■■■│      │  DONE ████│
-───┴──────┴──────────────┴──────┴──────────────┴──────┴──────────┴───
-```
-
-### Under the Hood
-
-V8 engine generator funksiyani qanday implement qiladi:
-
-1. **Generator object yaratiladi** — `GeneratorState: "suspended-start"` bilan
-2. Har bir `next()` chaqiruvda — execution **resume** bo'ladi
-3. `yield` da — execution **suspend** bo'ladi, state saqlanadi
-4. State ichida: local variables, execution position (IP — instruction pointer), scope chain — barchasi saqlanadi
+Bu nima degani? Agar siz custom iterable yaratsangiz — spread va destructuring avtomatik ishlaydi:
 
 ```javascript
-// V8 internal states:
-// "suspendedStart" — yaratilgan, hali boshlanmagan
-// "suspendedYield" — yield da to'xtagan
-// "executing"      — hozir ishlayapti
-// "completed"      — tugagan (return yoki throw)
+const range = new Range(1, 5); // oldingi section'dagi Range class
 
-// ECMAScript spec: GeneratorResume(generator, value, generatorBrand)
-// 1. generator.[[GeneratorState]] tekshiriladi
-// 2. Agar "completed" bo'lsa → { value: undefined, done: true }
-// 3. Agar "executing" bo'lsa → TypeError (recursive chaqiruv)
-// 4. genContext = generator.[[GeneratorContext]]
-// 5. Execution context stack ga push qilinadi
-// 6. Resume execution from where it was suspended
-```
+// Spread — iteratordan barcha qiymatlarni oladi
+const arr = [...range]; // [1, 2, 3, 4, 5]
 
-```javascript
-// Generator prototype chain:
-function* myGen() { yield 1; }
-const g = myGen();
+// Destructuring — iteratordan kerakli miqdorda oladi
+const [a, b, c] = range; // a=1, b=2, c=3
 
-// g → GeneratorPrototype → GeneratorFunctionPrototype → IteratorPrototype → Object.prototype
-console.log(typeof g.next);   // "function" — GeneratorPrototype dan
-console.log(typeof g.return); // "function" — GeneratorPrototype dan
-console.log(typeof g.throw);  // "function" — GeneratorPrototype dan
-console.log(typeof g[Symbol.iterator]); // "function" — IteratorPrototype dan
-
-// ⚠️ Generator object HAM iterable, HAM iterator!
-console.log(g[Symbol.iterator]() === g); // true — O'ZINI qaytaradi
-```
-
-**Lazy evaluation** — generator ning eng katta kuchi. Qiymatlar faqat **so'ralganda** hisoblanadi:
-
-```javascript
-// ❌ Eager evaluation — hamma qiymat oldindan hisoblanadi
-function getEvenNumbers(limit) {
-  const result = [];
-  for (let i = 0; i < limit; i++) {
-    if (i % 2 === 0) result.push(i);
-  }
-  return result; // Hamma qiymat memory'da
-}
-const evens = getEvenNumbers(1_000_000); // 500,000 element Array yaratildi
-
-// ✅ Lazy evaluation — faqat kerak bo'lganda hisoblanadi
-function* getEvenNumbersLazy(limit) {
-  for (let i = 0; i < limit; i++) {
-    if (i % 2 === 0) yield i;
-  }
-}
-const evensLazy = getEvenNumbersLazy(1_000_000);
-// Hech narsa hisoblanmadi! Faqat Generator object yaratildi
-
-// Faqat kerak bo'lganda:
-console.log(evensLazy.next().value); // 0
-console.log(evensLazy.next().value); // 2
-// ... qolgan 499,998 element hisoblaNMAdi — memory tejaldi!
+// Rest — qolgan qiymatlarni oladi
+const [first, ...rest] = range; // first=1, rest=[2, 3, 4, 5]
 ```
 
 ### Kod Misollari
 
+Iterator protocol ishlatadigan barcha til mexanizmlari:
+
 ```javascript
-// Generator function yozish usullari
-// 1. Declaration
-function* genDeclaration() { yield 1; }
+const nums = [1, 2, 3];
 
-// 2. Expression
-const genExpression = function*() { yield 1; };
+// 1. for...of
+for (const n of nums) { /* ... */ }
 
-// 3. Method shorthand (object ichida)
+// 2. Spread
+const copy = [...nums];
+
+// 3. Array destructuring
+const [a, b, c] = nums;
+
+// 4. Array.from()
+const arr = Array.from(nums);
+
+// 5. Promise.all / Promise.race / Promise.allSettled / Promise.any
+await Promise.all(nums.map(n => fetch(`/api/${n}`)));
+
+// 6. Map, Set constructor
+const set = new Set(nums);
+const map = new Map([[1, "a"], [2, "b"]]); // inner array'lar ham iterable
+
+// 7. yield*
+function* gen() {
+  yield* nums; // iterator protocol ishlatadi
+}
+
+// 8. Weak collections EMAS — WeakMap, WeakSet iterable emas!
+```
+
+Object spread (`{...obj}`) iterator protocol **ishlatmaydi** — u `Object.assign()` ga teng:
+
+```javascript
+const obj = { a: 1, b: 2 };
+
+// Object spread — OwnEnumerableProperties ni copy qiladi
+// Iterator protocol EMAS!
+const copy = { ...obj };
+
+// Agar object'ga Symbol.iterator qo'shsangiz ham:
+obj[Symbol.iterator] = function* () { yield "x"; yield "y"; };
+
+// Object spread buni IGNORE qiladi:
+console.log({ ...obj }); // { a: 1, b: 2 } — iterator ishlatilMADI
+
+// Array spread esa iterator'dan foydalanadi:
+console.log([...obj]); // ["x", "y"] — Symbol.iterator ishladi
+```
+
+---
+
+## Generator Functions (function*)
+
+### Nazariya
+
+Generator function — `function*` keyword bilan e'lon qilinadigan maxsus funksiya. U oddiy funksiyadan farqli ravishda **to'xtatilishi** (pause) va **davom ettirilishi** (resume) mumkin. Generator chaqirilganda kod darhol bajarilmaydi — o'rniga **generator object** qaytadi. Bu object iterator protocol'ni implement qiladi (`next()`, `return()`, `throw()` method'lari bor).
+
+Generator'ning asosiy kuchi — **lazy execution**. Qiymatlar faqat so'ralganda (ya'ni `next()` chaqirilganda) hisoblanadi. Bu katta yoki cheksiz ma'lumotlar bilan ishlashda juda samarali — hammasi birdaniga memory'ga yuklanmaydi.
+
+Generator function'ning xususiyatlari:
+- `function*` keyword bilan e'lon qilinadi (yulduzcha kerak)
+- Ichida `yield` keyword ishlatiladi — bajarilishni to'xtatadi
+- Chaqirilganda **generator object** qaytaradi — kod hali bajarilMAGAN
+- Generator object — iterator: `next()`, `return()`, `throw()` method'lari bor
+- Har bir `next()` chaqiruvida kod keyingi `yield` gacha ishlaydi
+
+### Under the Hood
+
+Generator function engine ichida **state machine** sifatida ishlaydi. Har bir `yield` — bitta state. `next()` chaqirilganda engine joriy state'dan keyingi state'ga o'tadi.
+
+```
+Generator State Machine:
+
+function* example() {
+  console.log("A");      ← State 0 (boshlang'ich)
+  yield 1;
+  console.log("B");      ← State 1
+  yield 2;
+  console.log("C");      ← State 2
+  return 3;
+}
+
+           next()           next()           next()
+State 0 ─────────► State 1 ─────────► State 2 ─────────► Done
+  "A"                "B"                "C"
+  yield 1            yield 2            return 3
+  {value:1,          {value:2,          {value:3,
+   done:false}        done:false}        done:true}
+```
+
+V8 ichida generator function Babel transpile qilgandek switch-case state machine'ga aylanadi:
+
+```javascript
+// Biz yozamiz:
+function* myGen() {
+  const a = yield 1;
+  const b = yield 2;
+  return a + b;
+}
+
+// V8 soddalashtirilgan internal representation:
+function myGen_desugared() {
+  let _state = 0;
+  let _a, _b, _sentValue;
+
+  return {
+    next(value) {
+      _sentValue = value;
+      switch (_state) {
+        case 0:
+          _state = 1;
+          return { value: 1, done: false };
+        case 1:
+          _a = _sentValue;
+          _state = 2;
+          return { value: 2, done: false };
+        case 2:
+          _b = _sentValue;
+          _state = 3;
+          return { value: _a + _b, done: true };
+        default:
+          return { value: undefined, done: true };
+      }
+    }
+  };
+}
+```
+
+### Kod Misollari
+
+Generator'ning turli e'lon usullari:
+
+```javascript
+// 1. Function declaration
+function* numbersGen() {
+  yield 1;
+  yield 2;
+  yield 3;
+}
+
+// 2. Function expression
+const numbersGen = function* () {
+  yield 1;
+  yield 2;
+};
+
+// 3. Object method
 const obj = {
-  *genMethod() { yield 1; }
+  *generate() {
+    yield 1;
+    yield 2;
+  }
 };
 
 // 4. Class method
-class MyClass {
-  *genMethod() { yield 1; }
-}
-
-// ⚠️ Arrow function GENERATOR bo'la olmaydi!
-// const genArrow = *() => { yield 1; }; // ❌ SyntaxError
-// Sabab: Arrow function da o'zining execution context yo'q,
-// generator esa alohida execution context talab qiladi
-```
-
-```javascript
-// generator.return() — generatorni tashqaridan tugatish
-function* countdown() {
-  yield 3;
-  yield 2;
-  yield 1;
-  console.log("Pusk!"); // Bu hech qachon ishlamaydi
-}
-
-const rocket = countdown();
-console.log(rocket.next());   // { value: 3, done: false }
-console.log(rocket.return("Bekor qilindi")); // { value: "Bekor qilindi", done: true }
-console.log(rocket.next());   // { value: undefined, done: true }
-// "Pusk!" konsolga CHIQMADI — generator erta tugatildi
-```
-
-```javascript
-// generator.throw() — tashqaridan xato yuborish
-function* safeDivide() {
-  try {
-    const a = yield "Birinchi son?";
-    const b = yield "Ikkinchi son?";
-    yield a / b;
-  } catch (err) {
-    yield `Xato: ${err.message}`;
+class DataSource {
+  *[Symbol.iterator]() {
+    yield "a";
+    yield "b";
   }
 }
 
-const calc = safeDivide();
-console.log(calc.next());         // { value: "Birinchi son?", done: false }
-console.log(calc.next(10));       // { value: "Ikkinchi son?", done: false }
-console.log(calc.throw(new Error("Nolga bo'lish mumkin emas")));
-// { value: "Xato: Nolga bo'lish mumkin emas", done: false }
+// 5. Arrow function bo'lmaydi!
+// const gen = *() => {}; // ❌ SyntaxError — arrow generator yo'q
+```
+
+Generator chaqiruv oqimi:
+
+```javascript
+function* greetingGen() {
+  console.log("Salom boshlanishi");
+  yield "Salom";
+
+  console.log("Dunyo boshlanishi");
+  yield "Dunyo";
+
+  console.log("Yakunlash");
+  return "Tamom";
+}
+
+const gen = greetingGen();
+// Hech narsa chiqmaydi — generator yaratildi, lekin kod hali BOSHLANMAGAN
+
+console.log(gen.next());
+// "Salom boshlanishi" chiqadi
+// { value: "Salom", done: false }
+
+console.log(gen.next());
+// "Dunyo boshlanishi" chiqadi
+// { value: "Dunyo", done: false }
+
+console.log(gen.next());
+// "Yakunlash" chiqadi
+// { value: "Tamom", done: true } ← return qiymati, done: true
+
+console.log(gen.next());
+// Hech narsa chiqmaydi
+// { value: undefined, done: true } ← tugagan, qayta boshlanmaydi
 ```
 
 ---
 
-## `yield` Keyword — Pause/Resume
+## yield Keyword — Pause/Resume
 
 ### Nazariya
 
-`yield` — generator ichida ishlatiladigan maxsus keyword bo'lib, u ikki vazifa bajaradi: **tashqariga qiymat berish** (`yield value` → `next()` chaqirgan kishiga `{ value, done: false }` qaytaradi) va **ichkariga qiymat olish** (`const x = yield` → keyingi `next(value)` da berilgan `value` ni `x` ga beradi).
+`yield` — generator funksiya ichida bajarilishni **to'xtatadigan** va tashqariga qiymat **beradigan** operator. `next()` chaqirilganda generator `yield` gacha ishlaydi, qiymatni qaytaradi va **to'xtaydi**. Keyingi `next()` da aynan shu joydan davom etadi.
 
-V8 generator'ni suspend qilganda, **GeneratorContext** ichida butun execution state saqlanadi: local variables, instruction pointer (qaysi yield da to'xtagan), scope chain (closure reference'lar), va try/catch state. Bu oddiy funksiyadan tubdan farq qiladi — oddiy funksiyada Call Stack'dan frame olib tashlanadi va hamma narsa yo'qoladi, generator da esa state **heap**'da saqlanadi.
+`yield` ikki yo'nalishda ishlaydi:
+1. **Tashqariga** — `yield value` → `next()` ga `{ value, done: false }` qaytaradi
+2. **Ichkariga** — `next(sentValue)` → `yield` ifodasining qiymati `sentValue` bo'ladi
 
-```javascript
-// yield — to'xtash nuqtasi
-function* steps() {
-  console.log("Step 1 boshlandi");
-  yield "step 1 tugadi"; // ← Shu yerda TO'XTAYDI
-
-  console.log("Step 2 boshlandi");
-  yield "step 2 tugadi"; // ← Shu yerda TO'XTAYDI
-
-  console.log("Step 3 boshlandi");
-  return "hammasi tugadi"; // ← Generator TUGAYDI
-}
-
-const s = steps();
-
-// Har bir next() — keyingi yield gacha ishlaydi
-s.next(); // Console: "Step 1 boshlandi" → { value: "step 1 tugadi", done: false }
-// PAUSE — funksiya to'xtadi, local vars saqlanmoqda
-
-s.next(); // Console: "Step 2 boshlandi" → { value: "step 2 tugadi", done: false }
-// PAUSE
-
-s.next(); // Console: "Step 3 boshlandi" → { value: "hammasi tugadi", done: true }
-// DONE — generator tugadi
-```
-
-### Under the Hood
-
-`yield` aslida qanday ishlaydi — V8 internal:
-
-```
-yield ning ish jarayoni:
-
-    Tashqi kod                    Generator ichki
-    ─────────                    ─────────────────
-                                 
-    gen.next()  ──────────────►  Execution RESUME
-                                      │
-                                      ▼
-                                 Kod ishlaydi...
-                                      │
-                                      ▼
-                                 yield value
-                                      │
-                 ◄────────────── Execution SUSPEND
-    { value, done: false }            │
-                                 ┌────┴─────────────┐
-                                 │  SAQLANADI:       │
-                                 │  - local vars     │
-                                 │  - scope chain    │
-                                 │  - instruction    │
-                                 │    pointer (IP)   │
-                                 │  - try/catch      │
-                                 │    stack          │
-                                 └──────────────────┘
-                                 
-    gen.next(val) ─────────────► Execution RESUME
-                                 yield ifodasi = val
-                                      │
-                                      ▼
-                                 Kod davom etadi...
-```
-
-V8 generator'ni suspend qilganda, **GeneratorContext** ichida butun execution state saqlanadi:
-- **Local variables** — hamma o'zgaruvchilar qiymati
-- **Instruction pointer** — qaysi yield da to'xtagan
-- **Scope chain** — closure reference'lar
-- **Try/catch state** — agar try block ichida bo'lsa
-
-Bu oddiy funksiya dan farqli — oddiy funksiyada Call Stack dan frame olib tashlanadi va hamma narsa yo'qoladi. Generator da esa state **heap**'da saqlanadi.
-
-```javascript
-// yield expression qiymati — KEYINGI next() ga berilgan argument
-function* echo() {
-  // Birinchi next() — yield gacha ishlaydi
-  // Birinchi next() ning argument'i IGNORE qilinadi!
-  const first = yield "Birinchi yield";
-
-  // Ikkinchi next(value) — "first" = value
-  console.log("first oldi:", first);
-  const second = yield "Ikkinchi yield";
-
-  // Uchinchi next(value) — "second" = value
-  console.log("second oldi:", second);
-  return "done";
-}
-
-const e = echo();
-console.log(e.next("bu ignore bo'ladi")); // { value: "Birinchi yield", done: false }
-console.log(e.next("Salom"));             // first oldi: Salom → { value: "Ikkinchi yield", done: false }
-console.log(e.next("Dunyo"));             // second oldi: Dunyo → { value: "done", done: true }
-```
+`yield` faqat generator funksiya ichida ishlatiladi — oddiy funksiya, callback, yoki arrow funksiya ichida ishlatish SyntaxError beradi.
 
 ### Kod Misollari
 
-```javascript
-// yield bilan state saqlash — Fibonacci
-function* fibonacci() {
-  let prev = 0;
-  let curr = 1;
+`yield` to'xtatib turish mexanizmi:
 
-  while (true) {            // Cheksiz loop — lekin xavfsiz!
-    yield curr;             // Faqat so'ralganda keyingi son hisoblanadi
-    [prev, curr] = [curr, prev + curr];
-  }
+```javascript
+function* stepByStep() {
+  console.log("Qadam 1: boshlanish");
+  yield "birinchi"; // ← STOP. Keyingi next() da shu yerdan davom
+
+  console.log("Qadam 2: davom");
+  yield "ikkinchi"; // ← STOP
+
+  console.log("Qadam 3: yakunlash");
+  return "tugadi";
 }
 
-const fib = fibonacci();
-console.log(fib.next().value); // 1
-console.log(fib.next().value); // 1
-console.log(fib.next().value); // 2
-console.log(fib.next().value); // 3
-console.log(fib.next().value); // 5
-console.log(fib.next().value); // 8
-// Memory: faqat 2 ta o'zgaruvchi (prev, curr)
-// Array emas — million ta son uchun ham O(1) memory!
+const gen = stepByStep();
+
+// next() 1 — kod yield gacha ishlaydi
+const r1 = gen.next(); // "Qadam 1: boshlanish" chiqadi
+console.log(r1);       // { value: "birinchi", done: false }
+
+// ... bu yerda boshqa kodlar ishlashi mumkin
+// generator TO'XTAB turadi — memory'da holat saqlanadi
+
+// next() 2 — oldngi yield joydan davom
+const r2 = gen.next(); // "Qadam 2: davom" chiqadi
+console.log(r2);       // { value: "ikkinchi", done: false }
+
+// next() 3 — tugash
+const r3 = gen.next(); // "Qadam 3: yakunlash" chiqadi
+console.log(r3);       // { value: "tugadi", done: true }
 ```
 
+Oddiy misollar — yield turli qiymatlar berishi:
+
 ```javascript
-// yield* — Array spread kabi, lekin lazy
-function* range(start, end) {
-  for (let i = start; i <= end; i++) {
-    yield i;
-  }
+function* mixedYields() {
+  yield 42;                // number
+  yield "hello";           // string
+  yield [1, 2, 3];        // array
+  yield { name: "Ali" };  // object
+  yield undefined;         // explicit undefined
+  // yield qilmasdan tugash ham mumkin — done: true, value: undefined
+}
+```
+
+`yield` ni callback yoki nested funksiya ichida ishlatib bo'lmaydi:
+
+```javascript
+function* badGenerator() {
+  [1, 2, 3].forEach(item => {
+    yield item; // ❌ SyntaxError! yield faqat generator ichida
+  });
 }
 
-// Birinchi 5 ta qiymatni olish
-const first5 = [];
-for (const n of range(1, Infinity)) {
-  first5.push(n);
-  if (first5.length === 5) break; // break — generator.return() chaqiradi
+// ✅ To'g'ri usul — for...of ishlatamiz:
+function* goodGenerator() {
+  for (const item of [1, 2, 3]) {
+    yield item; // ✅ generator ichida — to'g'ri
+  }
 }
-console.log(first5); // [1, 2, 3, 4, 5]
-// Infinity gacha hisoblaNMAdi — faqat 5 ta!
 ```
 
 ---
@@ -1176,690 +837,522 @@ console.log(first5); // [1, 2, 3, 4, 5]
 
 ### Nazariya
 
-Generator funksiya chaqirilganda qaytadigan Generator object **ham iterable, ham iterator** — `Symbol.iterator` o'zini qaytaradi. Bu juda qulaylik beradi: `Symbol.iterator` ni qo'lda implement qilish o'rniga generator ishlatish ancha sodda bo'ladi — `next()`, `{ value, done }` qo'lda yozish shart emas, state management avtomatik, va `return()` ham avtomatik ishlaydi (`for...of` da `break` qilsak, generator'ning `finally` bloki bajariladi).
+Generator object avtomatik iterator protocol'ni implement qiladi — `next()`, `return()`, `throw()` method'lari bor. Bundan tashqari, generator object o'zi ham iterable — uning `[Symbol.iterator]()` method'i **o'zini qaytaradi** (self-iterator). Shu sababli generator'ni to'g'ridan-to'g'ri `for...of`, spread, destructuring bilan ishlatish mumkin.
 
-```javascript
-// ❌ Qo'lda iterator yozish — ko'p kod
-const rangeManual = {
-  from: 1,
-  to: 5,
-  [Symbol.iterator]() {
-    let current = this.from;
-    const last = this.to;
-    return {
-      next() {
-        return current <= last
-          ? { value: current++, done: false }
-          : { value: undefined, done: true };
-      }
-    };
-  }
-};
-
-// ✅ Generator bilan — ancha sodda!
-const rangeGenerator = {
-  from: 1,
-  to: 5,
-  *[Symbol.iterator]() {
-    for (let i = this.from; i <= this.to; i++) {
-      yield i;
-    }
-  }
-};
-
-// Ikkalasi ham bir xil natija beradi
-console.log([...rangeManual]);    // [1, 2, 3, 4, 5]
-console.log([...rangeGenerator]); // [1, 2, 3, 4, 5]
-```
-
-**Nima uchun generator qulayroq?**
-
-1. `next()`, `{ value, done }` qo'lda yozish shart emas — `yield` o'zi barchasini handle qiladi
-2. State management avtomatik — local variables saqlanadi
-3. `return()` ham avtomatik — `for...of` da `break` qilsak, generator **finally** block ishga tushadi
-
-```javascript
-// Generator bilan clean up
-function* resourceGenerator() {
-  console.log("Resurs ochildi");
-  try {
-    yield 1;
-    yield 2;
-    yield 3;
-  } finally {
-    // break, return, throw — hamma holatda ishlaydi
-    console.log("Resurs yopildi (finally)");
-  }
-}
-
-for (const val of resourceGenerator()) {
-  console.log(val);
-  if (val === 2) break;
-}
-// Resurs ochildi
-// 1
-// 2
-// Resurs yopildi (finally) ← break bo'lsa ham finally ishladi!
-```
+Bu xususiyat generator'ni custom iterator yaratishning eng qulay usuli qiladi. Oddiy iterator yaratish uchun `next()`, `return()`, holat boshqaruvi — barchasini qo'lda yozish kerak. Generator'da esa faqat `yield` yozasiz — qolganini engine o'zi qiladi.
 
 ### Kod Misollari
 
+Generator'ni for...of va spread bilan ishlatish:
+
 ```javascript
-// Class ni generator bilan iterable qilish
-class Matrix {
-  #data;
-  #rows;
-  #cols;
+function* fibonacci() {
+  let prev = 0, curr = 1;
+  while (true) { // cheksiz generator — lekin lazy
+    yield curr;
+    [prev, curr] = [curr, prev + curr];
+  }
+}
 
-  constructor(data) {
-    this.#data = data;
-    this.#rows = data.length;
-    this.#cols = data[0].length;
+// for...of bilan (break kerak — cheksiz!)
+for (const num of fibonacci()) {
+  if (num > 100) break;
+  console.log(num); // 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
+}
+
+// ⚠️ [...fibonacci()] — QILMANG! Cheksiz loop → memory crash!
+
+// Cheklangan generator — xavfsiz
+function* range(start, end) {
+  for (let i = start; i <= end; i++) {
+    yield i;
+  }
+}
+
+console.log([...range(1, 5)]); // [1, 2, 3, 4, 5]
+const [a, b, c] = range(10, 20); // a=10, b=11, c=12
+```
+
+Class'da generator'ni Symbol.iterator sifatida ishlatish:
+
+```javascript
+class BinaryTree {
+  constructor(value, left = null, right = null) {
+    this.value = value;
+    this.left = left;
+    this.right = right;
   }
 
-  // Row-major order da iterate
+  // Generator bilan in-order traversal
   *[Symbol.iterator]() {
-    for (let r = 0; r < this.#rows; r++) {
-      for (let c = 0; c < this.#cols; c++) {
-        yield {
-          row: r,
-          col: c,
-          value: this.#data[r][c]
-        };
-      }
-    }
-  }
-
-  // Faqat diagonal elementlar
-  *diagonal() {
-    const size = Math.min(this.#rows, this.#cols);
-    for (let i = 0; i < size; i++) {
-      yield this.#data[i][i];
-    }
-  }
-
-  // Faqat ma'lum shartga mos elementlar
-  *filter(predicate) {
-    for (const cell of this) {
-      if (predicate(cell)) yield cell;
-    }
+    if (this.left) yield* this.left;   // chap subtree
+    yield this.value;                  // o'zini
+    if (this.right) yield* this.right; // o'ng subtree
   }
 }
 
-const matrix = new Matrix([
-  [1, 2, 3],
-  [4, 5, 6],
-  [7, 8, 9]
-]);
+const tree = new BinaryTree(4,
+  new BinaryTree(2,
+    new BinaryTree(1),
+    new BinaryTree(3)
+  ),
+  new BinaryTree(6,
+    new BinaryTree(5),
+    new BinaryTree(7)
+  )
+);
 
-// Barcha elementlar
-for (const { row, col, value } of matrix) {
-  console.log(`[${row}][${col}] = ${value}`);
+console.log([...tree]); // [1, 2, 3, 4, 5, 6, 7] — tartiblangan!
+
+for (const val of tree) {
+  console.log(val); // 1, 2, 3, 4, 5, 6, 7
+}
+```
+
+Muhim nuance — `return` qiymati `for...of` da ko'rinmaydi:
+
+```javascript
+function* gen() {
+  yield 1;
+  yield 2;
+  return 3; // Bu qiymat for...of da CHIQMAYDI!
 }
 
-// Diagonal
-console.log([...matrix.diagonal()]); // [1, 5, 9]
+// for...of — done: true bo'lganda TO'XTAYDI, value ni olmaydi
+for (const val of gen()) {
+  console.log(val); // 1, 2 — faqat yield qiymatlari
+}
+// 3 — chiqmaydi!
 
-// Filter — faqat juft sonlar
-const evens = [...matrix.filter(c => c.value % 2 === 0)];
-console.log(evens.map(c => c.value)); // [2, 4, 6, 8]
+// next() bilan — ko'rinadi
+const g = gen();
+console.log(g.next()); // { value: 1, done: false }
+console.log(g.next()); // { value: 2, done: false }
+console.log(g.next()); // { value: 3, done: true } ← return qiymati
 ```
 
 ---
 
-## `yield*` — Delegation
+## yield* — Delegation
 
 ### Nazariya
 
-`yield*` — boshqa iterable yoki generator'ga **delegatsiya** qiladi. Ya'ni boshqa generator'ning barcha qiymatlarini o'zidan berganday chiqaradi. `yield*` faqat generator bilan emas, Array, String, Set kabi istalgan iterable bilan ishlaydi.
+`yield*` — boshqa iterable yoki generator'ga iteratsiyani **delegatsiya** qiladigan operator. U ichki iterable'ning barcha qiymatlarini tashqi generator orqali birma-bir `yield` qiladi. Bu operator bilan nested generator'larni birlashtirish, tree traversal, va iterable'larni composite (tarkibiy) qilish mumkin.
 
-Eng muhim nuance: `yield*` ning expression qiymati boshqa generator'ning `return` qiymati bo'ladi (but not yielded values). Bundan tashqari, `yield*` `next()`, `return()`, va `throw()` ni ham delegate qiladi — ya'ni tashqi `gen.throw(err)` ichki generator'ga yetkaziladi. Bu xususiyat recursive tree traversal uchun `yield*` ni eng ideal vosita qiladi.
+`yield*` istalgan iterable bilan ishlaydi — Array, String, Map, Set, boshqa generator, yoki custom iterable. U ichki iterable'ning iterator'ini oladi va `next()` ni barcha qiymatlar tugagunicha chaqiradi.
 
-```javascript
-// yield* bilan delegation
-function* inner() {
-  yield "a";
-  yield "b";
-  return "inner-return"; // ⚠️ Bu qiymat yield* ning natijasi bo'ladi
-}
-
-function* outer() {
-  yield 1;
-  const result = yield* inner(); // inner() ning barcha yield'larini beradi
-  console.log("inner qaytardi:", result); // "inner-return"
-  yield 2;
-}
-
-const gen = outer();
-console.log(gen.next()); // { value: 1, done: false }       ← outer'dan
-console.log(gen.next()); // { value: "a", done: false }     ← inner'dan
-console.log(gen.next()); // { value: "b", done: false }     ← inner'dan
-                          // Console: "inner qaytardi: inner-return"
-console.log(gen.next()); // { value: 2, done: false }       ← outer'ga qaytdi
-console.log(gen.next()); // { value: undefined, done: true }
-```
-
-```
-yield* delegation chain:
-
-outer()
-  │
-  ├── yield 1               → { value: 1, done: false }
-  │
-  ├── yield* inner()  ─────► inner()
-  │                           ├── yield "a"  → { value: "a", done: false }
-  │                           ├── yield "b"  → { value: "b", done: false }
-  │                           └── return "inner-return"
-  │   ◄──── result = "inner-return"
-  │
-  ├── yield 2               → { value: 2, done: false }
-  │
-  └── return                → { value: undefined, done: true }
-```
-
-**`yield*` har qanday iterable bilan ishlaydi** — faqat generator emas:
-
-```javascript
-function* combined() {
-  yield* [1, 2, 3];      // Array
-  yield* "abc";            // String
-  yield* new Set([4, 5]); // Set
-}
-
-console.log([...combined()]); // [1, 2, 3, "a", "b", "c", 4, 5]
-```
-
-### Under the Hood
-
-`yield*` aslida quyidagi kodni bajaradi:
-
-```javascript
-// yield* iterable ═══► Desugared:
-function* outer() {
-  // yield* inner() aslida:
-  const _iter = inner()[Symbol.iterator]();
-  let _result;
-
-  while (true) {
-    _result = _iter.next();
-    if (_result.done) break;
-    yield _result.value;   // Har bir qiymatni "o'zidan" beradi
-  }
-  // yield* ning expression qiymati = _result.value (return qiymati)
-}
-
-// Muhim: yield* next(), return(), throw() ni ham delegate qiladi!
-// Ya'ni tashqi gen.throw(err) → inner generator'ga yetkaziladi
-// Tashqi gen.return() → inner generator'ga yetkaziladi
-```
+`yield*` ning return qiymati — ichki generator'ning **`return`** qiymati (agar bo'lsa). Bu xususiyat generator'lar orasida qiymat uzatishda ishlatiladi.
 
 ### Kod Misollari
 
+`yield*` bilan iterablelarni birlashtirish:
+
 ```javascript
-// Recursive tree traversal — yield* ning eng kuchli use case'i
-function* traverseTree(node) {
-  yield node.value;
+function* concat(...iterables) {
+  for (const iterable of iterables) {
+    yield* iterable;
+    // Yuqoridagi shu bilan teng:
+    // for (const value of iterable) {
+    //   yield value;
+    // }
+  }
+}
+
+console.log([...concat([1, 2], [3, 4], [5, 6])]);
+// [1, 2, 3, 4, 5, 6]
+
+console.log([...concat("abc", [1, 2], new Set([3, 4]))]);
+// ["a", "b", "c", 1, 2, 3, 4]
+```
+
+Nested generator delegation:
+
+```javascript
+function* innerGen() {
+  yield "inner-1";
+  yield "inner-2";
+  return "inner-result"; // yield* ning QIYMATI
+}
+
+function* outerGen() {
+  yield "outer-1";
+
+  const innerReturn = yield* innerGen();
+  // innerGen ning BARCHA yield'lari tashqariga chiqadi
+  // innerReturn = "inner-result" (return qiymati)
+
+  console.log("Inner return:", innerReturn);
+  yield "outer-2";
+}
+
+const values = [...outerGen()];
+// console: "Inner return: inner-result"
+// values: ["outer-1", "inner-1", "inner-2", "outer-2"]
+// "inner-result" — yield QILINMAYDI, faqat yield* ning natijasi sifatida olinadi
+```
+
+Recursive tree traversal — `yield*` ning eng kuchli use case'i:
+
+```javascript
+function* traverseDOM(element) {
+  yield element;
+
+  for (const child of element.children) {
+    yield* traverseDOM(child); // recursive delegation
+  }
+}
+
+// Barcha DOM elementlarni lazy iterate qilish:
+for (const el of traverseDOM(document.body)) {
+  if (el.classList.contains('highlight')) {
+    console.log(el.textContent);
+  }
+}
+```
+
+File system tree:
+
+```javascript
+function* walkTree(node) {
+  yield node;
 
   if (node.children) {
     for (const child of node.children) {
-      yield* traverseTree(child); // Recursive delegation!
+      yield* walkTree(child); // recursive delegation
     }
   }
 }
 
-const tree = {
-  value: "root",
+const fileTree = {
+  name: "src",
   children: [
+    { name: "index.js" },
     {
-      value: "A",
+      name: "components",
       children: [
-        { value: "A1", children: [] },
-        { value: "A2", children: [] }
+        { name: "App.js" },
+        { name: "Header.js" },
       ]
     },
-    {
-      value: "B",
-      children: [
-        { value: "B1", children: [] }
-      ]
-    }
+    { name: "utils.js" },
   ]
 };
 
-console.log([...traverseTree(tree)]);
-// ["root", "A", "A1", "A2", "B", "B1"]
-
-// ☝️ yield* recursion'ni "flat" qildi — depth-first traversal
-// Array yaratmasdan, faqat kerakli element'larni lazy berdi
-```
-
-```javascript
-// yield* bilan generator composition
-function* range(start, end) {
-  for (let i = start; i <= end; i++) yield i;
+for (const file of walkTree(fileTree)) {
+  console.log(file.name);
 }
-
-function* skip(gen, n) {
-  let count = 0;
-  for (const val of gen) {
-    if (count++ >= n) yield val;
-  }
-}
-
-function* take(gen, n) {
-  let count = 0;
-  for (const val of gen) {
-    if (count++ >= n) return;
-    yield val;
-  }
-}
-
-// Composition: 1-100 dan 5 tashlab, 3 ta ol
-const result = [...take(skip(range(1, 100), 5), 3)];
-console.log(result); // [6, 7, 8]
+// src, index.js, components, App.js, Header.js, utils.js
 ```
 
 ---
 
-## Two-Way Communication: `next(value)`
+## Two-Way Communication: next(value)
 
 ### Nazariya
 
-Generator faqat qiymat **bermaydi** — u qiymat **olishi** ham mumkin. `next(value)` chaqirilganda, `value` generator ichida **oxirgi yield ifodasi**ning qiymati bo'ladi. Bu ikki tomonlama kanal yaratadi: generator `yield` orqali tashqariga ma'lumot beradi, tashqi kod esa `next(value)` orqali ichkariga ma'lumot yuboradi.
+Generator faqat tashqariga qiymat bermaydi — `next(value)` orqali ichkariga ham qiymat olishi mumkin. `next()` ga argument berilganda, u oldingi `yield` ifodasining **qiymati** bo'lib qoladi. Bu ikki tomonlama aloqa — generator va tashqi kod o'rtasida ma'lumot almashinuvi.
 
-Muhim tushuncha: birinchi `next()` ga berilgan argument **har doim ignore** bo'ladi, chunki birinchi `next()` generator'ni boshlab, birinchi `yield` gacha olib boradi — bu paytda hali "kutayotgan yield ifodasi" yo'q. Bu two-way communication Redux-saga kabi kutubxonalarning asosiy mexanizmi hisoblanadi.
-
-```javascript
-function* conversation() {
-  // Birinchi next() — yield gacha ishlaydi
-  const name = yield "Ismingiz nima?";       // ← to'xtaydi, "Ismingiz nima?" beradi
-
-  // Ikkinchi next("Ali") — name = "Ali"
-  const age = yield `Salom ${name}! Yoshingiz?`; // ← to'xtaydi
-
-  // Uchinchi next(25) — age = 25
-  return `${name}, ${age} yosh — zo'r!`;
-}
-
-const chat = conversation();
-console.log(chat.next());       // { value: "Ismingiz nima?", done: false }
-console.log(chat.next("Ali"));  // { value: "Salom Ali! Yoshingiz?", done: false }
-console.log(chat.next(25));     // { value: "Ali, 25 yosh — zo'r!", done: true }
-```
+Muhim qoida: **birinchi** `next()` ga berilgan argument **ignore** qilinadi — chunki hali `yield` uchralmagan, olish uchun joy yo'q. Faqat ikkinchi va undan keyingi `next()` lardagi argument'lar `yield` qiymatiga aylanadi.
 
 ```
-Two-way communication flow:
+Two-way communication:
 
-   Tashqi kod                          Generator
-   ──────────                          ─────────
-   
-   chat.next()  ────────────────────►  [start]
-                                       │
-                                       yield "Ismingiz nima?"
-                ◄────────────────────  │
-   { value: "Ismingiz nima?" }         ║ PAUSED ║
-                                       ║        ║
-   chat.next("Ali") ───"Ali"────────►  │
-                                       const name = "Ali"  ← yield expression = "Ali"
-                                       │
-                                       yield `Salom Ali!...`
-                ◄────────────────────  │
-   { value: "Salom Ali!..." }         ║ PAUSED ║
-                                       ║        ║
-   chat.next(25) ────25─────────────►  │
-                                       const age = 25  ← yield expression = 25
-                                       │
-                                       return "Ali, 25 yosh..."
-                ◄────────────────────  │
-   { value: "Ali, 25 yosh...", done: true }   [completed]
-```
-
-### Under the Hood
-
-**Muhim tushuncha:** Birinchi `next()` ga berilgan argument **har doim ignore** bo'ladi. Chunki birinchi `next()` generator'ni boshlab, birinchi `yield` gacha olib boradi — bu paytda hali "kutayotgan yield ifodasi" yo'q.
-
-```javascript
-// ECMAScript spec: GeneratorResume(generator, value)
-// 1. generator.[[GeneratorState]] === "suspendedYield" bo'lsa:
-//    - yield expression ning natijasi "value" ga o'rnatiladi
-//    - Execution davom etadi
-// 2. generator.[[GeneratorState]] === "suspendedStart" bo'lsa:
-//    - "value" IGNORE qilinadi (birinchi next)
-//    - Execution boshlanadi
-
-function* demo() {
-  console.log("Boshlandi");         // 1. Birinchi next() — shu yerdan boshlanadi
-  const a = yield "first";          // 2. "first" beriladi, to'xtaydi
-  console.log("a =", a);           // 3. Ikkinchi next(100) — a = 100
-  const b = yield "second";
-  console.log("b =", b);
-  return a + b;
-}
-
-const d = demo();
-d.next(999);  // 999 IGNORE — chunki hali yield yo'q
-              // Console: "Boshlandi"
-              // { value: "first", done: false }
-
-d.next(100);  // a = 100
-              // Console: "a = 100"
-              // { value: "second", done: false }
-
-d.next(200);  // b = 200
-              // Console: "b = 200"
-              // { value: 300, done: true }
+Generator ichida:              Tashqi kod:
+──────────────────             ──────────────
+                               gen.next()
+                               │ (birinchi — argument yo'q / ignore)
+      ◄────────────────────────┘
+      |
+const a = yield "hello"       ────────────────────► { value: "hello", done: false }
+      |                                             │
+      ◄────────────────────────── gen.next(42)  ◄───┘
+      |                          │
+      a = 42   ◄─────────────────┘
+      |
+const b = yield "world"       ────────────────────► { value: "world", done: false }
 ```
 
 ### Kod Misollari
 
-```javascript
-// Accumulator — running total
-function* accumulator(initial = 0) {
-  let total = initial;
+Two-way communication:
 
-  while (true) {
-    const value = yield total;      // Jami beradi, yangi qiymat oladi
-    if (value === null) return total; // null bersa tugatadi
-    total += value;
-  }
+```javascript
+function* conversation() {
+  const name = yield "Ismingiz nima?";     // Tashqariga savol, ichkariga javob
+  const age = yield `Salom ${name}! Yoshingiz?`;
+  return `${name}, ${age} yosh — ro'yxatga olindi!`;
 }
 
-const acc = accumulator(100);
-console.log(acc.next().value);    // 100 (boshlang'ich)
-console.log(acc.next(50).value);  // 150 (100 + 50)
-console.log(acc.next(-30).value); // 120 (150 - 30)
-console.log(acc.next(80).value);  // 200 (120 + 80)
-console.log(acc.next(null));      // { value: 200, done: true }
+const gen = conversation();
+
+console.log(gen.next());
+// { value: "Ismingiz nima?", done: false }
+
+console.log(gen.next("Ali"));
+// name = "Ali"
+// { value: "Salom Ali! Yoshingiz?", done: false }
+
+console.log(gen.next(25));
+// age = 25
+// { value: "Ali, 25 yosh — ro'yxatga olindi!", done: true }
 ```
 
-```javascript
-// Middleware pattern — Redux-saga tushunchasi
-function* fetchUserFlow() {
-  try {
-    // yield orqali "effect" beramiz — tashqi kod bajaradi
-    const userId = yield { type: "GET_INPUT", prompt: "User ID?" };
-    const user = yield { type: "FETCH", url: `/api/users/${userId}` };
-    const posts = yield { type: "FETCH", url: `/api/users/${userId}/posts` };
+Real-world misol — step-by-step form wizard:
 
-    yield { type: "RENDER", data: { user, posts } };
-  } catch (err) {
-    yield { type: "SHOW_ERROR", message: err.message };
+```javascript
+function* orderWizard() {
+  // 1-qadam: mahsulot tanlash
+  const product = yield { step: 1, question: "Qaysi mahsulotni xohlaysiz?", options: ["Laptop", "Phone", "Tablet"] };
+
+  // 2-qadam: miqdor
+  const quantity = yield { step: 2, question: `${product} — nechta?`, min: 1, max: 10 };
+
+  // 3-qadam: manzil
+  const address = yield { step: 3, question: "Yetkazish manzili?" };
+
+  // Natija
+  return {
+    product,
+    quantity,
+    address,
+    total: quantity * getPrice(product),
+  };
+}
+
+// Controller:
+const wizard = orderWizard();
+let step = wizard.next(); // Birinchi savolni olish
+
+// UI dan javob kelganda:
+step = wizard.next("Laptop");  // product = "Laptop", keyingi savol
+step = wizard.next(2);          // quantity = 2, keyingi savol
+step = wizard.next("Toshkent"); // address = "Toshkent", yakunlash
+console.log(step.value);
+// { product: "Laptop", quantity: 2, address: "Toshkent", total: ... }
+```
+
+Accumulator pattern — yield orqali state boshqarish:
+
+```javascript
+function* runningAverage() {
+  let total = 0;
+  let count = 0;
+  let value;
+
+  while (true) {
+    value = yield total / (count || 1); // o'rtachani qaytarish
+    total += value;
+    count++;
   }
 }
 
-// Runner — generator'ni "interpret" qiladi
-async function runSaga(generator) {
-  const gen = generator();
-  let result = gen.next();
+const avg = runningAverage();
+avg.next();           // Boshlash (birinchi argument ignore)
+console.log(avg.next(10).value); // 10   — o'rtacha: 10/1
+console.log(avg.next(20).value); // 15   — o'rtacha: 30/2
+console.log(avg.next(30).value); // 20   — o'rtacha: 60/3
+console.log(avg.next(40).value); // 25   — o'rtacha: 100/4
+```
 
-  while (!result.done) {
-    const effect = result.value;
-    try {
-      let response;
+---
 
-      switch (effect.type) {
-        case "GET_INPUT":
-          response = "42"; // Simulated input
-          break;
-        case "FETCH":
-          response = await fetch(effect.url).then(r => r.json());
-          break;
-        case "RENDER":
-          console.log("Render:", effect.data);
-          response = true;
-          break;
-      }
+## Generator return() va throw()
 
-      result = gen.next(response); // Natijani generator'ga qaytaramiz
-    } catch (err) {
-      result = gen.throw(err); // Xatoni generator'ga yuboramiz
+### Nazariya
+
+Generator object'da `next()` dan tashqari ikkita muhim method bor:
+
+1. **`return(value)`** — generator'ni tugatadi. `{ value, done: true }` qaytaradi. Generator ichidagi `finally` bloklari ishlaydi. Bu method bilan generator'ni tashqaridan "majburan" to'xtatish mumkin.
+
+2. **`throw(error)`** — generator ichiga xato tashiydi. Xuddi generator ichida `yield` turgan joyda `throw error` yozilgandek ishlaydi. Agar generator ichida `try/catch` bilan ushlansa — generator davom etadi. Ushlanmasa — generator tugatiladi va xato tashqariga otiladi.
+
+Bu method'lar generator bilan tashqi kod o'rtasidagi to'liq nazorat imkonini beradi: `next()` — davom et, `return()` — tugat, `throw()` — xato tashla.
+
+### Kod Misollari
+
+`return()` — generator'ni erta tugatish:
+
+```javascript
+function* counter() {
+  try {
+    let i = 0;
+    while (true) {
+      yield i++;
     }
+  } finally {
+    // return() chaqirilganda finally ISHLAYDI
+    console.log("Generator tugatildi — cleanup");
+  }
+}
+
+const gen = counter();
+console.log(gen.next());      // { value: 0, done: false }
+console.log(gen.next());      // { value: 1, done: false }
+console.log(gen.return(99));  // "Generator tugatildi — cleanup"
+                               // { value: 99, done: true }
+console.log(gen.next());      // { value: undefined, done: true } — tugagan
+```
+
+`throw()` — xato tashish:
+
+```javascript
+function* safeGenerator() {
+  while (true) {
+    try {
+      const value = yield "kutish...";
+      console.log("Olindi:", value);
+    } catch (err) {
+      console.log("Xato ushlandi:", err.message);
+      // Generator davom etadi — catch ushladi
+    }
+  }
+}
+
+const gen = safeGenerator();
+gen.next();                                  // { value: "kutish...", done: false }
+gen.next("ok");                              // "Olindi: ok"
+gen.throw(new Error("nimadir xato bo'ldi")); // "Xato ushlandi: nimadir xato bo'ldi"
+gen.next("yana ok");                         // "Olindi: yana ok" — davom etyapti!
+```
+
+Agar `try/catch` bo'lmasa — xato tashqariga otiladi:
+
+```javascript
+function* unsafeGen() {
+  yield 1;
+  yield 2; // Bu yerga yetmaydi
+}
+
+const gen = unsafeGen();
+gen.next(); // { value: 1, done: false }
+
+try {
+  gen.throw(new Error("xato!")); // generator ichida try/catch yo'q
+} catch (err) {
+  console.log("Tashqarida ushlandi:", err.message); // "xato!"
+}
+
+console.log(gen.next()); // { value: undefined, done: true } — generator tugadi
+```
+
+Resource management pattern — `return()` bilan cleanup:
+
+```javascript
+function* dbConnection(url) {
+  const conn = await connect(url);
+  console.log("Connected to:", url);
+
+  try {
+    while (true) {
+      const query = yield "ready";
+      const result = await conn.execute(query);
+      yield result;
+    }
+  } finally {
+    // for...of ichida break, yoki qo'lda return() chaqirilganda
+    await conn.close();
+    console.log("Connection closed");
   }
 }
 ```
 
 ---
 
-## Async Generators va `for await...of`
+## Async Generators va for await...of
 
 ### Nazariya
 
-Async generator — `async function*` bilan yaratilib, oddiy generator bilan async/await ni birlashtiradi. Har bir `yield` da **Promise** berishi mumkin va `for await...of` orqali iterate qilinadi. Oddiy iterator'dan farqi: async iterator'ning `next()` metodi **Promise** qaytaradi, ya'ni `{ value, done }` o'rniga `Promise<{ value, done }>` olasiz.
+Async generator — `async function*` bilan e'lon qilinadigan funksiya. U generator va async funksiyaning kuchlarini birlashtiradi: ichida `yield` va `await` ni bir vaqtda ishlatish mumkin. Async generator'ning `next()` method'i **Promise** qaytaradi — `Promise<{ value, done }>`.
 
-Async generator ayniqsa paginated API, WebSocket stream, va server-sent events kabi asinxron data oqimlarini qayta ishlash uchun ideal. U lazy evaluation va async operatsiyalarni birlashtiradi — katta ma'lumotlarni bo'laklab, har bir bo'lakni asinxron tarzda olish va qayta ishlash imkonini beradi.
+`for await...of` — async iterator ustida iteratsiya qilish uchun maxsus tsikl. U har bir iteratsiyada Promise resolve bo'lishini kutadi. Stream, paginated API, real-time event'lar kabi scenariolarda async generator + `for await...of` eng qulay pattern.
 
-> **Oldingi bo'limlar bilan bog'lanish:** Async/Await [13-async-await.md](13-async-await.md) va Event Loop [11-event-loop.md](11-event-loop.md) — ular bilan tanish bo'lish kerak.
+> **Eslatma:** `for-await-of` batafsil — [13-async-await.md](13-async-await.md) da ham yoritilgan.
 
-```javascript
-// Oddiy generator — sinxron qiymatlar beradi
-function* syncGen() {
-  yield 1;
-  yield 2;
-  yield 3;
-}
+### Kod Misollari
 
-// Async generator — asinxron qiymatlar beradi
-async function* asyncGen() {
-  yield 1;                            // sinxron qiymat ham berishi mumkin
-  yield await fetchSomething();       // await ishlatishi mumkin
-  yield* someAsyncIterable;           // async iterable'ga delegate qilishi mumkin
-}
-```
-
-**Async Generator Protocol:**
+Async generator — paginated API'dan ma'lumot olish:
 
 ```javascript
-// Oddiy Iterator:  next() → { value, done }
-// Async Iterator:  next() → Promise<{ value, done }>
-
-async function* asyncCounter() {
-  let i = 0;
-  while (i < 3) {
-    // Har 1 soniyada bitta son
-    await new Promise(r => setTimeout(r, 1000));
-    yield i++;
-  }
-}
-
-const ac = asyncCounter();
-
-// next() PROMISE qaytaradi!
-console.log(ac.next()); // Promise { <pending> }
-
-// await bilan:
-console.log(await ac.next()); // { value: 0, done: false } (1 soniyadan keyin)
-console.log(await ac.next()); // { value: 1, done: false } (yana 1 soniya)
-console.log(await ac.next()); // { value: 2, done: false } (yana 1 soniya)
-console.log(await ac.next()); // { value: undefined, done: true }
-```
-
-**`for await...of`** — async iterable'lar ustida iteratsiya:
-
-```javascript
-async function* apiPaginator(url) {
+async function* fetchPaginatedData(baseUrl) {
   let page = 1;
   let hasMore = true;
 
   while (hasMore) {
-    const response = await fetch(`${url}?page=${page}`);
+    const response = await fetch(`${baseUrl}?page=${page}&limit=50`);
     const data = await response.json();
 
-    yield data.items;
+    for (const item of data.items) {
+      yield item; // HAR BIR itemni alohida yield qilish
+    }
 
     hasMore = data.hasNextPage;
     page++;
   }
 }
 
-// for await...of — har bir yield ni AWAIT qilib oladi
-async function getAllItems() {
-  const allItems = [];
+// for await...of bilan ishlatish
+async function processAllProducts() {
+  let count = 0;
 
-  for await (const items of apiPaginator("https://api.example.com/users")) {
-    allItems.push(...items);
-    console.log(`Page loaded, total: ${allItems.length}`);
+  for await (const product of fetchPaginatedData('/api/products')) {
+    await saveToDatabase(product);
+    count++;
+
+    if (count >= 1000) break; // Erta to'xtatish — generator.return() chaqiriladi
   }
 
-  return allItems;
+  console.log(`${count} ta mahsulot saqlandi`);
 }
 ```
 
-```
-Async Generator Flow:
-
-  async function* gen() {                for await (const x of gen()) {
-    yield await fetch(...)      ═══►       console.log(x);
-  }                                      }
-
-  Ichki jarayon:
-
-  gen.next()
-     │
-     ▼
-  Promise<{ value, done }> ─────────── await ───┐
-                                                  │
-     ┌────────────────────────────────────────────┘
-     │
-     ▼
-  { value: data, done: false }
-     │
-     ▼
-  x = data
-  console.log(x)
-     │
-     ▼
-  gen.next()  ← keyingi iteratsiya
-     │
-     ... (repeat)
-```
-
-### Under the Hood
-
-Async generator ikki protocol'ni birlashtiradi:
+Real-time event streaming:
 
 ```javascript
-// Async Iterable Protocol:
-// obj[Symbol.asyncIterator]() → async iterator qaytaradi
-
-// Async Iterator Protocol:
-// iterator.next() → Promise<{ value, done }> qaytaradi
-
-// ⚠️ for await...of avval Symbol.asyncIterator qidiradi,
-// agar yo'q bo'lsa — Symbol.iterator ga fallback qiladi
-
-async function* myAsyncGen() {
-  yield 1;
-}
-
-const ag = myAsyncGen();
-console.log(typeof ag[Symbol.asyncIterator]); // "function"
-console.log(ag[Symbol.asyncIterator]() === ag); // true — o'zini qaytaradi
-```
-
-```javascript
-// for await...of DESUGARED:
-async function forAwaitOfDesugared(asyncIterable, callback) {
-  // 1. Async iterator olish
-  const method = asyncIterable[Symbol.asyncIterator]
-    ?? asyncIterable[Symbol.iterator]; // fallback
-
-  const iterator = method.call(asyncIterable);
-  let result;
+async function* eventStream(url) {
+  const eventSource = new EventSource(url);
 
   try {
     while (true) {
-      // 2. next() ni AWAIT qilish
-      result = await iterator.next();
+      const event = await new Promise((resolve, reject) => {
+        eventSource.onmessage = (e) => resolve(JSON.parse(e.data));
+        eventSource.onerror = (e) => reject(new Error("SSE xato"));
+      });
 
-      if (result.done) break;
-
-      // 3. Callback (loop body)
-      await callback(result.value);
+      yield event;
     }
   } finally {
-    // 4. Cleanup
-    if (!result?.done && typeof iterator.return === "function") {
-      await iterator.return();
-    }
-  }
-}
-```
-
-### Kod Misollari
-
-```javascript
-// Real-world: Event stream processing
-async function* createEventStream(eventTarget, eventName) {
-  // Event'larni async generator orqali stream qilish
-  const events = [];
-  let resolve;
-
-  const handler = (event) => {
-    events.push(event);
-    if (resolve) {
-      resolve();
-      resolve = null;
-    }
-  };
-
-  eventTarget.addEventListener(eventName, handler);
-
-  try {
-    while (true) {
-      if (events.length > 0) {
-        yield events.shift();
-      } else {
-        // Yangi event kutish
-        await new Promise(r => { resolve = r; });
-      }
-    }
-  } finally {
-    eventTarget.removeEventListener(eventName, handler);
-    console.log("Event listener tozalandi");
-  }
-}
-
-// Ishlatish (browser):
-// for await (const event of createEventStream(button, "click")) {
-//   console.log("Click:", event.clientX, event.clientY);
-//   if (someCondition) break; // finally ishlaydi, listener o'chiriladi
-// }
-```
-
-```javascript
-// Readable Stream bilan (Node.js / Browser Streams API)
-async function* readLines(stream) {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) {
-        if (buffer) yield buffer; // Oxirgi qator
-        return;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop(); // Oxirgi to'liqmas qator
-
-      for (const line of lines) {
-        yield line;
-      }
-    }
-  } finally {
-    reader.releaseLock();
+    eventSource.close(); // Cleanup
+    console.log("Event stream yopildi");
   }
 }
 
 // Ishlatish:
-// const response = await fetch("https://api.example.com/large-file");
-// for await (const line of readLines(response.body)) {
-//   console.log(line);
-// }
+for await (const event of eventStream('/api/events')) {
+  console.log("Yangi event:", event.type);
+
+  if (event.type === 'shutdown') break;
+}
+```
+
+Interval bilan data polling:
+
+```javascript
+async function* poll(fn, intervalMs = 5000) {
+  while (true) {
+    yield await fn();
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+}
+
+// Har 5 sekundda serverdan status olish:
+for await (const status of poll(() => fetch('/api/status').then(r => r.json()))) {
+  console.log("Server status:", status.health);
+
+  if (status.health === 'critical') {
+    await sendAlert("Server critical!");
+    break;
+  }
+}
 ```
 
 ---
@@ -1868,75 +1361,54 @@ async function* readLines(stream) {
 
 ### Lazy Evaluation
 
-Generator'ning eng asosiy kuchi — **lazy evaluation**. Qiymatlar faqat so'ralganda hisoblanadi, oldindan emas.
+Qiymatlar faqat **so'ralganda** hisoblanadi — oldindan barchasini memory'ga yuklash shart emas:
 
 ```javascript
-// ❌ Eager: hamma qiymat oldindan hisoblanadi
-function getSquares(n) {
-  const result = [];
-  for (let i = 1; i <= n; i++) {
-    result.push(i * i); // Hamma qiymat hoziroq
-  }
-  return result;
-}
-const squares = getSquares(1_000_000); // 1M element Array — ~8MB memory
-
-// ✅ Lazy: faqat kerak bo'lganda hisoblanadi
-function* getSquaresLazy(n) {
-  for (let i = 1; i <= n; i++) {
-    yield i * i; // Faqat next() chaqirilganda
-  }
-}
-const squaresLazy = getSquaresLazy(1_000_000); // 0 memory — faqat Generator object
-
-// Faqat 3 ta kerak:
-const [a, b, c] = squaresLazy; // 1, 4, 9 — qolgan 999,997 ta hisoblaNMAdi!
-```
-
-```javascript
-// Pipeline — lazy transformation chain
-function* map(iterable, fn) {
+function* lazyMap(iterable, fn) {
   for (const item of iterable) {
     yield fn(item);
   }
 }
 
-function* filter(iterable, predicate) {
+function* lazyFilter(iterable, predicate) {
   for (const item of iterable) {
     if (predicate(item)) yield item;
   }
 }
 
-function* take(iterable, count) {
-  let i = 0;
+function* lazyTake(iterable, n) {
+  let count = 0;
   for (const item of iterable) {
-    if (i++ >= count) return;
+    if (count >= n) return;
     yield item;
+    count++;
   }
 }
 
-// Pipeline: 1-∞ dan juft sonlarni olib, kvadrat qilib, 5 tasini ol
+// 1 millionlik array yaratmasdan — lazy pipeline:
 function* naturals() {
   let n = 1;
   while (true) yield n++;
 }
 
-const pipeline = take(
-  map(
-    filter(naturals(), n => n % 2 === 0),
-    n => n * n
+const result = lazyTake(
+  lazyFilter(
+    lazyMap(naturals(), x => x * x),  // 1, 4, 9, 16, 25, ...
+    x => x % 2 === 0                  // 4, 16, 36, 64, ...
   ),
-  5
+  5                                    // birinchi 5 tasi
 );
 
-console.log([...pipeline]); // [4, 16, 36, 64, 100]
-// Infinite sequence edi — lekin faqat 10 ta natural son hisoblandi!
+console.log([...result]); // [4, 16, 36, 64, 100]
+// Faqat 10 ta natural son ishlatildi — cheksiz bo'lsa ham!
 ```
 
 ### Infinite Sequences
 
+Cheksiz ketma-ketliklar — memory sarflamaydi, chunki lazy:
+
 ```javascript
-// Fibonacci — cheksiz ketma-ketlik
+// Fibonacci — cheksiz
 function* fibonacci() {
   let [a, b] = [0, 1];
   while (true) {
@@ -1946,1239 +1418,507 @@ function* fibonacci() {
 }
 
 // Birinchi 10 ta Fibonacci soni
-console.log([...take(fibonacci(), 10)]);
-// [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
+const fib10 = [...lazyTake(fibonacci(), 10)];
+console.log(fib10); // [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
 
-// 1000-dan kichik Fibonacci sonlari
-function* takeWhile(iterable, predicate) {
-  for (const item of iterable) {
-    if (!predicate(item)) return;
-    yield item;
-  }
-}
-console.log([...takeWhile(fibonacci(), n => n < 1000)]);
-// [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987]
-```
-
-```javascript
-// Unique ID Generator
-function* idGenerator(prefix = "id") {
-  let id = 0;
+// Unique ID generator
+function* idGenerator(prefix = 'id') {
+  let counter = 0;
   while (true) {
-    yield `${prefix}_${++id}`;
+    yield `${prefix}_${counter++}_${Date.now()}`;
   }
 }
 
-const userId = idGenerator("user");
-const orderId = idGenerator("order");
-
-console.log(userId.next().value);  // "user_1"
-console.log(userId.next().value);  // "user_2"
-console.log(orderId.next().value); // "order_1"
-console.log(userId.next().value);  // "user_3"
-console.log(orderId.next().value); // "order_2"
-```
-
-```javascript
-// Cheksiz cyclic iterator
-function* cycle(arr) {
-  while (true) {
-    yield* arr;
-  }
-}
-
-const colors = cycle(["qizil", "yashil", "ko'k"]);
-console.log(colors.next().value); // "qizil"
-console.log(colors.next().value); // "yashil"
-console.log(colors.next().value); // "ko'k"
-console.log(colors.next().value); // "qizil" ← boshidan
-console.log(colors.next().value); // "yashil"
+const ids = idGenerator('user');
+console.log(ids.next().value); // "user_0_1709456789123"
+console.log(ids.next().value); // "user_1_1709456789124"
 ```
 
 ### State Machines
 
-Generator — state machine implement qilish uchun juda qulay. Har bir `yield` — bu state o'tishi (transition).
+Generator'ning pause/resume xususiyati state machine implement qilish uchun ideal:
 
 ```javascript
-// Traffic Light State Machine
 function* trafficLight() {
   while (true) {
-    yield "🔴 QIZIL";     // To'xtang
-    yield "🟡 SARIQ";     // Tayyorlaning
-    yield "🟢 YASHIL";    // Yuring
-    yield "🟡 SARIQ";     // Sekinlang
+    yield "🔴 QIZIL";    // 30s
+    yield "🟡 SARIQ";    // 5s
+    yield "🟢 YASHIL";   // 25s
+    yield "🟡 SARIQ";    // 5s
   }
 }
 
 const light = trafficLight();
+// setInterval bilan yoki event bilan boshqarish mumkin
 console.log(light.next().value); // "🔴 QIZIL"
 console.log(light.next().value); // "🟡 SARIQ"
 console.log(light.next().value); // "🟢 YASHIL"
 console.log(light.next().value); // "🟡 SARIQ"
-console.log(light.next().value); // "🔴 QIZIL" ← boshidan
+console.log(light.next().value); // "🔴 QIZIL" — boshidan
 ```
 
-```javascript
-// Advanced: Input-dependent state machine
-function* authStateMachine() {
-  let state = "LOGGED_OUT";
+HTTP request state machine:
 
+```javascript
+function* httpRequestFSM() {
   while (true) {
-    const action = yield { state, message: getStateMessage(state) };
+    // IDLE state
+    const config = yield { state: "IDLE", message: "Kutilmoqda" };
 
-    switch (state) {
-      case "LOGGED_OUT":
-        if (action?.type === "LOGIN") {
-          if (action.credentials) {
-            state = "AUTHENTICATING";
-          }
-        }
-        break;
-
-      case "AUTHENTICATING":
-        if (action?.type === "SUCCESS") {
-          state = "LOGGED_IN";
-        } else if (action?.type === "FAILURE") {
-          state = "ERROR";
-        }
-        break;
-
-      case "LOGGED_IN":
-        if (action?.type === "LOGOUT") {
-          state = "LOGGED_OUT";
-        }
-        break;
-
-      case "ERROR":
-        if (action?.type === "RETRY") {
-          state = "AUTHENTICATING";
-        } else if (action?.type === "CANCEL") {
-          state = "LOGGED_OUT";
-        }
-        break;
-    }
-  }
-}
-
-function getStateMessage(state) {
-  const messages = {
-    LOGGED_OUT: "Tizimga kiring",
-    AUTHENTICATING: "Tekshirilmoqda...",
-    LOGGED_IN: "Xush kelibsiz!",
-    ERROR: "Xato! Qayta urinib ko'ring"
-  };
-  return messages[state];
-}
-
-const auth = authStateMachine();
-console.log(auth.next());
-// { value: { state: "LOGGED_OUT", message: "Tizimga kiring" }, done: false }
-
-console.log(auth.next({ type: "LOGIN", credentials: { user: "ali", pass: "123" } }));
-// { value: { state: "AUTHENTICATING", message: "Tekshirilmoqda..." }, done: false }
-
-console.log(auth.next({ type: "SUCCESS" }));
-// { value: { state: "LOGGED_IN", message: "Xush kelibsiz!" }, done: false }
-
-console.log(auth.next({ type: "LOGOUT" }));
-// { value: { state: "LOGGED_OUT", message: "Tizimga kiring" }, done: false }
-```
-
-### Async Flow Control
-
-Generator'lar async/await dan OLDIN async flow control uchun ishlatilgan. `co` library va Redux-saga shu tamoyilda ishlaydi.
-
-```javascript
-// "co" pattern — async/await ning "otasi"
-// async/await aslida generator + promise bo'lib tug'ilgan
-
-// Generator bilan async flow:
-function* fetchUserFlow(userId) {
-  const user = yield fetch(`/api/users/${userId}`).then(r => r.json());
-  const posts = yield fetch(`/api/users/${user.id}/posts`).then(r => r.json());
-  return { user, posts };
-}
-
-// "co" runner — generator'ni avtomatik bajaradi
-function co(generatorFn, ...args) {
-  return new Promise((resolve, reject) => {
-    const gen = generatorFn(...args);
-
-    function step(nextFn) {
-      let result;
-      try {
-        result = nextFn();
-      } catch (err) {
-        return reject(err);
-      }
-
-      if (result.done) {
-        return resolve(result.value);
-      }
-
-      // yield qilingan Promise ni resolve qilib, natijani generator'ga qaytaramiz
-      Promise.resolve(result.value).then(
-        value => step(() => gen.next(value)),    // Natijani berish
-        err => step(() => gen.throw(err))        // Xatoni yuborish
-      );
-    }
-
-    step(() => gen.next());
-  });
-}
-
-// Ishlatish:
-// co(fetchUserFlow, 42).then(data => console.log(data));
-
-// ☝️ async/await xuddi shunday ishlaydi, faqat engine ichida!
-// async function === generator function*
-// await === yield
-// V8 engine "co" runner o'rniga o'zi bajaradi
-```
-
-```javascript
-// Redux-Saga tushunchasi — side effect management
-// Redux-Saga generator'lardan "effect descriptor" oladi va bajaradi
-
-// Saga — generator function
-function* userSaga() {
-  // takeEvery — har bir "FETCH_USER" action'da ishlaydi
-  while (true) {
-    const action = yield { type: "TAKE", pattern: "FETCH_USER" };
+    // LOADING state
+    yield { state: "LOADING", message: `So'rov yuborilmoqda: ${config.url}` };
 
     try {
-      yield { type: "PUT", action: { type: "FETCH_USER_LOADING" } };
+      const response = await fetch(config.url);
+      const data = await response.json();
 
-      const user = yield {
-        type: "CALL",
-        fn: fetch,
-        args: [`/api/users/${action.payload.id}`]
-      };
-
-      yield {
-        type: "PUT",
-        action: { type: "FETCH_USER_SUCCESS", payload: user }
-      };
+      // SUCCESS state
+      yield { state: "SUCCESS", data };
     } catch (err) {
-      yield {
-        type: "PUT",
-        action: { type: "FETCH_USER_ERROR", payload: err.message }
-      };
+      // ERROR state
+      const shouldRetry = yield { state: "ERROR", error: err.message };
+
+      if (shouldRetry) continue; // boshidan
     }
   }
 }
-
-// ☝️ Generator HECH NARSA BAJARMAYDI — faqat "nima qilish kerak" ni ta'riflaydi
-// Redux-Saga middleware bu effect'larni o'zi bajaradi
-// Bu testing ni osonlashtiradi — generator'ni oddiy next() bilan test qilish mumkin:
-
-// const gen = userSaga();
-// gen.next(); // → { type: "TAKE", pattern: "FETCH_USER" }
-// gen.next({ type: "FETCH_USER", payload: { id: 1 } });
-// → { type: "PUT", action: { type: "FETCH_USER_LOADING" } }
-// ... va hokazo — hech qanday real API chaqiruv yo'q!
 ```
 
 ### Data Streaming / Pagination
 
-```javascript
-// Paginated API — sahifama-sahifa ma'lumot olish
-async function* fetchPaginated(baseUrl, pageSize = 10) {
-  let page = 1;
-  let totalFetched = 0;
-
-  while (true) {
-    const url = `${baseUrl}?page=${page}&limit=${pageSize}`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    // Har bir item ni alohida yield qilish
-    for (const item of data.results) {
-      yield item;
-      totalFetched++;
-    }
-
-    // Keyingi sahifa bormi?
-    if (!data.hasNextPage || data.results.length === 0) {
-      console.log(`Jami ${totalFetched} ta element olindi`);
-      return;
-    }
-
-    page++;
-  }
-}
-
-// Ishlatish:
-// const users = fetchPaginated("https://api.example.com/users", 20);
-//
-// for await (const user of users) {
-//   console.log(user.name);
-//   // Kerak bo'lsa break — keyingi sahifalar yuklanMAYDI (lazy!)
-// }
-```
+Katta ma'lumotlarni bo'laklab qayta ishlash:
 
 ```javascript
-// Infinite scroll implementatsiyasi tushunchasi
-async function* infiniteScrollSource(fetchPage) {
-  let page = 1;
-  let isLoading = false;
+async function* readCSVLines(filePath) {
+  const stream = createReadStream(filePath, { encoding: 'utf-8' });
+  let buffer = '';
 
-  while (true) {
-    isLoading = true;
-    const items = await fetchPage(page);
-    isLoading = false;
+  for await (const chunk of stream) {
+    buffer += chunk;
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // oxirgi tugallanmagan qatorni saqlash
 
-    if (items.length === 0) return; // Ma'lumot tugadi
-
-    yield { items, page, isLoading: false };
-    page++;
-
-    // Keyingi sahifani FAQAT next() chaqirilganda yuklaydi
-    // Ya'ni foydalanuvchi scroll qilganda
-  }
-}
-
-// const scroller = infiniteScrollSource(async (page) => {
-//   const res = await fetch(`/api/items?page=${page}`);
-//   return res.json();
-// });
-//
-// // Scroll event'da:
-// const { value } = await scroller.next();
-// renderItems(value.items);
-```
-
-### Tree Traversal
-
-```javascript
-// Binary Search Tree bilan
-class BST {
-  #root = null;
-
-  insert(value) {
-    const node = { value, left: null, right: null };
-    if (!this.#root) {
-      this.#root = node;
-      return this;
-    }
-
-    let current = this.#root;
-    while (true) {
-      if (value < current.value) {
-        if (!current.left) { current.left = node; return this; }
-        current = current.left;
-      } else {
-        if (!current.right) { current.right = node; return this; }
-        current = current.right;
-      }
+    for (const line of lines) {
+      yield line.split(',');
     }
   }
 
-  // In-order traversal (sorted)
-  *inOrder(node = this.#root) {
-    if (!node) return;
-    yield* this.inOrder(node.left);
-    yield node.value;
-    yield* this.inOrder(node.right);
-  }
-
-  // Pre-order traversal
-  *preOrder(node = this.#root) {
-    if (!node) return;
-    yield node.value;
-    yield* this.preOrder(node.left);
-    yield* this.preOrder(node.right);
-  }
-
-  // Post-order traversal
-  *postOrder(node = this.#root) {
-    if (!node) return;
-    yield* this.postOrder(node.left);
-    yield* this.postOrder(node.right);
-    yield node.value;
-  }
-
-  // Level-order (BFS) — generator bilan
-  *levelOrder() {
-    if (!this.#root) return;
-    const queue = [this.#root];
-
-    while (queue.length > 0) {
-      const node = queue.shift();
-      yield node.value;
-
-      if (node.left) queue.push(node.left);
-      if (node.right) queue.push(node.right);
-    }
-  }
-
-  // Default iterator — sorted (in-order)
-  [Symbol.iterator]() {
-    return this.inOrder();
+  if (buffer) {
+    yield buffer.split(',');
   }
 }
 
-const tree = new BST();
-tree.insert(5).insert(3).insert(7).insert(1).insert(4).insert(6).insert(8);
-
-//       5
-//      / \
-//     3   7
-//    / \ / \
-//   1  4 6  8
-
-console.log([...tree]);                // [1, 3, 4, 5, 6, 7, 8]  — in-order (sorted!)
-console.log([...tree.preOrder()]);     // [5, 3, 1, 4, 7, 6, 8]  — pre-order
-console.log([...tree.postOrder()]);    // [1, 4, 3, 6, 8, 7, 5]  — post-order
-console.log([...tree.levelOrder()]);   // [5, 3, 7, 1, 4, 6, 8]  — level-order
-
-// for...of ishlaydi (sorted tartibda)
-for (const val of tree) {
-  console.log(val);
+// 10GB CSV faylni 1 qatordangina memory ishlatib o'qish:
+for await (const [name, email, age] of readCSVLines('users.csv')) {
+  await processUser({ name, email, age: Number(age) });
 }
-```
-
-```javascript
-// File system tree traversal (Node.js)
-// const fs = require('fs');
-// const path = require('path');
-
-async function* walkDirectory(dir) {
-  // const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-
-  // Simulated file system
-  const entries = [
-    { name: "src", isDirectory: () => true },
-    { name: "index.js", isDirectory: () => false },
-    { name: "package.json", isDirectory: () => false },
-  ];
-
-  for (const entry of entries) {
-    const fullPath = `${dir}/${entry.name}`;
-
-    if (entry.isDirectory()) {
-      yield { type: "directory", path: fullPath };
-      yield* walkDirectory(fullPath); // Recursive delegation
-    } else {
-      yield { type: "file", path: fullPath };
-    }
-  }
-}
-
-// Ishlatish:
-// for await (const entry of walkDirectory("./project")) {
-//   if (entry.type === "file" && entry.path.endsWith(".js")) {
-//     console.log("JS file:", entry.path);
-//   }
-// }
 ```
 
 ---
 
 ## Common Mistakes
 
-### 1. Generator funksiyani qayta ishlatmoqchi bo'lish
+### ❌ Xato 1: Generator'ni Qayta Ishlatish
 
 ```javascript
-// ❌ Anti-pattern: Generator OBJECT ni qayta ishlatish
-function* counter() {
+function* nums() {
   yield 1;
   yield 2;
   yield 3;
 }
 
-const gen = counter(); // Bitta generator object
+const gen = nums();
 console.log([...gen]); // [1, 2, 3]
-console.log([...gen]); // [] ← BO'SH! Generator allaqachon "completed"
-
-// ✅ Correct: Har safar YANGI generator object yaratish
-console.log([...counter()]); // [1, 2, 3]
-console.log([...counter()]); // [1, 2, 3] ← Yangi generator = yangi iteratsiya
-
-// 🔍 Nima uchun? Generator object bir martali (one-shot) — "completed" state'ga o'tgandan keyin
-// hech qachon "suspendedStart"ga qaytmaydi. Bu ECMAScript spec da belgilangan.
+console.log([...gen]); // [] ← BO'SH! Generator exhausted!
 ```
 
-### 2. `for...of` da `return` qiymatini kutish
+### ✅ To'g'ri usul:
 
 ```javascript
-// ❌ Anti-pattern: return qiymatini for...of da kutish
+// Har safar yangi generator yaratish:
+console.log([...nums()]); // [1, 2, 3]
+console.log([...nums()]); // [1, 2, 3]
+
+// Yoki iterable ob'ekt:
+const iterableNums = {
+  *[Symbol.iterator]() {
+    yield 1; yield 2; yield 3;
+  }
+};
+console.log([...iterableNums]); // [1, 2, 3]
+console.log([...iterableNums]); // [1, 2, 3] ← har safar yangi iterator
+```
+
+**Nima uchun:** Generator object bir yo'nalishli — tugagandan keyin qayta boshlanmaydi. Har safar yangi generator instance kerak. Iterable ob'ekt esa `[Symbol.iterator]()` har safar **yangi** iterator qaytaradi.
+
+---
+
+### ❌ Xato 2: Cheksiz Generator'ni Spread/Array.from Qilish
+
+```javascript
+function* naturals() {
+  let n = 1;
+  while (true) yield n++;
+}
+
+// ❌ CHEKSIZ LOOP → OutOfMemoryError → crash!
+const arr = [...naturals()];
+const arr2 = Array.from(naturals());
+```
+
+### ✅ To'g'ri usul:
+
+```javascript
+// Take helper bilan cheklash:
+function* take(iterable, n) {
+  let count = 0;
+  for (const item of iterable) {
+    if (count >= n) return;
+    yield item;
+    count++;
+  }
+}
+
+const first100 = [...take(naturals(), 100)]; // Xavfsiz
+```
+
+**Nima uchun:** Spread va `Array.from` iterator'ni **oxirigacha** o'qiydi. Cheksiz generator'da oxiri yo'q — cheksiz memory sarflanadi.
+
+---
+
+### ❌ Xato 3: yield Callback Ichida
+
+```javascript
+function* processItems(items) {
+  items.forEach(item => {
+    yield transform(item); // ❌ SyntaxError!
+  });
+}
+```
+
+### ✅ To'g'ri usul:
+
+```javascript
+function* processItems(items) {
+  for (const item of items) {
+    yield transform(item); // ✅ Generator ichida — to'g'ri
+  }
+}
+```
+
+**Nima uchun:** `yield` faqat **to'g'ridan-to'g'ri** generator funksiya ichida ishlatiladi. Nested callback (arrow yoki ordinary) — boshqa funksiya hisoblanadi, generator emas.
+
+---
+
+### ❌ Xato 4: Birinchi next() ga Argument Berish
+
+```javascript
+function* gen() {
+  const x = yield "savol";
+  console.log(x);
+}
+
+const g = gen();
+g.next("bu ignore bo'ladi"); // ← BIRINCHI next() — argument IGNORE
+// { value: "savol", done: false }
+// x hali assign bo'lmagan — faqat keyingi next() da bo'ladi
+
+g.next("shu x ga tushadi");
+// x = "shu x ga tushadi"
+```
+
+**Nima uchun:** Birinchi `next()` generator'ni boshlaydi — birinchi `yield` gacha ishlaydi. Bu paytda hali `yield` uchralmagan, shuning uchun argument qabul qilish uchun joy yo'q.
+
+---
+
+### ❌ Xato 5: for...of da return Qiymati Ko'rinmaydi
+
+```javascript
 function* gen() {
   yield 1;
   yield 2;
-  return 3; // ← Bu for...of da KO'RINMAYDI!
+  return 3; // ⚠️ for...of da ko'rinMAYDI
 }
 
-const results = [];
 for (const val of gen()) {
-  results.push(val);
+  console.log(val); // 1, 2 — 3 CHIQMAYDI!
 }
-console.log(results); // [1, 2] ← 3 YO'Q!
-
-// ✅ Correct: return qiymati faqat next() orqali ko'rinadi
-const g = gen();
-console.log(g.next()); // { value: 1, done: false }
-console.log(g.next()); // { value: 2, done: false }
-console.log(g.next()); // { value: 3, done: true } ← done: true bo'lganda value bor
-
-// Yoki spread ham return ni bermaydi:
-console.log([...gen()]); // [1, 2] ← 3 yo'q
-
-// 🔍 Nima uchun? for...of va spread done: true bo'lishi bilan TO'XTAYDI.
-// done: true dagi value ni IGNORE qiladi. Bu spec bo'yicha shunday ishlaydi.
-// yield* esa return qiymatini oladi — bu farqni bilish kerak.
 ```
 
-### 3. Birinchi `next()` ga argument berish va natija kutish
+### ✅ To'g'ri usul:
 
 ```javascript
-// ❌ Anti-pattern: Birinchi next() ga argument berish
-function* greet() {
-  const name = yield "Ismingiz?";
-  return `Salom, ${name}!`;
-}
-
-const g = greet();
-// Xato tushuncha: "Ali" ni birinchi next ga bersam, name = "Ali" bo'ladi
-console.log(g.next("Ali")); // { value: "Ismingiz?", done: false }
-// "Ali" IGNORE bo'ldi! ⚠️
-console.log(g.next("Vali")); // { value: "Salom, Vali!", done: true }
-
-// ✅ Correct: Birinchi next() — argument'siz (yoki argument'i ignore bo'lishini bilish)
-const g2 = greet();
-g2.next();              // { value: "Ismingiz?", done: false } — generator'ni boshlash
-g2.next("Ali");         // { value: "Salom, Ali!", done: true }
-
-// 🔍 Nima uchun? Birinchi next() generator'ni BOSHLAYDI — birinchi yield gacha olib boradi.
-// Bu paytda hali "kutayotgan yield expression" yo'q, shuning uchun argument'ni qayerga berishni bilmaydi.
-```
-
-### 4. Async generator'da `for...of` (await siz) ishlatish
-
-```javascript
-// ❌ Anti-pattern: async generator'da oddiy for...of
-async function* asyncNums() {
+// return o'rniga yield ishlatish:
+function* gen() {
   yield 1;
   yield 2;
+  yield 3; // ✅ for...of da ko'rinadi
 }
 
-// for (const n of asyncNums()) {
-//   console.log(n);
-// }
-// TypeError: asyncNums() is not iterable
-// (u async iterable, oddiy iterable emas!)
-
-// ✅ Correct: for AWAIT...of ishlatish
-for await (const n of asyncNums()) {
-  console.log(n); // 1, 2
+// Yoki return qiymatini next() bilan olish:
+const g = gen();
+let result;
+while (!(result = g.next()).done) {
+  console.log(result.value);
 }
-
-// 🔍 Async generator [Symbol.asyncIterator] beradi, [Symbol.iterator] emas.
-// for...of faqat [Symbol.iterator] ni qidiradi.
-// for await...of esa avval [Symbol.asyncIterator], keyin [Symbol.iterator] ni qidiradi.
+console.log("Return:", result.value); // return qiymati
 ```
 
-### 5. Generator ichida `this` ni noto'g'ri ishlatish
-
-```javascript
-// ❌ Anti-pattern: Generator ichida this orqali state saqlash
-function* badCounter() {
-  this.count = 0;       // ⚠️ this — generator object emas!
-  while (true) {
-    this.count++;
-    yield this.count;
-  }
-}
-
-const bc = badCounter();
-// bc.next(); // this noaniq — strict mode da undefined, sloppy da global
-
-// ✅ Correct: Local variables yoki closure ishlatish
-function* goodCounter() {
-  let count = 0;
-  while (true) {
-    yield ++count;
-  }
-}
-
-const gc = goodCounter();
-console.log(gc.next().value); // 1
-console.log(gc.next().value); // 2
-
-// 🔍 Generator function ichida this — generator OBJECT ga emas,
-// chaqiruv kontekstiga bog'liq (oddiy function kabi).
-// State uchun doim local variable ishlatish kerak.
-```
+**Nima uchun:** `for...of` `done: true` bo'lganda tsiklni tugatadi va shu iteratsiya'ning `value` sini **o'qimaydi**. `return` qiymati `done: true` bilan keladi — shuning uchun skip bo'ladi.
 
 ---
 
 ## Amaliy Mashqlar
 
-### Mashq 1: Custom Range Iterable (Junior)
+### Mashq 1: Range Generator (Oson)
 
-Range class yozing. `new Range(1, 5)` — 1 dan 5 gacha sonlarni beruvchi iterable bo'lsin. `step` parameter'i ham qo'llab-quvvatlansin.
-
-```javascript
-// Kutilgan natija:
-// const r = new Range(1, 10, 2);
-// console.log([...r]); // [1, 3, 5, 7, 9]
-// for (const n of r) console.log(n); // 1, 3, 5, 7, 9
-// for (const n of new Range(5, 1, -1)) console.log(n); // 5, 4, 3, 2, 1
-```
-
-<details>
-<summary>Yechim</summary>
+**Savol:** `range(start, end, step)` generator'ini yozing — `start` dan `end` gacha `step` qadam bilan raqamlar yield qilsin. Manfiy step ham ishlashi kerak.
 
 ```javascript
-class Range {
-  #start;
-  #end;
-  #step;
-
-  constructor(start, end, step) {
-    this.#start = start;
-    this.#end = end;
-
-    // step berilmagan bo'lsa, yo'nalishni avtomatik aniqlash
-    if (step === undefined) {
-      this.#step = start <= end ? 1 : -1;
-    } else {
-      if (step === 0) throw new RangeError("Step 0 bo'la olmaydi");
-      this.#step = step;
-    }
-  }
-
-  // Generator bilan iterable qilish
-  *[Symbol.iterator]() {
-    const { start, end, step } = { start: this.#start, end: this.#end, step: this.#step };
-
-    if (step > 0) {
-      for (let i = start; i <= end; i += step) {
-        yield i;
-      }
-    } else {
-      for (let i = start; i >= end; i += step) {
-        yield i;
-      }
-    }
-  }
-
-  get size() {
-    return Math.max(0, Math.ceil((this.#end - this.#start + this.#step) / this.#step));
-  }
-
-  includes(value) {
-    if (this.#step > 0) {
-      return value >= this.#start && value <= this.#end && (value - this.#start) % this.#step === 0;
-    } else {
-      return value <= this.#start && value >= this.#end && (this.#start - value) % (-this.#step) === 0;
-    }
-  }
-
-  toString() {
-    return `Range(${this.#start}, ${this.#end}, step=${this.#step})`;
-  }
-}
-
 // Test:
-const r1 = new Range(1, 10, 2);
-console.log([...r1]); // [1, 3, 5, 7, 9]
-
-const r2 = new Range(5, 1, -1);
-console.log([...r2]); // [5, 4, 3, 2, 1]
-
-const r3 = new Range(0, 1, 0.2);
-console.log([...r3]); // [0, 0.2, 0.4, 0.6, 0.8, 1]
-
-// for...of
-for (const n of new Range(1, 5)) {
-  console.log(n); // 1, 2, 3, 4, 5
-}
-
-// Spread, destructuring
-const [first, second, ...rest] = new Range(10, 50, 10);
-console.log(first, second, rest); // 10 20 [30, 40, 50]
-```
-
-**Tushuntirish:**
-- `*[Symbol.iterator]()` — generator method. Har safar `for...of` chaqirilganda yangi generator yaratiladi
-- `step` manfiy bo'lishi mumkin — kamayib boruvchi ketma-ketlik uchun
-- `includes()` — element range'da bormi tekshiradi (O(1) — iteratsiya qilmasdan)
-- Private field'lar (`#start`, `#end`, `#step`) — tashqaridan o'zgartirib bo'lmaydi
-
-</details>
-
-### Mashq 2: Infinite Fibonacci Generator (Junior-Mid)
-
-Fibonacci generator yozing. Qo'shimcha: `take(n)`, `skip(n)`, va `takeWhile(predicate)` utility generator'larni ham yozing.
-
-```javascript
-// Kutilgan natija:
-// const fib = fibonacci();
-// console.log([...take(fib, 8)]); // [0, 1, 1, 2, 3, 5, 8, 13]
-// console.log([...takeWhile(fibonacci(), n => n < 100)]);
-// // [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
-// console.log([...take(skip(fibonacci(), 10), 5)]);
-// // [55, 89, 144, 233, 377]
+console.log([...range(1, 10, 2)]);    // [1, 3, 5, 7, 9]
+console.log([...range(5, 1, -1)]);    // [5, 4, 3, 2, 1]
+console.log([...range(0, 1, 0.2)]);   // [0, 0.2, 0.4, 0.6, 0.8, 1]
 ```
 
 <details>
-<summary>Yechim</summary>
+<summary>Javob</summary>
 
 ```javascript
-// Fibonacci — cheksiz generator
-function* fibonacci() {
-  let a = 0, b = 1;
-  while (true) {
-    yield a;
-    [a, b] = [b, a + b];
-  }
-}
+function* range(start, end, step = 1) {
+  if (step === 0) throw new Error("Step 0 bo'lishi mumkin emas");
 
-// Utility generators
-function* take(iterable, n) {
-  let count = 0;
-  for (const item of iterable) {
-    if (count++ >= n) return;
-    yield item;
-  }
-}
-
-function* skip(iterable, n) {
-  let count = 0;
-  for (const item of iterable) {
-    if (count++ >= n) {
-      yield item;
+  if (step > 0) {
+    for (let i = start; i <= end; i += step) {
+      yield Math.round(i * 1e10) / 1e10; // floating point fix
+    }
+  } else {
+    for (let i = start; i >= end; i += step) {
+      yield Math.round(i * 1e10) / 1e10;
     }
   }
 }
 
-function* takeWhile(iterable, predicate) {
-  for (const item of iterable) {
-    if (!predicate(item)) return;
-    yield item;
-  }
-}
+console.log([...range(1, 10, 2)]);  // [1, 3, 5, 7, 9]
+console.log([...range(5, 1, -1)]); // [5, 4, 3, 2, 1]
+console.log([...range(0, 1, 0.2)]); // [0, 0.2, 0.4, 0.6, 0.8, 1]
+```
 
-function* skipWhile(iterable, predicate) {
-  let skipping = true;
-  for (const item of iterable) {
-    if (skipping && predicate(item)) continue;
-    skipping = false;
-    yield item;
-  }
-}
+**Tushuntirish:** Step musbat yoki manfiy bo'lishiga qarab yo'nalish o'zgaradi. `Math.round` — floating point xatolarini oldini olish uchun (masalan, `0.1 + 0.2 !== 0.3`).
 
+</details>
+
+---
+
+### Mashq 2: Lazy Pipeline (O'rta)
+
+**Savol:** `pipe(...generators)` funksiyasini yozing — generator'larni zanjirlab, lazy pipeline yaratsin.
+
+```javascript
 // Test:
-console.log([...take(fibonacci(), 8)]);
-// [0, 1, 1, 2, 3, 5, 8, 13]
+function* double(iter) { for (const x of iter) yield x * 2; }
+function* addOne(iter) { for (const x of iter) yield x + 1; }
+function* takeN(n) { return function*(iter) { let i = 0; for (const x of iter) { if (i++ >= n) return; yield x; } } }
 
-console.log([...takeWhile(fibonacci(), n => n < 100)]);
-// [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
+const pipeline = pipe(
+  function*() { let n = 1; while (true) yield n++; }, // 1, 2, 3, ...
+  double,    // 2, 4, 6, ...
+  addOne,    // 3, 5, 7, ...
+);
 
-// 10 ta o'tkazib, keyingi 5 tasini ol
-console.log([...take(skip(fibonacci(), 10), 5)]);
-// [55, 89, 144, 233, 377]
-
-// 100 dan oshguncha o'tkazib, keyingi 3 ta
-console.log([...take(skipWhile(fibonacci(), n => n <= 100), 3)]);
-// [144, 233, 377]
-```
-
-**Tushuntirish:**
-- `fibonacci()` — cheksiz, lekin `take` va `takeWhile` orqali cheklanadi
-- Har bir utility generator **o'zi ham lazy** — zanjirlab ishlatish mumkin
-- `skip(fibonacci(), 10)` — birinchi 10 ta qiymatni o'tkazib yuboradi, lekin keyingilarini lazy beradi
-- Bu patternni **transducer** deb ham atashadi — functional programming da keng tarqalgan
-
-</details>
-
-### Mashq 3: Async Paginator (Mid-Senior)
-
-API pagination uchun async generator yozing. U sahifama-sahifa ma'lumot olsin va har bir item ni alohida `yield` qilsin. Retry logic va error handling ham bo'lsin.
-
-```javascript
-// Kutilgan natija:
-// for await (const user of paginate("https://api.example.com/users", { pageSize: 20 })) {
-//   console.log(user.name);
-//   if (user.id > 100) break; // Kerak bo'lganda to'xtatish — keyingi sahifalar yuklanmaydi
-// }
+console.log([...take(pipeline(), 5)]); // [3, 5, 7, 9, 11]
 ```
 
 <details>
-<summary>Yechim</summary>
+<summary>Javob</summary>
 
 ```javascript
-// Async paginator with retry logic
-async function* paginate(baseUrl, options = {}) {
-  const {
-    pageSize = 10,
-    maxRetries = 3,
-    retryDelay = 1000,
-    pageParam = "page",
-    limitParam = "limit",
-  } = options;
+function pipe(source, ...transforms) {
+  return function* () {
+    let current = source();
 
-  let page = 1;
-
-  while (true) {
-    // Retry logic
-    let data;
-    let lastError;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const url = `${baseUrl}?${pageParam}=${page}&${limitParam}=${pageSize}`;
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        data = await response.json();
-        break; // Muvaffaqiyatli — loop dan chiqish
-
-      } catch (err) {
-        lastError = err;
-        console.warn(`Sahifa ${page}, urinish ${attempt}/${maxRetries}: ${err.message}`);
-
-        if (attempt < maxRetries) {
-          // Exponential backoff
-          const delay = retryDelay * Math.pow(2, attempt - 1);
-          await new Promise(r => setTimeout(r, delay));
-        }
-      }
+    for (const transform of transforms) {
+      current = transform(current);
     }
 
-    // Barcha urinishlar muvaffaqiyatsiz
-    if (!data) {
-      throw new Error(
-        `Sahifa ${page} ni yuklab bo'lmadi (${maxRetries} urinishdan keyin): ${lastError.message}`
-      );
-    }
-
-    // Har bir item ni alohida yield qilish
-    const items = data.results ?? data.data ?? data.items ?? data;
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return; // Ma'lumot tugadi
-    }
-
-    for (const item of items) {
-      yield item;
-    }
-
-    // Keyingi sahifa bormi?
-    const hasMore = data.hasNextPage ?? data.next != null ?? items.length === pageSize;
-    if (!hasMore) return;
-
-    page++;
-  }
-}
-
-// Simulated test (real API o'rniga):
-async function* fakeApiPaginate() {
-  const allUsers = Array.from({ length: 50 }, (_, i) => ({
-    id: i + 1,
-    name: `User_${i + 1}`
-  }));
-
-  const pageSize = 10;
-  let page = 0;
-
-  while (page * pageSize < allUsers.length) {
-    // Network delay simulyatsiyasi
-    await new Promise(r => setTimeout(r, 100));
-
-    const start = page * pageSize;
-    const items = allUsers.slice(start, start + pageSize);
-
-    for (const item of items) {
-      yield item;
-    }
-
-    page++;
-  }
-}
-
-// Test:
-async function main() {
-  let count = 0;
-  for await (const user of fakeApiPaginate()) {
-    console.log(`${user.id}: ${user.name}`);
-    count++;
-    if (count >= 15) break; // Faqat 15 ta kerak — qolgan sahifalar yuklanMAYDI
-  }
-  console.log(`Jami: ${count} ta user olindi`);
-}
-
-// main();
-```
-
-**Tushuntirish:**
-- `paginate()` — universal async generator, har qanday paginated API bilan ishlaydi
-- **Retry logic** — network xatosida `maxRetries` marta qayta urinadi, exponential backoff bilan
-- **Lazy loading** — `break` qilsak keyingi sahifalar YUKLANMAYDI — network traffic tejaydi
-- `data.results ?? data.data ?? data.items ?? data` — turli API format'lariga moslashadi
-- Real production'da `AbortController` ham qo'shish kerak — `break` da active fetch'ni cancel qilish uchun
-
-</details>
-
-### Mashq 4: Tree Traversal Generator (Mid-Senior)
-
-Generic tree traversal generator yozing. DFS (pre-order, in-order, post-order) va BFS (level-order) traversal'larni qo'llab-quvvatlasin. Har qanday tree structure bilan ishlashi kerak.
-
-```javascript
-// Kutilgan natija:
-// const tree = { val: 1, children: [{ val: 2, children: [...] }, ...] };
-// console.log([...dfs(tree)]); // pre-order
-// console.log([...bfs(tree)]); // level-order
-```
-
-<details>
-<summary>Yechim</summary>
-
-```javascript
-// Generic tree traversal generators
-// Tree node format: { value: any, children: Node[] }
-// Yoki: { value: any, left: Node, right: Node } (binary tree)
-
-// Helper: node ning bolalarini olish (universal)
-function getChildren(node) {
-  if (node.children) return node.children;
-  // Binary tree
-  const kids = [];
-  if (node.left) kids.push(node.left);
-  if (node.right) kids.push(node.right);
-  return kids;
-}
-
-// DFS — Pre-order (Root → Left → Right)
-function* dfsPreOrder(node) {
-  if (!node) return;
-  yield node.value ?? node.val;
-  for (const child of getChildren(node)) {
-    yield* dfsPreOrder(child);
-  }
-}
-
-// DFS — Post-order (Left → Right → Root)
-function* dfsPostOrder(node) {
-  if (!node) return;
-  for (const child of getChildren(node)) {
-    yield* dfsPostOrder(child);
-  }
-  yield node.value ?? node.val;
-}
-
-// DFS — In-order (faqat binary tree: Left → Root → Right)
-function* dfsInOrder(node) {
-  if (!node) return;
-  yield* dfsInOrder(node.left);
-  yield node.value ?? node.val;
-  yield* dfsInOrder(node.right);
-}
-
-// BFS — Level-order
-function* bfs(root) {
-  if (!root) return;
-  const queue = [root];
-
-  while (queue.length > 0) {
-    const node = queue.shift();
-    yield node.value ?? node.val;
-
-    for (const child of getChildren(node)) {
-      queue.push(child);
-    }
-  }
-}
-
-// BFS — Level-order (level raqami bilan)
-function* bfsWithLevel(root) {
-  if (!root) return;
-  const queue = [{ node: root, level: 0 }];
-
-  while (queue.length > 0) {
-    const { node, level } = queue.shift();
-    yield { value: node.value ?? node.val, level };
-
-    for (const child of getChildren(node)) {
-      queue.push({ node: child, level: level + 1 });
-    }
-  }
-}
-
-// Test tree:
-//         1
-//       / | \
-//      2  3  4
-//     / \    |
-//    5   6   7
-//   /
-//  8
-
-const tree = {
-  value: 1,
-  children: [
-    {
-      value: 2,
-      children: [
-        {
-          value: 5,
-          children: [{ value: 8, children: [] }]
-        },
-        { value: 6, children: [] }
-      ]
-    },
-    { value: 3, children: [] },
-    {
-      value: 4,
-      children: [{ value: 7, children: [] }]
-    }
-  ]
-};
-
-console.log("Pre-order: ", [...dfsPreOrder(tree)]);
-// [1, 2, 5, 8, 6, 3, 4, 7]
-
-console.log("Post-order:", [...dfsPostOrder(tree)]);
-// [8, 5, 6, 2, 3, 7, 4, 1]
-
-console.log("BFS:       ", [...bfs(tree)]);
-// [1, 2, 3, 4, 5, 6, 7, 8]
-
-// Level bilan:
-for (const { value, level } of bfsWithLevel(tree)) {
-  console.log(`${"  ".repeat(level)}Level ${level}: ${value}`);
-}
-// Level 0: 1
-//   Level 1: 2
-//   Level 1: 3
-//   Level 1: 4
-//     Level 2: 5
-//     Level 2: 6
-//     Level 2: 7
-//       Level 3: 8
-
-// Binary tree test:
-const binaryTree = {
-  value: 4,
-  left: {
-    value: 2,
-    left: { value: 1, left: null, right: null },
-    right: { value: 3, left: null, right: null }
-  },
-  right: {
-    value: 6,
-    left: { value: 5, left: null, right: null },
-    right: { value: 7, left: null, right: null }
-  }
-};
-
-console.log("In-order (sorted):", [...dfsInOrder(binaryTree)]);
-// [1, 2, 3, 4, 5, 6, 7]
-```
-
-**Tushuntirish:**
-- `yield*` — recursive delegation bilan tree'ni "flat" qilish. Stack overflow xavfi kam — V8 generator'larni samarali handle qiladi
-- `getChildren()` — universal helper, generic va binary tree'lar bilan ishlaydi
-- BFS `queue` ishlatadi (FIFO), DFS call stack/yield* ishlatadi
-- **Lazy** — 1 million node'li tree'da ham birinchi 10 ta node'ni olish O(10), O(N) emas
-- Real-world: DOM traversal, file system walk, dependency graph analysis
-
-</details>
-
-### Mashq 5: State Machine Generator (Senior)
-
-Generator yordamida to'liq state machine implement qiling. State'lar, transition'lar, va guard'lar bo'lsin. Konfiguratsiya orqali yaratilsin (XState tushunchasi).
-
-```javascript
-// Kutilgan natija:
-// const machine = createMachine(config);
-// const service = machine();
-// service.next(); // { value: { state: "idle", ... }, done: false }
-// service.next({ type: "FETCH" }); // { value: { state: "loading", ... }, done: false }
-```
-
-<details>
-<summary>Yechim</summary>
-
-```javascript
-// Generator-based state machine (XState tushunchasi)
-function createMachine(config) {
-  const { id, initial, states, context: initialContext = {} } = config;
-
-  return function* stateMachine() {
-    let currentState = initial;
-    let context = { ...initialContext };
-
-    while (true) {
-      const stateConfig = states[currentState];
-
-      if (!stateConfig) {
-        throw new Error(`Unknown state: ${currentState}`);
-      }
-
-      // Entry action bajarish
-      if (stateConfig.entry) {
-        context = stateConfig.entry(context) ?? context;
-      }
-
-      // Final state — generator tugaydi
-      if (stateConfig.type === "final") {
-        return { state: currentState, context, final: true };
-      }
-
-      // Hozirgi state ni yield qilamiz, event (action) kutamiz
-      const event = yield {
-        state: currentState,
-        context: { ...context },
-        allowedEvents: Object.keys(stateConfig.on ?? {})
-      };
-
-      // Event tekshirish
-      if (!event || !event.type) {
-        continue; // Event berilmasa — shu state da qolamiz
-      }
-
-      const transition = stateConfig.on?.[event.type];
-      if (!transition) {
-        console.warn(`State "${currentState}" da "${event.type}" event handle qilinmaydi`);
-        continue;
-      }
-
-      // Transition object yoki string bo'lishi mumkin
-      const transitionConfig = typeof transition === "string"
-        ? { target: transition }
-        : transition;
-
-      // Guard tekshirish
-      if (transitionConfig.guard && !transitionConfig.guard(context, event)) {
-        console.warn(`Guard rad etdi: ${currentState} → ${transitionConfig.target}`);
-        continue;
-      }
-
-      // Exit action
-      if (stateConfig.exit) {
-        context = stateConfig.exit(context) ?? context;
-      }
-
-      // Context update (assign)
-      if (transitionConfig.assign) {
-        context = { ...context, ...transitionConfig.assign(context, event) };
-      }
-
-      // Action bajarish
-      if (transitionConfig.action) {
-        transitionConfig.action(context, event);
-      }
-
-      // State o'zgartirish
-      currentState = transitionConfig.target;
-    }
+    yield* current;
   };
 }
 
-// Misol: Fetch state machine
-const fetchMachine = createMachine({
-  id: "fetch",
-  initial: "idle",
-  context: {
-    data: null,
-    error: null,
-    retries: 0,
-    maxRetries: 3
-  },
-  states: {
-    idle: {
-      on: {
-        FETCH: {
-          target: "loading",
-          assign: () => ({ data: null, error: null })
-        }
-      }
-    },
-    loading: {
-      entry: (ctx) => {
-        console.log(`Loading... (urinish ${ctx.retries + 1})`);
-        return ctx;
-      },
-      on: {
-        SUCCESS: {
-          target: "success",
-          assign: (ctx, event) => ({ data: event.data, retries: 0 })
-        },
-        FAILURE: {
-          target: "failure",
-          assign: (ctx, event) => ({ error: event.error, retries: ctx.retries + 1 })
-        }
-      }
-    },
-    success: {
-      on: {
-        RESET: "idle",
-        REFETCH: {
-          target: "loading",
-          assign: () => ({ error: null })
-        }
-      }
-    },
-    failure: {
-      on: {
-        RETRY: {
-          target: "loading",
-          guard: (ctx) => ctx.retries < ctx.maxRetries, // Faqat limit ichida
-          assign: (ctx) => ({ error: null })
-        },
-        RESET: {
-          target: "idle",
-          assign: () => ({ data: null, error: null, retries: 0 })
-        }
+// Helper'lar:
+function* double(iter) {
+  for (const x of iter) yield x * 2;
+}
+
+function* addOne(iter) {
+  for (const x of iter) yield x + 1;
+}
+
+function* take(iter, n) {
+  let count = 0;
+  for (const x of iter) {
+    if (count++ >= n) return;
+    yield x;
+  }
+}
+
+// Ishlatish:
+const pipeline = pipe(
+  function* () { let n = 1; while (true) yield n++; },
+  double,
+  addOne,
+);
+
+console.log([...take(pipeline(), 5)]); // [3, 5, 7, 9, 11]
+```
+
+**Tushuntirish:** `pipe` generator'larni zanjirlab, har biri oldingi generator'dan o'qiydi. Hammasi **lazy** — faqat kerakli miqdorda hisoblaydi. Cheksiz source bo'lsa ham — `take` bilan chegaralash mumkin.
+
+</details>
+
+---
+
+### Mashq 3: Custom Iterable Object (O'rta)
+
+**Savol:** `Matrix` class'ini yozing — 2D massiv ustida `for...of` bilan elementlarni qator bo'ylab iterate qilsin, va `columns()` method'i ustun bo'ylab iterate qilsin.
+
+```javascript
+const m = new Matrix([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+console.log([...m]);             // [1, 2, 3, 4, 5, 6, 7, 8, 9]
+console.log([...m.columns()]);   // [1, 4, 7, 2, 5, 8, 3, 6, 9]
+```
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+class Matrix {
+  #data;
+
+  constructor(data) {
+    this.#data = data;
+  }
+
+  // Default: qator bo'ylab (row-major)
+  *[Symbol.iterator]() {
+    for (const row of this.#data) {
+      yield* row;
+    }
+  }
+
+  // Ustun bo'ylab (column-major)
+  *columns() {
+    const rows = this.#data.length;
+    const cols = this.#data[0]?.length ?? 0;
+
+    for (let col = 0; col < cols; col++) {
+      for (let row = 0; row < rows; row++) {
+        yield this.#data[row][col];
       }
     }
   }
-});
 
-// Test:
-const service = fetchMachine();
+  // Diagonal
+  *diagonal() {
+    const size = Math.min(this.#data.length, this.#data[0]?.length ?? 0);
+    for (let i = 0; i < size; i++) {
+      yield this.#data[i][i];
+    }
+  }
+}
 
-let result = service.next(); // start
-console.log(result.value);
-// { state: "idle", context: {...}, allowedEvents: ["FETCH"] }
+const m = new Matrix([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
 
-result = service.next({ type: "FETCH" });
-console.log(result.value);
-// Loading... (urinish 1)
-// { state: "loading", context: {...}, allowedEvents: ["SUCCESS","FAILURE"] }
+console.log([...m]);           // [1, 2, 3, 4, 5, 6, 7, 8, 9]
+console.log([...m.columns()]); // [1, 4, 7, 2, 5, 8, 3, 6, 9]
+console.log([...m.diagonal()]); // [1, 5, 9]
 
-result = service.next({ type: "FAILURE", error: "Network error" });
-console.log(result.value);
-// { state: "failure", context: { error: "Network error", retries: 1, ... } }
+// Destructuring ishlaydi
+const [a, b, c] = m; // a=1, b=2, c=3
 
-result = service.next({ type: "RETRY" });
-console.log(result.value);
-// Loading... (urinish 2)
-// { state: "loading", ... }
-
-result = service.next({ type: "SUCCESS", data: { users: [1, 2, 3] } });
-console.log(result.value);
-// { state: "success", context: { data: { users: [1,2,3] }, retries: 0, ... } }
+// for...of ishlaydi
+for (const val of m) {
+  process(val);
+}
 ```
 
-**Tushuntirish:**
-- `createMachine()` — konfiguratsiya bo'yicha generator funksiya yaratadi
-- **Guard** — transition shartli bo'lishi mumkin (`retries < maxRetries`)
-- **Assign** — context ni yangilash (immutable — har safar yangi object)
-- **Entry/Exit** — state'ga kirganda/chiqqanda bajariladigan action
-- Bu pattern XState, Robot, va boshqa state machine library'lari asosida yotadi
-- Generator'ning `next(event)` — two-way communication orqali event berish
-- **Testing oson** — generator'ni oddiy `next()` bilan step-by-step test qilish mumkin
+**Tushuntirish:** `[Symbol.iterator]()` — default iteration (qator bo'ylab). `columns()` — alohida generator method. Generator class method'i sifatida (`*methodName()`) — eng qulay yondashuv.
+
+</details>
+
+---
+
+### Mashq 4: Async Generator — Batched Processing (Qiyin)
+
+**Savol:** `batchProcess(asyncIterable, batchSize, processFn)` funksiyasini yozing — async iterable'dan elementlarni `batchSize` tadan yig'ib, `processFn` ga guruh bo'lib bersin.
+
+```javascript
+// Test:
+async function* generateItems() {
+  for (let i = 1; i <= 10; i++) {
+    await delay(50);
+    yield i;
+  }
+}
+
+await batchProcess(generateItems(), 3, async (batch) => {
+  console.log("Processing batch:", batch);
+  await delay(100);
+});
+// "Processing batch: [1, 2, 3]"
+// "Processing batch: [4, 5, 6]"
+// "Processing batch: [7, 8, 9]"
+// "Processing batch: [10]"
+```
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+async function batchProcess(asyncIterable, batchSize, processFn) {
+  let batch = [];
+
+  for await (const item of asyncIterable) {
+    batch.push(item);
+
+    if (batch.length >= batchSize) {
+      await processFn(batch);
+      batch = [];
+    }
+  }
+
+  // Oxirgi to'lmagan batch
+  if (batch.length > 0) {
+    await processFn(batch);
+  }
+}
+
+// Yoki generator versiya — batch'larni yield qilish:
+async function* batchify(asyncIterable, batchSize) {
+  let batch = [];
+
+  for await (const item of asyncIterable) {
+    batch.push(item);
+
+    if (batch.length >= batchSize) {
+      yield batch;
+      batch = [];
+    }
+  }
+
+  if (batch.length > 0) {
+    yield batch;
+  }
+}
+
+// Ishlatish:
+for await (const batch of batchify(generateItems(), 3)) {
+  console.log("Batch:", batch);
+  await processBatch(batch);
+}
+```
+
+**Tushuntirish:** `batchProcess` — async iterable'dan element yig'adi va `batchSize` ga yetganda processFn chaqiradi. `batchify` — generator versiya, batch'larni yield qiladi — bu yanada flexible.
 
 </details>
 
@@ -3186,28 +1926,28 @@ console.log(result.value);
 
 ## Xulosa
 
-1. **Iteration Protocol ikki qismdan iborat:** Iterable (`Symbol.iterator` method'i bor) va Iterator (`next()` method'i bor, `{ value, done }` qaytaradi). Bu standard protocol `for...of`, spread, destructuring kabi mexanizmlar uchun asos.
+1. **Iteration Protocol** — iterable (`[Symbol.iterator]()`) va iterator (`next()`) dan iborat standart shartnoma. `for...of`, spread, destructuring — barchasi shu protocol orqali ishlaydi.
 
-2. **`Symbol.iterator`** — object'ni iterable qiluvchi well-known symbol. Built-in iterable'lar: Array, String, Map, Set, arguments, TypedArray, NodeList.
+2. **Built-in iterable'lar:** Array, String, Map, Set, TypedArray, arguments, NodeList. **Object iterable emas** — `Object.entries()` ishlatamiz.
 
-3. **Custom iterator** — `[Symbol.iterator]()` method'ini implement qilib, har qanday object'ni iterable qilish mumkin. Har safar **yangi** iterator qaytarish kerak.
+3. **Custom iterator** — `[Symbol.iterator]()` method'ini implement qilish bilan istalgan ob'ektni iterable qilish mumkin. Generator bu jarayonni ancha soddalashtiradi.
 
-4. **`for...of` aslida iterator protocol ishlatadi** — `Symbol.iterator` chaqiradi, `next()` ni loop qiladi, `done: true` da to'xtaydi. `break` da `iterator.return()` chaqiradi.
+4. **Generator (`function*`)** — to'xtatilishi (yield) va davom ettirilishi (next) mumkin bo'lgan maxsus funksiya. Chaqirilganda generator object qaytaradi — kod hali bajarilMAGAN.
 
-5. **Generator (`function*`)** — pause/resume qilinadigan funksiya. `yield` da to'xtaydi, `next()` da davom etadi. V8 execution state'ni heap'da saqlaydi.
+5. **`yield`** — ikki yo'nalishda ishlaydi: tashqariga qiymat beradi (`yield value`) va ichkariga qabul qiladi (`next(sentValue)` → `yield` qiymati).
 
-6. **`yield`** — ikki yo'nalishli: tashqariga qiymat beradi (`yield value`) va ichkariga qiymat oladi (`const x = yield`). Birinchi `next()` argument'i har doim ignore bo'ladi.
+6. **`yield*`** — boshqa iterable yoki generator'ga delegatsiya. Recursive tree traversal uchun ideal.
 
-7. **Generator = tayyor iterator.** `*[Symbol.iterator]()` bilan qo'lda iterator yozishdan ko'ra generator ishlatish ancha sodda va xavfsiz.
+7. **`return()` va `throw()`** — generator'ni tashqaridan tugatish yoki xato tashish. `finally` bloklari cleanup uchun ishlaydi.
 
-8. **`yield*`** — boshqa iterable/generator'ga delegation. Recursive tree traversal va generator composition uchun juda kuchli.
+8. **Async generator (`async function*`)** — `yield` va `await` birgalikda. `for await...of` bilan ishlatiladi. Streaming, pagination, real-time event'lar uchun.
 
-9. **Async generators (`async function*`)** va `for await...of` — asinxron data stream'lar uchun. Pagination, real-time events, file streaming kabi use case'larda ishlatiladi.
+9. **Use cases:** Lazy evaluation (faqat kerakli miqdorni hisoblash), infinite sequences (memory saqlash), state machines (pause/resume), data streaming (katta fayllarni bo'laklab o'qish).
 
-10. **Use cases:** lazy evaluation (memory tejash), infinite sequences (fibonacci, ID generator), state machines (XState pattern), async flow control (Redux-saga, co pattern), data streaming/pagination, tree traversal — bularning hammasi generator'ning kuchli tomonlari.
+10. **Eng katta xatolar:** generator'ni qayta ishlatish (yangi instance kerak), cheksiz generator'ni spread qilish (crash), yield callback ichida (SyntaxError), birinchi `next()` ga argument berish (ignore bo'ladi).
 
 ---
 
-> **Oldingi bo'lim:** [13-async-await.md](13-async-await.md) — Async/Await: Promise ustiga syntactic sugar, try/catch, parallel execution
+> **Oldingi bo'lim:** [13-async-await.md](13-async-await.md) — Async/Await: parallel execution, retry pattern, AbortController, async iteration, under the hood.
 >
-> **Keyingi bo'lim:** [15-modules.md](15-modules.md) — Modules: import/export, CommonJS vs ESM, dynamic import, module resolution
+> **Keyingi bo'lim:** [15-modules.md](15-modules.md) — Modules: CommonJS vs ES Modules, dynamic imports, circular dependencies, tree shaking.
