@@ -1,18 +1,20 @@
 # Bo'lim 1: JavaScript Engine Ichidan
 
-> JavaScript kodi qanday qilib kompyuter tushunadigan tilga aylanadi — engine ichidan to'liq sayohat.
+> JavaScript Engine — JavaScript source code ni qabul qilib, uni machine code ga aylantiruvchi va bajaruvchi dasturiy ta'minot komponenti. Engine parsing, compilation, optimization va execution bosqichlarini o'z ichiga oladi.
 
 ---
 
 ## Mundarija
 
-- [JS Engine Nima?](#js-engine-nima)
-- [Source Code dan Machine Code gacha](#source-code-dan-machine-code-gacha)
+- [JavaScript Engine Nima](#javascript-engine-nima)
+- [Asosiy JavaScript Engine'lar](#asosiy-javascript-enginelar)
+- [Source Code dan Machine Code gacha — To'liq Pipeline](#source-code-dan-machine-code-gacha--toliq-pipeline)
 - [Parser va Tokenizer](#parser-va-tokenizer)
 - [AST — Abstract Syntax Tree](#ast--abstract-syntax-tree)
 - [Interpreter vs Compiler](#interpreter-vs-compiler)
-- [JIT Compilation — V8 Pipeline](#jit-compilation--v8-pipeline)
+- [JIT Compilation](#jit-compilation)
 - [Optimization va Deoptimization](#optimization-va-deoptimization)
+- [Hidden Classes va Inline Caching](#hidden-classes-va-inline-caching)
 - [Call Stack](#call-stack)
 - [Memory Heap](#memory-heap)
 - [Stack vs Heap](#stack-vs-heap)
@@ -22,113 +24,234 @@
 
 ---
 
-## JS Engine Nima?
+## JavaScript Engine Nima
 
 ### Nazariya
 
-JavaScript engine — bu JavaScript kodini qabul qilib, uni mashina tushunadigan past darajadagi instruksiyalarga aylantiradigan va bajaradigan maxsus dastur. Har bir brauzer va server-side muhit (Node.js, Deno, Bun) ning ichida aynan shu engine ishlaydi.
+JavaScript Engine — bu JavaScript source code ni o'qib, tahlil qilib (parse), compile qilib va bajaradigan (execute) dastur. Brauzerlar va Node.js kabi runtime'lar o'z ichida JavaScript Engine'ni saqlaydi. Engine JavaScript kodini CPU tushunadigan machine code (yoki bytecode) ga aylantiradi va uni bajaradi.
 
-Nima uchun engine kerak? Kompyuter protsessori (CPU) faqat **machine code** — ikkilik sanoq sistemasidagi instruksiyalar (0 va 1) ni tushunadi. Biz yozgan `let x = 5` kabi ifodalar CPU uchun umuman ma'nosiz matn. Engine aynan shu bo'shliqni to'ldiradi: u bizning o'qish uchun qulay bo'lgan yuqori darajadagi kodni CPU bajara oladigan past darajadagi instruksiyalarga aylantiradi.
+JavaScript dasturlash tili sifatida o'zi hech narsa bajarmaydi — u faqat matn (source code). Engine shu matnni oladi, uning ma'nosini tushunadi (parsing), uni optimallashtiradi va CPU uchun tushunarli ko'rsatmalarga aylantiradi. Shu jarayon tufayli `console.log("hello")` degan matn aslida ekranga yozuv chiqaradi.
 
-Bu jarayonni **tarjimon**ga o'xshatish mumkin. Tasavvur qiling, siz o'zbek tilida gaplashyapsiz, lekin qarshingizda faqat mashina tilini tushunadigan kompyuter bor. Engine — bu ikki tomon o'rtasidagi professional tarjimon bo'lib, u nafaqat tarjima qiladi, balki matnni **optimizatsiya** ham qiladi — tez-tez takrorlanadigan iboralarni yodlab, keyingi safar tezroq tarjima qiladi.
+Engine'ning asosiy vazifalari:
 
-Zamonaviy enginelar oddiy tarjimondan ancha murakkab. Ular kodni tahlil qiladi (parsing), oraliq ko'rinishga aylantiradi (bytecode), profiling orqali "issiq" (ko'p ishlatiladigan) kod qismlarini aniqlaydi va ularni yuqori samarali mashina kodiga compile qiladi. Bu ko'p bosqichli jarayon engine'larga bir vaqtning o'zida ham tezkor ishga tushishni (cold start), ham yuqori bajarish tezligini (peak performance) ta'minlash imkonini beradi.
-
-Real-world kontekstda engine nafaqat brauzer ichida ishlaydi. Node.js orqali server-side dasturlash, Electron orqali desktop ilovalar, React Native orqali mobil ilovalar — bularning barchasi ichida JavaScript engine turadi. Shuning uchun engine qanday ishlashini tushunish — bu nafaqat akademik bilim, balki production koddagi performance muammolarini tushunish va hal qilish uchun zaruriy ko'nikma.
-
-### Asosiy Enginelar
-
-| Engine | Ishlab chiqaruvchi | Qayerda ishlatiladi |
-|--------|-------------------|---------------------|
-| **V8** | Google | Chrome, Node.js, Deno, Edge |
-| **SpiderMonkey** | Mozilla | Firefox |
-| **JavaScriptCore (Nitro)** | Apple | Safari, Bun |
-| **Chakra** | Microsoft | Eski Edge (hozir V8 ga o'tgan) |
-| **Hermes** | Meta | React Native |
-
-**V8** hozirgi kunda eng keng tarqalgan engine — Chrome va Node.js ikkalasi ham V8 da ishlaydi. Shuning uchun biz asosan V8 misolida tushuntiramiz.
+1. **Parsing** — source code ni tokenlar va AST (Abstract Syntax Tree) ga aylantirish
+2. **Compilation** — AST ni bytecode yoki machine code ga aylantirish
+3. **Execution** — hosil bo'lgan kodni CPU da bajarish
+4. **Optimization** — ko'p chaqiriladigan (hot) kodni yanada tezroq machine code ga qayta compile qilish
+5. **Garbage Collection** — ishlatilmayotgan memory ni avtomatik tozalash
 
 ### Under the Hood
 
-Har bir engine bir xil ishni qiladi, lekin ichki implementatsiya farq qiladi:
+JavaScript engine'lar C++ tilida yozilgan. Engine aslida ikki asosiy komponentdan iborat:
 
 ```
-┌──────────────────────────────────────────────┐
-│              JavaScript Engine                │
-│                                               │
-│   Source Code                                 │
-│       ↓                                       │
-│   [Parser] → Tokenize → AST                  │
-│       ↓                                       │
-│   [Interpreter] → Bytecode → Bajarish         │
-│       ↓ (hot code)                            │
-│   [Optimizing Compiler] → Machine Code        │
-│       ↓ (deopt kerak bo'lsa)                  │
-│   [Deoptimization] → Bytecode ga qaytish      │
-│                                               │
-│   ┌─────────────┐    ┌──────────────┐         │
-│   │  Call Stack  │    │  Memory Heap │         │
-│   └─────────────┘    └──────────────┘         │
-└──────────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│           JavaScript Engine              │
+│                                          │
+│  ┌─────────────┐  ┌──────────────────┐  │
+│  │  Call Stack  │  │   Memory Heap    │  │
+│  │             │  │                  │  │
+│  │  Execution  │  │  Objects, arrays │  │
+│  │  context'lar│  │  functions va    │  │
+│  │  saqlanadi  │  │  boshqa reference│  │
+│  │             │  │  type'lar        │  │
+│  │             │  │  saqlanadi       │  │
+│  └─────────────┘  └──────────────────┘  │
+│                                          │
+│  ┌──────────────────────────────────┐   │
+│  │     Compiler / Interpreter       │   │
+│  │  (parsing, compilation,          │   │
+│  │   optimization pipeline)         │   │
+│  └──────────────────────────────────┘   │
+│                                          │
+│  ┌──────────────────────────────────┐   │
+│  │       Garbage Collector          │   │
+│  │  (ishlatilmagan memory ni        │   │
+│  │   avtomatik tozalash)            │   │
+│  └──────────────────────────────────┘   │
+└─────────────────────────────────────────┘
 ```
 
-Har bir engine o'zining interpreter va compiler nomlariga ega:
-
-| Engine | Interpreter | Optimizing Compiler |
-|--------|------------|-------------------|
-| V8 | Ignition | TurboFan |
-| SpiderMonkey | Baseline Interpreter | IonMonkey / Warp |
-| JavaScriptCore | LLInt | FTL (DFG → B3) |
+- **Call Stack** — funksiya chaqiruvlarini LIFO (Last In, First Out) tartibida boshqaradigan stack. Har bir funksiya chaqirilganda yangi frame qo'shiladi, tugaganda olib tashlanadi.
+- **Memory Heap** — dinamik xotira ajratish (allocation) sodir bo'ladigan joy. Object, array, function kabi reference type'lar bu yerda saqlanadi. Strukturasiz (unstructured) xotira bloki.
 
 ---
 
-## Source Code dan Machine Code gacha
+## Asosiy JavaScript Engine'lar
 
 ### Nazariya
 
-Biz `console.log("salom")` deb yozganda, bu oddiy ko'rinadigan qator aslida engine ichida bir necha murakkab bosqichdan o'tadi. Har bir bosqich o'z vazifasini bajaradi va natijani keyingi bosqichga uzatadi — xuddi zavod konveyeridek.
+Har bir brauzer va runtime o'zining JavaScript engine'iga ega. Ular bir xil ECMAScript spetsifikatsiyasini implement qiladi, lekin ichki arxitekturalari — parsing strategiyasi, compiler pipeline'i, optimization texnikalari — farq qiladi.
 
-Nima uchun bu qadar murakkab? Chunki inson uchun tushunarli bo'lgan `let x = 5` ifodasi CPU uchun hech qanday ma'no anglatmaydi. CPU faqat registrlar bilan ishlaydi, xotira manzillarini tushunadi va arifmetik operatsiyalar bajaradi. Engine bu ikki dunyo o'rtasidagi ko'prikdir.
+**V8 (Google)**
 
-Dastlabki JavaScript enginelar (masalan, Netscape dagi birinchi interpreter) kodni to'g'ridan-to'g'ri satr-bosatr interpretatsiya qilardi. Bu yondashuv tez ishga tushardi, lekin bajarish juda sekin edi. Zamonaviy enginelar esa **ko'p bosqichli pipeline** arxitekturasidan foydalanadi: avval kodni tez ishga tushirish uchun bytecode ga aylantiradi, keyin ko'p ishlatiladigan qismlarni optimallashtirilgan mashina kodiga compile qiladi. Bu yondashuv **"tez boshla, vaqt o'tishi bilan tezlash"** strategiyasi deb ataladi va bugungi kunda barcha zamonaviy enginelar shu prinsipda ishlaydi:
+V8 — Google tomonidan C++ da yozilgan engine. Chrome brauzer va Node.js da ishlatiladi. Deno runtime ham V8 ustiga qurilgan. V8 engine'ning asosiy xususiyatlari:
+
+- **Ignition** — bytecode interpreter. Source code avval Ignition bytecode'ga compile qilinadi va interpret qilinadi
+- **TurboFan** — optimizing compiler. Ko'p chaqiriladigan (hot) funksiyalarni yuqori darajada optimized machine code ga compile qiladi
+- **Orinoco** — garbage collector. Generational, incremental va concurrent GC strategiyalarini qo'llaydi
+- **Sparkplug** — Ignition va TurboFan orasidagi non-optimizing compiler (baseline compiler). Bytecode dan tezda machine code hosil qiladi, lekin chuqur optimization qilmaydi
+- **Maglev** — mid-tier optimizing compiler (TurboFan dan yengilroq, Sparkplug dan kuchliroq)
+
+V8 pipeline:
 
 ```
-Source Code → Tokenizing → Parsing → AST → Bytecode → (Optimization) → Machine Code
-     ↓           ↓           ↓        ↓        ↓              ↓              ↓
-  "let x=5"   [let][x][=][5]  AST   Daraxt   Ignition    TurboFan      CPU bajardi
+Source Code → Parser → AST → Ignition (bytecode)
+                                  │
+                          ┌───────┴────────┐
+                          │  Sparkplug     │  ← baseline machine code
+                          │  (non-optimizing)│
+                          └───────┬────────┘
+                                  │
+                          ┌───────┴────────┐
+                          │  Maglev        │  ← mid-tier optimized
+                          │  (mid-tier)    │
+                          └───────┬────────┘
+                                  │
+                          ┌───────┴────────┐
+                          │  TurboFan      │  ← fully optimized
+                          │  (optimizing)  │     machine code
+                          └────────────────┘
 ```
 
-### To'liq Pipeline
+**SpiderMonkey (Mozilla)**
+
+SpiderMonkey — Mozilla tomonidan C/C++ da yozilgan engine, Firefox brauzerda ishlatiladi. Bu JavaScript uchun yaratilgan birinchi engine (1995, Brendan Eich). Asosiy komponentlari:
+
+- **Baseline Interpreter** — bytecode interpreter
+- **Baseline Compiler** — tez non-optimizing compiler
+- **WarpMonkey** — optimizing JIT compiler (avvalgi IonMonkey'ning o'rniga)
+
+**JavaScriptCore / JSC (Apple)**
+
+JavaScriptCore — Apple tomonidan yaratilgan engine, Safari brauzer va WebKit'da ishlatiladi. Nitro nomi bilan ham tanilgan. Komponentlari:
+
+- **LLInt (Low-Level Interpreter)** — bytecode interpreter
+- **Baseline JIT** — baseline compiler
+- **DFG (Data Flow Graph) JIT** — mid-tier optimizing compiler
+- **FTL (Faster Than Light) JIT** — yuqori darajadagi optimizing compiler
+
+**Taqqoslash jadvali:**
+
+| Xususiyat | V8 (Chrome/Node) | SpiderMonkey (Firefox) | JSC (Safari) |
+|-----------|-------------------|----------------------|--------------|
+| Til | C++ | C/C++ | C++ |
+| Interpreter | Ignition | Baseline Interpreter | LLInt |
+| Baseline Compiler | Sparkplug | Baseline Compiler | Baseline JIT |
+| Mid-tier | Maglev | — | DFG JIT |
+| Top-tier Optimizer | TurboFan | WarpMonkey | FTL JIT |
+| GC | Orinoco (Generational) | Generational GC | Riptide (Concurrent) |
+| Ishlatiladi | Chrome, Node.js, Deno, Edge | Firefox | Safari, iOS browsers |
+
+### Kod Misollari
+
+Turli engine'larda bir xil kodning natijasi bir xil — chunki hammasi ECMAScript spec ga amal qiladi:
+
+```javascript
+// Bu kod barcha engine'larda bir xil natija beradi
+// chunki spec tomonidan aniqlangan behavior
+const numbers = [3, 1, 2];
+numbers.sort((a, b) => a - b);
+console.log(numbers); // [1, 2, 3] — barcha engine'larda
+
+// Lekin performance farq qilishi mumkin
+// V8 TimSort ishlatadi, SpiderMonkey merge sort
+// Natija bir xil, tezlik farq qiladi
+```
+
+```javascript
+// Engine-specific optimization misoli:
+// V8 monomorphic call'larni juda yaxshi optimize qiladi
+function getX(obj) {
+  return obj.x; // ✅ doim bir xil shape'dagi object berilsa — inline cache hit
+}
+
+const point1 = { x: 1, y: 2 };
+const point2 = { x: 3, y: 4 };
+
+// Ikkalasi bir xil shape (hidden class) — V8 inline cache orqali tez ishlaydi
+getX(point1);
+getX(point2);
+```
+
+---
+
+## Source Code dan Machine Code gacha — To'liq Pipeline
+
+### Nazariya
+
+JavaScript source code CPU da bajarilishi uchun bir necha bosqichdan o'tadi. Bu jarayon engine ichida avtomatik sodir bo'ladi. To'liq pipeline quyidagicha:
+
+1. **Source Code** — developer yozgan `.js` fayl matni (UTF-16 encoded string)
+2. **Tokenizing / Lexing** — matnni tokenlar (eng kichik ma'noli birliklar) ga parchalash
+3. **Parsing** — tokenlardan AST (Abstract Syntax Tree) quriladi
+4. **Bytecode Generation** — AST dan interpreter uchun bytecode hosil qilinadi
+5. **Interpretation** — bytecode interpreter tomonidan qator-baqator bajariladi
+6. **Profiling** — interpreter qaysi funksiyalar ko'p chaqirilayotganini kuzatadi
+7. **Optimization** — "hot" funksiyalar optimizing compiler ga beriladi
+8. **Machine Code** — optimized native machine code hosil bo'ladi
+9. **Deoptimization** — agar optimization assumption'lari noto'g'ri chiqsa, bytecode'ga qaytish
+
+### Under the Hood
+
+V8 engine misolida to'liq pipeline:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   V8 Engine Pipeline                     │
-│                                                          │
-│  1. SOURCE CODE                                          │
-│     let x = 5;                                           │
-│         │                                                │
-│  2. SCANNER (Tokenizer)                                  │
-│     [Keyword:let] [Identifier:x] [Punctuator:=]         │
-│     [Numeric:5] [Punctuator:;]                           │
-│         │                                                │
-│  3. PARSER                                               │
-│     Tokens → AST (Abstract Syntax Tree)                  │
-│         │                                                │
-│  4. IGNITION (Interpreter)                               │
-│     AST → Bytecode                                       │
-│     Bytecode ni darhol bajaradi                          │
-│     "Hot spots" ni belgilaydi                            │
-│         │                                                │
-│  5. TURBOFAN (Optimizing Compiler)       ←── feedback ── │
-│     Hot bytecode → Optimized Machine Code                │
-│     (Agar type o'zgarsa → Deoptimize → Ignition ga)     │
-│         │                                                │
-│  6. CPU EXECUTION                                        │
-│     Machine code to'g'ridan-to'g'ri CPU da ishlaydi      │
-└─────────────────────────────────────────────────────────┘
+┌──────────────┐
+│ Source Code   │  "function add(a, b) { return a + b; }"
+│ (.js fayl)   │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│  Scanner     │  Tokenizing: function, add, (, a, ,, b, ), {, return, a, +, b, ;, }
+│ (Tokenizer)  │  Har bir token: {type: 'Keyword', value: 'function'}, ...
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│   Parser     │  Tokenlar → AST (tree structure)
+│              │  FunctionDeclaration → ReturnStatement → BinaryExpression
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│  Ignition    │  AST → Bytecode
+│ (Interpreter)│  LdaNamedProperty, Add, Return kabi instruction'lar
+│              │  Bytecode ni qator-baqator bajaradi
+│              │  + Profiling data yig'adi (type feedback)
+└──────┬───────┘
+       │
+       │ (funksiya "hot" bo'lsa — ko'p chaqirilsa)
+       ▼
+┌──────────────┐
+│  Sparkplug   │  Bytecode → Machine Code (tez, optimizatsiyasiz)
+│ (Baseline)   │  Faqat Ignition overhead ni yo'qotadi
+└──────┬───────┘
+       │
+       │ (yanada ko'p chaqirilsa + profiling data yetarli)
+       ▼
+┌──────────────┐
+│  Maglev      │  Machine Code (o'rtacha optimization)
+│ (Mid-tier)   │  Type feedback asosida ba'zi optimization
+└──────┬───────┘
+       │
+       │ (juda ko'p chaqirilsa + barcha type info to'plansa)
+       ▼
+┌──────────────┐
+│  TurboFan    │  Machine Code (to'liq optimized)
+│ (Optimizing) │  Inlining, dead code elimination, loop unrolling...
+└──────┬───────┘
+       │
+       │ (assumption noto'g'ri chiqsa)
+       ▼
+┌──────────────┐
+│  Deopt       │  Optimized code tashlanadi
+│              │  Ignition bytecode'ga qaytadi
+└──────────────┘
 ```
 
-Bu **lazy compilation** deyiladi — V8 hamma narsani birdaniga compile qilmaydi. Avval bytecode ga aylantiradi (tez), keyin ko'p ishlatiladigan qismlarni machine code ga optimize qiladi.
+Pipeline'ning muhim xususiyati — bu **tiered compilation** (bosqichli compile). Engine kodning barcha qismini bir xil darajada optimize qilmaydi. Faqat bir marta chaqiriladigan kod bytecode darajasida qoladi — bu compile vaqtini tejaydi. Ko'p chaqiriladigan "hot path" lar esa yuqori darajada optimize qilinadi.
 
 ---
 
@@ -136,82 +259,90 @@ Bu **lazy compilation** deyiladi — V8 hamma narsani birdaniga compile qilmaydi
 
 ### Nazariya
 
-Source code — bu aslida kompyuter uchun hech qanday ma'no anglatmaydigan oddiy matn (string). `let name = "Islom";` qatori inson ko'zi uchun tushunarli bo'lsa-da, engine uchun bu shunchaki belgilar ketma-ketligi. Engine buni tushunishi uchun avval matnni **strukturalangan shaklga** aylantirishi kerak — xuddi inson gapni o'qiganda avval so'zlarni ajratib, keyin grammatik tuzilmani tahlil qilganidek.
+Parsing — source code matnini engine tushunadigan strukturaga (AST) aylantirish jarayoni. Bu ikki bosqichda sodir bo'ladi: avval **tokenizing** (lexical analysis), keyin **parsing** (syntactic analysis).
 
-Bu jarayonni **tabiiy tilni tahlil qilish**ga o'xshatish mumkin. "Men maktabga bordim" gapini tushunish uchun avval so'zlarni ajratamiz ("Men", "maktabga", "bordim"), keyin grammatik tuzilmani aniqlaymiz (ega, to'ldiruvchi, kesim). Engine ham xuddi shunday qiladi — avval kodni token'larga (so'zlarga) ajratadi, keyin ulardan grammatik daraxt (AST) quradi.
+**Tokenizing (Lexical Analysis)**
 
-Agar bu bosqich bo'lmaganida, engine har bir belgi bilan alohida-alohida ishlashi kerak bo'lardi — bu nafaqat sekin, balki murakkab ifodalarni tushunish ham imkonsiz bo'lardi. Masalan, `let` ni keyword sifatida, `name` ni identifier sifatida, `=` ni operator sifatida ajratib olish — bu tokenizer'ning ishi. Keyin parser bu token'larni semantik tuzilmaga — **Abstract Syntax Tree** ga aylantiradi.
+Tokenizer (yoki Scanner, Lexer) source code string'ini **token**lar ketma-ketligiga aylantiradi. Token — bu eng kichik ma'noli birlik. Har bir token o'z turiga ega:
 
-Bu ikki bosqichda sodir bo'ladi:
+| Token turi | Misollar |
+|------------|----------|
+| Keyword | `function`, `let`, `const`, `if`, `return`, `class` |
+| Identifier | `myVariable`, `getUserName`, `count` |
+| Literal | `42`, `"hello"`, `true`, `null` |
+| Punctuator | `{`, `}`, `(`, `)`, `;`, `,`, `.` |
+| Operator | `+`, `-`, `*`, `===`, `=>`, `??` |
+| Template | `` ` ``, `${`, `` ` `` |
 
-1. **Tokenizing (Lexical Analysis)** — matnni token'larga bo'lish
-2. **Parsing (Syntax Analysis)** — token'lardan AST daraxt qurish
+Tokenizer whitespace va commentlarni odatda skip qiladi (ular AST ga kirmaydi), lekin ularni alohida saqlashi ham mumkin (formatting tool'lar uchun).
 
-### Tokenizing (Scanner)
+**Parsing (Syntactic Analysis)**
 
-Tokenizer source code ni ma'noli bo'laklarga — **token**'larga ajratadi:
+Parser tokenlar ketma-ketligini oladi va ulardan **AST** (Abstract Syntax Tree) quriladi. Parser tokenlarning grammatik to'g'riligini tekshiradi — agar syntax xato bo'lsa, shu yerda `SyntaxError` throw qilinadi.
+
+```javascript
+// SyntaxError parsing bosqichida aniqlanadi — kod hali bajarilmagan
+// Bu xato engine source code ni parse qilayotganda chiqadi
+const x = ; // SyntaxError: Unexpected token ';'
+```
+
+V8 engine'da ikkita parser bor:
+
+1. **Pre-parser (Lazy Parsing)** — funksiya tanasini to'liq parse qilmaydi, faqat syntax to'g'riligini tekshiradi va scope ma'lumotini yig'adi. Bu tezkorlik uchun — sahifa yuklanganda barcha funksiyalar darhol kerak emas
+2. **Full Parser (Eager Parsing)** — to'liq AST hosil qiladi. Funksiya chaqirilganda yoki darhol kerak bo'lganda ishlatiladi
+
+### Under the Hood
+
+Lazy parsing nima uchun kerak: katta web sahifalarda minglab funksiyalar bo'lishi mumkin, lekin sahifa yuklanganda ularning faqat bir qismi darhol chaqiriladi. Barcha funksiyalarni to'liq parse qilish ortiqcha vaqt oladi. Lazy parsing faqat funksiya signature'sini va scope'ini aniqlaydi — tanasini keyinga qoldiradi.
+
+```
+Lazy Parsing misoli:
+
+function heavyComputation() {   // ← Pre-parser faqat signature ni o'qiydi
+  // ... 500 qator kod ...       // ← Tana parse qilinMAYDI (lazy)
+}                                // ← Scope boundary aniqlanadi
+
+heavyComputation();              // ← Endi Full Parser tanani parse qiladi
+```
+
+Lekin lazy parsing har doim ham foyda bermaydi. Agar funksiya darhol chaqirilsa (IIFE), avval lazy parse, keyin full parse — ikki marta ish. Shuning uchun ba'zi bundler'lar IIFE'larni `!(function() {})()` yoki `(function() {})()` sifatida belgilaydi — engine buni ko'rib eager parsing qiladi.
+
+### Kod Misollari
+
+Tokenizing jarayonini ko'rsatish:
 
 ```javascript
 // Source code:
-let name = "Islom";
+const total = price * quantity;
 
-// Tokenlar:
-// [Keyword: "let"]
-// [Identifier: "name"]
-// [Punctuator: "="]
-// [String: "Islom"]
-// [Punctuator: ";"]
+// Tokenizer chiqishi (har bir token alohida):
+// [
+//   { type: 'Keyword',    value: 'const' },
+//   { type: 'Identifier', value: 'total' },
+//   { type: 'Punctuator', value: '=' },
+//   { type: 'Identifier', value: 'price' },
+//   { type: 'Punctuator', value: '*' },
+//   { type: 'Identifier', value: 'quantity' },
+//   { type: 'Punctuator', value: ';' }
+// ]
 ```
 
-Har bir token ning **turi** va **qiymati** bor. Token turlari:
-
-| Token turi | Misollar |
-|-----------|----------|
-| Keyword | `let`, `const`, `function`, `if`, `return` |
-| Identifier | `name`, `myFunc`, `x` |
-| Punctuator | `=`, `+`, `{`, `}`, `(`, `)`, `;` |
-| NumericLiteral | `42`, `3.14` |
-| StringLiteral | `"salom"`, `'dunyo'` |
-| Template | `` `salom ${name}` `` |
-| Comment | `// izoh`, `/* izoh */` |
-
-### Parsing
-
-Parser token'larni olib, **Abstract Syntax Tree (AST)** daraxt qurib chiqadi. Bu jarayonda **syntax xatolari** tekshiriladi.
+Parsing bosqichida SyntaxError misollar:
 
 ```javascript
-// Bu kod parse bo'lmaydi — SyntaxError
-let = 5;        // ❌ "let" dan keyin identifier kerak
-if (true { }    // ❌ ")" yetishmayapti
+// ❌ Syntax xato — parser tokenlarni grammatik tekshiradi
+// va bu yerda unexpected token topadi
+let 123abc = 5;   // SyntaxError: Unexpected number
+// Identifier raqam bilan boshlanishi mumkin emas
+
+// ❌ Parser kutilgan token ni topa olmaydi
+function() {}     // SyntaxError: Function statements require a function name
+// function declaration da nom majburiy
+
+// ✅ To'g'ri — parser tokenlarni muvaffaqiyatli AST ga aylantiradi
+const multiply = function(a, b) { return a * b; };
+// function expression da nom ixtiyoriy
 ```
-
-Parser xato topsa, kod bajarilmaydi — SyntaxError tashlanadi.
-
-### Under the Hood — V8 Lazy Parsing
-
-V8 da ikkita parser bor:
-
-1. **Pre-parser (Lazy Parser)** — funksiya ichini to'liq parse qilmaydi, faqat syntax tekshiradi. Tez.
-2. **Full Parser (Eager Parser)** — to'liq AST quradi. Sekinroq.
-
-```javascript
-function kamIshlatiladi() {
-  // Bu funksiya hech qachon chaqirilmasligi mumkin
-  // V8 buni PRE-PARSE qiladi (faqat syntax tekshirish)
-  // AST qurilmaydi — vaqt tejaladi
-  return "salom";
-}
-
-function koʻpIshlatiladi() {
-  // Bu funksiya darhol chaqiriladi
-  // V8 buni FULL PARSE qiladi (to'liq AST)
-  return 42;
-}
-
-koʻpIshlatiladi(); // ← darhol chaqirilgani uchun full parse
-```
-
-Nima uchun lazy parsing? Chunki odatiy web sahifadagi JS kodining **~30-50%** hech qachon bajarilmaydi. Hammasini parse qilish vaqt va xotira isrof.
 
 ---
 
@@ -219,68 +350,118 @@ Nima uchun lazy parsing? Chunki odatiy web sahifadagi JS kodining **~30-50%** he
 
 ### Nazariya
 
-AST (Abstract Syntax Tree) — bu kodning ierarxik **daraxt ko'rinishidagi** tuzilmasi bo'lib, dasturning mantiqiy strukturasini ifodalaydi. "Abstract" deyilishiga sabab — source code dagi sintaktik bezaklar (bo'sh joylar, nuqtali vergullar, ortiqcha qavslar) olib tashlanadi va faqat **semantik ma'no** — dasturning asl maqsadi qoladi.
+AST (Abstract Syntax Tree) — source code ning tree (daraxt) shaklidagi abstrakt tasviri. Parser tokenlardan AST ni quriladi. "Abstract" deyilishining sababi — AST da source code'ning barcha detallari emas, faqat semantik (ma'noviy) struktura saqlanadi. Qavslar, nuqtali vergullar, bo'shliqlar — bular AST da yo'q, chunki ular faqat syntax uchun kerak, ma'no uchun emas.
 
-Nima uchun AST kerak? Tasavvur qiling, siz uy qurishni rejalashtirmoqchisiz. Arxitektor chizmani (source code) olib, undan 3D model (AST) quradi. Bu modelda devorlarning rangi yoki bezak elementlari yo'q — faqat tarkibiy tuzilma: qayerda devor turadi, qayerda eshik bor, qayerga oyna qo'yiladi. Xuddi shunday, AST koddan faqat tuzilmaviy ma'lumotni ajratib oladi: qayerda o'zgaruvchi e'lon qilingan, qanday operatsiya bajariladi, qaysi funksiyalar chaqiriladi.
+AST — bu tree data structure bo'lib, har bir node (tugun) kodning bitta semantik birligini ifodalaydi. Masalan: `VariableDeclaration`, `FunctionDeclaration`, `BinaryExpression`, `CallExpression`, `ReturnStatement`.
 
-AST butun JavaScript ekotizimining **poydevori** hisoblanadi. Engine AST dan bytecode hosil qiladi, lekin undan tashqari — Babel, ESLint, Prettier, TypeScript, Webpack kabi toollarning barchasi AST ustida ishlaydi. Masalan, Babel ES6+ kodning AST ini olib, uni ES5 ga mos AST ga aylantiradi va qaytadan kod generatsiya qiladi. ESLint esa AST ni tekshirib, potensial xatolarni topadi. Shuning uchun AST ni tushunish — bu nafaqat engine ichki mexanizmini bilish, balki zamonaviy JavaScript toolchain ini to'liq tushunish demakdir.
+AST nima uchun kerak:
 
-### Kod Misoli
+- **Compiler/Interpreter** — AST dan bytecode yoki machine code hosil qiladi
+- **Static Analysis** — ESLint kabi tool'lar AST ni tahlil qilib xatolarni topadi
+- **Code Transformation** — Babel kabi transpiler'lar AST ni o'zgartiradi (yangi syntax → eski syntax)
+- **Minification** — Terser AST yordamida kodni qisqartiradi
+- **Formatting** — Prettier AST dan kodni qayta format qiladi
+- **Type Checking** — TypeScript compiler AST ustida type analysis qiladi
 
-```javascript
-let age = 25;
-```
+### Under the Hood
 
-Bu quyidagi AST ga aylanadi:
+`const total = price + tax;` uchun AST strukturasi:
 
 ```
 Program
-└── VariableDeclaration (kind: "let")
+└── VariableDeclaration (kind: "const")
     └── VariableDeclarator
-        ├── id: Identifier (name: "age")
-        └── init: NumericLiteral (value: 25)
+        ├── id: Identifier (name: "total")
+        └── init: BinaryExpression (operator: "+")
+              ├── left: Identifier (name: "price")
+              └── right: Identifier (name: "tax")
 ```
 
-Murakkabroq misol:
-
-```javascript
-function add(a, b) {
-  return a + b;
-}
-```
+Murakkabroq misol — `function greet(name) { return "Hello, " + name; }`:
 
 ```
 Program
 └── FunctionDeclaration
-    ├── id: Identifier (name: "add")
+    ├── id: Identifier (name: "greet")
     ├── params:
-    │   ├── Identifier (name: "a")
-    │   └── Identifier (name: "b")
+    │   └── Identifier (name: "name")
     └── body: BlockStatement
         └── ReturnStatement
-            └── BinaryExpression (operator: "+")
-                ├── left: Identifier (name: "a")
-                └── right: Identifier (name: "b")
+            └── argument: BinaryExpression (operator: "+")
+                  ├── left: Literal (value: "Hello, ")
+                  └── right: Identifier (name: "name")
 ```
 
-### Amaliy Tekshirish
+Har bir AST node — bu JavaScript object:
 
-AST ni ko'rish uchun: [astexplorer.net](https://astexplorer.net) — bu saytda istalgan JS kodini yozib, real-time AST ni ko'rishingiz mumkin.
+```json
+{
+  "type": "BinaryExpression",
+  "operator": "+",
+  "left": {
+    "type": "Identifier",
+    "name": "price"
+  },
+  "right": {
+    "type": "Identifier",
+    "name": "tax"
+  }
+}
+```
 
-### AST Nima Uchun Muhim?
+AST ni real vaqtda ko'rish uchun [astexplorer.net](https://astexplorer.net) — bu tool'da JavaScript kodni yozib, uning AST sini vizual ko'rish mumkin.
 
-AST faqat engine uchun emas — ko'p toollar AST ustida ishlaydi:
+### Kod Misollari
 
-| Tool | AST ni nima uchun ishlatadi |
-|------|---------------------------|
-| **Babel** | ES6+ kodni ES5 ga transpile qilish |
-| **ESLint** | Kod sifatini tekshirish |
-| **Prettier** | Kod formatlash |
-| **Webpack/Vite** | Module dependency aniqlash, tree shaking |
-| **TypeScript** | Type checking |
-| **Terser** | Code minification |
+AST'ni amalda qanday ishlatilishini ko'rsatadigan misol — Babel plugin yozish orqali `console.log` chaqiruvlarini olib tashlash:
 
-Shuning uchun AST ni tushunish — bu faqat engine bilimi emas, balki butun JS ecosystem ni tushunish.
+```javascript
+// Babel plugin — AST traversal va transformation
+// Bu plugin barcha console.log() chaqiruvlarini o'chirib tashlaydi
+module.exports = function() {
+  return {
+    visitor: {
+      CallExpression(path) {
+        // ✅ AST node'ini tekshiramiz — CallExpression turi
+        const callee = path.node.callee;
+
+        if (
+          callee.type === 'MemberExpression' &&
+          callee.object.name === 'console' &&
+          callee.property.name === 'log'
+        ) {
+          // ✅ console.log() topildi — AST dan olib tashlaymiz
+          path.remove();
+        }
+      }
+    }
+  };
+};
+
+// Natija: production build da console.log'lar avtomatik o'chiriladi
+```
+
+ESLint custom rule — AST ustida ishlash:
+
+```javascript
+// ESLint rule — var ishlatishni taqiqlash
+module.exports = {
+  create(context) {
+    return {
+      // ✅ AST traversal — VariableDeclaration node topilganda
+      VariableDeclaration(node) {
+        if (node.kind === 'var') {
+          context.report({
+            node,
+            message: 'var ishlatmang — let yoki const ishlating'
+            // ❌ var function-scoped — block scope muammolari keltirib chiqaradi
+          });
+        }
+      }
+    };
+  }
+};
+```
 
 ---
 
@@ -288,132 +469,146 @@ Shuning uchun AST ni tushunish — bu faqat engine bilimi emas, balki butun JS e
 
 ### Nazariya
 
-Dasturlash tillari yaratilganidan beri ularni bajarish uchun ikkita fundamental yondashuv mavjud — interpretation va compilation. Bu ikki yondashuv o'rtasidagi farqni tushunish JavaScript engine'ning nima uchun aynan JIT (Just-In-Time) compilation strategiyasini tanlaganini anglash uchun muhim.
+Dasturlash tillarini bajarish uchun ikkita asosiy yondashuv mavjud: **interpretation** va **compilation**. JavaScript engine'lar har ikkisini birlashtirgan **JIT (Just-In-Time) compilation** ishlatadi.
 
-**Interpreter** — kodni satr-bosatr o'qiydi va darhol bajaradi. Buni **sinxron tarjimon**ga o'xshatish mumkin: notiq gapni aytadi, tarjimon darhol tarjima qiladi, keyin keyingi gap. Dastur darhol ishga tushadi (chunki kutish kerak emas), lekin bajarish jarayoni sekin bo'ladi, chunki har bir satr qayta-qayta interpretatsiya qilinadi. Dastlabki JavaScript enginelar (1995-yillarda Brendan Eich yaratgan birinchi engine) aynan shu usulda ishlagan.
+**Interpreter:**
+- Source code ni (yoki bytecode ni) **qator-baqator** o'qib bajaradi
+- Oldindan compile qilish shart emas — darhol bajarishni boshlaydi
+- Har safar bir xil kodni qayta o'qib bajaradi — takroriy chaqiruvlarda sekin
+- Afzalligi: **startup tez** — darhol bajarishni boshlaydi, compile kutish kerak emas
+- Kamchiligi: **runtime sekin** — bir xil kodni har safar qayta interpret qiladi
 
-**Compiler** — butun kodni oldindan mashina tiliga aylantiradi, keyin bajaradi. Buni **kitob tarjimasi**ga o'xshatish mumkin: avval butun kitob to'liq tarjima qilinadi, keyin o'qiladi. Boshlash uzoq davom etadi (chunki avval hamma narsa compile bo'lishi kerak), lekin bajarilish juda tez, chunki natijada hosil bo'lgan mashina kodi to'g'ridan-to'g'ri CPU da ishlaydi. C, C++, Rust, Go kabi tillar compile qilinadi.
+**Compiler:**
+- Butun source code ni **oldindan** machine code ga aylantiradi
+- Compile vaqtida optimization qilish imkoniyati bor
+- Compile qilingan machine code to'g'ridan-to'g'ri CPU da ishlaydi — juda tez
+- Afzalligi: **runtime tez** — optimized machine code CPU da native ishlaydi
+- Kamchiligi: **startup sekin** — avval butun kodni compile qilish kerak
 
-JavaScript web uchun yaratilgan til — foydalanuvchi sahifani ochganda kod **darhol** ishga tushishi kerak. Shuning uchun faqat compiler ishlatish mumkin emas (foydalanuvchi butun kod compile bo'lguncha kutib tura olmaydi). Lekin faqat interpreter ham samarasiz — zamonaviy web ilovalar (Gmail, Google Maps, VS Code) juda murakkab va sekin interpretatsiya foydalanuvchi tajribasini buzadi. Aynan shu muammo uchun **JIT Compilation** ixtiro qilindi — bu ikki yondashuvning eng yaxshi tomonlarini birlashtirgan inqilobiy yechim.
-
-### Taqqoslash
+**Taqqoslash:**
 
 | Xususiyat | Interpreter | Compiler |
-|-----------|------------|---------|
-| **Tezlik (boshlash)** | Tez — darhol bajaradi | Sekin — avval compile kerak |
-| **Tezlik (bajarish)** | Sekin — har safar qayta interpret | Tez — optimize qilingan machine code |
-| **Xotira** | Kam — bytecode saqlaydi | Ko'p — machine code saqlaydi |
-| **Xato aniqlash** | Runtime da, satr-bosatr | Compile vaqtida ko'pchilik |
-| **Misollar** | Eski JS enginelar | C, C++, Rust, Go |
+|-----------|-------------|----------|
+| Startup vaqti | Tez (darhol bajaradi) | Sekin (avval compile) |
+| Execution tezligi | Sekin (har safar qayta o'qiydi) | Tez (optimized machine code) |
+| Memory | Kam (source/bytecode saqlaydi) | Ko'proq (machine code saqlaydi) |
+| Optimization | Imkoni cheklangan | Keng (inlining, dead code, loop optimization) |
+| Debugging | Oson (source code bilan 1:1) | Qiyinroq (machine code source'dan uzoq) |
 
-### Under the Hood — Nima uchun JS ikkalasini ham ishlatadi?
+### Under the Hood
 
-Muammo: faqat interpreter = **sekin**. Faqat compiler = **boshlash uzoq**.
+JavaScript evolyutsiyasi:
 
-Yechim: **JIT (Just-In-Time) Compilation** — ikkalasini birlashtirish.
+- **1995-2008** — dastlabki engine'lar faqat interpreter ishlatgan. Source code bevosita interpret qilingan. Bu sekin edi, lekin web sahifalar oddiy bo'lgani uchun yetarli edi.
+- **2008** — Google V8 engine chiqdi, birinchi marta JavaScript uchun JIT compilation qo'lladi. Bu JavaScript'ni bir necha marta tezlashtirdi.
+- **Hozir** — barcha zamonaviy engine'lar **multi-tier JIT compilation** ishlatadi: interpreter + bir nechta darajadagi compiler'lar.
 
-```
-Pure Interpreter:            Pure Compiler:             JIT (V8):
-                                                        
-Kod → Bajir                  Kod → Compile → Bajir      Kod → Bytecode → Bajir
-Kod → Bajir                       (kutish...)                  ↓ (hot code)
-Kod → Bajir                       (kutish...)            Optimize → Machine Code
-...                               (kutish...)                  ↓
-(sekin, lekin tez boshlaydi)       → Tez bajarish        (tez boshlaydi + tez ishlaydi)
-```
+Nima uchun faqat compiler yetarli emas: JavaScript **dynamic typed** til. Compiler oldindan biror o'zgaruvchining tipini bilmaydi — u `number` ham, `string` ham bo'lishi mumkin. Shuning uchun to'liq ahead-of-time compilation qiyin — runtime da tiplar aniqlanadi.
+
+Nima uchun faqat interpreter yetarli emas: zamonaviy web ilovalar murakkab — React, Angular, Vue kabi framework'lar minglab funksiyalarni chaqiradi. Faqat interpret qilish juda sekin bo'ladi.
+
+Yechim: **JIT Compilation** — har ikkisining afzalliklarini birlashtirish.
 
 ---
 
-## JIT Compilation — V8 Pipeline
+## JIT Compilation
 
 ### Nazariya
 
-JIT — **Just-In-Time** Compilation — bu zamonaviy JavaScript engine'larning eng muhim innovatsiyasi. "Just-In-Time" — ya'ni "aynan kerak bo'lgan paytda" compile qilish degani. Kod oldindan butunlay compile qilinmaydi, balki dastur ishlayotgan paytda, kerak bo'lgan qismlar kerak bo'lgan vaqtda mashina kodiga aylantiriladi.
+JIT (Just-In-Time) Compilation — kodni runtime da, kerak bo'lgan paytda compile qilish usuli. AOT (Ahead-Of-Time) compilation'dan farqi — JIT da butun kod oldindan compile qilinmaydi, balki faqat bajarilayotgan qism kerak bo'lganda compile qilinadi.
 
-Bu yondashuv 2008-yilda Google V8 engine bilan keng ommaga tarqaldi. Ungacha JavaScript enginelar asosan interpretatorlar edi va juda sekin ishlardi. V8 ning JIT compilation bilan paydo bo'lishi JavaScript ning tezligini **10-100 marta** oshirdi va bugungi kunda biz bilgan murakkab web ilovalar (Google Maps, Gmail, VS Code Web) ning paydo bo'lishiga zamin yaratdi.
+JIT compilation'ning asosiy g'oyasi: **avval interpret qil, keyin ko'p chaqiriladigan kodni compile qil**.
 
-JIT ning asosiy g'oyasi **"kuzatib bor va optimizatsiya qil"** strategiyasiga asoslanadi. Engine avval kodni tez ishga tushirish uchun bytecode ga aylantiradi (bu tez jarayon), keyin dastur ishlayotgan paytda qaysi funksiyalar ko'p chaqirilayotganini kuzatadi (profiling). Ko'p chaqiriladigan "issiq" (hot) funksiyalarni engine yuqori samarali mashina kodiga compile qiladi. Bu xuddi **restoran oshpazi**ga o'xshaydi: avval barcha buyurtmalarni oddiy tarzda tayyorlaydi, lekin eng ko'p buyurtiladigan taomning retseptini yodlab oladi va uni tezroq tayyorlashni o'rganadi.
+- Dastlab barcha kod interpreter orqali bajariladi — bu startup ni tez qiladi
+- Interpreter **profiling data** yig'adi — qaysi funksiya necha marta chaqirildi, qanday tip'dagi argument'lar berildi
+- Ko'p chaqiriladigan funksiyalar ("hot functions") optimizing compiler'ga beriladi
+- Compiler profiling data asosida **assumption**lar qiladi va ularga mos optimized machine code hosil qiladi
+- Agar assumption'lar noto'g'ri chiqsa — **deoptimization** sodir bo'ladi, bytecode'ga qaytiladi
 
-V8 ning ikki asosiy komponenti bu jarayonni amalga oshiradi:
+### Under the Hood
 
-1. **Ignition** — Interpreter. AST ni **bytecode** ga aylantiradi va darhol bajaradi. Shu bilan birga, har bir funksiya haqida **type feedback** (ma'lumot turlari statistikasi) to'playdi — qanday argumentlar keladi, qanday natijalar qaytadi.
-2. **TurboFan** — Optimizing Compiler. Ignition to'plagan feedback ma'lumotlari asosida "hot" (ko'p ishlatiladigan) kodni yuqori darajada optimallashtirilgan **machine code** ga aylantiradi. Bu mashina kodi to'g'ridan-to'g'ri CPU registrlari bilan ishlaydi va C/C++ ga yaqin tezlikda bajariladi.
+V8 engine'da JIT compilation jarayoni:
 
-### V8 Pipeline Diagramma
+**1-Bosqich: Ignition (Interpreter)**
+
+Source code parse qilinib AST hosil qilingandan keyin, Ignition AST dan **bytecode** hosil qiladi. Bytecode — bu machine code emas, lekin source code dan past darajadagi instruction'lar to'plami. Ignition shu bytecode'ni register-based virtual machine sifatida bajaradi.
 
 ```
-                    V8 ENGINE
-                    
-Source Code ──→ [Parser] ──→ AST
-                              │
-                              ▼
-                    ┌──────────────────┐
-                    │     IGNITION     │
-                    │   (Interpreter)  │
-                    │                  │
-                    │  AST → Bytecode  │
-                    │  Bajirish +      │
-                    │  Profiling       │
-                    └────────┬─────────┘
-                             │
-                    feedback data:
-                    - type information
-                    - call counts
-                    - branch data
-                             │
-                    ┌────────▼─────────┐
-                    │     TURBOFAN     │
-                    │  (Opt. Compiler) │
-                    │                  │
-                    │  Bytecode →      │
-                    │  Machine Code    │
-                    │  (optimized)     │
-                    └────────┬─────────┘
-                             │
-                    Deopt? ──┤──→ Ignition ga qaytish
-                             │
-                    CPU Execution (tez!)
+// JavaScript source:
+function add(a, b) { return a + b; }
+
+// V8 Ignition bytecode (taxminiy):
+// Ldar a1          — a registr'dan yuklash
+// Add a2           — b ni qo'shish
+// Return           — natijani qaytarish
 ```
 
-### Ignition Bytecode
+Ignition bajarish paytida **feedback vector** ga type information yozadi: "bu funksiyaga doim number berildi" yoki "bu property doim string".
 
-Ignition AST ni **bytecode** ga aylantiradi. Bytecode — bu machine code emas, lekin juda oddiy instruksiyalar to'plami.
+**2-Bosqich: Sparkplug (Baseline Compiler)**
+
+Sparkplug — V8'dagi non-optimizing baseline compiler. U Ignition bytecode'dan tezda machine code hosil qiladi, lekin hech qanday optimization qilmaydi. Maqsad — Ignition overhead'ini (dispatch loop, bytecode decoding) yo'qotish. Sparkplug machine code Ignition bytecode bilan 1:1 mos keladi — faqat format boshqa.
+
+**3-Bosqich: Maglev (Mid-tier Compiler)**
+
+Maglev — V8'dagi o'rta darajadagi optimizing compiler. U Ignition'ning feedback data'sidan foydalanib ba'zi optimization'larni qo'llaydi — masalan type speculation (agar funksiyaga doim number berilgan bo'lsa, number deb faraz qilish). TurboFan dan soddaroq va tezroq compile qiladi.
+
+**4-Bosqich: TurboFan (Optimizing Compiler)**
+
+TurboFan — V8'dagi eng yuqori darajadagi optimizing compiler. U keng qamrovli optimization'larni qo'llaydi:
+
+| Optimization | Nima qiladi |
+|-------------|-------------|
+| **Inlining** | Kichik funksiya tanasini chaqiruv joyiga ko'chiradi — funksiya chaqiruv overhead'ini yo'qotadi |
+| **Type Specialization** | Profiling data asosida specific tip uchun optimized kod hosil qiladi |
+| **Dead Code Elimination** | Hech qachon bajarilmaydigan kodni olib tashlaydi |
+| **Constant Folding** | `3 + 5` ni compile vaqtida `8` ga almashtiradi |
+| **Loop Invariant Code Motion** | Loop ichidagi o'zgarmas kodni loop tashqarisiga chiqaradi |
+| **Escape Analysis** | Object faqat funksiya ichida ishlatilsa — heap emas, stack'da saqlaydi |
+| **Register Allocation** | O'zgaruvchilarni CPU register'lariga optimal joylashtiradi |
+
+### Kod Misollari
+
+JIT compilation ta'sirini ko'rsatadigan misol:
 
 ```javascript
-function add(a, b) {
-  return a + b;
+// Bu funksiya ko'p chaqirilganda V8 uni optimize qiladi
+function calculateArea(width, height) {
+  return width * height;
+  // ✅ Doim number * number — V8 buni "monomorphic" deb belgilaydi
+  // TurboFan number-specific machine code hosil qiladi
+}
+
+// Ignition bosqichi — bytecode interpret qilinadi (sekin)
+for (let i = 0; i < 100; i++) {
+  calculateArea(10, 20);
+}
+
+// Sparkplug/Maglev bosqichi — machine code (tezroq)
+for (let i = 100; i < 10000; i++) {
+  calculateArea(10, 20);
+}
+
+// TurboFan bosqichi — fully optimized machine code (eng tez)
+for (let i = 10000; i < 1000000; i++) {
+  calculateArea(10, 20);
+  // Bu yerda funksiya chaqiruvi inline bo'lishi ham mumkin
+  // ya'ni funksiya tanasi loop ichiga ko'chiriladi
 }
 ```
 
-Ignition bytecode (soddalashtirilgan):
-
-```
-Ldar a1          // a ni accumulator ga yukla
-Add a2           // b ni qo'sh
-Return           // natijani qaytar
-```
-
-Bu bytecode CPU ga to'g'ridan-to'g'ri tushunarsiz, lekin V8 ning Ignition interpreteri uni bajara oladi.
-
-### TurboFan Optimization
-
-Ignition kodni bajarish paytida **profiling** qiladi — qaysi funksiyalar ko'p chaqiriladi, qanday type'lar keladi. Agar funksiya "hot" bo'lsa (ko'p chaqirilsa), TurboFan uni optimize qiladi.
-
 ```javascript
-function add(a, b) {
-  return a + b;
+// ❌ JIT optimization'ni buzadigan pattern
+function processValue(value) {
+  return value + 1;
 }
 
-// Dastlabki chaqiruvlar — Ignition (bytecode) bajiradi
-add(1, 2);     // Ignition: a = number, b = number ekan...
-add(3, 4);     // Ignition: yana number, number...
-add(10, 20);   // Ignition: doim number, number kelayapti
-
-// ☝️ Profiler: "add() doim number qabul qiladi"
-// TurboFan: "Unda optimize qilaman — faqat number uchun machine code"
-
-// Endi keyingi chaqiruvlar machine code da — juda tez!
-add(100, 200); // TurboFan optimized machine code
+processValue(10);     // number — V8: "bu number funksiya"
+processValue(20);     // number — V8: "tasdiqlandi, number"
+processValue("oops"); // ❌ string! — V8: deoptimization!
+// TurboFan number uchun optimize qilgan edi
+// Endi string keldi — optimized code noto'g'ri
+// Deopt: machine code tashlanadi, bytecode'ga qaytiladi
 ```
 
 ---
@@ -422,114 +617,235 @@ add(100, 200); // TurboFan optimized machine code
 
 ### Nazariya
 
-Optimization va deoptimization — V8 engine'ning eng muhim va amaliy jihatdan eng ko'p ta'sir qiladigan mexanizmi. Bu tushunchalarni bilish sizning JavaScript kodingiziing production da qanchalik tez ishlashiga bevosita ta'sir qiladi.
+**Optimization** — JIT compiler profiling data asosida kodni tezlashtirish uchun qo'llaydigan texnikalar. Engine "assumption" (taxmin) qiladi va shu taxminga asoslangan optimized kod hosil qiladi.
 
-TurboFan kodni optimize qilayotganda u **speculative optimization** — ya'ni **taxminga asoslangan optimizatsiya** strategiyasini qo'llaydi. Engine Ignition orqali to'plangan profiling ma'lumotlariga asoslanib taxminlar qiladi: "bu funksiya doim `number` tipidagi argumentlar qabul qiladi", "bu property doim mavjud", "bu shart doim `true` bo'ladi". Keyin engine shu taxminlarga asoslanib maksimal darajada optimallashtirilgan mashina kodini hosil qiladi — gereksiz tip tekshiruvlarini olib tashlaydi, xotira manzillarini oldindan hisoblaydi, hatto butun funksiya chaqiruvlarini inline qiladi.
+Asosiy assumption'lar:
+- **Type Assumption** — "bu funksiyaga doim number beriladi" → number-specific machine code
+- **Shape Assumption** — "bu object doim bir xil property'larga ega" → fast property access
+- **Call Target Assumption** — "bu joyda doim bir xil funksiya chaqiriladi" → inline qilish
 
-Lekin hayotda taxminlar buzilishi mumkin. Masalan, 10 000 marta `number` qabul qilgan funksiyaga birdan `string` berilsa — TurboFan hosil qilgan optimallashtirilgan mashina kodi noto'g'ri natija berishi mumkin. Bunday hollarda engine **deoptimization** — ya'ni optimizatsiyani bekor qilish jarayonini boshlaydi: mashina kodini tashlab, qayta bytecode ga qaytadi va Ignition orqali qayta bajaradi. Bu jarayon qimmat — vaqt va resurs talab qiladi. Shuning uchun professional JavaScript dasturchilari o'z kodlarini V8 uchun "do'stona" qilib yozadilar — ya'ni tiplarni barqaror (monomorphic) saqlaydilar va deoptimizatsiyaga sabab bo'ladigan patternlardan qochadilar.
+**Deoptimization (Deopt)** — agar runtime da assumption noto'g'ri chiqsa, engine optimized machine code ni tashlab, bytecode'ga qaytadi. Bu "bail out" deb ham ataladi.
 
-### Optimization Misol
+Deoptimization qimmat operatsiya — optimized code uchun sarflangan compile vaqti behuda ketadi. Lekin bu xavfsizlik mexanizmi — noto'g'ri natija berishdan ko'ra, sekin lekin to'g'ri ishlash muhimroq.
+
+### Under the Hood
+
+Deoptimization jarayoni qadam-baqadam:
+
+1. Optimized machine code bajarilayotganda "guard" (tekshiruv) turib qoladi
+2. Guard shart noto'g'ri — masalan, kutilgan number o'rniga string keldi
+3. Engine joriy execution state'ni to'xtatadi
+4. Optimized frame'dan bytecode frame'ga "reconstruct" qiladi (on-stack replacement)
+5. Ignition bytecode'dan davom ettiradi
+6. Keyinchalik bu funksiya yana hot bo'lsa — yangi profiling data bilan qayta optimize qilinishi mumkin
+
+Eng ko'p uchraydigan deoptimization sabablari:
+
+| Sabab | Misol | Optimization |
+|-------|-------|-------------|
+| Type change | number o'rniga string | Type specialization buziladi |
+| Hidden class change | Object ga yangi property qo'shish | Inline cache invalidation |
+| Map transition | Object shape o'zgarishi | Property access deopt |
+| Out-of-bounds | Array'dan tashqari index | Bounds check elimination deopt |
+| Prototype chain change | Prototype'ga property qo'shish/o'chirish | Prototype check deopt |
+
+### Kod Misollari
+
+Optimization ni ta'minlaydigan pattern'lar:
 
 ```javascript
-function calculate(x, y) {
-  return x + y;
+// ✅ Monomorphic — doim bir xil tip
+// V8 bu funksiyani juda yaxshi optimize qiladi
+function square(n) {
+  return n * n;
 }
 
-// V8 ko'radi: doim number + number
+// Doim number berish — type assumption saqlanadi
+for (let i = 0; i < 1000000; i++) {
+  square(i); // ✅ har doim number — monomorphic call
+}
+```
+
+Deoptimization ga olib keladigan pattern'lar:
+
+```javascript
+// ❌ Megamorphic — turli tip'lar
+function process(input) {
+  return input.toString();
+}
+
+process(42);         // number
+process("hello");    // string
+process(true);       // boolean
+process({ x: 1 });  // object
+// ❌ 4 ta turli tip — megamorphic
+// V8 bu funksiyani optimize qila olmaydi — har safar generic code ishlaydi
+```
+
+```javascript
+// ❌ Object shape o'zgarishi — deopt
+function getX(point) {
+  return point.x;
+}
+
+const p1 = { x: 1, y: 2 };    // Shape A: {x, y}
+const p2 = { x: 3, y: 4 };    // Shape A: {x, y} — bir xil ✅
+
+getX(p1); // ✅ V8 Shape A uchun inline cache yaratadi
+getX(p2); // ✅ Bir xil shape — cache hit
+
+const p3 = { y: 5, x: 6 };    // Shape B: {y, x} — boshqa tartib!
+getX(p3); // ❌ Boshqa shape — inline cache miss, deopt mumkin
+// Sabab: property qo'shilish TARTIBI shape ni aniqlaydi
+// {x, y} va {y, x} — bular turli hidden class'lar
+```
+
+```javascript
+// ✅ Optimizatsiyani saqlash uchun — doim bir xil shape'da object yarating
+function createPoint(x, y) {
+  return { x, y }; // ✅ doim bir xil tartibda — bir xil hidden class
+}
+
+const points = [];
 for (let i = 0; i < 10000; i++) {
-  calculate(i, i + 1); // ✅ Doim number — TurboFan optimize qildi
+  points.push(createPoint(i, i * 2));
+  // Barcha point'lar bir xil hidden class — V8 juda yaxshi optimize qiladi
 }
 ```
 
-TurboFan bu funksiya uchun **faqat number qo'shish** machine code hosil qiladi. Bu oddiy CPU `ADD` instruksiyasi — juda tez.
+---
 
-### Deoptimization Misol
+## Hidden Classes va Inline Caching
+
+### Nazariya
+
+JavaScript — dynamic typed til. Object'ga istalgan vaqtda property qo'shish yoki o'chirish mumkin. Bu moslashuvchanlik bilan birga performance muammosi ham keltirib chiqaradi: engine property'ni topish uchun har safar hash table lookup qilishi kerak, bu esa sekin.
+
+V8 bu muammoni **Hidden Classes** (ichki nomi: **Maps**) va **Inline Caching** mexanizmlari bilan hal qiladi.
+
+**Hidden Class (Map):**
+Har bir object yaratilganda V8 unga hidden class (Map) biriktiradi. Hidden class — object'ning "shape" ini (qaysi property'lar bor, ular xotirada qayerda joylashgan) tavsiflaydigan ichki struktura. Bir xil tartibda bir xil property'larga ega object'lar **bir xil** hidden class'ni share qiladi.
+
+Hidden class nima uchun kerak: agar V8 object'ning shape'ini bilsa, property'ning xotiradagi aniq offset'ini ham biladi. Shunda property lookup hash table orqali emas, to'g'ridan-to'g'ri offset orqali — C/C++ struct kabi tez ishlaydi.
+
+**Inline Caching (IC):**
+Inline cache — property access operatsiyasi uchun "yorliq" (shortcut). Birinchi marta `obj.x` bajarilganda engine property'ni topadi va uning hidden class + offset'ini cache'laydi. Keyingi safar xuddi shu shape'dagi object kelsa — cache'dan to'g'ridan-to'g'ri offset bilan oladi, qidiruv kerak emas.
+
+IC holatlari:
+- **Monomorphic** — faqat bitta shape uchraydigan joy. Eng tez — single cache entry
+- **Polymorphic** — 2-4 ta turli shape. O'rtacha tez — bir necha cache entry
+- **Megamorphic** — 5+ turli shape. Eng sekin — cache ishlamaydi, generic lookup
+
+### Under the Hood
+
+Hidden Class yaratilish jarayoni:
+
+```
+// const user = {};
+// V8 ichida:
+// user → HiddenClass C0 (bo'sh object)
+//
+// user.name = "Ali";
+// V8 ichida:
+// user → HiddenClass C1 {name: offset 0}
+//   C0 → "name" qo'shilsa → C1 ga transition
+//
+// user.age = 25;
+// V8 ichida:
+// user → HiddenClass C2 {name: offset 0, age: offset 1}
+//   C1 → "age" qo'shilsa → C2 ga transition
+
+┌──────────┐    add "name"    ┌──────────────────┐   add "age"   ┌───────────────────────────┐
+│   C0     │ ──────────────→ │   C1             │ ───────────→ │   C2                      │
+│ (bo'sh)  │                 │ name: offset 0   │              │ name: offset 0            │
+└──────────┘                 └──────────────────┘              │ age:  offset 1            │
+                                                                └───────────────────────────┘
+```
+
+Transition chain — har bir property qo'shilganda yangi hidden class yaratiladi, lekin transition'lar cache'lanadi. Agar boshqa object ham xuddi shu tartibda xuddi shu property'larni qo'shsa — tayyor hidden class ishlatiladi, yangi yaratilmaydi.
+
+Inline Caching mexanizmi:
+
+```
+// function getAge(person) { return person.age; }
+//
+// Birinchi chaqiruv: getAge({ name: "Ali", age: 25 })
+// person.age → Hidden Class C2 da age offset 1 da
+// IC saqlaydi: [C2 → offset 1]
+//
+// Ikkinchi chaqiruv: getAge({ name: "Vali", age: 30 })
+// person hidden class C2 mi? → HA! → offset 1 dan to'g'ridan-to'g'ri ol
+// Hash table lookup kerak EMAS — to'g'ridan-to'g'ri memory offset
+
+┌─────────────────────────────────┐
+│  Inline Cache (person.age)      │
+│                                 │
+│  [HiddenClass C2] → offset 1   │  ← monomorphic: 1 ta entry
+│                                 │
+│  Tekshiruv: person.map === C2?  │
+│  Ha → memory[person + offset 1] │  ← to'g'ridan-to'g'ri, hash-free
+│  Yo'q → slow path (lookup)     │
+└─────────────────────────────────┘
+```
+
+### Kod Misollari
+
+Hidden class optimization'ni ta'minlash:
 
 ```javascript
-function calculate(x, y) {
-  return x + y;
+// ✅ Bir xil tartibda property qo'shish — bir xil hidden class
+function createUser(name, age) {
+  const user = {};
+  user.name = name;  // C0 → C1 (name qo'shildi)
+  user.age = age;    // C1 → C2 (age qo'shildi)
+  return user;
 }
 
-// 10,000 marta number bilan — TurboFan optimize qildi
-for (let i = 0; i < 10000; i++) {
-  calculate(i, i + 1);
-}
-
-// ❌ Keyin birdaniga string berildi!
-calculate("salom", " dunyo");
-// TurboFan: "type o'zgardi! Optimizatsiyam noto'g'ri bo'lib qoldi!"
-// → DEOPTIMIZATION — bytecode ga qaytish
-// → Ignition qayta bajiradi
-// → Keyinchalik yana optimize qilishi MUMKIN (endi mixed type uchun)
+const user1 = createUser("Ali", 25);   // Hidden Class: C2
+const user2 = createUser("Vali", 30);  // Hidden Class: C2 — bir xil!
+// ✅ Ikkalasi bir xil hidden class share qiladi
 ```
-
-### Optimization Killers — Nimalar V8 ni sekinlashtiradi
 
 ```javascript
-// ❌ 1. Type o'zgarishi (Polymorphic/Megamorphic)
-function bad(x) { return x + 1; }
-bad(5);          // number
-bad("5");        // string — deopt!
-bad(true);       // boolean — megamorphic, optimize qilinmaydi
+// ❌ Turli tartibda property qo'shish — turli hidden class
+const userA = {};
+userA.name = "Ali";  // C0 → C1_name
+userA.age = 25;      // C1_name → C2_name_age
 
-// ❌ 2. Hidden class o'zgarishi
-function Point(x, y) {
-  this.x = x;
-  this.y = y;
-}
-let p1 = new Point(1, 2);
-let p2 = new Point(3, 4);
-p2.z = 5; // ← p1 va p2 endi turli "hidden class"
-           // V8 inline cache miss — sekin
-
-// ✅ To'g'ri: bir xil shape saqlash
-let p3 = new Point(5, 6);
-let p4 = new Point(7, 8);
-// Ikkalasi ham {x, y} shape — V8 xursand, inline cache hit
-
-// ❌ 3. delete operator
-let obj = { a: 1, b: 2 };
-delete obj.a; // ← Hidden class o'zgaradi — sekin
-// ✅ To'g'ri: obj.a = undefined; (hidden class saqlanadi)
-
-// ❌ 4. arguments object ni noto'g'ri ishlatish
-function bad2() {
-  let args = Array.prototype.slice.call(arguments); // ← eski, sekin
-}
-// ✅ To'g'ri:
-function good2(...args) { /* rest parameter */ }
+const userB = {};
+userB.age = 30;      // C0 → C1_age (boshqa transition!)
+userB.name = "Vali"; // C1_age → C2_age_name (boshqa hidden class!)
+// ❌ userA va userB TURLI hidden class'larga ega
+// chunki property qo'shilish tartibi farq qiladi
+// Bu inline caching'ni buzadi — polymorphic bo'ladi
 ```
-
-### Under the Hood — Hidden Classes (V8 Maps)
-
-V8 har bir object uchun ichki "hidden class" (rasmiy nomi **Map**) yaratadi. Bu object ning shape (qanday property'lari bor, qaysi tartibda) ni belgilaydi.
 
 ```javascript
-let user = {};       // Hidden Class C0 (bo'sh)
-user.name = "Ali";   // Hidden Class C1 (name)
-user.age = 25;       // Hidden Class C2 (name, age)
-
-let user2 = {};      // Hidden Class C0
-user2.name = "Vali"; // Hidden Class C1 — user bilan BIR XIL!
-user2.age = 30;      // Hidden Class C2 — user bilan BIR XIL!
-// ✅ Bir xil tartibda property qo'shilgani uchun, bir xil hidden class
-
-let user3 = {};      // Hidden Class C0
-user3.age = 20;      // Hidden Class C3 — BOSHQA! (avval age, keyin name)
-user3.name = "Sami"; // Hidden Class C4 — BOSHQA!
-// ❌ Tartib farq qiladi — yangi hidden class yaratildi
+// ✅ Eng yaxshi pattern — constructor yoki factory function ishlatish
+// Barcha object'lar bir xil shape bilan yaratiladi
+class User {
+  constructor(name, age, email) {
+    this.name = name;   // har doim 1-chi
+    this.age = age;     // har doim 2-chi
+    this.email = email; // har doim 3-chi
+    // ✅ Barcha User instance'lari bir xil hidden class
+  }
+}
 ```
 
-```
-user, user2:                    user3:
+```javascript
+// ❌ delete operator — hidden class transition'ni buzadi
+const product = { name: "Phone", price: 999, category: "Electronics" };
+// product → HiddenClass C3 {name, price, category}
 
-C0 {} ──→ C1 {name} ──→ C2     C0 {} ──→ C3 {age} ──→ C4
-               {name, age}                    {age, name}
-                                
-         BIR XIL chain              BOSHQA chain
-```
+delete product.price;
+// ❌ delete hidden class'ni buzadi — V8 slow mode'ga o'tadi
+// Bu object endi hash table based bo'ladi — sekin
 
-**Qoida:** Object property'larini doim **bir xil tartibda** qo'shing — V8 bir xil hidden class ishlatadi va inline cache yaxshi ishlaydi.
+// ✅ delete o'rniga — null yoki undefined qo'yish
+product.price = undefined;
+// Hidden class saqlanadi, faqat qiymat o'zgaradi
+```
 
 ---
 
@@ -537,119 +853,131 @@ C0 {} ──→ C1 {name} ──→ C2     C0 {} ──→ C3 {age} ──→ C4
 
 ### Nazariya
 
-Call Stack — bu engine'ning **funksiya chaqiruvlarini kuzatib borish va boshqarish** uchun ishlatiladigan asosiy ma'lumot tuzilmasi. U **LIFO** (Last In, First Out) — ya'ni "oxirgi kirgan birinchi chiqadi" prinsipi bilan ishlaydi.
+Call Stack — funksiya chaqiruvlarini boshqaradigan LIFO (Last In, First Out) tartibidagi stack ma'lumot strukturasi. Har bir funksiya chaqirilganda stack'ga yangi **frame** (yoki **execution context**) qo'shiladi, funksiya tugaganda bu frame olib tashlanadi.
 
-Call Stack ni **kitoblar ustma-ust qo'yilgan ustun**ga o'xshatish mumkin. Yangi kitob faqat tepaga qo'yiladi, olish ham faqat tepadan mumkin. Xuddi shunday, yangi funksiya chaqirilganda uning Execution Context stack'ning tepasiga qo'yiladi, funksiya tugaganda esa tepadan olib tashlanadi.
+JavaScript **single-threaded** — uning faqat **bitta** call stack'i bor. Bu degani bir vaqtda faqat **bitta** funksiya bajarilishi mumkin. Agar bitta funksiya hali tugamagan bo'lsa — barcha boshqa kod kutib turadi.
 
-Call Stack nima uchun muhim? JavaScript **single-threaded** til — ya'ni bir vaqtda faqat bitta ish bajara oladi. Call Stack aynan shu "bitta ish" ni boshqaradi: engine doimo stack'ning eng **tepasidagi** funksiyani bajaradi. Agar funksiya A ichida funksiya B chaqirilsa, B A ning tepasiga qo'yiladi va engine B ni bajarishga o'tadi. B tugaganda stack'dan chiqariladi va engine A ni davom ettiradi.
-
-Amaliy jihatdan Call Stack ikki muhim chegaraga ega. Birinchisi — stack hajmi cheklangan (odatda 10 000–25 000 frame). Agar funksiya cheksiz o'zini chaqirsa (rekursiya to'xtash shartisiz), stack to'lib ketadi va **Stack Overflow** xatosi yuz beradi. Ikkinchisi — bitta uzoq davom etadigan funksiya butun stack'ni band qiladi va boshqa hech narsa bajara olmaydi. Brauzerda bu UI ni "muzlatib" qo'yadi — foydalanuvchi hech narsani bosa olmaydi. Shuning uchun og'ir hisob-kitoblarni asinxron qilish yoki Web Worker'larga o'tkazish muhim — bu haqida [11-event-loop.md](11-event-loop.md) da batafsil gaplashamiz.
-
-### Vizualizatsiya
-
-```javascript
-function birinchi() {
-  console.log("birinchi");
-  ikkinchi();
-  console.log("birinchi tugadi");
-}
-
-function ikkinchi() {
-  console.log("ikkinchi");
-  uchinchi();
-  console.log("ikkinchi tugadi");
-}
-
-function uchinchi() {
-  console.log("uchinchi");
-}
-
-birinchi();
-```
-
-Call Stack ning holati har bir qadam da:
-
-```
-1)              2)              3)              4)
-┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐
-│           │  │           │  │ uchinchi() │  │           │
-│           │  │ ikkinchi()│  │ ikkinchi() │  │ ikkinchi() │
-│ birinchi()│  │ birinchi()│  │ birinchi() │  │ birinchi() │
-│ global()  │  │ global()  │  │ global()   │  │ global()   │
-└───────────┘  └───────────┘  └───────────┘  └───────────┘
- birinchi()     ikkinchi()     uchinchi()      uchinchi()
- chaqirildi     chaqirildi     chaqirildi      tugadi, pop
-
-5)              6)
-┌───────────┐  ┌───────────┐
-│           │  │           │
-│           │  │           │
-│ birinchi()│  │           │
-│ global()  │  │ global()  │
-└───────────┘  └───────────┘
- ikkinchi()     birinchi()
- tugadi, pop    tugadi, pop
-```
-
-**Output:**
-```
-birinchi
-ikkinchi
-uchinchi
-ikkinchi tugadi
-birinchi tugadi
-```
-
-### Stack Overflow
-
-Call Stack ning **chegarasi** bor. Agar funksiya cheksiz o'zini chaqirsa (recursive), stack to'lib ketadi:
-
-```javascript
-// ❌ Stack Overflow
-function cheksiz() {
-  cheksiz(); // o'zini chaqiradi — to'xtash sharti yo'q
-}
-
-cheksiz();
-// Uncaught RangeError: Maximum call stack size exceeded
-```
-
-```
-┌────────────┐
-│ cheksiz()  │  ← 10,000+ marta
-│ cheksiz()  │
-│ cheksiz()  │
-│ cheksiz()  │
-│   .....    │
-│ cheksiz()  │
-│ global()   │
-└────────────┘
-     💥 OVERFLOW!
-```
-
-Stack limiti browser/environment ga bog'liq — odatda **10,000-25,000** frame atrofida.
-
-```javascript
-// ✅ To'g'ri recursive funksiya — base case bor
-function countdown(n) {
-  if (n <= 0) {     // ← BASE CASE — to'xtash sharti
-    console.log("Go!");
-    return;
-  }
-  console.log(n);
-  countdown(n - 1); // recursive call
-}
-
-countdown(3);
-// 3
-// 2
-// 1
-// Go!
-```
+Call Stack'ning asosiy vazifalari:
+- Hozir qaysi funksiya bajarilayotganini tracking qilish
+- Funksiya tugaganda qayerga qaytishni bilish (return address)
+- Local o'zgaruvchilarni saqlash (har bir frame o'zining local scope'iga ega)
+- Funksiya chaqiruvlari ketma-ketligini (call chain) saqlash
 
 ### Under the Hood
 
-Call Stack aslida **Execution Context Stack** deb ham ataladi. Har bir "frame" aslida bir **Execution Context** — o'z ichida o'zgaruvchilar, `this`, scope chain saqlaydi. Bu haqida keyingi bo'limda ([02-execution-context.md](02-execution-context.md)) batafsil gaplashamiz.
+Call Stack'ning ishlash mexanizmi:
+
+```javascript
+function multiply(a, b) {
+  return a * b;
+}
+
+function square(n) {
+  return multiply(n, n);
+}
+
+function printSquare(n) {
+  const result = square(n);
+  console.log(result);
+}
+
+printSquare(5);
+```
+
+Stack holati qadam-baqadam:
+
+```
+Qadam 1: printSquare(5) chaqirildi
+┌─────────────────┐
+│ printSquare(5)   │
+│ global()         │
+└─────────────────┘
+
+Qadam 2: square(5) chaqirildi (printSquare ichidan)
+┌─────────────────┐
+│ square(5)        │
+│ printSquare(5)   │
+│ global()         │
+└─────────────────┘
+
+Qadam 3: multiply(5, 5) chaqirildi (square ichidan)
+┌─────────────────┐
+│ multiply(5, 5)   │
+│ square(5)        │
+│ printSquare(5)   │
+│ global()         │
+└─────────────────┘
+
+Qadam 4: multiply return 25 — stack'dan chiqdi
+┌─────────────────┐
+│ square(5)        │  ← multiply natijasi: 25
+│ printSquare(5)   │
+│ global()         │
+└─────────────────┘
+
+Qadam 5: square return 25 — stack'dan chiqdi
+┌─────────────────┐
+│ printSquare(5)   │  ← square natijasi: 25
+│ global()         │
+└─────────────────┘
+
+Qadam 6: console.log(25) chaqirildi va tugadi
+Qadam 7: printSquare tugadi — stack'dan chiqdi
+┌─────────────────┐
+│ global()         │
+└─────────────────┘
+```
+
+**Stack Overflow:**
+
+Call Stack'ning hajmi cheklangan (brauzer va engine'ga qarab odatda 10,000–25,000 frame atrofida). Agar stack bu limitdan oshsa — **Stack Overflow** xatosi yuz beradi. Bu ko'pincha cheksiz rekursiyada sodir bo'ladi.
+
+### Kod Misollari
+
+```javascript
+// ❌ Stack Overflow — cheksiz rekursiya
+function countdown(n) {
+  console.log(n);
+  countdown(n - 1); // ❌ to'xtash sharti yo'q — cheksiz chaqiruv
+}
+
+countdown(5);
+// 5, 4, 3, 2, 1, 0, -1, -2, ... → RangeError: Maximum call stack size exceeded
+```
+
+```javascript
+// ✅ To'g'ri rekursiya — base case bilan
+function countdown(n) {
+  if (n < 0) return; // ✅ base case — rekursiya to'xtaydi
+  console.log(n);
+  countdown(n - 1);
+}
+
+countdown(5); // 5, 4, 3, 2, 1, 0
+```
+
+```javascript
+// Stack trace o'qish — xato sodir bo'lganda call stack holati ko'rinadi
+function c() {
+  throw new Error("Xato!");
+}
+
+function b() {
+  c();
+}
+
+function a() {
+  b();
+}
+
+a();
+// Error: Xato!
+//     at c (script.js:2)    ← xato shu yerda sodir bo'ldi
+//     at b (script.js:6)    ← c ni b chaqirgan
+//     at a (script.js:10)   ← b ni a chaqirgan
+//     at script.js:13       ← a ni global scope chaqirgan
+// ✅ Stack trace pastdan yuqoriga — chaqiruv ketma-ketligini ko'rsatadi
+```
 
 ---
 
@@ -657,321 +985,380 @@ Call Stack aslida **Execution Context Stack** deb ham ataladi. Har bir "frame" a
 
 ### Nazariya
 
-Memory Heap — bu engine'ning **tartibsiz (unstructured) xotira sohasi** bo'lib, bu yerda ob'ektlar, massivlar, funksiyalar va boshqa murakkab (reference type) ma'lumotlar saqlanadi. Stack bilan birga u JavaScript xotira boshqaruvining ikki asosiy tarkibiy qismidan birini tashkil qiladi.
+Memory Heap — JavaScript engine'dagi dinamik xotira ajratish (dynamic memory allocation) sodir bo'ladigan maydon. Object, array, function, Map, Set va boshqa reference type'lar heap'da saqlanadi.
 
-Stack va Heap ning farqini tushunish uchun **shkaf va ombor** analogiyasini olaylik. Stack — bu kichik, tartibli shkaf: har bir javon aniq belgilangan, narsalarni tez topish va qo'yish mumkin, lekin sig'imi cheklangan. Heap esa — katta ombor: ko'p narsa sig'adi, lekin narsalar tartibsiz joylashadi va biror narsani topish uchun manzil (reference) kerak.
+Heap — bu **strukturasiz** (unstructured) xotira bloki. Stack'dan farqli ravishda, heap'da ma'lumotlar ketma-ket emas, balki bo'sh joy topilgan joyga joylashtiriladi. Shuning uchun heap'da allocation va deallocation stack'ga nisbatan sekinroq.
 
-Nima uchun heap kerak? Primitive qiymatlar (number, boolean, string) hajmi oldindan ma'lum va kichik — ular stack da saqlash uchun ideal. Lekin ob'ektlar, massivlar, funksiyalar — bularning hajmi oldindan noma'lum va dinamik o'zgarishi mumkin. Masalan, massivga yangi element qo'shsangiz, u o'sadi. Ob'ektga yangi property qo'shsangiz, u kengayadi. Bunday dinamik ma'lumotlar uchun **heap** — ya'ni katta, moslashuvchan xotira hududi kerak.
+Heap'da saqlanadigan narsalar:
+- Object'lar (`{}`, `new Object()`)
+- Array'lar (`[]`, `new Array()`)
+- Function'lar (function object sifatida)
+- String'lar (V8 da kichik string'lar inline saqlanishi mumkin, lekin katta string'lar heap'da)
+- Map, Set, WeakMap, WeakSet
+- RegExp, Date, Error object'lari
+- Closure'larning tashqi scope reference'lari
+- Class instance'lari
 
-Heap da ma'lumotlar stack'dagi kabi avtomatik tozalanmaydi. Funksiya tugaganda stack frame yo'qoladi va undagi barcha primitive qiymatlar bilan birga ketadi. Lekin heap dagi ob'ektlar funksiya tugagandan keyin ham yashashi mumkin (masalan, boshqa o'zgaruvchi ularga reference qilayotgan bo'lsa). Shuning uchun heap da ishlatilmagan ma'lumotlarni tozalash uchun maxsus mexanizm — **Garbage Collector** kerak. V8 ning Garbage Collector'i murakkab algoritmlar (Mark-and-Sweep, Generational GC) yordamida ishlatilmagan ob'ektlarni aniqlaydi va xotirani bo'shatadi. Bu haqida batafsil [16-memory.md](16-memory.md) da gaplashamiz.
+### Under the Hood
 
-### Nima Qayerda Saqlanadi
+V8 engine'da heap bir necha bo'limlarga (space) ajratilgan:
+
+```
+┌───────────────────────────────────────────────┐
+│                V8 Heap                         │
+│                                                │
+│  ┌────────────────────────────────────────┐   │
+│  │  New Space (Young Generation)          │   │
+│  │  ┌──────────────┐ ┌──────────────┐    │   │
+│  │  │  Semi-space A │ │ Semi-space B │    │   │
+│  │  │  (From/To)    │ │ (From/To)    │    │   │
+│  │  └──────────────┘ └──────────────┘    │   │
+│  │  Yangi yaratilgan object'lar shu yerda │   │
+│  │  Hajmi: 1-8 MB (kichik, tez GC)       │   │
+│  └────────────────────────────────────────┘   │
+│                                                │
+│  ┌────────────────────────────────────────┐   │
+│  │  Old Space (Old Generation)            │   │
+│  │  Uzoq yashaydigan object'lar           │   │
+│  │  New Space'dan omon qolganlar          │   │
+│  │  Hajmi: yuzlab MB gacha               │   │
+│  └────────────────────────────────────────┘   │
+│                                                │
+│  ┌────────────────────────────────────────┐   │
+│  │  Large Object Space                    │   │
+│  │  Katta object'lar (>256KB)             │   │
+│  │  GC da ko'chirilMAYDI                  │   │
+│  └────────────────────────────────────────┘   │
+│                                                │
+│  ┌────────────────────────────────────────┐   │
+│  │  Code Space                            │   │
+│  │  JIT compile qilingan machine code     │   │
+│  └────────────────────────────────────────┘   │
+│                                                │
+│  ┌────────────────────────────────────────┐   │
+│  │  Map Space                             │   │
+│  │  Hidden Class (Map) object'lari        │   │
+│  └────────────────────────────────────────┘   │
+└───────────────────────────────────────────────┘
+```
+
+Heap'da memory allocation qilish — bu Garbage Collector'ning ishi. Yangi object yaratilganda New Space'dagi bo'sh joyga joylashtiriladi. Agar object uzoq yashasa (bir necha GC cycle'dan omon qolsa) — Old Space'ga ko'chiriladi. Bu **generational hypothesis** ga asoslanadi: ko'p object'lar qisqa muddatli, tez yaratiladi va tez unutiladi. Shuning uchun kichik New Space'da tez-tez GC qilish samarali — ko'p "axlat" shu yerda to'planadi.
+
+Memory haqida to'liq ma'lumot [16-memory.md](16-memory.md) da yoritiladi.
+
+### Kod Misollari
 
 ```javascript
-// STACK da saqlanadi (primitive values):
-let age = 25;            // number → stack
-let name = "Islom";      // string → stack (kichik stringlar)*
-let isActive = true;     // boolean → stack
-let empty = null;        // null → stack
-let notDefined;          // undefined → stack
+// Stack va Heap'da nima saqlanadi:
 
-// HEAP da saqlanadi (reference types):
-let user = { name: "Islom", age: 25 };    // object → heap
-let numbers = [1, 2, 3];                   // array → heap
-let greet = function() { return "salom"; }; // function → heap
-let regex = /hello/gi;                      // RegExp → heap
-let date = new Date();                      // Date → heap
+// Primitive — qiymat to'g'ridan-to'g'ri stack frame'da saqlanadi
+let count = 42;          // stack: count = 42
+let name = "Ali";        // stack: name = "Ali" (yoki heap, agar uzun string)
+let isActive = true;     // stack: isActive = true
+
+// Reference type — object heap'da, reference (pointer) stack'da
+let user = { name: "Ali", age: 25 };
+// stack: user = 0x7f3a (heap'dagi address)
+// heap:  0x7f3a → { name: "Ali", age: 25 }
+
+let numbers = [1, 2, 3];
+// stack: numbers = 0x8b2c (heap'dagi address)
+// heap:  0x8b2c → [1, 2, 3]
 ```
 
-*Eslatma: V8 da stringlar aslida murakkabroq — kichik stringlar stack/inline, katta stringlar heap da. Lekin oddiy model uchun yuqoridagi yetarli.*
+```javascript
+// Reference type'ning xatti-harakati:
+const original = { x: 10, y: 20 };
+const copy = original;
+// ✅ copy va original BIR XIL object'ga point qiladi (heap'da)
+// Ikkita reference — bitta object
 
-### Diagramma
-
+copy.x = 99;
+console.log(original.x); // 99 — chunki bitta object
+// ❌ copy "mustaqil nusxa" emas — faqat reference nusxasi
 ```
-        STACK                          HEAP
-  ┌──────────────┐           ┌─────────────────────┐
-  │ age: 25      │           │                     │
-  │ name: "Islom"│           │  ┌───────────────┐  │
-  │ isActive:true│           │  │ { name:"Islom"│  │
-  │              │           │  │   age: 25 }   │  │
-  │ user: ───────────────────│→ └───────────────┘  │
-  │              │           │                     │
-  │              │           │  ┌───────────────┐  │
-  │ numbers: ────────────────│→ │ [1, 2, 3]     │  │
-  │              │           │  └───────────────┘  │
-  │              │           │                     │
-  │              │           │  ┌───────────────┐  │
-  │ greet: ──────────────────│→ │ function(){...}│  │
-  │              │           │  └───────────────┘  │
-  └──────────────┘           └─────────────────────┘
-  
-  Tez, tartibli,              Sekinroq, tartibsiz,
-  hajmi cheklangan            hajmi katta
-```
-
-Stack da **reference** (manzil/pointer) saqlanadi, haqiqiy object heap da turadi.
-
-### Under the Hood — V8 Heap Tuzilmasi
-
-V8 ning heap qismi bir necha **space** larga bo'lingan:
-
-```
-V8 Heap
-├── New Space (Young Generation)     ← Yangi object'lar shu yerda
-│   ├── Semi-space (From)
-│   └── Semi-space (To)
-├── Old Space (Old Generation)       ← Uzoq yashagan object'lar
-│   ├── Old Pointer Space            ← Boshqa object'larga reference
-│   └── Old Data Space               ← Faqat data (string, number)
-├── Large Object Space               ← Katta object'lar (>256KB)
-├── Code Space                       ← Compiled code (JIT)
-└── Map Space                        ← Hidden classes (Maps)
-```
-
-Yangi object avval **New Space** ga tushadi. Agar u bir necha GC cycle dan omon qolsa, **Old Space** ga ko'chiriladi. Bu **Generational GC** deyiladi — ko'proq [16-memory.md](16-memory.md) da.
 
 ---
 
 ## Stack vs Heap
 
-### Qisqa Taqqoslash
+### Nazariya
+
+Stack va Heap — xotiraning ikki turli hududi. Ular turli maqsadlarda ishlatiladi va turli xususiyatlarga ega.
 
 | Xususiyat | Stack | Heap |
 |-----------|-------|------|
-| **Nima saqlanadi** | Primitives, references, execution context | Objects, arrays, functions |
-| **Tuzilma** | LIFO — tartibli | Tartibsiz |
-| **Tezlik** | Juda tez | Sekinroq |
-| **Hajm** | Kichik (~1-8 MB) | Katta (~1.5 GB default) |
-| **Boshqaruv** | Avtomatik (scope tugaganda tozalanadi) | Garbage Collector boshqaradi |
-| **Muammo** | Stack Overflow | Memory Leak |
+| **Nima saqlanadi** | Primitive qiymatlar, function frame'lar, local reference'lar | Object, array, function va boshqa reference type'lar |
+| **Struktura** | LIFO — tartibli, ketma-ket | Strukturasiz — ixtiyoriy joylarda |
+| **Tezlik** | Juda tez — faqat pointer harakatlanadi | Sekinroq — bo'sh joy qidirish kerak |
+| **Hajmi** | Cheklangan (odatda 1-8 MB) | Katta (yuzlab MB, GB gacha) |
+| **Boshqaruv** | Avtomatik — funksiya chiqqanda tozalanadi | Garbage Collector boshqaradi |
+| **Xotirani bo'shatish** | Function tugaganda frame avtomatik olib tashlanadi | GC o'zi tozalaydi (mark-and-sweep) |
+| **Lifetime** | Function scope bilan cheklangan | Reference bor ekan — yashaydi |
 
-### Muhim Farq — Copy vs Reference
+Stack tez ishlashining sababi — u faqat **stack pointer** ni yuqoriga yoki pastga siljitadi. Yangi frame qo'shish = pointer ni ko'tarish. Frame olib tashlash = pointer ni tushirish. Heap esa bo'sh joy qidirishi, fragmentation bilan kurashishi kerak.
+
+Bu mavzu [16-memory.md](16-memory.md) da to'liq chuqur yoritiladi — garbage collection algoritmlari, memory leak'lar, WeakRef, FinalizationRegistry va boshqalar.
+
+### Kod Misollari
 
 ```javascript
-// STACK — Copy by Value
-let a = 10;
-let b = a;     // b ga a ning NUSXASI berildi
-b = 20;
-console.log(a); // 10 — a o'zgarmadi!
-console.log(b); // 20
+function processOrder(orderId) {
+  // Stack'da:
+  //   orderId = 1001 (primitive — to'g'ridan-to'g'ri qiymat)
+  //   discount = 0.1
+  //   order = 0xABC (heap'ga pointer)
 
-// HEAP — Copy by Reference
-let obj1 = { x: 10 };
-let obj2 = obj1;      // obj2 ga REFERENCE (manzil) nusxalandi
-obj2.x = 20;
-console.log(obj1.x);  // 20 — obj1 HAM o'zgardi! Chunki bitta object
-console.log(obj2.x);  // 20
+  const discount = 0.1;
+
+  const order = {          // ← Heap'da yaratiladi
+    id: orderId,
+    items: ["Phone", "Case"],
+    total: 999
+  };
+
+  const finalPrice = order.total * (1 - discount);
+  // finalPrice = 899.1 (primitive — stack'da)
+
+  return finalPrice;
+  // Funksiya tugaganda:
+  // - Stack frame tozalanadi (orderId, discount, order ref, finalPrice)
+  // - Heap'dagi { id: 1001, ... } object — endi unga reference yo'q
+  // - Garbage Collector keyingi cycle'da uni tozalaydi
+}
 ```
-
-```
-STACK (primitive):              STACK (reference):
-
-┌──────┐  ┌──────┐             ┌──────┐  ┌──────┐        HEAP
-│ a:10 │  │ b:20 │             │ obj1 │  │ obj2 │     ┌──────┐
-└──────┘  └──────┘             │  ◆───│──│───◆  │────→│{x:20}│
-  alohida qiymatlar             └──────┘  └──────┘     └──────┘
-                                  ikkalasi BIR object ga ishora
-```
-
-Bu haqida to'liqroq [16-memory.md](16-memory.md) da gaplashamiz.
 
 ---
 
 ## Common Mistakes
 
-### ❌ Xato 1: Type o'zgartirish orqali V8 optimizatsiyasini buzish
+### ❌ Xato 1: Object shape'ni buzish — turli tartibda property qo'shish
 
 ```javascript
-// ❌ Noto'g'ri — mixed types
-function sum(a, b) {
-  return a + b;
-}
-sum(1, 2);         // number
-sum("1", "2");     // string — deoptimize!
-```
-
-### ✅ To'g'ri usul:
-
-```javascript
-// ✅ To'g'ri — consistent types
-function sumNumbers(a, b) {
-  return a + b;
-}
-// Doim number bilan chaqiring
-
-function concatStrings(a, b) {
-  return a + b;
-}
-// Doim string bilan chaqiring
-```
-
-**Nima uchun:** V8 funksiya argumentlarining type'ini kuzatadi. Har xil type'lar kelsa, optimized machine code yaroqsiz bo'ladi va deoptimize qilinadi.
-
----
-
-### ❌ Xato 2: Object property tartibini buzish
-
-```javascript
-// ❌ Noto'g'ri — har xil tartibda property
-function createUser(name, age) {
-  let user = {};
-  if (age) user.age = age;     // ba'zan avval age
-  if (name) user.name = name;  // ba'zan avval name
+// ❌ Noto'g'ri — turli tartibda property qo'shish
+function createUser(type) {
+  const user = {};
+  if (type === 'admin') {
+    user.role = 'admin';   // avval role
+    user.name = 'Admin';   // keyin name
+  } else {
+    user.name = 'User';    // avval name
+    user.role = 'user';    // keyin role
+  }
   return user;
 }
+// ❌ admin va user TURLI hidden class'lar — inline cache buziladi
 ```
 
 ### ✅ To'g'ri usul:
 
 ```javascript
-// ✅ To'g'ri — doim bir xil tartib
-function createUser(name, age) {
+// ✅ Doim bir xil tartibda property qo'shish
+function createUser(type) {
   return {
-    name: name || "",    // doim birinchi
-    age: age || 0        // doim ikkinchi
+    name: type === 'admin' ? 'Admin' : 'User',
+    role: type === 'admin' ? 'admin' : 'user'
   };
+  // ✅ Barcha object'lar bir xil shape — {name, role} tartibida
 }
 ```
 
-**Nima uchun:** V8 hidden class (Map) yaratadi. Bir xil tartibda property qo'shilsa, object'lar bitta hidden class bo'lishadi — inline cache tez ishlaydi.
+**Nima uchun:** V8 hidden class'ni property qo'shilish tartibiga qarab yaratadi. Turli tartib = turli hidden class = inline cache polymorphic bo'ladi = sekin.
 
 ---
 
-### ❌ Xato 3: delete operator ishlatish
+### ❌ Xato 2: delete operator ishlatish
 
 ```javascript
-// ❌ Noto'g'ri
-let config = { host: "localhost", port: 3000, debug: true };
-delete config.debug; // hidden class buziladi — slow mode
+// ❌ Noto'g'ri — delete hidden class zanjirini buzadi
+const config = { host: 'localhost', port: 3000, debug: true };
+delete config.debug;
+// ❌ V8 bu object'ni "slow mode" (dictionary mode) ga o'tkazadi
+// Barcha property access sekinlashadi
 ```
 
 ### ✅ To'g'ri usul:
 
 ```javascript
-// ✅ To'g'ri — undefined qo'yish yoki boshidan qo'shmaslik
-let config = { host: "localhost", port: 3000, debug: true };
-config.debug = undefined; // hidden class saqlanadi
+// ✅ delete o'rniga — undefined yoki yangi object yaratish
+const config = { host: 'localhost', port: 3000, debug: true };
+config.debug = undefined; // ✅ hidden class saqlanadi
 
 // Yoki destructuring bilan yangi object
 const { debug, ...cleanConfig } = config;
+// ✅ cleanConfig = { host: 'localhost', port: 3000 }
 ```
 
-**Nima uchun:** `delete` object ning hidden class ini o'zgartiradi va V8 ni "slow mode" (dictionary mode) ga o'tkazadi. `undefined` qo'yish hidden class ni buzmaydi.
+**Nima uchun:** `delete` property'ni o'chirganda V8 hidden class transition zanjirini buzadi. Object "slow properties" (hash table based) rejimga o'tadi — bu 10-100x sekin.
 
 ---
 
-### ❌ Xato 4: Recursion da base case unutish
+### ❌ Xato 3: Turli tip'larni bir funksiyaga berish
 
 ```javascript
-// ❌ Stack Overflow
-function factorial(n) {
-  return n * factorial(n - 1); // to'xtash sharti yo'q!
+// ❌ Noto'g'ri — turli tip'lar polymorphic/megamorphic call hosil qiladi
+function double(value) {
+  return value * 2;
+}
+
+double(5);       // number
+double("5");     // string → NaN yoki coercion
+double(true);    // boolean → 2
+// ❌ 3 xil tip — V8 optimize qila olmaydi
+```
+
+### ✅ To'g'ri usul:
+
+```javascript
+// ✅ Doim bir xil tip bilan chaqirish
+function doubleNumber(n) {
+  return n * 2;
+}
+
+// Agar turli tip'lar kerak bo'lsa — alohida funksiyalar
+function doubleString(s) {
+  return s.repeat(2);
+}
+
+doubleNumber(5);     // ✅ doim number — monomorphic
+doubleString("ab");  // ✅ doim string — monomorphic
+```
+
+**Nima uchun:** V8 JIT compiler profiling data asosida tip-specific machine code hosil qiladi. Turli tip'lar kelsa — assumption buziladi va deoptimization sodir bo'ladi.
+
+---
+
+### ❌ Xato 4: Cheksiz rekursiya — stack overflow
+
+```javascript
+// ❌ Noto'g'ri — base case yo'q yoki noto'g'ri
+function fibonacci(n) {
+  return fibonacci(n - 1) + fibonacci(n - 2);
+  // ❌ n === 0 yoki n === 1 tekshiruvi yo'q — cheksiz rekursiya
 }
 ```
 
 ### ✅ To'g'ri usul:
 
 ```javascript
-// ✅ Base case bor
-function factorial(n) {
-  if (n <= 1) return 1;       // ← BASE CASE
-  return n * factorial(n - 1);
+// ✅ Base case bilan
+function fibonacci(n) {
+  if (n <= 1) return n; // ✅ base case
+  return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+// ✅ Yoki iterativ yondashuv — stack overflow xavfi yo'q
+function fibonacciIterative(n) {
+  let prev = 0, curr = 1;
+  for (let i = 2; i <= n; i++) {
+    [prev, curr] = [curr, prev + curr];
+  }
+  return n === 0 ? 0 : curr;
 }
 ```
 
-**Nima uchun:** Har bir recursive call stack ga yangi frame qo'shadi. Base case bo'lmasa — cheksiz call = stack overflow.
+**Nima uchun:** Call stack hajmi cheklangan. Har bir rekursiv chaqiruv yangi frame qo'shadi. Base case bo'lmasa stack to'ladi va `RangeError: Maximum call stack size exceeded` xatosi chiqadi.
 
 ---
 
-### ❌ Xato 5: Katta array'lar bilan "holey" array yaratish
+### ❌ Xato 5: Katta object'larni keraksiz yaratish
 
 ```javascript
-// ❌ Noto'g'ri — holey array
-let arr = new Array(10000); // 10,000 ta empty slot
-arr[0] = 1;
-arr[9999] = 2;
-// V8: "bu holey array — sekin mode"
-
-// ❌ Yana noto'g'ri
-let arr2 = [1, 2, 3];
-arr2[100] = 4; // index 3-99 empty — holey!
+// ❌ Noto'g'ri — loop ichida har safar yangi object yaratish
+function processItems(items) {
+  const results = [];
+  for (const item of items) {
+    const config = {                // ❌ har iteratsiyada yangi object
+      format: 'json',              // bu qiymatlar o'zgarmaydi!
+      encoding: 'utf-8',
+      compress: true
+    };
+    results.push(transform(item, config));
+  }
+  return results;
+}
 ```
 
 ### ✅ To'g'ri usul:
 
 ```javascript
-// ✅ To'g'ri — packed array
-let arr = [];
-for (let i = 0; i < 10000; i++) {
-  arr.push(i); // ketma-ket to'ldirish
-}
-// V8: "bu packed array — tez mode"
+// ✅ O'zgarmas config'ni loop tashqarisida yaratish
+function processItems(items) {
+  const config = {               // ✅ bir marta yaratiladi
+    format: 'json',
+    encoding: 'utf-8',
+    compress: true
+  };
 
-// ✅ Yoki Array.from
-let arr2 = Array.from({ length: 100 }, (_, i) => i);
+  const results = [];
+  for (const item of items) {
+    results.push(transform(item, config));
+    // ✅ bir xil object reference ishlatiladi — heap allocation kamaytildi
+  }
+  return results;
+}
 ```
 
-**Nima uchun:** V8 array'larni ichki tuzilmalariga ko'ra turlicha optimize qiladi. "Packed" (to'liq to'ldirilgan) array lar "Holey" (bo'sh joylar bor) array lardan tezroq ishlaydi.
+**Nima uchun:** Har bir `{}` yangi heap allocation. Loop 10,000 marta aylanasa — 10,000 ta keraksiz object yaratiladi va GC ular bilan shug'ullanishi kerak. O'zgarmas qiymatlarni loop tashqarisida yaratish memory va GC pressure'ni kamaytiradi.
 
 ---
 
 ## Amaliy Mashqlar
 
-### Mashq 1: Call Stack Natijasini Aniqlang (Oson)
+### Mashq 1: Call Stack Vizualizatsiya (Oson)
 
-**Savol:** Quyidagi kodning output ini aniqlang:
+**Savol:** Quyidagi kodning call stack holatini har bir qadam uchun chizing. Output nima bo'ladi?
 
 ```javascript
-function a() {
-  console.log("a boshi");
-  b();
-  console.log("a oxiri");
+function first() {
+  console.log("1");
+  second();
+  console.log("3");
 }
 
-function b() {
-  console.log("b boshi");
-  c();
-  console.log("b oxiri");
+function second() {
+  console.log("2");
 }
 
-function c() {
-  console.log("c");
-}
-
-a();
+first();
 ```
 
 <details>
 <summary>Javob</summary>
 
-```javascript
-// Output:
-// "a boshi"
-// "b boshi"
-// "c"
-// "b oxiri"
-// "a oxiri"
+```
+Output: 1, 2, 3
+
+Qadam 1: first() chaqirildi
+Stack: [global, first]
+→ console.log("1") — output: "1"
+
+Qadam 2: second() chaqirildi
+Stack: [global, first, second]
+→ console.log("2") — output: "2"
+
+Qadam 3: second() tugadi
+Stack: [global, first]
+→ console.log("3") — output: "3"
+
+Qadam 4: first() tugadi
+Stack: [global]
 ```
 
-**Tushuntirish:** Call Stack LIFO prinsipi bilan ishlaydi.
-1. `a()` chaqirildi → stack: `[global, a]` → "a boshi"
-2. `b()` chaqirildi → stack: `[global, a, b]` → "b boshi"
-3. `c()` chaqirildi → stack: `[global, a, b, c]` → "c"
-4. `c()` tugadi, pop → stack: `[global, a, b]` → "b oxiri"
-5. `b()` tugadi, pop → stack: `[global, a]` → "a oxiri"
-6. `a()` tugadi, pop → stack: `[global]`
+**Tushuntirish:** Call stack LIFO tartibida ishlaydi — `second()` `first()` ichidan chaqirildi, avval `second()` tugaydi, keyin `first()` davom etadi.
 </details>
 
 ---
 
-### Mashq 2: Stack Overflow ni Tuzating (O'rta)
+### Mashq 2: Stack Overflow (Oson)
 
-**Savol:** Quyidagi kod stack overflow beradi. Uni tuzating:
+**Savol:** Bu kod nima uchun xato beradi? Qanday tuzatish mumkin?
 
 ```javascript
 function sum(n) {
   return n + sum(n - 1);
 }
+
 console.log(sum(5));
 ```
 
@@ -979,193 +1366,181 @@ console.log(sum(5));
 <summary>Javob</summary>
 
 ```javascript
+// Xato: RangeError: Maximum call stack size exceeded
+// Sabab: base case yo'q — sum(5) → sum(4) → sum(3) → ... → sum(-Infinity)
+
+// ✅ Tuzatilgan versiya:
 function sum(n) {
-  if (n <= 0) return 0; // ← base case qo'shdik
+  if (n <= 0) return 0; // ✅ base case
   return n + sum(n - 1);
 }
+
 console.log(sum(5)); // 15 (5 + 4 + 3 + 2 + 1 + 0)
 ```
 
-**Tushuntirish:** Original kodda base case yo'q edi. `n` manfiy songa o'tib ketib, cheksiz recursive call hosil bo'lardi. `n <= 0` sharti qo'shilganda, funksiya 0 ga yetganda to'xtaydi.
-
-Call stack vizualizatsiya:
-```
-sum(5) = 5 + sum(4)
-  sum(4) = 4 + sum(3)
-    sum(3) = 3 + sum(2)
-      sum(2) = 2 + sum(1)
-        sum(1) = 1 + sum(0)
-          sum(0) = 0  ← base case, qaytish boshlanadi
-        = 1 + 0 = 1
-      = 2 + 1 = 3
-    = 3 + 3 = 6
-  = 4 + 6 = 10
-= 5 + 10 = 15
-```
+**Tushuntirish:** Har bir rekursiv funksiyada **base case** (to'xtash sharti) bo'lishi shart. Bu shart bajarilganda rekursiya to'xtaydi va stack frame'lar birin-ketin qaytariladi.
 </details>
 
 ---
 
-### Mashq 3: V8 Optimization (O'rta)
+### Mashq 3: Hidden Class Optimization (O'rta)
 
-**Savol:** Quyidagi kodda V8 optimizatsiyasini buzadigan muammolarni toping va tuzating:
+**Savol:** Quyidagi ikkita variant'dan qaysi biri V8 da tezroq ishlaydi va nima uchun?
 
 ```javascript
-function processItem(item) {
-  return item.value + 10;
+// Variant A
+function createPointA(x, y) {
+  const p = {};
+  p.x = x;
+  p.y = y;
+  return p;
 }
 
-processItem({ value: 1 });
-processItem({ value: 2, extra: true });
-processItem({ value: "3" });
+// Variant B
+function createPointB(x, y) {
+  return { x, y };
+}
 ```
 
 <details>
 <summary>Javob</summary>
 
-Muammolar:
-1. **Object shape farq qiladi** — birinchi `{value}`, ikkinchi `{value, extra}` → turli hidden class
-2. **Type o'zgaradi** — avval number, keyin string → deoptimization
+Ikkala variant ham deyarli bir xil tezlikda ishlaydi — chunki ikkisida ham property'lar doim bir xil tartibda qo'shiladi (`x`, keyin `y`). Barcha hosil bo'lgan object'lar bir xil hidden class'ga ega bo'ladi.
 
-```javascript
-// ✅ To'g'ri
-function processItem(item) {
-  return item.value + 10;
-}
+Lekin **Variant B** biroz yaxshiroq — chunki:
+1. Object literal'da V8 barcha property'larni birdaniga ko'radi va to'g'ridan-to'g'ri final hidden class bilan yaratadi
+2. Variant A da esa uch bosqich: `{}` (C0) → `.x = x` (C1) → `.y = y` (C2) — har bir qadam transition
 
-// Doim bir xil shape va type
-processItem({ value: 1, extra: false });
-processItem({ value: 2, extra: true });
-processItem({ value: 3, extra: false });
-```
+Amalda farq juda kichik, lekin million object yaratilganda sezilishi mumkin.
 
-**Tushuntirish:**
-- Barcha object'lar bir xil property'lar (bir xil tartibda) = bitta hidden class = inline cache hit = tez
-- `value` doim number = monomorphic = TurboFan optimize qila oladi
+**Asosiy qoida:** Object literal ishlatish — eng yaxshi pattern, chunki engine barcha property'larni oldindan ko'radi.
 </details>
 
 ---
 
-### Mashq 4: Pipeline ni Tushuntiring (Qiyin)
+### Mashq 4: JIT Deoptimization (Qiyin)
 
-**Savol:** Quyidagi kod V8 pipeline ning qaysi bosqichlaridan o'tadi? Har bir bosqichda nima sodir bo'ladi?
+**Savol:** Quyidagi kod nima uchun kutilganidan sekinroq ishlaydi? Qanday tuzatish mumkin?
 
 ```javascript
-function multiply(a, b) {
-  return a * b;
+function getLength(collection) {
+  return collection.length;
 }
+
+const arr = [1, 2, 3, 4, 5];
+const str = "Hello World";
+const typedArr = new Uint8Array(10);
 
 for (let i = 0; i < 100000; i++) {
-  multiply(i, i + 1);
+  getLength(arr);
+  getLength(str);
+  getLength(typedArr);
 }
 ```
 
 <details>
 <summary>Javob</summary>
 
-```
-1. PARSING
-   Source code → Token'lar → AST
-   - multiply funksiyasi va for loop AST node'lariga aylanadi
+```javascript
+// Muammo: getLength ga 3 xil tip berilmoqda:
+// - Array → hidden class A
+// - String → hidden class B
+// - Uint8Array → hidden class C
+// Bu "megamorphic" holatga olib keladi — inline cache ishlamaydi
+// V8 har safar generic (sekin) property lookup qiladi
 
-2. IGNITION (Bytecode)
-   - AST bytecode ga compile bo'ladi:
-     Ldar a0       // a ni yukla
-     Mul a1        // b ga ko'paytir
-     Return        // qaytir
-   - Dastlabki chaqiruvlar Ignition orqali bajariladi (sekinroq)
+// ✅ Tuzatilgan versiya — har bir tip uchun alohida funksiya
+function getArrayLength(arr) {
+  return arr.length;  // ✅ doim Array — monomorphic
+}
 
-3. PROFILING
-   - Ignition har bir chaqiruvda ma'lumot yig'adi:
-     - a: doim number (SmallInteger yoki HeapNumber)
-     - b: doim number
-     - Return: doim number
-     - Chaqiruvlar soni: 100,000 (juda hot!)
+function getStringLength(str) {
+  return str.length;  // ✅ doim String — monomorphic
+}
 
-4. TURBOFAN (Optimization)
-   - ~1000-2000 chaqiruvdan keyin TurboFan ishga tushadi
-   - "a va b doim number" degan taxmin bilan
-   - Optimized machine code: CPU ning MUL instruksiyasi
-   - Type check'lar minimal
+const arr = [1, 2, 3, 4, 5];
+const str = "Hello World";
 
-5. MACHINE CODE EXECUTION
-   - Qolgan ~98,000 chaqiruv juda tez machine code da bajariladi
-   - Deoptimization yo'q — type hech qachon o'zgarmadi ✅
+for (let i = 0; i < 100000; i++) {
+  getArrayLength(arr);   // ✅ inline cache hit — tez
+  getStringLength(str);  // ✅ inline cache hit — tez
+}
 ```
 
-**Muhim:** Bu ideal holat. Agar loop ichida `multiply("2", "3")` chaqirilganda, TurboFan deoptimize qilgan bo'lardi.
+**Tushuntirish:** V8 Inline Cache har bir property access joyida shape'ni cache'laydi. Bitta joyda turli shape'lar uchrasa — cache polymorphic/megamorphic bo'ladi va samaradorligi tushadi. Har bir tip uchun alohida funksiya — monomorphic inline cache ta'minlaydi.
 </details>
 
 ---
 
-### Mashq 5: Hidden Class Muammosini Aniqlang (Qiyin)
+### Mashq 5: Engine Pipeline (Qiyin)
 
-**Savol:** Quyidagi kodda nima uchun `user1` va `user2` turli hidden class'larda? Qanday tuzatasiz?
+**Savol:** Quyidagi kodni V8 qaysi bosqichlarda qayta ishlaydi? Har bir bosqichda nima sodir bo'lishini tushuntiring.
 
 ```javascript
-function createUser(name, age, isAdmin) {
-  let user = {};
-  user.name = name;
-
-  if (isAdmin) {
-    user.role = "admin";
-  }
-
-  user.age = age;
-  return user;
+function fibonacci(n) {
+  if (n <= 1) return n;
+  return fibonacci(n - 1) + fibonacci(n - 2);
 }
 
-let user1 = createUser("Ali", 25, false);  // {name, age}
-let user2 = createUser("Vali", 30, true);  // {name, role, age}
+for (let i = 0; i < 50; i++) {
+  fibonacci(20);
+}
 ```
 
 <details>
 <summary>Javob</summary>
 
-**Muammo:** `user1` va `user2` ning property qo'shilish **tartibi** farq qiladi:
-- `user1`: name → age (role yo'q)
-- `user2`: name → role → age
+```
+1. PARSING:
+   - Scanner: source code → tokenlar (function, fibonacci, (, n, ), {, ...)
+   - Parser: tokenlar → AST (FunctionDeclaration, IfStatement, ReturnStatement, ...)
 
-V8 har bir tartib uchun **alohida hidden class** yaratadi. Natijada inline cache samarali ishlamaydi.
+2. IGNITION (Bytecode):
+   - AST → bytecode instruction'lar
+   - Dastlabki chaqiruvlarda bytecode interpret qilinadi
+   - Profiling data yig'iladi:
+     - fibonacci doim number argument oladi
+     - fibonacci ko'p chaqiriladi (recursive)
 
-```javascript
-// ✅ To'g'ri — doim bir xil shape
-function createUser(name, age, isAdmin) {
-  return {
-    name: name,
-    role: isAdmin ? "admin" : null,  // doim mavjud
-    age: age
-  };
-}
+3. SPARKPLUG (Baseline):
+   - fibonacci ko'p chaqirilgani sababli baseline machine code hosil qilinadi
+   - Optimization yo'q, faqat interpreter overhead olib tashlanadi
 
-let user1 = createUser("Ali", 25, false);  // {name, role: null, age}
-let user2 = createUser("Vali", 30, true);  // {name, role: "admin", age}
-// ✅ Ikkalasi ham {name, role, age} — bitta hidden class!
+4. MAGLEV (Mid-tier):
+   - fibonacci hali ham hot — type feedback asosida
+   - n doim number ekani asosida number-specific machine code
+
+5. TURBOFAN (Optimizing):
+   - fibonacci juda ko'p chaqirildi — to'liq optimization:
+     - n <= 1 branch prediction
+     - Recursive call optimization
+     - Integer overflow check (n doim safe integer)
+   - Natija: highly optimized native machine code
+
+   Eslatma: rekursiv fibonacci(20) juda ko'p call hosil qiladi
+   (fibonacci(20) = 6765 marta chaqiriladi)
+   Bu katta call stack ishlaydi, lekin stack overflow bo'lmaydi
+   chunki tree recursion depth faqat 20.
 ```
 
-**Tushuntirish:** Object literal da barcha property'lar birdaniga beriladi — V8 bitta hidden class yaratadi. `null` yoki `undefined` bo'lsa ham, property mavjud bo'lgani muhim — shape bir xil qoladi.
+**Tushuntirish:** V8 tiered compilation qo'llaydi — har bir bosqich oldingisidan tezroq lekin compile vaqti uzonroq. fibonacci juda ko'p chaqirilgani uchun eng yuqori bosqich (TurboFan) gacha yetadi.
 </details>
 
 ---
 
 ## Xulosa
 
-1. **JS Engine** — JavaScript kodni parse qiladi, bytecode/machine code ga aylantiradi va bajaradi. Eng mashhuri V8 (Chrome, Node.js).
+Bu bo'limda JavaScript Engine'ning ichki ishlash mexanizmini o'rgandik:
 
-2. **Pipeline:** Source Code → Tokenizer → Parser → AST → Bytecode (Ignition) → Machine Code (TurboFan).
+- **JavaScript Engine** — source code ni machine code ga aylantirib bajaradigan dastur (V8, SpiderMonkey, JSC)
+- **Pipeline** — Source Code → Tokenizer → Parser → AST → Bytecode → Machine Code — bu bosqichlar orqali kod CPU gacha yetadi
+- **JIT Compilation** — avval interpret qil, keyin hot code ni compile qil — startup tezligi va runtime performance'ni muvozanatlaydi
+- **Hidden Classes va Inline Caching** — V8 object'larning shape'ini kuzatib, property access ni C/C++ darajasida tez qiladi
+- **Call Stack** — funksiya chaqiruvlarini LIFO tartibida boshqaradi, single-threaded execution'ni ta'minlaydi
+- **Memory Heap** — reference type'lar saqlanadigan dinamik xotira, Garbage Collector tomonidan boshqariladi
 
-3. **JIT Compilation** — avval tez interpret qiladi, keyin "hot" kodni optimize qiladi. Ikki dunyoning eng yaxshisi.
-
-4. **Optimization/Deoptimization** — V8 type taxminlari asosida optimize qiladi. Type o'zgarsa — deoptimize. Shuning uchun **consistent types** muhim.
-
-5. **Call Stack** — LIFO, funksiya chaqiruvlarini kuzatadi. To'lib ketsa — Stack Overflow.
-
-6. **Memory Heap** — object, array, function'lar saqlanadi. Garbage Collector boshqaradi.
-
-7. **Stack vs Heap** — primitives stack da (copy by value), reference types heap da (copy by reference).
-
-8. **Hidden Classes** — V8 object shape ni kuzatadi. Bir xil tartib = tez. Har xil tartib = sekin.
+Engine'ning ishlash prinsiplarindan kelib chiqadigan amaliy qoidalar: doim bir xil shape'da object yarating, bir xil tip'dagi argument'larni bering, `delete` operator'dan saqlaning, rekursiyada base case'ni unutmang.
 
 ---
 
-> **Keyingi bo'lim:** [02-execution-context.md](02-execution-context.md) — Execution Context nima, qanday yaratiladi, Creation va Execution phase'lari.
+**Keyingi bo'lim:** [02-execution-context.md](02-execution-context.md) — Execution Context nima, qanday yaratiladi, Creation va Execution phase'lari, Variable Environment vs Lexical Environment farqi, Environment Record turlari.

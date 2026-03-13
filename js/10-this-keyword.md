@@ -18,6 +18,7 @@
 - [Yechimlar](#yechimlar)
 - [`this` in Different Contexts](#this-in-different-contexts)
 - [Strict Mode Ta'siri](#strict-mode-tasiri)
+- [`globalThis` (ES2020)](#globalthis-es2020)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -1208,6 +1209,104 @@ Strict mode V8 ga bir nechta optimization imkonini beradi:
 
 ---
 
+## `globalThis` (ES2020)
+
+### Nazariya
+
+JavaScript turli muhitlarda ishlaydi va har birida global ob'ekt boshqacha nomlanadi: browser'da `window`, Node.js da `global`, Web Worker'da `self`. Bu muhitlar orasida universal ishlaydigan kod yozishni qiyinlashtirardi — har bir muhit uchun alohida tekshiruv kerak edi.
+
+**`globalThis`** (ES2020) — bu muammoni hal qiluvchi standart: **qaysi muhitda bo'lishingizdan qat'i nazar**, `globalThis` doim global ob'ektga ishora qiladi. Bu cross-platform kod yozish uchun rasmiy, spec da tasdiqlangan yechim.
+
+`globalThis` `this` bilan bog'liq chunki global scope'dagi `this` aynan shu global ob'ekt. Non-strict mode'da oddiy funksiya ichidagi default `this` ham aynan `globalThis` ga teng. Shuning uchun `this` binding qoidalarini to'liq tushunish uchun `globalThis` ni bilish zarur.
+
+### Under the Hood
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Muhit          │  Global Object  │  globalThis         │
+├─────────────────────────────────────────────────────────┤
+│  Browser        │  window         │  ✅ window          │
+│  Node.js        │  global         │  ✅ global          │
+│  Web Worker     │  self           │  ✅ self            │
+│  Deno           │  globalThis     │  ✅ globalThis      │
+│  Service Worker │  self           │  ✅ self            │
+│  Bun            │  globalThis     │  ✅ globalThis      │
+└─────────────────────────────────────────────────────────┘
+
+ES2020 dan OLDIN universal global olish:
+  var getGlobal = function() {
+    if (typeof self !== 'undefined') return self;
+    if (typeof window !== 'undefined') return window;
+    if (typeof global !== 'undefined') return global;
+    throw new Error('global object topilmadi');
+  };
+
+ES2020 dan KEYIN:
+  globalThis  // Tamom. Istalgan muhitda ishlaydi.
+```
+
+ECMAScript spec bo'yicha `globalThis` — bu `[[GlobalThisValue]]` internal slot'dan olinadigan qiymat. Har bir Realm (execution environment) o'zining global `this` qiymatiga ega va `globalThis` aynan shu qiymatga direct reference.
+
+### Kod Misollari
+
+**Cross-platform utility:**
+
+```javascript
+// ❌ Eski usul — har muhitni tekshirish
+function getGlobalObject() {
+  if (typeof window !== "undefined") return window;
+  if (typeof global !== "undefined") return global;
+  if (typeof self !== "undefined") return self;
+  throw new Error("Global object topilmadi");
+}
+
+// ✅ Zamonaviy — globalThis
+console.log(globalThis); // window (browser) / global (Node.js) / self (Worker)
+```
+
+**Polyfill va cross-platform feature detection:**
+
+```javascript
+// Feature detection — istalgan muhitda ishlaydi
+if (typeof globalThis.fetch === "function") {
+  // Fetch API mavjud
+  globalThis.fetch("/api/data");
+} else {
+  // Polyfill kerak (masalan, eski Node.js versiyalarda)
+  const nodeFetch = require("node-fetch");
+  globalThis.fetch = nodeFetch;
+}
+
+// Global constant yaratish (istalgan muhitda accessible)
+globalThis.__APP_VERSION__ = "2.0.0";
+```
+
+**Global scope'dagi `this` va `globalThis` aloqasi:**
+
+```javascript
+// Global scope da (non-strict):
+console.log(this === globalThis); // true (browser'da)
+
+// Function scope da (non-strict):
+function test() {
+  console.log(this === globalThis); // true — default binding
+}
+test();
+
+// Strict mode da:
+"use strict";
+function testStrict() {
+  console.log(this === globalThis); // false — this = undefined
+}
+testStrict();
+
+// Module scope da:
+// this !== globalThis — module da this = undefined
+// lekin globalThis hali ham global object'ga ishora qiladi
+```
+
+---
+
 ## Common Mistakes
 
 ### ❌ Xato 1: Arrow Function ni Object Method Sifatida Ishlatish
@@ -1797,7 +1896,8 @@ G: Object   (setTimeout dan keyin)
 
 8. **`bind` faqat bir marta ishlaydi** — qayta bind qilib bo'lmaydi. `new` binding hatto `bind` ni ham override qiladi.
 
+9. **`globalThis`** (ES2020) — qaysi muhitda bo'lishingizdan qat'i nazar global ob'ektga universal access beradi: browser'da `window`, Node.js da `global`, Worker'da `self` o'rniga.
+
 ---
 
-> **Oldingi bo'lim:** [09-functions.md](09-functions.md) — Functions First-Class Citizens.  
-> **Keyingi bo'lim:** [11-event-loop.md](11-event-loop.md) — Event Loop — Miyaning Asosi.
+**Keyingi bo'lim:** [11-event-loop.md](11-event-loop.md) — Event Loop: JavaScript single-threaded runtime, Call Stack, Web APIs, Callback Queue, Microtask Queue, macrotask vs microtask, `setTimeout(fn, 0)` nima uchun darhol ishlamaydi, `requestAnimationFrame`, Node.js event loop farqlari.

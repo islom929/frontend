@@ -1,18 +1,20 @@
-# Bo'lim 11: Event Loop — Miyaning Asosi
+# Bo'lim 11: Event Loop
 
-> Event Loop — JavaScript ning yagona thread'da asinxron operatsiyalarni boshqaradigan mexanizmi. Async JS ni tushunish shu yerdan boshlanadi.
+> Event Loop — JavaScript ning yagona thread'da asinxron operatsiyalarni boshqaradigan mexanizmi. U Call Stack, Web APIs, Microtask Queue va Macrotask Queue o'rtasidagi aloqani tartibga soladi.
 
 ---
 
 ## Mundarija
 
 - [JavaScript Single-Threaded](#javascript-single-threaded)
-- [Runtime Architecture — To'liq Diagramma](#runtime-architecture--toliq-diagramma)
+- [Runtime Architecture](#runtime-architecture)
 - [Event Loop Algoritmi — Step by Step](#event-loop-algoritmi--step-by-step)
 - [Macrotasks (Task Queue)](#macrotasks-task-queue)
 - [Microtasks (Microtask Queue)](#microtasks-microtask-queue)
 - [setTimeout(fn, 0) — Nima Uchun Darhol Bajarmaydi](#settimeoutfn-0--nima-uchun-darhol-bajarmaydi)
+- [queueMicrotask()](#queuemicrotask)
 - [requestAnimationFrame — Qayerda Turadi](#requestanimationframe--qayerda-turadi)
+- [requestIdleCallback — Idle Vaqtda Ishlash](#requestidlecallback--idle-vaqtda-ishlash)
 - [Node.js Event Loop Farqlari](#nodejs-event-loop-farqlari)
 - [Starvation — Microtask Queue To'xtovsiz To'lsa](#starvation--microtask-queue-toxtovsiz-tolsa)
 - [Real-World Misol: UI Blocking va Yechimi](#real-world-misol-ui-blocking-va-yechimi)
@@ -27,37 +29,19 @@
 
 ### Nazariya
 
-JavaScript **single-threaded** til — ya'ni bir vaqtda faqat **bitta** operatsiyani bajaradi. Bitta Call Stack, bitta execution context, bitta code path. Buni bir qo'lli oshpazga o'xshatish mumkin: u bir vaqtda faqat bitta idishni tayyorlay oladi, lekin aqlli rejalashtirish orqali — bitta narsa pishib turganida boshqa ingredientlarni tayyorlashga o'tadi.
+JavaScript **single-threaded** til — bir vaqtda faqat **bitta** operatsiyani bajaradi. Bitta Call Stack, bitta execution context, bitta code path. Har qanday paytda faqat bitta funksiya ishlab turadi.
 
-Nima uchun JavaScript single-threaded qilib yaratildi? U dastlab browser uchun yaratilgan — DOM ni manipulatsiya qilish uchun. Agar ikkita thread bir vaqtda bitta DOM elementni o'zgartirmoqchi bo'lsa — **race condition** yuzaga keladi va natija oldindan aytib bo'lmas edi. Brendan Eich single-threaded dizaynni tanladi: DOM safety (conflict yo'q), simplicity (deadlock/mutex muammolari yo'q), va predictability (kod ketma-ket bajariladi, debug oson).
-
-Lekin single-threaded degani sekin degani emas. JavaScript o'zi single-threaded bo'lsa-da, u ishlaydigan muhit (browser yoki Node.js) **multi-threaded**. `setTimeout`, `fetch`, `fs.readFile` kabi operatsiyalar aslida browser/Node.js ning boshqa thread'larida bajariladi — JavaScript faqat natijalarni qaytarib oladi. Shu mexanizm tufayli JavaScript non-blocking tarzda ishlaydi.
-
-**Nima uchun single-threaded?**
-
-JavaScript dastlab browser uchun yaratilgan — DOM ni manipulatsiya qilish uchun. Agar ikkita thread bir vaqtda bitta DOM element ni o'zgartirmoqchi bo'lsa — **race condition** yuzaga keladi. Brendan Eich JavaScript ni single-threaded qilgan, chunki:
+JavaScript nima uchun single-threaded qilib yaratilgan? U dastlab browser uchun — DOM ni manipulatsiya qilish uchun yaratilgan. Agar ikkita thread bir vaqtda bitta DOM elementni o'zgartirmoqchi bo'lsa, **race condition** yuzaga keladi — natija oldindan aytib bo'lmas edi. Brendan Eich single-threaded dizaynni tanladi:
 
 1. **DOM safety** — bir vaqtda bitta thread DOM ga yozadi, conflict yo'q
 2. **Simplicity** — deadlock, mutex, lock kabi muammolar yo'q
 3. **Predictability** — kod ketma-ketlikda bajariladi, debug qilish oson
 
-```javascript
-// JavaScript bitta thread da ishlaydi
-// Bu kod KETMA-KET bajariladi, parallel emas
-
-console.log("1");
-console.log("2");
-console.log("3");
-
-// Output (har doim shu tartibda):
-// 1
-// 2
-// 3
-```
+Lekin single-threaded degani sekin degani emas. JavaScript o'zi single-threaded bo'lsa-da, u ishlaydigan muhit (browser yoki Node.js) **multi-threaded**. `setTimeout`, `fetch`, `fs.readFile` kabi operatsiyalar aslida browser/Node.js ning boshqa thread'larida bajariladi — JavaScript faqat natijalarni qaytarib oladi. Shu mexanizm tufayli JavaScript non-blocking tarzda ishlaydi.
 
 ### Under the Hood
 
-ECMAScript spec da **"job"** tushunchasi bor — lekin Event Loop o'zi **spec dan tashqarida**, HTML spec da ta'riflangan (browser uchun) va libuv kutubxonasida (Node.js uchun).
+ECMAScript spec da **"job"** tushunchasi bor — lekin Event Loop o'zi **spec dan tashqarida**. Event Loop browser uchun HTML spec da ta'riflangan, Node.js uchun esa libuv kutubxonasida implement qilingan.
 
 V8 engine o'zi Event Loop ni implement qilmaydi. V8 faqat JavaScript kodni compile va execute qiladi. Event Loop **runtime environment** (browser yoki Node.js) tomonidan ta'minlanadi.
 
@@ -81,24 +65,25 @@ V8 engine o'zi Event Loop ni implement qilmaydi. V8 faqat JavaScript kodni compi
 - **Browser/Node.js (runtime)** — multi-threaded! Web APIs background thread'larda ishlaydi
 - Biz yozgan JavaScript kod bitta thread da ishlaydi, lekin `setTimeout`, `fetch`, `fs.readFile` kabi operatsiyalar **boshqa thread'larda** bajariladi
 
-```javascript
-// Biz buni yozamiz:
-setTimeout(() => console.log("Timer!"), 1000);
-
-// Lekin aslida:
-// 1. V8: setTimeout() ni bajaradi → Web API ga uzatadi
-// 2. Browser (C++ thread): 1000ms kutadi
-// 3. 1000ms o'tgach: callback ni Task Queue ga qo'yadi
-// 4. Event Loop: Call Stack bo'sh bo'lganda callback ni stack ga ko'taradi
-// 5. V8: callback ni bajaradi → "Timer!" chiqaradi
-```
-
 ### Kod Misollari
 
-```javascript
-// ❌ Single-threaded muammo — blocking
-// Agar bitta operatsiya uzoq davom etsa, HAMMA narsa to'xtaydi
+JavaScript bitta thread da ishlaydi — kod ketma-ket bajariladi:
 
+```javascript
+console.log("1");
+console.log("2");
+console.log("3");
+
+// Output (har doim shu tartibda):
+// 1
+// 2
+// 3
+```
+
+Agar bitta operatsiya uzoq davom etsa, HAMMA narsa to'xtaydi — bu **blocking** deyiladi:
+
+```javascript
+// ❌ Blocking — og'ir hisoblash main thread'ni to'xtatadi
 function heavyCalculation() {
   let sum = 0;
   for (let i = 0; i < 10_000_000_000; i++) {
@@ -108,17 +93,15 @@ function heavyCalculation() {
 }
 
 console.log("Boshladik");
-heavyCalculation(); // 🔴 Bu yerda HAMMA narsa muzlab qoladi
+heavyCalculation(); // Bu yerda HAMMA narsa muzlab qoladi
 console.log("Tugadi"); // Bu qator 10+ soniya kutadi
-
 // Buttonlar bosilmaydi, animatsiyalar to'xtaydi, scroll ishlamaydi
-// Chunki JavaScript single-threaded — bitta narsa bajarilayotganda boshqasi kutadi
 ```
 
-```javascript
-// ✅ Yechim — async operatsiyalar orqali non-blocking
-// Og'ir ishlarni boshqa thread'ga (Web API) uzatamiz
+Asinxron operatsiyalar orqali main thread bloklanmaydi:
 
+```javascript
+// ✅ Non-blocking — fetch boshqa thread'da ishlaydi
 console.log("Boshladik");
 
 fetch("https://api.example.com/data")
@@ -131,20 +114,25 @@ console.log("Fetch yuborildi, boshqa ishlar davom etadi");
 // "Boshladik"
 // "Fetch yuborildi, boshqa ishlar davom etadi"
 // "Data keldi: {...}"  (bir necha millisekunddan keyin)
-
-// 🔍 fetch() browser ning network thread'ida ishlaydi
+// fetch() browser ning network thread'ida ishlaydi
 // JavaScript thread bloklanmaydi — boshqa kod davom etadi
 ```
 
 ---
 
-## Runtime Architecture — To'liq Diagramma
+## Runtime Architecture
 
 ### Nazariya
 
-JavaScript o'zi single-threaded bo'lsa-da, u **yolg'iz ishlamaydi**. Browser yoki Node.js uni o'rab turgan muhitni ta'minlaydi — bu muhit **Runtime Environment** deyiladi. Runtime Environment beshta asosiy komponentdan tashkil topgan: Call Stack (hozir bajarilayotgan funksiyalar), Web APIs (browser bergan asinxron API'lar), Macrotask Queue (tayyor callback'lar navbati), Microtask Queue (yuqori prioritetli navbat), va Event Loop (bularning barchasini boshqaradigan "dirigyor").
+JavaScript o'zi single-threaded bo'lsa-da, u **yolg'iz ishlamaydi**. Browser yoki Node.js uni o'rab turgan muhitni ta'minlaydi — bu muhit **Runtime Environment** deyiladi. Runtime Environment beshta asosiy komponentdan tashkil topgan:
 
-Bu arxitekturani tushunish muhim chunki ko'p dasturchilar "JavaScript asinxron til" deb o'ylaydi — aslida JavaScript **sinxron** til, lekin runtime environment asinxron imkoniyatlarni beradi. V8 engine o'zi Event Loop ni implement qilmaydi — u faqat JavaScript kodni compile va execute qiladi. Event Loop, timer'lar, network request'lar — bularning barchasi runtime tomonidan ta'minlanadi.
+1. **Call Stack** — hozir bajarilayotgan funksiyalar (LIFO)
+2. **Web APIs** — browser bergan asinxron API'lar (setTimeout, fetch, DOM Events)
+3. **Macrotask Queue** (Task Queue) — tayyor callback'lar navbati (FIFO)
+4. **Microtask Queue** — yuqori prioritetli callback'lar navbati (Promise.then)
+5. **Event Loop** — bularning barchasini boshqaradigan koordinator
+
+Ko'p dasturchilar "JavaScript asinxron til" deb o'ylaydi — aslida JavaScript **sinxron** til, lekin runtime environment asinxron imkoniyatlarni beradi.
 
 ### Under the Hood
 
@@ -166,8 +154,8 @@ Bu arxitekturani tushunish muhim chunki ko'p dasturchilar "JavaScript asinxron t
 │  │  │  global()  │  │      │                                      │  │
 │  │  └────────────┘  │      └──────────┬───────────────────────────┘  │
 │  │                  │                 │                               │
-│  │  ← LIFO (Last   │                 │ Callback tayyor bo'lganda     │
-│  │     In First Out)│                 ↓                               │
+│  │  LIFO (Last In   │                 │ Callback tayyor bo'lganda     │
+│  │  First Out)      │                 ↓                               │
 │  └──────────────────┘                                                │
 │           ↑                                                          │
 │           │         ┌────────────────────────────────────────┐       │
@@ -177,7 +165,7 @@ Bu arxitekturani tushunish muhim chunki ko'p dasturchilar "JavaScript asinxron t
 │           │         │  │ .then()  │ .catch() │  task()     │ │       │
 │           │         │  └──────────┴──────────┴─────────────┘ │       │
 │           │         └──────────────────┬─────────────────────┘       │
-│           │                            │ ⚡ YUQORI PRIORITY           │
+│           │                            │ YUQORI PRIORITY             │
 │           │                            │                              │
 │    ┌──────┴────────────────────────────┴────────────┐                │
 │    │                  EVENT LOOP                     │                │
@@ -202,7 +190,7 @@ Bu arxitekturani tushunish muhim chunki ko'p dasturchilar "JavaScript asinxron t
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-### Har Bir Qism Haqida Batafsil
+### Har Bir Komponent Haqida
 
 #### 1. Call Stack
 
@@ -253,8 +241,25 @@ Bu API'lar JavaScript engine'dan **tashqarida** ishlaydi. Browser yoki Node.js o
 | `Geolocation`, `WebSocket` | `child_process` |
 | `IntersectionObserver` | OS-level I/O (libuv) |
 
+#### 3. Macrotask Queue (Task Queue)
+
+Web API'lar o'z ishini tugatganda, callback'ni **Macrotask Queue** ga qo'yadi. Bu FIFO (First In, First Out) navbat — kim avval kelsa, o'sha avval bajariladi.
+
+#### 4. Microtask Queue
+
+Microtask Queue — **yuqoriroq prioritetli** navbat. Promise `.then()`, `.catch()`, `.finally()`, `queueMicrotask()`, `MutationObserver` callback'lari shu yerga tushadi.
+
+**Kritik farq:** Event Loop har bir macrotask'dan keyin **barcha** microtask'larni bajaradi. Macrotask Queue dan esa **bittadan** oladi.
+
+#### 5. Event Loop
+
+Event Loop — **cheksiz loop**. U Call Stack va Queue'larni kuzatib turadi va callback'larni to'g'ri tartibda bajarilishini ta'minlaydi.
+
+### Kod Misollari
+
+setTimeout chaqirganda nima sodir bo'lishini qadam-baqadam ko'ramiz:
+
 ```javascript
-// setTimeout chaqirganda nima sodir bo'ladi:
 console.log("A");
 
 setTimeout(function timerCallback() {
@@ -276,58 +281,9 @@ console.log("C");
 // Output: A, C, B
 ```
 
-#### 3. Callback Queue (Macrotask Queue / Task Queue)
-
-Web API lar o'z ishini tugatganda, callback'ni **Macrotask Queue** ga qo'yadi. Bu FIFO (First In, First Out) navbat — kim avval kelsa, o'sha avval bajariladi.
-
-#### 4. Microtask Queue
-
-Microtask Queue — **yuqoriroq prioritetli** navbat. Promise `.then()`, `.catch()`, `.finally()`, `queueMicrotask()`, `MutationObserver` callback'lari shu yerga tushadi.
-
-**Kritik farq:** Event Loop har bir macrotask'dan keyin **barcha** microtask'larni bajaradi. Macrotask Queue dan esa **bittadan** oladi.
-
-#### 5. Event Loop
-
-Event Loop — bu **cheksiz loop** (while true). U Call Stack va Queue'larni kuzatib turadi va callback'larni to'g'ri tartibda bajarilishini ta'minlaydi.
-
-```
-┌─────────────────────────────────┐
-│          EVENT LOOP             │
-│                                 │
-│    ┌───────────────────┐        │
-│    │ Call Stack bo'shmi?│←──────┐│
-│    └────────┬──────────┘       ││
-│             │ Ha               ││
-│             ↓                  ││
-│    ┌───────────────────┐       ││
-│    │ Microtask Queue   │       ││
-│    │ da task bormi?    │       ││
-│    └───┬──────────┬────┘       ││
-│     Ha │          │ Yo'q       ││
-│        ↓          ↓            ││
-│   ┌─────────┐ ┌────────────┐  ││
-│   │ BARCHA  │ │ Macrotask  │  ││
-│   │ micro-  │ │ Queue dan  │  ││
-│   │ task ni │ │ BITTA ol   │  ││
-│   │ bajir   │ └─────┬──────┘  ││
-│   └────┬────┘       │         ││
-│        │            ↓         ││
-│        │     ┌────────────┐   ││
-│        │     │ Render     │   ││
-│        │     │ (agar kerak│   ││
-│        │     │  bo'lsa)   │   ││
-│        │     └─────┬──────┘   ││
-│        │           │          ││
-│        └───────────┴──────────┘│
-│                                 │
-└─────────────────────────────────┘
-```
-
-### Kod Misollari
+To'liq runtime flow — barcha komponentlarni ko'rish:
 
 ```javascript
-// To'liq runtime flow — barcha qismlarni ko'rish
-
 console.log("1: Synchronous — Call Stack");
 
 setTimeout(() => {
@@ -346,7 +302,7 @@ console.log("4: Synchronous — Call Stack");
 // "3: Microtask — Promise.then callback"
 // "2: Macrotask — setTimeout callback"
 
-// 🔍 Nima uchun bu tartibda?
+// Nima uchun bu tartibda?
 // 1. Synchronous kodlar birinchi (Call Stack da darhol bajariladi)
 // 2. Microtasks keyingi (Promise.then — yuqori priority)
 // 3. Macrotasks eng oxirda (setTimeout — past priority)
@@ -358,11 +314,43 @@ console.log("4: Synchronous — Call Stack");
 
 ### Nazariya
 
-Event Loop algoritmi — JavaScript asinxronligini tushunishning **kaliti**. Bu algoritmni bilish degani — istalgan asinxron kodning output tartibini oldindan aytib bera olish demak. Event Loop algoritmining mohiyati 4 qadamdan iborat cheksiz sikl: Call Stack bo'shmi tekshir, Microtask Queue ni **to'liq** bo'shat, Macrotask Queue dan **bitta** task ol, kerak bo'lsa render qil va boshidan boshla.
+Event Loop algoritmi — JavaScript asinxronligini tushunishning **kaliti**. Bu algoritmni bilish degani — istalgan asinxron kodning output tartibini oldindan aytib bera olish demak.
+
+Event Loop algoritmining mohiyati 4 qadamdan iborat cheksiz sikl:
+1. Call Stack bo'shmi tekshir
+2. Microtask Queue ni **to'liq** bo'shat
+3. Macrotask Queue dan **bitta** task ol
+4. Kerak bo'lsa render qil va boshidan boshla
 
 Bu algoritmning eng muhim nuqtasi — microtask va macrotask orasidagi **asimmetriya**: microtask'lar **barchasi** bajariladi (ichidan yangi microtask qo'shilsa ham), lekin macrotask'dan faqat **bittasi** olinadi. Shu sababli Promise callback'lari doim setTimeout callback'laridan oldin ishlaydi.
 
-### Event Loop Sikli (To'liq)
+### Under the Hood
+
+HTML Living Standard (spec) bo'yicha Event Loop quyidagicha ishlaydi:
+
+**Qadam 1: Call Stack bo'shligini tekshir**
+- Agar Call Stack da hali funksiya bajarilayotgan bo'lsa — kutamiz
+- Stack bo'sh bo'lganda keyingi qadamga o'tamiz
+
+**Qadam 2: Microtask checkpoint**
+- Microtask Queue dagi **BARCHA** task'larni ketma-ket bajaramiz
+- Agar microtask bajarilayotganda yangi microtask qo'shilsa — **uni ham** bajaramiz
+- Microtask Queue **butunlay bo'sh** bo'lguncha davom etamiz
+
+**Qadam 3: Macrotask Queue dan bitta task olish**
+- Eng eski (birinchi qo'shilgan) task ni olamiz
+- Uni Call Stack ga qo'yamiz va bajaramiz
+- **Faqat BITTA** macrotask olinadi — keyin yana microtask checkpoint bo'ladi
+
+**Qadam 4: Rendering**
+- Browser ~16.6ms da bir marta render qiladi (60fps)
+- Har bir Event Loop iteration'da render bo'lavermaydi
+- Browser o'zi qaror qiladi — render kerakmi yoki yo'q
+- `requestAnimationFrame` callback'lari shu bosqichda ishlaydi
+
+**Qadam 5: Qaytadan boshdan**
+- Loop to'xtamaydi — doimiy aylanadi
+- Agar hech narsa yo'q bo'lsa — "idle" holatda kutadi
 
 ```
        ┌─────────────────────────────────────────┐
@@ -396,54 +384,22 @@ Bu algoritmning eng muhim nuqtasi — microtask va macrotask orasidagi **asimmet
   │    │  └──────────┬──────────────────────┘     │
   │    │             │                            │
   │    │             ↓                            │
-  └────│─────── 1-qadamga qayt ◄─────────────    │
+  └────│─────── 1-qadamga qayt                    │
        │                                          │
        └─────────────────────────────────────────┘
 ```
 
-### Under the Hood
-
-HTML Living Standard (spec) bo'yicha Event Loop quyidagicha ishlaydi:
-
-**Qadam 1: Call Stack bo'shligini tekshir**
-- Agar Call Stack da hali funksiya bajarilayotgan bo'lsa — kutamiz
-- Stack bo'sh bo'lganda keyingi qadamga o'tamiz
-
-**Qadam 2: Microtask checkpoint**
-- Microtask Queue dagi **BARCHA** task'larni ketma-ket bajaramiz
-- Agar microtask bajarilayotganda yangi microtask qo'shilsa — **uni ham** bajaramiz
-- Microtask Queue **butunlay bo'sh** bo'lguncha davom etamiz
-- Shuning uchun microtask'lar macrotask'lardan oldin ishlaydi
-
-**Qadam 3: Macrotask Queue dan bitta task olish**
-- Eng eski (birinchi qo'shilgan) task ni olamiz
-- Uni Call Stack ga qo'yamiz va bajaramiz
-- **Faqat BITTA** macrotask olinadi — keyin yana microtask checkpoint bo'ladi
-
-**Qadam 4: Rendering**
-- Browser ~16.6ms da bir marta render qiladi (60fps)
-- Har bir Event Loop iteration'da render bo'lavermaydi
-- Browser o'zi qaror qiladi — render kerakmi yoki yo'q
-- `requestAnimationFrame` callback'lari shu bosqichda ishlaydi
-
-**Qadam 5: Qaytadan boshdan**
-- Loop to'xtamaydi — doimiy aylanadi
-- Agar hech narsa yo'q bo'lsa — "idle" holatda kutadi
-
 ### Kod Misollari
 
+Event Loop algoritmini qadam-baqadam kuzatamiz:
+
 ```javascript
-// Event Loop algoritmini qadam-baqadam kuzatamiz:
-
-console.log("START");                         // Qadam 1: Sync
-
+console.log("START");                         // Sync
 setTimeout(() => console.log("TIMEOUT"), 0);  // → Macrotask Queue
-
 Promise.resolve()
   .then(() => console.log("PROMISE 1"))       // → Microtask Queue
   .then(() => console.log("PROMISE 2"));      // → (1-microtask ichida) Microtask Queue
-
-console.log("END");                           // Qadam 2: Sync
+console.log("END");                           // Sync
 
 // OUTPUT:
 // START
@@ -471,16 +427,15 @@ console.log("END");                           // Qadam 2: Sync
 3. Macrotask Queue ni tekshir:
    Macrotask Queue: [TIMEOUT_callback]
    → TIMEOUT_callback bajarildi → "TIMEOUT"
-   Macrotask Queue: [] (bo'sh)
 
 4. Rendering (kerak bo'lsa)
 
 5. Qaytadan boshlash → hech narsa yo'q → idle
 ```
 
-```javascript
-// Murakkabroq misol — microtask ichida microtask
+Murakkabroq misol — microtask ichida microtask:
 
+```javascript
 console.log("A");
 
 setTimeout(() => {
@@ -524,14 +479,10 @@ Sync phase:
 
 Call Stack bo'sh → Microtask Queue ni tekshir:
   → E_callback → "E" chiqadi
-    → queueMicrotask(F) → Microtask Queue: [G_callback, F_callback]
-  → G_callback → "G" ... KUTIB TURING!
-
-  Aslida .then(() => "G") — bu E_callback .then() zinjiridagi keyingi qadam.
-  E_callback resolve bo'lganda "G" microtask sifatida qo'shiladi.
-  Shuning uchun:
-  → F_callback → "F" chiqadi  (queueMicrotask avvalroq qo'shilgan)
-  → G_callback → "G" chiqadi  (.then() keyinroq resolve bo'lgan)
+    → queueMicrotask(F) → Microtask Queue: [F_callback]
+    → E_callback resolve bo'ldi → G_callback queue ga
+  → F_callback → "F" chiqadi  (avvalroq qo'shilgan)
+  → G_callback → "G" chiqadi
 
   Microtask Queue bo'sh.
 
@@ -546,7 +497,7 @@ Macrotask Queue dan bitta: D_callback
   → "D" chiqadi
 ```
 
-> **Eslatma:** Yuqoridagi misolda F va G tartibini tushunish muhim. `queueMicrotask(F)` sinxron tarzda microtask queue ga qo'shiladi. `.then(() => G)` esa faqat E callback resolve bo'lgandan keyin queue ga tushadi — lekin ikkalasi ham microtask, shuning uchun tartib: E → F → G.
+> **Eslatma:** `queueMicrotask(F)` sinxron tarzda microtask queue ga qo'shiladi. `.then(() => G)` esa faqat E callback resolve bo'lgandan keyin queue ga tushadi. Tartib: E → F → G.
 
 ---
 
@@ -554,7 +505,15 @@ Macrotask Queue dan bitta: D_callback
 
 ### Nazariya
 
-Macrotask (yoki oddiy "task") — bu Event Loop ning **asosiy ish birligi**. Har bir Event Loop iteration'da faqat **bitta** macrotask olinadi va bajariladi — keyin esa microtask checkpoint bo'ladi. `setTimeout`, `setInterval`, I/O operatsiyalar, UI rendering events, `MessageChannel` — bularning barchasi macrotask.
+Macrotask (yoki oddiy "task") — Event Loop ning **asosiy ish birligi**. Har bir Event Loop iteration'da faqat **bitta** macrotask olinadi va bajariladi — keyin esa microtask checkpoint bo'ladi.
+
+Macrotask turlari:
+- `setTimeout` callback'lari
+- `setInterval` callback'lari
+- I/O operatsiyalar (Node.js)
+- UI rendering event'lari
+- `MessageChannel` callback'lari
+- `setImmediate` (faqat Node.js)
 
 Macrotask nima uchun bittadan olinadi? Bu dizayn qaror browser'ning responsive bo'lishi uchun qilingan — agar barcha macrotask'lar bir yo'la bajarilsa, ular orasida render va microtask tekshiruvi bo'lmasdi. Bittadan olish orqali Event Loop har bir macrotask'dan keyin microtask'larni bajarishga, render qilishga va boshqa muhim ishlarga vaqt ajratadi.
 
@@ -573,7 +532,7 @@ Event Loop Tick #1:          Event Loop Tick #2:
 └──────────────────┘         └──────────────────┘
 
 Macrotask Queue: [T1, T2, T3, T4]
-                  ↑               
+                  ↑
                   Tick #1 da faqat T1 olinadi
                       ↑
                       Tick #2 da T2 olinadi
@@ -581,14 +540,12 @@ Macrotask Queue: [T1, T2, T3, T4]
 
 ### Kod Misollari
 
-```javascript
-// setTimeout — eng ko'p ishlatiladigan macrotask
+0ms timeout ham darhol bajarmaydi — Macrotask Queue ga qo'yadi:
 
-// 0ms timeout ham DARHOL bajarmaydi — Macrotask Queue ga qo'yadi
+```javascript
 setTimeout(() => console.log("timeout 1"), 0);
 setTimeout(() => console.log("timeout 2"), 0);
 setTimeout(() => console.log("timeout 3"), 0);
-
 console.log("sync");
 
 // Output:
@@ -597,36 +554,13 @@ console.log("sync");
 // timeout 2
 // timeout 3
 
-// 🔍 Har bir setTimeout callback alohida macrotask
+// Har bir setTimeout callback alohida macrotask
 // Ular KETMA-KET, har bir Event Loop tick'da bittadan bajariladi
-// Lekin oralarda microtask queue tekshiriladi
 ```
 
-```javascript
-// setInterval — takrorlanuvchi macrotask
-
-let counter = 0;
-
-const intervalId = setInterval(() => {
-  counter++;
-  console.log(`Interval: ${counter}`);
-
-  if (counter >= 3) {
-    clearInterval(intervalId);
-    console.log("Interval to'xtatildi");
-  }
-}, 1000);
-
-// Output (har 1 soniyada):
-// Interval: 1   (1s da)
-// Interval: 2   (2s da)
-// Interval: 3   (3s da)
-// Interval to'xtatildi
-```
+Macrotask'lar orasida microtask'lar bajariladi — bu eng muhim xususiyat:
 
 ```javascript
-// Macrotask'lar orasida microtask'lar bajariladi:
-
 setTimeout(() => {
   console.log("Macrotask 1");
   Promise.resolve().then(() => console.log("Microtask from Macrotask 1"));
@@ -643,8 +577,30 @@ setTimeout(() => {
 // Macrotask 2
 // Microtask from Macrotask 2
 
-// 🔍 Har bir macrotask'dan keyin microtask checkpoint bo'ladi
+// Har bir macrotask'dan keyin microtask checkpoint bo'ladi
 // Shuning uchun "Microtask from Macrotask 1" "Macrotask 2" dan OLDIN chiqadi
+```
+
+setInterval — takrorlanuvchi macrotask:
+
+```javascript
+let counter = 0;
+
+const intervalId = setInterval(() => {
+  counter++;
+  console.log(`Interval: ${counter}`);
+
+  if (counter >= 3) {
+    clearInterval(intervalId);
+    console.log("Interval to'xtatildi");
+  }
+}, 1000);
+
+// Output (har 1 soniyada):
+// Interval: 1
+// Interval: 2
+// Interval: 3
+// Interval to'xtatildi
 ```
 
 ---
@@ -655,20 +611,21 @@ setTimeout(() => {
 
 Microtask — macrotask'dan **kichikroq** va **yuqoriroq priority**ga ega task turi. Event Loop har bir macrotask'dan keyin Microtask Queue ni **TO'LIQ BO'SHATADI** — bu microtask'larning eng muhim xususiyati.
 
-Microtask'lar orasida eng ko'p ishlatiladiganlari: `Promise.then()/.catch()/.finally()` callback'lari, `queueMicrotask()` va `MutationObserver`. Node.js da `process.nextTick()` ham microtask hisoblanadi (hatto oddiy microtask'lardan ham yuqoriroq priority bilan).
+Microtask turlari:
+- `Promise.then()` / `.catch()` / `.finally()` callback'lari
+- `queueMicrotask()` callback'lari
+- `MutationObserver` callback'lari
+- Node.js da `process.nextTick()` (hatto oddiy microtask'lardan ham yuqoriroq priority bilan)
 
-Nima uchun microtask tushunchasi muhim? U `Promise` asosidagi butun asinxron dasturlashning ishlash tartibini belgilaydi. Microtask checkpoint algoritmining jiddiy oqibati — agar har bir microtask yangi microtask qo'shsa, bu loop **hech qachon tugamaydi** va macrotask'lar hamda rendering to'xtab qoladi (starvation).
+Microtask checkpoint algoritmining jiddiy oqibati — agar har bir microtask yangi microtask qo'shsa, bu loop **hech qachon tugamaydi** va macrotask'lar hamda rendering to'xtab qoladi (starvation — bu haqda keyinroq).
 
 ### Under the Hood
 
 ECMAScript spec da microtask'lar **"PromiseJobs"** deb ataladi. HTML spec'da esa **"microtask queue"** deb ataladi.
 
-Microtask checkpoint algoritmini batafsil ko'ramiz:
+Microtask checkpoint algoritmi:
 
 ```
-Microtask Checkpoint Algoritmi:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 while (microtaskQueue.length > 0) {
     let task = microtaskQueue.shift();  // Birinchisini ol (FIFO)
     execute(task);                       // Bajir
@@ -676,17 +633,17 @@ while (microtaskQueue.length > 0) {
     // — loop davom etadi, uni HAM bajaradi
 }
 
-// ⚠️ XAVF: agar har bir microtask yangi microtask qo'shsa
+// XAVF: agar har bir microtask yangi microtask qo'shsa
 // — bu loop HECH QACHON tugamaydi → STARVATION
 ```
 
-**Muhim:** Microtask Queue bo'shatilish davomida yangi microtask qo'shilsa — ular **shu** checkpoint'da bajariladi, keyingi tick'ga qoldirilmaydi!
+Microtask Queue bo'shatilish davomida yangi microtask qo'shilsa — ular **shu** checkpoint'da bajariladi, keyingi tick'ga qoldirilmaydi.
 
 ### Kod Misollari
 
-```javascript
-// Promise.then() — eng keng tarqalgan microtask
+Promise.then() — eng keng tarqalgan microtask:
 
+```javascript
 const promise = Promise.resolve("natija");
 
 promise.then(value => {
@@ -704,37 +661,12 @@ console.log("sync");
 // then 1: natija
 // then 2: natija
 
-// 🔍 .then() callback'lari microtask — sync koddan keyin, lekin macrotask'lardan oldin
+// .then() callback'lari microtask — sync koddan keyin, lekin macrotask'lardan oldin
 ```
 
-```javascript
-// queueMicrotask() — to'g'ridan-to'g'ri microtask qo'shish
-
-console.log("1");
-
-queueMicrotask(() => {
-  console.log("2 — queueMicrotask");
-});
-
-Promise.resolve().then(() => {
-  console.log("3 — Promise.then");
-});
-
-console.log("4");
-
-// Output:
-// 1
-// 4
-// 2 — queueMicrotask
-// 3 — Promise.then
-
-// 🔍 queueMicrotask va Promise.then ikkalasi ham microtask
-// Tartib: FIFO — qaysi biri avval queue ga tushsa, o'sha avval bajariladi
-```
+Microtask ichida yangi microtask — recursive:
 
 ```javascript
-// Microtask ichida yangi microtask — recursive
-
 queueMicrotask(() => {
   console.log("micro 1");
   queueMicrotask(() => {
@@ -753,13 +685,13 @@ setTimeout(() => console.log("macrotask"), 0);
 // micro 3 (micro 2 ichidan yaratildi)
 // macrotask
 
-// 🔍 BARCHA microtask'lar (ichma-ich bo'lsa ham) macrotask'dan OLDIN tugaydi
+// BARCHA microtask'lar (ichma-ich bo'lsa ham) macrotask'dan OLDIN tugaydi
 // Chunki microtask checkpoint queue TO'LIQ bo'shguncha ishlaydi
 ```
 
-```javascript
-// MutationObserver — DOM o'zgarishlarini kuzatish (microtask)
+MutationObserver — DOM o'zgarishlarini kuzatish (microtask sifatida ishlaydi):
 
+```javascript
 const targetNode = document.getElementById("app");
 
 const observer = new MutationObserver((mutations) => {
@@ -808,9 +740,12 @@ targetNode.appendChild(document.createElement("div"));
 
 ### Nazariya
 
-`setTimeout(fn, 0)` deganda ko'pchilik "0 millisekund = darhol" deb o'ylaydi. Lekin bu **noto'g'ri**. `setTimeout(fn, 0)` callback'ni **Macrotask Queue**ga qo'yadi, va u faqat hozirgi sinxron kod tugagandan keyin, barcha microtask'lar bajarilgandan keyin, va Event Loop macrotask queue'ga navbat kelganda bajariladi.
+`setTimeout(fn, 0)` deganda ko'pchilik "0 millisekund = darhol" deb o'ylaydi. Lekin bu **noto'g'ri**. `setTimeout(fn, 0)` callback'ni **Macrotask Queue**ga qo'yadi, va u faqat:
+1. Hozirgi sinxron kod tugagandan keyin
+2. Barcha microtask'lar bajarilgandan keyin
+3. Event Loop macrotask queue'ga navbat kelganda bajariladi
 
-Bu tushuncha nima uchun muhim? `setTimeout(fn, 0)` aslida "ushbu kodni joriy execution kontekstidan keyin, keyingi Event Loop tick'da bajarin" degani. Bu ayniqsa UI ni blokirovka qilmaslik uchun og'ir hisoblashlarni bo'laklarga ajratishda, va render sikliga imkon berishda ishlatiladi. HTML spetsifikatsiyasiga ko'ra nested setTimeout 5+ marta chaqirilganda minimum delay **4ms** bo'ladi (clamping), shuning uchun haqiqiy kechikish doim 0ms dan ko'proq.
+`setTimeout(fn, 0)` aslida "ushbu kodni joriy execution kontekstidan keyin, keyingi Event Loop tick'da bajarin" degani. Bu UI ni blokirovka qilmaslik uchun og'ir hisoblashlarni bo'laklarga ajratishda va render sikliga imkon berishda ishlatiladi.
 
 ### Under the Hood
 
@@ -820,9 +755,9 @@ Aslida `setTimeout(fn, 0)` **0ms ham emas**:
 2. **Browser** — background tab'larda setTimeout minimum **1000ms** gacha throttle qilinishi mumkin
 3. **Amalda** — hatto active tab'da ham OS scheduler tufayli ~1-4ms delay bo'ladi
 
-```javascript
-// setTimeout(fn, 0) aslida nima qiladi:
+### Kod Misollari
 
+```javascript
 console.log("A — sync");
 
 setTimeout(() => {
@@ -836,18 +771,16 @@ console.log("C — sync");
 // C — sync
 // B — setTimeout(0)
 
-// 🔍 B eng oxirda! Chunki:
+// B eng oxirda! Chunki:
 // 1. "A" — sync, darhol
 // 2. setTimeout(B, 0) — callback ni Macrotask Queue ga QO'YADI (bajaramaydi!)
 // 3. "C" — sync, darhol
 // 4. Call Stack bo'sh → microtask queue (bo'sh) → macrotask queue → B
 ```
 
-### Kod Misollari
+setTimeout(0) vs Promise — kim birinchi?
 
 ```javascript
-// setTimeout(0) vs Promise — kim birinchi?
-
 setTimeout(() => console.log("setTimeout"), 0);
 Promise.resolve().then(() => console.log("Promise"));
 console.log("Sync");
@@ -857,13 +790,40 @@ console.log("Sync");
 // Promise
 // setTimeout
 
-// 🔍 Promise (microtask) DOIM setTimeout (macrotask) dan oldin!
+// Promise (microtask) DOIM setTimeout (macrotask) dan oldin!
 // 0ms delay ham buni o'zgartirmaydi
 ```
 
-```javascript
-// setTimeout(0) real use case — UI unblocking
+setTimeout minimum delay — nested call'larda 4ms clamping:
 
+```javascript
+let start = Date.now();
+
+setTimeout(function tick() {
+  let elapsed = Date.now() - start;
+  console.log(`${elapsed}ms o'tdi`);
+
+  if (elapsed < 50) {
+    setTimeout(tick, 0); // Har safar 0ms bilan chaqiramiz
+  }
+}, 0);
+
+// Output (taxminiy):
+// 1ms o'tdi    — birinchi chaqiruv
+// 2ms o'tdi    — ikkinchi
+// 3ms o'tdi    — uchinchi
+// 4ms o'tdi    — to'rtinchi
+// 8ms o'tdi    — beshinchi (4ms clamping boshlandi!)
+// 12ms o'tdi   — oltinchi
+// 16ms o'tdi   — yettinchi
+
+// 5-chi nested setTimeout dan boshlab browser minimum 4ms delay qo'yadi
+// HTML spec: "If nesting level is greater than 5, clamp timeout to at least 4ms"
+```
+
+setTimeout(0) — real use case — UI unblocking:
+
+```javascript
 // ❌ Noto'g'ri — UI bloklanadi
 function renderHeavyList(items) {
   items.forEach(item => {
@@ -898,32 +858,77 @@ function renderHeavyListBatched(items) {
 }
 ```
 
+---
+
+## queueMicrotask()
+
+### Nazariya
+
+`queueMicrotask(callback)` — microtask queue'ga to'g'ridan-to'g'ri callback qo'shish uchun API. U `Promise.resolve().then(callback)` bilan deyarli bir xil ishlaydi, lekin semantik jihatdan aniqroq va bir oz samaraliroq — chunki Promise object yaratilmaydi.
+
+`queueMicrotask` qachon ishlatiladi:
+- Microtask queue'ga callback qo'shish kerak bo'lganda, lekin Promise semantikasi kerak bo'lmaganda
+- Sinxron koddan keyin, lekin rendering va macrotask'lardan oldin biror ishni bajarishda
+- Bir nechta sinxron o'zgarishlarni batch'lab, bitta microtask'da qayta ishlashda
+
+### Under the Hood
+
+`queueMicrotask` HTML spec da aniqlangan. U `Promise.resolve().then()` dan farqli ravishda yangi Promise object yaratmaydi — callback'ni to'g'ridan-to'g'ri microtask queue'ga qo'shadi. Bu ozgina performance ustunlik beradi.
+
+Lekin **tartib** jihatidan `queueMicrotask` va `Promise.then` bir xil queue'da turadi — FIFO tartibida bajariladi.
+
+### Kod Misollari
+
 ```javascript
-// setTimeout minimum delay — nested call larda 4ms clamping
+console.log("1");
 
-let start = Date.now();
+queueMicrotask(() => {
+  console.log("2 — queueMicrotask");
+});
 
-setTimeout(function tick() {
-  let elapsed = Date.now() - start;
-  console.log(`${elapsed}ms o'tdi`);
+Promise.resolve().then(() => {
+  console.log("3 — Promise.then");
+});
 
-  if (elapsed < 50) {
-    setTimeout(tick, 0); // Har safar 0ms bilan chaqiramiz
+console.log("4");
+
+// Output:
+// 1
+// 4
+// 2 — queueMicrotask
+// 3 — Promise.then
+
+// queueMicrotask va Promise.then ikkalasi ham microtask
+// Tartib: FIFO — qaysi biri avval queue ga tushsa, o'sha avval bajariladi
+```
+
+Real-world use case — batch DOM updates:
+
+```javascript
+let pendingUpdates = [];
+let updateScheduled = false;
+
+function scheduleUpdate(element, value) {
+  pendingUpdates.push({ element, value });
+
+  if (!updateScheduled) {
+    updateScheduled = true;
+    queueMicrotask(() => {
+      // Barcha o'zgarishlarni bitta batch'da bajaramiz
+      pendingUpdates.forEach(({ element, value }) => {
+        element.textContent = value;
+      });
+      pendingUpdates = [];
+      updateScheduled = false;
+    });
   }
-}, 0);
+}
 
-// Output (taxminiy):
-// 1ms o'tdi    — birinchi chaqiruv
-// 2ms o'tdi    — ikkinchi
-// 3ms o'tdi    — uchinchi
-// 4ms o'tdi    — to'rtinchi
-// 8ms o'tdi    — beshinchi (4ms clamping boshlandi!)
-// 12ms o'tdi   — oltinchi
-// 16ms o'tdi   — yettinchi
-// ...
-
-// 🔍 5-chi nested setTimeout dan boshlab browser minimum 4ms delay qo'yadi
-// HTML spec: "If nesting level is greater than 5, clamp timeout to at least 4ms"
+// Bir nechta update chaqiriladi — lekin DOM faqat BIR marta yangilanadi
+scheduleUpdate(titleEl, "Yangi sarlavha");
+scheduleUpdate(bodyEl, "Yangi matn");
+scheduleUpdate(footerEl, "Yangi footer");
+// Uchala o'zgarish bitta microtask'da batch'lanadi
 ```
 
 ---
@@ -934,7 +939,10 @@ setTimeout(function tick() {
 
 `requestAnimationFrame(callback)` (qisqacha **rAF**) — na microtask, na macrotask. U Event Loop'ning **rendering bosqichida** ishlaydi — browser har gal ekranga chizishdan (paint) oldin rAF callback'larini chaqiradi. Bu uni animatsiyalar uchun ideal qiladi chunki u browser'ning render sikli bilan sinxronlashtirilgan (odatda 60fps = har 16.6ms).
 
-Nima uchun `setTimeout` emas, `rAF` ishlatish kerak? `setTimeout` macrotask bo'lib, u render sikli bilan sinxronlashtirilmagan — natijada animatsiyalar "jitter" qilishi mumkin. `rAF` esa browser o'zi render qilmoqchi bo'lganida aynan o'sha paytda chaqiriladi — silliq, 60fps animatsiya uchun optimal. Bundan tashqari, tab ko'rinmayotganda rAF avtomatik to'xtaydi — bu battery va CPU tejaydi.
+`setTimeout` emas, `rAF` ishlatish kerak bo'lgan sabablar:
+- `setTimeout` macrotask bo'lib, u render sikli bilan sinxronlashtirilmagan — natijada animatsiyalar "jitter" qilishi mumkin
+- `rAF` browser o'zi render qilmoqchi bo'lganida aynan o'sha paytda chaqiriladi — silliq, 60fps animatsiya uchun optimal
+- Tab ko'rinmayotganda rAF avtomatik to'xtaydi — battery va CPU tejaydi
 
 **rAF Event Loop'da qayerda turadi:**
 
@@ -965,9 +973,11 @@ Nima uchun `setTimeout` emas, `rAF` ishlatish kerak? `setTimeout` macrotask bo'l
 - Animation uchun **eng yaxshi** usul (vsync bilan sinxronlashgan)
 - `setTimeout(fn, 16)` dan aniqroq — chunki browser ning render sikliga ulangan
 
-```javascript
-// rAF vs setTimeout — animation uchun farq
+### Kod Misollari
 
+rAF vs setTimeout — animatsiya uchun farq:
+
+```javascript
 // ❌ Noto'g'ri — setTimeout bilan animation
 function animateWithTimeout(element) {
   let position = 0;
@@ -1002,11 +1012,9 @@ function animateWithRAF(element) {
 // Natija: silliq, 60fps ga sinxron, battery-friendly
 ```
 
-### Kod Misollari
+rAF, setTimeout, Promise — tartibni aniqlash:
 
 ```javascript
-// rAF, setTimeout, Promise — tartibni aniqlang
-
 console.log("1 — sync");
 
 requestAnimationFrame(() => {
@@ -1030,20 +1038,20 @@ console.log("5 — sync");
 // 3 — setTimeout(0)
 // 2 — requestAnimationFrame
 
-// 🔍 Tartib sababi:
+// Tartib sababi:
 // 1, 5 — synchronous (darhol)
 // 4 — microtask (eng yuqori async priority)
 // 3 — macrotask (microtask'lardan keyin)
 // 2 — rAF (render bosqichida — macrotask'dan HAM keyin)
 //
-// ⚠️ DIQQAT: 3 va 2 tartibi browser va frame timing'ga qarab
+// DIQQAT: 3 va 2 tartibi browser va frame timing'ga qarab
 // o'zgarishi mumkin. Agar render shu tick'da bo'lmasa,
 // rAF keyingi render'gacha kutishi mumkin.
 ```
 
-```javascript
-// rAF bilan silliq DOM update
+rAF bilan silliq scroll-to-top:
 
+```javascript
 function smoothScrollToTop() {
   const scrollY = window.scrollY;
   if (scrollY > 0) {
@@ -1061,13 +1069,74 @@ document.getElementById("topBtn").addEventListener("click", () => {
 
 ---
 
+## requestIdleCallback — Idle Vaqtda Ishlash
+
+### Nazariya
+
+`requestIdleCallback(callback)` — browser **bo'sh vaqtida** (idle) callback'ni bajaradigan API. U Event Loop'da barcha muhim ishlar (macrotask, microtask, render) tugagandan keyin, keyingi frame boshlanguncha qolgan vaqtda ishlaydi.
+
+Bu API past priority'li ishlar uchun mo'ljallangan — analytics yuborish, prefetching, lazy initialization kabi foydalanuvchi tajribasiga bevosita ta'sir qilmaydigan operatsiyalar. `requestIdleCallback` ga berilgan callback `IdleDeadline` object oladi — unda `timeRemaining()` method bor, bu frame tugashigacha qancha vaqt qolganini (millisekund) ko'rsatadi.
+
+`requestIdleCallback` `requestAnimationFrame` dan farqi: rAF har render oldidan ishlaydi (yuqori priority), `requestIdleCallback` esa faqat browser bo'sh bo'lgandagina ishlaydi (past priority). Agar browser band bo'lsa, `requestIdleCallback` umuman chaqirilmasligi ham mumkin — shuning uchun `timeout` option bilan cheklov qo'yish mumkin.
+
+### Under the Hood
+
+```
+Frame budget (16.6ms @ 60fps):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+│ Macrotask │ Microtasks │ rAF │ Style│Layout│Paint│ IDLE │
+│   2ms     │   1ms      │ 1ms │ 2ms  │ 3ms  │ 2ms │~5.6ms│
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                     ↑
+                                            requestIdleCallback
+                                            shu oraliqda ishlaydi
+```
+
+### Kod Misollari
+
+```javascript
+// Past priority'li ishni idle vaqtda bajarish
+requestIdleCallback((deadline) => {
+  // deadline.timeRemaining() — frame oxirigacha qolgan vaqt (ms)
+  while (deadline.timeRemaining() > 0) {
+    // Past priority'li ish: analytics, prefetch, lazy init
+    processNextAnalyticsEvent();
+  }
+});
+
+// timeout bilan — maksimum 2 soniya kutadi, keyin majburiy bajaradi
+requestIdleCallback((deadline) => {
+  sendAnalytics(pendingData);
+}, { timeout: 2000 });
+```
+
+```javascript
+// Real-world use case: katta ro'yxatni idle vaqtda prefetch qilish
+const itemsToPreload = [...longList];
+
+function preloadBatch(deadline) {
+  while (itemsToPreload.length > 0 && deadline.timeRemaining() > 5) {
+    const item = itemsToPreload.shift();
+    preloadImage(item.imageUrl); // Past priority — foydalanuvchi kutmaydi
+  }
+
+  if (itemsToPreload.length > 0) {
+    requestIdleCallback(preloadBatch); // Qolganlari keyingi idle'da
+  }
+}
+
+requestIdleCallback(preloadBatch);
+```
+
+---
+
 ## Node.js Event Loop Farqlari
 
 ### Nazariya
 
 Node.js Event Loop browser'nikidan sezilarli farq qiladi. Node.js **libuv** kutubxonasini ishlatadi — bu C da yozilgan cross-platform asinxron I/O kutubxonasi. Browser'dagi oddiy "macrotask → microtask → render" siklidan farqli o'laroq, Node.js Event Loop **6 ta faza (phase)** dan iborat: Timers, Pending Callbacks, Idle/Prepare, Poll, Check, Close Callbacks.
 
-Bu farqlarni bilish nima uchun muhim? Agar siz Node.js server yozayotgan bo'lsangiz, `setImmediate` vs `setTimeout(fn, 0)` ning farqi, `process.nextTick()` ning boshqa microtask'lardan yuqori priority'si, va Poll phase'ning I/O event'larni kutishi — bularning barchasi dasturingizning to'g'ri ishlashiga ta'sir qiladi.
+Bu farqlarni bilish muhim chunki `setImmediate` vs `setTimeout(fn, 0)` ning farqi, `process.nextTick()` ning boshqa microtask'lardan yuqori priority'si, va Poll phase'ning I/O event'larni kutishi — bularning barchasi Node.js server kodining to'g'ri ishlashiga ta'sir qiladi.
 
 ### Under the Hood
 
@@ -1128,11 +1197,11 @@ Bu farqlarni bilish nima uchun muhim? Agar siz Node.js server yozayotgan bo'lsan
 
 **2. Pending Callbacks** — ba'zi system-level I/O callback'lari (masalan, TCP `ECONNREFUSED`).
 
-**3. Idle/Prepare** — faqat Node.js ichki ishlatadi. Biz uchun ahamiyati yo'q.
+**3. Idle/Prepare** — faqat Node.js ichki ishlatadi.
 
 **4. Poll** — eng muhim faza:
 - Yangi I/O event'larini kutadi
-- I/O callback'larini bajaradi (fs.readFile, http response, etc.)
+- I/O callback'larini bajaradi (fs.readFile, http response)
 - Agar poll queue bo'sh bo'lsa:
   - `setImmediate` bor → check faza ga o'tadi
   - Timer expired bor → timers faza ga o'tadi
@@ -1144,17 +1213,15 @@ Bu farqlarni bilish nima uchun muhim? Agar siz Node.js server yozayotgan bo'lsan
 
 ### `process.nextTick()` vs `setImmediate()`
 
-Bu ikkalasi Node.js ga xos va ko'pchilikni chalkashtiradigan API'lar:
-
 | Xususiyat | `process.nextTick()` | `setImmediate()` |
 |-----------|---------------------|------------------|
 | Qachon ishlaydi | **Har bir faza ORASIDA**, barchasidan oldin | **Check faza** da |
 | Priority | Eng yuqori (microtask'dan ham oldin) | Macrotask (check phase) |
 | Queue | nextTick Queue (alohida) | Check Queue |
 | Starvation xavfi | **HA** — recursive nextTick loop'ni to'xtatmaydi | Yo'q |
-| Nomlash | Aslida "immediate" ishlaydigan shu | Aslida "next tick" da ishlaydigan shu 😅 |
+| Nomlash | Aslida "immediate" ishlaydigan shu | Aslida "next tick" da ishlaydigan shu |
 
-> **Qiziq fakt:** `process.nextTick` va `setImmediate` nomlari teskari qo'yilgan. `nextTick` darhol ishlaydi, `setImmediate` esa keyingi fazada. Bu Node.js ning tarixiy xatosi — o'zgartirishning iloji yo'q (backward compatibility).
+> `process.nextTick` va `setImmediate` nomlari teskari qo'yilgan. `nextTick` darhol ishlaydi, `setImmediate` esa keyingi fazada. Bu Node.js ning tarixiy xatosi — o'zgartirishning iloji yo'q (backward compatibility).
 
 ### Kod Misollari
 
@@ -1164,11 +1231,8 @@ Bu ikkalasi Node.js ga xos va ko'pchilikni chalkashtiradigan API'lar:
 console.log("1 — sync");
 
 setTimeout(() => console.log("2 — setTimeout"), 0);
-
 setImmediate(() => console.log("3 — setImmediate"));
-
 process.nextTick(() => console.log("4 — nextTick"));
-
 Promise.resolve().then(() => console.log("5 — Promise"));
 
 console.log("6 — sync");
@@ -1181,16 +1245,14 @@ console.log("6 — sync");
 // 2 — setTimeout      ← timers faza
 // 3 — setImmediate    ← check faza
 
-// 🔍 Tartib: sync → nextTick → microtask → macrotask
-// Node.js da: nextTick > Promise > setTimeout >= setImmediate
+// Tartib: sync → nextTick → microtask → macrotask
 ```
 
-```javascript
-// setTimeout(0) vs setImmediate — I/O ichida
+I/O callback ichida — `setImmediate` DOIM `setTimeout(fn, 0)` dan oldin:
 
+```javascript
 const fs = require("fs");
 
-// I/O callback ICHIDA — setImmediate DOIM birinchi
 fs.readFile(__filename, () => {
   setTimeout(() => console.log("setTimeout"), 0);
   setImmediate(() => console.log("setImmediate"));
@@ -1200,22 +1262,22 @@ fs.readFile(__filename, () => {
 // setImmediate
 // setTimeout
 
-// 🔍 I/O callback poll faza da bajariladi.
+// I/O callback poll faza da bajariladi.
 // Poll dan keyin → Check faza (setImmediate) → keyin loop boshiga → Timers (setTimeout)
 // Shuning uchun I/O ichida setImmediate DOIM birinchi.
 ```
 
-```javascript
-// Top-level da — tartib GARANTI EMAS
+Top-level da — tartib **garanti emas**:
 
+```javascript
 setTimeout(() => console.log("setTimeout"), 0);
 setImmediate(() => console.log("setImmediate"));
 
-// Output (OLDINDAN AYTIB BO'LMAYDI — system timer resolution ga bog'liq):
+// Output (OLDINDAN AYTIB BO'LMAYDI):
 // Ba'zan: setTimeout → setImmediate
 // Ba'zan: setImmediate → setTimeout
 
-// 🔍 Nima uchun? Main module top-level da, poll faza yo'q.
+// Main module top-level da, poll faza yo'q.
 // setTimeout(0) aslida ≈1ms. Agar 1ms o'tgan bo'lsa → setTimeout birinchi.
 // Agar hali o'tmagan bo'lsa → setImmediate birinchi.
 // Timer resolution OS ga bog'liq.
@@ -1255,9 +1317,9 @@ setImmediate(() => console.log("setImmediate"));
 
 ### Nazariya
 
-**Starvation** — bu microtask queue hech qachon bo'sh bo'lmaydigan xavfli holat. Har bir microtask yangi microtask qo'shsa, Event Loop **hech qachon** macrotask'larga yoki rendering'ga o'tmaydi — natijada UI muzlab qoladi, setTimeout callback'lari ishlamaydi, va browser "Not Responding" holatiga tushadi.
+**Starvation** — microtask queue hech qachon bo'sh bo'lmaydigan xavfli holat. Har bir microtask yangi microtask qo'shsa, Event Loop **hech qachon** macrotask'larga yoki rendering'ga o'tmaydi — natijada UI muzlab qoladi, setTimeout callback'lari ishlamaydi, va browser "Not Responding" holatiga tushadi.
 
-Bu muammo aynan microtask'larning "barchasini bo'shat" qoidasidan kelib chiqadi. Macrotask'larda bu muammo yo'q chunki ular bittadan olinadi. Lekin microtask'lar rekursiv qo'shilsa — Event Loop ularni tugatishga urinib qoladi. Shuning uchun microtask ichida yangi microtask qo'shishda ehtiyot bo'lish kerak, ayniqsa tsikl yoki rekursiya ishlatilganda.
+Bu muammo aynan microtask'larning "barchasini bo'shat" qoidasidan kelib chiqadi. Macrotask'larda bu muammo yo'q chunki ular bittadan olinadi. Lekin microtask'lar rekursiv qo'shilsa — Event Loop ularni tugatishga urinib qoladi.
 
 ### Under the Hood
 
@@ -1293,33 +1355,15 @@ function starvation() {
 starvation();
 // setTimeout(() => console.log("HECH QACHON ishlamaydi"), 0);
 
-// 🔴 Bu kod browser'ni muzlatadi!
+// Bu kod browser'ni muzlatadi!
 // Microtask queue hech qachon bo'sh bo'lmaydi
-// → Macrotask'lar (setTimeout) bajarilmaydi
-// → Rendering to'xtaydi → UI muzlab qoladi
-// → Tab "Not Responding" bo'ladi
-```
-
-```javascript
-// ❌ XAVFLI — queueMicrotask bilan ham xuddi shunday
-
-function infiniteMicrotasks() {
-  queueMicrotask(() => {
-    console.log("yana microtask...");
-    infiniteMicrotasks(); // cheksiz loop
-  });
-}
-
-infiniteMicrotasks();
-// 🔴 Huddi Promise starvation kabi — browser muzlaydi
+// → Macrotask'lar bajarilmaydi → Rendering to'xtaydi → UI muzlab qoladi
 ```
 
 ```javascript
 // ✅ XAVFSIZ — setTimeout bilan "breathing room" berish
 
 function safeRecursion() {
-  // Har bir iteration — macrotask
-  // Event Loop boshqa task'larni HAM bajara oladi
   setTimeout(() => {
     console.log("iteration");
     safeRecursion();
@@ -1332,18 +1376,17 @@ safeRecursion();
 ```
 
 ```javascript
-// ✅ To'g'ri — process.nextTick starvation (Node.js)
+// ✅ Node.js da — setImmediate bilan recursive ishlar
+// process.nextTick bilan ham starvation bo'ladi:
 
-// ❌ Node.js da process.nextTick bilan ham starvation bo'ladi:
+// ❌ Node.js da process.nextTick bilan starvation:
 function badNextTick() {
   process.nextTick(() => {
-    // Bu cheksiz davom etsa — I/O callback'lar HECH QACHON ishlamaydi
-    badNextTick();
+    badNextTick(); // I/O callback'lar HECH QACHON ishlamaydi
   });
 }
 
-// ✅ Node.js hujjatlari tavsiyasi:
-// Recursive holatlarda setImmediate() ishlating, nextTick() emas
+// ✅ Node.js hujjatlari tavsiyasi: setImmediate ishlating
 function goodRecursion() {
   setImmediate(() => {
     // setImmediate check fazada ishlaydi
@@ -1368,129 +1411,15 @@ function goodRecursion() {
 
 ### Nazariya
 
-UI blocking — bu JavaScript ning single-threaded tabiatidan kelib chiqadigan **eng katta amaliy muammo**. Agar Call Stack da og'ir hisoblash bajarilayotgan bo'lsa — browser **hech narsani** qila olmaydi: button click'lar, scroll, animatsiyalar, render — HAMMA narsa to'xtaydi. Bu muammoni hal qilishning bir nechta usuli bor: ishni kichik bo'laklarga ajratish (`setTimeout` yoki `requestAnimationFrame` bilan), `Web Worker` ishlatish (haqiqiy parallel thread), yoki `requestIdleCallback` bilan browser bo'sh paytida ishlash.
+UI blocking — JavaScript ning single-threaded tabiatidan kelib chiqadigan **eng katta amaliy muammo**. Agar Call Stack da og'ir hisoblash bajarilayotgan bo'lsa — browser **hech narsani** qila olmaydi: button click'lar, scroll, animatsiyalar, render — HAMMA narsa to'xtaydi.
 
-Bu tushuncha nima uchun muhim? Real-world dasturlarda ko'pincha katta ma'lumotlarni filterlash, murakkab hisoblashlar, yoki katta ro'yxatlarni render qilish kerak bo'ladi. Bularni to'g'ri boshqarmasangiz — foydalanuvchi interfeysi 3-5 soniya muzlab qoladi va bu foydalanuvchi tajribasini buzadi. Zamonaviy framework'lar (React Fiber, Vue 3) bu muammoni ichki optimizatsiyalar bilan hal qiladi, lekin mexanizmni tushunish har qanday dasturchi uchun muhim.
+Bu muammoni hal qilishning bir nechta usuli bor:
+1. **Batch processing** — ishni kichik bo'laklarga ajratish (`setTimeout` yoki `rAF` bilan)
+2. **Web Worker** — haqiqiy parallel thread
+3. **requestIdleCallback** — browser bo'sh paytida ishlash
+4. **Debounce** — ortiqcha chaqiruvlarni kamaytirish
 
-### Kod Misollari
-
-```javascript
-// ❌ Real-world muammo: Search filter 10,000 ta itemni sync filterlaydi
-
-const searchInput = document.getElementById("search");
-const resultsList = document.getElementById("results");
-const items = Array.from({ length: 10000 }, (_, i) => `Mahsulot ${i + 1}`);
-
-searchInput.addEventListener("input", (e) => {
-  const query = e.target.value.toLowerCase();
-
-  // 🔴 10,000 ta itemni filterlash + DOM update — hammasi sync
-  resultsList.innerHTML = "";
-  const filtered = items.filter(item => item.toLowerCase().includes(query));
-
-  filtered.forEach(item => {
-    const li = document.createElement("li");
-    li.textContent = item;
-    resultsList.appendChild(li);
-  });
-
-  // Natija: har bir harf yozganda UI 100-500ms muzlaydi
-  // Foydalanuvchi yozayotganda kursor "qotib qoladi"
-});
-```
-
-```javascript
-// ✅ Yechim 1: Debounce + requestAnimationFrame
-
-function debounce(fn, delay) {
-  let timeoutId;
-  return function (...args) {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn.apply(this, args), delay);
-  };
-}
-
-searchInput.addEventListener("input", debounce((e) => {
-  const query = e.target.value.toLowerCase();
-  const filtered = items.filter(item => item.toLowerCase().includes(query));
-
-  // requestAnimationFrame — render sikliga sinxron
-  requestAnimationFrame(() => {
-    resultsList.innerHTML = "";
-    const fragment = document.createDocumentFragment();
-    filtered.forEach(item => {
-      const li = document.createElement("li");
-      li.textContent = item;
-      fragment.appendChild(li);
-    });
-    resultsList.appendChild(fragment); // Bir marta DOM ga qo'shish
-  });
-}, 300)); // 300ms kutish — foydalanuvchi yozishni to'xtatganda ishlaydi
-```
-
-```javascript
-// ✅ Yechim 2: Og'ir hisoblashni batch'larga bo'lish
-
-function processInBatches(items, batchSize, processFn) {
-  let index = 0;
-
-  function nextBatch() {
-    const batch = items.slice(index, index + batchSize);
-    batch.forEach(processFn);
-    index += batchSize;
-
-    if (index < items.length) {
-      // Har bir batch orasida Event Loop ga "nafas olish" imkoniyati
-      setTimeout(nextBatch, 0);
-    }
-  }
-
-  nextBatch();
-}
-
-// Ishlatish:
-processInBatches(hugeDataArray, 500, (item) => {
-  // Har 500 ta itemdan keyin UI yangilanadi
-  renderItem(item);
-});
-```
-
-```javascript
-// ✅ Yechim 3: Web Worker — og'ir ishni boshqa thread'ga uzatish
-
-// main.js
-const worker = new Worker("heavy-worker.js");
-
-searchInput.addEventListener("input", debounce((e) => {
-  worker.postMessage({
-    query: e.target.value,
-    items: items
-  });
-}, 200));
-
-worker.onmessage = (e) => {
-  const filtered = e.data;
-  requestAnimationFrame(() => {
-    renderResults(filtered); // UI thread'da faqat render
-  });
-};
-
-// heavy-worker.js (alohida thread!)
-self.onmessage = (e) => {
-  const { query, items } = e.data;
-  // Og'ir filter — bu yerda UI bloklanmaydi!
-  const filtered = items.filter(item =>
-    item.toLowerCase().includes(query.toLowerCase())
-  );
-  self.postMessage(filtered);
-};
-
-// 🔍 Web Worker alohida thread'da ishlaydi
-// Main thread (UI) hech qachon bloklanmaydi
-// Lekin: Worker da DOM ga access yo'q
-```
-
-### UI Blocking Diagrammasi
+### Under the Hood
 
 ```
 ❌ BLOCKING (og'ir ish sync):
@@ -1511,27 +1440,129 @@ self.onmessage = (e) => {
       ↑ UI responsive — har batch orasida render va event'lar ishlaydi
 ```
 
+### Kod Misollari
+
+```javascript
+// ❌ Real-world muammo: Search filter 10,000 ta itemni sync filterlaydi
+
+const searchInput = document.getElementById("search");
+const resultsList = document.getElementById("results");
+const items = Array.from({ length: 10000 }, (_, i) => `Mahsulot ${i + 1}`);
+
+searchInput.addEventListener("input", (e) => {
+  const query = e.target.value.toLowerCase();
+
+  // 10,000 ta itemni filterlash + DOM update — hammasi sync
+  resultsList.innerHTML = "";
+  const filtered = items.filter(item => item.toLowerCase().includes(query));
+
+  filtered.forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    resultsList.appendChild(li);
+  });
+  // Natija: har bir harf yozganda UI 100-500ms muzlaydi
+});
+```
+
+```javascript
+// ✅ Yechim 1: Debounce + requestAnimationFrame
+
+function debounce(fn, delay) {
+  let timeoutId;
+  return function (...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
+searchInput.addEventListener("input", debounce((e) => {
+  const query = e.target.value.toLowerCase();
+  const filtered = items.filter(item => item.toLowerCase().includes(query));
+
+  requestAnimationFrame(() => {
+    resultsList.innerHTML = "";
+    const fragment = document.createDocumentFragment();
+    filtered.forEach(item => {
+      const li = document.createElement("li");
+      li.textContent = item;
+      fragment.appendChild(li);
+    });
+    resultsList.appendChild(fragment); // Bir marta DOM ga qo'shish
+  });
+}, 300));
+```
+
+```javascript
+// ✅ Yechim 2: Og'ir hisoblashni batch'larga bo'lish
+
+function processInBatches(items, batchSize, processFn) {
+  let index = 0;
+
+  function nextBatch() {
+    const batch = items.slice(index, index + batchSize);
+    batch.forEach(processFn);
+    index += batchSize;
+
+    if (index < items.length) {
+      setTimeout(nextBatch, 0); // Har batch orasida Event Loop ga "nafas" berish
+    }
+  }
+
+  nextBatch();
+}
+
+processInBatches(hugeDataArray, 500, (item) => {
+  renderItem(item); // Har 500 ta itemdan keyin UI yangilanadi
+});
+```
+
+```javascript
+// ✅ Yechim 3: Web Worker — og'ir ishni boshqa thread'ga uzatish
+
+// main.js
+const worker = new Worker("heavy-worker.js");
+
+searchInput.addEventListener("input", debounce((e) => {
+  worker.postMessage({ query: e.target.value, items: items });
+}, 200));
+
+worker.onmessage = (e) => {
+  const filtered = e.data;
+  requestAnimationFrame(() => {
+    renderResults(filtered); // UI thread'da faqat render
+  });
+};
+
+// heavy-worker.js (alohida thread!)
+self.onmessage = (e) => {
+  const { query, items } = e.data;
+  // Og'ir filter — bu yerda UI bloklanmaydi!
+  const filtered = items.filter(item =>
+    item.toLowerCase().includes(query.toLowerCase())
+  );
+  self.postMessage(filtered);
+};
+
+// Web Worker alohida thread'da ishlaydi
+// Main thread (UI) hech qachon bloklanmaydi
+// Lekin: Worker da DOM ga access yo'q
+```
+
 ---
 
 ## Output Tartibini Aniqlang — Tricky Misollar
 
-Bu bo'lim eng muhim — interview'da eng ko'p so'raladigan savollar shu turdagi. Har bir misolni sinchiklab o'rganing.
+Bu bo'lim interview'da eng ko'p so'raladigan savollar turini o'z ichiga oladi. Har bir misolni sinchiklab tahlil qiling.
 
 ### Misol 1: Asosiy Tartib
 
 ```javascript
 console.log("1");
-
 setTimeout(() => console.log("2"), 0);
-
 Promise.resolve().then(() => console.log("3"));
-
 console.log("4");
 
-// Output nima?
-// ...
-// ...
-// ...
 // Javob: 1, 4, 3, 2
 // Sync (1, 4) → Microtask (3) → Macrotask (2)
 ```
@@ -1552,13 +1583,9 @@ Promise.resolve()
 
 console.log("F");
 
-// Output nima?
-// ...
-// ...
-// ...
 // Javob: A, F, C, E, D, B
 
-// 🔍 Tahlil:
+// Tahlil:
 // Sync: A, F
 // Microtask Queue (sync tugagandan keyin): [C_callback, E_callback]
 // → C bajariladi → .then(D) queue ga qo'shiladi: [E_callback, D_callback]
@@ -1582,13 +1609,9 @@ Promise.resolve()
 Promise.resolve()
   .then(() => console.log("E"));
 
-// Output nima?
-// ...
-// ...
-// ...
 // Javob: C, E, A, B, D
 
-// 🔍 Tahlil:
+// Tahlil:
 // Sync tugagandan keyin:
 //   Macrotask Queue: [A, B]
 //   Microtask Queue: [C_callback, E_callback]
@@ -1598,9 +1621,7 @@ Promise.resolve()
 //   E → "E"
 //
 // Macrotask: A → "A"
-// Microtask checkpoint (bo'sh)
 // Macrotask: B → "B"
-// Microtask checkpoint (bo'sh)
 // Macrotask: D → "D"
 ```
 
@@ -1624,13 +1645,9 @@ new Promise((resolve) => {
 
 console.log("6");
 
-// Output nima?
-// ...
-// ...
-// ...
 // Javob: 1, 6, 2, 3, 4, 5
 
-// 🔍 Tahlil:
+// Tahlil:
 // Sync: 1 (Promise constructor sync ishlaydi!), 6
 // Microtask: then_2 callback
 //   → "2" chiqadi
@@ -1657,13 +1674,9 @@ console.log("A");
 asyncFunc();
 console.log("B");
 
-// Output nima?
-// ...
-// ...
-// ...
 // Javob: A, 1, B, 2, 3
 
-// 🔍 async/await = Promise + .then() syntactic sugar
+// async/await = Promise + .then() syntactic sugar
 // Yuqoridagi kod quyidagiga teng:
 //
 // console.log("A");
@@ -1696,13 +1709,9 @@ Promise.resolve()
   .then(() => console.log("5"))
   .then(() => console.log("6"));
 
-// Output nima?
-// ...
-// ...
-// ...
 // Javob: 5, 6, 1, 2, 3, 4
 
-// 🔍 Tahlil:
+// Tahlil:
 // Microtask Queue: [then_5]
 // Macrotask Queue: [setTimeout_1, setTimeout_3]
 //
@@ -1721,76 +1730,7 @@ Promise.resolve()
 //   4 → "4"
 ```
 
-### Misol 7: queueMicrotask + Promise + setTimeout
-
-```javascript
-console.log("START");
-
-queueMicrotask(() => {
-  console.log("queueMicrotask 1");
-  queueMicrotask(() => console.log("queueMicrotask 2"));
-});
-
-setTimeout(() => console.log("setTimeout 1"), 0);
-
-Promise.resolve()
-  .then(() => console.log("Promise 1"))
-  .then(() => console.log("Promise 2"));
-
-setTimeout(() => console.log("setTimeout 2"), 0);
-
-console.log("END");
-
-// Output nima?
-// ...
-// ...
-// ...
-// Javob:
-// START
-// END
-// queueMicrotask 1
-// Promise 1
-// queueMicrotask 2
-// Promise 2
-// setTimeout 1
-// setTimeout 2
-
-// 🔍 Tahlil:
-// Sync: START, END
-// Microtask Queue: [qM1_callback, P1_callback]
-//   qM1 → "queueMicrotask 1" → qM2 queue ga: [..., P1_callback, qM2_callback]
-//   P1  → "Promise 1" → P2 queue ga: [qM2_callback, P2_callback]
-//   qM2 → "queueMicrotask 2"
-//   P2  → "Promise 2"
-// Macrotask: setTimeout 1, setTimeout 2
-```
-
-### Misol 8: Promise Constructor — Sync Trap
-
-```javascript
-const promise = new Promise((resolve, reject) => {
-  console.log("1 — Promise constructor sync!");
-  resolve("done");
-  console.log("2 — resolve dan keyin ham ishlaydi!");
-  // resolve() funksiyani to'xtatmaydi — faqat Promise holatini o'zgartiradi
-});
-
-promise.then(val => console.log("3 — then:", val));
-
-console.log("4 — sync");
-
-// Output nima?
-// ...
-// ...
-// ...
-// Javob: 1, 2, 4, 3
-
-// 🔍 Muhim: Promise constructor SYNC ishlaydi!
-// resolve() Promise ni fulfilled qiladi, lekin .then() callback
-// MICROTASK sifatida keyinroq ishlaydi
-```
-
-### Misol 9: Super Tricky — Ko'p Qatlamli
+### Misol 7: Super Tricky — Ko'p Qatlamli
 
 ```javascript
 console.log("1");
@@ -1823,13 +1763,9 @@ new Promise(resolve => {
 
 console.log("10");
 
-// Output nima?
-// ...
-// ...
-// ...
 // Javob: 1, 6, 10, 7, 9, 2, 3, 4, 8, 5
 
-// 🔍 Qadam-baqadam:
+// Qadam-baqadam:
 // SYNC: "1", "6" (Promise constructor), "10"
 //
 // Microtask: then_7 → "7"
@@ -1847,6 +1783,26 @@ console.log("10");
 // Macrotask: setTimeout_5 → "5"
 ```
 
+### Misol 8: Promise Constructor — Sync Trap
+
+```javascript
+const promise = new Promise((resolve, reject) => {
+  console.log("1 — Promise constructor sync!");
+  resolve("done");
+  console.log("2 — resolve dan keyin ham ishlaydi!");
+  // resolve() funksiyani to'xtatmaydi — faqat Promise holatini o'zgartiradi
+});
+
+promise.then(val => console.log("3 — then:", val));
+
+console.log("4 — sync");
+
+// Javob: 1, 2, 4, 3
+// Promise constructor SYNC ishlaydi!
+// resolve() Promise ni fulfilled qiladi, lekin .then() callback
+// MICROTASK sifatida keyinroq ishlaydi
+```
+
 ---
 
 ## Common Mistakes
@@ -1854,16 +1810,12 @@ console.log("10");
 ### ❌ Xato 1: setTimeout(fn, 0) "darhol" ishlaydi deb o'ylash
 
 ```javascript
-// Ko'pchilik buni "instant" deb o'ylaydi
 console.log("oldin");
 setTimeout(() => console.log("setTimeout"), 0);
 console.log("keyin");
 
-// "setTimeout" darhol chiqadi deb kutiladi
-// Lekin aslida:
-// oldin
-// keyin
-// setTimeout  ← ENG OXIRDA!
+// Ko'pchilik kutadi: oldin, setTimeout, keyin
+// Aslida: oldin, keyin, setTimeout  ← ENG OXIRDA!
 ```
 
 ### ✅ To'g'ri usul:
@@ -1928,11 +1880,10 @@ console.log("C");
 ### ❌ Xato 3: Microtask va Macrotask tartibini bilmaslik
 
 ```javascript
-// "setTimeout birinchi" deb o'ylash ← XATO
 setTimeout(() => console.log("timeout"), 0);
 Promise.resolve().then(() => console.log("promise"));
 
-// Kutiladi: timeout, promise
+// Ko'pchilik kutadi: timeout, promise
 // Aslida: promise, timeout
 ```
 
@@ -1945,8 +1896,7 @@ setTimeout(() => console.log("3 — macrotask"), 0);
 Promise.resolve().then(() => console.log("2 — microtask"));
 console.log("1 — sync");
 
-// Output: 1, 2, 3
-// DOIM shu tartibda!
+// Output: 1, 2, 3  — DOIM shu tartibda!
 ```
 
 **Nima uchun:** Microtask Queue **har doim** Macrotask Queue dan oldin bo'shatiladi. Bu Event Loop algoritmining asosiy qoidasi.
@@ -1958,12 +1908,9 @@ console.log("1 — sync");
 ```javascript
 // ❌ UI bloklaydigan kod
 button.addEventListener("click", () => {
-  // 50,000 ta elementni sortlash — UI 3-5 soniya muzlaydi
-  const sorted = hugeArray.sort((a, b) => {
-    // Murakkab comparison logic
-    return complexCompare(a, b);
-  });
+  const sorted = hugeArray.sort((a, b) => complexCompare(a, b));
   renderTable(sorted);
+  // UI 3-5 soniya muzlaydi
 });
 ```
 
@@ -1974,15 +1921,12 @@ button.addEventListener("click", () => {
 const sortWorker = new Worker("sort-worker.js");
 
 button.addEventListener("click", () => {
-  // Loading ko'rsatish
   showSpinner();
-
-  // Og'ir ishni Worker ga yuborish
   sortWorker.postMessage(hugeArray);
 
   sortWorker.onmessage = (e) => {
     hideSpinner();
-    renderTable(e.data); // Tayyor natijani render qilish
+    renderTable(e.data);
   };
 });
 
@@ -2000,10 +1944,9 @@ self.onmessage = (e) => {
 ### ❌ Xato 5: async/await ning Event Loop'dagi o'rnini tushunmaslik
 
 ```javascript
-// Ko'pchilik await "to'xtatadi" deb o'ylaydi
 async function example() {
   console.log("A");
-  await fetch("/api/data"); // "Hamma narsa shu yerda to'xtaydi" ← XATO tushuncha
+  await fetch("/api/data");
   console.log("B");
 }
 
@@ -2017,21 +1960,18 @@ console.log("C");
 ### ✅ To'g'ri usul:
 
 ```javascript
-// await FAQAT async funksiya ICHIDA "kutadi"
-// Tashqi kod DAVOM ETADI
-
 async function example() {
   console.log("A");     // sync — darhol
   await Promise.resolve(); // Shu yerdan keyin — microtask
   console.log("B");     // ← microtask callback ichida
 }
 
-example();              // async funksiyani chaqiramiz
+example();
 console.log("C");       // ← Bu DARHOL ishlaydi!
 
 // Output: A, C, B
 
-// 🔍 await — funksiya ichini "to'xtatadi", lekin TASHQI kodni to'xtatmaydi
+// await — funksiya ichini "to'xtatadi", lekin TASHQI kodni to'xtatmaydi
 // await = .then() ning syntactic sugar'i
 // await dan keyingi kod = .then() callback ichidagi kod
 ```
@@ -2131,10 +2071,10 @@ Promise.resolve().then(() => console.log("8"));
 4. `await Promise.resolve()` — second to'xtaydi, microtask queue ga: `[second_resume]`
 5. `second()` qaytmadi hali, shuning uchun `first` ham kutib turadi
 6. `"6"` — sync (main script davom etadi)
-7. `setTimeout(7)` → Macrotask Queue: `[timeout_7]`
+7. `setTimeout(7)` → Macrotask Queue
 8. `Promise.then(8)` → Microtask Queue: `[second_resume, then_8]`
 9. **Microtask checkpoint:**
-   - `second_resume` → `"4"` chiqadi. `second()` tugadi → `first` resume bo'ladi: `[then_8, first_resume]`
+   - `second_resume` → `"4"` chiqadi. `second()` tugadi → `first` resume: `[then_8, first_resume]`
    - `then_8` → `"8"` chiqadi
    - `first_resume` → `"2"` chiqadi
 10. **Macrotask:** `"7"`
@@ -2188,7 +2128,7 @@ Qadam 1: console.log("sync 1")
 Qadam 2: setTimeout(...)
   Call Stack:    [global, setTimeout]
   Microtask Q:   []
-  Macrotask Q:   [timeout_callback]  ← Web API dan keladi
+  Macrotask Q:   [timeout_callback]
   Output:        —
 
 Qadam 3: Promise.resolve().then(...)
@@ -2217,7 +2157,7 @@ Qadam 6: Microtask — microtask_in_promise
 
 Qadam 7: Macrotask — timeout_callback
   Call Stack:    [timeout_callback]
-  Microtask Q:   [promise_in_timeout]  ← yangi microtask
+  Microtask Q:   [promise_in_timeout]
   Macrotask Q:   []
   Output:        "timeout"
 
@@ -2245,8 +2185,7 @@ function processItems(items) {
     if (index < items.length) {
       console.log(`Processing: ${items[index]}`);
       index++;
-      // Microtask — starvation!
-      queueMicrotask(next);
+      queueMicrotask(next); // Microtask — starvation!
     }
   }
 
@@ -2275,8 +2214,7 @@ function processItems(items) {
     }
 
     if (index < items.length) {
-      // setTimeout — macrotask, UI refresh imkoniyati beradi
-      setTimeout(processBatch, 0);
+      setTimeout(processBatch, 0); // macrotask — UI refresh imkoniyati beradi
     }
   }
 
@@ -2287,9 +2225,9 @@ processItems(Array.from({ length: 100000 }, (_, i) => `item-${i}`));
 ```
 
 **Tushuntirish:**
-1. **Muammo:** `queueMicrotask` recursive chaqirilganda, microtask queue **hech qachon** bo'sh bo'lmaydi. Event Loop macrotask'larga va rendering'ga o'ta olmaydi → browser muzlaydi.
-2. **Yechim:** `setTimeout(fn, 0)` macrotask yaratadi. Har bir batch orasida Event Loop boshqa task'larni (rendering, click event'lar) bajara oladi.
-3. **Batch processing:** 1000 ta itemni sync bajaramiz (tez), keyin setTimeout bilan keyingi batch'ga o'tamiz. Bu "breathing room" beradi.
+1. **Muammo:** `queueMicrotask` recursive chaqirilganda, microtask queue **hech qachon** bo'sh bo'lmaydi → browser muzlaydi.
+2. **Yechim:** `setTimeout(fn, 0)` macrotask yaratadi. Har bir batch orasida Event Loop boshqa task'larni bajara oladi.
+3. **Batch processing:** 1000 ta itemni sync bajaramiz, keyin setTimeout bilan keyingi batch'ga o'tamiz.
 
 </details>
 
@@ -2297,7 +2235,7 @@ processItems(Array.from({ length: 100000 }, (_, i) => `item-${i}`));
 
 ### Mashq 5: Node.js Event Loop (Qiyin)
 
-**Savol:** Quyidagi Node.js kodining output tartibini aniqlang va nima uchun shunday ekanini tushuntiring.
+**Savol:** Quyidagi Node.js kodining output tartibini aniqlang.
 
 ```javascript
 const fs = require("fs");
@@ -2356,15 +2294,13 @@ console.log("11");
 - `4` — setImmediate (check faza — poll dan keyin)
 - `3` — setTimeout (timers faza — keyingi loop'da)
 
-**Asosiy qoida:** I/O callback ichida `setImmediate` DOIM `setTimeout(fn, 0)` dan oldin ishlaydi, chunki poll fazadan keyin check faza keladi.
+**Asosiy qoida:** I/O callback ichida `setImmediate` DOIM `setTimeout(fn, 0)` dan oldin ishlaydi.
 
 </details>
 
 ---
 
 ## Xulosa
-
-### Asosiy Fikrlar
 
 1. **JavaScript single-threaded** — bitta Call Stack, bitta execution context. Lekin runtime (browser/Node.js) multi-threaded.
 
@@ -2385,42 +2321,12 @@ Sync kod → process.nextTick (Node) → Microtask (Promise) → Macrotask (setT
 
 7. **requestAnimationFrame** — render sikliga ulangan, animation uchun eng yaxshi usul.
 
-8. **Node.js** Event Loop 6 fazadan iborat, `process.nextTick` eng yuqori priority, `setImmediate` check fazada ishlaydi.
+8. **requestIdleCallback** — browser bo'sh vaqtida past priority'li ishlarni bajarish uchun.
 
-9. **Starvation** — recursive microtask'lar browser'ni muzlatadi. `setTimeout` yoki `setImmediate` bilan oldini oling.
+9. **Node.js** Event Loop 6 fazadan iborat, `process.nextTick` eng yuqori priority, `setImmediate` check fazada ishlaydi.
 
-10. **UI blocking** — og'ir hisoblashni batch'larga bo'ling, Web Worker ishlating, yoki requestAnimationFrame bilan render sikliga sinxronlang.
+10. **Starvation** — recursive microtask'lar browser'ni muzlatadi. `setTimeout` yoki `setImmediate` bilan oldini oling.
 
-### Event Loop Mental Model
+---
 
-```
-┌────────────────────────────────────────────────────────┐
-│                    EVENT LOOP                          │
-│                                                        │
-│   🔄 Cheksiz Loop:                                    │
-│                                                        │
-│   [Sync Code]                     ← Birinchi: HAMMASI │
-│        ↓                                               │
-│   [Microtask Queue]               ← BARCHASI          │
-│   (Promise, queueMicrotask)          bajariladi        │
-│        ↓                                               │
-│   [Macrotask Queue]               ← BITTASI           │
-│   (setTimeout, setInterval)          bajariladi        │
-│        ↓                                               │
-│   [Render]                        ← Kerak bo'lsa      │
-│   (rAF, style, layout, paint)                          │
-│        ↓                                               │
-│   [Microtask Queue]               ← Yana tekshir      │
-│        ↓                                               │
-│   ... takrorlanadi ...                                 │
-└────────────────────────────────────────────────────────┘
-```
-
-### Keyingi Qadam
-
-Event Loop ni tushunganingizdan keyin, keyingi bo'limlarda biz async JavaScript'ning asosiy qurollarini o'rganamiz:
-- [Bo'lim 12: Promises](12-promises.md) — async operatsiyalarni boshqarish
-- [Bo'lim 13: Async/Await](13-async-await.md) — zamonaviy async syntax
-
-Shuningdek, qayta ko'rib chiqing:
-- [Bo'lim 1: JS Engine](01-js-engine.md) — Call Stack va Memory Heap haqida
+**Keyingi bo'lim:** [12-promises.md](12-promises.md) — Promises: state machine (pending → fulfilled | rejected), Promise constructor, `.then()/.catch()/.finally()` chaining, static methods (`Promise.all`, `Promise.race`, `Promise.allSettled`, `Promise.any`, `Promise.withResolvers`), error propagation, va under the hood microtask queue bilan aloqasi.

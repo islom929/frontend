@@ -20,6 +20,7 @@
 - [`arguments` Object](#arguments-object)
 - [Rest Parameters vs Arguments](#rest-parameters-vs-arguments)
 - [Default Parameters](#default-parameters)
+- [Function `name` va `length` Properties](#function-name-va-length-properties)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -1208,6 +1209,34 @@ const addTo3 = sum.bind(null, 1, 2); // a=1, b=2 oldindan berildi
 addTo3(3); // 6 — faqat c berildi
 ```
 
+### Under the Hood
+
+Partial application ichida closure mexanizmi ishlaydi — oldindan berilgan argumentlar closure orqali saqlanadi va keyingi chaqiruvda ular bilan birlashtirilib original funksiyaga uzatiladi.
+
+`Function.prototype.bind` — JavaScript'ning built-in partial application mexanizmi. `bind` yangi funksiya yaratadi va ichida quyidagilarni saqlaydi:
+
+```
+bind(thisArg, arg1, arg2) chaqirilganda:
+
+┌──────────────────────────────────────────────┐
+│  BoundFunction Object                         │
+│                                               │
+│  [[BoundTargetFunction]]: originalFn          │ ← asl funksiya
+│  [[BoundThis]]:          thisArg              │ ← this kontekst
+│  [[BoundArguments]]:     [arg1, arg2]         │ ← oldindan berilgan args
+│                                               │
+│  Chaqirilganda:                               │
+│  1. [[BoundArguments]] + yangi args birlashadi│
+│  2. originalFn.apply(thisArg, allArgs)        │
+└──────────────────────────────────────────────┘
+
+Misol: log.bind(null, "ERROR")
+  → BoundFunction { targetFn: log, boundArgs: ["ERROR"] }
+  → Chaqirilganda: log("ERROR", ...qolganArgs)
+```
+
+Custom `partial` funksiyasi (placeholder bilan) ham xuddi shu prinsipda ishlaydi — lekin `bind` dan farqli, u argumentlarning **istalgan pozitsiyasida** placeholder qo'yish imkonini beradi. Bu closures'ning amaliy qo'llanishi — [05-closures.md](05-closures.md) dagi mexanizm bu yerda to'g'ridan-to'g'ri ishlatilmoqda.
+
 ### Kod Misollari
 
 **`bind` bilan partial application:**
@@ -2231,6 +2260,155 @@ transferMoney();                            // Error: "from" parametri majburiy!
 
 ---
 
+## Function `name` va `length` Properties
+
+### Nazariya
+
+Har bir funksiya object bo'lgani uchun ([First-Class Functions](#first-class-functions) bo'limida tushuntirilganidek), unda **avtomatik xususiyatlar** mavjud. Bulardan ikkitasi debugging va meta-programming uchun juda foydali: `name` — funksiyaning nomi (string), va `length` — **kutilayotgan parametrlar soni** (rest parametrlarni hisoblamasdan).
+
+**`name` property** — funksiyaning **debug-friendly** nomi. Bu DevTools call stack'da, error stack trace'da, va `console.log` da funksiyani identifikatsiya qilish uchun ishlatiladi. Anonymous funksiyalar ham kontekstga qarab nom olishi mumkin — bu ES6 da kiritilgan **name inference** mexanizmi.
+
+**`length` property** — funksiyaning e'lon qilingan **majburiy parametrlari** soni. Bu rest parameters (`...args`) va default value bilan berilgan parametrlarni **hisoblamaydi**. `length` meta-programming da, masalan `curry` funksiyasida, kerakli argumentlar sonini aniqlash uchun ishlatiladi — yuqoridagi [Currying](#currying) bo'limidagi `curry` implementatsiyamiz aynan `fn.length` ga tayanadi.
+
+### Under the Hood
+
+ECMAScript spec bo'yicha `name` va `length` — bu funksiya yaratilganda engine tomonidan avtomatik o'rnatiladigan xususiyatlar. Ikkisi ham `configurable: true` (o'zgartirilishi mumkin), lekin `writable: false` (to'g'ridan-to'g'ri assign bilan o'zgartirib bo'lmaydi).
+
+```
+Function Object Properties (auto-generated):
+
+┌────────────────────────────────────────────────────────────┐
+│  name property:                                             │
+│  ├── Function Declaration:  function greet() {}             │
+│  │   → name = "greet"                                       │
+│  ├── Named Expression:  const f = function myFn() {}        │
+│  │   → name = "myFn" (expression nomi ustunlik qiladi)      │
+│  ├── Anonymous + assign:  const f = function() {}           │
+│  │   → name = "f" (ES6 name inference — o'zgaruvchidan)     │
+│  ├── Arrow + assign:  const f = () => {}                    │
+│  │   → name = "f" (ES6 name inference)                      │
+│  ├── Method:  { greet() {} }                                │
+│  │   → name = "greet"                                       │
+│  ├── Computed:  { ["say" + "Hi"]() {} }                     │
+│  │   → name = "sayHi"                                       │
+│  ├── Symbol:  { [Symbol.iterator]() {} }                    │
+│  │   → name = "[Symbol.iterator]"                           │
+│  ├── bind():  greet.bind(null)                              │
+│  │   → name = "bound greet"                                 │
+│  └── new Function("a", "return a"):                         │
+│      → name = "anonymous"                                   │
+├────────────────────────────────────────────────────────────┤
+│  length property:                                           │
+│  ├── Hisoblanadi: oddiy parametrlar                         │
+│  ├── Hisoblanmaydi: rest (...args)                          │
+│  ├── Hisoblanmaydi: default (param = value) va undan keyin  │
+│  │                                                          │
+│  │  function f(a, b, c)        → length = 3                 │
+│  │  function f(a, b, ...rest)  → length = 2                 │
+│  │  function f(a, b = 1, c)    → length = 1 (!)             │
+│  │  function f(...args)        → length = 0                 │
+│  │  function f(a, b = 1)       → length = 1                 │
+│  └────────────────────────────────────────────────────────  │
+└────────────────────────────────────────────────────────────┘
+```
+
+`length` ning default parameter qoidasi diqqatga sazovor: birinchi default parameter **va undan keyingi barcha parametrlar** hisoblanmaydi. Ya'ni `function f(a, b = 1, c)` da `length = 1` — `b` default bo'lgani uchun hisoblanmaydi, `c` esa `b` dan keyin kelgani uchun hisoblanmaydi (hatto `c` da default yo'q bo'lsa ham).
+
+### Kod Misollari
+
+**`name` property — turli holatlarda:**
+
+```javascript
+// Function Declaration
+function calculateTax(income) { return income * 0.12; }
+console.log(calculateTax.name); // "calculateTax"
+
+// Named Function Expression — expression nomi ustunlik qiladi
+const calc = function calculateTaxFn(income) { return income * 0.12; };
+console.log(calc.name); // "calculateTaxFn" — o'zgaruvchi nomi emas!
+
+// Anonymous + assign — ES6 name inference
+const double = function(x) { return x * 2; };
+console.log(double.name); // "double" — o'zgaruvchi nomidan oldi
+
+// Arrow function
+const triple = (x) => x * 3;
+console.log(triple.name); // "triple"
+
+// Object method
+const user = {
+  greet() { return "salom"; },
+  ["say" + "Bye"]() { return "xayr"; }
+};
+console.log(user.greet.name);  // "greet"
+console.log(user.sayBye.name); // "sayBye" — computed property'dan
+
+// bind()
+const boundGreet = user.greet.bind(null);
+console.log(boundGreet.name); // "bound greet" — "bound " prefiksi
+
+// new Function
+const dynamic = new Function("a", "return a * 2");
+console.log(dynamic.name); // "anonymous"
+```
+
+**`length` property — parametrlar soni:**
+
+```javascript
+function noParams() {}
+function oneParam(a) {}
+function threeParams(a, b, c) {}
+function withRest(a, b, ...rest) {}
+function withDefault(a, b = 10) {}
+function defaultFirst(a = 1, b, c) {}
+
+console.log(noParams.length);     // 0
+console.log(oneParam.length);     // 1
+console.log(threeParams.length);  // 3
+console.log(withRest.length);     // 2 — rest hisoblanmaydi
+console.log(withDefault.length);  // 1 — b default, shuning uchun hisoblanmaydi
+console.log(defaultFirst.length); // 0 — a default, b va c ham hisoblanmaydi!
+```
+
+**Real-world: `length` ni `curry` da ishlatish:**
+
+```javascript
+// Yuqoridagi curry implementatsiyamiz fn.length ga tayanadi:
+function curry(fn) {
+  return function curried(...args) {
+    if (args.length >= fn.length) { // ← fn.length — kerakli argumentlar soni
+      return fn.apply(this, args);
+    }
+    return (...moreArgs) => curried(...args, ...moreArgs);
+  };
+}
+
+function add(a, b, c) { return a + b + c; }
+console.log(add.length); // 3 — curry shu raqamga qaraydi
+
+const curriedAdd = curry(add);
+curriedAdd(1)(2)(3); // 6 — 3 ta argument to'planganda chaqiradi
+```
+
+**Debugging uchun `name`:**
+
+```javascript
+// Error stack trace da funksiya nomi ko'rinadi:
+const handlers = {
+  // Anonymous — stack trace da "anonymous" yoki "<anonymous>"
+  bad: function() { throw new Error("xato"); },
+
+  // Named — stack trace da "handleUserCreate" ko'rinadi
+  good: function handleUserCreate() { throw new Error("xato"); }
+};
+
+// DevTools da:
+// bad():  Error at Object.<anonymous> (file.js:2)
+// good(): Error at handleUserCreate (file.js:5)  ← ancha foydali!
+```
+
+---
+
 ## Common Mistakes
 
 ### ❌ Xato 1: Arrow function ni object method sifatida ishlatish
@@ -2793,7 +2971,10 @@ Bu bo'limda biz JavaScript Functions ning **barcha muhim tomonlarini** ko'rib ch
 | **arguments Object** | Array-like, arrow'da yo'q — bugun rest parameters ishlatamiz |
 | **Rest Parameters** | `...args` — haqiqiy Array, zamonaviy usul |
 | **Default Parameters** | `param = default` — faqat `undefined` da ishga tushadi |
+| **name va length** | `name` — debugging uchun; `length` — majburiy parametrlar soni (curry'da ishlatiladi) |
 
 **Functional programming paradigmasi** JavaScript'ning kuchli tarafi. Bu bo'limdagi pattern'lar — currying, composition, memoization, HOF — bular **production kodda** har kuni ishlatiladi. Ularni chuqur tushunish sizni **professional JavaScript developer** ga aylantiradi.
 
-Keyingi bo'limda biz `this` keyword'ni chuqur o'rganamiz — [10-this-keyword.md](10-this-keyword.md).
+---
+
+**Keyingi bo'lim:** [10-this-keyword.md](10-this-keyword.md) — `this` keyword mastery: 4 ta binding rule (new, explicit, implicit, default), `call`/`apply`/`bind` farqi, arrow function va lexical `this`, `this` yo'qotish muammolari va yechimlari.

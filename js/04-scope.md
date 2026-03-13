@@ -1,69 +1,88 @@
 # Bo'lim 4: Scope Chain
 
-> Scope — o'zgaruvchilarning "ko'rinish sohasi". Engine o'zgaruvchini qayerdan qidirishini aynan scope belgilaydi.
+> Scope — o'zgaruvchilar va funksiyalarning kodning qaysi qismida accessible ekanligini belgilaydigan qoidalar to'plami. JavaScript lexical scoping ishlatadi — scope kod **yozilgan** joyga qarab, compile-time da aniqlanadi.
 
 ---
 
 ## Mundarija
 
-- [Scope Nima?](#scope-nima)
+- [Scope Nima](#scope-nima)
 - [Global Scope](#global-scope)
 - [Function Scope](#function-scope)
 - [Block Scope](#block-scope)
 - [Lexical Scope (Static Scope)](#lexical-scope-static-scope)
 - [Dynamic Scope vs Lexical Scope](#dynamic-scope-vs-lexical-scope)
 - [Scope Chain](#scope-chain)
-- [Scope Chain va Execution Context](#scope-chain-va-execution-context)
+- [Scope Chain va Execution Context Bog'liqligi](#scope-chain-va-execution-context-bogliqligi)
 - [Variable Shadowing](#variable-shadowing)
 - [Variable Lookup](#variable-lookup)
+- [Strict Mode](#strict-mode)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
 
 ---
 
-## Scope Nima?
+## Scope Nima
 
 ### Nazariya
 
-Scope — bu o'zgaruvchilar, funksiyalar va ob'ektlarning **ko'rinish (accessibility) sohasi**. Ya'ni kodning qaysi qismida qaysi o'zgaruvchiga kirish mumkinligi aniq qoidalar bilan belgilangan.
+Scope — o'zgaruvchilar, funksiyalar va class'larning **accessibility (kirish mumkinlik) chegarasi**. Har bir o'zgaruvchi qandaydir scope ichida e'lon qilinadi va faqat shu scope (va uning ichki scope'lari) dan ko'rinadi.
 
-Nima uchun scope kerak? Tasavvur qiling, 10 ming qatordan iborat dasturda barcha o'zgaruvchilar hamma joydan ko'rinsa — nomlar to'qnashadi, kutilmagan qayta yozishlar sodir bo'ladi, xatolarni topish imkonsiz bo'lib qoladi. Scope bu muammoni hal qiladi: u o'zgaruvchilarni **izolyatsiya** qiladi, ya'ni har bir kod bloki faqat o'ziga tegishli o'zgaruvchilarni ko'radi.
+Scope'ning mavjud bo'lishiga sabab — **encapsulation** (ma'lumotni ajratish). Agar barcha o'zgaruvchilar hamma joydan ko'rinadigan bo'lsa, nomlar to'qnashuvi (name collision) muqarrar bo'ladi. Scope tizimi har bir kod blokiga o'z "xotira maydoni" beradi — bu maydon ichidagi nomlar tashqariga chiqmaydi.
 
-Buni **xonalar** ga o'xshatish mumkin. Uy ichida turli xonalar bor — har bir xonada o'z buyumlari. Oshxonadagi pichoq yotoqxonada ko'rinmaydi. Lekin umumiy koridor (global scope) dan barcha xonalarga kirish mumkin. Xuddi shunday, funksiya ichidagi o'zgaruvchi tashqaridan ko'rinmaydi, lekin global o'zgaruvchilar hamma joydan ko'rinadi.
+JavaScript da uchta asosiy scope turi mavjud:
 
-Scope JavaScript'ning eng fundamental tushunchalaridan biri — closure, hoisting, module pattern va boshqa ko'plab tushunchalar scope mexanizmiga asoslanadi. Scope qoidalarini chuqur tushunish kodning xatti-harakatini oldindan aytib berishga imkon beradi.
+1. **Global Scope** — script'ning eng yuqori darajasi, hamma joydan accessible
+2. **Function Scope** — funksiya tanasi ichida yaratiladi, faqat shu funksiya ichidan ko'rinadi
+3. **Block Scope** — `{}` qavslar ichida `let`/`const` bilan yaratiladi (ES6+)
+
+Bu uch tur bir-birining ichiga joylashishi (nesting) mumkin — natijada **scope chain** (scope zanjiri) hosil bo'ladi.
+
+### Under the Hood
+
+ECMAScript spetsifikatsiyasida scope tushunchasi **Environment Record** orqali implement qilingan. Har bir scope uchun yangi Environment Record yaratiladi. Bu record ichida shu scope'dagi barcha binding'lar (o'zgaruvchi-qiymat juftliklari) saqlanadi.
+
+```
+Scope turlari va Environment Record aloqasi:
+
+Global Scope     →  Global Environment Record (Object + Declarative)
+Function Scope   →  Function Environment Record (Declarative)
+Block Scope      →  Declarative Environment Record
+Module Scope     →  Module Environment Record (Declarative)
+```
+
+Global Environment Record ikki qismdan iborat:
+- **Object Environment Record** — `var` va `function` declaration'lar bu yerda, global object (`window`/`globalThis`) ning property'lari sifatida
+- **Declarative Environment Record** — `let`, `const`, `class` declaration'lar bu yerda, global object'ga tushMAYDI
+
+### Kod Misollari
+
+Uchta scope turini bir misolda ko'rsatadigan kod:
 
 ```javascript
-function greet() {
-  let message = "Salom";  // message faqat greet() ICHIDA ko'rinadi
-  console.log(message);    // ✅ "Salom"
+// ── Global Scope ──
+const appName = "MyApp";
+
+function processUser(name) {
+  // ── Function Scope ──
+  const prefix = "User";
+
+  if (name.length > 0) {
+    // ── Block Scope ──
+    const fullName = `${prefix}: ${name}`;
+    console.log(fullName); // ✅ "User: Alice" — block ichida accessible
+  }
+
+  // console.log(fullName);
+  // ❌ ReferenceError — fullName block scope'da, bu yerda ko'rinmaydi
+
+  console.log(prefix); // ✅ "User" — function scope ichida
 }
 
-greet();
-console.log(message);      // ❌ ReferenceError — message bu yerda ko'rinMAYDI
-```
-
-### Scope Turlari
-
-JavaScript da **3 xil** scope bor:
-
-```
-┌──────────────────────────────────────────────────┐
-│  GLOBAL SCOPE                                     │
-│  (hamma joydan ko'rinadi)                        │
-│                                                   │
-│   ┌──────────────────────────────────────────┐   │
-│   │  FUNCTION SCOPE                           │   │
-│   │  (faqat funksiya ichida)                  │   │
-│   │                                           │   │
-│   │   ┌──────────────────────────────────┐   │   │
-│   │   │  BLOCK SCOPE                      │   │   │
-│   │   │  (faqat {} ichida — let/const)    │   │   │
-│   │   └──────────────────────────────────┘   │   │
-│   └──────────────────────────────────────────┘   │
-│                                                   │
-└──────────────────────────────────────────────────┘
+processUser("Alice");
+// console.log(prefix);
+// ❌ ReferenceError — prefix function scope'da, global'da ko'rinmaydi
 ```
 
 ---
@@ -72,73 +91,69 @@ JavaScript da **3 xil** scope bor:
 
 ### Nazariya
 
-Global scope — eng tashqi, eng keng scope. Bu yerda e'lon qilingan o'zgaruvchilar **istalgan joydan** — istalgan funksiya, istalgan block ichidan ko'rinadi. Dastur ishga tushganda Global Execution Context yaratiladi va aynan shu EC ning environment'i global scope'ni hosil qiladi.
+Global scope — script'ning eng tashqi qatlami. Bu yerda e'lon qilingan o'zgaruvchilar dasturning **istalgan joyidan** accessible — barcha funksiyalar, barcha bloklar, barcha modullar (module scope'dan tashqari) ichidan ko'rinadi.
 
-Global scope qulay bo'lsa-da, u **xavfli**. Katta loyihalarda, ayniqsa ko'p kutubxonalar ishlatilganda, global scope "ifloslangan" bo'lishi mumkin: turli fayllar va kutubxonalar bir xil nomli global o'zgaruvchilar yaratishi va bir-birini kutilmagan tarzda qayta yozishi mumkin. Bu muammo JavaScript tarixida shunchalik jiddiy ediki, uni hal qilish uchun avval IIFE (Immediately Invoked Function Expression) pattern, keyin esa ES6 modullar tizimi yaratildi. Zamonaviy kodda global scope'ni imkon qadar **toza** saqlash — professional dasturlashning asosiy qoidasi.
+Global scope'da ikki xil narsa saqlanadi:
 
-```javascript
-// Global scope
-var globalVar = "men global var man";
-let globalLet = "men global let man";
-const GLOBAL_CONST = "men global const man";
+1. **`var` va `function` declaration'lar** — global object (`window` browser'da, `global` Node.js da) ning property'lariga aylanadi
+2. **`let`, `const`, `class` declaration'lar** — global scope'da mavjud, lekin global object'ning property'si bo'lMAYDI
 
-function anywhere() {
-  // Funksiya ichidan ko'rinadi
-  console.log(globalVar);    // ✅ "men global var man"
-  console.log(globalLet);    // ✅ "men global let man"
-  console.log(GLOBAL_CONST); // ✅ "men global const man"
+Bu farq juda muhim — `var` bilan e'lon qilingan global o'zgaruvchi `window.variableName` orqali ham accessible, `let`/`const` bilan e'lon qilingan esa faqat identifier orqali.
 
-  if (true) {
-    // Block ichidan ham ko'rinadi
-    console.log(globalVar);  // ✅
-  }
-}
+**`globalThis` (ES2020)** — cross-environment global object'ga murojaat qilish uchun standart yo'l. Browser'da `globalThis === window`, Node.js da `globalThis === global`, Web Worker'da `globalThis === self`. ES2020 dan oldin har bir environment uchun alohida nom ishlatish kerak edi.
 
-anywhere();
+### Under the Hood
+
+Global scope'ning Environment Record tuzilishi:
+
+```
+Global Environment Record
+├── Object Environment Record (bindingObject = globalThis)
+│   ├── var message = "hello"     → globalThis.message = "hello"
+│   ├── function greet() {...}    → globalThis.greet = function(){...}
+│   └── [built-ins: parseInt, Math, JSON, ...]
+│
+├── Declarative Environment Record
+│   ├── let count = 0             → faqat identifier orqali accessible
+│   ├── const PI = 3.14           → faqat identifier orqali accessible
+│   └── class User {...}          → faqat identifier orqali accessible
+│
+└── [[GlobalThisValue]] → globalThis object
 ```
 
-### Global Scope Muammolari
+`var` global declaration nima uchun `globalThis` property bo'ladi? ECMAScript spec bo'yicha global code'dagi `var` statement **CreateGlobalVarBinding** abstract operation ni chaqiradi — bu operation global object'ga property qo'shadi. `let`/`const` esa **CreateGlobalLetBinding** ni chaqiradi — bu global object'ga tegmaydi, faqat declarative record'ga yozadi.
 
-Global scope kuchli, lekin **xavfli**:
+### Kod Misollari
+
+`var` vs `let`/`const` ning global scope'dagi farqi:
 
 ```javascript
-// ❌ Muammo 1: Name collision
-var count = 0;
+var oldWay = "var bilan";
+let newWay = "let bilan";
+const alsoNew = "const bilan";
 
-// ... 500 satr keyinroq yoki boshqa faylda ...
-var count = "hello"; // Birinchi count yo'q bo'ldi!
+console.log(globalThis.oldWay);   // ✅ "var bilan" — window property
+console.log(globalThis.newWay);   // ✅ undefined — window property EMAS
+console.log(globalThis.alsoNew);  // ✅ undefined — window property EMAS
 
-// ❌ Muammo 2: Ifloslantirish (Global Namespace Pollution)
-var temp = 1;
-var data = [];
-var result = null;
-// Bular hammasi window ga tushadi — boshqa kutubxonalar bilan to'qnashishi mumkin
-
-// ❌ Muammo 3: var → window property
-var myApp = "config";
-// Uchinchi tomon kutubxonasi ham window.myApp ishlatsa — MUAMMO
+// globalThis turli environment larda
+console.log(globalThis === window);  // ✅ true (browser)
+console.log(globalThis === global);  // ✅ true (Node.js)
+console.log(globalThis === self);    // ✅ true (Web Worker)
 ```
 
-### Yechim — Scope ni cheklash
+Global scope pollution muammosi — uchinchi tomon kutubxona ham global'da nom e'lon qilsa, to'qnashuv bo'ladi:
 
 ```javascript
-// ✅ IIFE bilan scope yaratish (eski usul)
-(function() {
-  var privateVar = "xavfsiz";
-  // bu yerda global scope ifloslanmaydi
-})();
+// kutubxona-A.js
+var utils = { format: () => "A" };
 
-// ✅ Module bilan (zamonaviy usul)
-// module.js
-export const config = { port: 3000 };
-// Bu global scope ga tushMAYDI
+// kutubxona-B.js
+var utils = { format: () => "B" };
+// ❌ utils o'zgaruvchisi qayta yozildi — kutubxona-A ishlashdan to'xtadi
 
-// ✅ Block scope bilan
-{
-  let temp = "xavfsiz";
-  const data = [];
-  // block tugaganda ular yo'qoladi
-}
+// Yechim: modullar yoki IIFE orqali scope ajratish
+// (batafsil 15-modules.md da)
 ```
 
 ---
@@ -147,72 +162,69 @@ export const config = { port: 3000 };
 
 ### Nazariya
 
-Function scope — funksiya ichida e'lon qilingan o'zgaruvchilarning **faqat shu funksiya ichidan** ko'rinadigan sohasi. Funksiya tugaganda — uning scope'i yo'qoladi va undagi barcha local o'zgaruvchilar garbage collection uchun tayyor bo'ladi (agar closure yo'q bo'lsa).
+Function scope — funksiya tanasi (`{ }`) ichida yaratiladi. Funksiya ichida `var` bilan e'lon qilingan o'zgaruvchilar **faqat shu funksiya ichidan** accessible. Funksiya tashqarisidan ularga murojaat qilish imkonsiz — `ReferenceError` beradi.
 
-Function scope JavaScript'ning eng asosiy izolyatsiya mexanizmi. ES6 dan oldin JavaScript'da **faqat** function scope bor edi (block scope yo'q edi). Shu sababli dasturchilar o'zgaruvchilarni izolyatsiya qilish uchun IIFE (Immediately Invoked Function Expression) ishlatishgan — bu aslida sun'iy ravishda function scope yaratish edi.
+`var` keyword **faqat function scope** ni tan oladi — block scope (`if`, `for`, `while`) ni tanimaydi. Bu `var` ning eng asosiy xususiyati va ko'plab xatolarga sabab bo'ladigan xulq-atvori.
 
-Muhim nuqta: `var`, `let`, `const` — **uchala** keyword ham function scope'ni hurmat qiladi. Ya'ni ular funksiya ichida e'lon qilinsa, tashqaridan ko'rinmaydi. Farq shundaki `var` **faqat** function scope'ni tan oladi (block scope'ni e'tiborsiz qoldiradi), `let` va `const` esa ham function, ham block scope'ni tushunadi.
+Funksiya parametrlari ham function scope'ga tegishli — ular shu funksiyaning local o'zgaruvchilari hisoblanadi.
 
-```javascript
-function calculate() {
-  var x = 10;       // function scope
-  let y = 20;       // function scope (va block scope ham)
-  const z = 30;     // function scope (va block scope ham)
+Har bir funksiya chaqiruvi **yangi scope** yaratadi. Bitta funksiya 10 marta chaqirilsa — 10 ta alohida function scope hosil bo'ladi, har birida o'z local o'zgaruvchilari.
 
-  console.log(x, y, z); // ✅ 10, 20, 30
-}
+### Under the Hood
 
-calculate();
-console.log(x); // ❌ ReferenceError — x function ichida qoldi
-console.log(y); // ❌ ReferenceError
-console.log(z); // ❌ ReferenceError
+Funksiya chaqirilganda engine yangi **Function Execution Context** yaratadi. Bu context'ning **VariableEnvironment** component'ida `var` declaration'lar, **LexicalEnvironment** component'ida `let`/`const` declaration'lar saqlanadi.
+
+```
+processOrder() chaqirilganda:
+
+Function Execution Context
+├── VariableEnvironment (Function Environment Record)
+│   ├── arguments: Arguments object
+│   ├── orderId: undefined → keyin 42
+│   └── var bilan e'lon qilingan boshqa o'zgaruvchilar
+│
+├── LexicalEnvironment (Function Environment Record)
+│   ├── let/const bilan e'lon qilinganlar
+│   └── [[OuterEnv]] → Global Environment Record
+│
+└── ThisBinding → (chaqiruv kontekstiga qarab)
 ```
 
-### Har Bir Funksiya Chaqiruvi — Yangi Scope
+`var` ning function scope xulq-atvori tufayli, agar `if` block ichida `var` ishlatilsa, u function scope'ga "ko'tariladi" (hoist bo'ladi):
+
+### Kod Misollari
+
+`var` ning function scope xulq-atvori:
+
+```javascript
+function checkAge(age) {
+  if (age >= 18) {
+    var status = "adult";
+    // ✅ var → function scope, if block uni cheklamaydi
+  }
+
+  console.log(status);
+  // ✅ "adult" — var function scope'da, if tashqarisida ham ko'rinadi
+  // agar age < 18 bo'lsa → undefined (hoist bo'lgan, assign bo'lmagan)
+}
+
+checkAge(25); // "adult"
+checkAge(15); // undefined — xato EMAS, faqat undefined
+```
+
+Har bir funksiya chaqiruvi alohida scope yaratadi:
 
 ```javascript
 function counter() {
-  var count = 0;  // HAR CHAQIRUVDA yangi scope, yangi count
+  var count = 0;
   count++;
   return count;
 }
 
-counter(); // 1 — yangi scope: count = 0 → 1
-counter(); // 1 — yana yangi scope: count = 0 → 1 (oldingi yo'q bo'lgan)
-counter(); // 1 — har safar 1
+console.log(counter()); // 1
+console.log(counter()); // 1 — har chaqiruvda YANGI scope, yangi count
+// ✅ oldingi chaqiruvdagi count yo'q bo'lgan — yangi EC yaratildi
 ```
-
-### Nested Functions — Ichki Funksiyalar
-
-Ichki funksiya tashqi funksiyaning o'zgaruvchilarini **ko'ra oladi**:
-
-```javascript
-function outer() {
-  var outerVar = "tashqi";
-
-  function inner() {
-    var innerVar = "ichki";
-    console.log(outerVar); // ✅ "tashqi" — ichki tashqini ko'radi
-    console.log(innerVar); // ✅ "ichki"
-  }
-
-  inner();
-  console.log(outerVar);   // ✅ "tashqi"
-  console.log(innerVar);   // ❌ ReferenceError — tashqi ichkini ko'rmaydi!
-}
-```
-
-```
-outer() scope:
-  outerVar: "tashqi"
-  inner: function
-  │
-  └── inner() scope:
-        innerVar: "ichki"
-        outerVar ga kirish: ✅ (scope chain orqali)
-```
-
-**Qoida:** Ichki scope tashqini **ko'radi**. Tashqi scope ichkini **ko'rmaydi**. Faqat ichdan tashqariga — bir tomonlama.
 
 ---
 
@@ -220,82 +232,88 @@ outer() scope:
 
 ### Nazariya
 
-Block scope — `{}` (curly braces) ichida yaratilgan scope. Bu ES6 (2015) da `let` va `const` bilan birga kiritilgan tushuncha bo'lib, JavaScript'ning scope tizimini sezilarli darajada kuchaytirdi.
+Block scope — `{}` qavslar (curly braces) ichida `let` yoki `const` bilan e'lon qilingan o'zgaruvchilar **faqat shu block ichida** accessible bo'lishi. Bu ES6 (2015) da kiritilgan — undan oldin JavaScript da block scope mavjud emas edi, faqat function scope bor edi.
 
-Nima uchun block scope kerak bo'ldi? ES6 dan oldin JavaScript'da faqat function scope bor edi. Buning natijasida `for` loop ichida `var` bilan e'lon qilingan `i` o'zgaruvchisi loop'dan tashqarida ham yashab qolardi — bu ko'plab kutilmagan xatolarga sabab bo'lardi (masalan, klassik closure-in-loop muammosi). Block scope bu muammoni hal qildi: `let` va `const` har bir `{}` blok ichida yangi scope yaratadi va o'zgaruvchilar o'sha blokdan chiqmaydi.
+Block scope yaratadigan konstruktsiyalar:
+- `if / else if / else` bloklari
+- `for`, `for...in`, `for...of` loop'lari
+- `while`, `do...while` loop'lari
+- `switch` statement
+- `try / catch / finally` bloklari
+- Oddiy `{}` — standalone block (block statement)
 
-`var` block scope'ni **tushunmaydi** — u `if`, `for`, `while` ichida e'lon qilinsa ham function yoki global scope'ga "chiqib ketadi". `let` va `const` esa block scope'ni to'liq hurmat qiladi.
+`var` keyword block scope'ni **tanimaydi** — u faqat function scope ni ko'radi. Shu sababli `let`/`const` ning block scope'da ishlashi `var` dan tubdan farq qiladi.
 
-Block: `if`, `for`, `while`, `switch`, yoki oddiy `{}`
+`for` loop'da `let` ishlatilganida har bir iteratsiya uchun **yangi block scope** yaratiladi — bu closure bilan ishlashda juda muhim farq (batafsil [05-closures.md](05-closures.md) da).
 
-```javascript
-// if block
-if (true) {
-  var a = 1;     // ❌ var block dan CHIQADI (function scope)
-  let b = 2;     // ✅ block ichida qoladi
-  const c = 3;   // ✅ block ichida qoladi
-}
+### Under the Hood
 
-console.log(a); // 1 — var chiqdi
-console.log(b); // ❌ ReferenceError — let qoldi
-console.log(c); // ❌ ReferenceError — const qoldi
+Engine block scope uchun yangi **Declarative Environment Record** yaratadi. Bu record joriy execution context'ning LexicalEnvironment'iga ulanadi. Block tugaganda bu record yo'qoladi (GC tomonidan tozalanadi, agar closure reference saqlamasa).
+
+```
+for (let i = 0; i < 3; i++) — har bir iteratsiyada:
+
+Iteratsiya 0:
+  Block Environment Record { i: 0 }
+    └── [[OuterEnv]] → Function/Global Environment Record
+
+Iteratsiya 1:
+  Block Environment Record { i: 1 }  ← YANGI record
+    └── [[OuterEnv]] → Function/Global Environment Record
+
+Iteratsiya 2:
+  Block Environment Record { i: 2 }  ← YANGI record
+    └── [[OuterEnv]] → Function/Global Environment Record
 ```
 
-### for Loop da
+`var` bilan `for` da faqat **bitta** binding yaratiladi — barcha iteratsiyalar shu bitta `i` ni ko'radi. `let` bilan har iteratsiya **yangi** binding oladi — har biri o'z `i` qiymatiga ega.
+
+### Kod Misollari
+
+Block scope ning amaliy farqi:
 
 ```javascript
-// var bilan — BITTA instance
+function showItems(items) {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    console.log(item);
+  }
+
+  // console.log(i);
+  // ❌ ReferenceError — i faqat for block ichida (let)
+
+  // console.log(item);
+  // ❌ ReferenceError — item faqat for body ichida (const)
+}
+```
+
+`var` vs `let` — loop + async muammosi:
+
+```javascript
+// ❌ var bilan — barcha callback'lar bitta i ni ko'radi
 for (var i = 0; i < 3; i++) {
-  // i butun function/global scope da
+  setTimeout(() => console.log(i), 100);
 }
-console.log(i); // 3 — var block dan chiqdi
+// Output: 3, 3, 3
+// ✅ Sabab: var function-scoped, bitta binding — loop tugaganda i = 3
 
-// let bilan — HAR ITERATSIYADA yangi instance
-for (let j = 0; j < 3; j++) {
-  // j faqat bu iteration'ning block scope'ida
+// ✅ let bilan — har iteratsiya o'z i binding'iga ega
+for (let i = 0; i < 3; i++) {
+  setTimeout(() => console.log(i), 100);
 }
-console.log(j); // ❌ ReferenceError — let block da qoldi
+// Output: 0, 1, 2
+// ✅ Sabab: let block-scoped, har iteratsiyada yangi binding yaratiladi
 ```
 
-### Oddiy Block
+Standalone block statement:
 
 ```javascript
-// Oddiy {} ham scope yaratadi (let/const uchun)
 {
-  let secret = "maxfiy";
-  const API_KEY = "abc123";
-  var exposed = "oshkor";   // ❌ var chiqib ketadi
+  const temp = computeValue();
+  processResult(temp);
 }
-
-console.log(secret);   // ❌ ReferenceError
-console.log(API_KEY);  // ❌ ReferenceError
-console.log(exposed);  // "oshkor" — var chiqdi
-```
-
-### switch da Block Scope
-
-```javascript
-// ❌ switch da scope muammosi
-switch (action) {
-  case "create":
-    let result = create(); // result bu case da
-    break;
-  case "delete":
-    let result = remove(); // ❌ SyntaxError: result allaqachon e'lon qilingan!
-    break;
-}
-
-// ✅ To'g'ri usul — har bir case ni {} bilan o'rash
-switch (action) {
-  case "create": {
-    let result = create(); // bu block scope'da
-    break;
-  }
-  case "delete": {
-    let result = remove(); // bu BOSHQA block scope'da — ✅
-    break;
-  }
-}
+// temp bu yerda ko'rinmaydi — scope tugadi
+// ✅ Foyda: vaqtinchalik o'zgaruvchilar tashqi scope'ni ifloslamaydi
 ```
 
 ---
@@ -304,72 +322,86 @@ switch (action) {
 
 ### Nazariya
 
-JavaScript **Lexical Scope** (yoki **Static Scope**) ishlatadi. Bu JavaScript'ning scope tizimini belgilaydigan eng muhim qoida:
+Lexical scope (yoki static scope) — scope'ning **kod yozilgan pozitsiyaga** qarab aniqlanishi. JavaScript lexical scoping ishlatadi — funksiyaning scope'i u **define qilingan** joyga bog'liq, **chaqirilgan** joyga emas.
 
-> O'zgaruvchining scope'i **kodda yozilgan joyiga** qarab aniqlanadi — **chaqirilgan joyiga** qarab emas.
+"Lexical" so'zi "leksik analiz" (lexical analysis) dan olingan — bu compiler/interpreter ning source code'ni tokenize qilish bosqichi. Scope aynan shu bosqichda, ya'ni **parse-time** da (kod o'qilayotganda) aniqlanadi, runtime da emas.
 
-Bu nima degani? Funksiya qayerda chaqirilgan bo'lmasin — u har doim **yozilgan joydagi** scope chain'ni ishlatadi. Bu tushuncha **closure**'larning asosi — [05-closures.md](05-closures.md) da ko'rib chiqamiz.
+Bu shuni anglatadi: funksiya tanasiga qarab, uning qaysi tashqi o'zgaruvchilarga kirishi mumkinligini **kodni o'qib** aniqlash mumkin. Runtime da scope o'zgarmaydi (bir nechta istisnolardan tashqari, masalan `eval()` va `with` — ikkalasi ham zamonaviy JavaScript da ishlatish tavsiya etilmaydi).
 
-Lexical scope nima uchun muhim? Chunki u kodni **predictable** (oldindan aytib berish mumkin) qiladi. Siz kodni o'qib turib, hech qanday dasturni ishga tushirmasdan, istalgan o'zgaruvchining qaysi scope'ga tegishli ekanligini aniq aytib bera olasiz. Bu xususiyat IDE'larga (VS Code) auto-complete va refactoring imkonini beradi, linter'larga (ESLint) xatolarni compile vaqtida topish imkonini beradi, va bundler'larga (Webpack, Rollup) tree-shaking orqali ishlatilmagan kodni olib tashlash imkonini beradi. Bularning barchasi lexical scope tufayli mumkin.
+Lexical scope'ning muhim oqibati — funksiya qayerda chaqirilmasin, u o'zi yaratilgan scope'dagi o'zgaruvchilarga murojaat qiladi. Bu xulq-atvor **closure** ning asosi (batafsil [05-closures.md](05-closures.md) da).
 
-```javascript
-let x = "global";
+### Under the Hood
+
+Har bir funksiya yaratilganda (define qilinganda — e'lon yoki expression bilan), engine uning **`[[Environment]]`** internal slot'iga **joriy LexicalEnvironment** ni saqlaydi. Bu slot funksiyaning "tug'ilgan joyi" ni eslab qoladi.
+
+```
+const x = 10;
 
 function outer() {
-  let x = "outer";
+  const y = 20;
 
   function inner() {
-    console.log(x); // "outer" — inner YOZILGAN joyda x = "outer"
+    console.log(x, y);
   }
 
   return inner;
 }
 
-const fn = outer();
-fn(); // "outer" — CHAQIRILGAN joyda x = "global", lekin YOZILGAN joyda x = "outer"
+inner yaratilgan paytda:
+  inner.[[Environment]] → outer() ning LexicalEnvironment
+    ├── y: 20
+    └── [[OuterEnv]] → Global LexicalEnvironment
+                         └── x: 10
+
+inner() qayerda chaqirilmasin — uning [[Environment]] o'zgarmaydi.
+Doim outer() scope'iga, keyin global scope'ga murojaat qiladi.
 ```
 
-### Vizualizatsiya
+Bu mexanizm compile-time (parse-time) da belgilanadi — engine AST ni traverse qilib, har bir identifier qaysi scope'ga tegishli ekanini **statik** aniqlaydi. V8 da bu jarayon "scope analysis" deyiladi va bytecode generation paytida sodir bo'ladi.
 
-```
-YOZILGAN joyga qaraydi (Lexical):
+### Kod Misollari
 
-┌── Global Scope ──────────────────┐
-│  let x = "global"                │
-│                                  │
-│  ┌── outer() Scope ──────────┐  │
-│  │  let x = "outer"          │  │
-│  │                            │  │
-│  │  ┌── inner() Scope ───┐  │  │
-│  │  │  console.log(x)    │  │  │
-│  │  │  x yo'q → yuqoriga │──┘  │
-│  │  │  x = "outer" ✅    │     │
-│  │  └────────────────────┘     │
-│  └─────────────────────────────┘│
-└──────────────────────────────────┘
-
-inner() qayerda CHAQIRILSA ham — u YOZILGAN joy bo'yicha scope chain quradi.
-```
-
-### Compile-Time da Aniqlanadi
-
-Lexical scope — **compile-time** (yoki parse-time) da aniqlanadi. Engine kodni parse qilganda, har bir funksiyaning qaysi scope ichida **yozilganini** biladi.
+Lexical scope ishini ko'rsatuvchi misol — funksiya boshqa scope'da chaqirilsa ham o'z scope'ini ishlatadi:
 
 ```javascript
-function a() {
-  let x = 1;
-  b(); // b() bu yerda CHAQIRILDI, lekin...
+const language = "JavaScript";
+
+function getLanguage() {
+  return language;
+  // ✅ language → lexical scope bo'yicha global'dagi "JavaScript"
 }
 
-function b() {
-  console.log(x); // ❌ ReferenceError
-  // b() YOZILGAN joy — global scope
-  // Global scope da x yo'q!
+function wrapper() {
+  const language = "TypeScript";
+  // Bu local language getLanguage() ga hech qanday ta'sir ko'rsatmaydi
+  return getLanguage();
 }
 
-// b() a() ICHIDA chaqirilgan bo'lsa ham, a() ning x ini ko'rmaydi
-// Chunki b() a() ichida YOZILMAGAN — global scope da yozilgan
-let x; // ← faqat bu bo'lsa ko'radi
+console.log(wrapper()); // "JavaScript" — "TypeScript" EMAS
+// ✅ getLanguage() global scope'da define qilingan
+// ✅ Uning [[Environment]] global scope'ga ishora qiladi
+// ✅ wrapper() ichidagi language ga murojaat qilmaydi
+```
+
+Nested lexical scope:
+
+```javascript
+function createMultiplier(factor) {
+  // factor → createMultiplier scope'da
+  return function multiply(number) {
+    // multiply bu yerda define qilingan →
+    // uning [[Environment]] = createMultiplier scope
+    return number * factor;
+    // ✅ factor lexical scope bo'yicha createMultiplier dan olinadi
+  };
+}
+
+const double = createMultiplier(2);
+const triple = createMultiplier(3);
+
+console.log(double(5));  // 10 — factor = 2 (birinchi chaqiruvdan)
+console.log(triple(5));  // 15 — factor = 3 (ikkinchi chaqiruvdan)
+// ✅ Har bir chaqiruv alohida scope yaratdi, har birida o'z factor qiymati
 ```
 
 ---
@@ -378,49 +410,53 @@ let x; // ← faqat bu bo'lsa ko'radi
 
 ### Nazariya
 
-Ko'pchilik dasturlash tillari (JavaScript, Python, C, Java, Go) **Lexical Scope** ishlatadi. Lekin ba'zi tillar (Bash, eski Perl, ayrim Lisp dialektlari) **Dynamic Scope** ishlatadi. Bu ikki yondashuvning farqini tushunish JavaScript'ning scope mexanizmini chuqurroq anglashga yordam beradi.
+Scope aniqlashning ikkita fundamental yondashuvi bor:
 
-**Lexical Scope** da o'zgaruvchi qaysi scope'ga tegishli ekanligi **kod yozilgan paytda** (parse-time) aniqlanadi — dastur ishlashdan oldin. **Dynamic Scope** da esa bu **runtime** da — funksiya chaqirilgan paytda aniqlanadi. Amaliy farq shuki — lexical scope'da kodni o'qib turib natijani oldindan bilish mumkin, dynamic scope'da esa dasturni ishga tushirmasdan natijani aytib bo'lmaydi.
+1. **Lexical (Static) Scope** — scope kod **yozilgan** joyga qarab aniqlanadi (compile-time). JavaScript, C, Java, Python, Go — barchasi lexical scope ishlatadi.
 
-Qiziq fakt: JavaScript'da `this` keyword aslida dynamic scope'ga **o'xshash** behavior ko'rsatadi — u funksiya qanday chaqirilganiga qarab o'zgaradi. Lekin bu scope emas, bu **binding** mexanizmi — to'liq [10-this-keyword.md](10-this-keyword.md) da.
+2. **Dynamic Scope** — scope funksiya **chaqirilgan** joyga qarab aniqlanadi (runtime). Bash shell, bazi Lisp dialektlari, Perl (maxsus `local` bilan) — dynamic scope'ga misol.
 
-| Xususiyat | Lexical Scope (JS) | Dynamic Scope |
-|-----------|-------------------|---------------|
-| **Aniqlanadi** | Kod yozilganda (parse-time) | Kod chaqirilganda (runtime) |
-| **Qaraydi** | Funksiya YOZILGAN joy | Funksiya CHAQIRILGAN joy |
-| **Predictable** | Ha — kodni o'qib bilib olish mumkin | Yo'q — runtime da o'zgaradi |
-| **Tillar** | JS, Python, C, Java, Go | Bash, old Perl, some Lisps |
+Asosiy farq:
 
-### Farqni Ko'rsatish
+| Xususiyat | Lexical Scope | Dynamic Scope |
+|-----------|--------------|---------------|
+| **Aniqlanish vaqti** | Compile-time (parse-time) | Runtime (execution-time) |
+| **Nimaga bog'liq** | Kod yozilgan pozitsiya | Funksiya chaqirilgan kontekst |
+| **Predictability** | Yuqori — kodni o'qib bilsa bo'ladi | Past — runtime da o'zgaradi |
+| **Debugging** | Oson | Qiyin |
+| **Performance** | Tezroq — statik analiz mumkin | Sekinroq — har chaqiruvda qidirish |
+| **JS da** | Ha — standart | Yo'q (lekin `this` o'xshash xulq ko'rsatadi) |
+
+JavaScript da `this` keyword dynamic scope'ga o'xshash ishlaydi — u funksiya **chaqirilgan** kontekstga qarab o'zgaradi (batafsil [10-this-keyword.md](10-this-keyword.md) da). Lekin o'zgaruvchilar uchun JavaScript faqat lexical scope ishlatadi.
+
+### Kod Misollari
+
+Agar JavaScript dynamic scope ishlatganida nima bo'lishini ko'rsatuvchi solishtirma:
 
 ```javascript
-let x = "global";
+const value = "global";
 
-function first() {
-  let x = "first";
-  second();
+function readValue() {
+  console.log(value);
 }
 
-function second() {
-  console.log(x);
+function callWithLocal() {
+  const value = "local";
+  readValue();
 }
 
-first();
+callWithLocal();
+
+// LEXICAL SCOPE (JavaScript haqiqiy xulqi):
+// Output: "global"
+// ✅ readValue() global scope'da define qilingan →
+//    uning [[Environment]] global scope → value = "global"
+
+// AGAR DYNAMIC SCOPE BO'LGANIDA:
+// Output: "local" bo'lardi
+// ❌ readValue() callWithLocal() ichidan chaqirilgan →
+//    callWithLocal() scope'idagi value = "local" ishlatilardi
 ```
-
-```
-LEXICAL SCOPE (JavaScript):
-  second() YOZILGAN joy = global scope
-  x = "global" ✅
-
-Agar DYNAMIC SCOPE bo'lganida:
-  second() CHAQIRILGAN joy = first() ichida
-  x = "first" bo'lardi
-```
-
-JavaScript **doim** lexical scope — `second()` qayerda chaqirilmasin, u **yozilgan** joydagi scope chain'ni ishlatadi.
-
-> **Eslatma:** JavaScript da `this` keyword — dynamic scope'ga o'xshash behavior ko'rsatadi (chaqirilgan joyga qaraydi). Lekin bu scope emas, bu binding. To'liq [10-this-keyword.md](10-this-keyword.md) da.
 
 ---
 
@@ -428,132 +464,186 @@ JavaScript **doim** lexical scope — `second()` qayerda chaqirilmasin, u **yozi
 
 ### Nazariya
 
-Scope Chain — bu engine o'zgaruvchini qidirish uchun yuradigan **zanjir**. Har bir scope o'z **tashqi (outer) scope**'iga havola (reference) qiladi va bu havolalar zanjiri global scope'gacha davom etadi.
+Scope chain — o'zgaruvchi qidirilganda engine bosib o'tadigan **scope'lar ketma-ketligi**. Qidiruv doim **ichki scope'dan boshlanadi** va tashqariga (yuqoriga) qarab davom etadi — eng tashqi scope global scope.
 
-Buni **pochta manzili**ga o'xshatish mumkin. Xat yetkazilayotganda avval ko'cha nomeri, keyin ko'cha, keyin mahalla, keyin shahar tekshiriladi. Xuddi shunday, engine o'zgaruvchini avval **joriy scope**'da qidiradi, topmasa **tashqi scope**'ga, keyin yana tashqiga — to global scope'gacha ko'tariladi. Global scope'da ham topilmasa — `ReferenceError` tashlanadi.
+Scope chain quyidagicha quriladi:
 
-Muhim qoida: scope chain **faqat ichdan tashqariga** yuradi. Tashqi scope ichki scope'ni **ko'ra olmaydi**. Bu izolyatsiya prinsipi — ichki funksiya tashqi funksiyaning o'zgaruvchilarini ko'radi, lekin tashqi funksiya ichki funksiyaning o'zgaruvchilarini ko'ra olmaydi.
+1. Joriy scope (funksiya yoki block) — birinchi tekshiriladi
+2. Tashqi (parent) scope — joriy scope'ning `[[OuterEnv]]` reference'i orqali
+3. Undan ham tashqi scope — yana `[[OuterEnv]]` orqali
+4. ... va hokazo ...
+5. Global scope — zanjirning eng tashqi halqasi
+6. Global scope'da ham topilmasa → `ReferenceError`
 
-Scope chain aslida [02-execution-context.md](02-execution-context.md) da o'rgangan LexicalEnvironment'larning **outer reference** lar orqali bog'langan zanjiriga teng. Engine har bir o'zgaruvchi uchun aynan shu zanjir bo'ylab qidiradi.
-
-```
-inner scope → outer scope → ... → global scope → topilmadi? → ReferenceError
-```
-
-### Misol
-
-```javascript
-let a = "global a";
-let b = "global b";
-let c = "global c";
-
-function outer() {
-  let b = "outer b";
-  let d = "outer d";
-
-  function inner() {
-    let c = "inner c";
-
-    console.log(a); // ? → o'z scope'da yo'q → outer da yo'q → GLOBAL da bor → "global a"
-    console.log(b); // ? → o'z scope'da yo'q → OUTER da bor → "outer b"
-    console.log(c); // ? → O'Z SCOPE da bor → "inner c"
-    console.log(d); // ? → o'z scope'da yo'q → OUTER da bor → "outer d"
-  }
-
-  inner();
-}
-
-outer();
-```
-
-### Scope Chain Diagramma
-
-```
-┌── Global Scope ─────────────────────────────────┐
-│  a: "global a"                                   │
-│  b: "global b"                                   │
-│  c: "global c"                                   │
-│  outer: function                                 │
-│                                                  │
-│  ┌── outer() Scope ─────────────────────────┐   │
-│  │  b: "outer b"  (global b ni shadow)       │   │
-│  │  d: "outer d"                             │   │
-│  │  inner: function                          │   │
-│  │                                            │   │
-│  │  ┌── inner() Scope ──────────────────┐   │   │
-│  │  │  c: "inner c"  (global c ni shadow)│   │   │
-│  │  │                                    │   │   │
-│  │  │  a → yo'q → outer yo'q → GLOBAL ──│───│───│→ "global a"
-│  │  │  b → yo'q → OUTER ────────────────│───│→ "outer b"
-│  │  │  c → O'ZIDA ──────────────────────│→ "inner c"
-│  │  │  d → yo'q → OUTER ────────────────│───│→ "outer d"
-│  │  └───────────────────────────────────┘   │   │
-│  └───────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────┘
-```
-
-### Scope Chain FAQAT Yuqoriga Yuradi
-
-```javascript
-function parent() {
-  let parentVar = "parent";
-
-  function child() {
-    let childVar = "child";
-    console.log(parentVar); // ✅ yuqoriga → topdi
-  }
-
-  child();
-  console.log(childVar); // ❌ ReferenceError — pastga yura olmaydi!
-}
-```
-
-**Qoida:** Scope chain **faqat ichdan tashqariga** yuradi. Tashqaridan ichkariga kirish **mumkin emas**.
-
----
-
-## Scope Chain va Execution Context
+Scope chain'ning muhim qoidalari:
+- **Faqat ichdan tashqariga** — tashqi scope ichki scope'dagi o'zgaruvchini ko'rMAYDI
+- **Birinchi topilgan qiymat** — qidiruv birinchi topilgan joyda to'xtaydi (shadowing)
+- **Scope chain o'zgarmaydi** — u funksiya yaratilgan paytda belgilanadi (lexical)
 
 ### Under the Hood
 
-Scope Chain aslida Execution Context ning bir qismi. [02-execution-context.md](02-execution-context.md) da o'rganganimizdek, har bir EC ning **LexicalEnvironment** si bor, va har bir LexicalEnvironment **outer reference** ga ega:
+Scope chain fizik ravishda **Environment Record'larning `[[OuterEnv]]` zanjiri** orqali implement qilingan. Har bir Environment Record o'zining tashqi (parent) Environment Record'iga reference saqlaydi.
 
 ```
-┌─────────────────────────────────┐
-│  inner() EC                     │
-│  LexicalEnvironment:            │
-│    c: "inner c"                 │
-│    outer: ─────────────────────────→ outer() EC ning LexicalEnvironment
-│                                 │
-└─────────────────────────────────┘
+function a() {
+  let x = 1;
+  function b() {
+    let y = 2;
+    function c() {
+      let z = 3;
+      console.log(x + y + z); // 6
+    }
+    c();
+  }
+  b();
+}
+a();
 
-┌─────────────────────────────────┐
-│  outer() EC                     │
-│  LexicalEnvironment:            │
-│    b: "outer b"                 │
-│    d: "outer d"                 │
-│    outer: ─────────────────────────→ Global EC ning LexicalEnvironment
-│                                 │
-└─────────────────────────────────┘
+Scope Chain vizualizatsiya (c() ichidan):
 
-┌─────────────────────────────────┐
-│  Global EC                      │
-│  LexicalEnvironment:            │
-│    a: "global a"                │
-│    b: "global b"                │
-│    c: "global c"                │
-│    outer: null (eng tashqi)     │
-│                                 │
-└─────────────────────────────────┘
+c() Environment Record
+  ├── z: 3
+  └── [[OuterEnv]] ──→ b() Environment Record
+                          ├── y: 2
+                          └── [[OuterEnv]] ──→ a() Environment Record
+                                                 ├── x: 1
+                                                 └── [[OuterEnv]] ──→ Global Environment Record
+                                                                        ├── a: function
+                                                                        └── [[OuterEnv]] → null
+
+console.log(x + y + z) bajarilganda:
+1. z → c() da topildi ✅ (z = 3)
+2. y → c() da yo'q → b() da topildi ✅ (y = 2)
+3. x → c() da yo'q → b() da yo'q → a() da topildi ✅ (x = 1)
 ```
 
-**Scope Chain** = LexicalEnvironment'larning **outer reference** lar zanjiri.
+V8 engine'da scope chain traversal optimizatsiya qilingan: agar engine parse-time da identifier qaysi scope'ga tegishli ekanini aniqlay olsa, u **to'g'ridan-to'g'ri** shu scope'ga murojaat qiladi — zanjir bo'ylab ketma-ket qidirmaydi. Bu "scope resolution" deyiladi va bytecode'da index orqali amalga oshiriladi.
 
-Engine o'zgaruvchini qidirganda:
-1. Joriy EC ning LexicalEnvironment da qidiradi
-2. Topmasa → `outer` reference orqali tashqi Environment ga
-3. Topmasa → yana tashqiga
-4. Global'gacha yetdi va topmasa → **ReferenceError**
+### Kod Misollari
+
+Chuqur scope chain misoli:
+
+```javascript
+const config = { debug: true };
+
+function createApp(name) {
+  const version = "1.0";
+
+  function createRouter(prefix) {
+    const routes = [];
+
+    function addRoute(path, handler) {
+      // addRoute ichida barcha tashqi scope o'zgaruvchilari accessible:
+      routes.push({
+        fullPath: `${prefix}${path}`,        // ✅ prefix — createRouter scope
+        handler,
+        app: name,                            // ✅ name — createApp scope
+        appVersion: version,                  // ✅ version — createApp scope
+        isDebug: config.debug                 // ✅ config — global scope
+      });
+    }
+
+    return { addRoute, routes };
+  }
+
+  return createRouter;
+}
+
+const router = createApp("MyApp")("/api");
+router.addRoute("/users", () => {});
+console.log(router.routes[0]);
+// { fullPath: "/api/users", handler: fn, app: "MyApp", appVersion: "1.0", isDebug: true }
+```
+
+---
+
+## Scope Chain va Execution Context Bog'liqligi
+
+### Nazariya
+
+Scope chain va Execution Context bir-biriga chambarchas bog'langan — scope chain Execution Context'ning **LexicalEnvironment** component'i orqali quriladi.
+
+[02-execution-context.md](02-execution-context.md) da o'rganganimizdek, har bir Execution Context ikkita environment component'ga ega:
+
+1. **VariableEnvironment** — `var` declaration'lar va `function` declaration'lar saqlanadi. Funksiya scope'ni ifodalaydi.
+2. **LexicalEnvironment** — `let`, `const`, `class` declaration'lar saqlanadi. Block scope'ni ifodalaydi.
+
+Ikkalasida ham **`[[OuterEnv]]`** (outer reference) bor — shu reference scope chain'ni hosil qiladi.
+
+Aloqani aniq ko'rsatuvchi jarayon:
+
+1. Funksiya **yaratilganda** — `[[Environment]]` slot'iga joriy LexicalEnvironment saqlanadi
+2. Funksiya **chaqirilganda** — yangi Execution Context yaratiladi
+3. Yangi EC'ning LexicalEnvironment'ining `[[OuterEnv]]` reference'i → funksiyaning `[[Environment]]` slot'idagi qiymatga o'rnatiladi
+4. Natija: yangi EC ichidan tashqi scope'ga yo'l ochiladi — scope chain tayyor
+
+### Under the Hood
+
+```
+// Source code:
+function outer() {
+  const x = 10;
+  function inner() {
+    console.log(x);
+  }
+  inner();
+}
+outer();
+
+// Runtime jarayoni:
+
+1. outer() CHAQIRILDI:
+   ┌─ Execution Context: outer ──────────────────┐
+   │  LexicalEnvironment:                         │
+   │    Environment Record: { x: 10, inner: fn }  │
+   │    [[OuterEnv]]: Global Environment           │
+   └──────────────────────────────────────────────┘
+
+2. inner() YARATILDI (outer ichida):
+   inner.[[Environment]] = outer'ning LexicalEnvironment
+
+3. inner() CHAQIRILDI:
+   ┌─ Execution Context: inner ──────────────────────────┐
+   │  LexicalEnvironment:                                 │
+   │    Environment Record: { } (local o'zgaruvchi yo'q)  │
+   │    [[OuterEnv]]: outer'ning LexicalEnvironment ──────┼──→ { x: 10 }
+   └──────────────────────────────────────────────────────┘
+
+4. console.log(x):
+   inner EC → x yo'q → [[OuterEnv]] → outer EC → x = 10 ✅
+```
+
+Call Stack va Scope Chain **bir-biridan mustaqil**. Call Stack funksiyalarning **chaqiruv tartibini** boshqaradi (LIFO), Scope Chain esa o'zgaruvchilarning **qidiruv yo'lini** belgilaydi (lexical nesting). Funksiya call stack'dan chiqsa ham, uning scope'i closure orqali saqlanib qolishi mumkin.
+
+### Kod Misollari
+
+Execution Context va Scope Chain'ning birga ishlashini ko'rsatuvchi misol:
+
+```javascript
+let step = 0;
+
+function first() {
+  let a = 1;
+  step++;
+  console.log(`Step ${step}: first() — a=${a}`);
+  second();
+}
+
+function second() {
+  let b = 2;
+  step++;
+  console.log(`Step ${step}: second() — b=${b}`);
+  // console.log(a);
+  // ❌ ReferenceError — a first() scope'da
+  // ✅ second() global scope'da define qilingan
+  //    uning scope chain: second → global
+  //    first() scope'ga yo'l YO'Q (lexical, call-based emas)
+}
+
+first();
+// Step 1: first() — a=1
+// Step 2: second() — b=2
+```
 
 ---
 
@@ -561,80 +651,51 @@ Engine o'zgaruvchini qidirganda:
 
 ### Nazariya
 
-Variable shadowing — ichki scope'dagi o'zgaruvchi tashqi scope'dagini **"yashirishi"** (shadow qilishi). Ichki scope'da bir xil nomli o'zgaruvchi yaratilsa, tashqi scope'dagi o'zgaruvchi o'sha ichki scope uchun **ko'rinmay qoladi** — lekin yo'q bo'lmaydi, shunchaki vaqtinchalik "soyada" qoladi.
+Variable shadowing — ichki scope'da tashqi scope'dagi o'zgaruvchi bilan **bir xil nomli** yangi o'zgaruvchi e'lon qilish. Bu holda ichki scope'da yangi (local) o'zgaruvchi tashqi o'zgaruvchini "yashiradi" — ichki scope ichidan tashqi o'zgaruvchiga murojaat qilish imkonsiz bo'ladi.
 
-Buni **nomlar** ga o'xshatish mumkin. Maktabda ikki xil "Islom" bo'lishi mumkin — sinfda "Islom" desangiz, shu sinfdagi Islom tushuniladi (ichki scope). Lekin maktab yo'lagida "Islom" desangiz, boshqa Islom tushunilishi mumkin (tashqi scope). Ichki "Islom" tashqini "yashiradi" — bu shadowing.
+Shadowing qoidalari:
+- `let` / `const` **shadow qila oladi** `var`, `let`, `const`, va function parameter'larni
+- `var` **shadow qila oladi** tashqi scope'dagi `var` ni (lekin block scope'da emas, function scope'da)
+- `var` **shadow qila olMaydi** ayniyat (block scope'da) `let`/`const` ni — `SyntaxError` beradi
+- Shadowed o'zgaruvchining original qiymati o'zgarmaydi — ichki scope'dagi o'zgaruvchi alohida binding
 
-Shadowing ba'zan ataylab qilinadi (masalan, funksiya ichida global o'zgaruvchi bilan bir xil nomli local o'zgaruvchi yaratish), lekin ko'pincha bu **xato manbayi**. Ayniqsa `var` bilan shadowing'da hoisting ham aralashsa, natija juda chalkash bo'lishi mumkin — bu ko'p intervyu savollarining asosi. ESLint ning `no-shadow` qoidasi aynan shu muammoni oldini olish uchun yaratilgan.
+Shadow bo'lgan o'zgaruvchiga qayta murojaat qilishning **yagona yo'li** — global scope'da `globalThis.variableName` orqali (faqat `var` yoki global property bo'lsa).
+
+### Kod Misollari
+
+Shadowing'ning turli holatlari:
 
 ```javascript
-let name = "Global";
+const name = "Global";
 
-function outer() {
-  let name = "Outer"; // global name ni SHADOW qildi
+function greet() {
+  const name = "Function";
+  // ✅ Shadowing — global name "yashirildi"
 
-  function inner() {
-    let name = "Inner"; // outer name ni SHADOW qildi
-
-    console.log(name); // "Inner" — eng yaqin scope
+  if (true) {
+    const name = "Block";
+    // ✅ Shadowing — function name ham "yashirildi"
+    console.log(name); // "Block"
   }
 
-  inner();
-  console.log(name); // "Outer" — inner ning name buni ko'rmaydi
+  console.log(name); // "Function" — block scope tugadi, function scope tiklanadi
 }
 
-outer();
-console.log(name); // "Global" — global o'zgarmagan
+greet();
+console.log(name); // "Global" — function scope tugadi, global tiklanadi
 ```
 
-```
-┌── Global: name = "Global" ──────────────┐
-│                                          │
-│  ┌── outer: name = "Outer" ──────────┐  │  ← Global "Global" ni yashirdi
-│  │                                    │  │
-│  │  ┌── inner: name = "Inner" ───┐  │  │  ← Outer "Outer" ni yashirdi
-│  │  │  console.log(name)         │  │  │
-│  │  │  → "Inner" ✅              │  │  │
-│  │  └────────────────────────────┘  │  │
-│  │                                    │  │
-│  │  console.log(name) → "Outer" ✅  │  │
-│  └────────────────────────────────────┘  │
-│                                          │
-│  console.log(name) → "Global" ✅        │
-└──────────────────────────────────────────┘
-```
-
-### var bilan Shadowing Muammolari
+`var` va `let` shadowing muammosi:
 
 ```javascript
-var x = 10;
+function example() {
+  let x = 10;
 
-function test() {
-  console.log(x); // undefined — hoist bo'lgan LOCAL x ni ko'radi, global 10 ni emas!
-  var x = 20;     // bu x global x ni shadow qildi
-  console.log(x); // 20
-}
-
-test();
-console.log(x); // 10 — global o'zgarmagan
-```
-
-Bu hoisting + shadowing kombinatsiyasi — ko'p interview savollarining asosi.
-
-### let bilan var ni Shadow Qilish
-
-```javascript
-var x = 1;
-{
-  let x = 2;  // ✅ var x ni shadow qildi — bu legal
-  console.log(x); // 2
-}
-console.log(x); // 1
-
-// Lekin teskari — illegal:
-let y = 1;
-{
-  var y = 2; // ❌ SyntaxError — var function scope, let bilan conflict
+  if (true) {
+    // let x = 20; // ✅ Bu ishlaydi — let block scope'da shadow
+    // var x = 20; // ❌ SyntaxError: Identifier 'x' has already been declared
+    // Sabab: var function scope'ga ko'tariladi va let bilan to'qnashadi
+  }
 }
 ```
 
@@ -644,264 +705,406 @@ let y = 1;
 
 ### Nazariya
 
-Engine o'zgaruvchini topish uchun **scope chain bo'ylab aniq algoritmga** asosan qidiradi. Bu jarayon Variable Lookup deb ataladi va u JavaScript'ning istalgan o'zgaruvchiga murojaat qilganida sodir bo'ladi.
+Variable lookup — engine'ning o'zgaruvchi qiymatini topish jarayoni. Identifier (o'zgaruvchi nomi) ishlatilganda engine quyidagi algoritmni bajaradi:
 
-Lookup jarayoni doimo **joriy scope**'dan boshlanadi va **tashqariga** yo'naladi — hech qachon ichkariga emas. Birinchi topilgan qiymat ishlatiladi (shuning uchun shadowing ishlaydi). Agar global scope'gacha yetib ham topilmasa — strict mode'da `ReferenceError` tashlanadi, non-strict mode'da esa assignment bo'lsa **implicit global** yaratiladi (bu juda xavfli antipattern). Shu sababli doimo `"use strict"` yoki ES modules ishlatish tavsiya etiladi.
+1. **Joriy Environment Record** — identifier shu record'da bormi? Agar ha — qiymatini qaytar
+2. **`[[OuterEnv]]` bo'ylab tashqariga** — joriy record'da yo'q bo'lsa, outer reference bo'ylab tashqi scope'ga o't
+3. **Jarayon takrorlanadi** — har bir tashqi scope'da identifier qidiriladi
+4. **Global scope** — eng tashqi scope, bu yerda ham topilmasa:
+   - **Strict mode'da** → `ReferenceError: x is not defined`
+   - **Non-strict mode'da** → agar bu **assignment** bo'lsa (masalan `x = 10`), engine global object'ga yangi property qo'shadi (implicit global) — bu **xato** va strict mode'da taqiqlangan
 
-### Lookup Algoritmi
+Variable lookup ikki kontekstda farq qiladi:
+
+- **Read (o'qish)** — `console.log(x)` — qiymatni olish, topilmasa `ReferenceError`
+- **Write (yozish)** — `x = 10` — assign qilish, strict mode'da topilmasa `ReferenceError`, non-strict'da implicit global
+
+### Under the Hood
+
+ECMAScript spec'da variable lookup **ResolveBinding** abstract operation orqali amalga oshiriladi:
 
 ```
-1. Joriy scope'da bor? → Ha → ISH TAMOM, qiymatini qaytir
-                         → Yo'q → 2-qadamga
+ResolveBinding(name, env):
+  1. Agar env berilmagan bo'lsa → env = running EC ning LexicalEnvironment
+  2. Agar env === null → ReferenceError (global scope'dan ham o'tdi)
+  3. exists = env.HasBinding(name)
+  4. Agar exists === true → return env.GetBindingValue(name)
+  5. Agar exists === false → return ResolveBinding(name, env.[[OuterEnv]])
 
-2. Tashqi (outer) scope bor? → Ha → outer scope'da qidir (1-qadamga qayit)
-                                → Yo'q → 3-qadamga
-
-3. Global scope'da bor? → Ha → qiymatini qaytir
-                          → Yo'q → 4-qadamga
-
-4. ReferenceError (strict mode)
-   yoki undefined (non-strict, assignment da implicit global)
+Bu recursive jarayon — har bir scope'da tekshirib, topilmasa tashqariga o'tadi.
 ```
 
-### Misol
+V8 optimizatsiyasi: V8 parse-time da har bir identifier uchun scope depth va index ni aniqlaydi. Runtime da zanjir bo'ylab qidirmasdan, to'g'ridan-to'g'ri kerakli scope'dagi index'ga murojaat qiladi. Bu **scope caching** deyiladi.
+
+### Kod Misollari
+
+Lookup jarayoni qadam-baqadam:
 
 ```javascript
-let x = "global";
+const globalVar = "G";
 
-function a() {
-  let y = "a scope";
+function outer() {
+  const outerVar = "O";
 
-  function b() {
-    let z = "b scope";
+  function inner() {
+    const innerVar = "I";
 
-    function c() {
-      // x ni qidirish:
-      // c scope → yo'q
-      // b scope → yo'q
-      // a scope → yo'q
-      // global scope → BOR! → "global"
-      console.log(x); // "global"
+    // 1-lookup: innerVar
+    console.log(innerVar);
+    // inner scope → topildi ✅ ("I")
 
-      // y ni qidirish:
-      // c scope → yo'q
-      // b scope → yo'q
-      // a scope → BOR! → "a scope"
-      console.log(y); // "a scope"
+    // 2-lookup: outerVar
+    console.log(outerVar);
+    // inner scope → yo'q → outer scope → topildi ✅ ("O")
 
-      // z ni qidirish:
-      // c scope → yo'q... ASLIDA: z... yo'q wait, z b scope da
-      // c scope → yo'q
-      // b scope → BOR! → "b scope"
-      console.log(z); // "b scope"
-    }
-    c();
+    // 3-lookup: globalVar
+    console.log(globalVar);
+    // inner → yo'q → outer → yo'q → global → topildi ✅ ("G")
+
+    // 4-lookup: unknown
+    // console.log(unknown);
+    // inner → yo'q → outer → yo'q → global → yo'q → ReferenceError ❌
   }
-  b();
+
+  inner();
 }
-a();
+
+outer();
 ```
 
-### Non-Strict Mode — Implicit Global (Xavfli!)
+Implicit global muammosi (non-strict mode):
 
 ```javascript
-// ❌ Non-strict mode da:
-function danger() {
-  oops = "global bo'lib qoldi!"; // var/let/const yo'q!
+function leaky() {
+  // "use strict" yo'q
+  leaked = "Oops!";
+  // ❌ let/const/var yo'q — engine scope chain bo'ylab qidiradi
+  // Hech joyda topilmaydi → global object'ga property qo'shadi
+  // globalThis.leaked = "Oops!"
 }
-danger();
-console.log(oops);       // "global bo'lib qoldi!" — global scope ga chiqdi!
-console.log(window.oops); // "global bo'lib qoldi!" — window property bo'ldi!
 
-// ✅ Strict mode da:
-"use strict";
-function safe() {
-  oops = "xato"; // ❌ ReferenceError: oops is not defined
-}
+leaky();
+console.log(leaked); // "Oops!" — global scope iflos bo'ldi
+console.log(globalThis.leaked); // "Oops!" — globalThis property
 ```
 
-**Qoida:** Doim `"use strict"` ishlatish yoki module ishlatish (module'lar avtomatik strict). E'lon qilmasdan assign qilish — **xavfli implicit global** yaratadi.
+---
+
+## Strict Mode
+
+### Nazariya
+
+Strict mode — JavaScript'ning **qat'iyroq** rejimi bo'lib, `"use strict"` directive bilan yoqiladi. ES5 (2009) da kiritilgan. Strict mode bir qator xavfli va xatoga olib keladigan xulq-atvorlarni taqiqlaydi, code'ni xavfsizroq va optimizatsiyaga qulayroq qiladi.
+
+Strict mode ikki darajada yoqiladi:
+1. **Script darajasida** — fayl boshiga `"use strict";` yoziladi, butun fayl uchun amal qiladi
+2. **Function darajasida** — funksiya tanasining birinchi qatoriga yoziladi, faqat shu funksiya uchun
+
+ES6 **modullar** (`import`/`export`) va **class** tanasi avtomatik strict mode'da ishlaydi — alohida `"use strict"` yozish shart emas.
+
+### Strict Mode Qoidalari
+
+Strict mode'da taqiqlangan va o'zgartirilgan xulq-atvorlar:
+
+**1. Implicit global'lar taqiqlanadi:**
+
+```javascript
+"use strict";
+undeclaredVar = 10;
+// ❌ ReferenceError: undeclaredVar is not defined
+// Non-strict'da bu global property yaratgan bo'lardi
+```
+
+**2. `this` → `undefined` (default binding da):**
+
+Non-strict mode'da funksiya oddiy chaqirilganda (method emas) `this` global object'ga (`window`/`globalThis`) ishora qiladi. Strict mode'da bu `undefined` bo'ladi:
+
+```javascript
+"use strict";
+
+function showThis() {
+  console.log(this);
+}
+
+showThis(); // undefined
+// Non-strict'da: globalThis (window) bo'lardi
+// ✅ Bu xatolikdan himoya — tasodifan global object'ni o'zgartirmaslik uchun
+```
+
+**3. Duplicate parameter nomlari taqiqlanadi:**
+
+```javascript
+"use strict";
+
+// ❌ SyntaxError: Duplicate parameter name not allowed
+function sum(a, a) {
+  return a + a;
+}
+
+// Non-strict'da bu ishlaydi — ikkinchi a birinchini yozib tashlaydi
+```
+
+**4. `with` statement taqiqlanadi:**
+
+```javascript
+"use strict";
+
+const obj = { x: 10, y: 20 };
+// ❌ SyntaxError: Strict mode code may not include a with statement
+with (obj) {
+  console.log(x + y);
+}
+
+// with scope chain'ni buzadi — engine compile-time da scope'ni
+// aniqlay olmaydi, shuning uchun optimizatsiya imkonsiz bo'ladi
+```
+
+**5. `arguments.callee` taqiqlanadi:**
+
+```javascript
+"use strict";
+
+function factorial(n) {
+  if (n <= 1) return 1;
+  // ❌ TypeError: 'caller', 'callee', and 'arguments' properties
+  //    may not be accessed on strict mode functions
+  return n * arguments.callee(n - 1);
+}
+
+// ✅ To'g'ri usul — named function expression ishlatish:
+const factorial2 = function fact(n) {
+  if (n <= 1) return 1;
+  return n * fact(n - 1); // ✅ nom orqali recursive chaqiruv
+};
+```
+
+**6. Octal literal syntax taqiqlanadi:**
+
+```javascript
+"use strict";
+
+// ❌ SyntaxError: Octal literals are not allowed in strict mode
+const num = 010; // non-strict'da 8 ga teng (octal)
+
+// ✅ Agar octal kerak bo'lsa — ES6 prefix ishlatish:
+const octal = 0o10; // 8 — aniq va tushunarli
+```
+
+**7. `delete` cheklovlari:**
+
+```javascript
+"use strict";
+
+let x = 10;
+// ❌ SyntaxError: Delete of an unqualified identifier in strict mode
+delete x;
+
+// Non-strict'da bu silently fail qiladi (false qaytaradi)
+```
+
+**8. `eval` cheklovlari:**
+
+```javascript
+"use strict";
+
+eval("var x = 10");
+// console.log(x);
+// ❌ ReferenceError — strict mode'da eval o'z scope'ini yaratadi
+// Non-strict'da x tashqi scope'ga chiqardi
+```
+
+### Under the Hood
+
+Strict mode engine uchun nima beradi:
+
+1. **Scope optimizatsiyasi** — `with` va `eval` ning scope'ni buzish imkoniyati yo'q bo'lgani uchun engine compile-time da scope'ni to'liq aniqlay oladi → tezroq variable lookup
+2. **TDZ enforcement** — `let`/`const` hoisting bilan ishlashda TDZ check'lari aniqroq
+3. **`this` security** — tasodifan global object'ni o'zgartirish xavfi yo'qoladi
+4. **Hidden class stability (V8)** — `with` yo'qligi object shape'larni barqarorroq qiladi → inline caching samaraliroq
+
+### Kod Misollari
+
+Production'da strict mode — deyarli barcha zamonaviy loyihalarda modullar ishlatilgani uchun avtomatik:
+
+```javascript
+// module.js — avtomatik strict mode
+export function processOrder(order) {
+  // "use strict" yozish shart emas — module ichida
+  // quantity = order.qty; // ❌ ReferenceError — implicit global
+  const quantity = order.qty; // ✅ To'g'ri
+  return quantity * order.price;
+}
+
+// class ichida — avtomatik strict mode
+class UserService {
+  getUser() {
+    // "use strict" yozish shart emas — class ichida
+    return this; // strict mode qoidalari amal qiladi
+  }
+}
+```
 
 ---
 
 ## Common Mistakes
 
-### ❌ Xato 1: Lexical scope o'rniga dynamic scope kutish
+### ❌ Xato 1: Implicit Global O'zgaruvchilar
 
 ```javascript
-let x = "global";
-
-function printX() {
-  console.log(x);
-}
-
-function callPrintX() {
-  let x = "local";
-  printX(); // "global" — "local" emas!
-}
-
-callPrintX();
-```
-
-### ✅ To'g'ri tushunish:
-
-```javascript
-// printX() YOZILGAN joyda x = "global"
-// printX() CHAQIRILGAN joyda x = "local"
-// JavaScript LEXICAL scope → YOZILGAN joy qaraydi → "global"
-
-// Agar "local" chiqishini xohlasangiz — argument sifatida bering:
-function printX(val) {
-  console.log(val);
-}
-
-function callPrintX() {
-  let x = "local";
-  printX(x); // "local" ✅
-}
-```
-
-**Nima uchun:** JS lexical scope — funksiya **yozilgan** joydagi scope chain saqlanadi, chaqirilgan joydagi emas.
-
----
-
-### ❌ Xato 2: var ning block scope'siz ishlashini unutish
-
-```javascript
-function example() {
-  for (var i = 0; i < 5; i++) {
-    // ...
-  }
-  console.log(i); // 5 — for dan tashqarida!
-
-  if (true) {
-    var secret = "maxfiy";
-  }
-  console.log(secret); // "maxfiy" — if dan tashqarida!
-}
-```
-
-### ✅ To'g'ri usul:
-
-```javascript
-function example() {
-  for (let i = 0; i < 5; i++) {
-    // ...
-  }
-  // console.log(i); // ❌ ReferenceError — let block ichida qoldi
-
-  if (true) {
-    const secret = "maxfiy";
-  }
-  // console.log(secret); // ❌ ReferenceError — const block ichida qoldi
-}
-```
-
-**Nima uchun:** `var` faqat function scope'ni taniydi. `if`, `for`, `while` — bular function emas, block. `let`/`const` ishlating.
-
----
-
-### ❌ Xato 3: Implicit global yaratish
-
-```javascript
-function oops() {
-  myVar = "xavfli!"; // var/let/const yo'q!
-}
-oops();
-console.log(myVar);       // "xavfli!" — global bo'lib qoldi
-console.log(window.myVar); // "xavfli!" — window ga qo'shildi
-```
-
-### ✅ To'g'ri usul:
-
-```javascript
-"use strict"; // yoki module mode
-
-function safe() {
-  const myVar = "xavfsiz";
-}
-safe();
-// console.log(myVar); // ❌ ReferenceError
-```
-
-**Nima uchun:** E'lon qilinmagan o'zgaruvchiga assign qilish (non-strict) global property yaratadi. `"use strict"` yoki ES module mode bu xatoni ReferenceError bilan ushlaydi.
-
----
-
-### ❌ Xato 4: Shadowing + hoisting aralashmasi
-
-```javascript
-var x = 10;
-
-function confusing() {
-  console.log(x); // Ko'pchilik 10 kutadi
-  if (false) {
-    var x = 20;  // Bu satr HECH QACHON bajarilmaydi
-  }
-  console.log(x);
-}
-
-confusing();
-```
-
-### ✅ To'g'ri tushunish:
-
-```javascript
-// Output: undefined, undefined
-
-// Nima uchun?
-// var x = 20 — if(false) ichida bo'lsa ham, VAR HOIST bo'ladi!
-// var block scope'ni tanimaydi — function scope'da hoist
-// confusing() ning Creation Phase da: var x = undefined (LOCAL)
-// Bu local x global x ni SHADOW qildi
-// if(false) bajarilmaydi — x hech qachon 20 bo'lmaydi
-// Ikki console.log ham LOCAL x = undefined ni ko'radi
-```
-
-**Nima uchun:** `var` block'dan chiqadi + hoist bo'ladi. `if (false)` ichidagi `var x` ham function scope'da hoist bo'ladi. `let` ishlatganingizda bu muammo bo'lmaydi.
-
----
-
-### ❌ Xato 5: Closure + scope ni tushunmaslik
-
-```javascript
-function createFunctions() {
-  var result = [];
-  for (var i = 0; i < 3; i++) {
-    result.push(function() {
-      return i;
-    });
-  }
+function calculate() {
+  result = 42; // ❌ let/const/var yo'q
   return result;
 }
 
-var fns = createFunctions();
-console.log(fns[0]()); // 3 — 0 emas!
-console.log(fns[1]()); // 3 — 1 emas!
-console.log(fns[2]()); // 3 — 2 emas!
+calculate();
+console.log(result); // 42 — global scope iflos bo'ldi!
 ```
 
 ### ✅ To'g'ri usul:
 
 ```javascript
-// let ishlatish — har iteratsiyada yangi scope
-function createFunctions() {
-  const result = [];
-  for (let i = 0; i < 3; i++) {
-    result.push(function() {
-      return i; // har bir callback O'ZINING i siga ega
-    });
-  }
+"use strict"; // yoki module ishlatish
+
+function calculate() {
+  const result = 42; // ✅ scope ichida qoladi
   return result;
 }
 
-const fns = createFunctions();
-console.log(fns[0]()); // 0 ✅
-console.log(fns[1]()); // 1 ✅
-console.log(fns[2]()); // 2 ✅
+calculate();
+// console.log(result); // ❌ ReferenceError — to'g'ri xulq
 ```
 
-**Nima uchun:** `var i` — bitta instance. Barcha callback'lar **bitta** `i` ga reference qiladi. Loop tugaganda `i = 3`. `let i` — har iteratsiyada **yangi** scope va **yangi** `i`. Har bir callback o'zining `i` nusxasiga ega. Ko'proq [05-closures.md](05-closures.md) da.
+**Nima uchun:** Non-strict mode'da assign qilingan lekin declare qilinmagan o'zgaruvchi global property bo'ladi. Bu xatolikni topish qiyin va boshqa kod bilan conflict yaratishi mumkin.
+
+---
+
+### ❌ Xato 2: `var` ning Block Scope'ni Tanimaslik Muammosi
+
+```javascript
+function processItems(items) {
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i]; // ❌ var function scope'ga ko'tariladi
+  }
+
+  console.log(i);    // items.length — loop tugagandan keyin ham accessible
+  console.log(item);  // oxirgi element — kutilmagan natija
+}
+```
+
+### ✅ To'g'ri usul:
+
+```javascript
+function processItems(items) {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]; // ✅ block scope ichida qoladi
+  }
+
+  // console.log(i);    // ❌ ReferenceError — to'g'ri!
+  // console.log(item);  // ❌ ReferenceError — to'g'ri!
+}
+```
+
+**Nima uchun:** `var` faqat function scope'ni tan oladi — `for` loop body block scope hisoblanmaydi. `let`/`const` ishlatish bu muammoni hal qiladi.
+
+---
+
+### ❌ Xato 3: Scope Chain ni Noto'g'ri Tushunish
+
+```javascript
+function outer() {
+  const secret = "abc123";
+}
+
+function reader() {
+  console.log(secret); // ❌ ReferenceError
+  // reader() va outer() bir-birining ichida emas
+  // scope chain: reader → global (outer scope emas!)
+}
+```
+
+### ✅ To'g'ri usul:
+
+```javascript
+function outer() {
+  const secret = "abc123";
+
+  function reader() {
+    console.log(secret); // ✅ "abc123"
+    // reader() outer() ICHIDA define qilingan
+    // scope chain: reader → outer → global
+  }
+
+  reader();
+}
+```
+
+**Nima uchun:** Scope chain lexical — **yozilgan joyga** qarab aniqlanadi. Funksiyalar bir-birini chaqirishi scope chain'ga ta'sir qilmaydi, faqat bir-birining **ichida** define bo'lishi ta'sir qiladi.
+
+---
+
+### ❌ Xato 4: Loop + var + Closure Muammosi
+
+```javascript
+const buttons = document.querySelectorAll(".btn");
+
+for (var i = 0; i < buttons.length; i++) {
+  buttons[i].addEventListener("click", function () {
+    console.log(`Button ${i} clicked`);
+    // ❌ Doim "Button [buttons.length] clicked" chiqaradi
+    // var bitta binding — loop tugaganda i = buttons.length
+  });
+}
+```
+
+### ✅ To'g'ri usul:
+
+```javascript
+const buttons = document.querySelectorAll(".btn");
+
+for (let i = 0; i < buttons.length; i++) {
+  buttons[i].addEventListener("click", function () {
+    console.log(`Button ${i} clicked`);
+    // ✅ Har iteratsiyada yangi i binding — to'g'ri raqam chiqaradi
+  });
+}
+```
+
+**Nima uchun:** `var` bitta binding yaratadi, barcha closure'lar shu bitta `i` ga reference saqlaydi. `let` har iteratsiyada yangi binding yaratadi — har bir closure o'z `i` qiymatiga ega.
+
+---
+
+### ❌ Xato 5: Shadow Qilingan O'zgaruvchini O'zgartirmoqchi Bo'lish
+
+```javascript
+let count = 0;
+
+function increment() {
+  let count = count + 1;
+  // ❌ ReferenceError: Cannot access 'count' before initialization
+  // Sabab: let count — shadowing yaratdi, yangi count TDZ da
+  // "count + 1" dagi count — yangi (shadow) count, hali initialize bo'lmagan
+  return count;
+}
+```
+
+### ✅ To'g'ri usul:
+
+```javascript
+let count = 0;
+
+function increment() {
+  count = count + 1; // ✅ tashqi count'ni o'zgartiradi (shadow yo'q)
+  return count;
+}
+
+// Yoki boshqa nom ishlatish:
+function increment2() {
+  let newCount = count + 1; // ✅ boshqa nom — shadowing muammosi yo'q
+  return newCount;
+}
+```
+
+**Nima uchun:** `let count = count + 1` da chap tomondagi `let count` shadowing yaratadi. O'ng tomondagi `count` endi yangi (local) `count` ga murojaat qiladi — lekin u hali TDZ da (initialize bo'lmagan).
 
 ---
 
@@ -909,263 +1112,273 @@ console.log(fns[2]()); // 2 ✅
 
 ### Mashq 1: Scope Aniqlash (Oson)
 
-**Savol:** Har bir `console.log` nima chiqaradi?
+**Savol:** Quyidagi kodning output'ini ayting va har bir natijani tushuntiring:
 
 ```javascript
 let a = 1;
-var b = 2;
 
-function test() {
-  let a = 10;
-  var b = 20;
+function outer() {
+  let b = 2;
 
-  {
-    let a = 100;
-    var c = 200;
-    console.log(a); // ?
-    console.log(b); // ?
+  function inner() {
+    let c = 3;
+    console.log(a, b, c);
   }
 
-  console.log(a); // ?
-  console.log(b); // ?
-  console.log(c); // ?
+  inner();
+  console.log(a, b);
+}
+
+outer();
+console.log(a);
+```
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+// inner() ichida:
+console.log(a, b, c); // 1, 2, 3
+// a → inner → yo'q → outer → yo'q → global → 1 ✅
+// b → inner → yo'q → outer → 2 ✅
+// c → inner → 3 ✅
+
+// outer() ichida (inner() tugagandan keyin):
+console.log(a, b); // 1, 2
+// a → outer → yo'q → global → 1 ✅
+// b → outer → 2 ✅
+// c → outer da yo'q — lekin console.log(c) ham yo'q
+
+// global'da:
+console.log(a); // 1
+// a → global → 1 ✅
+```
+
+**Tushuntirish:** Scope chain ichdan tashqariga ishlaydi. `inner()` uchta scope'ni ko'radi (inner → outer → global), `outer()` ikkitasini (outer → global), global faqat o'zini.
+
+</details>
+
+---
+
+### Mashq 2: Shadowing (O'rta)
+
+**Savol:** Quyidagi kodning output'ini ayting:
+
+```javascript
+const x = "global";
+
+function first() {
+  const x = "first";
+
+  function second() {
+    console.log(x); // A
+  }
+
+  function third() {
+    const x = "third";
+    second();
+    console.log(x); // B
+  }
+
+  third();
+  console.log(x); // C
+}
+
+first();
+console.log(x); // D
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+A: "first"
+B: "third"
+C: "first"
+D: "global"
+```
+
+```javascript
+// A: second() first() ichida define qilingan
+//    second() scope chain: second → first → global
+//    x → second'da yo'q → first'da topildi → "first"
+//    DIQQAT: second() third() ichidan chaqirilgan bo'lsa ham,
+//    lexical scope bo'yicha first() scope'iga qaraydi
+
+// B: third() ichidagi const x = "third" — shadowing
+//    console.log(x) → third scope'dagi x → "third"
+
+// C: first() ichida const x = "first"
+//    third() tugab bo'lgan, first() scope'ga qaytdik → "first"
+
+// D: global scope'dagi const x = "global" → "global"
+```
+
+**Tushuntirish:** A — eng muhim qism. `second()` funksiyasi `third()` ichidan **chaqirilgan** bo'lsa ham, u `first()` ichida **define qilingan**. Lexical scope: chaqirilgan joy emas, yozilgan joy ahamiyatli.
+
+</details>
+
+---
+
+### Mashq 3: var vs let vs Scope (O'rta)
+
+**Savol:** Quyidagi kodning output'ini ayting:
+
+```javascript
+function test() {
+  var a = 1;
+  let b = 2;
+
+  {
+    var a = 3;
+    let b = 4;
+    console.log(a, b); // A
+  }
+
+  console.log(a, b); // B
 }
 
 test();
-console.log(a); // ?
-console.log(b); // ?
 ```
 
 <details>
 <summary>Javob</summary>
 
-```javascript
-console.log(a); // 100 — block scope'dagi let a
-console.log(b); // 20 — var function scope, block ta'sir qilmaydi
-
-console.log(a); // 10 — function scope'dagi let a
-console.log(b); // 20
-console.log(c); // 200 — var block dan chiqdi, function scope'da
-
-console.log(a); // 1 — global let a
-console.log(b); // 2 — global var b
+```
+A: 3, 4
+B: 3, 2
 ```
 
-**Tushuntirish:**
-- `let a = 100` block ichida — faqat block scope
-- `var c = 200` block ichida — lekin var function scope, block dan chiqadi
-- Har bir scope o'zining `a` va `b` sini yaratgan — shadowing
+```javascript
+// Block ichida:
+// var a = 3 — var block scope tanimaydi, function scope'dagi a NI QAYTA YOZDI
+// let b = 4 — let block scope'da yangi b yaratdi (shadowing)
+// A: a = 3, b = 4
+
+// Block tashqarisida:
+// a = 3 — var a = 3 function scope'dagi a ni 3 ga o'zgartirgan edi
+// b = 2 — block'dagi let b = 4 tugadi, function scope'dagi b = 2 qaytdi
+// B: a = 3, b = 2
+```
+
+**Tushuntirish:** `var a = 3` yangi o'zgaruvchi yaratmadi — mavjud function scope'dagi `a` ni qayta yozdi. `let b = 4` esa yangi block scope binding yaratdi — function scope'dagi `b` ga tegmadi.
+
 </details>
 
 ---
 
-### Mashq 2: Scope Chain Lookup (O'rta)
+### Mashq 4: Scope Chain + Closure (Qiyin)
 
-**Savol:**
+**Savol:** Quyidagi kodning output'ini ayting:
 
 ```javascript
-let x = "A";
+function createCounter(initial) {
+  let count = initial;
 
-function one() {
-  let x = "B";
-
-  function two() {
-    let x = "C";
-
-    function three() {
-      console.log(x); // ?
+  return {
+    increment() {
+      count++;
+      return count;
+    },
+    getCount() {
+      return count;
     }
-    three();
-  }
-  two();
+  };
 }
 
-one();
+const counter1 = createCounter(0);
+const counter2 = createCounter(10);
+
+console.log(counter1.increment()); // A
+console.log(counter1.increment()); // B
+console.log(counter2.increment()); // C
+console.log(counter1.getCount());  // D
+console.log(counter2.getCount());  // E
 ```
-
-`three()` ichidagi `console.log(x)` "A", "B" yoki "C" chiqaradi?
-
-Endi `three()` ichidagi `let x = "C"` ni olib tashlang — nima bo'ladi?
-`two()` ichidagi `let x = "B"` ni ham olib tashlang — nima bo'ladi?
 
 <details>
 <summary>Javob</summary>
 
-```javascript
-// Original: console.log(x) → "C"
-// three() → o'zida yo'q → two() da bor → "C"
-
-// two() dan let x olib tashlansa:
-// three() → o'zida yo'q → two() yo'q → one() da bor → "B"
-
-// one() dan ham olib tashlansa:
-// three() → yo'q → two() yo'q → one() yo'q → GLOBAL → "A"
+```
+A: 1
+B: 2
+C: 11
+D: 2
+E: 11
 ```
 
-Scope chain: `three → two → one → global` — ichdan tashqariga, yozilgan joylari bo'yicha.
+```javascript
+// createCounter(0) chaqirilganda:
+//   Yangi scope yaratildi: { count: 0, initial: 0 }
+//   increment va getCount shu scope'ga closure hosil qildi
+
+// createCounter(10) chaqirilganda:
+//   YANGI scope yaratildi: { count: 10, initial: 10 }
+//   Boshqa increment va getCount — boshqa scope
+
+// counter1.increment() → count: 0 → 1, return 1       (A)
+// counter1.increment() → count: 1 → 2, return 2       (B)
+// counter2.increment() → count: 10 → 11, return 11    (C)
+// counter1.getCount()  → count = 2                     (D)
+// counter2.getCount()  → count = 11                    (E)
+```
+
+**Tushuntirish:** Har bir `createCounter()` chaqiruvi yangi scope (Environment Record) yaratadi. `counter1` va `counter2` turli scope'larga closure hosil qilgan — ular bir-biriga ta'sir qilmaydi. Bu scope + closure pattern'ining asosi — data privacy.
+
 </details>
 
 ---
 
-### Mashq 3: Lexical vs Dynamic (O'rta)
+### Mashq 5: Strict Mode Muammolari (Qiyin)
 
-**Savol:**
+**Savol:** Quyidagi kodda qaysi qatorlar xato beradi va nima uchun?
 
 ```javascript
-let animal = "cat";
+"use strict";
 
-function getAnimal() {
-  return animal;
+function processData(data, data) {  // Qator A
+  result = data * 2;                // Qator B
+  var undefined = 5;                // Qator C
+  let NaN = 10;                     // Qator D
+  delete data;                      // Qator E
+  return result;
 }
-
-function showAnimal() {
-  let animal = "dog";
-  console.log(getAnimal()); // ?
-}
-
-showAnimal();
 ```
 
 <details>
 <summary>Javob</summary>
 
 ```javascript
-console.log(getAnimal()); // "cat"
+// Qator A: ❌ SyntaxError — strict mode'da duplicate parameter taqiq
+// Qator B: ❌ ReferenceError — strict mode'da implicit global taqiq (let/const/var yo'q)
+// Qator C: ❌ Bu aslida SyntaxError emas — var undefined ishlaydi (local shadow),
+//          lekin bu juda yomon amaliyot
+// Qator D: ✅ let NaN ishlaydi — NaN global property'ni shadow qiladi
+// Qator E: ❌ SyntaxError — strict mode'da variable'ni delete qilish taqiq
 ```
 
-**Tushuntirish:**
+**Tushuntirish:** Strict mode bir nechta xavfli pattern'larni taqiqlaydi. Duplicate parameters, implicit globals va o'zgaruvchilarni `delete` qilish — barchasi compile-time da aniqlanadi va SyntaxError beradi. Amalda bu xatolar A qatorda to'xtaydi — engine parse qilayotganda birinchi SyntaxError'ni topishi bilan to'xtaydi.
 
-`getAnimal()` **yozilgan** joy = global scope. Global scope da `animal = "cat"`.
-`showAnimal()` ichida `animal = "dog"` bor, lekin `getAnimal()` bu scope'ni ko'rmaydi — chunki u bu yerda **yozilmagan**, faqat **chaqirilgan**.
-
-JavaScript = lexical scope = yozilgan joyga qaraydi.
-</details>
-
----
-
-### Mashq 4: Block Scope Puzzle (Qiyin)
-
-**Savol:**
-
-```javascript
-function loop() {
-  for (var i = 0; i < 3; i++) {
-    setTimeout(function() {
-      console.log("var:", i);
-    }, 10);
-  }
-
-  for (let j = 0; j < 3; j++) {
-    setTimeout(function() {
-      console.log("let:", j);
-    }, 10);
-  }
-}
-
-loop();
-```
-
-<details>
-<summary>Javob</summary>
-
-```
-var: 3
-var: 3
-var: 3
-let: 0
-let: 1
-let: 2
-```
-
-**Tushuntirish:**
-
-**var loop:**
-- `var i` = function scope da **bitta** o'zgaruvchi
-- Loop tugaganda `i = 3`
-- setTimeout callback'lari loop tugagandan keyin ishlaydi
-- Barchasi bitta `i = 3` ni ko'radi
-
-**let loop:**
-- `let j` = har iteratsiyada **yangi block scope**
-- Har bir setTimeout callback o'zining `j` nusxasiga ega
-- Callback #0 → j=0, Callback #1 → j=1, Callback #2 → j=2
-
-Bu var va let ning eng muhim amaliy farqi.
-</details>
-
----
-
-### Mashq 5: Scope Chain Master (Qiyin)
-
-**Savol:** Har bir `console.log` nima chiqaradi?
-
-```javascript
-var x = 1;
-let y = 2;
-
-function a() {
-  var x = 10;
-  let y = 20;
-
-  function b() {
-    var x = 100;
-
-    function c() {
-      console.log(x); // ?
-      console.log(y); // ?
-    }
-    c();
-  }
-  b();
-}
-
-a();
-```
-
-<details>
-<summary>Javob</summary>
-
-```javascript
-console.log(x); // 100
-console.log(y); // 20
-```
-
-**Scope chain vizualizatsiya:**
-
-```
-c() uchun x qidirish:
-  c() scope → yo'q
-  b() scope → var x = 100 → TOPILDI ✅ → 100
-
-c() uchun y qidirish:
-  c() scope → yo'q
-  b() scope → yo'q (b da y e'lon qilinmagan!)
-  a() scope → let y = 20 → TOPILDI ✅ → 20
-```
-
-Kalit: `b()` da `x` bor lekin `y` yo'q. Shuning uchun `x` b() dan olinadi, `y` esa b() ni "sakrab" a() dan olinadi.
 </details>
 
 ---
 
 ## Xulosa
 
-1. **Scope** — o'zgaruvchining ko'rinish sohasi. 3 turi: Global, Function, Block.
+Bu bo'limda scope tizimining barcha qatlamlari yoritildi:
 
-2. **Global Scope** — hamma joydan ko'rinadi. Muammo: namespace pollution. Yechim: module, IIFE, block scope.
+- **Scope** — o'zgaruvchilarning accessibility chegarasi. Uchta asosiy turi: global, function, block.
+- **Global Scope** — `var`/`function` → `globalThis` property, `let`/`const` → faqat identifier orqali.
+- **Function Scope** — `var` faqat function chegarasini tan oladi, block'ni emas.
+- **Block Scope** — `let`/`const` `{}` ichida qoladi. `for` loop'da har iteratsiya yangi binding.
+- **Lexical Scope** — scope kod **yozilgan** joyga qarab aniqlanadi, **chaqirilgan** joyga emas.
+- **Scope Chain** — `[[OuterEnv]]` reference'lar zanjiri, ichdan tashqariga qidirish.
+- **Variable Shadowing** — ichki scope tashqi scope'dagi bir xil nomli o'zgaruvchini yashiradi.
+- **Variable Lookup** — ResolveBinding algoritmi, scope chain bo'ylab recursive qidirish.
+- **Strict Mode** — implicit globals, duplicate params, `with`, `arguments.callee` taqiqlaydi; `this` → `undefined`.
 
-3. **Function Scope** — `var`, `let`, `const` hammasi taniydi. Funksiya ichida e'lon = tashqaridan ko'rinmaydi.
-
-4. **Block Scope** — `let`/`const` taniydi, `var` **tanimaydi** (block'dan chiqadi).
-
-5. **Lexical Scope** — JS kodda **yozilgan joyiga** qarab scope aniqlanadi, chaqirilgan joyiga emas. Bu closure'lar uchun asos.
-
-6. **Scope Chain** — ichdan tashqariga zanjir: joriy scope → outer → ... → global → ReferenceError.
-
-7. **Variable Shadowing** — ichki scope tashqi scope'dagi bir xil nomli o'zgaruvchini "yashiradi".
-
-8. **Variable Lookup** — engine scope chain bo'ylab birinchi topgan qiymatni qaytaradi. `"use strict"` implicit global'larni oldini oladi.
+Scope tushunchasi keyingi bo'limdagi **closure** ning asosi — closure scope chain'ning "tirik qolishi" natijasida hosil bo'ladi.
 
 ---
 
-> **Keyingi bo'lim:** [05-closures.md](05-closures.md) — Closures — lexical scope'ning eng kuchli natijasi. Funksiya yaratilganda scope saqlanadi.
+**Keyingi bo'lim:** [05-closures.md](05-closures.md) — Closures chuqur tushuncha: lexical environment va closure aloqasi, `[[Environment]]` internal slot, closure hosil bo'lish jarayoni qadam-baqadam, use cases (data privacy, factory functions, memoization), memory va closures, klassik loop + closure muammosi.
