@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: `this` nima va qanday aniqlanadi? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. `this` nima va qanday aniqlanadi? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 `this` — **runtime'da**, funksiya **qanday chaqirilganiga** qarab aniqlanadigan maxsus keyword. Qayerda **e'lon qilinganiga** bog'liq emas (arrow function bundan mustasno).
 
@@ -23,11 +26,12 @@ user.show();     // { name: "Ali", show: fn } — user object
 
 **Kalit tushuncha:** Bir xil funksiya — turli chaqiruv usuli — turli `this`. `this` compile-time emas, **call-time** da aniqlanadi.
 
----
+</details>
 
-## Savol 2: `this` binding 4 ta qoidasi nima? (Priority tartibida) [Middle]
+### 2. `this` binding 4 ta qoidasi nima? (Priority tartibida) [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **4 ta qoida (priority: yuqoridan pastga):**
 
@@ -63,11 +67,12 @@ show(); // this → globalThis (sloppy) yoki undefined (strict)
 
 Engine har bir funksiya chaqiruvida `[[Call]](thisValue, args)` internal method'ni ishlatadi. `thisValue` argument sifatida beriladi. Priority tekshiruvi: `new` → `call/apply/bind` → `obj.method()` → default.
 
----
+</details>
 
-## Savol 3: `call` vs `apply` vs `bind` farqi nima? [Middle]
+### 3. `call` vs `apply` vs `bind` farqi nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function introduce(greeting, punctuation) {
@@ -115,11 +120,12 @@ class Button {
 }
 ```
 
----
+</details>
 
-## Savol 4: Arrow function va `this` — nima farq? [Middle]
+### 4. Arrow function va `this` — nima farq? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Arrow function o'zining `this` si **yo'q** — tashqi (enclosing) scope dan **lexical** this oladi:
 
@@ -160,40 +166,12 @@ arrow.call({ name: "test" }); // globalThis — call ta'sir qilmaydi!
 arrow.bind({ name: "test" })(); // globalThis — bind ham ta'sir qilmaydi!
 ```
 
----
+</details>
 
-## Savol 5: Quyidagi kodning output ini ayting: [Middle+]
+### 5. `this` yo'qotish muammosi va yechimi [Middle]
 
-```javascript
-const obj = {
-  name: "Test",
-  getName: () => this.name,
-  getNameRegular() { return this.name; }
-};
-
-console.log(obj.getName());        // ?
-console.log(obj.getNameRegular()); // ?
-```
-
-**Javob:**
-
-```
-undefined
-"Test"
-```
-
-**Tushuntirish:**
-
-- `obj.getName()` → arrow function! `this` = **tashqi scope** (global/module), `obj` emas. `globalThis.name` = undefined
-- `obj.getNameRegular()` → implicit binding ishlaydi. `this` = `obj` → `"Test"`
-
-**Kalit:** Object literal `{ }` — scope yaratmaydi! Arrow function ichidagi `this` object ga emas, **uning tashqarisiga** qaraydi.
-
----
-
-## Savol 6: `this` yo'qotish muammosi va yechimi [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Method reference sifatida olganingizda, `this` binding yo'qoladi:
 
@@ -231,104 +209,12 @@ class UserService {
 
 Class arrow field har bir instance uchun **alohida funksiya** yaratadi (memory trade-off), lekin `this` doim to'g'ri bo'ladi. React component'larda bu eng ko'p ishlatiladigan pattern.
 
----
+</details>
 
-## Savol 7: `Function.prototype.bind` polyfill yozing [Senior]
+### 6. `this` turli kontekstlarda nima? [Middle]
 
-**Javob:**
-
-```javascript
-Function.prototype.myBind = function(thisArg, ...boundArgs) {
-  const originalFn = this;
-
-  // Arrow function — bind ishlamaydi
-  if (!originalFn.prototype && originalFn.toString().includes("=>")) {
-    return function(...args) {
-      return originalFn.apply(thisArg, [...boundArgs, ...args]);
-    };
-  }
-
-  const boundFn = function(...args) {
-    // new bilan chaqirilganda — thisArg ignore qilinadi
-    const context = this instanceof boundFn ? this : thisArg;
-    return originalFn.apply(context, [...boundArgs, ...args]);
-  };
-
-  // Prototype chain saqlash (new bilan ishlashi uchun)
-  if (originalFn.prototype) {
-    boundFn.prototype = Object.create(originalFn.prototype);
-  }
-
-  return boundFn;
-};
-
-// Test:
-function greet(greeting) {
-  return `${greeting}, ${this.name}`;
-}
-
-const bound = greet.myBind({ name: "Ali" }, "Salom");
-console.log(bound()); // "Salom, Ali"
-
-// new bilan
-function User(name) { this.name = name; }
-const BoundUser = User.myBind({ name: "ignored" });
-const user = new BoundUser("Ali");
-console.log(user.name); // "Ali" (thisArg ignored with new)
-console.log(user instanceof User); // true
-```
-
-**Deep Dive:**
-
-Real `bind` spec bo'yicha:
-1. `thisArg` ni saqlash
-2. Partial arguments ni saqlash
-3. `new` bilan chaqirilganda `thisArg` ni ignore qilish
-4. `length` property = original.length - boundArgs.length
-5. `name` property = "bound " + original.name
-
----
-
-## Savol 8: Quyidagi kodning output ini ayting: [Middle+]
-
-```javascript
-const user = {
-  name: "Ali",
-  greet: function() {
-    console.log("A:", this.name);
-    return {
-      name: "Vali",
-      greet: () => {
-        console.log("B:", this.name);
-      }
-    };
-  }
-};
-
-user.greet().greet();
-```
-
-**Javob:**
-
-```
-A: Ali
-B: Ali
-```
-
-**Tushuntirish:**
-
-1. `user.greet()` → implicit binding → `this = user` → `"A: Ali"`
-2. Return qilingan object'ning `greet` — arrow function
-3. Arrow function `this` ni **tashqi scope** dan oladi = `user.greet()` dagi `this` = `user`
-4. Shuning uchun `"B: Ali"` (`"B: Vali"` emas!)
-
-Arrow function ichidagi `this` = yaratilgan vaqtdagi enclosing function'ning `this` i.
-
----
-
-## Savol 9: `this` turli kontekstlarda nima? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // 1. Global scope
@@ -362,17 +248,21 @@ button.addEventListener("click", () => {
   console.log(this); // tashqi scope this (window/module)
 });
 
-// 8. setTimeout
+// 8. setTimeout — environment'ga qarab farqli!
 setTimeout(function() {
-  console.log(this); // globalThis (browser) — strict da ham!
+  console.log(this);
+  // Browser: globalThis/window (strict da HAM — HTML spec explicit this = window beradi)
+  // Node.js: Timeout object { _idleTimeout: 100, ... } (not globalThis, not undefined)
+  // Node.js explicit this beradi — strict mode ta'sir qilmaydi
 }, 100);
 ```
 
----
+</details>
 
-## Savol 10: Strict mode `this` ga qanday ta'sir qiladi? [Middle]
+### 7. Strict mode `this` ga qanday ta'sir qiladi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // Sloppy mode — default binding = globalThis
@@ -410,134 +300,12 @@ fn(); // undefined (strict mode — class ichida avtomatik)
 
 Strict mode da `call(null)` va `call(undefined)` ham `this` ni **o'zgartirmaydi** — null/undefined qoladi. Sloppy mode da ular globalThis ga **coerce** bo'ladi. Bu xavfsizlik va debugging uchun muhim farq.
 
----
+</details>
 
-## Savol 11: Quyidagi kodning output ini ayting: [Senior]
+### 8. Method chaining va `this` [Middle]
 
-```javascript
-var name = "Global";
-
-const person = {
-  name: "Ali",
-  greet: function() {
-    console.log("1:", this.name);
-
-    function inner() {
-      console.log("2:", this.name);
-    }
-    inner();
-
-    const arrowInner = () => {
-      console.log("3:", this.name);
-    };
-    arrowInner();
-  }
-};
-
-person.greet();
-```
-
-**Javob:**
-
-```
-1: Ali
-2: Global (yoki undefined strict mode da)
-3: Ali
-```
-
-**Tushuntirish:**
-
-1. `person.greet()` → implicit binding → `this = person` → `"1: Ali"`
-2. `inner()` — oddiy function call (default binding) → `this = globalThis` → `"2: Global"`
-3. `arrowInner()` — arrow function → lexical this = `greet` dagi `this = person` → `"3: Ali"`
-
----
-
-## Savol 12: Bu kodda nima muammo bor va qanday tuzatasiz? [Middle]
-
-```javascript
-class Timer {
-  constructor() {
-    this.seconds = 0;
-  }
-  start() {
-    setInterval(function() {
-      this.seconds++;
-      console.log(this.seconds);
-    }, 1000);
-  }
-}
-new Timer().start(); // Nima bo'ladi?
-```
-
-**Javob:**
-
-`NaN` chiqadi. `setInterval` callback'i — oddiy function. `this` → `globalThis`. `globalThis.seconds` → `undefined`. `undefined + 1` → `NaN`.
-
-**3 ta tuzatish:**
-
-```javascript
-// ✅ 1. Arrow function (eng yaxshi)
-start() {
-  setInterval(() => {
-    this.seconds++; // lexical this = Timer instance
-    console.log(this.seconds); // 1, 2, 3...
-  }, 1000);
-}
-
-// ✅ 2. bind
-start() {
-  setInterval(function() {
-    this.seconds++;
-    console.log(this.seconds);
-  }.bind(this), 1000);
-}
-
-// ✅ 3. self = this (eski usul)
-start() {
-  const self = this;
-  setInterval(function() {
-    self.seconds++;
-    console.log(self.seconds);
-  }, 1000);
-}
-```
-
----
-
-## Savol 13: Quyidagi kodning output ini ayting: [Senior]
-
-```javascript
-function User(name) { this.name = name; }
-User.prototype.getName = function() { return this.name; };
-
-const ali = new User("Ali");
-const getName = ali.getName;
-
-console.log(ali.getName());         // ?
-console.log(getName());             // ?
-console.log(getName.call(ali));     // ?
-console.log(getName.bind(ali)());   // ?
-
-const arrowGet = () => ali.name;
-console.log(arrowGet.call({name: "Vali"})); // ?
-```
-
-**Javob:**
-
-```
-"Ali"       // implicit binding → this = ali
-undefined   // default binding → this = globalThis → globalThis.name = undefined
-"Ali"       // explicit binding → this = ali
-"Ali"       // bind → this = ali
-"Ali"       // arrow function — call ta'sir qilmaydi, ali.name = "Ali"
-```
-
----
-
-## Savol 14: Method chaining va `this` [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 class QueryBuilder {
@@ -592,11 +360,12 @@ const query = new QueryBuilder()
 
 Method chaining `return this` ga asoslangan. jQuery, Lodash chain, D3.js — barchasi shu pattern. `this` har method'da bir xil object'ga ishora qiladi.
 
----
+</details>
 
-## Savol 15: `this` va Proxy [Senior]
+### 9. `this` va Proxy [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 class Collection {
@@ -636,11 +405,12 @@ const logged = new Proxy(collection, {
 
 Private field'lar (`#`) Proxy bilan muammo keltirib chiqaradi — chunki private field'lar **faqat deklaratsiya qilingan class instance'ida** ishlaydi. Proxy — boshqa object. Shuning uchun `value.apply(target, args)` — `target` (original object) ga qaytarish kerak.
 
----
+</details>
 
-## Savol 16: globalThis nima? [Junior+]
+### 10. globalThis nima? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `globalThis` — barcha muhitlarda (browser, Node.js, Worker) global object'ga **universal kirish**:
 
@@ -666,5 +436,285 @@ globalThis === self; // true
 **Deep Dive:**
 
 `globalThis` ES2020 da qo'shildi. Isomorphic (universal) JavaScript yozishda muhim — bitta kodda browser, server, va worker da ishlaydi.
+
+</details>
+
+---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Quyidagi kodning output'ini ayting: [Middle+]
+
+```javascript
+const obj = {
+  name: "Test",
+  getName: () => this.name,
+  getNameRegular() { return this.name; }
+};
+
+console.log(obj.getName());        // ?
+console.log(obj.getNameRegular()); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+undefined
+"Test"
+```
+
+**Tushuntirish:**
+
+- `obj.getName()` → arrow function! `this` = **tashqi scope** (global/module), `obj` emas. `globalThis.name` = undefined
+- `obj.getNameRegular()` → implicit binding ishlaydi. `this` = `obj` → `"Test"`
+
+**Kalit:** Object literal `{ }` — scope yaratmaydi! Arrow function ichidagi `this` object ga emas, **uning tashqarisiga** qaraydi.
+
+</details>
+
+### 2. `Function.prototype.bind` polyfill yozing [Senior]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+Function.prototype.myBind = function(thisArg, ...boundArgs) {
+  const originalFn = this;
+
+  if (typeof originalFn !== "function") {
+    throw new TypeError("Bind must be called on a function");
+  }
+
+  const boundFn = function(...args) {
+    // new bilan chaqirilganda — thisArg ignore qilinadi
+    const context = this instanceof boundFn ? this : thisArg;
+    return originalFn.apply(context, [...boundArgs, ...args]);
+  };
+
+  // Prototype chain saqlash (new bilan ishlashi uchun)
+  if (originalFn.prototype) {
+    boundFn.prototype = Object.create(originalFn.prototype);
+  }
+
+  return boundFn;
+};
+
+// ⚠️ Bu polyfill'ning cheklovlari (real bind spec bilan farq):
+// 1. Arrow function check yo'q — arrow.bind(obj) ishlaydi lekin this o'zgarmaydi
+//    (real bind ham shunday, chunki arrow ichida OrdinaryCallBindThis skip bo'ladi)
+// 2. new boundArrow() — polyfill xato bermaydi, real bind TypeError beradi
+//    (real bind target.[[IsConstructor]] yo'q bo'lsa bound fn ham not constructable)
+// 3. bound.length va bound.name property'lar o'rnatilmagan
+//    (real: length = max(0, original.length - boundArgs.length), name = "bound " + original.name)
+
+// Test:
+function greet(greeting) {
+  return `${greeting}, ${this.name}`;
+}
+
+const bound = greet.myBind({ name: "Ali" }, "Salom");
+console.log(bound()); // "Salom, Ali"
+
+// new bilan
+function User(name) { this.name = name; }
+const BoundUser = User.myBind({ name: "ignored" });
+const user = new BoundUser("Ali");
+console.log(user.name); // "Ali" (thisArg ignored with new)
+console.log(user instanceof User); // true
+```
+
+**Deep Dive:**
+
+Real `bind` spec bo'yicha:
+1. `thisArg` ni saqlash
+2. Partial arguments ni saqlash
+3. `new` bilan chaqirilganda `thisArg` ni ignore qilish
+4. `length` property = original.length - boundArgs.length
+5. `name` property = "bound " + original.name
+
+</details>
+
+### 3. Quyidagi kodning output'ini ayting: [Middle+]
+
+```javascript
+const user = {
+  name: "Ali",
+  greet: function() {
+    console.log("A:", this.name);
+    return {
+      name: "Vali",
+      greet: () => {
+        console.log("B:", this.name);
+      }
+    };
+  }
+};
+
+user.greet().greet();
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+A: Ali
+B: Ali
+```
+
+**Tushuntirish:**
+
+1. `user.greet()` → implicit binding → `this = user` → `"A: Ali"`
+2. Return qilingan object'ning `greet` — arrow function
+3. Arrow function `this` ni **tashqi scope** dan oladi = `user.greet()` dagi `this` = `user`
+4. Shuning uchun `"B: Ali"` (`"B: Vali"` emas!)
+
+Arrow function ichidagi `this` = yaratilgan vaqtdagi enclosing function'ning `this` i.
+
+</details>
+
+### 4. Bu kodda nima muammo bor va qanday tuzatasiz? [Middle]
+
+```javascript
+class Timer {
+  constructor() {
+    this.seconds = 0;
+  }
+  start() {
+    setInterval(function() {
+      this.seconds++;
+      console.log(this.seconds);
+    }, 1000);
+  }
+}
+new Timer().start(); // Nima bo'ladi?
+```
+
+<details>
+<summary>Javob</summary>
+
+`NaN` chiqadi. `setInterval` callback'i — oddiy function. `this` → `globalThis`. `globalThis.seconds` → `undefined`. `undefined + 1` → `NaN`.
+
+**3 ta tuzatish:**
+
+```javascript
+// ✅ 1. Arrow function (eng yaxshi)
+start() {
+  setInterval(() => {
+    this.seconds++; // lexical this = Timer instance
+    console.log(this.seconds); // 1, 2, 3...
+  }, 1000);
+}
+
+// ✅ 2. bind
+start() {
+  setInterval(function() {
+    this.seconds++;
+    console.log(this.seconds);
+  }.bind(this), 1000);
+}
+
+// ✅ 3. self = this (eski usul)
+start() {
+  const self = this;
+  setInterval(function() {
+    self.seconds++;
+    console.log(self.seconds);
+  }, 1000);
+}
+```
+
+</details>
+
+### 5. Quyidagi kodning output'ini ayting: [Senior]
+
+```javascript
+function User(name) { this.name = name; }
+User.prototype.getName = function() { return this.name; };
+
+const ali = new User("Ali");
+const getName = ali.getName;
+
+console.log(ali.getName());         // ?
+console.log(getName());             // ?
+console.log(getName.call(ali));     // ?
+console.log(getName.bind(ali)());   // ?
+
+const arrowGet = () => ali.name;
+console.log(arrowGet.call({name: "Vali"})); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+"Ali"       // implicit binding → this = ali
+undefined   // default binding → this = globalThis → globalThis.name = undefined
+"Ali"       // explicit binding → this = ali
+"Ali"       // bind → this = ali
+"Ali"       // arrow function — call ta'sir qilmaydi, ali.name = "Ali"
+```
+
+**Deep Dive:**
+
+`bind` spec'da `BoundFunctionCreate` orqali yangi **exotic object** yaratadi — bu object `[[BoundTargetFunction]]`, `[[BoundThis]]`, va `[[BoundArguments]]` internal slot'lariga ega. Chaqirilganda `[[Call]]` ichida saqlangan `[[BoundThis]]` ishlatiladi. Lekin `new` bilan chaqirilganda `[[Construct]]` da `[[BoundThis]]` **ignore** qilinadi — bu spec'dagi `new` binding > explicit binding priority qoidasini ta'minlaydi. Arrow function uchun esa `bind` `[[BoundThis]]` ni saqlaydi, lekin arrow function `OrdinaryCallBindThis` ni skip qilgani uchun bu qiymat hech qachon ishlatilmaydi.
+
+</details>
+
+### 6. Quyidagi kodning output'ini ayting: [Senior]
+
+```javascript
+var name = "Global";
+
+const person = {
+  name: "Ali",
+  greet: function() {
+    console.log("1:", this.name);
+
+    function inner() {
+      console.log("2:", this.name);
+    }
+    inner();
+
+    const arrowInner = () => {
+      console.log("3:", this.name);
+    };
+    arrowInner();
+  }
+};
+
+person.greet();
+```
+
+<details>
+<summary>Javob</summary>
+
+Non-strict (classic script) da:
+```
+1: Ali
+2: Global
+3: Ali
+```
+
+Strict mode yoki ES module da:
+```
+1: Ali
+// ❌ TypeError: Cannot read properties of undefined (reading 'name')
+// inner() da this = undefined → undefined.name → THROW
+```
+
+**Tushuntirish:**
+
+1. `person.greet()` → implicit binding → `this = person` → `"1: Ali"`
+2. `inner()` — oddiy function call (default binding):
+   - **Non-strict:** `this = globalThis` → `globalThis.name` → `"Global"` (`var name` globalThis property)
+   - **Strict/module:** `this = undefined` → `undefined.name` → **TypeError** (undefined'da property o'qib bo'lmaydi!)
+3. `arrowInner()` — arrow function → lexical this = `greet` dagi `this = person` → `"3: Ali"` (strict mode ta'sir qilmaydi — lexical this doim person)
+
+**Deep Dive:**
+
+Spec bo'yicha `inner()` chaqirilganda `Call(func, undefined)` bajariladi — `thisValue` `undefined`. Non-strict mode da `OrdinaryCallBindThis` algoritmining 6-qadami `thisValue` `undefined` yoki `null` bo'lsa uni `globalThis` ga almashtiradi (coercion). Strict mode da bu coercion bo'lmaydi — `this` `undefined` bo'lib qoladi. Arrow function uchun esa `OrdinaryCallBindThis` umuman chaqirilmaydi — `this` tashqi function environment'dan `GetThisBinding()` orqali olinadi.
+
+</details>
 
 ---

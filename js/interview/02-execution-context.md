@@ -2,17 +2,19 @@
 
 > Execution Context ichki mexanizmlari bo'yicha interview savollari: nazariy, output, coding va tuzatish savollari.
 
-
 ---
 
-## Savol 1: Execution Context nima va unda qanday komponentlar bor? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Execution Context nima va unda qanday komponentlar bor? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 Execution Context — JavaScript engine har bir kod bo'lagini bajarishdan oldin yaratiladigan ichki muhit. Bu muhit quyidagi komponentlardan iborat:
 
-1. **LexicalEnvironment** — `let`, `const`, `function`, `class` declaration'lar saqlanadi
-2. **VariableEnvironment** — `var` declaration'lar saqlanadi
+1. **LexicalEnvironment** — `let`, `const`, `class` declaration'lar saqlanadi
+2. **VariableEnvironment** — `var` va `function` declaration'lar saqlanadi
 3. **ThisBinding** — `this` qiymati
 
 Har bir EC ikki bosqichda yaratiladi:
@@ -32,11 +34,12 @@ function greet() { return "Hi"; }
 
 Bu mexanizm hoisting'ning asosi — `var` Creation Phase da `undefined` bilan initialize qilinadi, shuning uchun e'lon qilishdan oldin o'qish mumkin (lekin qiymati `undefined`).
 
----
+</details>
 
-## Savol 2: Execution Context necha xil bo'ladi? [Junior+]
+### 2. Execution Context necha xil bo'ladi? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Uch xil:
 
@@ -63,11 +66,12 @@ calculate(3, 4);  // FEC #2 yaratildi → tugadi → yo'qoldi
 
 Barcha EC'lar **Execution Context Stack** (Call Stack) da boshqariladi — LIFO tartibida.
 
----
+</details>
 
-## Savol 3: Creation Phase va Execution Phase da nima sodir bo'ladi? [Middle]
+### 3. Creation Phase va Execution Phase da nima sodir bo'ladi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **Creation Phase** — kod bajarilmaydi, faqat muhit tayyorlanadi:
 - `var` declaration'lar topiladi → `undefined` bilan initialize
@@ -102,21 +106,26 @@ var result = sum();
 
 **Deep Dive:**
 
-Creation Phase'da engine aslida source code'ni ikkinchi marta scan qilmaydi — parsing bosqichida (AST yaratishda) allaqachon barcha declaration'lar aniqlangan. Creation Phase parser'ning ma'lumotlari asosida environment record'larni to'ldiradi.
+Muhim farq: **Parsing** va **Creation Phase** — bular ikki alohida bosqich:
+- **Parsing** (engine source code'dan AST yaratishda) — declaration'lar static ravishda topiladi va saqlanadi (qaysi scope'da qaysi `var`/`let`/`const`/`function` bor). Bu faqat bir marta bajariladi.
+- **Creation Phase** (har EC yaratilganda) — parser'ning static ma'lumotlari asosida Environment Record'lar **runtime'da** to'ldiriladi: `CreateMutableBinding` va `InitializeBinding(undefined)` chaqiriladi (var uchun), let/const faqat `CreateMutableBinding` (uninitialized holatda).
 
----
+Shuning uchun Creation Phase tez ishlaydi — engine source'ni qayta scan qilmaydi, faqat parser'ning metadata'sidan EC environment'ni yaratadi.
 
-## Savol 4: Variable Environment va Lexical Environment farqi nima? [Middle+]
+</details>
 
-**Javob:**
+### 4. Variable Environment va Lexical Environment farqi nima? [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 ES6 dan boshlab har bir EC'da ikkita alohida environment bor:
 
 | Xususiyat | VariableEnvironment | LexicalEnvironment |
 |-----------|--------------------|--------------------|
-| Nima saqlanadi | `var` | `let`, `const`, `function`, `class` |
+| Nima saqlanadi | `var`, `function` | `let`, `const`, `class` |
 | Scope | Function scope | Block scope |
-| Hoisting | `undefined` bilan | `uninitialized` (TDZ) |
+| Hoisting | `undefined` bilan (`function` — to'liq) | `uninitialized` (TDZ) |
 | Block ichida | Block yangi VE yaratMAYDI | Block yangi LE yaratadi |
 
 ```javascript
@@ -139,173 +148,76 @@ function example() {
 
 Nima uchun ikki alohida environment kerak: `var` (ES5 dan) function-scoped. ES6 da `let`/`const` kiritilganda block scoping kerak bo'ldi. Alohida environment'lar tufayli engine block ichida yangi LexicalEnvironment yaratib block scope'ni ta'minlaydi — VariableEnvironment'ga ta'sir qilmaydi.
 
----
+</details>
 
-## Savol 5: Quyidagi kodning output'ini ayting [Middle]
+### 5. Environment Record turlari va farqlari nima? [Senior]
 
-```javascript
-var x = 1;
+<details>
+<summary>Javob</summary>
 
-function foo() {
-  console.log(x);
-  var x = 2;
-  console.log(x);
-}
-
-foo();
-console.log(x);
-```
-
-**Javob:**
-
-```
-undefined
-2
-1
-```
-
-Qadam-baqadam:
-
-```
-foo() FEC Creation Phase:
-  VariableEnvironment: x = undefined (var hoist — local x!)
-
-foo() Execution Phase:
-  console.log(x)  → undefined (local x hali undefined)
-  x = 2            → local x endi 2
-  console.log(x)  → 2
-
-Global:
-  console.log(x)  → 1 (global x o'zgarmagan)
-```
-
-Asosiy nuqta: `foo()` ichida `var x = 2` bor — bu **local** `x` yaratadi. Creation Phase da local `x` = `undefined` bo'ladi. Shuning uchun birinchi `console.log(x)` local `x` ni topadi (undefined), global `x` (1) ni emas. Bu **variable shadowing** — local scope global scope'ni "yashiradi".
-
----
-
-## Savol 6: Quyidagi kodning output'ini ayting [Middle+]
-
-```javascript
-console.log(foo);
-console.log(bar);
-
-var foo = "Hello";
-function foo() { return "World"; }
-var bar = function() { return "!"; };
-
-console.log(foo);
-console.log(bar);
-```
-
-**Javob:**
-
-```
-function foo() { return "World"; }
-undefined
-"Hello"
-function() { return "!"; }
-```
-
-Creation Phase:
-1. `var foo` → `undefined`
-2. `function foo()` → **function declaration function bilan override qiladi** → `foo = function foo(){...}`
-3. `var bar` → `undefined`
-
-Function declaration `var` dan yuqori priority'ga ega — ikkalasi bir xil nomda bo'lsa, function declaration yutadi.
-
-Execution Phase:
-1. `console.log(foo)` → `function foo(){...}` (Creation Phase natijasi)
-2. `console.log(bar)` → `undefined` (var hoist)
-3. `foo = "Hello"` → endi foo string
-4. `bar = function(){...}` → endi bar function
-5. `console.log(foo)` → `"Hello"`
-6. `console.log(bar)` → `function(){ return "!"; }`
-
----
-
-## Savol 7: Environment Record turlari va farqlari nima? [Senior]
-
-**Javob:**
-
-ECMAScript spec'da Environment Record — scope'dagi barcha binding'lar saqlanadigan tuzilma. Uch asosiy turi bor:
+ECMAScript spec'da Environment Record — scope'dagi barcha binding'lar saqlanadigan tuzilma. Spec da **5 turi** bor (ko'p manbalar faqat 3 ta aytadi, bu chala):
 
 **1. Declarative Environment Record:**
-- `let`, `const`, `var`, `function`, `class`, `import`, `catch` parameter'lar saqlanadi
-- Function va block scope'larda ishlatiladi
+- `let`, `const`, `function`, `class`, `catch` parameter, va **function scope'dagi `var`**'lar saqlanadi
+- Block va function scope'larda ishlatiladi
 - O'zgaruvchilar to'g'ridan-to'g'ri record ichida — **tez** (index-based access)
+- Eslatma: **global scope'dagi `var`** esa Object ER'ga ketadi (pastda)
 
-**2. Object Environment Record:**
+**2. Function Environment Record** (Declarative ER'ning kengaytmasi):
+- Declarative ER'ning barcha funksiyasi +
+- `[[ThisValue]]` — funksiya `this` binding'i
+- `[[NewTarget]]` — `new.target` qiymati
+- `[[HomeObject]]` — `super` resolution uchun method'ning uy-object'i
+- `[[FunctionObject]]` — joriy funksiyaning o'ziga reference
+- Har function chaqiruvi yangi Function ER yaratadi
+
+**3. Module Environment Record** (ES6+ ES Modules uchun):
+- Declarative ER'ning kengaytmasi
+- `import` qilingan binding'lar **immutable** va **indirect** (original module'dagi binding'ga reference, nusxa emas)
+- Import value'lari exporting module'da o'zgartirilsa — importing module ham yangilanadi (live bindings)
+
+**4. Object Environment Record:**
 - Biror object'ning property'larini binding sifatida ko'rsatadi
-- Global scope'da `var` va function declaration'lar `window` orqali → Object ER
-- `with` statement uchun ishlatiladi
+- Global scope'da `var` va function declaration'lar Object ER'ga ketadi (`globalThis`/`window` orqali)
+- `with` statement uchun ishlatiladi (faqat shu ikki holat)
 
-**3. Global Environment Record** (maxsus — ikkisining birikmasi):
-- Object ER (`var`, function → window property bo'ladi)
-- Declarative ER (`let`, `const`, `class` → window'da yo'q)
+**5. Global Environment Record** (maxsus — composite):
+- Object ER qismi: `var`, function declaration'lar → `globalThis` property bo'ladi
+- Declarative ER qismi: `let`, `const`, `class` → alohida, `globalThis`'da yo'q
 
 ```javascript
-var name = "Ali";       // Object ER → window.name = "Ali"
-let age = 25;           // Declarative ER → window.age = undefined
+// Global scope
+var name = "Ali";       // Global ER → Object ER qismi → window.name = "Ali"
+let age = 25;           // Global ER → Declarative ER qismi (window.age yo'q)
 
 console.log(window.name); // "Ali" ✅
-console.log(window.age);  // undefined ❌ — Declarative ER da, window da emas
-console.log(age);          // 25 ✅ — scope'da accessible
+console.log(window.age);  // undefined ❌ — Declarative ER'da, window'da emas
+console.log(age);          // 25 ✅ — scope resolve orqali topiladi
+
+// Function scope — var bu yerda Declarative ER'ga ketadi!
+function example() {
+  var x = 1;    // Function ER (Declarative ER kengaytmasi) — window.x YO'Q
+  console.log(globalThis.x); // undefined ✅
+}
+
+// ES Module scope
+import { counter } from "./module.js";
+// counter — Module Environment Record'da, immutable indirect binding
+// counter = 10; // ❌ SyntaxError: Assignment to constant variable
 ```
 
 **Deep Dive:**
 
-Declarative ER tezroq ishlashining sababi: engine compile vaqtida barcha binding'larning index'ini biladi — hash table lookup kerak emas. Object ER esa dynamic property lookup qiladi (window object orqali) — sekinroq.
+Declarative ER tezroq ishlashining sababi: engine compile vaqtida barcha binding'larning index'ini biladi — hash table lookup kerak emas. Object ER esa dynamic property lookup qiladi (window object orqali) — sekinroq va ko'p optimizatsiyalar uchun to'siq.
 
----
+Module ER'ning "live binding" xususiyati — V8 spec'dagi `GetBindingValue` operatsiyasi har safar original exporting module'dan qiymatni oladi. Shuning uchun circular import'larda `import` qiymati keyinroq ham yangilanishi mumkin.
 
-## Savol 8: Quyidagi kodning output'ini ayting [Middle+]
+</details>
 
-```javascript
-var a = 1;
+### 6. Global scope'da var bilan e'lon qilingan o'zgaruvchi let dan nima farq qiladi? [Middle]
 
-function outer() {
-  var a = 2;
-
-  function inner() {
-    console.log(a);
-  }
-
-  return inner;
-}
-
-var fn = outer();
-
-function anotherScope() {
-  var a = 3;
-  fn();
-}
-
-anotherScope();
-```
-
-**Javob:**
-
-```
-2
-```
-
-`inner()` funksiyasi `outer()` **ichida yozilgan** — shuning uchun uning outer reference `outer()`ning environment'iga bog'langan. `inner()` `anotherScope()` ichida **chaqirilgan** bo'lsa ham — JavaScript lexical scoping ishlatadi, dynamic emas.
-
-Scope chain: `inner() → outer() → global`
-
-`inner()` ichida `a` qidiriladi:
-1. `inner()` scope'ida → yo'q
-2. `outer()` scope'ida → `a = 2` ✅ topildi!
-
-`anotherScope()` dagi `a = 3` ga hech qachon borilmaydi — chunki `inner()` `outer()` da yozilgan, `anotherScope()` da emas.
-
-Bu **closure** mexanizmi — `inner()` `outer()` tugagandan keyin ham uning scope'iga kira oladi. Bu haqda to'liq [05-closures.md](../05-closures.md) da.
-
----
-
-## Savol 9: Global scope'da var bilan e'lon qilingan o'zgaruvchi let dan nima farq qiladi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Farq | `var` (global) | `let` (global) |
 |------|---------------|----------------|
@@ -334,15 +246,214 @@ var a = 1;
 let b = 2;
 
 // delete
-delete window.x;              // ✅ o'chirish mumkin (configurable: true)
-// let o'zgaruvchini delete bilan o'chirib bo'lmaydi
+delete window.x;              // ❌ false qaytaradi (configurable: false)
+// var ham let ham global scope'da delete bilan o'chirilmaydi
+// Faqat window.x = 1 (var'siz) qilingan property delete bo'ladi
 ```
 
 Bu farqning sababi: `var` va `let` turli Environment Record'larda saqlanadi. `var` → Object ER (window object orqali), `let` → Declarative ER (alohida, window'dan mustaqil).
 
+</details>
+
+### 7. Kod baholash operatsiyasi nima uchun ishlatmaslik kerak? [Middle]
+
+<details>
+<summary>Javob</summary>
+
+`eval()` string sifatida berilgan JavaScript kodni parse va execute qiladi. Uni ishlatmaslik kerak chunki:
+
+**1. Xavfsizlik:** Tashqi source'dan kelgan string'ni baholash code injection imkonini beradi:
+
+```javascript
+// ❌ Xavfli — foydalanuvchi input'ini baholash
+const userInput = "alert('hacked')";
+// ixtiyoriy kod bajariladi!
+```
+
+**2. Performance:** Non-trivial kod baholash mavjud scope'dagi ko'p optimization'larni bekor qiladi:
+
+```javascript
+function optimized() {
+  var x = 10;
+  // V8 x ni register'da saqlashi mumkin (tez)
+  return x + 1;
+}
+
+function notOptimized() {
+  var x = 10;
+  // ❌ scope escape — x heap'ga
+  // V8 x ni heap'da saqlashga majbur — chunki baholash x ni o'qishi/o'zgartirishi MUMKIN
+  return x + 1;
+}
+```
+
+V8 ayrim hollarda **statik bo'sh** kod baholashni specially handle qiladi (constant folding orqali olib tashlanishi mumkin), lekin har qanday non-trivial yoki dinamik baholash scope escape trigger qiladi va kompilyator lokal o'zgaruvchilarni context (heap) ga ko'chirishga majbur bo'ladi.
+
+**3. Direct vs Indirect — spec farqi va scope muammolari:**
+
+Spec'da kod baholash ikki xil chaqiriladi, ular turli semantika beradi. Bu farq ko'pchilik developer'ga noma'lum va interview'larda muhim:
+
+```javascript
+// DIRECT — identifier orqali to'g'ridan-to'g'ri chaqiriladi
+function direct() {
+  // calling scope'ga inject qiladi!
+}
+
+// INDIRECT — boshqa expression orqali chaqiriladi
+function indirect() {
+  // calling scope'ga inject qilMAYDI
+  // global scope'ga ketadi
+}
+```
+
+**Spec farqi:** Direct chaqiruv calling scope context'ida bajariladi. Indirect esa har doim **global scope context'ida** ishlaydi.
+
+**Amaliy ta'siri:**
+- Kutubxonalar qasddan indirect variant ishlatadi ("safe" global code evaluation uchun)
+- Direct variant **scope pollution** va **optimization destruction** ni yaratadi
+- Indirect variant faqat **global injection** xavfi — lekin lokal scope xavfsiz qoladi
+
+**O'rniga ishlatish kerak:** `JSON.parse()` (ma'lumot uchun), yoki dizayn pattern'lar (strategy, command map, factory) — bular statik kod bilan ishlaydi va hech qanday runtime parsing/execution kerak emas.
+
+</details>
+
 ---
 
-## Savol 10: Quyidagi kodda EC Stack qanday o'zgaradi? Output nima? [Middle]
+## Amaliy savollar (Coding Challenges)
+
+### 1. Quyidagi kodning output'ini ayting [Middle]
+
+```javascript
+var x = 1;
+
+function showValue() {
+  console.log(x);
+  var x = 2;
+  console.log(x);
+}
+
+showValue();
+console.log(x);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+undefined
+2
+1
+```
+
+Qadam-baqadam:
+
+```
+showValue() FEC Creation Phase:
+  VariableEnvironment: x = undefined (var hoist — local x!)
+
+showValue() Execution Phase:
+  console.log(x)  → undefined (local x hali undefined)
+  x = 2            → local x endi 2
+  console.log(x)  → 2
+
+Global:
+  console.log(x)  → 1 (global x o'zgarmagan)
+```
+
+Asosiy nuqta: `showValue()` ichida `var x = 2` bor — bu **local** `x` yaratadi. Creation Phase da local `x` = `undefined` bo'ladi. Shuning uchun birinchi `console.log(x)` local `x` ni topadi (undefined), global `x` (1) ni emas. Bu **variable shadowing** — local scope global scope'ni "yashiradi".
+
+</details>
+
+### 2. Quyidagi kodning output'ini ayting [Middle+]
+
+```javascript
+console.log(greeting);
+console.log(format);
+
+var greeting = "Hello";
+function greeting() { return "World"; }
+var format = function() { return "!"; };
+
+console.log(greeting);
+console.log(format);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+[Function: greeting]
+undefined
+Hello
+[Function (anonymous)]
+```
+
+> **Eslatma:** Node.js/brauzer console'da function qiymatlar `[Function: name]` yoki `[Function (anonymous)]` sifatida ko'rsatiladi, to'liq tanasi bilan emas. Quyida real bajarilish tartibi tushuntiriladi.
+
+Creation Phase:
+1. `var greeting` → `undefined`
+2. `function greeting()` → **function declaration function bilan override qiladi** → `greeting = function greeting(){...}`
+3. `var format` → `undefined`
+
+Function declaration `var` dan yuqori priority'ga ega — ikkalasi bir xil nomda bo'lsa, function declaration yutadi.
+
+Execution Phase:
+1. `console.log(greeting)` → `function greeting(){...}` (Creation Phase natijasi)
+2. `console.log(format)` → `undefined` (var hoist)
+3. `greeting = "Hello"` → endi greeting string
+4. `format = function(){...}` → endi format function
+5. `console.log(greeting)` → `"Hello"`
+6. `console.log(format)` → `function(){ return "!"; }`
+
+</details>
+
+### 3. Quyidagi kodning output'ini ayting [Middle+]
+
+```javascript
+var a = 1;
+
+function outer() {
+  var a = 2;
+
+  function inner() {
+    console.log(a);
+  }
+
+  return inner;
+}
+
+var fn = outer();
+
+function anotherScope() {
+  var a = 3;
+  fn();
+}
+
+anotherScope();
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+2
+```
+
+`inner()` funksiyasi `outer()` **ichida yozilgan** — shuning uchun uning outer reference `outer()`ning environment'iga bog'langan. `inner()` `anotherScope()` ichida **chaqirilgan** bo'lsa ham — JavaScript lexical scoping ishlatadi, dynamic emas.
+
+Scope chain: `inner() → outer() → global`
+
+`inner()` ichida `a` qidiriladi:
+1. `inner()` scope'ida → yo'q
+2. `outer()` scope'ida → `a = 2` ✅ topildi!
+
+`anotherScope()` dagi `a = 3` ga hech qachon borilmaydi — chunki `inner()` `outer()` da yozilgan, `anotherScope()` da emas.
+
+Bu **closure** mexanizmi — `inner()` `outer()` tugagandan keyin ham uning scope'iga kira oladi. Bu haqda to'liq [05-closures.md](../05-closures.md) da.
+
+</details>
+
+### 4. Quyidagi kodda EC Stack qanday o'zgaradi? Output nima? [Middle]
 
 ```javascript
 function a() {
@@ -363,7 +474,8 @@ function c() {
 c();
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```
 c start
@@ -385,9 +497,9 @@ EC Stack holati:
 
 Muhim nuqta: `a()` ichidagi `b()` tugamaguncha `c()` `console.log("c end")` ga yeta olmaydi. JavaScript single-threaded — bir vaqtda faqat stack tepasidagi EC bajariladi.
 
----
+</details>
 
-## Savol 11: Bu kodda xato bor. Toping va tuzating [Middle]
+### 5. Bu kodda xato bor. Toping va tuzating [Middle]
 
 ```javascript
 function getUserRole(userId) {
@@ -403,7 +515,8 @@ function getUserRole(userId) {
 }
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Kod ishlaydi, lekin **potentsial xato** bor: `var` function-scoped bo'lgani uchun if/else tashqarisida ham accessible. Hozir ishlaydi, lekin bu xavfli pattern:
 
@@ -438,9 +551,9 @@ function getUserRole(userId) {
 
 `var` bilan if ichida e'lon qilish — bu niyatni noaniq qiladi. O'quvchi "bu faqat if ichida ishlaydi" deb o'ylashi mumkin, aslida function scope bo'ylab accessible. `let` bilan yozish niyatni aniq ko'rsatadi.
 
----
+</details>
 
-## Savol 12: Quyidagi kodning output'ini ayting [Senior]
+### 6. Quyidagi kodning output'ini ayting [Senior]
 
 ```javascript
 var x = 1;
@@ -463,7 +576,8 @@ outer();
 console.log(x);      // ?
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```
 undefined
@@ -501,48 +615,8 @@ console.log(x) → 1 (global x — hech o'zgarmagan)
 
 Har bir funksiyada `var x` bor — har biri **alohida** local `x` yaratadi. Inner'ning `x` i outer'ning `x` iga ta'sir qilmaydi, outer'niki global'ga ta'sir qilmaydi. Bu **variable shadowing** — ichki scope'dagi o'zgaruvchi tashqisini "yashiradi".
 
----
+**Deep Dive:**
 
-## Savol 13: eval() nima uchun ishlatmaslik kerak? [Middle]
+ECMAScript spec'da har bir `var` declaration VariableEnvironment'ning Environment Record'iga `CreateMutableBinding` va `InitializeBinding(undefined)` orqali yoziladi. Identifier resolution esa `ResolveBinding` abstract operation orqali — joriy LexicalEnvironment'dan boshlab, `[[OuterEnv]]` chain bo'ylab `null` gacha qidiriladi. Shuning uchun inner scope'dagi binding topilsa — outer scope'ga bormaydi.
 
-**Javob:**
-
-`eval()` string sifatida berilgan JavaScript kodni parse va execute qiladi. Uni ishlatmaslik kerak chunki:
-
-**1. Xavfsizlik:** Tashqi source'dan kelgan string'ni eval qilish code injection imkonini beradi:
-
-```javascript
-// ❌ Xavfli — foydalanuvchi input'ini eval qilish
-const userInput = "alert('hacked')";
-eval(userInput); // ❌ ixtiyoriy kod bajariladi!
-```
-
-**2. Performance:** Engine eval mavjud scope'dagi barcha optimization'larni bekor qiladi:
-
-```javascript
-function optimized() {
-  var x = 10;
-  // V8 x ni register'da saqlashi mumkin (tez)
-  return x + 1;
-}
-
-function notOptimized() {
-  var x = 10;
-  eval(""); // ❌ hatto bo'sh eval ham optimization'ni buzadi!
-  // V8 x ni heap'da saqlashga majbur — chunki eval x ni o'zgartirishi MUMKIN
-  return x + 1;
-}
-```
-
-**3. Scope muammolari:** Non-strict mode'da eval calling scope'ga o'zgaruvchi inject qilishi mumkin:
-
-```javascript
-function test() {
-  eval("var injected = 'surprise'");
-  console.log(injected); // "surprise" — ❌ eval scope'ga inject qildi!
-}
-```
-
-**O'rniga ishlatish kerak:** `JSON.parse()` (data uchun), `new Function()` (oxirgi chora), yoki boshqa pattern'lar.
-
----
+</details>

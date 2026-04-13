@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: JavaScript Engine nima va u qanday ishlaydi? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. JavaScript Engine nima va u qanday ishlaydi? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 JavaScript Engine — bu JavaScript source code ni qabul qilib, uni machine code ga aylantiruvchi va bajaruvchi dastur. Har bir brauzer o'z engine'iga ega: Chrome — V8, Firefox — SpiderMonkey, Safari — JavaScriptCore.
 
@@ -31,15 +34,18 @@ function add(a, b) {
 // 5. Ko'p chaqirilsa — TurboFan optimized machine code hosil qiladi
 ```
 
-Engine'ning ikkita asosiy komponenti:
+Engine'ning asosiy memory strukturalari (runtime execution uchun):
 - **Call Stack** — funksiya chaqiruvlarini boshqaradi (LIFO tartibida)
 - **Memory Heap** — object, array, function kabi reference type'lar saqlanadigan dinamik xotira
 
----
+Qo'shimcha asosiy qismlar: parser, bytecode interpreter (Ignition), baseline va optimizing compiler'lar (Sparkplug, Maglev, TurboFan), Garbage Collector, inline cache infrastructure — bular hammasi birga engine pipeline'ini tashkil qiladi.
 
-## Savol 2: JIT Compilation nima? Interpreter va Compiler'dan qanday farq qiladi? [Middle]
+</details>
 
-**Javob:**
+### 2. JIT Compilation nima? Interpreter va Compiler'dan qanday farq qiladi? [Middle]
+
+<details>
+<summary>Javob</summary>
 
 JIT (Just-In-Time) Compilation — kodni runtime da, kerak bo'lganda compile qilish usuli. Bu interpreter va compiler'ning afzalliklarini birlashtiradi.
 
@@ -49,7 +55,7 @@ JIT (Just-In-Time) Compilation — kodni runtime da, kerak bo'lganda compile qil
 |-----------|-------------|----------|-----|
 | Startup | Tez | Sekin | Tez |
 | Runtime | Sekin | Tez | Tez (hot code uchun) |
-| Memory | Kam | Ko'p | O'rtacha |
+| Memory | Faqat bytecode/AST | Faqat machine code | Bytecode + optimized code (ikkalasi) |
 
 ```javascript
 // JIT Compilation amalda:
@@ -73,11 +79,12 @@ for (let i = 0; i < 100000; i++) {
 
 JavaScript dynamic typed til bo'lgani uchun AOT (Ahead-Of-Time) compilation qiyin — o'zgaruvchi tipi oldindan noma'lum. JIT esa runtime da profiling data yig'ib, type assumption'lar asosida optimize qiladi. Agar assumption noto'g'ri chiqsa — deoptimization: optimized code tashlanadi, bytecode'ga qaytiladi.
 
----
+</details>
 
-## Savol 3: V8 Engine pipeline'ini bosqichma-bosqich tushuntiring [Senior]
+### 3. V8 Engine pipeline'ini bosqichma-bosqich tushuntiring [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 V8 engine multi-tier compilation pipeline ishlatadi. Source code bir nechta bosqichdan o'tib, to'liq optimized machine code'ga aylanadi.
 
@@ -114,16 +121,22 @@ function sum(arr) {
 
 const numbers = [1, 2, 3, 4, 5];
 
-// 1-10 chaqiruv: Ignition bytecode interpret qiladi
-// 10-100 chaqiruv: Sparkplug baseline machine code
-// 100-1000 chaqiruv: Maglev mid-tier optimized code
-// 1000+ chaqiruv: TurboFan to'liq optimized code
-//   - arr doim Array ekani uchun: bounds check optimization
-//   - arr[i] doim number ekani uchun: number-specific addition
-//   - total hech qachon overflow qilmasa: Smi (Small Integer) optimization
+// V8 tier promotion real mexanizmi:
+// - Har funksiya DOIM Ignition bytecode bilan boshlanadi (birinchi chaqiruv)
+// - Sparkplug: bytecode interpret overhead sezilarli bo'lgan "warm" funksiyalar
+//   uchun baseline machine code (criteria: invocation count + bytecode size heuristic)
+// - Maglev: type feedback yetarli to'plangan "hot" funksiyalar uchun mid-tier
+// - TurboFan: eng hot funksiyalar uchun to'liq optimized code
+// Tier promotion aniq "N chaqiruv" emas — feedback vector state + bytecode size +
+// allocation site feedback + invocation count kombinatsiyasi. Aniq threshold'lar
+// V8 versiyasiga qarab o'zgaradi va `--trace-opt` flag bilan kuzatiladi.
 for (let j = 0; j < 10000; j++) {
   sum(numbers);
 }
+// Loop davomida sum(numbers):
+//   - arr doim Array ekani kuzatiladi → bounds check elimination mumkin
+//   - arr[i] doim number (Smi) ekani kuzatiladi → number-specific addition
+//   - total Smi range'da qolsa → Smi (Small Integer) tagged pointer optimization
 ```
 
 **Deep Dive:**
@@ -135,11 +148,12 @@ TurboFan optimization'lari:
 - **Loop Invariant Code Motion** — loop ichidagi o'zgarmas kodni tashqariga chiqaradi
 - **Register Allocation** — o'zgaruvchilarni CPU register'lariga optimal joylashtiradi
 
----
+</details>
 
-## Savol 4: AST (Abstract Syntax Tree) nima va qayerda ishlatiladi? [Junior+]
+### 4. AST (Abstract Syntax Tree) nima va qayerda ishlatiladi? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 AST — source code'ning tree (daraxt) shaklidagi abstrakt tasviri. Parser tokenlardan AST ni quriladi. "Abstract" — chunki source code'dagi qavslar, nuqtali vergullar, bo'shliqlar AST da yo'q, faqat semantik (ma'noviy) struktura saqlanadi.
 
@@ -166,11 +180,12 @@ AST ni nafaqat engine, balki boshqa tool'lar ham ishlatadi:
 // AST ni real vaqtda ko'rish: https://astexplorer.net
 ```
 
----
+</details>
 
-## Savol 5: V8 dagi Hidden Classes nima va ular nima uchun kerak? [Middle+]
+### 5. V8 dagi Hidden Classes nima va ular nima uchun kerak? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Hidden Classes (V8 ichki nomi: Maps) — har bir JavaScript object'ga biriktiriladigan ichki tuzilma bo'lib, object'ning shape'ini (qaysi property'lar bor, ular xotirada qayerda) tavsiflaydi.
 
@@ -207,11 +222,12 @@ Hidden class'ni buzadigan amallar:
 
 Hidden class transition chain: har bir property qo'shilganda yangi hidden class yaratiladi va avvalgi class'dan transition saqlanadi. Agar boshqa object ham xuddi shu tartibda property qo'shsa — tayyor transition ishlatiladi.
 
----
+</details>
 
-## Savol 6: Inline Caching nima va Monomorphic, Polymorphic, Megamorphic farqi nima? [Senior]
+### 6. Inline Caching nima va Monomorphic, Polymorphic, Megamorphic farqi nima? [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Inline Caching (IC) — property access operatsiyasi uchun engine saqlaydigan "yorliq". Birinchi marta `obj.x` bajarilganda engine hidden class va property offset'ini topadi va cache'laydi. Keyingi safar xuddi shu shape'dagi object kelsa — cache'dan to'g'ridan-to'g'ri oladi, qayta qidirish kerak emas.
 
@@ -250,15 +266,16 @@ getName({ name: "z", c: 3, d: 4 });     // Shape E
 
 Monomorphic holat production kodni eng tez qiladi. Shuning uchun bir xil shape'dagi object'lar bilan ishlash muhim. React/Vue component'lar ham shu sababdan predictable shape'da props oladi — engine yaxshi optimize qiladi.
 
----
+</details>
 
-## Savol 7: Call Stack nima va JavaScript nima uchun single-threaded? [Junior+]
+### 7. Call Stack nima va JavaScript nima uchun single-threaded? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Call Stack — funksiya chaqiruvlarini boshqaradigan LIFO (Last In, First Out) tartibidagi stack. Har bir funksiya chaqirilganda stack'ga yangi frame qo'shiladi, funksiya tugaganda olib tashlanadi.
 
-JavaScript **single-threaded** — uning faqat **bitta** call stack'i bor. Bir vaqtda faqat bitta funksiya bajariladi. Bu dizayn tanlovi edi — JavaScript dastlab brauzerda DOM manipulate qilish uchun yaratilgan. Agar ikkita thread bir vaqtda bitta DOM element'ni o'zgartirsa — conflict hosil bo'ladi. Single-threaded model buni oldini oladi.
+JavaScript **single-threaded** — uning faqat **bitta** call stack'i bor. Bir vaqtda faqat bitta funksiya bajariladi. Bu dizayn tanlovi tarixiy: Netscape 1995-da JavaScript'ni Brendan Eich'ga 10 kun ichida yozishni buyurgan — implementation simplicity birinchi asosiy sabab edi. DOM concurrency xavfi (ikkita thread bir vaqtda DOM element'ni o'zgartirsa race condition) — keyinchalik qo'shilgan muhim justification: single-threaded model DOM API dizaynini ham ancha soddalashtirdi.
 
 Lekin single-threaded degani "sekin" degani emas — Web APIs, callback queue va event loop orqali asinxron operatsiyalar bajariladi (bu haqda [11-event-loop.md](../11-event-loop.md) da).
 
@@ -282,58 +299,12 @@ printSquare(4);
 // 8. printSquare return → [global]
 ```
 
----
+</details>
 
-## Savol 8: Quyidagi kodning output'ini ayting [Middle]
+### 8. V8 da Deoptimization nima va qachon sodir bo'ladi? [Senior]
 
-```javascript
-function a() {
-  console.log('a start');
-  b();
-  console.log('a end');
-}
-
-function b() {
-  console.log('b start');
-  c();
-  console.log('b end');
-}
-
-function c() {
-  console.log('c');
-}
-
-a();
-```
-
-**Javob:**
-
-```
-a start
-b start
-c
-b end
-a end
-```
-
-Call Stack holati har bir qadam uchun:
-
-```
-1. a() chaqirildi     → Stack: [a]       → "a start"
-2. b() chaqirildi     → Stack: [a, b]    → "b start"
-3. c() chaqirildi     → Stack: [a, b, c] → "c"
-4. c() tugadi         → Stack: [a, b]    → "b end"
-5. b() tugadi         → Stack: [a]       → "a end"
-6. a() tugadi         → Stack: []
-```
-
-Call stack LIFO tartibida ishlaydi — eng oxirgi qo'shilgan funksiya eng birinchi tugaydi. `c()` birinchi tugadi, keyin `b()`, keyin `a()`. Har bir funksiya o'zidan keyingi kod qatoriga faqat chaqirgan funksiya qaytgandan keyin o'tadi — shuning uchun `"b end"` faqat `c()` tugagandan keyin chiqadi.
-
----
-
-## Savol 9: V8 da Deoptimization nima va qachon sodir bo'ladi? [Senior]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Deoptimization — V8 optimizing compiler (TurboFan) yaratgan optimized machine code'ni tashlab, Ignition bytecode'ga qaytish jarayoni. Bu optimized code'dagi assumption (taxmin) runtime da noto'g'ri chiqganda sodir bo'ladi.
 
@@ -365,16 +336,22 @@ add("hello", " world");
 
 Eng ko'p uchraydigan deoptimization sabablari:
 1. **Type change** — kutilmagan tip kelishi (number o'rniga string)
-2. **Hidden class change** — object shape o'zgarishi
+2. **Hidden class change** — object shape o'zgarishi (yangi property, delete)
 3. **delete operator** — object dictionary mode'ga o'tishi
-4. **Prototype chain change** — prototype'ga o'zgartirish kiritish
+4. **Prototype chain mutation** — `Object.prototype` yoki `Array.prototype` ga runtime modifikatsiyasi (V8 built-in prototype stability assumption'larini invalidate qiladi), `Object.setPrototypeOf()` chaqiruvi
 5. **Out-of-bounds array access** — array chegarasidan tashqari index
+6. **Feedback vector state change** — monomorphic → polymorphic → megamorphic transition
 
----
+**Deep Dive:**
 
-## Savol 10: Stack va Heap farqi nima? Primitive va Reference type'lar qayerda saqlanadi? [Junior+]
+V8 da deoptimization `Deoptimizer::DeoptimizeFunction` orqali amalga oshiriladi. TurboFan har bir type assumption uchun machine code'ga **guard** (type check) qo'yadi. Guard fail bo'lganda **bailout** sodir bo'ladi — optimized frame'dan Ignition bytecode frame'ga qaytish uchun `FrameState` ma'lumoti ishlatiladi. V8 `--trace-deopt` flag bilan deoptimization sabablarini ko'rish mumkin.
 
-**Javob:**
+</details>
+
+### 9. Stack va Heap farqi nima? Primitive va Reference type'lar qayerda saqlanadi? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 **Stack** — tez, tartibli, hajmi cheklangan xotira. Funksiya chaqiruvlari (frame'lar) va primitive qiymatlar saqlanadi. Funksiya tugaganda frame avtomatik tozalanadi.
 
@@ -408,9 +385,104 @@ d = 99;
 console.log(c);       // 10 — c o'zgarmadi, chunki qiymat nusxalangan
 ```
 
+</details>
+
+### 10. Lazy Parsing (Pre-parsing) nima va nima uchun kerak? [Senior]
+
+<details>
+<summary>Javob</summary>
+
+Lazy Parsing — V8 da funksiya tanasini darhol to'liq parse qilmasdan, faqat syntax to'g'riligini va scope ma'lumotini tekshirish usuli. Funksiya chaqirilganda to'liq parse qilinadi (eager parsing).
+
+Bu nima uchun kerak: katta web sahifalarda minglab funksiya bo'lishi mumkin, lekin sahifa yuklanganda ularning faqat kichik qismi darhol chaqiriladi. Barcha funksiyalarni to'liq parse qilish vaqtni behuda sarflaydi.
+
+```javascript
+// V8 bu funksiyani darhol to'liq parse qilMAYDI (lazy)
+function heavyAnalytics() {
+  // 500 qator kod...
+  // Pre-parser faqat scope va syntax tekshiradi
+  // To'liq AST hosil qilMAYDI
+}
+
+// Bu yerda to'liq parse qilinadi — chunki chaqirildi
+document.getElementById('btn').onclick = function() {
+  heavyAnalytics(); // ← endi full parse
+};
+```
+
+Lekin lazy parsing kamchiligi ham bor: agar funksiya darhol chaqirilsa (IIFE), avval lazy parse keyin full parse — ikki marta ish.
+
+```javascript
+// ❌ Ikki marta parse bo'ladi:
+(function() {
+  // avval pre-parse, keyin chaqirilganda full parse
+})();
+
+// V8 buni taniydi va to'g'ridan-to'g'ri eager parse qiladi
+// Lekin ba'zi hollarda engine buni aniqlay olmaydi
+```
+
+Sahifa yuklash tezligini oshirish uchun: darhol kerak bo'lmagan kodni dynamic import (`import()`) orqali alohida chunk'ga ajratish — bu engine'ga lazy parsing imkonini beradi va initial parse vaqtini kamaytiradi.
+
+**Deep Dive:**
+
+V8 da pre-parser `PreParser::PreParseFunction` deb ataladi. U to'liq AST qurmaydi — faqat scope analysis (qaysi o'zgaruvchi qaysi scope'da) va syntax validation qiladi. Pre-parser davomida topilgan scope ma'lumotlari `PreparseData` sifatida cache'lanadi, keyinchalik to'liq parse qilinganda qayta scope analysis kerak bo'lmaydi. IIFE'lar uchun V8 `(` dan keyin `function` kelganini ko'rsa eager parse qilishga o'tadi.
+
+</details>
+
 ---
 
-## Savol 11: Bu kodda performance muammo bor. Toping va tuzating [Middle+]
+## Amaliy savollar (Coding Challenges)
+
+### 1. Quyidagi kodning output'ini ayting [Middle]
+
+```javascript
+function a() {
+  console.log('a start');
+  b();
+  console.log('a end');
+}
+
+function b() {
+  console.log('b start');
+  c();
+  console.log('b end');
+}
+
+function c() {
+  console.log('c');
+}
+
+a();
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+a start
+b start
+c
+b end
+a end
+```
+
+Call Stack holati har bir qadam uchun:
+
+```
+1. a() chaqirildi     → Stack: [a]       → "a start"
+2. b() chaqirildi     → Stack: [a, b]    → "b start"
+3. c() chaqirildi     → Stack: [a, b, c] → "c"
+4. c() tugadi         → Stack: [a, b]    → "b end"
+5. b() tugadi         → Stack: [a]       → "a end"
+6. a() tugadi         → Stack: []
+```
+
+Call stack LIFO tartibida ishlaydi — eng oxirgi qo'shilgan funksiya eng birinchi tugaydi. `c()` birinchi tugadi, keyin `b()`, keyin `a()`. Har bir funksiya o'zidan keyingi kod qatoriga faqat chaqirgan funksiya qaytgandan keyin o'tadi — shuning uchun `"b end"` faqat `c()` tugagandan keyin chiqadi.
+
+</details>
+
+### 2. Bu kodda performance muammo bor. Toping va tuzating [Middle+]
 
 ```javascript
 function processUsers(users) {
@@ -434,7 +506,8 @@ function processUsers(users) {
 }
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Muammo: `adminUser` va `regularUser` turli tartibda property qo'shmoqda. Admin: `role → name → permissions`. Regular: `name → role → permissions`. Bu turli hidden class'lar hosil qiladi — inline cache buziladi.
 
@@ -473,9 +546,9 @@ function processUsers(users) {
 }
 ```
 
----
+</details>
 
-## Savol 12: Quyidagi kodning output'ini ayting va Stack Overflow bo'ladimi? [Middle]
+### 3. Quyidagi kodning output'ini ayting va Stack Overflow bo'ladimi? [Middle]
 
 ```javascript
 function factorial(n) {
@@ -487,7 +560,8 @@ console.log(factorial(5));
 console.log(factorial(0));
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```
 120
@@ -513,13 +587,14 @@ console.log(factorial(1)); // 1
 
 Base case yozishda edge case'larni (0, negative, undefined) hisobga olish kerak — aks holda cheksiz rekursiya va stack overflow xavfi bor.
 
----
+</details>
 
-## Savol 13: V8 uchun optimized bo'lgan `createPoint` factory function yozing [Middle+]
+### 4. V8 uchun optimized bo'lgan `createPoint` factory function yozing [Middle+]
 
 **Savol:** `createPoint(x, y)` funksiyasi yozing — V8 Hidden Classes va Inline Caching uchun optimal bo'lsin.
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // ✅ V8 optimized factory function
@@ -571,42 +646,4 @@ function createPoint2D(x, y) { return { x, y }; }         // doim {x, y}
 function createPoint3D(x, y, z) { return { x, y, z }; }   // doim {x, y, z}
 ```
 
----
-
-## Savol 14: Lazy Parsing (Pre-parsing) nima va nima uchun kerak? [Senior]
-
-**Javob:**
-
-Lazy Parsing — V8 da funksiya tanasini darhol to'liq parse qilmasdan, faqat syntax to'g'riligini va scope ma'lumotini tekshirish usuli. Funksiya chaqirilganda to'liq parse qilinadi (eager parsing).
-
-Bu nima uchun kerak: katta web sahifalarda minglab funksiya bo'lishi mumkin, lekin sahifa yuklanganda ularning faqat kichik qismi darhol chaqiriladi. Barcha funksiyalarni to'liq parse qilish vaqtni behuda sarflaydi.
-
-```javascript
-// V8 bu funksiyani darhol to'liq parse qilMAYDI (lazy)
-function heavyAnalytics() {
-  // 500 qator kod...
-  // Pre-parser faqat scope va syntax tekshiradi
-  // To'liq AST hosil qilMAYDI
-}
-
-// Bu yerda to'liq parse qilinadi — chunki chaqirildi
-document.getElementById('btn').onclick = function() {
-  heavyAnalytics(); // ← endi full parse
-};
-```
-
-Lekin lazy parsing kamchiligi ham bor: agar funksiya darhol chaqirilsa (IIFE), avval lazy parse keyin full parse — ikki marta ish.
-
-```javascript
-// ❌ Ikki marta parse bo'ladi:
-(function() {
-  // avval pre-parse, keyin chaqirilganda full parse
-})();
-
-// V8 buni taniydi va to'g'ridan-to'g'ri eager parse qiladi
-// Lekin ba'zi hollarda engine buni aniqlay olmaydi
-```
-
-Sahifa yuklash tezligini oshirish uchun: darhol kerak bo'lmagan kodni dynamic import (`import()`) orqali alohida chunk'ga ajratish — bu engine'ga lazy parsing imkonini beradi va initial parse vaqtini kamaytiradi.
-
----
+</details>

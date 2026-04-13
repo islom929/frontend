@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Iterable va Iterator farqi nima? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Iterable va Iterator farqi nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 Bu ikki alohida tushuncha:
 
@@ -28,11 +31,12 @@ console.log(iterator.next()); // { value: undefined, done: true }
 
 `for...of`, spread (`...`), destructuring — barchasi avval `[Symbol.iterator]()` ni chaqirib iterator oladi, keyin `next()` orqali qiymatlarni oladi.
 
----
+</details>
 
-## Savol 2: `for...of` va `for...in` farqi nima? [Junior+]
+### 2. `for...of` va `for...in` farqi nima? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Xususiyat | `for...of` | `for...in` |
 |-----------|-----------|-----------|
@@ -54,11 +58,12 @@ for (const key in arr) console.log(key); // "0", "1", "2", "custom" ← kutilmag
 
 Qoida: **Array/iterable** ustida → `for...of`. **Object property'lari** ustida → `for...in` (yoki `Object.keys()/entries()`).
 
----
+</details>
 
-## Savol 3: Generator nima? Oddiy funksiyadan farqi? [Middle]
+### 3. Generator nima? Oddiy funksiyadan farqi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Generator — `function*` bilan e'lon qilinadigan maxsus funksiya. Oddiy funksiyadan asosiy farqlari:
 
@@ -88,45 +93,12 @@ gen.next(); //                 → { value: undefined, done: true }
 
 **Deep Dive:** Engine ichida generator state machine sifatida ishlaydi. Har bir `yield` — bitta state. `next()` joriy state'dan keyingisiga o'tadi. V8 da bu switch-case ga transpile bo'ladi.
 
----
+</details>
 
-## Savol 4: Quyidagi kodning output ini ayting [Middle+]
+### 4. `yield*` nima qiladi? [Middle]
 
-**Savol:**
-
-```javascript
-function* gen() {
-  const a = yield 1;
-  const b = yield a + 10;
-  return a + b;
-}
-
-const g = gen();
-console.log(g.next());
-console.log(g.next(5));
-console.log(g.next(20));
-```
-
-**Javob:**
-
-```
-{ value: 1, done: false }
-{ value: 15, done: false }
-{ value: 25, done: true }
-```
-
-Step-by-step:
-1. `g.next()` → generator boshlanadi → `yield 1` → `{ value: 1, done: false }`. Birinchi `next()` ga argument ignore bo'ladi.
-2. `g.next(5)` → `a = 5` (oldingi yield qiymati) → `yield 5 + 10` → `{ value: 15, done: false }`
-3. `g.next(20)` → `b = 20` (oldingi yield qiymati) → `return 5 + 20` → `{ value: 25, done: true }`
-
-Muhim: birinchi `next()` ga argument berish ma'nosiz — hali `yield` uchralmagan. Ikkinchi `next(5)` dagi `5` — birinchi `yield` ning qiymatiga aylanadi (`a = 5`).
-
----
-
-## Savol 5: `yield*` nima qiladi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `yield*` — boshqa iterable yoki generator'ga iteratsiyani **delegatsiya** qiladi. Ichki iterable'ning barcha qiymatlarini tashqi generator orqali birma-bir yield qiladi.
 
@@ -163,11 +135,12 @@ console.log([...concat([1, 2], "ab", new Set([3, 4]))]);
 
 Eng kuchli use case — **recursive tree traversal**: `yield* walkTree(child)`.
 
----
+</details>
 
-## Savol 6: Custom iterable ob'ekt qanday yaratiladi? [Middle]
+### 5. Custom iterable ob'ekt qanday yaratiladi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Ob'ektga `[Symbol.iterator]()` method qo'shish kerak. Bu method iterator qaytarishi kerak.
 
@@ -192,46 +165,12 @@ const [a, b, ...rest] = range; // a=1, b=2, rest=[3, 4, 5]
 
 Generator bilan yozish ancha qisqa — state boshqaruvini engine o'zi qiladi. Oddiy usulda `next()` method'i bor ob'ekt qaytarish va `current` state ni qo'lda boshqarish kerak.
 
----
+</details>
 
-## Savol 7: Bu kodda nima xato? [Middle+]
+### 6. Generator'ni qayta ishlatsa bo'ladimi? [Middle]
 
-**Savol:**
-
-```javascript
-function* fetchAll(urls) {
-  urls.forEach(async url => {
-    const res = await fetch(url);
-    yield await res.json();
-  });
-}
-```
-
-**Javob:**
-
-**Ikkita xato:**
-
-1. `yield` callback ichida — **SyntaxError**. `yield` faqat to'g'ridan-to'g'ri generator ichida ishlatiladi. `forEach` callback — boshqa funksiya.
-
-2. `forEach` + async — `await` ishlaydi, lekin `forEach` natijani **kutmaydi**. Barcha callback'lar "fire and forget" bo'ladi.
-
-To'g'ri usul:
-
-```javascript
-// ✅ async generator + for...of
-async function* fetchAll(urls) {
-  for (const url of urls) {
-    const res = await fetch(url);
-    yield await res.json();
-  }
-}
-```
-
----
-
-## Savol 8: Generator'ni qayta ishlatsa bo'ladimi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **Yo'q.** Generator object bir yo'nalishli — tugagandan keyin qayta boshlanmaydi.
 
@@ -257,11 +196,12 @@ console.log([...reusable]); // [1, 2, 3]
 console.log([...reusable]); // [1, 2, 3] — har safar yangi iterator
 ```
 
----
+</details>
 
-## Savol 9: Lazy evaluation nima? Generator bilan qanday bog'liq? [Middle+]
+### 7. Lazy evaluation nima? Generator bilan qanday bog'liq? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Lazy evaluation — qiymatlar faqat **so'ralganda** hisoblanadi, oldindan barchasini tayyor qilmasdan. Generator'ning `yield` mexanizmi aynan shu.
 
@@ -273,6 +213,7 @@ Lazy evaluation — qiymatlar faqat **so'ralganda** hisoblanadi, oldindan barcha
   .slice(0, 3);         // faqat 3 tasi kerak edi!
 
 // LAZY — faqat kerakli miqdor
+function* range(n) { for (let i = 1; i <= n; i++) yield i; } // 1..n generator
 function* lazyMap(iter, fn) { for (const x of iter) yield fn(x); }
 function* lazyFilter(iter, fn) { for (const x of iter) if (fn(x)) yield x; }
 function* take(iter, n) {
@@ -290,40 +231,12 @@ const result = [...take(
 // Faqat 8 ta raqam hisoblandi (25, 36, 49 topilganda to'xtaydi)
 ```
 
----
+</details>
 
-## Savol 10: Quyidagi kodning output ini ayting [Middle+]
+### 8. `generator.return()` va `generator.throw()` nima qiladi? [Middle+]
 
-**Savol:**
-
-```javascript
-function* a() {
-  yield 1;
-  yield* b();
-  yield 4;
-}
-
-function* b() {
-  yield 2;
-  yield 3;
-}
-
-console.log([...a()]);
-```
-
-**Javob:**
-
-```
-[1, 2, 3, 4]
-```
-
-`yield* b()` — `b()` generator'ining barcha yield'larini `a()` orqali tashqariga chiqaradi. Ya'ni `yield 2` va `yield 3` bevosita `a()` dan keladi. Keyin `a()` o'z `yield 4` bilan davom etadi.
-
----
-
-## Savol 11: `generator.return()` va `generator.throw()` nima qiladi? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 - **`return(value)`** — generator'ni **tugatadi**. `{ value, done: true }` qaytaradi. `finally` bloklari bajariladi.
 - **`throw(error)`** — generator ichiga **xato tashiydi**. `try/catch` bilan ushlansa — davom etadi. Ushlanmasa — generator tugaydi.
@@ -359,11 +272,12 @@ g.next();                           // { value: "kutish" }
 g.throw(new Error("xato!"));       // "Xato: xato!" → { value: "kutish" } — DAVOM!
 ```
 
----
+</details>
 
-## Savol 12: Async generator nima? Qachon ishlatiladi? [Middle+]
+### 9. Async generator nima? Qachon ishlatiladi? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Async generator — `async function*` — `yield` va `await` ni bir vaqtda ishlatish imkonini beradi. `next()` **Promise** qaytaradi.
 
@@ -397,11 +311,12 @@ for await (const item of fetchPages('/api/products')) {
 | Tsikl | `for...of` | `for await...of` |
 | Use case | Sinxron data, lazy eval | API, streams, events |
 
----
+</details>
 
-## Savol 13: Spread operator iterable bo'lmagan object bilan ishlaydimi? [Middle]
+### 10. Spread operator iterable bo'lmagan object bilan ishlaydimi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **Array spread** (`[...x]`) — faqat **iterable** bilan.
 **Object spread** (`{...x}`) — **iterable shart emas**, OwnEnumerableProperties copy qiladi.
@@ -415,11 +330,12 @@ console.log({ ...obj }); // ✅ { a: 1, b: 2 }
 
 Bu ikki **turli mexanizm**: `[...x]` → iterator protocol, `{...x}` → Object.assign semantikasi.
 
----
+</details>
 
-## Savol 14: `for...of` da `return` qiymati nima uchun ko'rinmaydi? [Middle+]
+### 11. `for...of` da `return` qiymati nima uchun ko'rinmaydi? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `for...of` `done: true` bo'lganda tsikl **TO'XTAYDI** — shu iteratsiya'ning `value` sini o'qimaydi.
 
@@ -439,11 +355,174 @@ g.next(); // { value: 2, done: false }
 g.next(); // { value: 3, done: true } ← bu yerda bor
 ```
 
+</details>
+
+### 12. Generator va async/await bog'liqligi nima? [Senior]
+
+<details>
+<summary>Javob</summary>
+
+`async/await` — generator + Promise pattern'ning **syntactic sugar'i**:
+
+```javascript
+// async/await:
+async function getData() {
+  const a = await fetch(url);
+  return a.json();
+}
+
+// generator ekvivalenti:
+function getData() {
+  return spawn(function* () {
+    const a = yield fetch(url);
+    return a.json();
+  });
+}
+```
+
+Mapping: `await` → `yield`, resume → `gen.next(value)`, reject → `gen.throw(error)`.
+
+`spawn` — generator runner — har bir `yield` qilingan Promise resolve bo'lganda `next()`, reject bo'lganda `throw()` chaqiradi. Bugungi kunda engine buni native bajaradi.
+
+**Deep Dive:** Babel va TypeScript async/await ni transpile qilganda aynan shu generator+Promise pattern ishlatadi. V8 da esa async function ichida `await` uchrasa engine implicit Promise yaratadi va microtask queue orqali resume qiladi — bu generator-based polyfill'dan samaraliroq, chunki engine stack frame'ni to'g'ridan-to'g'ri saqlaydi.
+
+</details>
+
+### 13. Iterator Helpers (ES2025) nima? [Senior]
+
+<details>
+<summary>Javob</summary>
+
+ES2025 da iterator'larga to'g'ridan-to'g'ri method'lar qo'shildi — `Iterator.prototype` ga. Array method'lariga o'xshash, lekin **lazy** ishlaydi:
+
+```javascript
+// ES2025 Iterator Helpers
+const result = Iterator.from([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+  .filter(x => x % 2 === 0)  // lazy — darhol hisoblanmaydi
+  .map(x => x * x)           // lazy
+  .take(3)                    // lazy — faqat 3 ta oladi
+  .toArray();                 // trigger — hisoblash boshlaydi
+
+console.log(result); // [4, 16, 36]
+```
+
+Mavjud method'lar: `.map()`, `.filter()`, `.take()`, `.drop()`, `.flatMap()`, `.reduce()`, `.toArray()`, `.forEach()`, `.some()`, `.every()`, `.find()`.
+
+Bu generator bilan qo'lda yozilgan lazy pipeline'ning standart versiyasi.
+
+**Deep Dive:** Iterator Helpers TC39 proposal (Stage 4) `Iterator.prototype` ga method'lar qo'shadi. `Iterator.from()` — istalgan iterable yoki iterator'ni wrap qiladi. Lazy method'lar (map, filter, take) yangi `WrapForValidIteratorPrototype` object qaytaradi — har bir `next()` chaqiruvda pipeline'dagi oldingi bosqichdan element so'raydi. Bu pull-based evaluation modeli.
+
+</details>
+
 ---
 
-## Savol 15: Generator bilan infinite Fibonacci ketma-ketligini yozing [Middle]
+## Amaliy savollar (Coding Challenges)
 
-**Javob:**
+### 1. Quyidagi kodning output'ini ayting [Middle+]
+
+**Savol:**
+
+```javascript
+function* gen() {
+  const a = yield 1;
+  const b = yield a + 10;
+  return a + b;
+}
+
+const g = gen();
+console.log(g.next());
+console.log(g.next(5));
+console.log(g.next(20));
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+{ value: 1, done: false }
+{ value: 15, done: false }
+{ value: 25, done: true }
+```
+
+Step-by-step:
+1. `g.next()` → generator boshlanadi → `yield 1` → `{ value: 1, done: false }`. Birinchi `next()` ga argument ignore bo'ladi.
+2. `g.next(5)` → `a = 5` (oldingi yield qiymati) → `yield 5 + 10` → `{ value: 15, done: false }`
+3. `g.next(20)` → `b = 20` (oldingi yield qiymati) → `return 5 + 20` → `{ value: 25, done: true }`
+
+Muhim: birinchi `next()` ga argument berish ma'nosiz — hali `yield` uchralmagan. Ikkinchi `next(5)` dagi `5` — birinchi `yield` ning qiymatiga aylanadi (`a = 5`).
+
+</details>
+
+### 2. Bu kodda nima xato? [Middle+]
+
+**Savol:**
+
+```javascript
+function* fetchAll(urls) {
+  urls.forEach(async url => {
+    const res = await fetch(url);
+    yield await res.json();
+  });
+}
+```
+
+<details>
+<summary>Javob</summary>
+
+**Ikkita xato:**
+
+1. `yield` callback ichida — **SyntaxError**. `yield` faqat to'g'ridan-to'g'ri generator ichida ishlatiladi. `forEach` callback — boshqa funksiya.
+
+2. `forEach` + async — `await` ishlaydi, lekin `forEach` natijani **kutmaydi**. Barcha callback'lar "fire and forget" bo'ladi.
+
+To'g'ri usul:
+
+```javascript
+// ✅ async generator + for...of
+async function* fetchAll(urls) {
+  for (const url of urls) {
+    const res = await fetch(url);
+    yield await res.json();
+  }
+}
+```
+
+</details>
+
+### 3. Quyidagi kodning output'ini ayting [Middle+]
+
+**Savol:**
+
+```javascript
+function* a() {
+  yield 1;
+  yield* b();
+  yield 4;
+}
+
+function* b() {
+  yield 2;
+  yield 3;
+}
+
+console.log([...a()]);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+[1, 2, 3, 4]
+```
+
+`yield* b()` — `b()` generator'ining barcha yield'larini `a()` orqali tashqariga chiqaradi. Ya'ni `yield 2` va `yield 3` bevosita `a()` dan keladi. Keyin `a()` o'z `yield 4` bilan davom etadi.
+
+</details>
+
+### 4. Generator bilan infinite Fibonacci ketma-ketligini yozing [Middle]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function* fibonacci() {
@@ -468,53 +547,4 @@ console.log([...take(fibonacci(), 10)]);
 
 Generator'ning kuchi — cheksiz ketma-ketlik memory sarflamaydi. Faqat joriy holatni saqlaydi (`a`, `b`). `take` bilan kerakli miqdorni olish — xavfsiz.
 
----
-
-## Savol 16: Generator va async/await bog'liqligi nima? [Senior]
-
-**Javob:**
-
-`async/await` — generator + Promise pattern'ning **syntactic sugar'i**:
-
-```javascript
-// async/await:
-async function getData() {
-  const a = await fetch(url);
-  return a.json();
-}
-
-// generator ekvivalenti:
-function getData() {
-  return spawn(function* () {
-    const a = yield fetch(url);
-    return a.json();
-  });
-}
-```
-
-Mapping: `await` → `yield`, resume → `gen.next(value)`, reject → `gen.throw(error)`.
-
-`spawn` — generator runner — har bir `yield` qilingan Promise resolve bo'lganda `next()`, reject bo'lganda `throw()` chaqiradi. Bugungi kunda engine buni native bajaradi.
-
----
-
-## Savol 17: Iterator Helpers (ES2025) nima? [Senior]
-
-**Javob:**
-
-ES2025 da iterator'larga to'g'ridan-to'g'ri method'lar qo'shildi — `Iterator.prototype` ga. Array method'lariga o'xshash, lekin **lazy** ishlaydi:
-
-```javascript
-// ES2025 Iterator Helpers
-const result = Iterator.from([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-  .filter(x => x % 2 === 0)  // lazy — darhol hisoblanmaydi
-  .map(x => x * x)           // lazy
-  .take(3)                    // lazy — faqat 3 ta oladi
-  .toArray();                 // trigger — hisoblash boshlaydi
-
-console.log(result); // [4, 16, 36]
-```
-
-Mavjud method'lar: `.map()`, `.filter()`, `.take()`, `.drop()`, `.flatMap()`, `.reduce()`, `.toArray()`, `.forEach()`, `.some()`, `.every()`, `.find()`.
-
-Bu generator bilan qo'lda yozilgan lazy pipeline'ning standart versiyasi.
+</details>

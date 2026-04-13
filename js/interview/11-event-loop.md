@@ -4,11 +4,18 @@
 
 ---
 
-## Savol 1: JavaScript nima uchun single-threaded? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. JavaScript nima uchun single-threaded? [Junior+]
 
-JavaScript dastlab browser uchun — DOM manipulatsiya qilish uchun yaratilgan. Agar ikkita thread bir vaqtda bitta DOM elementni o'zgartirmoqchi bo'lsa, **race condition** yuzaga keladi — natija oldindan aytib bo'lmaydi.
+<details>
+<summary>Javob</summary>
+
+JavaScript single-threaded dizaynining **ikki tarixiy sababi** bor:
+
+1. **Implementation simplicity (asosiy)** — Netscape 1995-da Brendan Eich'ga JavaScript'ni 10 kun ichida yozishni buyurgan. Multi-threaded runtime yaratish murakkab va ko'p vaqt talab qilardi — single-threaded eng oddiy va tezkor yechim edi.
+
+2. **DOM concurrency safety (post-hoc justification)** — keyinchalik muhim: agar ikkita thread bir vaqtda bitta DOM elementni o'zgartirmoqchi bo'lsa, **race condition** yuzaga keladi. Single-threaded model DOM API dizaynini ham ancha soddalashtirdi.
 
 Single-threaded dizaynning afzalliklari:
 - **DOM safety** — bir vaqtda bitta thread DOM ga yozadi
@@ -25,11 +32,12 @@ console.log("3");
 
 Lekin JavaScript o'zi single-threaded bo'lsa-da, runtime (browser/Node.js) **multi-threaded**. `setTimeout`, `fetch` kabi operatsiyalar browser'ning boshqa thread'larida bajariladi.
 
----
+</details>
 
-## Savol 2: Event Loop nima va qanday ishlaydi? [Middle]
+### 2. Event Loop nima va qanday ishlaydi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Event Loop — Call Stack va Queue'lar o'rtasidagi aloqani boshqaradigan cheksiz loop. U quyidagi algoritmni takrorlaydi:
 
@@ -54,11 +62,12 @@ Eng muhim nuqta — **asimmetriya**: microtask'lar **barchasi** bajariladi, macr
 
 V8 engine Event Loop ni implement qilmaydi — u faqat JavaScript kodni compile va execute qiladi. Event Loop browser uchun HTML spec da, Node.js uchun libuv kutubxonasida implement qilingan.
 
----
+</details>
 
-## Savol 3: Microtask va Macrotask farqi nima? [Middle]
+### 3. Microtask va Macrotask farqi nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Xususiyat | Microtask | Macrotask |
 |-----------|-----------|-----------|
@@ -86,44 +95,12 @@ setTimeout(() => {
 // Har bir macrotask'dan keyin microtask checkpoint bo'ladi
 ```
 
----
+</details>
 
-## Savol 4: Quyidagi kodning output ini ayting [Middle+]
+### 4. setTimeout(fn, 0) nima uchun darhol bajarmaydi? [Middle]
 
-**Savol:**
-
-```javascript
-console.log("A");
-setTimeout(() => console.log("B"), 0);
-Promise.resolve()
-  .then(() => console.log("C"))
-  .then(() => console.log("D"));
-Promise.resolve().then(() => console.log("E"));
-console.log("F");
-```
-
-**Javob:**
-
-Output: **A, F, C, E, D, B**
-
-```
-Sync phase: "A", "F"
-
-Microtask Queue: [C_callback, E_callback]
-→ C bajariladi → "C" → .then(D) queue ga: [E_callback, D_callback]
-→ E bajariladi → "E"
-→ D bajariladi → "D"
-
-Macrotask: B bajariladi → "B"
-```
-
-C va E **ikkalasi ham birinchi** .then() callback — ular FIFO tartibida bajariladi. D esa C bajarilgandan keyin queue ga tushadi, shuning uchun E dan keyin.
-
----
-
-## Savol 5: setTimeout(fn, 0) nima uchun darhol bajarmaydi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `setTimeout(fn, 0)` callback'ni **Macrotask Queue** ga qo'yadi. U faqat:
 1. Sync kod tugagandan keyin
@@ -144,11 +121,12 @@ Qo'shimcha nuqtalar:
 - Background tab'larda minimum **1000ms** gacha throttle qilinishi mumkin
 - Amalda OS scheduler tufayli ~1-4ms delay bo'ladi
 
----
+</details>
 
-## Savol 6: Promise constructor sync ishlashini tushuntiring [Middle]
+### 5. Promise constructor sync ishlashini tushuntiring [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `new Promise(executor)` dagi `executor` funksiya **synchronous** tarzda darhol chaqiriladi. Faqat `.then()`, `.catch()`, `.finally()` callback'lari async (microtask sifatida) ishlaydi.
 
@@ -168,11 +146,12 @@ console.log("4 — sync");
 // .then(): MICROTASK — sync koddan keyin
 ```
 
----
+</details>
 
-## Savol 7: requestAnimationFrame Event Loop'da qayerda turadi? [Middle+]
+### 6. requestAnimationFrame Event Loop'da qayerda turadi? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `requestAnimationFrame` (rAF) na microtask, na macrotask — u Event Loop'ning **rendering bosqichida** ishlaydi.
 
@@ -204,11 +183,12 @@ rAF animatsiya uchun ideal:
 - Background tab'da avtomatik to'xtaydi (battery tejaydi)
 - `setTimeout(fn, 16)` dan aniqroq
 
----
+</details>
 
-## Savol 8: Starvation nima va qanday oldini olish mumkin? [Middle+]
+### 7. Starvation nima va qanday oldini olish mumkin? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **Starvation** — microtask queue hech qachon bo'sh bo'lmaydigan holat. Har bir microtask yangi microtask qo'shsa, Event Loop macrotask'larga va rendering'ga **hech qachon** o'tmaydi — UI muzlab qoladi.
 
@@ -235,11 +215,12 @@ Oldini olish qoidalari:
 - Uzoq loop'larni `setTimeout(fn, 0)` bilan batch'lang
 - Node.js da `setImmediate` ishlating (`process.nextTick` emas)
 
----
+</details>
 
-## Savol 9: Node.js Event Loop browser'nikidan qanday farq qiladi? [Middle+]
+### 8. Node.js Event Loop browser'nikidan qanday farq qiladi? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Node.js Event Loop **6 ta faza (phase)** dan iborat (browser'da faqat macrotask → microtask → render):
 
@@ -276,112 +257,12 @@ fs.readFile(__filename, () => {
 
 `process.nextTick` va `setImmediate` nomlari teskari qo'yilgan — tarixiy xato. `nextTick` darhol (har faza orasida) ishlaydi, `setImmediate` esa check fazada (keyinroq) ishlaydi. Top-level da `setTimeout(fn,0)` vs `setImmediate` tartibi **garanti emas** (OS timer resolution ga bog'liq).
 
----
+</details>
 
-## Savol 10: Quyidagi kodning output ini ayting [Middle+]
+### 9. UI blocking muammosini qanday hal qilasiz? [Middle+]
 
-**Savol:**
-
-```javascript
-async function foo() {
-  console.log("1");
-  await Promise.resolve();
-  console.log("2");
-}
-
-console.log("3");
-foo();
-console.log("4");
-setTimeout(() => console.log("5"), 0);
-Promise.resolve().then(() => console.log("6"));
-```
-
-**Javob:**
-
-Output: **3, 1, 4, 2, 6, 5**
-
-```
-Sync: "3"
-foo() chaqirildi:
-  "1" — sync (async funksiyaning await gacha bo'lgan qismi sync)
-  await Promise.resolve() — foo to'xtaydi → microtask: [foo_resume]
-"4" — sync (main script davom etadi)
-
-setTimeout(5) → Macrotask Queue
-Promise.then(6) → Microtask Queue: [foo_resume, then_6]
-
-Microtask checkpoint:
-  foo_resume → "2"
-  then_6 → "6"
-
-Macrotask: "5"
-```
-
-`await` faqat o'sha async funksiya ichini to'xtatadi — tashqi sync kod davom etadi. `await` dan keyingi kod `.then()` callback bilan teng.
-
----
-
-## Savol 11: Quyidagi murakkab kodning output ini ayting [Senior]
-
-**Savol:**
-
-```javascript
-console.log("1");
-
-setTimeout(() => {
-  console.log("2");
-  new Promise(resolve => {
-    console.log("3");
-    resolve();
-  }).then(() => console.log("4"));
-  setTimeout(() => console.log("5"), 0);
-}, 0);
-
-new Promise(resolve => {
-  console.log("6");
-  resolve();
-}).then(() => {
-  console.log("7");
-  setTimeout(() => console.log("8"), 0);
-  return Promise.resolve();
-}).then(() => {
-  console.log("9");
-});
-
-console.log("10");
-```
-
-**Javob:**
-
-Output: **1, 6, 10, 7, 9, 2, 3, 4, 8, 5**
-
-```
-SYNC: "1", "6" (Promise constructor sync!), "10"
-
-Microtask: then_7 → "7"
-  → setTimeout(8) → Macrotask: [setTimeout_2, setTimeout_8]
-  → return Promise.resolve() → then_9 microtask queue ga
-Microtask: then_9 → "9"
-
-Macrotask: setTimeout_2 → "2"
-  → Promise constructor → "3" (sync)
-  → .then(4) → Microtask: [then_4]
-  → setTimeout(5) → Macrotask: [setTimeout_8, setTimeout_5]
-Microtask: then_4 → "4"
-
-Macrotask: setTimeout_8 → "8"
-Macrotask: setTimeout_5 → "5"
-```
-
-**Deep Dive:**
-
-`return Promise.resolve()` bilan return qilish muhim — bu `.then(9)` ni faqat shu Promise resolve bo'lgandagina queue ga qo'shadi. Oddiy `return undefined` bo'lganida `.then(9)` darhol queue ga tushardi. `return Promise.resolve()` esa qo'shimcha microtask tick kutadi (spec bo'yicha thenable resolve qilish uchun qo'shimcha job kerak).
-
----
-
-## Savol 12: UI blocking muammosini qanday hal qilasiz? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 UI blocking — og'ir hisoblash main thread'ni to'xtatganda yuzaga keladi. Yechimlar:
 
@@ -431,11 +312,12 @@ input.addEventListener("input", debounce(filterList, 300));
 
 Real production'da ko'pincha uchala usul birgalikda ishlatiladi: debounce + Web Worker + batch rendering.
 
----
+</details>
 
-## Savol 13: queueMicrotask() nima va qachon ishlatiladi? [Middle]
+### 10. queueMicrotask() nima va qachon ishlatiladi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `queueMicrotask(callback)` — microtask queue'ga to'g'ridan-to'g'ri callback qo'shish uchun API. `Promise.resolve().then(callback)` bilan deyarli bir xil, lekin Promise object yaratmaydi.
 
@@ -453,11 +335,12 @@ Qachon ishlatiladi:
 - Bir nechta sinxron o'zgarishlarni batch'lab bitta microtask'da qayta ishlash
 - Sync koddan keyin, lekin rendering va macrotask'lardan oldin ish bajarish
 
----
+</details>
 
-## Savol 14: process.nextTick() va queueMicrotask() farqi nima? (Node.js) [Senior]
+### 11. process.nextTick() va queueMicrotask() farqi nima? (Node.js) [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Xususiyat | `process.nextTick()` | `queueMicrotask()` |
 |-----------|---------------------|---------------------|
@@ -483,69 +366,12 @@ Promise.resolve().then(() => console.log("Promise"));
 
 Node.js hujjatlari o'zi `queueMicrotask` ni tavsiya qiladi — chunki u cross-platform (browser + Node.js) va `process.nextTick` ning starvation xavfi yuqoriroq. `process.nextTick` har bir Event Loop faza **orasida** ishlagani uchun, recursive chaqirilganda I/O callback'lar umuman bajarilmasligi mumkin.
 
----
+</details>
 
-## Savol 15: Quyidagi kodda nima xato va qanday tuzatasiz? [Middle+]
+### 12. requestIdleCallback nima va requestAnimationFrame dan farqi? [Senior]
 
-**Savol:**
-
-```javascript
-// Foydalanuvchi "Load" tugmasini bosganda 50,000 ta yozuvni ko'rsatish
-loadBtn.addEventListener("click", () => {
-  const records = fetchRecordsSync(); // 50,000 ta yozuv
-
-  records.forEach(record => {
-    const row = document.createElement("tr");
-    row.innerHTML = `<td>${record.name}</td><td>${record.email}</td>`;
-    table.appendChild(row);
-  });
-});
-```
-
-**Javob:**
-
-**Muammo:** 50,000 ta DOM element yaratish va qo'shish — hammasi **sync** va **bitta frame** ichida. Bu UI ni bir necha soniya muzlatadi.
-
-**Xatolar:**
-1. `fetchRecordsSync()` — sync data fetch (I/O blocking)
-2. `table.appendChild` har safar chaqirilganda reflow trigger qiladi
-3. Hamma ish bitta macrotask ichida — render imkoniyati yo'q
-
-```javascript
-// ✅ Tuzatilgan versiya
-loadBtn.addEventListener("click", async () => {
-  const records = await fetchRecords(); // ✅ Async fetch
-
-  const BATCH = 500;
-  let i = 0;
-
-  function renderBatch() {
-    const fragment = document.createDocumentFragment(); // ✅ Batch DOM
-    const end = Math.min(i + BATCH, records.length);
-
-    while (i < end) {
-      const row = document.createElement("tr");
-      row.innerHTML = `<td>${records[i].name}</td><td>${records[i].email}</td>`;
-      fragment.appendChild(row);
-      i++;
-    }
-
-    table.appendChild(fragment); // ✅ Bir marta DOM ga qo'shish
-
-    if (i < records.length) {
-      requestAnimationFrame(renderBatch); // ✅ Har frame'da batch
-    }
-  }
-
-  renderBatch();
-});
-```
-
----
-
-## Savol 16: requestIdleCallback nima va requestAnimationFrame dan farqi? [Senior]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `requestIdleCallback` — browser **bo'sh vaqtida** (idle) callback bajaradigan API. `requestAnimationFrame` dan farqli o'laroq, u **past priority'li** ishlar uchun — analytics, prefetching, lazy initialization.
 
@@ -574,3 +400,216 @@ requestIdleCallback((deadline) => {
 **Deep Dive:**
 
 `requestIdleCallback` ga berilgan callback `IdleDeadline` object oladi. `deadline.timeRemaining()` frame tugashigacha qolgan vaqtni (ms) qaytaradi. Odatda bu 0-50ms oraliqda. Agar browser band bo'lsa va `timeout` berilgan bo'lsa — timeout o'tgandan keyin `timeRemaining()` 0 qaytaradi, lekin callback baribir chaqiriladi.
+
+</details>
+
+---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Quyidagi kodning output'ini ayting [Middle+]
+
+**Savol:**
+
+```javascript
+console.log("A");
+setTimeout(() => console.log("B"), 0);
+Promise.resolve()
+  .then(() => console.log("C"))
+  .then(() => console.log("D"));
+Promise.resolve().then(() => console.log("E"));
+console.log("F");
+```
+
+<details>
+<summary>Javob</summary>
+
+Output: **A, F, C, E, D, B**
+
+```
+Sync phase: "A", "F"
+
+Microtask Queue: [C_callback, E_callback]
+→ C bajariladi → "C" → .then(D) queue ga: [E_callback, D_callback]
+→ E bajariladi → "E"
+→ D bajariladi → "D"
+
+Macrotask: B bajariladi → "B"
+```
+
+C va E **ikkalasi ham birinchi** .then() callback — ular FIFO tartibida bajariladi. D esa C bajarilgandan keyin queue ga tushadi, shuning uchun E dan keyin.
+
+</details>
+
+### 2. Quyidagi kodning output'ini ayting [Middle+]
+
+**Savol:**
+
+```javascript
+async function runAsync() {
+  console.log("1");
+  await Promise.resolve();
+  console.log("2");
+}
+
+console.log("3");
+runAsync();
+console.log("4");
+setTimeout(() => console.log("5"), 0);
+Promise.resolve().then(() => console.log("6"));
+```
+
+<details>
+<summary>Javob</summary>
+
+Output: **3, 1, 4, 2, 6, 5**
+
+```
+Sync: "3"
+runAsync() chaqirildi:
+  "1" — sync (async funksiyaning await gacha bo'lgan qismi sync)
+  await Promise.resolve() — runAsync to'xtaydi → microtask: [runAsync_resume]
+"4" — sync (main script davom etadi)
+
+setTimeout(5) → Macrotask Queue
+Promise.then(6) → Microtask Queue: [runAsync_resume, then_6]
+
+Microtask checkpoint:
+  runAsync_resume → "2"
+  then_6 → "6"
+
+Macrotask: "5"
+```
+
+`await` faqat o'sha async funksiya ichini to'xtatadi — tashqi sync kod davom etadi. `await` dan keyingi kod `.then()` callback bilan teng.
+
+</details>
+
+### 3. Quyidagi murakkab kodning output'ini ayting [Senior]
+
+**Savol:**
+
+```javascript
+console.log("1");
+
+setTimeout(() => {
+  console.log("2");
+  new Promise(resolve => {
+    console.log("3");
+    resolve();
+  }).then(() => console.log("4"));
+  setTimeout(() => console.log("5"), 0);
+}, 0);
+
+new Promise(resolve => {
+  console.log("6");
+  resolve();
+}).then(() => {
+  console.log("7");
+  setTimeout(() => console.log("8"), 0);
+  return Promise.resolve();
+}).then(() => {
+  console.log("9");
+});
+
+console.log("10");
+```
+
+<details>
+<summary>Javob</summary>
+
+Output: **1, 6, 10, 7, 9, 2, 3, 4, 8, 5**
+
+```
+SYNC: "1", "6" (Promise constructor sync!), "10"
+
+Microtask: then_7 → "7"
+  → setTimeout(8) → Macrotask: [setTimeout_2, setTimeout_8]
+  → return Promise.resolve() → then_9 microtask queue ga
+Microtask: then_9 → "9"
+
+Macrotask: setTimeout_2 → "2"
+  → Promise constructor → "3" (sync)
+  → .then(4) → Microtask: [then_4]
+  → setTimeout(5) → Macrotask: [setTimeout_8, setTimeout_5]
+Microtask: then_4 → "4"
+
+Macrotask: setTimeout_8 → "8"
+Macrotask: setTimeout_5 → "5"
+```
+
+**Deep Dive:**
+
+`return Promise.resolve()` bilan return qilish muhim — bu `.then(9)` ni faqat shu Promise resolve bo'lgandagina queue ga qo'shadi. Oddiy `return undefined` bo'lganida `.then(9)` darhol queue ga tushardi.
+
+`return Promise.resolve()` esa qo'shimcha microtask tick kutadi — spec bo'yicha `PromiseResolveThenableJob` yaratiladi (thenable resolve qilish uchun). Bu **spec evolution** bor:
+- **Eski spec (ES2018 gacha):** 2 extra microtask tick (NewPromiseResolveThenableJob + PromiseReactionJob)
+- **ES2019+ (V8 7.2+):** 1 extra microtask tick — optimization: native `Promise` resolve qilinayotganda `PromiseResolve` shortcut qo'llaniladi
+
+Bu farq **shu savol natijasiga ta'sir qilmaydi** (tartib bir xil), lekin boshqa murakkab interleaving'larda muhim bo'lishi mumkin — shuning uchun interview'da "spec version'ga qarab tick soni farq qilishi mumkin" deb eslatish yaxshi.
+
+</details>
+
+### 4. Quyidagi kodda nima xato va qanday tuzatasiz? [Middle+]
+
+**Savol:**
+
+```javascript
+// Foydalanuvchi "Load" tugmasini bosganda 50,000 ta yozuvni ko'rsatish
+loadBtn.addEventListener("click", () => {
+  const records = fetchRecordsSync(); // 50,000 ta yozuv
+
+  records.forEach(record => {
+    const row = document.createElement("tr");
+    row.textContent = `${record.name} | ${record.email}`;
+    table.appendChild(row);
+  });
+});
+```
+
+<details>
+<summary>Javob</summary>
+
+**Muammo:** 50,000 ta DOM element yaratish va qo'shish — hammasi **sync** va **bitta frame** ichida. Bu UI ni bir necha soniya muzlatadi.
+
+**Xatolar:**
+1. `fetchRecordsSync()` — sync data fetch (I/O blocking)
+2. `table.appendChild` har safar chaqirilganda reflow trigger qiladi
+3. Hamma ish bitta macrotask ichida — render imkoniyati yo'q
+
+```javascript
+// ✅ Tuzatilgan versiya
+loadBtn.addEventListener("click", async () => {
+  const records = await fetchRecords(); // ✅ Async fetch
+
+  const BATCH = 500;
+  let i = 0;
+
+  function renderBatch() {
+    const fragment = document.createDocumentFragment(); // ✅ Batch DOM
+    const end = Math.min(i + BATCH, records.length);
+
+    while (i < end) {
+      const row = document.createElement("tr");
+      const td1 = document.createElement("td");
+      td1.textContent = records[i].name;
+      const td2 = document.createElement("td");
+      td2.textContent = records[i].email;
+      row.appendChild(td1);
+      row.appendChild(td2);
+      fragment.appendChild(row);
+      i++;
+    }
+
+    table.appendChild(fragment); // ✅ Bir marta DOM ga qo'shish
+
+    if (i < records.length) {
+      requestAnimationFrame(renderBatch); // ✅ Har frame'da batch
+    }
+  }
+
+  renderBatch();
+});
+```
+
+</details>

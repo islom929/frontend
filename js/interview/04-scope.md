@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Scope nima va JavaScript da qanday scope turlari mavjud? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Scope nima va JavaScript da qanday scope turlari mavjud? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 Scope — o'zgaruvchilar va funksiyalarning kodning qaysi qismida **accessible** (kirish mumkin) ekanligini belgilaydigan qoidalar to'plami. JavaScript da uchta asosiy scope turi bor:
 
@@ -45,48 +48,12 @@ console.log(globalThis.a); // 1 — var globalThis property
 console.log(globalThis.b); // undefined — let globalThis property EMAS
 ```
 
----
+</details>
 
-## Savol 2: Quyidagi kodning output'i nima? [Middle]
+### 2. Lexical scope nima va dynamic scope dan farqi? [Middle]
 
-```javascript
-function test() {
-  var x = 1;
-  let y = 2;
-
-  {
-    var x = 10;
-    let y = 20;
-    console.log(x, y); // ?
-  }
-
-  console.log(x, y); // ?
-}
-
-test();
-```
-
-**Javob:**
-
-```
-10, 20
-10, 2
-```
-
-Block ichida `var x = 10` — `var` block scope tanimaydi, u function scope'dagi `x` ni **qayta yozdi** (3 → 10). `let y = 20` esa block scope'da yangi `y` binding yaratdi (shadowing) — function scope'dagi `y` ga tegmadi.
-
-Block tashqarisida: `x = 10` (var qayta yozilgan), `y = 2` (block scope'dagi let tugadi, function scope'dagi let qaytdi).
-
-| Deklaratsiya | Block ichida | Block tashqarisida | Sabab |
-|---|---|---|---|
-| `var x = 10` | 10 | 10 | var block scope tanimaydi — function scope'dagi x ni o'zgartirdi |
-| `let y = 20` | 20 | 2 | let block scope'da yangi binding — tashqi y ga tegmadi |
-
----
-
-## Savol 3: Lexical scope nima va dynamic scope dan farqi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Lexical scope (static scope) — scope funksiya **yozilgan** (define qilingan) joyga qarab aniqlanadi, **chaqirilgan** joyga qarab emas. JavaScript lexical scoping ishlatadi.
 
@@ -122,11 +89,12 @@ JavaScript da `this` keyword dynamic scope'ga o'xshash ishlaydi — u funksiya c
 
 Texnik jihatdan lexical scope funksiya yaratilganda `[[Environment]]` internal slot'ga joriy LexicalEnvironment saqlash orqali implement qilingan. Bu slot bir marta o'rnatiladi va hech qachon o'zgarmaydi.
 
----
+</details>
 
-## Savol 4: Scope chain nima va qanday ishlaydi? [Middle]
+### 3. Scope chain nima va qanday ishlaydi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Scope chain — o'zgaruvchi qidirilganda engine bosib o'tadigan **scope'lar ketma-ketligi**. Qidiruv doim joriy (ichki) scope'dan boshlanadi va `[[OuterEnv]]` reference bo'ylab tashqariga (yuqoriga) qarab davom etadi — global scope'gacha.
 
@@ -167,100 +135,12 @@ Muhim qoidalar:
 - Scope chain **o'zgarmaydi** — funksiya yaratilgan paytda belgilanadi (lexical)
 - Hech joyda topilmasa → `ReferenceError`
 
----
+</details>
 
-## Savol 5: Quyidagi kodning output'i nima? [Middle+]
+### 4. `globalThis` nima va nima uchun kerak? [Junior+]
 
-```javascript
-var x = 1;
-
-function first() {
-  console.log(x); // A
-}
-
-function second() {
-  var x = 2;
-  first();
-  console.log(x); // B
-}
-
-second();
-console.log(x); // C
-```
-
-**Javob:**
-
-```
-A: 1
-B: 2
-C: 1
-```
-
-Bu savol **lexical scope** ni tekshiradi. `first()` funksiyasi **global scope'da** define qilingan — uning scope chain: `first → global`. `second()` ichidan chaqirilgan bo'lsa ham, `first()` scope chain'i o'zgarmaydi.
-
-- **A:** `first()` ichida `x` → `first` scope'da yo'q → global → `x = 1`
-- **B:** `second()` ichida local `var x = 2` → `x = 2`
-- **C:** Global scope'dagi `x = 1` — `second()` ichidagi `var x = 2` global `x` ga tegmadi
-
-Agar JavaScript dynamic scope ishlatganida, A javob `2` bo'lardi — chunki `first()` `second()` kontekstidan chaqirilgan. Lekin lexical scope — yozilgan joy ahamiyatli.
-
----
-
-## Savol 6: Variable shadowing nima? Quyidagi kodning output'ini ayting [Middle]
-
-```javascript
-let count = 100;
-
-function outer() {
-  let count = 0;
-
-  function increment() {
-    let count = count + 1;
-    return count;
-  }
-
-  return increment();
-}
-
-console.log(outer()); // ?
-```
-
-**Javob:**
-
-```
-ReferenceError: Cannot access 'count' before initialization
-```
-
-Bu klassik **TDZ + shadowing** tuzoq. `increment()` ichida `let count = count + 1` qatori:
-
-1. `let count` — yangi block scope binding yaratadi (shadowing)
-2. `= count + 1` — bu yerda `count` endi **local** (shadow) `count` ga murojaat qiladi
-3. Lekin local `count` hali **TDZ** da (Temporal Dead Zone) — `let` declare qilingan lekin initialize bo'lmagan
-4. Natija: `ReferenceError`
-
-Tuzatish usullari:
-
-```javascript
-// 1-usul: boshqa nom ishlatish
-function increment() {
-  let newCount = count + 1; // ✅ tashqi count o'qiladi
-  return newCount;
-}
-
-// 2-usul: shadow qilmaslik
-function increment() {
-  count = count + 1; // ✅ tashqi count o'zgartiriladi
-  return count;
-}
-```
-
-Variable shadowing — ichki scope'da tashqi scope'dagi o'zgaruvchi bilan bir xil nomli yangi o'zgaruvchi e'lon qilish. Ichki scope ichida tashqi o'zgaruvchi "ko'rinmay qoladi". Bu o'z-o'zidan xato emas, lekin TDZ bilan birgalikda xatoga olib kelishi mumkin.
-
----
-
-## Savol 7: `globalThis` nima va nima uchun kerak? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `globalThis` — ES2020 da kiritilgan, **cross-environment global object** ga murojaat qilish uchun standart yo'l. Turli JavaScript environment'larda global object turli nomlarga ega:
 
@@ -295,54 +175,12 @@ console.log(globalThis.oldVar); // "accessible"
 console.log(globalThis.newLet); // undefined
 ```
 
----
+</details>
 
-## Savol 8: Quyidagi kodning output'i nima? Nima uchun? [Middle+]
+### 5. `var` ning block scope tanimasligini tushuntiring va bu qanday muammolarga olib keladi? [Junior+]
 
-```javascript
-for (var i = 0; i < 3; i++) {
-  setTimeout(() => console.log("var:", i), 0);
-}
-
-for (let j = 0; j < 3; j++) {
-  setTimeout(() => console.log("let:", j), 0);
-}
-```
-
-**Javob:**
-
-```
-var: 3
-var: 3
-var: 3
-let: 0
-let: 1
-let: 2
-```
-
-Bu **scope + closure + event loop** ning kesishishi:
-
-**`var` bilan:**
-- `var i` function scope'da (yoki global'da) **bitta** binding yaratadi
-- Barcha 3 ta `setTimeout` callback'lari shu **bitta** `i` ga closure hosil qiladi
-- Loop tugagandan keyin `i = 3`
-- Callback'lar event loop orqali ishlaganda — barchasi `i = 3` ni ko'radi
-
-**`let` bilan:**
-- `let j` har iteratsiyada **yangi** block scope binding yaratadi
-- Har bir `setTimeout` callback **o'z** `j` binding'iga closure hosil qiladi
-- Iteratsiya 0 da `j = 0`, iteratsiya 1 da `j = 1`, iteratsiya 2 da `j = 2`
-- Har bir callback o'z qiymatini ko'radi
-
-**Deep Dive:**
-
-ECMAScript spec'da `for` loop bilan `let` ishlatilganida **ForBodyEvaluation** abstract operation har iteratsiya uchun `CreatePerIterationEnvironment` ni chaqiradi. Bu operation yangi **Declarative Environment Record** yaratadi va loop variable'ning joriy qiymatini shu yangi record'ga copy qiladi. `var` uchun bunday mexanizm yo'q — bitta VariableEnvironment binding.
-
----
-
-## Savol 9: `var` ning block scope tanimasligini tushuntiring va bu qanday muammolarga olib keladi? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `var` keyword faqat **function scope** ni tan oladi — `if`, `for`, `while`, `{}` kabi block konstruktsiyalar `var` uchun scope chegarasi hisoblanmaydi. `var` bilan block ichida e'lon qilingan o'zgaruvchi tashqi function scope'ga "chiqadi".
 
@@ -374,11 +212,12 @@ Bu qanday muammolarga olib keladi:
 
 Yechim: `let`/`const` ishlatish. Zamonaviy JavaScript'da `var` ishlatish uchun hech qanday texnik sabab qolmagan.
 
----
+</details>
 
-## Savol 10: Strict mode nima va u scope'ga qanday ta'sir ko'rsatadi? [Middle]
+### 6. Strict mode nima va u scope'ga qanday ta'sir ko'rsatadi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Strict mode — `"use strict"` directive bilan yoqiladigan JavaScript'ning qat'iyroq rejimi. ES5 da kiritilgan. Scope va o'zgaruvchilarga tegishli asosiy ta'sirlari:
 
@@ -396,12 +235,11 @@ function show() { console.log(this); }
 show(); // undefined (non-strict: globalThis)
 ```
 
-**3. `eval` o'z scope'ini yaratadi:**
+**3. Scope izolyatsiyasi kuchaytiriladi:**
 ```javascript
 "use strict";
-eval("var x = 10");
-// console.log(x); // ❌ ReferenceError
-// Non-strict: x tashqi scope'ga chiqardi
+// Dynamic kod baholash o'z scope'ini yaratadi
+// Non-strict: tashqi scope'ga chiqarishi mumkin
 ```
 
 **4. Duplicate parameter nomlari taqiqlanadi:**
@@ -424,80 +262,16 @@ ES6 **modullar** va **class** tanasi avtomatik strict mode'da ishlaydi — alohi
 |---|---|---|
 | Declare qilmagan assign | Global property yaratadi | ReferenceError |
 | `this` (default binding) | `globalThis` | `undefined` |
-| `eval` scope | Tashqi scope'ga chiqadi | O'z scope'ida qoladi |
+| Dynamic kod scope | Tashqi scope'ga chiqadi | O'z scope'ida qoladi |
 | `with` statement | Ruxsat etilgan | SyntaxError |
 | Duplicate params | Ruxsat (oxirgisi qoladi) | SyntaxError |
 
----
+</details>
 
-## Savol 11: Quyidagi kodda nima xato va qanday tuzatasiz? [Middle+]
+### 7. `let`, `const`, `var` ning scope farqlarini jadvali bilan tushuntiring [Junior+]
 
-```javascript
-function createHandlers(elements) {
-  var handlers = [];
-
-  for (var i = 0; i < elements.length; i++) {
-    handlers.push(function () {
-      console.log(`Element ${i}: ${elements[i]}`);
-    });
-  }
-
-  return handlers;
-}
-
-const handlers = createHandlers(["a", "b", "c"]);
-handlers[0](); // ?
-handlers[1](); // ?
-handlers[2](); // ?
-```
-
-**Javob:**
-
-Muammo: barcha handler'lar bir xil natija beradi:
-
-```
-Element 3: undefined
-Element 3: undefined
-Element 3: undefined
-```
-
-Sabab: `var i` function scope'da **bitta** binding. Loop tugaganda `i = 3`. Barcha closure'lar shu bitta `i` ga reference saqlaydi. `elements[3]` mavjud emas → `undefined`.
-
-**3 ta tuzatish usuli:**
-
-```javascript
-// 1-usul: let ishlatish (eng oddiy va to'g'ri)
-for (let i = 0; i < elements.length; i++) {
-  handlers.push(function () {
-    console.log(`Element ${i}: ${elements[i]}`);
-    // ✅ Har iteratsiyada yangi i binding
-  });
-}
-
-// 2-usul: IIFE bilan scope yaratish (ES5 usuli)
-for (var i = 0; i < elements.length; i++) {
-  (function (index) {
-    handlers.push(function () {
-      console.log(`Element ${index}: ${elements[index]}`);
-      // ✅ IIFE har chaqiruvda yangi scope — index har birida alohida
-    });
-  })(i);
-}
-
-// 3-usul: forEach ishlatish (har callback o'z scope)
-elements.forEach(function (element, index) {
-  handlers.push(function () {
-    console.log(`Element ${index}: ${element}`);
-    // ✅ forEach callback'i har element uchun yangi scope yaratadi
-  });
-});
-```
-
----
-
-## Savol 12: `let`, `const`, `var` ning scope farqlarini jadvali bilan tushuntiring [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Xususiyat | `var` | `let` | `const` |
 |---|---|---|---|
@@ -507,7 +281,7 @@ elements.forEach(function (element, index) {
 | **Re-declaration** | Ha (bir scope'da) | Yo'q (SyntaxError) | Yo'q (SyntaxError) |
 | **Re-assignment** | Ha | Ha | Yo'q (TypeError) |
 | **Global scope'da** | `globalThis` property | `globalThis` da emas | `globalThis` da emas |
-| **`for` loop'da** | Bitta binding | Har iteratsiya yangi | Har iteratsiya yangi |
+| **`for` loop'da** | Bitta binding (closure trap) | Har iteratsiyada yangi binding (`CreatePerIterationEnvironment`) | `for...in`/`for...of` har iteratsiyada yangi binding (`const` ishlaydi); oddiy `for(let i=0; ...; i++)` o'rniga `const` yozib bo'lmaydi — `i++` TypeError beradi |
 
 ```javascript
 // Re-declaration
@@ -525,11 +299,12 @@ c.name = "Bob"; // ✅ Object ICHIDAGI property o'zgaradi — reference o'zgarma
 
 Zamonaviy JavaScript'da qoida: **default `const`**, faqat qiymat o'zgarishi kerak bo'lganda `let`. `var` ishlatmaslik.
 
----
+</details>
 
-## Savol 13: Scope chain va call stack farqi nima? [Senior]
+### 8. Scope chain va call stack farqi nima? [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Bu ikki tushuncha ko'p aralashtiriladi, lekin ular **butunlay farqli** mexanizmlar:
 
@@ -577,54 +352,12 @@ a() scope yo'q — chunki b() a() ICHIDA define qilinMAGAN.
 
 Closure bu ikki mexanizm orasidagi ko'prik. Funksiya call stack'dan chiqqandan keyin ham uning scope chain'i (Environment Record'lari) saqlanib qoladi — agar ichki funksiya ularga reference saqlasa. Call stack frame'i yo'qoladi, lekin scope data heap'da tirik qoladi.
 
----
+</details>
 
-## Savol 14: Quyidagi kodning output'ini ayting [Middle+]
+### 9. Module scope nima va global scope dan farqi? [Middle]
 
-```javascript
-function outer() {
-  var a = 1;
-  let b = 2;
-
-  function inner() {
-    console.log(a); // A
-    console.log(b); // B
-
-    var a = 3;
-    let b = 4;
-
-    console.log(a); // C
-    console.log(b); // D
-  }
-
-  inner();
-}
-
-outer();
-```
-
-**Javob:**
-
-```
-A: undefined
-B: ReferenceError: Cannot access 'b' before initialization
-```
-
-C va D ga yetib bormaydi — B da xato bo'lib to'xtaydi.
-
-Tahlil:
-
-- **A: `undefined`** — `inner()` ichida `var a = 3` bor. `var a` hoist bo'ladi (Creation Phase da `a = undefined`). `console.log(a)` — local `a` ko'riladi (`undefined`), tashqi `a = 1` shadow qilingan.
-
-- **B: `ReferenceError`** — `inner()` ichida `let b = 4` bor. `let b` hoist bo'ladi lekin TDZ da. `console.log(b)` — local `b` ni ko'radi (shadow), lekin u TDZ da → `ReferenceError`.
-
-Bu savolda **hoisting + shadowing + TDZ** uchala tushuncha birgalikda tekshiriladi. `var` hoist bo'lganda `undefined` beradi, `let` hoist bo'lganda TDZ da qoladi — shu farq natijani belgilaydi.
-
----
-
-## Savol 15: Module scope nima va global scope dan farqi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ES Modules (`import`/`export`) da har bir fayl o'zining **module scope**'iga ega. Module scope'dagi o'zgaruvchilar boshqa modullardan **ko'rinmaydi** — faqat `export` qilinganlar accessible.
 
@@ -661,13 +394,347 @@ console.log(this);           // undefined
 console.log(globalThis.y);   // undefined — var ham globalThis'ga tushmaydi
 ```
 
+</details>
+
+### 10. `with` statement nima uchun taqiqlangan va u scope chain'ga qanday ta'sir ko'rsatadi? [Senior]
+
+<details>
+<summary>Javob</summary>
+
+`with` statement object'ning property'larini scope chain'ga qo'shadi — object property'lariga to'g'ridan-to'g'ri nom bilan murojaat qilish imkonini beradi:
+
+```javascript
+const config = { host: "localhost", port: 3000, protocol: "https" };
+
+// with bilan (strict mode'da TAQIQ):
+with (config) {
+  console.log(host);     // "localhost" — config.host
+  console.log(port);     // 3000 — config.port
+  console.log(protocol); // "https" — config.protocol
+}
+```
+
+Nima uchun taqiqlangan:
+
+1. **Scope chain buziladi** — engine compile-time da identifier qaysi scope'ga tegishli ekanini aniqlay olmaydi. `with` ichidagi `host` — bu local variable mi, tashqi scope variable mi, yoki object property mi? Runtime'gacha noma'lum.
+
+2. **Optimizatsiya imkonsiz** — V8 scope analysis va variable caching qila olmaydi, chunki scope dynamic bo'lib qoladi.
+
+3. **Bug'lar** — agar object'da kutilmagan property bo'lsa, boshqa scope'dagi o'zgaruvchi "yashirinadi":
+
+```javascript
+const obj = { toString: "custom" };
+with (obj) {
+  console.log(toString); // "custom" — Object.prototype.toString EMAS!
+  // ❌ Kutilmagan shadowing
+}
+```
+
+**Deep Dive:**
+
+`with` statement yangi **Object Environment Record** yaratadi va uni scope chain'ning tepasiga qo'yadi. Bu record'ning binding object'i `with` ga berilgan object. Identifier resolve qilinganda avval shu object'da qidiriladi, topilmasa tashqi scope'ga o'tiladi. Bu mexanizm global scope'ning Object Environment Record'iga o'xshash — aslida global scope'ning `var` xulq-atvori ham shu orqali ishlaydi.
+
+Strict mode'da `with` SyntaxError beradi — shu sababli zamonaviy JavaScript'da deyarli uchramaydi. Destructuring yaxshiroq alternativ:
+
+```javascript
+const { host, port, protocol } = config; // ✅ Aniq, optimizable
+```
+
+</details>
+
 ---
 
-## Savol 16: Scope bilimingizni ishlatib, quyidagi muammoni hal qiling [Senior]
+## Amaliy savollar (Coding Challenges)
+
+### 1. Quyidagi kodning output'i nima? [Middle]
+
+```javascript
+function test() {
+  var x = 1;
+  let y = 2;
+
+  {
+    var x = 10;
+    let y = 20;
+    console.log(x, y); // ?
+  }
+
+  console.log(x, y); // ?
+}
+
+test();
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+10, 20
+10, 2
+```
+
+Block ichida `var x = 10` — `var` block scope tanimaydi, u function scope'dagi `x` ni **qayta yozdi** (1 → 10). `let y = 20` esa block scope'da yangi `y` binding yaratdi (shadowing) — function scope'dagi `y` ga tegmadi.
+
+Block tashqarisida: `x = 10` (var qayta yozilgan), `y = 2` (block scope'dagi let tugadi, function scope'dagi let qaytdi).
+
+| Deklaratsiya | Block ichida | Block tashqarisida | Sabab |
+|---|---|---|---|
+| `var x = 10` | 10 | 10 | var block scope tanimaydi — function scope'dagi x ni o'zgartirdi |
+| `let y = 20` | 20 | 2 | let block scope'da yangi binding — tashqi y ga tegmadi |
+
+</details>
+
+### 2. Quyidagi kodning output'i nima? [Middle+]
+
+```javascript
+var x = 1;
+
+function first() {
+  console.log(x); // A
+}
+
+function second() {
+  var x = 2;
+  first();
+  console.log(x); // B
+}
+
+second();
+console.log(x); // C
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+A: 1
+B: 2
+C: 1
+```
+
+Bu savol **lexical scope** ni tekshiradi. `first()` funksiyasi **global scope'da** define qilingan — uning scope chain: `first → global`. `second()` ichidan chaqirilgan bo'lsa ham, `first()` scope chain'i o'zgarmaydi.
+
+- **A:** `first()` ichida `x` → `first` scope'da yo'q → global → `x = 1`
+- **B:** `second()` ichida local `var x = 2` → `x = 2`
+- **C:** Global scope'dagi `x = 1` — `second()` ichidagi `var x = 2` global `x` ga tegmadi
+
+Agar JavaScript dynamic scope ishlatganida, A javob `2` bo'lardi — chunki `first()` `second()` kontekstidan chaqirilgan. Lekin lexical scope — yozilgan joy ahamiyatli.
+
+</details>
+
+### 3. Variable shadowing nima? Quyidagi kodning output'ini ayting [Middle]
+
+```javascript
+let count = 100;
+
+function outer() {
+  let count = 0;
+
+  function increment() {
+    let count = count + 1;
+    return count;
+  }
+
+  return increment();
+}
+
+console.log(outer()); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+ReferenceError: Cannot access 'count' before initialization
+```
+
+Bu klassik **TDZ + shadowing** tuzoq. `increment()` ichida `let count = count + 1` qatori:
+
+1. `let count` — yangi block scope binding yaratadi (shadowing)
+2. `= count + 1` — bu yerda `count` endi **local** (shadow) `count` ga murojaat qiladi
+3. Lekin local `count` hali **TDZ** da (Temporal Dead Zone) — `let` declare qilingan lekin initialize bo'lmagan
+4. Natija: `ReferenceError`
+
+Tuzatish usullari:
+
+```javascript
+// 1-usul: boshqa nom ishlatish
+function increment() {
+  let newCount = count + 1; // ✅ tashqi count o'qiladi
+  return newCount;
+}
+
+// 2-usul: shadow qilmaslik
+function increment() {
+  count = count + 1; // ✅ tashqi count o'zgartiriladi
+  return count;
+}
+```
+
+Variable shadowing — ichki scope'da tashqi scope'dagi o'zgaruvchi bilan bir xil nomli yangi o'zgaruvchi e'lon qilish. Ichki scope ichida tashqi o'zgaruvchi "ko'rinmay qoladi". Bu o'z-o'zidan xato emas, lekin TDZ bilan birgalikda xatoga olib kelishi mumkin.
+
+</details>
+
+### 4. Quyidagi kodning output'i nima? Nima uchun? [Middle+]
+
+```javascript
+for (var i = 0; i < 3; i++) {
+  setTimeout(() => console.log("var:", i), 0);
+}
+
+for (let j = 0; j < 3; j++) {
+  setTimeout(() => console.log("let:", j), 0);
+}
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+var: 3
+var: 3
+var: 3
+let: 0
+let: 1
+let: 2
+```
+
+Bu **scope + closure + event loop** ning kesishishi:
+
+**`var` bilan:**
+- `var i` function scope'da (yoki global'da) **bitta** binding yaratadi
+- Barcha 3 ta `setTimeout` callback'lari shu **bitta** `i` ga closure hosil qiladi
+- Loop tugagandan keyin `i = 3`
+- Callback'lar event loop orqali ishlaganda — barchasi `i = 3` ni ko'radi
+
+**`let` bilan:**
+- `let j` har iteratsiyada **yangi** block scope binding yaratadi
+- Har bir `setTimeout` callback **o'z** `j` binding'iga closure hosil qiladi
+- Iteratsiya 0 da `j = 0`, iteratsiya 1 da `j = 1`, iteratsiya 2 da `j = 2`
+- Har bir callback o'z qiymatini ko'radi
+
+**Deep Dive:**
+
+ECMAScript spec'da `for` loop bilan `let` ishlatilganida **ForBodyEvaluation** abstract operation har iteratsiya uchun `CreatePerIterationEnvironment` ni chaqiradi. Bu operation yangi **Declarative Environment Record** yaratadi va loop variable'ning joriy qiymatini shu yangi record'ga copy qiladi. `var` uchun bunday mexanizm yo'q — bitta VariableEnvironment binding.
+
+</details>
+
+### 5. Quyidagi kodda nima xato va qanday tuzatasiz? [Middle+]
+
+```javascript
+function createHandlers(elements) {
+  var handlers = [];
+
+  for (var i = 0; i < elements.length; i++) {
+    handlers.push(function () {
+      console.log(`Element ${i}: ${elements[i]}`);
+    });
+  }
+
+  return handlers;
+}
+
+const handlers = createHandlers(["a", "b", "c"]);
+handlers[0](); // ?
+handlers[1](); // ?
+handlers[2](); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+Muammo: barcha handler'lar bir xil natija beradi:
+
+```
+Element 3: undefined
+Element 3: undefined
+Element 3: undefined
+```
+
+Sabab: `var i` function scope'da **bitta** binding. Loop tugaganda `i = 3`. Barcha closure'lar shu bitta `i` ga reference saqlaydi. `elements[3]` mavjud emas → `undefined`.
+
+**3 ta tuzatish usuli:**
+
+```javascript
+// 1-usul: let ishlatish (eng oddiy va to'g'ri)
+for (let i = 0; i < elements.length; i++) {
+  handlers.push(function () {
+    console.log(`Element ${i}: ${elements[i]}`);
+    // ✅ Har iteratsiyada yangi i binding
+  });
+}
+
+// 2-usul: IIFE bilan scope yaratish (ES5 usuli)
+for (var i = 0; i < elements.length; i++) {
+  (function (index) {
+    handlers.push(function () {
+      console.log(`Element ${index}: ${elements[index]}`);
+      // ✅ IIFE har chaqiruvda yangi scope — index har birida alohida
+    });
+  })(i);
+}
+
+// 3-usul: forEach ishlatish (har callback o'z scope)
+elements.forEach(function (element, index) {
+  handlers.push(function () {
+    console.log(`Element ${index}: ${element}`);
+    // ✅ forEach callback'i har element uchun yangi scope yaratadi
+  });
+});
+```
+
+</details>
+
+### 6. Quyidagi kodning output'ini ayting [Middle+]
+
+```javascript
+function outer() {
+  var a = 1;
+  let b = 2;
+
+  function inner() {
+    console.log(a); // A
+    console.log(b); // B
+
+    var a = 3;
+    let b = 4;
+
+    console.log(a); // C
+    console.log(b); // D
+  }
+
+  inner();
+}
+
+outer();
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+A: undefined
+B: ReferenceError: Cannot access 'b' before initialization
+```
+
+C va D ga yetib bormaydi — B da xato bo'lib to'xtaydi.
+
+Tahlil:
+
+- **A: `undefined`** — `inner()` ichida `var a = 3` bor. `var a` hoist bo'ladi (Creation Phase da `a = undefined`). `console.log(a)` — local `a` ko'riladi (`undefined`), tashqi `a = 1` shadow qilingan.
+
+- **B: `ReferenceError`** — `inner()` ichida `let b = 4` bor. `let b` hoist bo'ladi lekin TDZ da. `console.log(b)` — local `b` ni ko'radi (shadow), lekin u TDZ da → `ReferenceError`.
+
+Bu savolda **hoisting + shadowing + TDZ** uchala tushuncha birgalikda tekshiriladi. `var` hoist bo'lganda `undefined` beradi, `let` hoist bo'lganda TDZ da qoladi — shu farq natijani belgilaydi.
+
+</details>
+
+### 7. Scope bilimingizni ishlatib, quyidagi muammoni hal qiling [Senior]
 
 **Savol:** `createPrivateCounter()` funksiyasini yozing. U `increment()`, `decrement()`, `getCount()`, `reset()` method'lariga ega object qaytarsin. `count` tashqaridan o'zgartirilishi mumkin bo'lmasin.
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function createPrivateCounter(initialValue = 0) {
@@ -710,9 +777,9 @@ Bu pattern **scope-based encapsulation** deyiladi — function scope + closure y
 
 Scope chain: `increment()` → `createPrivateCounter()` scope (count bu yerda) → global. `count` `createPrivateCounter()` scope'da turadi — faqat shu scope'dan return qilingan method'lar uni ko'radi va o'zgartiradi.
 
----
+</details>
 
-## Savol 17: Quyidagi kodning output'i nima? [Middle+]
+### 8. Quyidagi kodning output'i nima? [Middle+]
 
 ```javascript
 let a = 1;
@@ -738,7 +805,8 @@ function first() {
 first();
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```
 A: 1, 2
@@ -755,49 +823,6 @@ Tahlil:
 
 Diqqat: C — `second()` `if` block ichida define qilingan, shuning uchun uning scope chain `if block → first → global`. Block scope'dagi shadow o'zgaruvchilarni ko'radi.
 
----
+> **Muhim eslatma (strict/module mode assumption):** Block ichida `function` declaration ES6+ strict mode va modul'larda **block-scoped** ishlaydi — yuqoridagi javob shunga tayanadi. Classic script non-strict mode'da esa **Annex B "Legacy Function Declarations in Blocks"** semantikasi qo'llaniladi — `second` containing function scope'ga ham hoist bo'ladi (web compat uchun), bu esa subtle bug'larga olib keladi. Shuning uchun block ichida `function` declaration o'rniga `const second = () => {...}` (arrow/function expression) yozish tavsiya qilinadi.
 
-## Savol 18: `with` statement nima uchun taqiqlangan va u scope chain'ga qanday ta'sir ko'rsatadi? [Senior]
-
-**Javob:**
-
-`with` statement object'ning property'larini scope chain'ga qo'shadi — object property'lariga to'g'ridan-to'g'ri nom bilan murojaat qilish imkonini beradi:
-
-```javascript
-const config = { host: "localhost", port: 3000, protocol: "https" };
-
-// with bilan (strict mode'da TAQIQ):
-with (config) {
-  console.log(host);     // "localhost" — config.host
-  console.log(port);     // 3000 — config.port
-  console.log(protocol); // "https" — config.protocol
-}
-```
-
-Nima uchun taqiqlangan:
-
-1. **Scope chain buziladi** — engine compile-time da identifier qaysi scope'ga tegishli ekanini aniqlay olmaydi. `with` ichidagi `host` — bu local variable mi, tashqi scope variable mi, yoki object property mi? Runtime'gacha noma'lum.
-
-2. **Optimizatsiya imkonsiz** — V8 scope analysis va variable caching qila olmaydi, chunki scope dynamic bo'lib qoladi.
-
-3. **Bug'lar** — agar object'da kutilmagan property bo'lsa, boshqa scope'dagi o'zgaruvchi "yashirinadi":
-
-```javascript
-const obj = { toString: "custom" };
-with (obj) {
-  console.log(toString); // "custom" — Object.prototype.toString EMAS!
-  // ❌ Kutilmagan shadowing
-}
-```
-
-**Deep Dive:**
-
-`with` statement yangi **Object Environment Record** yaratadi va uni scope chain'ning tepasiga qo'yadi. Bu record'ning binding object'i `with` ga berilgan object. Identifier resolve qilinganda avval shu object'da qidiriladi, topilmasa tashqi scope'ga o'tiladi. Bu mexanizm global scope'ning Object Environment Record'iga o'xshash — aslida global scope'ning `var` xulq-atvori ham shu orqali ishlaydi.
-
-Strict mode'da `with` SyntaxError beradi — shu sababli zamonaviy JavaScript'da deyarli uchramaydi. Destructuring yaxshiroq alternativ:
-
-```javascript
-const { host, port, protocol } = config; // ✅ Aniq, optimizable
-```
-
----
+</details>

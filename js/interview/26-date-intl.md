@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Date object ichida nima saqlanadi? [Junior]
+## Nazariy savollar
 
-**Javob:**
+### 1. Date object ichida nima saqlanadi? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 Date object ichida bitta raqam saqlanadi — **Unix timestamp** — 1970-yil 1-yanvar 00:00:00 UTC dan boshlab o'tgan **millisekundlar** soni. Bu `[[DateValue]]` internal slot'da saqlanadi.
 
@@ -25,11 +28,12 @@ date.getMonth();    // 2 — timestamp'dan hisoblangan
 
 Timestamp diapazoni: ±8,640,000,000,000,000 ms — taxminan ±271,821 yil.
 
----
+</details>
 
-## Savol 2: new Date() va Date() farqi nima? [Junior+]
+### 2. new Date() va Date() farqi nima? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // new Date() — Date OBJECT qaytaradi
@@ -54,11 +58,12 @@ str instanceof Date; // false
 
 `Date()` `new` siz — `Date.prototype.toString()` natijasini qaytaradi. Date object yaratmaydi.
 
----
+</details>
 
-## Savol 3: Nima uchun getMonth() 0-based? new Date(2024, 3, 1) — bu qaysi oy? [Junior+]
+### 3. Nima uchun getMonth() 0-based? new Date(2024, 3, 1) — bu qaysi oy? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 new Date(2024, 3, 1); // 2024-04-01 — APREL, Mart EMAS!
@@ -92,53 +97,12 @@ months[d.getMonth()]; // "Jan"
 new Intl.DateTimeFormat("en", { month: "long" }).format(d); // "January"
 ```
 
----
+</details>
 
-## Savol 4: Quyidagi kodning output'ini ayting [Middle]
+### 4. Ikki Date objectni qanday solishtirish kerak? [Junior+]
 
-```javascript
-const date = new Date(2024, 0, 31);
-date.setMonth(1);
-console.log(date.getMonth()); // ?
-console.log(date.getDate());  // ?
-```
-
-**Javob:**
-
-```javascript
-const date = new Date(2024, 0, 31); // January 31, 2024
-date.setMonth(1);
-// Fevral 31 → Fevralda 31 kun YO'Q!
-// 2024 kabisa yil → Fevral = 29 kun
-// 31 - 29 = 2 kun overflow → Mart 2
-
-console.log(date.getMonth()); // 2 (March!) — Fevral emas!
-console.log(date.getDate());  // 2
-
-// Sabab: setMonth() — overflow handling
-// Jan 31 → Feb 31 → Feb has 29 days → 31-29=2 → March 2
-```
-
-Bu Date'ning eng xavfli pitfall'laridan biri. `setMonth()` oy o'rnatganda kun overflow bo'lsa, keyingi oyga o'tib ketadi.
-
-**Yechim:**
-```javascript
-function safeSetMonth(date, month) {
-  const d = new Date(date);
-  const day = d.getDate();
-  d.setMonth(month);
-  if (d.getMonth() !== month) {
-    d.setDate(0); // oldingi oyning oxirgi kuni
-  }
-  return d;
-}
-```
-
----
-
-## Savol 5: Ikki Date objectni qanday solishtirish kerak? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const a = new Date("2024-03-13");
@@ -171,11 +135,12 @@ a.toISOString() === b.toISOString(); // true ✅
 | `getTime() ===` | ✅ | Timestamp (number) solishtiradi |
 | `+a === +b` | ✅ | Unary plus → number |
 
----
+</details>
 
-## Savol 6: "2024-03-13" va "2024-03-13T00:00:00" parse qilishda qanday farq bor? [Middle+]
+### 5. "2024-03-13" va "2024-03-13T00:00:00" parse qilishda qanday farq bor? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ECMAScript spetsifikatsiyasi bo'yicha:
 
@@ -206,11 +171,12 @@ console.log(a.getTime() === b.getTime()); // false! (timezone farqi)
 
 **Deep Dive:** Bu xatti-harakat ISO 8601 standartiga mos emas (ISO'da vaqtsiz sana timezone'siz deb hisoblanadi). Lekin ECMAScript spec shunday belgilagan. Bu ko'p bug'larga sabab bo'ladi, ayniqsa timezone musbat bo'lgan mintaqalarda — "2024-03-13" local time'da 2024-03-12 bo'lib qolishi mumkin.
 
----
+</details>
 
-## Savol 7: Date.now() va new Date().getTime() farqi bormi? [Junior+]
+### 6. Date.now() va new Date().getTime() farqi bormi? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // Ikkalasi ham hozirgi vaqtni ms timestamp sifatida qaytaradi
@@ -229,13 +195,14 @@ new Date().getTime();  // 1710345600000
 
 **Qoida:** Faqat timestamp kerak bo'lsa — `Date.now()`. Date object kerak bo'lsa — `new Date()`.
 
-Yuqori aniqlikdagi vaqt o'lchash uchun `performance.now()` ishlatiladi — u mikrosekund aniqlikda ishlaydi.
+Yuqori aniqlikdagi vaqt o'lchash uchun `performance.now()` ishlatiladi — u millisekund qaytaradi (sub-ms fractional qism bilan). Browser'larda Spectre mitigatsiyasi tufayli aniqlik ~100µs gacha cheklangan.
 
----
+</details>
 
-## Savol 8: Intl.DateTimeFormat nima? toLocaleDateString dan farqi? [Middle]
+### 7. Intl.DateTimeFormat nima? toLocaleDateString dan farqi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const date = new Date("2024-03-13T16:00:00Z");
@@ -257,7 +224,7 @@ dates.map(d => d.toLocaleDateString("en-US", { dateStyle: "long" }));
 
 // ✅ Tez — bir formatter, ko'p format
 const formatter = new Intl.DateTimeFormat("en-US", { dateStyle: "long" });
-dates.map(d => formatter.format(d)); // ~10x tezroq
+dates.map(d => formatter.format(d)); // ancha tezroq — ICU pattern compile faqat bir marta
 ```
 
 `Intl.DateTimeFormat` qo'shimcha imkoniyatlari:
@@ -265,11 +232,12 @@ dates.map(d => formatter.format(d)); // ~10x tezroq
 - `formatRange()` — "Mar 13 – 20, 2024" kabi sana oralig'i
 - `resolvedOptions()` — haqiqatda qo'llanilgan options'ni ko'rish
 
----
+</details>
 
-## Savol 9: Intl.NumberFormat bilan valyutani qanday formatlaysiz? [Middle]
+### 8. Intl.NumberFormat bilan valyutani qanday formatlaysiz? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function formatCurrency(amount, currency, locale) {
@@ -282,7 +250,7 @@ function formatCurrency(amount, currency, locale) {
 formatCurrency(1234.5, "USD", "en-US");   // "$1,234.50"
 formatCurrency(1234.5, "EUR", "de-DE");   // "1.234,50 €"
 formatCurrency(1234, "JPY", "ja-JP");     // "￥1,234"
-formatCurrency(1234567, "UZS", "uz-UZ");  // "1 234 567 soʻm"
+formatCurrency(1234567, "UZS", "uz-UZ");  // "1 234 567,00 soʻm"
 ```
 
 | Option | Qiymati | Natija |
@@ -310,11 +278,12 @@ new Intl.NumberFormat("en", {
 // "85.6%"
 ```
 
----
+</details>
 
-## Savol 10: Intl.Collator nima? Oddiy sort() dan farqi nima? [Middle]
+### 9. Intl.Collator nima? Oddiy sort() dan farqi nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // ❌ Oddiy sort — Unicode code point tartibida
@@ -344,11 +313,12 @@ const numCol = new Intl.Collator("en", { numeric: true });
 files.sort(numCol.compare); // ["file1", "file2", "file10", "file20"] ✅
 ```
 
----
+</details>
 
-## Savol 11: Intl.Segmenter nima? Qachon kerak? [Middle+]
+### 10. Intl.Segmenter nima? Qachon kerak? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `Intl.Segmenter` — matnni grapheme (ko'zga ko'rinadigan belgi), so'z, yoki gap bo'yicha **to'g'ri** segmentatsiya qiladi.
 
@@ -382,11 +352,12 @@ const words = [...seg.segment("今天天气很好")]
 
 Use case'lar: tweet belgi limiti, matn truncate, xitoycha/yaponcha so'z ajratish.
 
----
+</details>
 
-## Savol 12: Temporal API nima? Date dan nima farq qiladi? [Senior]
+### 11. Temporal API nima? Date dan nima farq qiladi? [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Temporal — TC39 Stage 3 proposal, Date object'ni almashtirishga mo'ljallangan yangi standart API.
 
@@ -429,47 +400,12 @@ start.until(end); // P2M12D (2 oy 12 kun)
 
 **Deep Dive:** Temporal hali browser'larda standart sifatida mavjud emas (2024-yil holatida). Polyfill: `@js-temporal/polyfill`. Production'da hozircha `date-fns` yoki `luxon` tavsiya qilinadi.
 
----
+</details>
 
-## Savol 13: Quyidagi kodning output'ini ayting [Middle+]
+### 12. Intl.RelativeTimeFormat qanday ishlaydi? [Middle]
 
-```javascript
-const a = new Date("2024-03-13");
-const b = new Date("2024-03-13T00:00:00");
-
-console.log(a.getTime() === b.getTime());
-console.log(a.getDate() === b.getDate());
-```
-
-**Javob:**
-
-```javascript
-const a = new Date("2024-03-13");
-// "2024-03-13" — vaqtsiz → UTC midnight → UTC 00:00
-
-const b = new Date("2024-03-13T00:00:00");
-// "2024-03-13T00:00:00" — Z siz → LOCAL midnight → local 00:00
-
-// UTC+5 zonasida:
-// a = 2024-03-13T00:00:00Z (UTC)
-// b = 2024-03-12T19:00:00Z (local 00:00 → UTC 19:00 oldingi kun)
-
-console.log(a.getTime() === b.getTime());
-// false ❌ — farqli timestamp'lar (5 soat farq)
-
-console.log(a.getDate() === b.getDate());
-// ??? — timezone'ga bog'liq!
-// UTC+5 da: a.getDate() = 13, b.getDate() = 13 → true
-// Lekin UTC-12 da: a.getDate() = 12, b.getDate() = 13 → false
-```
-
-Bu Date parsing'ning eng xavfli pitfall'i — vaqtsiz string UTC, vaqtli string (Z siz) local time sifatida parse qilinadi.
-
----
-
-## Savol 14: Intl.RelativeTimeFormat qanday ishlaydi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
@@ -492,46 +428,16 @@ rtfNum.format(-1, "day"); // "1 day ago" ("yesterday" emas)
 | `numeric` | `"auto"` | Iloji bo'lsa so'z: "yesterday" |
 | `style` | `"long"` | "in 3 months" |
 | `style` | `"short"` | "in 3 mo." |
-| `style` | `"narrow"` | "3mo." |
+| `style` | `"narrow"` | "in 3mo" |
 
 Real-world'da bu API bilan `timeAgo()` funksiyasi implement qilinadi — ikki Date orasidagi farqni hisoblab, eng mos birlikni (sekund, minut, soat, kun, hafta, oy, yil) tanlash kerak.
 
----
+</details>
 
-## Savol 15: Oyning oxirgi kunini qanday topasiz? [Middle]
+### 13. Intl.NumberFormat bilan raqamni compact formatda qanday chiqarasiz? [Junior+]
 
-**Javob:**
-
-```javascript
-// Eng oson usul — keyingi oyning 0-kuni
-function getLastDayOfMonth(year, month) {
-  // month+1 oyning 0-kuni = shu oyning oxirgi kuni
-  return new Date(year, month + 1, 0).getDate();
-}
-
-getLastDayOfMonth(2024, 0);  // 31 (January)
-getLastDayOfMonth(2024, 1);  // 29 (February — 2024 kabisa yil)
-getLastDayOfMonth(2023, 1);  // 28 (February — oddiy yil)
-getLastDayOfMonth(2024, 3);  // 30 (April)
-getLastDayOfMonth(2024, 11); // 31 (December)
-```
-
-**Qanday ishlaydi:** `new Date(2024, 2, 0)` — Mart oyining **0-kuni**. 0-kun deganda Date API oldingi oyning oxirgi kuniga overflow qiladi. Shuning uchun `month + 1` oyning 0-kuni = `month` oyning oxirgi kuni.
-
-```javascript
-// Kabisa yilni tekshirish
-function isLeapYear(year) {
-  return new Date(year, 1, 29).getDate() === 29;
-}
-isLeapYear(2024); // true
-isLeapYear(2023); // false
-```
-
----
-
-## Savol 16: Intl.NumberFormat bilan raqamni compact formatda qanday chiqarasiz? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function compactNumber(num, locale = "en") {
@@ -561,11 +467,12 @@ new Intl.NumberFormat("ru", {
 
 Bu YouTube subscriber count, social media stats, dashboardlar uchun juda foydali — kutubxonasiz, faqat Intl API bilan.
 
----
+</details>
 
-## Savol 17: Date object'ni nima uchun mutate qilmaslik kerak? Qanday oldini olasiz? [Middle+]
+### 14. Date object'ni nima uchun mutate qilmaslik kerak? Qanday oldini olasiz? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // ❌ Muammo — Date mutable
@@ -597,9 +504,15 @@ function addHours(date, hours) {
   return new Date(date.getTime() + hours * 3600000);
 }
 
-// 3. Object.freeze — setter'larni bloklaydi
-const frozen = Object.freeze(new Date());
-frozen.setFullYear(2030); // ❌ Strict mode'da TypeError, otherwise silent fail
+// 3. Yangi Date yaratish (original'ni mutate qilmaslik)
+// Eslatma: Object.freeze(date) Date setter'larni BLOKLAMAYDI —
+// chunki setFullYear() internal [[DateValue]] slot'ni o'zgartiradi, property emas.
+// Shu sababli immutability uchun doim yangi Date yarating:
+function safeSetYear(date, year) {
+  const copy = new Date(date);
+  copy.setFullYear(year);
+  return copy; // original o'zgarmaydi
+}
 
 // 4. date-fns — pure functions, Date mutate qilmaydi
 import { addMonths } from "date-fns";
@@ -611,3 +524,121 @@ plain.add({ months: 1 }); // yangi object, plain o'zgarmaydi
 ```
 
 **Qoida:** Date qabul qiladigan har bir funksiyada **birinchi qadam** — `new Date(date)` bilan copy yaratish.
+
+</details>
+
+---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Quyidagi kodning output'ini ayting [Middle]
+
+```javascript
+const date = new Date(2024, 0, 31);
+date.setMonth(1);
+console.log(date.getMonth()); // ?
+console.log(date.getDate());  // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+const date = new Date(2024, 0, 31); // January 31, 2024
+date.setMonth(1);
+// Fevral 31 → Fevralda 31 kun YO'Q!
+// 2024 kabisa yil → Fevral = 29 kun
+// 31 - 29 = 2 kun overflow → Mart 2
+
+console.log(date.getMonth()); // 2 (March!) — Fevral emas!
+console.log(date.getDate());  // 2
+
+// Sabab: setMonth() — overflow handling
+// Jan 31 → Feb 31 → Feb has 29 days → 31-29=2 → March 2
+```
+
+Bu Date'ning eng xavfli pitfall'laridan biri. `setMonth()` oy o'rnatganda kun overflow bo'lsa, keyingi oyga o'tib ketadi.
+
+**Yechim:**
+```javascript
+function safeSetMonth(date, month) {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setMonth(month);
+  if (d.getMonth() !== month) {
+    d.setDate(0); // oldingi oyning oxirgi kuni
+  }
+  return d;
+}
+```
+
+</details>
+
+### 2. Quyidagi kodning output'ini ayting [Middle+]
+
+```javascript
+const a = new Date("2024-03-13");
+const b = new Date("2024-03-13T00:00:00");
+
+console.log(a.getTime() === b.getTime());
+console.log(a.getDate() === b.getDate());
+```
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+const a = new Date("2024-03-13");
+// "2024-03-13" — vaqtsiz → UTC midnight → UTC 00:00
+
+const b = new Date("2024-03-13T00:00:00");
+// "2024-03-13T00:00:00" — Z siz → LOCAL midnight → local 00:00
+
+// UTC+5 zonasida:
+// a = 2024-03-13T00:00:00Z (UTC)
+// b = 2024-03-12T19:00:00Z (local 00:00 → UTC 19:00 oldingi kun)
+
+console.log(a.getTime() === b.getTime());
+// false ❌ — farqli timestamp'lar (5 soat farq)
+
+console.log(a.getDate() === b.getDate());
+// ??? — timezone'ga bog'liq!
+// UTC+5 da: a.getDate() = 13, b.getDate() = 13 → true
+// Lekin UTC-12 da: a.getDate() = 12, b.getDate() = 13 → false
+```
+
+Bu Date parsing'ning eng xavfli pitfall'i — vaqtsiz string UTC, vaqtli string (Z siz) local time sifatida parse qilinadi.
+
+</details>
+
+### 3. Oyning oxirgi kunini qanday topasiz? [Middle]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+// Eng oson usul — keyingi oyning 0-kuni
+function getLastDayOfMonth(year, month) {
+  // month+1 oyning 0-kuni = shu oyning oxirgi kuni
+  return new Date(year, month + 1, 0).getDate();
+}
+
+getLastDayOfMonth(2024, 0);  // 31 (January)
+getLastDayOfMonth(2024, 1);  // 29 (February — 2024 kabisa yil)
+getLastDayOfMonth(2023, 1);  // 28 (February — oddiy yil)
+getLastDayOfMonth(2024, 3);  // 30 (April)
+getLastDayOfMonth(2024, 11); // 31 (December)
+```
+
+**Qanday ishlaydi:** `new Date(2024, 2, 0)` — Mart oyining **0-kuni**. 0-kun deganda Date API oldingi oyning oxirgi kuniga overflow qiladi. Shuning uchun `month + 1` oyning 0-kuni = `month` oyning oxirgi kuni.
+
+```javascript
+// Kabisa yilni tekshirish
+function isLeapYear(year) {
+  return new Date(year, 1, 29).getDate() === 29;
+}
+isLeapYear(2024); // true
+isLeapYear(2023); // false
+```
+
+</details>

@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Destructuring nima va qanday turlariga bo'linadi? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Destructuring nima va qanday turlariga bo'linadi? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 Destructuring — object yoki array ichidagi qiymatlarni alohida o'zgaruvchilarga ajratib olish. 3 turi bor:
 
@@ -36,39 +39,13 @@ greet({ name: "Ali" }); // "Ali (user)"
 
 Object destructuring — `ToObject()` + property access. Array destructuring — `Symbol.iterator` + `next()`. Shuning uchun **har qanday iterable** array destructuring bilan ishlaydi: String, Map, Set, generator. Default qiymat faqat `undefined` uchun ishlaydi, `null` uchun **emas**.
 
----
 
-## Savol 2: Output nima? Destructuring defaults va null [Middle]
+</details>
 
-**Javob:**
+### 2. Spread va Rest operatorlarining farqi nima? [Junior+]
 
-```javascript
-const config = { timeout: null, retries: undefined, debug: false };
-
-const { timeout = 3000, retries = 5, debug = true, port = 8080 } = config;
-
-console.log(timeout);  // ?
-console.log(retries);  // ?
-console.log(debug);    // ?
-console.log(port);     // ?
-```
-
-**Javob:**
-
-```
-null     // timeout: null !== undefined → default ISHLAMAYDI
-5        // retries: undefined === undefined → default ishlaydi
-false    // debug: false !== undefined → default ISHLAMAYDI
-8080     // port: property yo'q → undefined → default ishlaydi
-```
-
-Default faqat qiymat **`undefined`** bo'lganda ishlaydi. `null`, `0`, `""`, `false` — barchasi explicit qiymat hisoblanadi.
-
----
-
-## Savol 3: Spread va Rest operatorlarining farqi nima? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Ikkalasi ham `...` sintaksisi, lekin kontekstga qarab farq qiladi:
 
@@ -93,37 +70,13 @@ const { password, ...safeUser } = { name: "Ali", age: 25, password: "s" };
 
 **MUHIM:** Spread faqat **shallow copy** — nested object'lar reference bo'yicha copy bo'ladi. Deep copy uchun `structuredClone()` ishlatish kerak.
 
----
 
-## Savol 4: Output nima? Spread va shallow copy [Middle]
+</details>
 
-**Javob:**
+### 3. Tagged template nima va real-world da qayerda ishlatiladi? [Middle]
 
-```javascript
-const original = { a: 1, b: { c: 2 } };
-const copy = { ...original };
-
-copy.a = 100;
-copy.b.c = 200;
-
-console.log(original.a); // ?
-console.log(original.b.c); // ?
-```
-
-**Javob:**
-
-```
-1    // original.a o'zgarmadi — primitive to'g'ridan-to'g'ri copy bo'ldi
-200  // original.b.c O'ZGARDI! — b object reference bo'yicha copy bo'ldi
-```
-
-Spread **shallow** copy. Birinchi daraja property'lar mustaqil copy bo'ladi. Lekin nested object'lar (b) — bir xil reference. `copy.b === original.b` — `true`.
-
----
-
-## Savol 5: Tagged template nima va real-world da qayerda ishlatiladi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Tagged template — template literal oldiga funksiya nomi qo'yish. Funksiya static string qismlarini va dynamic qiymatlarni alohida oladi:
 
@@ -147,11 +100,13 @@ Real-world ishlatilishi:
 | `lit-html` | HTML template sanitization |
 | `graphql-tag` | GraphQL query parsing |
 
----
 
-## Savol 6: `?.` (optional chaining) va `??` (nullish coalescing) farqi nima? [Junior+]
+</details>
 
-**Javob:**
+### 4. `?.` (optional chaining) va `??` (nullish coalescing) farqi nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 `?.` — null/undefined bo'lishi mumkin bo'lgan qiymat property'siga **xavfsiz murojaat**. TypeError o'rniga `undefined` qaytaradi.
 
@@ -176,41 +131,13 @@ console.log(port ?? 3000); // 0    — ✅ 0 null/undefined emas
 const theme = user?.settings?.theme ?? "light";
 ```
 
----
 
-## Savol 7: Output nima? || vs ?? [Middle]
+</details>
 
-**Javob:**
+### 5. Default parameter qachon ishlaydi, qachon ishlamaydi? [Middle]
 
-```javascript
-function getConfig(options) {
-  const debug = options.debug ?? false;
-  const timeout = options.timeout || 5000;
-  const retries = options.retries ?? 3;
-
-  return { debug, timeout, retries };
-}
-
-console.log(getConfig({ debug: false, timeout: 0, retries: 0 }));
-```
-
-**Javob:**
-
-```javascript
-{ debug: false, timeout: 5000, retries: 0 }
-```
-
-- `debug`: `false ?? false` → `false` (false null/undefined emas — `??` saqlaydi)
-- `timeout`: `0 || 5000` → `5000` (0 falsy — `||` fallback berdi, **BUG!**)
-- `retries`: `0 ?? 3` → `0` (0 null/undefined emas — `??` saqlaydi)
-
-**Xulosa:** `0`, `""`, `false` valid qiymat bo'lishi mumkin bo'lgan joylarda `??` ishlatish kerak, `||` emas.
-
----
-
-## Savol 8: Default parameter qachon ishlaydi, qachon ishlamaydi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Default parameter faqat argument `undefined` bo'lganda ishlaydi:
 
@@ -240,77 +167,13 @@ addToList("a"); // ["a"] — yangi array
 addToList("b"); // ["b"] — yana yangi array! (Python da muammo bo'lardi)
 ```
 
----
 
-## Savol 9: Bu kodda nima xato? [Middle]
+</details>
 
-**Javob:**
+### 6. `for...of` va `for...in` qachon ishlatiladi? [Junior+]
 
-```javascript
-const response = await fetch("/api/users");
-const data = response.json();
-
-for (const user in data) {
-  console.log(user.name);
-}
-```
-
-**3 ta xato:**
-
-1. **`response.json()` da `await` yo'q** — `.json()` Promise qaytaradi, `data` Promise bo'lib qoladi, array emas.
-
-2. **`for...in` ishlatilgan** — array uchun `for...of` kerak. `for...in` index'larni string sifatida beradi, prototype property'lar ham kirib qoladi.
-
-3. **HTTP error tekshiruvi yo'q** — `fetch` 404/500 uchun reject qilmaydi.
-
-```javascript
-// ✅ Tuzatilgan:
-const response = await fetch("/api/users");
-if (!response.ok) throw new Error(`HTTP ${response.status}`);
-const data = await response.json(); // ← await qo'shildi
-
-for (const user of data) { // ← for...of
-  console.log(user.name);
-}
-```
-
----
-
-## Savol 10: Output nima? Array destructuring va iterator [Middle+]
-
-**Javob:**
-
-```javascript
-function* counter() {
-  let i = 0;
-  while (true) {
-    console.log("yield:", i);
-    yield i++;
-  }
-}
-
-const [a, , b] = counter();
-console.log("a:", a);
-console.log("b:", b);
-```
-
-**Javob:**
-
-```
-yield: 0
-yield: 1
-yield: 2
-a: 0
-b: 2
-```
-
-Array destructuring `Symbol.iterator` + `next()` ishlatadi. Generator'dan 3 marta `next()` chaqiriladi: `a = 0`, skip (ikkinchi `,` — lekin `next()` chaqiriladi, 1 yield bo'ladi), `b = 2`. Destructuring **lazy** emas — skip qilingan element ham evaluate bo'ladi.
-
----
-
-## Savol 11: `for...of` va `for...in` qachon ishlatiladi? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | | `for...of` | `for...in` |
 |---|---|---|
@@ -338,11 +201,13 @@ for (const [key, value] of Object.entries(user)) {
 }
 ```
 
----
 
-## Savol 12: `||=`, `&&=`, `??=` operator'larini tushuntiring [Middle]
+</details>
 
-**Javob:**
+### 7. `||=`, `&&=`, `??=` operator'larini tushuntiring [Middle]
+
+<details>
+<summary>Javob</summary>
 
 | Operator | Ma'nosi | Qachon assign qiladi |
 |----------|---------|---------------------|
@@ -366,11 +231,13 @@ let val = "existing";
 val ??= expensiveComputation(); // chaqirilMAYDI — val null/undefined emas
 ```
 
----
 
-## Savol 13: JSON.stringify qaysi qiymatlarni skip qiladi? [Middle]
+</details>
 
-**Javob:**
+### 8. JSON.stringify qaysi qiymatlarni skip qiladi? [Middle]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const data = {
@@ -400,11 +267,13 @@ console.log(JSON.stringify(data));
 | `BigInt` | **TypeError** | **TypeError** |
 | `Date` | `.toISOString()` | `.toISOString()` |
 
----
 
-## Savol 14: JSON.stringify ning replacer va space argumentlarini tushuntiring [Middle+]
+</details>
 
-**Javob:**
+### 9. JSON.stringify ning replacer va space argumentlarini tushuntiring [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const user = { name: "Ali", password: "secret", age: 25, role: "admin" };
@@ -427,11 +296,13 @@ JSON.stringify(user, null, "\t"); // tab indent
 
 `toJSON()` method — custom serialization: agar object'da `toJSON()` bor bo'lsa, `JSON.stringify` shu method natijasini ishlatadi.
 
----
 
-## Savol 15: RegExp named groups va matchAll nima? [Middle]
+</details>
 
-**Javob:**
+### 10. RegExp named groups va matchAll nima? [Middle]
+
+<details>
+<summary>Javob</summary>
 
 Named groups — match natijalariga nom berish (`groups` property):
 
@@ -461,47 +332,13 @@ for (const m of text.matchAll(regex)) {
 }
 ```
 
----
 
-## Savol 16: Output nima? Optional chaining edge cases [Middle+]
+</details>
 
-**Javob:**
+### 11. Lookbehind va Lookahead nima? Misol bering [Senior]
 
-```javascript
-const obj = {
-  a: { b: { c: 0 } },
-  fn: null,
-  arr: [1, 2, 3]
-};
-
-console.log(obj?.a?.b?.c);       // ?
-console.log(obj?.a?.b?.c?.d);    // ?
-console.log(obj?.x?.y?.z);      // ?
-console.log(obj?.fn?.());       // ?
-console.log(obj?.missing?.());  // ?
-console.log(obj?.arr?.[1]);     // ?
-console.log(obj?.arr?.[10]);    // ?
-```
-
-**Javob:**
-
-```
-0          // c = 0 — 0 null/undefined emas, saqlanadi
-undefined  // 0?.d → (0).d → undefined (number'da d property yo'q)
-undefined  // x undefined → short-circuit → undefined
-undefined  // fn = null → null?.() → undefined
-undefined  // missing = undefined → undefined?.() → undefined
-2          // arr[1] = 2
-undefined  // arr[10] — index yo'q, undefined
-```
-
-`0?.d` — 0 null/undefined emas, shuning uchun `?.` to'xtamaydi, `(0).d` → `undefined` (autoboxing — Number prototype'da `d` yo'q).
-
----
-
-## Savol 17: Lookbehind va Lookahead nima? Misol bering [Senior]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Lookahead/lookbehind — pattern'ni match'ga **kiritmasdan** tekshirish:
 
@@ -531,11 +368,13 @@ strongPassword.test("abcdefgh"); // false — katta harf va raqam yo'q
 
 Lookbehind ES2018 da qo'shildi (oldin faqat lookahead bor edi). Safari da lookbehind qo'llab-quvvatlash kech qo'shildi (v16.4+). Lookbehind'da variable-length pattern ishlaydi, lekin ba'zi engine'larda cheklovlar bor.
 
----
 
-## Savol 18: `String.raw` nima va qachon ishlatiladi? [Middle]
+</details>
 
-**Javob:**
+### 12. `String.raw` nima va qachon ishlatiladi? [Middle]
+
+<details>
+<summary>Javob</summary>
 
 `String.raw` — built-in tagged template, escape sequence'larni **qayta ishlamaydi**:
 
@@ -559,11 +398,13 @@ const pattern = String.raw`\d+\.\d+`; // "\\d+\\.\\d+"
 new RegExp(pattern); // /\d+\.\d+/
 ```
 
----
 
-## Savol 19: Swap, filter, va clean object — destructuring bilan qanday qilinadi? [Junior+]
+</details>
 
-**Javob:**
+### 13. Swap, filter, va clean object — destructuring bilan qanday qilinadi? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // 1. Swap — vaqtinchalik o'zgaruvchisiz
@@ -587,11 +428,13 @@ console.log(firstName); // "Ali"
 const { data: { users: [firstUser] } } = response;
 ```
 
----
 
-## Savol 20: ES6+ xususiyatlardan qaysilari eng ko'p ishlatiladi va nima uchun? [Senior]
+</details>
 
-**Javob:**
+### 14. ES6+ xususiyatlardan qaysilari eng ko'p ishlatiladi va nima uchun? [Senior]
+
+<details>
+<summary>Javob</summary>
 
 | Xususiyat | Ishlatilish darajasi | Sabab |
 |-----------|---------------------|-------|
@@ -622,3 +465,203 @@ async function loadUserDashboard(userId) {
 **Deep Dive:**
 
 TypeScript bilan birga eng kuchli kombinatsiyalar: destructuring + type inference, optional chaining + strict null checks, `??` + `strictNullChecks`. Framework'larda: React'da destructuring (props, state), Vue'da optional chaining (computed), Node.js'da spread (config merge).
+
+
+</details>
+
+---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Output nima? Destructuring defaults va null [Middle]
+
+
+```javascript
+const config = { timeout: null, retries: undefined, debug: false };
+
+const { timeout = 3000, retries = 5, debug = true, port = 8080 } = config;
+
+console.log(timeout);  // ?
+console.log(retries);  // ?
+console.log(debug);    // ?
+console.log(port);     // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+null     // timeout: null !== undefined → default ISHLAMAYDI
+5        // retries: undefined === undefined → default ishlaydi
+false    // debug: false !== undefined → default ISHLAMAYDI
+8080     // port: property yo'q → undefined → default ishlaydi
+```
+
+Default faqat qiymat **`undefined`** bo'lganda ishlaydi. `null`, `0`, `""`, `false` — barchasi explicit qiymat hisoblanadi.
+
+
+</details>
+
+### 2. Output nima? Spread va shallow copy [Middle]
+
+
+```javascript
+const original = { a: 1, b: { c: 2 } };
+const copy = { ...original };
+
+copy.a = 100;
+copy.b.c = 200;
+
+console.log(original.a); // ?
+console.log(original.b.c); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+1    // original.a o'zgarmadi — primitive to'g'ridan-to'g'ri copy bo'ldi
+200  // original.b.c O'ZGARDI! — b object reference bo'yicha copy bo'ldi
+```
+
+Spread **shallow** copy. Birinchi daraja property'lar mustaqil copy bo'ladi. Lekin nested object'lar (b) — bir xil reference. `copy.b === original.b` — `true`.
+
+
+</details>
+
+### 3. Output nima? || vs ?? [Middle]
+
+
+```javascript
+function getConfig(options) {
+  const debug = options.debug ?? false;
+  const timeout = options.timeout || 5000;
+  const retries = options.retries ?? 3;
+
+  return { debug, timeout, retries };
+}
+
+console.log(getConfig({ debug: false, timeout: 0, retries: 0 }));
+```
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+{ debug: false, timeout: 5000, retries: 0 }
+```
+
+- `debug`: `false ?? false` → `false` (false null/undefined emas — `??` saqlaydi)
+- `timeout`: `0 || 5000` → `5000` (0 falsy — `||` fallback berdi, **BUG!**)
+- `retries`: `0 ?? 3` → `0` (0 null/undefined emas — `??` saqlaydi)
+
+**Xulosa:** `0`, `""`, `false` valid qiymat bo'lishi mumkin bo'lgan joylarda `??` ishlatish kerak, `||` emas.
+
+
+</details>
+
+### 4. Bu kodda nima xato? [Middle]
+
+```javascript
+const response = await fetch("/api/users");
+const data = response.json();
+
+for (const user in data) {
+  console.log(user.name);
+}
+```
+
+<details>
+<summary>Javob</summary>
+
+**3 ta xato:**
+
+1. **`response.json()` da `await` yo'q** — `.json()` Promise qaytaradi, `data` Promise bo'lib qoladi, array emas.
+
+2. **`for...in` ishlatilgan** — array uchun `for...of` kerak. `for...in` index'larni string sifatida beradi, prototype property'lar ham kirib qoladi.
+
+3. **HTTP error tekshiruvi yo'q** — `fetch` 404/500 uchun reject qilmaydi.
+
+```javascript
+// ✅ Tuzatilgan:
+const response = await fetch("/api/users");
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
+const data = await response.json(); // ← await qo'shildi
+
+for (const user of data) { // ← for...of
+  console.log(user.name);
+}
+```
+
+
+</details>
+
+### 5. Output nima? Array destructuring va iterator [Middle+]
+
+
+```javascript
+function* counter() {
+  let i = 0;
+  while (true) {
+    console.log("yield:", i);
+    yield i++;
+  }
+}
+
+const [a, , b] = counter();
+console.log("a:", a);
+console.log("b:", b);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+yield: 0
+yield: 1
+yield: 2
+a: 0
+b: 2
+```
+
+Array destructuring `Symbol.iterator` + `next()` ishlatadi. Generator'dan 3 marta `next()` chaqiriladi: `a = 0`, skip (ikkinchi `,` — lekin `next()` chaqiriladi, 1 yield bo'ladi), `b = 2`. Destructuring **lazy** emas — skip qilingan element ham evaluate bo'ladi.
+
+
+</details>
+
+### 6. Output nima? Optional chaining edge cases [Middle+]
+
+
+```javascript
+const obj = {
+  a: { b: { c: 0 } },
+  fn: null,
+  arr: [1, 2, 3]
+};
+
+console.log(obj?.a?.b?.c);       // ?
+console.log(obj?.a?.b?.c?.d);    // ?
+console.log(obj?.x?.y?.z);      // ?
+console.log(obj?.fn?.());       // ?
+console.log(obj?.missing?.());  // ?
+console.log(obj?.arr?.[1]);     // ?
+console.log(obj?.arr?.[10]);    // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+0          // c = 0 — 0 null/undefined emas, saqlanadi
+undefined  // 0?.d → (0).d → undefined (number'da d property yo'q)
+undefined  // x undefined → short-circuit → undefined
+undefined  // fn = null → null?.() → undefined
+undefined  // missing = undefined → undefined?.() → undefined
+2          // arr[1] = 2
+undefined  // arr[10] — index yo'q, undefined
+```
+
+`0?.d` — 0 null/undefined emas, shuning uchun `?.` to'xtamaydi, `(0).d` → `undefined` (autoboxing — Number prototype'da `d` yo'q).
+
+
+</details>

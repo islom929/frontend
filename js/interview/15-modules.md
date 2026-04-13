@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: CommonJS va ES Modules farqi nima? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. CommonJS va ES Modules farqi nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 | Xususiyat | CommonJS | ES Modules |
 |-----------|----------|------------|
@@ -14,7 +17,7 @@
 | Loading | **Sinxron** | **Asinxron** |
 | Tahlil | **Runtime** (dynamic) | **Compile-time** (static) |
 | Binding | **Value copy** | **Live binding** |
-| `this` | `module.exports` | `undefined` |
+| `this` | `exports` (dastlab `module.exports` ga teng, lekin qayta tayinlansa farqlanadi) | `undefined` |
 | Strict mode | Yo'q | **Avtomatik** |
 | Tree shaking | ❌ | ✅ |
 | Browser | Bundler kerak | Native support |
@@ -31,11 +34,12 @@ export function myFunction() {}
 
 Eng muhim farq: ESM **static** — import/export'lar compile-time da tahlil qilinadi, bu tree shaking va optimization imkonini beradi. CJS **dynamic** — runtime da bajariladi.
 
----
+</details>
 
-## Savol 2: `module.exports` va `exports` farqi nima? [Middle]
+### 2. `module.exports` va `exports` farqi nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `exports` — `module.exports` ga **shortcut** (reference). Boshlang'ichda ikkalasi **bir xil ob'ekt**ga ishora qiladi. Lekin Node.js faqat `module.exports` ni export qiladi.
 
@@ -54,11 +58,12 @@ module.exports = { add: (a, b) => a + b };
 
 Qoida: `module.exports` ishlatish xavfsizroq. `exports` ga faqat property qo'shish mumkin, qayta assign qilish MUMKIN EMAS.
 
----
+</details>
 
-## Savol 3: Live bindings nima? [Middle+]
+### 3. Live bindings nima? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ESM da export qilingan qiymat **reference** sifatida ulangan. Source modul qiymatni o'zgartirsa — import qilgan modul ham yangi qiymatni ko'radi. CommonJS da esa **value copy** bo'ladi.
 
@@ -88,11 +93,12 @@ console.log(count); // 0 ← O'ZGARMADI! Copy
 
 Bu ESM ning eng muhim xususiyatlaridan biri — modul ichidagi state'ni doim haqiqiy ko'rish imkonini beradi.
 
----
+</details>
 
-## Savol 4: Named export va Default export farqi nima? [Junior+]
+### 4. Named export va Default export farqi nima? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // Named export — bir faylda bir nechta
@@ -121,11 +127,12 @@ import Database, { createPool } from './database.mjs';
 | Nom o'zgartirish | `as` kerak | Erkin |
 | Tree shaking | **Yaxshi** | O'rtacha |
 
----
+</details>
 
-## Savol 5: `import()` dynamic import nima? Qachon ishlatiladi? [Middle]
+### 5. `import()` dynamic import nima? Qachon ishlatiladi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `import()` — modulni **runtime** da, **asinxron** yuklaydigan funksiya-like syntax. Promise qaytaradi.
 
@@ -146,24 +153,26 @@ Asosiy use case'lar:
 3. **Conditional loading** — environment/feature flag bo'yicha
 4. **CJS → ESM interop** — CommonJS da ESM import qilish
 
----
+</details>
 
-## Savol 6: Circular dependency nima? Qanday oldini olish mumkin? [Middle+]
+### 6. Circular dependency nima? Qanday oldini olish mumkin? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Circular dependency — A moduli B ni import qiladi, B esa A ni import qiladi. Natijada initialization tartibida muammo bo'ladi:
 
 ```javascript
 // a.mjs
 import { b } from './b.mjs';
-export const a = "A + " + b;
+export var a = "A + " + b;
 
 // b.mjs
 import { a } from './a.mjs';
-export const b = "B + " + a;
+export var b = "B + " + a;
 
 // Natija: a = "A + B + undefined" — a hali assign bo'lmagan!
+// DIQQAT: const/let ishlatilsa ReferenceError (TDZ) bo'ladi, var ishlatilsa undefined
 ```
 
 Yechimlar:
@@ -172,11 +181,12 @@ Yechimlar:
 3. **Dependency injection** — parametr orqali berish
 4. **Arxitekturani qayta ko'rish** — ko'pincha circular = noto'g'ri arxitektura
 
----
+</details>
 
-## Savol 7: Tree shaking nima? Nima uchun faqat ESM bilan ishlaydi? [Middle]
+### 7. Tree shaking nima? Nima uchun faqat ESM bilan ishlaydi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Tree shaking — bundle'dan **ishlatilmagan kodni** olib tashlash. Bundle hajmini kamaytiradi.
 
@@ -196,43 +206,12 @@ Nima uchun faqat ESM? ESM import/export'lari **static** — compile-time da qays
 { "sideEffects": false }
 ```
 
----
+</details>
 
-## Savol 8: Bu kodning output ini ayting [Middle+]
+### 8. ESM da `require()` ishlatsa bo'ladimi? [Middle]
 
-**Savol:**
-
-```javascript
-// counter.cjs
-let count = 0;
-module.exports = {
-  count,
-  increment() { count++; },
-  getCount() { return count; }
-};
-
-// main.cjs
-const mod = require('./counter.cjs');
-mod.increment();
-mod.increment();
-console.log(mod.count);     // ?
-console.log(mod.getCount()); // ?
-```
-
-**Javob:**
-
-```
-0
-2
-```
-
-`mod.count` — export paytidagi qiymat (0) **copy** bo'lgan, hech qachon o'zgarmaydi. `mod.getCount()` — closure orqali ichki `count` ga murojaat qiladi, shuning uchun haqiqiy qiymat (2) qaytaradi. Bu CommonJS dagi value copy muammosi.
-
----
-
-## Savol 9: ESM da `require()` ishlatsa bo'ladimi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **Yo'q.** ESM da `require`, `module`, `exports`, `__filename`, `__dirname` — yo'q. Bular CommonJS wrapper'dan keladi.
 
@@ -255,11 +234,12 @@ const require = createRequire(import.meta.url);
 const cjsModule = require('./legacy.cjs');
 ```
 
----
+</details>
 
-## Savol 10: `import * as` va `import { }` farqi nima? [Middle]
+### 9. `import * as` va `import { }` farqi nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // Named import — faqat keraklilarni
@@ -281,11 +261,12 @@ import Calculator from './math.mjs';
 | Naming collision | `as` bilan hal qilinadi | M.x — collision yo'q |
 | Use case | Ko'p hollarda | Ko'p export bo'lganda |
 
----
+</details>
 
-## Savol 11: Node.js da CJS va ESM ni qanday farqlaydi? [Middle+]
+### 10. Node.js da CJS va ESM ni qanday farqlaydi? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Node.js modulni **CJS yoki ESM** deb aniqlaydigan qoidalar:
 
@@ -316,11 +297,12 @@ Kutubxona uchun ikkala formatni qo'llab-quvvatlash — **dual package**:
 }
 ```
 
----
+</details>
 
-## Savol 12: `import.meta` nima? [Middle+]
+### 11. `import.meta` nima? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `import.meta` — joriy modul haqida meta-ma'lumot saqlovchi ob'ekt. Faqat ES Module'larda mavjud.
 
@@ -339,11 +321,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const lodashPath = import.meta.resolve('lodash');
 ```
 
----
+</details>
 
-## Savol 13: Re-export (barrel file) nima? Performance muammosi bormi? [Middle+]
+### 12. Re-export (barrel file) nima? Performance muammosi bormi? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Re-export — bir nechta modulni bitta fayldan qayta export qilish:
 
@@ -365,11 +348,12 @@ Yechim: to'g'ridan-to'g'ri import:
 import { Button } from './components/Button.mjs'; // faqat bitta fayl
 ```
 
----
+</details>
 
-## Savol 14: ESM da top-level await ishlaydi, CJS da nima uchun ishlamaydi? [Middle+]
+### 13. ESM da top-level await ishlaydi, CJS da nima uchun ishlamaydi? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ESM — **asinxron** yuklaydi: construction → instantiation → evaluation. Top-level `await` evaluation bosqichida ishlaydi — bu modulni import qilgan boshqa modullar kutadi.
 
@@ -393,11 +377,12 @@ init();
 // Lekin require() sinxron — natija tayyor bo'lmaydi!
 ```
 
----
+</details>
 
-## Savol 15: Module bundler nima? Webpack va Vite farqi? [Middle]
+### 14. Module bundler nima? Webpack va Vite farqi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Bundler — bir nechta modul fayllarni bitta yoki bir nechta bundle'ga birlashtiradi.
 
@@ -410,3 +395,42 @@ Bundler — bir nechta modul fayllarni bitta yoki bir nechta bundle'ga birlashti
 | Use case | Legacy, katta production | Zamonaviy SPA |
 
 Vite dev da tezroq chunki bundlemaydi — browser'ning native ESM support'idan foydalanadi. Webpack esa dev da ham butun dependency graph'ni bundle qiladi.
+
+</details>
+
+---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Bu kodning output'ini ayting [Middle+]
+
+**Savol:**
+
+```javascript
+// counter.cjs
+let count = 0;
+module.exports = {
+  count,
+  increment() { count++; },
+  getCount() { return count; }
+};
+
+// main.cjs
+const mod = require('./counter.cjs');
+mod.increment();
+mod.increment();
+console.log(mod.count);     // ?
+console.log(mod.getCount()); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+0
+2
+```
+
+`mod.count` — export paytidagi qiymat (0) **copy** bo'lgan, hech qachon o'zgarmaydi. `mod.getCount()` — closure orqali ichki `count` ga murojaat qiladi, shuning uchun haqiqiy qiymat (2) qaytaradi. Bu CommonJS dagi value copy muammosi.
+
+</details>

@@ -20,6 +20,7 @@
 - [Generator return() va throw()](#generator-return-va-throw)
 - [Async Generators va for await...of](#async-generators-va-for-awaitof)
 - [Use Cases](#use-cases)
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -38,7 +39,8 @@ JavaScript da **iteration protocol** — ma'lumotlarni ketma-ket olish uchun sta
 
 Bu protocol nima muammoni hal qiladi? ES6 dan oldin turli data structure'lar (Array, arguments, NodeList) ustida iteratsiya qilishning yagona universal usuli yo'q edi — har biri o'z usuli bilan ishlardi. Iteration protocol **yagona standart interfeys** yaratadi — `for...of`, spread operator, destructuring, `Promise.all`, `Array.from` kabi mexanizmlar **istalgan** iterable bilan ishlaydi. Yangi data structure yaratganingizda ham — shu protocol'ni implement qilsangiz, barcha til mexanizmlari avtomatik ishlaydi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ECMAScript spec da iteration protocol aniq belgilangan:
 
@@ -81,7 +83,10 @@ Iterator object'da `next()` dan tashqari ixtiyoriy `return()` va `throw()` metho
 - **`return(value)`** — iterator erta tugatilganda chaqiriladi (`break`, `return`, `throw` for...of ichida). Cleanup logic uchun ishlatiladi.
 - **`throw(error)`** — generator'larda xato tashish uchun ishlatiladi.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Iterable va Iterator farqini ko'rsatadigan misol:
 
@@ -116,6 +121,8 @@ for (const value of user) {
 console.log(user[Symbol.iterator]); // undefined
 ```
 
+</details>
+
 ---
 
 ## Symbol.iterator
@@ -126,7 +133,8 @@ console.log(user[Symbol.iterator]); // undefined
 
 `Symbol.iterator` nima uchun symbol? Chunki oddiy string key bo'lsa (masalan `"iterator"`) — mavjud ob'ektlardagi shu nomdagi property bilan to'qnashishi mumkin edi (naming collision). Symbol'lar unique — bu muammoni hal qiladi. Shu sababli ECMAScript spec da barcha well-known method'lar Symbol orqali aniqlangan.
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Symbol.iterator'ni qo'lda chaqirish:
 
@@ -167,6 +175,8 @@ console.log(isIterable({ a: 1 }));    // false — oddiy Object
 console.log(isIterable(null));         // false — null
 ```
 
+</details>
+
 ---
 
 ## Built-in Iterables
@@ -187,7 +197,8 @@ JavaScript da quyidagi built-in turlar iterable protocol'ni implement qiladi:
 
 Har bir built-in iterable'ning **alohida iterator method'lari** ham bor — masalan, Array va Map da `.keys()`, `.values()`, `.entries()` — bular turli ko'rinishdagi iterator'larni qaytaradi.
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Turli built-in iterable'larning iterator'larini ko'rsatadigan misol:
 
@@ -253,6 +264,8 @@ for (const [key, value] of Object.entries(config)) {
 }
 ```
 
+</details>
+
 ---
 
 ## Custom Iterator Yaratish
@@ -265,7 +278,8 @@ Ikki xil yondashuv bor:
 1. **Alohida iterator ob'ekt** — har safar `[Symbol.iterator]()` chaqirilganda yangi iterator yaratiladi
 2. **Self-iterator** — ob'ektning o'zi ham iterable, ham iterator (`next()` va `[Symbol.iterator]()` bitta ob'ektda)
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Range — berilgan oraliqda raqamlar generatsiya qiluvchi custom iterable:
 
@@ -420,6 +434,8 @@ for (const val of iter) {
 // Resource closed (early exit)
 ```
 
+</details>
+
 ---
 
 ## for...of Under the Hood
@@ -437,7 +453,8 @@ for (const val of iter) {
 
 Agar tsikl erta to'xtasa (`break`, `return`, `throw`) — iterator'ning `return()` method'i chaqiriladi (agar mavjud bo'lsa).
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```javascript
 // for...of ni desugarlash — engine ichida shu ishlaydi:
@@ -493,7 +510,10 @@ iterable ──[Symbol.iterator]()──► iterator
                                   break? ──YES──► return() → STOP
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 `for...of` va boshqa tsikllar farqi:
 
@@ -526,6 +546,8 @@ for (const key in arr) {
 | `await` ishlaydi? | Ha | Ha | **Yo'q** |
 | Ishlatiladigan joy | Iterable'lar | Object property'lari | Array |
 
+</details>
+
 ---
 
 ## Spread va Destructuring — Iterator Protocol
@@ -549,7 +571,8 @@ const [a, b, c] = range; // a=1, b=2, c=3
 const [first, ...rest] = range; // first=1, rest=[2, 3, 4, 5]
 ```
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Iterator protocol ishlatadigan barcha til mexanizmlari:
 
@@ -602,6 +625,8 @@ console.log({ ...obj }); // { a: 1, b: 2 } — iterator ishlatilMADI
 console.log([...obj]); // ["x", "y"] — Symbol.iterator ishladi
 ```
 
+</details>
+
 ---
 
 ## Generator Functions (function*)
@@ -619,7 +644,8 @@ Generator function'ning xususiyatlari:
 - Generator object — iterator: `next()`, `return()`, `throw()` method'lari bor
 - Har bir `next()` chaqiruvida kod keyingi `yield` gacha ishlaydi
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Generator function engine ichida **state machine** sifatida ishlaydi. Har bir `yield` — bitta state. `next()` chaqirilganda engine joriy state'dan keyingi state'ga o'tadi.
 
@@ -681,7 +707,10 @@ function myGen_desugared() {
 }
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Generator'ning turli e'lon usullari:
 
@@ -753,6 +782,8 @@ console.log(gen.next());
 // { value: undefined, done: true } ← tugagan, qayta boshlanmaydi
 ```
 
+</details>
+
 ---
 
 ## yield Keyword — Pause/Resume
@@ -767,7 +798,35 @@ console.log(gen.next());
 
 `yield` faqat generator funksiya ichida ishlatiladi — oddiy funksiya, callback, yoki arrow funksiya ichida ishlatish SyntaxError beradi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Generator — state machine**: V8 generator funksiyalarni state machine'ga compile qiladi. Har `yield` — alohida **suspension point**. Generator object hozirgi state'ni saqlaydi — `resumePoint`, local variable'lar, this binding, lexical environment.
+
+**Local variables**: Generator pause bo'lganda, local variable'lar state object ichida saqlanadi (closure emas — bu performance uchun):
+```javascript
+function* counter() {
+  let x = 0;
+  while (true) {
+    yield x++;   // x state object'da saqlanadi
+  }
+}
+```
+
+**`yield` qadamlari**:
+1. `expr` evaluate qilinadi
+2. Execution suspend — state saqlanadi
+3. `{value, done: false}` qaytariladi
+4. Keyingi `next(arg)` kutiladi
+5. `yield` expression qiymati = `arg`
+6. Keyingi statement'dan davom
+
+**Performance**: Generator'lar manual iterator'lardan biroz sekinroq bo'lishi mumkin — state machine resume overhead (suspend/resume, register file restoration) tufayli. Aniq farq V8 versiyasi, JIT optimization holati va workload'ga bog'liq. Lekin syntax soddaligi va maintainability afzalliklari tufayli production'da generator'lar deyarli har doim afzal — performance farqi aksariyat real-world holatlarda sezilarsiz.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 `yield` to'xtatib turish mexanizmi:
 
@@ -792,7 +851,7 @@ console.log(r1);       // { value: "birinchi", done: false }
 // ... bu yerda boshqa kodlar ishlashi mumkin
 // generator TO'XTAB turadi — memory'da holat saqlanadi
 
-// next() 2 — oldngi yield joydan davom
+// next() 2 — oldingi yield joydan davom
 const r2 = gen.next(); // "Qadam 2: davom" chiqadi
 console.log(r2);       // { value: "ikkinchi", done: false }
 
@@ -831,6 +890,8 @@ function* goodGenerator() {
 }
 ```
 
+</details>
+
 ---
 
 ## Generator as Iterator
@@ -841,7 +902,38 @@ Generator object avtomatik iterator protocol'ni implement qiladi — `next()`, `
 
 Bu xususiyat generator'ni custom iterator yaratishning eng qulay usuli qiladi. Oddiy iterator yaratish uchun `next()`, `return()`, holat boshqaruvi — barchasini qo'lda yozish kerak. Generator'da esa faqat `yield` yozasiz — qolganini engine o'zi qiladi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Self-iterator pattern**: Generator object'ning `[Symbol.iterator]()` methodi **o'zini qaytaradi**:
+```javascript
+const g = gen();
+g[Symbol.iterator]() === g  // true!
+```
+
+Bu Array/Set/Map'dan farq — ular har chaqiruvda **yangi** iterator yaratadi. Generator esa o'zi allaqachon iterator. Shuning uchun bir generator'ni bir nechta `for...of`'da ishlatib bo'lmaydi — u bitta.
+
+**`for...of` integration**: Generator iterable bo'lgani uchun `for...of` to'g'ridan-to'g'ri ishlaydi. Engine `next()` methodini `done: true` bo'lguncha chaqiradi.
+
+**Spread bilan ehtiyot**: `[...fibonacci()]` cheksiz generator bilan — **memory crash**! Chunki spread `done: true` bo'lmaguncha push qiladi. `for...of` da `break` ishlatish mumkin, spread'da imkon yo'q.
+
+**`return` qiymati `for...of`'da chiqmaydi** — bu muhim nuansa:
+```javascript
+function* gen() {
+  yield 1;
+  return 2;
+}
+
+for (const v of gen()) console.log(v);
+// 1 — faqat yield. 2 chiqmadi, chunki done: true bo'lganda for...of darhol break qiladi.
+```
+
+`return` qiymati **iterator-level metadata**, qiymat emas. `.next()` bilan ko'rish mumkin, lekin `for...of` e'tiborga olmaydi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Generator'ni for...of va spread bilan ishlatish:
 
@@ -931,6 +1023,8 @@ console.log(g.next()); // { value: 2, done: false }
 console.log(g.next()); // { value: 3, done: true } ← return qiymati
 ```
 
+</details>
+
 ---
 
 ## yield* — Delegation
@@ -943,7 +1037,46 @@ console.log(g.next()); // { value: 3, done: true } ← return qiymati
 
 `yield*` ning return qiymati — ichki generator'ning **`return`** qiymati (agar bo'lsa). Bu xususiyat generator'lar orasida qiymat uzatishda ishlatiladi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`yield*` — transparent delegation**: tashqi generator ichki generator'ga butunlay transparent ishlaydi:
+1. **Forward values** — ichki generator yield'lari to'g'ridan-to'g'ri tashqaridan chiqayotgandek
+2. **Bidirectional `next(value)`** — yuborilgan qiymat ichkiga yetadi
+3. **Error propagation** — `throw()` ham forward qilinadi
+4. **Return propagation** — `return()` ham
+5. **Final value** — ichki generator'ning `return` qiymati `yield*` ifodasining qiymati bo'ladi
+
+**Performance**: V8 `yield*` ni native optimize qiladi — manual `while` loop bilan delegation'ga nisbatan samaraliroq bo'lishi mumkin (aniq farq V8 versiyasiga va iterator implementatsiyasiga bog'liq):
+```javascript
+// Manual loop (boilerplate ko'p)
+function* outer() {
+  const inner = innerGen();
+  let r = inner.next();
+  while (!r.done) { yield r.value; r = inner.next(); }
+}
+
+// yield* (tavsiya — toza va engine optimize qiladi)
+function* outer() { yield* innerGen(); }
+```
+`yield*` nafaqat tez, balki `next(value)`, `throw()`, `return()` propagation'ni ham avtomatik boshqaradi — qo'lda implement qilish murakkab va xato manbai.
+
+**Iterable bilan ishlaydi**: Array, String, Map, Set, boshqa generator — har qanday iterable. Iterable bo'lmagan qiymat (`yield* 42`) → `TypeError`.
+
+**Recursive use case** — tree traversal uchun ideal:
+```javascript
+function* traverse(node) {
+  yield node.value;
+  for (const child of node.children) {
+    yield* traverse(child);  // recursive delegation
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 `yield*` bilan iterablelarni birlashtirish:
 
@@ -1044,6 +1177,8 @@ for (const file of walkTree(fileTree)) {
 // src, index.js, components, App.js, Header.js, utils.js
 ```
 
+</details>
+
 ---
 
 ## Two-Way Communication: next(value)
@@ -1053,6 +1188,31 @@ for (const file of walkTree(fileTree)) {
 Generator faqat tashqariga qiymat bermaydi — `next(value)` orqali ichkariga ham qiymat olishi mumkin. `next()` ga argument berilganda, u oldingi `yield` ifodasining **qiymati** bo'lib qoladi. Bu ikki tomonlama aloqa — generator va tashqi kod o'rtasida ma'lumot almashinuvi.
 
 Muhim qoida: **birinchi** `next()` ga berilgan argument **ignore** qilinadi — chunki hali `yield` uchralmagan, olish uchun joy yo'q. Faqat ikkinchi va undan keyingi `next()` lardagi argument'lar `yield` qiymatiga aylanadi.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Nima uchun birinchi `next()` argument ignored?**
+
+Birinchi `next()` chaqirilganda, generator hali hech qanday `yield` ga yetmagan. Birinchi `yield` ga yetganda — uning qiymatini **saqlash uchun joy yo'q** (hech qanday `const x = yield` construct hali ishga tushmagan). Shuning uchun argument ignored.
+
+```javascript
+function* gen() {
+  const a = yield 1;      // ← 1-next() bu yerda STOP
+  console.log("a =", a);  // ← 2-next(arg) da arg = a
+  const b = yield 2;
+  console.log("b =", b);
+}
+
+const g = gen();
+g.next("ignored");  // start, value: 1 — "ignored" ishlatilmaydi
+g.next("hello");    // a = hello, value: 2
+g.next("world");    // b = world
+```
+
+**Coroutine pattern**: `yield`/`next` bilan **coroutine** yaratiladi — ikki tomonlama, cooperative multitasking. Bu pattern Python'dan (yield/send), Lua'dan (coroutine), C#'dan (async/await) kelgan.
+
+**`async/await` — generator'ning yuqori darajadagi shakli**: Babel `async/await` ni `function*` + `yield` ga compile qiladi (regenerator runtime). State machine bir xil, farqi `await` Promise bilan integrated.
 
 ```
 Two-way communication:
@@ -1072,7 +1232,10 @@ const a = yield "hello"       ────────────────�
 const b = yield "world"       ────────────────────► { value: "world", done: false }
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Two-way communication:
 
@@ -1154,6 +1317,8 @@ console.log(avg.next(30).value); // 20   — o'rtacha: 60/3
 console.log(avg.next(40).value); // 25   — o'rtacha: 100/4
 ```
 
+</details>
+
 ---
 
 ## Generator return() va throw()
@@ -1164,11 +1329,48 @@ Generator object'da `next()` dan tashqari ikkita muhim method bor:
 
 1. **`return(value)`** — generator'ni tugatadi. `{ value, done: true }` qaytaradi. Generator ichidagi `finally` bloklari ishlaydi. Bu method bilan generator'ni tashqaridan "majburan" to'xtatish mumkin.
 
-2. **`throw(error)`** — generator ichiga xato tashiydi. Xuddi generator ichida `yield` turgan joyda `throw error` yozilgandek ishlaydi. Agar generator ichida `try/catch` bilan ushlansa — generator davom etadi. Ushlanmasa — generator tugatiladi va xato tashqariga otiladi.
+2. **`throw(error)`** — generator ichiga xato tashiydi. `throw()` chaqirilganda, generator ichida hozirgi `yield` pozitsiyasida xato throw bo'ladi. Agar generator ichida `try/catch` bilan ushlansa — generator davom etadi. Ushlanmasa — generator tugatiladi va xato tashqariga otiladi.
 
 Bu method'lar generator bilan tashqi kod o'rtasidagi to'liq nazorat imkonini beradi: `next()` — davom et, `return()` — tugat, `throw()` — xato tashla.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`return()` — faqat to'xtatish emas**: agar generator `try/finally` ichida bo'lsa, `finally` bloki bajariladi. Bu cleanup uchun muhim:
+```javascript
+function* withCleanup() {
+  try {
+    yield 1;
+    yield 2;
+  } finally {
+    console.log("Cleaning up");  // return() chaqirilsa ham ishlaydi
+  }
+}
+
+const g = withCleanup();
+g.next();           // {value: 1, done: false}
+g.return("stop");   // "Cleaning up" chiqadi, {value: "stop", done: true}
+```
+
+**`throw()` — yield ichidagi xato**: generator ichida `try/catch` bo'lsa ushlay oladi va davom etadi:
+```javascript
+function* safeGen() {
+  try {
+    yield 1;
+  } catch (err) {
+    yield "recovered";  // davom etishi mumkin
+  }
+}
+```
+
+**Generator states**: `suspendedStart` → `executing` → `suspendedYield` → `executing` → ... → `completed`. Tugagandan keyin `next()` → `{value: undefined, done: true}`.
+
+**Re-entrancy protection**: Generator `executing` state'da bo'lganda `next()`/`return()`/`throw()` chaqirib bo'lmaydi — `TypeError: Generator is already running`. Bu spec qoida, mutex-like himoya.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 `return()` — generator'ni erta tugatish:
 
@@ -1238,7 +1440,7 @@ console.log(gen.next()); // { value: undefined, done: true } — generator tugad
 Resource management pattern — `return()` bilan cleanup:
 
 ```javascript
-function* dbConnection(url) {
+async function* dbConnection(url) {
   const conn = await connect(url);
   console.log("Connected to:", url);
 
@@ -1256,6 +1458,8 @@ function* dbConnection(url) {
 }
 ```
 
+</details>
+
 ---
 
 ## Async Generators va for await...of
@@ -1268,7 +1472,25 @@ Async generator — `async function*` bilan e'lon qilinadigan funksiya. U genera
 
 > **Eslatma:** `for-await-of` batafsil — [13-async-await.md](13-async-await.md) da ham yoritilgan.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Async iterator protocol**: `Symbol.asyncIterator` orqali aniqlanadi (sync'dagi `Symbol.iterator` emas). `next()` Promise qaytaradi — `Promise<{value, done}>`. Async generator avtomatik shu protocol'ni implement qiladi.
+
+**Sequential execution**: Async generator **parallel ishlamaydi**. Har `yield` navbatdagi pending `next()` ni resolve qiladi. Internal queue bor — bir vaqtda birdan ortiq `next()` chaqirilsa, ular navbatda turadi.
+
+**`for await...of` — har iteratsiyada `await`**:
+- Sync `for...of` dan farqi — har `iterator.next()` chaqirig'ida `await`
+- Loop body ichida `await` ishlatish mumkin
+- Bitta iteratsiya tugamaguncha keyingisi boshlanmaydi
+- **Sync iterable bilan ham ishlaydi** — agar `Symbol.asyncIterator` yo'q bo'lsa, `Symbol.iterator` ishlatiladi va har value `Promise.resolve()` ga o'raladi
+
+**Backpressure**: Async generator'da implicit backpressure. Consumer tez bo'lsa — `await` kutadi. Sekinroq bo'lsa — generator pause qoladi `next()` chaqirilguncha. Bu Node.js streams uchun ideal pattern — `readline`, `fs.createReadStream` kabi built-in module'lar async iterable interface'iga ega.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Async generator — paginated API'dan ma'lumot olish:
 
@@ -1355,6 +1577,8 @@ for await (const status of poll(() => fetch('/api/status').then(r => r.json())))
 }
 ```
 
+</details>
+
 ---
 
 ## Use Cases
@@ -1362,6 +1586,11 @@ for await (const status of poll(() => fetch('/api/status').then(r => r.json())))
 ### Lazy Evaluation
 
 Qiymatlar faqat **so'ralganda** hisoblanadi — oldindan barchasini memory'ga yuklash shart emas:
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Generator function chaqirilganda kod bajarilmaydi — faqat generator object yaratiladi. Bu object ichida **suspended execution context** saqlanadi: local variable'lar, program counter (qayerda to'xtagan), scope chain. Har bir `next()` chaqiruvida engine shu execution context'ni call stack'ga push qiladi, oldingi `yield` dan keyingi nuqtadan davom ettiradi, keyingi `yield` gacha bajaradi va yana execution context'ni pop qiladi. V8 da generator state machine sifatida compile qilinadi — har bir `yield` nuqtasi alohida state, `next()` chaqiruvi state transition. Lazy pipeline (`lazyMap` → `lazyFilter` → `lazyTake`) da har bir `next()` chaqiruvi chain bo'ylab propagate qiladi: `lazyTake.next()` → `lazyFilter.next()` → `lazyMap.next()` → manba generator'ning `next()`. Element pipeline'dan bittadan o'tadi — butun collection memory'ga yuklanmaydi. Shuning uchun 1 million elementlik array'dan faqat 5 ta kerak bo'lsa, faqat 5 ta (yoki filter tufayli ko'proq) element hisoblanadi, qolgan 999,995 ta hech qachon yaratilmaydi.
 
 ```javascript
 function* lazyMap(iterable, fn) {
@@ -1403,9 +1632,16 @@ console.log([...result]); // [4, 16, 36, 64, 100]
 // Faqat 10 ta natural son ishlatildi — cheksiz bo'lsa ham!
 ```
 
+</details>
+
 ### Infinite Sequences
 
 Cheksiz ketma-ketliklar — memory sarflamaydi, chunki lazy:
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+`while (true) { yield n++; }` — bu cheksiz loop, lekin memory cheksiz o'smaydi. Sababi: `yield` execution'ni to'xtatadi va faqat bitta qiymat qaytaradi. Generator object ichida faqat joriy state saqlanadi (masalan, `n` ning qiymati va `[a, b]` Fibonacci uchun) — bu 2-3 ta variable, O(1) memory. `yield` spec bo'yicha **GeneratorYield** abstract operation'ni bajaradi: (1) `{ value, done: false }` result object yaratadi, (2) generator'ning `[[GeneratorState]]` ni `"suspendedYield"` ga o'zgartiradi, (3) execution context'ni call stack'dan olib tashlaydi. Keyingi `next()` da `[[GeneratorState]]` `"executing"` ga o'zgaradi va davom etadi. `[...generator]` yoki `Array.from(generator)` cheksiz generator'ga qo'llansa — cheksiz loop, memory tugaguncha array o'sib boradi, keyin RangeError yoki OOM crash. Shuning uchun cheksiz generator'lar doim `take(n)`, `for...of` + `break`, yoki manual `next()` bilan cheklanishi kerak. V8 da generator object'ning asosiy hajmi kichik va doimiy (internal context + register file saqlovchi struktura) — qancha element generate qilishidan qat'i nazar bu hajm **o'zgarmaydi**. Aniq byte hajmi local variable'lar soniga, V8 versiyasiga va architecture'ga bog'liq, lekin prinsip bir xil: cheksiz generator doimiy (O(1)) memory sarflaydi.
 
 ```javascript
 // Fibonacci — cheksiz
@@ -1434,9 +1670,16 @@ console.log(ids.next().value); // "user_0_1709456789123"
 console.log(ids.next().value); // "user_1_1709456789124"
 ```
 
+</details>
+
 ### State Machines
 
 Generator'ning pause/resume xususiyati state machine implement qilish uchun ideal:
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Generator spec bo'yicha uchta internal state'ga ega: **`"suspendedStart"`** (yaratilgan, hali `next()` chaqirilmagan), **`"suspendedYield"`** (`yield` da to'xtagan), **`"executing"`** (`next()` bilan ishlayotgan), **`"completed"`** (`return` yoki funksiya tugagan). State machine pattern'da generator o'zining `[[GeneratorState]]` dan tashqari, dasturchi belgilagan business state'larni ham boshqaradi (QIZIL/SARIQ/YASHIL). `while (true)` + `yield` kombinatsiyasi circular state machine yaratadi — generator hech qachon `"completed"` state'ga o'tmaydi. `next(value)` bilan two-way communication — argument oldingi `yield` expression'ning qiymati bo'lib qaytadi. V8 da generator function compile vaqtida state machine'ga aylantiriladi: har bir `yield` alohida switch-case label bo'ladi, `next()` chaqiruvi `[[GeneratorResumeIndex]]` bo'yicha to'g'ri label'ga jump qiladi. Async generator (`async function*`) qo'shimcha murakkablik qo'shadi — har bir `yield` va `await` alohida suspension point, engine ikkalasini internal state'da track qiladi.
 
 ```javascript
 function* trafficLight() {
@@ -1460,7 +1703,7 @@ console.log(light.next().value); // "🔴 QIZIL" — boshidan
 HTTP request state machine:
 
 ```javascript
-function* httpRequestFSM() {
+async function* httpRequestFSM() {
   while (true) {
     // IDLE state
     const config = yield { state: "IDLE", message: "Kutilmoqda" };
@@ -1483,6 +1726,8 @@ function* httpRequestFSM() {
   }
 }
 ```
+
+</details>
 
 ### Data Streaming / Pagination
 
@@ -1513,6 +1758,304 @@ for await (const [name, email, age] of readCSVLines('users.csv')) {
   await processUser({ name, email, age: Number(age) });
 }
 ```
+
+---
+
+## Edge Cases va Gotchas
+
+### `yield` expression precedence — qavslar majburiy
+
+`yield` operatori **juda past priority'ga** ega — nullish coalescing va ternary operatordan ham pastroq. Shu sababli `yield` ni murakkab expression ichida ishlatish uchun **qavslar** majburiy, aks holda SyntaxError bo'ladi.
+
+```javascript
+function* gen() {
+  // ✅ yield expression oxirida — OK
+  yield 1 + 2;        // yield (1 + 2) → yield 3
+  yield x > 0 ? x : -x; // yield (x > 0 ? x : -x)
+
+  // ❌ yield expression o'rtasida — SyntaxError!
+  // const x = 1 + yield 2;  // SyntaxError: Unexpected token 'yield'
+  // const y = yield 1 + yield 2; // SyntaxError
+
+  // ✅ Qavslar bilan — ishlaydi
+  const x = 1 + (yield 2);              // OK
+  const y = (yield 1) + (yield 2);      // OK
+  const z = (yield "a") ?? (yield "b"); // OK
+
+  // ❌ Function argument sifatida — qavslar majburiy
+  // console.log(yield 1, yield 2); // SyntaxError
+  console.log((yield 1), (yield 2));  // OK
+}
+```
+
+**Nima uchun:** ECMAScript grammar'da `YieldExpression` `AssignmentExpression` darajasida — bu ternary, `+`, `*` va boshqa barcha arithmetic/logical operatorlardan past. Shu sababli `a + yield b` parser uchun `a + <AssignmentExpression>` kabi, va keyingi token `yield` kutilmagan — SyntaxError. Qavslar bilan `yield` ga alohida expression scope beriladi.
+
+**Yechim qoidasi:** Agar `yield` boshqa operator bilan birga ishlatilsa va `yield` expression'ning **oxirgi** qismi emas — **har doim qavslar** ishlating. Shubha bo'lsa — qavslar qo'shing, ortiqcha zarari yo'q.
+
+---
+
+### Set/Map iterator + mutation during iteration — skipped va live semantics
+
+Set va Map iterator'lari **live** — iteratsiya davomida kolleksiya o'zgartirilsa, yangi qo'shilgan elementlar (yet not visited) **ko'rinadi**, o'chirilgan elementlar esa **skip qilinadi**. Bu Java'ning `ConcurrentModificationException` behaviour'idan farqli, lekin undefined bug manbai bo'lishi mumkin.
+
+```javascript
+// Set — add during iteration:
+const set = new Set([1, 2, 3]);
+for (const val of set) {
+  console.log(val);
+  if (val === 2) set.add(4); // Mid-iteration add
+}
+// Output:
+// 1
+// 2
+// 3
+// 4  ← Qo'shilgan element KO'RINADI (hali visit qilinmagan)
+
+// Set — delete not-yet-visited:
+const set2 = new Set([1, 2, 3, 4]);
+for (const val of set2) {
+  console.log(val);
+  if (val === 2) set2.delete(3); // "3" hali visit qilinmagan
+}
+// Output:
+// 1
+// 2
+// 4  ← "3" SKIP qilindi! (mid-iteration'da o'chirildi)
+```
+
+```javascript
+// Map — similar behavior
+const map = new Map([[1, 'a'], [2, 'b'], [3, 'c']]);
+for (const [k, v] of map) {
+  if (k === 1) map.delete(3); // "3" hali visit qilinmagan
+  console.log(k, v);
+}
+// Output:
+// 1 'a'
+// 2 'b'
+// (3 skipped — deleted before visit)
+```
+
+**Nima uchun:** Spec'da Set/Map iterator'lari internal counter bilan ishlaydi. Iterator `next()` har chaqirilganda, counter'ni tekshiradi va mavjud element'ni qaytaradi. Iteratsiya davomida element qo'shilsa — u internal storage'ning oxiriga qo'shiladi, counter hali unga yetmagan, shuning uchun **ko'rinadi**. Element o'chirilsa va hali counter unga yetmagan bo'lsa — **skip** qilinadi.
+
+**Xavf:**
+- Infinite loop — har iteratsiyada yangi element qo'shsangiz, loop hech qachon tugamaydi
+- Silent skip — o'chirilgan elementlar ko'rinmaganligi sababli bug'lar yashiriladi
+
+**Yechim:** Iteration davomida mutation kerak bo'lsa — snapshot oling yoki operatsiyalarni keyinga qoldiring:
+
+```javascript
+// ✅ Snapshot pattern:
+const snapshot = [...set];
+for (const val of snapshot) {
+  if (val === 2) set.add(4); // Orig set'ni mutate qilsa ham, loop snapshot'da
+}
+
+// ✅ Defer pattern:
+const toDelete = [];
+for (const val of set) {
+  if (val % 2 === 0) toDelete.push(val);
+}
+toDelete.forEach(v => set.delete(v));
+```
+
+---
+
+### Array destructuring iterator'ni **avtomatik yopadi** (`return()` chaqiriladi)
+
+Array destructuring iterator protocol'idan foydalanadi, lekin iteratorda qolgan elementlar bor bo'lsa — spec'da `IteratorClose()` chaqiriladi, ya'ni iterator'ning `return()` method'i (agar mavjud bo'lsa) trigger qilinadi. Bu generator'larda `finally` blokining ishga tushishiga olib keladi — **cleanup semantics**.
+
+```javascript
+function* gen() {
+  try {
+    yield 1;
+    yield 2;
+    yield 3;
+    yield 4;
+  } finally {
+    console.log("cleanup called"); // ← Destructuring'da ham chaqiriladi!
+  }
+}
+
+// Destructuring faqat 2 ta element oladi:
+const [a, b] = gen();
+console.log(a, b); // 1, 2
+// Output:
+// "cleanup called"  ← Iterator yopildi, finally ishladi
+// 1, 2
+```
+
+```javascript
+// Taqqoslash: for...of + break ham shunday ishlaydi
+for (const val of gen()) {
+  if (val === 2) break;
+}
+// "cleanup called" chiqadi
+
+// Lekin: spread iteratorni to'liq consume qiladi, return() chaqirilmaydi:
+const arr = [...gen()];
+console.log(arr); // [1, 2, 3, 4]
+// "cleanup called" chiqadi — chunki generator oxirigacha yetdi (finally natural flow)
+```
+
+**Nima uchun:** Spec'da `ArrayAssignmentPattern` va `ArrayBindingPattern` evaluation algoritmi `IteratorClose(iteratorRecord, completion)` chaqiradi agar iterator'da elements qolgan bo'lsa. Bu resurs leak'ning oldini olish uchun — masalan, database cursor yoki file handle.
+
+**Amaliy ta'sir:**
+```javascript
+async function* dbCursor() {
+  const connection = await openDb();
+  try {
+    let row;
+    while (row = await connection.next()) {
+      yield row;
+    }
+  } finally {
+    await connection.close(); // ✅ Destructuring + break'da ham ishlaydi
+  }
+}
+
+// Faqat birinchi 10 ta row kerak:
+const [...first10] = take(dbCursor(), 10);
+// Cursor destructuring oxirida avtomatik yopiladi — resurs tejaladi
+```
+
+**Gotcha:** `return()` method bo'lmagan iterator'larda bu avtomatik cleanup ishlamaydi. Custom iterator yaratayotganda `return()` implement qilish tavsiya etiladi.
+
+---
+
+### `yield*` da error propagation — delegation zanjiri bo'ylab
+
+`yield*` faqat qiymatlarni emas, `next()`, `throw()`, `return()` chaqiruvlarini ham ichki iterator/generator'ga **propagate** qiladi. Ya'ni tashqaridan `gen.throw(err)` chaqirsangiz — inner generator'da `yield` pozitsiyasida throw bo'ladi. Inner `try/catch` bilan handle qilishi yoki yuqoriga propagate qilishi mumkin.
+
+```javascript
+function* inner() {
+  try {
+    yield 1;
+    yield 2;
+    yield 3;
+  } catch (e) {
+    console.log("inner caught:", e.message);
+    yield 99; // ✅ Recover — inner davom etadi
+  }
+}
+
+function* outer() {
+  yield "before";
+  yield* inner(); // delegation
+  yield "after";
+}
+
+const g = outer();
+console.log(g.next()); // { value: "before", done: false }
+console.log(g.next()); // { value: 1, done: false } — inner'dan
+console.log(g.throw(new Error("oops")));
+// "inner caught: oops"  ← Inner catch ushladi
+// { value: 99, done: false }  ← Inner yield 99 davom etdi
+
+console.log(g.next()); // { value: "after", done: false } — outer davom
+```
+
+**Agar inner catch yo'q bo'lsa — error outer'ga chiqadi:**
+
+```javascript
+function* innerNoCatch() {
+  yield 1;
+  yield 2;
+}
+
+function* outerWithCatch() {
+  try {
+    yield* innerNoCatch();
+  } catch (e) {
+    console.log("outer caught:", e.message);
+  }
+  yield "recovered";
+}
+
+const g = outerWithCatch();
+g.next(); // { value: 1 }
+g.throw(new Error("oops"));
+// "outer caught: oops"
+// { value: "recovered" }
+```
+
+**Nima uchun:** Spec'da `yield*` evaluation delegation mexanizmini implement qiladi. `outer.throw(err)` chaqirilsa, u inner iterator'ning `throw()` method'iga forward qilinadi. Agar inner catch bilan handle qilsa — yangi value yield qilishi mumkin, outer uni oladi. Agar inner re-throw qilsa yoki `throw()` method'i yo'q bo'lsa — error outer'ga qaytadi. Bu **bidirectional error channel** generator'lar orasida.
+
+**Use case:** Nested state machines, error recovery chains, stream processors bilan error routing.
+
+---
+
+### Async generator sequential — parallel `next()` chaqirib bo'lmaydi
+
+Async generator har vaqtda faqat **bitta pending `next()`** ga ega bo'lishi mumkin. Agar siz bir nechta `next()` ni bir vaqtda chaqirsangiz — ular internal queue'da kutib turadi, parallel bajarilmaydi. Bu async generator'ning **sequential nature**'i, va parallelism uchun boshqa pattern kerak.
+
+```javascript
+async function* gen() {
+  console.log("1 start");
+  await new Promise(r => setTimeout(r, 100));
+  console.log("1 done");
+  yield 1;
+
+  console.log("2 start");
+  await new Promise(r => setTimeout(r, 100));
+  console.log("2 done");
+  yield 2;
+
+  console.log("3 start");
+  await new Promise(r => setTimeout(r, 100));
+  console.log("3 done");
+  yield 3;
+}
+
+const g = gen();
+
+// ❌ Parallel chaqirishga urinish — foyda yo'q:
+const [a, b, c] = await Promise.all([
+  g.next(),
+  g.next(),
+  g.next(),
+]);
+
+// Output (sequential, not parallel):
+// 1 start
+// 1 done
+// 2 start
+// 2 done
+// 3 start
+// 3 done
+// Total: ~300ms (3 × 100ms)
+// Agar parallel bo'lganida — ~100ms bo'lardi
+```
+
+**Nima uchun:** Spec'da async generator internal `[[AsyncGeneratorQueue]]` slot bor — bu pending `next()` request'lar navbati. Har chaqiruv queue'ga qo'shiladi va **ketma-ket** bajariladi. Bu dizayn choice — generator state machine'ni consistent tutish uchun. Agar parallel ruxsat berilsa, `yield` position'i va local variable'lar noaniq bo'lib qolardi.
+
+**Yechim — true parallelism uchun:**
+
+```javascript
+// ✅ Yechim 1: Har so'rov uchun alohida generator
+async function* singleRequest(id) {
+  const data = await fetchItem(id);
+  yield data;
+}
+
+const results = await Promise.all(
+  ids.map(id => singleRequest(id).next().then(r => r.value))
+);
+
+// ✅ Yechim 2: Promise.all ichida — generator'siz
+const results2 = await Promise.all(ids.map(id => fetchItem(id)));
+
+// ✅ Yechim 3: for-await-of ichida async operations parallel qilish
+async function* processParallel(ids, concurrency = 5) {
+  for (let i = 0; i < ids.length; i += concurrency) {
+    const batch = ids.slice(i, i + concurrency);
+    const results = await Promise.all(batch.map(fetchItem));
+    for (const result of results) yield result; // batch results ketma-ket yield
+  }
+}
+```
+
+**Muhim:** Async generator **sekin emas** — faqat **sequential**. Agar sizga "lazy stream" kerak bo'lsa (masalan, paginated API, database cursor) — async generator ideal. Agar parallel fan-out kerak bo'lsa — `Promise.all` yoki concurrent limit pattern ishlating (14-async-await.md dagi `p-limit` pattern).
 
 ---
 
@@ -1919,6 +2462,98 @@ for await (const batch of batchify(generateItems(), 3)) {
 ```
 
 **Tushuntirish:** `batchProcess` — async iterable'dan element yig'adi va `batchSize` ga yetganda processFn chaqiradi. `batchify` — generator versiya, batch'larni yield qiladi — bu yanada flexible.
+
+</details>
+
+---
+
+### Mashq 5: Permutations Generator (Qiyin)
+
+**Savol:** `permutations(arr)` generator'ini yozing — array'ning barcha permutation'larini **lazy** ravishda yield qilsin. Recursive `yield*` pattern'ini ishlating.
+
+```javascript
+// Test:
+console.log([...permutations([1, 2, 3])]);
+// [
+//   [1, 2, 3],
+//   [1, 3, 2],
+//   [2, 1, 3],
+//   [2, 3, 1],
+//   [3, 1, 2],
+//   [3, 2, 1]
+// ]
+
+// 5 ta element = 120 permutations — lekin lazy, birinchi 10 tasini olish mumkin:
+const gen = permutations([1, 2, 3, 4, 5]);
+const first10 = [];
+for (const perm of gen) {
+  first10.push(perm);
+  if (first10.length === 10) break; // Erta to'xtatish — qolgan 110 tasi yaratilmaydi
+}
+console.log(first10.length); // 10
+```
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+function* permutations(arr) {
+  // Base case: bo'sh yoki bitta element — faqat o'zini qaytar
+  if (arr.length <= 1) {
+    yield arr.slice(); // Copy qilib qaytar (mutation oldini olish)
+    return;
+  }
+
+  // Recursive case: har bir elementni birinchi pozitsiyaga qo'y,
+  // qolganlari uchun recursive permutations
+  for (let i = 0; i < arr.length; i++) {
+    // arr[i] ni qoldirib, qolgan elementlarni olish
+    const rest = [...arr.slice(0, i), ...arr.slice(i + 1)];
+
+    // Recursive delegation — yield* bilan inner generator
+    for (const perm of permutations(rest)) {
+      yield [arr[i], ...perm];
+    }
+  }
+}
+
+// Test 1: 3 ta element
+console.log([...permutations([1, 2, 3])]);
+// [[1,2,3], [1,3,2], [2,1,3], [2,3,1], [3,1,2], [3,2,1]]
+
+// Test 2: Lazy iteration
+const gen = permutations([1, 2, 3, 4]);
+let count = 0;
+for (const perm of gen) {
+  console.log(perm);
+  count++;
+  if (count === 5) break; // 5 tasidan keyin to'xtatish
+}
+// Faqat 5 ta permutation generated, qolgan 19 tasi yaratilmaydi (24 total)
+
+// Test 3: Katta N uchun — memory-efficient
+function* takeN(iter, n) {
+  let i = 0;
+  for (const item of iter) {
+    if (i++ >= n) return;
+    yield item;
+  }
+}
+
+// 10 ta element = 3,628,800 permutation — lekin lazy!
+const first100 = [...takeN(permutations([1,2,3,4,5,6,7,8,9,10]), 100)];
+console.log(first100.length); // 100
+// Memory: O(n) chunki faqat active recursive chain'lar saqlanadi
+```
+
+**Tushuntirish:**
+1. **Base case** — array'da 0 yoki 1 element bo'lsa, o'zini yield qilish (recursion to'xtaydi)
+2. **Recursive case** — har bir elementni "pivot" sifatida olib, qolgan elementlarning permutatsiyalarini hisoblash
+3. **`yield*` delegation** — inner `permutations(rest)` natijasini `yield*` orqali uzatish, keyin har bir natijani `[arr[i], ...perm]` bilan o'rash
+4. **Lazy evaluation** — `for...of` break qilsa, qolgan permutation'lar yaratilmaydi. 10! = 3.6M permutation, lekin faqat kerakli qismi generate qilinadi
+5. **Memory efficiency** — O(n) chuqurlik recursion bilan, O(n!) array saqlamasdan
+
+**Real use case:** Brute force algoritmlar (TSP, scheduling), test case generatsiyasi, combinatorial search space exploration.
 
 </details>
 

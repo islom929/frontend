@@ -19,8 +19,9 @@
 - [Import Attributes (ES2025)](#import-attributes-es2025)
 - [RegExp Pattern Modifiers (ES2025)](#regexp-pattern-modifiers-es2025)
 - [Duplicate Named Capturing Groups (ES2025)](#duplicate-named-capturing-groups-es2025)
-- [Kelgusi Proposals (Stage 3)](#kelgusi-proposals-stage-3)
+- [Kelgusi Proposals](#kelgusi-proposals)
 - [Common Mistakes](#common-mistakes)
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
 
@@ -43,9 +44,14 @@ TC39 — ECMAScript standartini boshqaradigan komitet. Har bir yangi feature quy
 
 Stage 3+ feature'larni ishlatish xavfsiz — ular deyarli o'zgarmaydi. Stage 2 va undan pastlari hali o'zgarishi mumkin.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
-Har yili yanvar oyida Stage 4 ga yetgan feature'lar shu yilgi ECMAScript versiyasiga kiritiladi. Masalan, 2024-yil yanvarigacha Stage 4 ga yetganlar → ES2024. Browser vendor'lar (Chrome/V8, Firefox/SpiderMonkey, Safari/JavaScriptCore) odatda Stage 3 da implement qilishni boshlaydi — shuning uchun ko'p ES2025 feature'lari allaqachon browser'larda ishlaydi.
+ECMAScript har yilgi yangi versiyasi **iyun** oyida Ecma General Assembly tomonidan tasdiqlanadi. Feature Stage 4 ga yetishi uchun uning kutish chegarasi — o'sha yilgi **mart/aprel TC39 plenary** yig'ilishi (odatda iyundan 2-3 oy oldin). Shu cut-off'gacha Stage 4 ga yetgan proposal'lar keyingi ES spec'ga kiritiladi. Masalan: ES2024 cut-off = 2024-mart TC39 plenary, rasmiy nashr = 2024-iyun Ecma GA.
+
+Browser vendor'lar (Chrome/V8, Firefox/SpiderMonkey, Safari/JavaScriptCore) odatda **Stage 3** dan implement qilishni boshlaydi — shuning uchun ES2025 feature'larining ko'pi allaqachon production browser'larda ishlaydi (Stage 3 = "Candidate", syntax va semantika muzlatilgan, asosan bug fix kutiladi).
+
+</details>
 
 ---
 
@@ -59,7 +65,8 @@ Bu method'lar `Array.prototype.reduce()` bilan qo'lda guruhlash o'rniga qisqa, o
 
 **Muhim farq:** `Object.groupBy()` — `Array.prototype` da emas, `Object` static method. Chunki natija — null-prototype object (`Object.create(null)` kabi), `Object.prototype` method'lari chaqirilmaydi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
 Object.groupBy(items, callback) algoritmi:
@@ -74,7 +81,10 @@ Object.groupBy(items, callback) algoritmi:
 Map.groupBy xuddi shunday, faqat Map qaytaradi
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 const products = [
@@ -136,6 +146,8 @@ const oldWay = products.reduce((acc, product) => {
 const newWay = Object.groupBy(products, p => p.category);
 ```
 
+</details>
+
 ---
 
 ## Promise.withResolvers (ES2024)
@@ -157,7 +169,8 @@ const promise = new Promise((res, rej) => {
 
 `Promise.withResolvers()` buni bitta qatorda hal qiladi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 `Promise.withResolvers()` ichida aynan yuqoridagi eski pattern bajariladigan. Method yangi Promise yaratadi, executor'dan `resolve` va `reject` ni oladi, va uchala qiymatni bitta object sifatida qaytaradi.
 
@@ -170,7 +183,10 @@ Promise.withResolvers() qaytaradi:
 }
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // ✅ ES2024 usul — toza, qisqa
@@ -221,6 +237,8 @@ deferred.resolve("tayyor!");
 const result = await deferred.promise; // "tayyor!"
 ```
 
+</details>
+
 ---
 
 ## String isWellFormed va toWellFormed (ES2024)
@@ -232,7 +250,8 @@ JavaScript string'lari UTF-16 formatida saqlanadi. UTF-16 da ba'zi belgilar (emo
 - `isWellFormed()` — string'da lone surrogate borligini tekshiradi
 - `toWellFormed()` — lone surrogate'larni `U+FFFD` (replacement character) bilan almashtiradi
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 UTF-16 surrogate'lar:
 - **High surrogate**: `0xD800` – `0xDBFF`
@@ -250,7 +269,10 @@ UTF-16 encoding:
 "\uDE00" → [0xDE00]                ← lone low surrogate (noto'g'ri!)
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Well-formed string — oddiy belgilar va to'g'ri surrogate pair'lar
@@ -292,6 +314,8 @@ function sanitizeInput(input) {
 }
 ```
 
+</details>
+
 ---
 
 ## RegExp v Flag — Unicode Sets (ES2024)
@@ -302,7 +326,8 @@ function sanitizeInput(input) {
 
 `v` flag `u` flag'ni almashtirishga mo'ljallangan — ikkalasini birga ishlatib bo'lmaydi.
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // ❌ u flag — cheklangan
@@ -342,6 +367,8 @@ letterOnly.test("Hello!");   // false
 // /[a-z]/uv — ❌ SyntaxError (ikkalasini birga bo'lmaydi)
 ```
 
+</details>
+
 ---
 
 ## Array.fromAsync (ES2024)
@@ -355,7 +382,8 @@ Qabul qiladigan argumentlar:
 2. **Iterable with async mapping** — oddiy iterable + async mapFn
 3. **Array-like with async mapping** — `{ length, 0: ..., 1: ... }` + async mapFn
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Async generator → array
@@ -406,6 +434,8 @@ const mapped = await Array.fromAsync({ length: 3 }, async (_, i) => {
 });
 ```
 
+</details>
+
 ---
 
 ## Atomics.waitAsync (ES2024)
@@ -416,18 +446,24 @@ const mapped = await Array.fromAsync({ length: 3 }, async (_, i) => {
 
 Bu API asosan **low-level concurrent programming** uchun — Web Workers orasida shared memory bilan ishlashda.
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // SharedArrayBuffer — thread'lar orasidagi umumiy memory
+// ⚠️ Cross-origin isolation majburiy: COOP: same-origin + COEP: require-corp
+// (Spectre mitigation 2018+, aks holda SharedArrayBuffer mavjud emas)
 const sab = new SharedArrayBuffer(1024);
 const int32 = new Int32Array(sab);
 
 // Main thread'da — async kutish
 async function waitForSignal() {
+  // Atomics.waitAsync qaytaradi: { async: boolean, value: Promise | string }
+  // - async: false → value = "not-equal" (hozirgi qiymat expectedValue'ga teng emas, darhol qaytdi)
+  // - async: true  → value = Promise, u "ok" (notify) yoki "timed-out" ga resolve bo'ladi
   const result = await Atomics.waitAsync(int32, 0, 0).value;
-  // result: "ok" (notify bo'lganda) yoki "timed-out"
-  console.log("Signal olindi:", result);
+  // result: "not-equal" | "ok" | "timed-out"
+  console.log("Signal holati:", result);
 }
 
 waitForSignal();
@@ -436,15 +472,23 @@ waitForSignal();
 // Atomics.store(int32, 0, 1);
 // Atomics.notify(int32, 0, 1);
 
-// Timeout bilan
+// Timeout bilan va ikki case'ni to'g'ri boshqarish
 const { value, async: isAsync } = Atomics.waitAsync(int32, 0, 0, 5000);
-// value — Promise (agar async = true)
-// 5000ms ichida notify bo'lmasa — "timed-out"
+if (isAsync) {
+  // Haqiqiy async kutish — Promise resolve bo'lishini kutamiz
+  value.then(res => console.log("Async natija:", res));
+  // 5000ms ichida notify bo'lmasa — "timed-out"
+} else {
+  // Darhol qaytdi — value aslida "not-equal" string
+  console.log("Sync natija:", value);
+}
 
 // Farq: wait vs waitAsync
-// Atomics.wait()      — BLOCKING (worker'da ishlaydi, main thread'da yo'q)
-// Atomics.waitAsync() — NON-BLOCKING (Promise qaytaradi, istalgan joyda)
+// Atomics.wait()      — BLOCKING (Worker'da ishlaydi, Main thread'da TypeError)
+// Atomics.waitAsync() — NON-BLOCKING (Main thread + Worker, Promise qaytaradi)
 ```
+
+</details>
 
 ---
 
@@ -466,7 +510,8 @@ ES2025 da `Set` ga matematik to'plam operatsiyalari qo'shildi. Ilgari bu amallar
 
 Barcha method'lar **yangi Set qaytaradi** (mutate qilmaydi) yoki boolean qaytaradi (is* method'lari). Argument sifatida har qanday **Set-like object** qabul qiladi — `size` property va `has()`, `keys()` method'lari bo'lsa yetarli.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
 Set operatsiyalari vizualizatsiya:
@@ -482,7 +527,10 @@ isSubsetOf(B):           false           ← A ⊄ B
 isDisjointFrom(B):       false           ← umumiy element bor (3,4,5)
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 const frontend = new Set(["HTML", "CSS", "JavaScript", "TypeScript"]);
@@ -537,6 +585,8 @@ const requiredPermissions = new Set(["read", "write"]);
 requiredPermissions.isSubsetOf(userPermissions); // true — ruxsat bor
 ```
 
+</details>
+
 ---
 
 ## Iterator Helpers (ES2025)
@@ -561,7 +611,8 @@ Array method'larida har bir qadam butun array ni qayta ishlaydi va yangi array y
 | `.every(fn)` | Hammasi true? | ❌ Yo'q (consuming) |
 | `.find(fn)` | Birinchi mos element | ❌ Yo'q (consuming) |
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
 Lazy evaluation vizualizatsiya:
@@ -583,7 +634,10 @@ Iterator helper'lar (lazy):
   Array usulida? 5 + 5 = 10 ta operatsiya + 2 ta oraliq array
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Asosiy ishlatish — Array iterator'dan
@@ -687,6 +741,8 @@ bigArray.values()
 // Faqat ~60 ta element ishlandi (10 ta topilguncha)
 ```
 
+</details>
+
 ---
 
 ## Explicit Resource Management — using (ES2025)
@@ -699,7 +755,8 @@ C# dagi `using`, Python dagi `with`, va Java dagi `try-with-resources` ga o'xsha
 
 Ishlash uchun resource object'da **`Symbol.dispose`** (sync) yoki **`Symbol.asyncDispose`** (async) method bo'lishi kerak.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
 using da nima sodir bo'ladi:
@@ -732,7 +789,10 @@ await using uchun:
    → x[Symbol.asyncDispose]() chaqiriladi (await bilan)
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Symbol.dispose — sync resource
@@ -847,6 +907,8 @@ async function newWay() {
 // }
 ```
 
+</details>
+
 ---
 
 ## Import Attributes (ES2025)
@@ -857,7 +919,8 @@ Import Attributes — `import` statement'ga qo'shimcha metadata berish imkonini 
 
 Oldingi nomlanishi "Import Assertions" edi — keyinchalik "Import Attributes" ga o'zgartirildi (semantik farq: assertion faqat tekshiradi, attribute import xatti-harakatini o'zgartirishi mumkin).
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // JSON import — type attribute bilan
@@ -885,6 +948,8 @@ export { default as config } from "./config.json" with { type: "json" };
 // import data from "./config.json" with { type: "json" };    // ✅ yangi
 ```
 
+</details>
+
 ---
 
 ## RegExp Pattern Modifiers (ES2025)
@@ -900,11 +965,12 @@ RegExp Pattern Modifiers — regex ichida **ma'lum bir qism** uchun flag'larni y
 | `(?m:pattern)` | Shu qism uchun multiline |
 | `(?s:pattern)` | Shu qism uchun dotAll (`.` = `\n` ham) |
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Faqat bir qismda case-insensitive
-const re = /hello (?i:world)/v;
+const re = /hello (?i:world)/;
 re.test("hello World"); // true — "World" case-insensitive
 re.test("Hello world"); // false — "Hello" case-sensitive!
 
@@ -924,6 +990,8 @@ re2.test("exact Match");  // false — "exact" ≠ "EXACT"
 re2.test("EXACT match");  // true
 ```
 
+</details>
+
 ---
 
 ## Duplicate Named Capturing Groups (ES2025)
@@ -932,7 +1000,8 @@ re2.test("EXACT match");  // true
 
 ES2025 dan boshlab regex'da turli **alternative** (`|`) branch'larda **bir xil nomli** capture group ishlatish mumkin. Ilgari har bir nomli group nomi unikal bo'lishi kerak edi — bu alternation pattern'larda qo'shimcha murakkablik yaratardi.
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // ❌ Ilgari — har bir branch'da boshqa nom kerak edi
@@ -963,13 +1032,15 @@ timeRe.exec("14:30:45").groups; // { h: "14", m: "30", s: "45" }
 timeRe.exec("14h30").groups;    // { h: "14", m: "30" }
 ```
 
+</details>
+
 ---
 
-## Kelgusi Proposals (Stage 3)
+## Kelgusi Proposals
 
 ### Nazariya
 
-Quyidagi proposal'lar Stage 3 da — browser'lar implement qilmoqda, tez orada standartga qo'shiladi.
+Quyidagi proposal'lar turli bosqichlarda — ba'zilari Stage 3 da (browser'lar implement qilmoqda), ba'zilari esa hali ertaroq bosqichlarda (syntax o'zgarishi mumkin).
 
 ### Temporal API
 
@@ -986,12 +1057,15 @@ date.month; // 3 (1-indexed!)
 Class va class member'lariga meta-behavior qo'shish uchun standart syntax. TypeScript allaqachon o'z decorator'larini implement qilgan, lekin TC39 standarti farqli.
 
 ```javascript
-// Stage 3 Decorators
-function logged(target, context) {
+// Stage 3 Decorators — method decorator signature
+// Birinchi parameter (value): decorated bo'layotgan method (function)
+// Ikkinchi parameter (context): { kind, name, static, private, addInitializer, access, metadata }
+function logged(value, context) {
+  if (context.kind !== "method") return value;
   const methodName = context.name;
   return function (...args) {
     console.log(`${methodName} chaqirildi:`, args);
-    return target.apply(this, args);
+    return value.apply(this, args); // asl method'ni this bilan chaqirish
   };
 }
 
@@ -1006,6 +1080,10 @@ const calc = new Calculator();
 calc.add(2, 3);
 // Console: "add chaqirildi: [2, 3]"
 // Return: 5
+
+// ⚠️ Muhim: Stage 3 (TC39) decorators va TypeScript "experimental decorators"
+// (tsconfig `experimentalDecorators`) — BOSHQA-BOSHQA proposal'lar.
+// TS 5+ `experimentalDecorators: false` bilan Stage 3 syntax'ga o'tgan.
 ```
 
 ### Pattern Matching
@@ -1028,7 +1106,12 @@ match (response) {
 Immutable va deeply comparable data structure'lar — primitive sifatida.
 
 ```javascript
-// ⚠️ Stage 2 — hali ancha uzoq
+// ⚠️ Status (2026-04): Proposal Stage 2 da ko'p yil qolib ketdi — 2024-25 da
+// championship o'zgardi va engine implementation'dagi murakkablik tufayli
+// asl "new primitive" yondashuvi qayta ko'rib chiqilmoqda. TC39'da alternativ
+// variant — "Composites" yoki "Keyed Collections" kabi — muhokama qilinmoqda.
+// Quyidagi `#{...}` syntax'i oxirgi shakl bo'lmasligi mumkin.
+
 const record = #{ name: "Ali", age: 25 };
 const tuple = #[1, 2, 3];
 
@@ -1039,6 +1122,8 @@ const tuple = #[1, 2, 3];
 // Immutable
 // record.name = "Vali"; // ❌ TypeError
 ```
+
+**Hozirgi alternativ (production'da):** `Object.freeze()` deep + custom structural equality (lodash `isEqual`), yoki Immutable.js / Immer kutubxonalari.
 
 ---
 
@@ -1139,6 +1224,295 @@ grouped.hasOwnProperty("big"); // ❌ TypeError!
 "big" in grouped;         // true ✅
 Object.hasOwn(grouped, "big"); // true ✅
 ```
+
+---
+
+## Edge Cases va Gotchas
+
+Ushbu bo'lim Common Mistakes'da qamrab olinmagan, lekin ES2024+ feature'larni production'da ishlatishda uchraydigan nozik holatlarni tavsiflaydi.
+
+### Gotcha 1: `Object.groupBy` key coercion — object kalitlar bir guruhga tushadi
+
+`Object.groupBy` callback qaytargan qiymatni `ToPropertyKey` orqali **string'ga coerce qiladi**. Bu har qanday non-string/non-symbol qiymat string ifodasi sifatida saqlanishiga olib keladi. Object'lar esa `"[object Object]"` ga aylanadi — natijada **barcha object kalitlar bir guruhga tushib ketadi**.
+
+```javascript
+const data = [
+  { type: { id: 1 }, value: "a" },
+  { type: { id: 2 }, value: "b" },
+  { type: { id: 1 }, value: "c" },
+];
+
+// ❌ Object.groupBy — object kalitlar "[object Object]" ga coerce bo'ladi
+const wrong = Object.groupBy(data, item => item.type);
+// {
+//   "[object Object]": [
+//     { type: { id: 1 }, value: "a" },
+//     { type: { id: 2 }, value: "b" },  // ← ikkala id aralashib ketdi!
+//     { type: { id: 1 }, value: "c" },
+//   ]
+// }
+
+// ❌ Boolean ham noto'g'ri — string'ga coerce bo'ladi
+Object.groupBy([1, 2, 3], n => n > 1);
+// { "false": [1], "true": [2, 3] } — boolean emas, string kalit!
+
+// ✅ Object kalit kerak bo'lsa — Map.groupBy ishlating
+const right = Map.groupBy(data, item => item.type);
+// Map { { id: 1 } → [...], { id: 2 } → [...] }
+// Lekin eslatma: Map.groupBy identity-based — ikki har xil { id: 1 } object
+// alohida kalit hisoblanadi. Normalizatsiya uchun avval mapping qiling.
+
+// ✅ String kalitni majburiy qilish — JSON.stringify bilan
+const byIdString = Object.groupBy(data, item => JSON.stringify(item.type));
+// { '{"id":1}': [...], '{"id":2}': [...] }
+```
+
+**Nima uchun:** `Object.groupBy` spec'da callback natijasi `ToPropertyKey` abstract operatsiyasidan o'tadi — bu string yoki symbol'ga coerce qiladi. `Map.groupBy` esa SameValueZero taqqoslash ishlatadi, shuning uchun object identity saqlanadi.
+
+**Yechim:** Primitive (string/number) kalit uchun `Object.groupBy`, object yoki Symbol kalit uchun `Map.groupBy`. Composite kalit uchun `JSON.stringify()` yoki explicit ID maydoni.
+
+---
+
+### Gotcha 2: Iterator helper pipeline — single-use semantics
+
+Iterator helper'lar yaratgan pipeline **bir marta ishlatiladi**. Siz `.toArray()` chaqirganingizdan yoki for-of bilan consume qilganingizdan keyin iterator **exhausted** holatga o'tadi. Qayta chaqirish bo'sh natija beradi. Bu array method'laridan tub farqi — array har safar boshidan boshlanadi.
+
+```javascript
+const pipeline = [1, 2, 3, 4, 5]
+  .values()
+  .map(n => n * 2)
+  .filter(n => n > 4);
+
+// ✅ Birinchi consume — kutilganidek ishlaydi
+const first = pipeline.toArray();
+// [6, 8, 10]
+
+// ❌ Ikkinchi consume — bo'sh!
+const second = pipeline.toArray();
+// [] — iterator allaqachon exhausted
+
+// Worse: for-of dan keyin ham yo'qoladi
+const iter = [1, 2, 3].values().map(n => n * 2);
+for (const x of iter) console.log(x); // 2, 4, 6
+for (const x of iter) console.log(x); // — hech narsa
+
+// ✅ Qayta ishlatish kerak bo'lsa — har safar yangi iterator
+function makeIter() {
+  return [1, 2, 3, 4, 5].values().map(n => n * 2).filter(n => n > 4);
+}
+makeIter().toArray(); // [6, 8, 10]
+makeIter().toArray(); // [6, 8, 10] ✅
+
+// ✅ Yoki natijani array'ga saqlab qo'yish
+const cached = makeIter().toArray();
+cached; // qayta ishlatish mumkin
+```
+
+**Nima uchun:** Iterator protocol'ida `next()` state'ni oldinga siljitadi — bu fundamental one-way traversal. Helper'lar ichki iterator'ni wrap qiladi, lekin state'ni reset qila olmaydi (asl manba reusable bo'lsa ham). Bu lazy evaluation'ning narxi.
+
+**Yechim:** Pipeline'ni funksiya ichida yarating (har chaqiruvda yangi), yoki oxirgi natijani array'ga `toArray()` bilan saqlang.
+
+---
+
+### Gotcha 3: `using` va `return` bilan qiymat qaytarish — dispose vaqti
+
+`using` declaration'li funksiyada `return resource` yoki `return resource.value` yozganda, qaytariladigan qiymat **dispose'dan oldin** hisoblanadi, lekin resource dispose'dan **keyin** chaqiruvchiga qaytariladi. Bu "yopilgan resource'ga ega bo'lgan reference" xavfini yaratadi.
+
+```javascript
+class Connection {
+  #closed = false;
+
+  query(sql) {
+    if (this.#closed) throw new Error("Connection yopilgan");
+    return { rows: [/* ... */] };
+  }
+
+  [Symbol.dispose]() {
+    this.#closed = true;
+    console.log("Connection yopildi");
+  }
+}
+
+// ❌ Xavfli pattern — resource reference'ni qaytarish
+function getConnection() {
+  using conn = new Connection();
+  return conn; // dispose chaqiriladi, lekin reference tashqariga chiqadi
+}
+
+const c = getConnection();
+// Console: "Connection yopildi"
+c.query("SELECT *"); // ❌ Error: Connection yopilgan
+
+// ❌ Yanada xavfli — qaytarilgan method chaqiriladi
+function getQueryFn() {
+  using conn = new Connection();
+  return () => conn.query("SELECT *"); // closure — conn dispose bo'lgan!
+}
+
+const fn = getQueryFn();
+fn(); // ❌ Error: Connection yopilgan
+
+// ✅ Natijani scope ichida oling
+function fetchData() {
+  using conn = new Connection();
+  return conn.query("SELECT *"); // natija (POJO) — reference emas
+  // dispose — OK, chunki biz primitive/POJO qaytarmoqdamiz
+}
+
+fetchData(); // { rows: [...] } ✅ — connection allaqachon yopilgan, lekin bizga kerak emas
+
+// ✅ Yoki scope'ni manual boshqarish — tashqariga reference kerak bo'lsa
+async function processWithConn(task) {
+  using conn = new Connection();
+  return await task(conn); // task scope ichida tugaydi
+}
+
+await processWithConn(async conn => {
+  const result = conn.query("...");
+  return result; // POJO — conn dispose'dan keyin ham mavjud
+});
+```
+
+**Nima uchun:** `using` spec-level `try/finally` kabi kompilyatsiya bo'ladi — `finally` blokidagi dispose `return` qiymat hisoblanganidan **keyin**, lekin chaqiruvchi uni olishdan **oldin** bajariladi. Bu mexanizm scope-bound lifecycle'ni kafolatlaydi.
+
+**Yechim:** `using` scope'idan faqat **primitive** yoki **resource'ga bog'liq bo'lmagan ma'lumot** qaytaring. Resource'ning o'zini yoki uning method'ini hech qachon tashqariga bermang.
+
+---
+
+### Gotcha 4: `Promise.withResolvers` detached reference — uzoq pending xavfi
+
+`Promise.withResolvers()` `resolve`/`reject` funksiyalarini scope'dan chiqarib beradi. Agar bu funksiyalar hech qachon chaqirilmasa, yoki chaqiruvchi object GC bo'lib ketsa ham, **promise pending holatda qoladi** va barcha `.then()` handler'lari xotirada saqlanadi — memory leak.
+
+```javascript
+// ❌ Xavfli pattern — event source'siz pending promise
+class EventBus {
+  #waiters = new Map();
+
+  waitFor(event) {
+    const { promise, resolve } = Promise.withResolvers();
+    this.#waiters.set(event, resolve);
+    return promise;
+    // ⚠️ Agar event hech qachon emit bo'lmasa — promise abadiy pending
+  }
+
+  emit(event, data) {
+    const resolve = this.#waiters.get(event);
+    if (resolve) {
+      resolve(data);
+      this.#waiters.delete(event);
+    }
+  }
+}
+
+const bus = new EventBus();
+
+// Ko'p joylardan kutish
+async function handler1() {
+  const data = await bus.waitFor("ready");
+  // ... data ishlatish
+}
+
+handler1(); // "ready" hech qachon emit bo'lmasa — handler1 abadiy pending
+// + microtask queue'da catch/then chain xotirani ushlab turadi
+
+// ✅ Timeout bilan majburiy cleanup
+function waitWithTimeout(bus, event, ms) {
+  const { promise, resolve, reject } = Promise.withResolvers();
+
+  const timer = setTimeout(() => {
+    reject(new Error(`Timeout: ${event}`));
+    bus.off(event, resolve); // listener'ni olib tashlash
+  }, ms);
+
+  bus.once(event, data => {
+    clearTimeout(timer);
+    resolve(data);
+  });
+
+  return promise;
+}
+
+// ✅ Yoki AbortSignal bilan cancellation
+function waitForCancellable(bus, event, signal) {
+  const { promise, resolve, reject } = Promise.withResolvers();
+
+  if (signal?.aborted) {
+    reject(new DOMException("Aborted", "AbortError"));
+    return promise;
+  }
+
+  const onEvent = data => {
+    signal?.removeEventListener("abort", onAbort);
+    resolve(data);
+  };
+  const onAbort = () => {
+    bus.off(event, onEvent);
+    reject(new DOMException("Aborted", "AbortError"));
+  };
+
+  bus.once(event, onEvent);
+  signal?.addEventListener("abort", onAbort);
+
+  return promise;
+}
+```
+
+**Nima uchun:** Promise'ning lifecycle'i undan foydalanuvchi kodga emas, resolve/reject chaqiruviga bog'liq. `Promise.withResolvers` bu nazoratni tashqariga beradi — lekin "nazorat" = "mas'uliyat". Eski `new Promise(executor)` pattern'ida executor tugagach engine resolve/reject'ga reference'ni boshqa ushlab turmas edi (agar developer saqlamagan bo'lsa).
+
+**Yechim:** Har bir `Promise.withResolvers()` uchun **uch savolga javob bering**: (1) Resolve qachon chaqiriladi? (2) Timeout/cancellation bormi? (3) Abandoned holatda cleanup mavjudmi? Javoblar aniq bo'lmasa — `setTimeout` yoki `AbortSignal` bilan cheklang.
+
+---
+
+### Gotcha 5: RegExp `v` flag strict character class — eski `u` pattern'lar xato beradi
+
+`v` flag `u` flag'ning yangi versiyasi, lekin **strict character class parsing** bilan. Ayrim `u` flag'da ruxsat etilgan pattern'lar `v` flag'da SyntaxError beradi. Bu migration'da nozik tuzoq — "shunchaki `u` ni `v` bilan almashtirish" ishlamaydi.
+
+```javascript
+// ❌ v flag'da SyntaxError — reserved punctuation
+/[(){}]/v;
+// SyntaxError: Invalid regular expression: /[(){}]/: Invalid character in character class
+
+// Sabab: v flag'da ( ) { } [ ] / - \ | belgilar character class
+// ichida escape qilinishi SHART — set operations uchun reserved
+// ✅ v flag uchun escape
+/[\(\)\{\}]/v; // OK
+
+// ❌ u flag da ishlagan — v da yo'q
+/[a-z&&]/u; // u flag: "a-z va &" — oddiy character class
+/[a-z&&]/v; // v flag: SyntaxError — && intersection syntax reservation!
+
+// ✅ v flag da escape qilish
+/[a-z\&\&]/v; // OK, literal &&
+
+// ❌ Subtraction/intersection bilan multi-char set — faqat string properties
+/[\q{ab}--\q{a}]/v;        // ✅ \q{} string property — OK
+/[[ab]--[a]]/v;             // ❌ character class ichida multi-char literal emas
+// Sabab: v flag character class ichida faqat single characters va
+// string properties (\q{...}, \p{RGI_Emoji}, va h.k.)
+
+// ✅ Migration strategy — `u` kodini v ga o'tkazishda avval test
+function upgradeRegex(pattern) {
+  try {
+    // Avval v flag bilan sinab ko'ring
+    return new RegExp(pattern, "v");
+  } catch (e) {
+    if (e instanceof SyntaxError) {
+      console.warn(`v flag bilan mos kelmaydi: ${pattern}`, e.message);
+      return new RegExp(pattern, "u"); // fallback
+    }
+    throw e;
+  }
+}
+
+// ❌ Umumiy xato: u va v ni birga ishlatish
+/[a-z]/uv;
+// SyntaxError: Invalid regular expression flags
+// u va v MUTUALLY EXCLUSIVE
+```
+
+**Nima uchun:** `v` flag (Unicode Sets) ECMA-262 da yangi character class syntax kiritdi — set operations (`--`, `&&`) uchun punctuation'lar reserved qilindi. Bu backward-incompatible — ba'zi `u` pattern'lar `v` da invalid. Spec'da bu "strict mode" tariqasida atay qilingan — kelajak kengaytmalar uchun ambiguity'dan saqlanish.
+
+**Yechim:** Codebase'da RegExp'larni `u`→`v` ga o'tkazayotganda har birini alohida test qiling. Statik pattern'lar uchun SyntaxError compile-time'da chiqadi. Dynamic pattern'lar (user input'dan) uchun har doim `try/catch` bilan o'rang.
 
 ---
 

@@ -21,6 +21,7 @@
 - [Bo'lim 6: Objects](06-objects.md)
 - [Bo'lim 7: Prototypes](07-prototypes.md)
 - [Bo'lim 8: Classes](08-classes.md)
+- [Bo'lim 8.5: OOP](08.5-oop.md)
 
 ### QISM 4: FUNCTIONS CHUQUR
 - [Bo'lim 9: Functions](09-functions.md)
@@ -42,47 +43,16 @@
 ### QISM 8: DOM VA BROWSER APIs
 - [Bo'lim 18: DOM Manipulation](18-dom.md)
 - [Bo'lim 19: Events](19-events.md)
-- [Bo'lim 20: Browser APIs](20-browser-apis.md)
+- [Bo'lim 19.5: Browser APIs](19.5-browser-apis.md)
 
 ### QISM 9: ERROR HANDLING
-- [Bo'lim 21: Error Handling](21-error-handling.md)
+- [Bo'lim 20: Error Handling](20-error-handling.md)
 
-### QISM 10: ES6+ FEATURES
-- [Bo'lim 22: Modern JavaScript](22-modern-js.md)
-- [Bo'lim 23: Array Methods](23-array-methods.md)
-- [Bo'lim 24: Proxy va Reflect](24-proxy-reflect.md)
-- [Bo'lim 25: Design Patterns](25-design-patterns.md)
-
----
-
-## Progress
-
-> ❌ = Qilinmagan | 🔄 = Jarayonda | ✅ = Tayyor (GUIDE.md standartlariga mos)
-
-| # | Bo'lim | Status | Izoh |
-|---|--------|--------|------|
-| 01 | JS Engine va Asoslar | ✅ | 20 savol, barcha daraja |
-| 02 | Execution Context | ✅ | 24 savol, coding/tuzatish qo'shildi |
-| 03 | Hoisting | ✅ | 23 savol, coding/tuzatish qo'shildi |
-| 04 | Scope | ✅ | 21 savol, barcha daraja |
-| 05 | Closures | ✅ | 20 savol, debounce/throttle/memoize bor |
-| 06 | Objects | ✅ | 26 savol, deepClone/deepEqual bor |
-| 07 | Prototypes | ✅ | 20 savol, tuzatish qo'shildi |
-| 08 | Classes | ✅ | 16 savol, barcha daraja |
-| 09 | Functions | ✅ | 25 savol, barcha majburiy challenges bor |
-| 10 | this Keyword | ✅ | 16 savol, bind polyfill bor |
-| 11 | Event Loop | ✅ | 25 savol, barcha daraja |
-| 12 | Promises | ✅ | 18 savol, Promise.all/allSettled/race/sleep bor |
-| 13 | Async/Await | ✅ | 15 savol, retry bor |
-| 14 | Iterators & Generators | ✅ | 20 savol, barcha daraja |
-| 15 | Modules | ✅ | 12 savol, barcha daraja |
-| 16 | Memory Management | ✅ | 12 savol, barcha daraja |
-| 17 | Type Coercion | ✅ | 15 savol, barcha daraja |
-| 18 | DOM Manipulation | ✅ | 20 savol, coding+tuzatish bor |
-| 19 | Events | ✅ | 13 savol, barcha daraja |
-| 20 | Browser APIs | ✅ | 19 savol, output/coding/tuzatish qo'shildi |
-| 21 | Error Handling | ✅ | 19 savol, coding+deep dive bor |
-| 22 | Modern JS (ES6+) | ✅ | 19 savol, barcha daraja va tur |
-| 23 | Array Methods | ✅ | 20 savol, map/reduce/flat polyfill |
-| 24 | Proxy & Reflect | ✅ | 16 savol, barcha daraja va tur |
-| 25 | Design Patterns | ✅ | 16 savol, EventEmitter/Middleware pipeline |
+### QISM 10: ES6+ VA ZAMONAVIY JS
+- [Bo'lim 21: Modern JavaScript](21-modern-js.md)
+- [Bo'lim 22: Array Methods](22-array-methods.md)
+- [Bo'lim 23: Proxy va Reflect](23-proxy-reflect.md)
+- [Bo'lim 24: Design Patterns](24-design-patterns.md)
+- [Bo'lim 25: String Methods](25-string-methods.md)
+- [Bo'lim 26: Date va Intl API](26-date-intl.md)
+- [Bo'lim 27: ES2024+ va Kelgusi Standartlar](27-es2024-beyond.md)

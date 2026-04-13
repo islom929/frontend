@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Class nima va prototype bilan qanday bog'liq? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Class nima va prototype bilan qanday bog'liq? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 ES6 `class` — prototypal inheritance ustiga qurilgan **syntactic sugar**. Engine ichida class xuddi constructor function + prototype mexanizmi sifatida ishlaydi:
 
@@ -27,13 +30,14 @@ const user = new User("Ali");
 console.log(Object.getPrototypeOf(user) === User.prototype); // true
 ```
 
-Lekin `class` faqat "yozuv qulayligi" emas — muhim farqlari bor: barcha method'lar `enumerable: false`, ichki kod **strict mode** da, `new` siz chaqirish **TypeError** beradi, va **TDZ** da turadi (hoisting yo'q).
+Lekin `class` faqat "yozuv qulayligi" emas — muhim farqlari bor: barcha method'lar `enumerable: false`, ichki kod **strict mode** da, `new` siz chaqirish **TypeError** beradi, va **TDZ** da turadi (hoist bo'ladi lekin declaration gacha ishlatib bo'lmaydi).
 
----
+</details>
 
-## Savol 2: Class va constructor function o'rtasidagi farqlar nima? [Middle]
+### 2. Class va constructor function o'rtasidagi farqlar nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Xususiyat | Constructor Function | Class |
 |-----------|---------------------|-------|
@@ -66,11 +70,12 @@ for (const key in new PersonFn("Ali"))  console.log(key); // "name", "greet"
 for (const key in new PersonCls("Ali")) console.log(key); // "name" — greet yo'q
 ```
 
----
+</details>
 
-## Savol 3: `extends` va `super` qanday ishlaydi? [Middle]
+### 3. `extends` va `super` qanday ishlaydi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `extends` — child class parent'dan meros olishini bildiradi. Engine ichida ikki prototype chain quradi:
 
@@ -106,60 +111,12 @@ console.log(Dog.kingdom()); // "Animalia" — static meros
 // super() chaqirilmasdan this ishlatish → ReferenceError
 ```
 
----
+</details>
 
-## Savol 4: Quyidagi kodning output'ini ayting [Middle+]
+### 4. Private fields (`#`) va underscore convention (`_`) farqi nima? [Middle]
 
-**Savol:**
-
-```javascript
-class A {
-  constructor() {
-    this.name = "A";
-    console.log(this.greet());
-  }
-  greet() { return "Hello from A"; }
-}
-
-class B extends A {
-  constructor() {
-    super();
-    this.name = "B";
-  }
-  greet() { return "Hello from B"; }
-}
-
-const b = new B();
-console.log(b.name);
-```
-
-**Javob:**
-
-```
-"Hello from B"
-"B"
-```
-
-```javascript
-// new B() chaqirilganda:
-// 1. B constructor ishlaydi → super() chaqiriladi
-// 2. super() → A constructor ishlaydi
-// 3. A constructor ichida: this.name = "A"
-// 4. A constructor ichida: console.log(this.greet())
-//    this = b instance, b.greet() → B ning greet() chaqiriladi (override!)
-//    → "Hello from B"
-// 5. A constructor tugadi, B constructor'ga qaytadi
-// 6. this.name = "B" — A da yozilgan "A" ni override qiladi
-// 7. console.log(b.name) → "B"
-```
-
-**Muhim nuqta:** `super()` ichida ham `this` child instance'ga ishora qiladi. Shuning uchun `this.greet()` child'ning override method'ini chaqiradi — parent'nikini emas.
-
----
-
-## Savol 5: Private fields (`#`) va underscore convention (`_`) farqi nima? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `_` prefix — bu faqat **convention** (kelishuv), hech qanday himoya yo'q. `#` prefix — bu **til darajasidagi enforcement**, tashqi kodda kirish **SyntaxError** beradi.
 
@@ -189,11 +146,12 @@ console.log(b.getName()); // "Ali" — faqat public method orqali
 | **`Object.keys`** | Ko'rinadi | Ko'rinmaydi |
 | **Reflection** | Mavjud | Yo'q |
 
----
+</details>
 
-## Savol 6: Static method nima va qachon ishlatiladi? [Middle]
+### 5. Static method nima va qachon ishlatiladi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `static` method class'ning o'zida saqlanadi, instance'larda emas. Instance yaratmasdan chaqiriladi.
 
@@ -226,65 +184,29 @@ Static method'lar `extends` bilan meros bo'ladi:
 
 ```javascript
 class Animal {
+  constructor(name) { this.name = name; }
   static create(name) { return new this(name); }
+  //                         ↑ "this" static method'da = chaqirilgan class'ning o'zi
 }
 class Dog extends Animal {}
 
-const rex = Dog.create("Rex"); // this = Dog
-console.log(rex instanceof Dog); // true ✅
+const rex = Dog.create("Rex");
+// Dog.create chaqirilganda this = Dog
+// new this(name) → new Dog("Rex") → Animal constructor chaqiriladi (meros orqali)
+// Natija: Dog instance, name = "Rex"
+
+console.log(rex instanceof Dog);  // true ✅
+console.log(rex.name);            // "Rex" ✅
 ```
 
----
+Bu pattern — **polymorphic factory** — parent'da yozilgan factory method child class'lar uchun ham to'g'ri instance yaratadi (chunki `this` dinamik).
 
-## Savol 7: Quyidagi kodning output'ini ayting [Middle+]
+</details>
 
-**Savol:**
+### 6. Class field'lar (public va arrow function) qanday ishlaydi? [Middle]
 
-```javascript
-class Counter {
-  #count = 0;
-
-  increment() {
-    this.#count++;
-    return this;
-  }
-
-  get value() { return this.#count; }
-}
-
-const c = new Counter();
-console.log(c.increment().increment().increment().value);
-console.log(Object.keys(c));
-console.log(JSON.stringify(c));
-```
-
-**Javob:**
-
-```
-3
-[]
-"{}"
-```
-
-```javascript
-// c.increment().increment().increment()
-// Har bir increment() this qaytaradi → chaining mumkin
-// #count: 0 → 1 → 2 → 3
-// .value → getter → 3
-
-// Object.keys(c) → []
-// #count private — ko'rinmaydi. Oddiy own property yo'q.
-
-// JSON.stringify(c) → "{}"
-// Private field'lar JSON.stringify da ko'rinmaydi
-// Public own property'lar yo'q → bo'sh object
-```
-
----
-
-## Savol 8: Class field'lar (public va arrow function) qanday ishlaydi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Public class field'lar — har instance'da **own property** sifatida yaratiladi (prototype'da emas):
 
@@ -326,52 +248,12 @@ console.log(t1.increment === t2.increment); // false — 2 ta alohida fn!
 
 **Tavsiya:** Arrow function field faqat `this` binding kerak bo'lganda (event handler) ishlating. Aks holda oddiy method yozing — memory tejaydi.
 
----
+</details>
 
-## Savol 9: Bu kodda nima xato? [Middle]
+### 7. Getter va setter class'da qanday ishlaydi? [Middle]
 
-**Savol:**
-
-```javascript
-class Animal {
-  constructor(name) { this.name = name; }
-  speak() { return `${this.name} speaks`; }
-}
-
-class Dog extends Animal {
-  constructor(name, breed) {
-    this.breed = breed;
-    super(name);
-  }
-}
-
-const rex = new Dog("Rex", "Labrador");
-```
-
-**Javob:**
-
-`ReferenceError: Must call super constructor in derived class before accessing 'this'`
-
-```javascript
-// ❌ this.breed = breed → super() dan OLDIN this ishlatilgan!
-// Derived class'da this faqat super() chaqirilgandan keyin mavjud
-
-// ✅ To'g'ri:
-class Dog extends Animal {
-  constructor(name, breed) {
-    super(name);       // ✅ avval super
-    this.breed = breed; // keyin this
-  }
-}
-```
-
-**Sababi:** Derived class'da `this` object parent constructor tomonidan yaratiladi. `super()` chaqirilmaguncha `this` mavjud emas — bu JavaScript'ning prototype-based meros mexanizmining tabiiy cheklovi.
-
----
-
-## Savol 10: Getter va setter class'da qanday ishlaydi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `get`/`set` — computed property yaratadi. Tashqaridan oddiy property kabi ko'rinadi, ichida funksiya ishlaydi:
 
@@ -415,56 +297,12 @@ console.log(typeof desc.set); // "function"
 console.log(desc.enumerable); // false — class method
 ```
 
----
+</details>
 
-## Savol 11: Quyidagi kodning output'ini ayting [Senior]
+### 8. Static initialization block nima? [Middle+]
 
-**Savol:**
-
-```javascript
-class Parent {
-  static x = 1;
-  static getX() { return this.x; }
-}
-
-class Child extends Parent {
-  static x = 2;
-}
-
-console.log(Parent.getX());
-console.log(Child.getX());
-console.log(Child.hasOwnProperty("getX"));
-console.log(Child.getX === Parent.getX);
-```
-
-**Javob:**
-
-```
-1
-2
-false
-true
-```
-
-```javascript
-// Parent.getX() → this = Parent, Parent.x = 1 → 1
-// Child.getX() → this = Child, Child.x = 2 → 2
-//   (getX Child'da yo'q — Parent'dan meros. Lekin this = Child)
-
-// Child.hasOwnProperty("getX") → false
-//   (getX Child'ning o'zida yo'q, Parent'dan meros bo'lgan)
-
-// Child.getX === Parent.getX → true
-//   (bitta funksiya — Child.[[Prototype]] = Parent orqali topiladi)
-```
-
-**Muhim:** Static method'larda `this` — chaqirilgan class'ning o'zi. `Child.getX()` da `this` = `Child`, shuning uchun `this.x` = `Child.x` = 2.
-
----
-
-## Savol 12: Static initialization block nima? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ES2022 da qo'shilgan `static { }` — class yaratilganda bir marta ishlaydi. Murakkab static initialization uchun:
 
@@ -490,11 +328,12 @@ console.log(Config.apiUrl); // "http://localhost:3000"
 
 Nima uchun kerak? Static field'da try/catch ishlatib bo'lmaydi, bir nechta o'zaro bog'liq field'larni initialize qilish qiyin. `static { }` bloki to'liq JavaScript kodi yozish imkonini beradi.
 
----
+</details>
 
-## Savol 13: Mixin pattern class'larda qanday qilinadi? [Senior]
+### 9. Mixin pattern class'larda qanday qilinadi? [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 JavaScript single inheritance — bitta `extends`. Mixin — **subclass factory** pattern orqali ko'p capability qo'shish:
 
@@ -529,11 +368,16 @@ console.log(user.createdAt);    // Date object
 2. Constructor tartib — super() chaqirilish ketma-ketligi muhim
 3. Debugging — method qaysi mixin'dan kelganini aniqlash qiyin
 
----
+**Deep Dive:**
 
-## Savol 14: Composition vs inheritance — qachon qaysi biri? [Senior]
+Mixin pattern spec'da maxsus qo'llab-quvvatlanmaydi — bu oddiy `extends` expression'ning dynamic xususiyatidan foydalanadi. `class C extends Mixin(Base)` da `extends` operandi runtime'da evaluate qilinadigan expression. Engine `ClassDefinitionEvaluation` algoritmida `superclass` ni evaluate qiladi va uning `prototype` property'sini yangi class'ning `[[Prototype]]` chain'iga ulaydi. Shuning uchun mixin chain'da har bir mixin alohida class yaratadi va prototype chain'ga qo'shiladi.
 
-**Javob:**
+</details>
+
+### 10. Composition vs inheritance — qachon qaysi biri? [Senior]
+
+<details>
+<summary>Javob</summary>
 
 **Inheritance** — "is-a" munosabat. `Dog extends Animal` — "Dog **bu** Animal".
 **Composition** — "has-a" munosabat. `Car` da `Engine` **bor**.
@@ -545,7 +389,7 @@ class FlyingAnimal extends Animal { fly() {} }
 class SwimmingAnimal extends Animal { swim() {} }
 // FlyingSwimmingAnimal? Multiple inheritance yo'q!
 
-// ✅ Composition — flexible:
+// ✅ Composition — flexible (closure-based):
 const canFly = (state) => ({
   fly() { return `${state.name} uchmoqda`; }
 });
@@ -557,7 +401,31 @@ function createDuck(name) {
   const state = { name };
   return { ...state, ...canFly(state), ...canSwim(state) };
 }
+
+// ⚠️ Subtle closure behavior: method'lar `state.name` ni closure orqali tutadi,
+// natija object'idagi `name` bilan bog'liq emas:
+const duck = createDuck("Donald");
+duck.name = "Daffy";       // object property o'zgardi
+duck.fly();                // "Donald uchmoqda" — closure `state.name` o'zgarmadi!
+
+// ✅ Alternative — `this` bilan composition (tashqi o'zgarish'ga sezgir):
+const canFly2 = {
+  fly() { return `${this.name} uchmoqda`; }
+};
+const canSwim2 = {
+  swim() { return `${this.name} suzmoqda`; }
+};
+
+function createDuck2(name) {
+  return Object.assign({ name }, canFly2, canSwim2);
+}
+
+const duck2 = createDuck2("Donald");
+duck2.name = "Daffy";
+duck2.fly();               // "Daffy uchmoqda" ✅ — `this.name` dinamik
 ```
+
+**Qaysi usulni tanlash:** Closure-based ko'proq "private state" illyuziyasini beradi (o'zgarmas snapshot), `this`-based esa dinamik — real OOP class semantikasiga yaqin.
 
 | Criteria | Inheritance | Composition |
 |----------|------------|-------------|
@@ -568,52 +436,16 @@ function createDuck(name) {
 
 **Qoida:** Default'da composition ishlating. Inheritance faqat haqiqiy "is-a" munosabat va barqaror parent class bo'lganda.
 
----
+**Deep Dive:**
 
-## Savol 15: Quyidagi kodning output'ini ayting [Middle+]
+JavaScript spec'da faqat single prototype chain (`[[Prototype]]`) qo'llab-quvvatlanadi — shuning uchun multiple inheritance to'g'ridan-to'g'ri mumkin emas. Composition bu cheklovdan qochadi — object'lar bir-biriga delegation emas, balki property copying orqali bog'lanadi (`Object.assign` yoki spread). V8 nuqtai nazaridan composition'da yaratilgan object'lar predictable hidden class'ga ega bo'ladi, chunki barcha property'lar yaratish vaqtida aniq — bu inline caching uchun qulay.
 
-**Savol:**
+</details>
 
-```javascript
-class A {
-  x = 1;
-  method() { return this.x; }
-}
+### 11. `#private in obj` tekshiruvi nima? [Middle+]
 
-class B extends A {
-  x = 2;
-}
-
-const b = new B();
-console.log(b.method());
-console.log(b.x);
-console.log(Object.keys(b));
-```
-
-**Javob:**
-
-```
-2
-2
-["x"]
-```
-
-```javascript
-// Class field'lar tartib bo'yicha initialize bo'ladi:
-// 1. super() chaqiriladi (B da default constructor)
-// 2. A ning field'lari: this.x = 1
-// 3. B ning field'lari: this.x = 2 (A dagi x ni OVERRIDE qildi)
-
-// b.method() → this = b, this.x = 2 → 2
-// b.x → 2
-// Object.keys(b) → ["x"] — bitta own property (ikkinchi assign birinchini yozdi)
-```
-
----
-
-## Savol 16: `#private in obj` tekshiruvi nima? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ES2022 da `#field in obj` sintaksisi — **brand check**. Object'da ma'lum class'ning private field'i borligini tekshiradi:
 
@@ -644,58 +476,12 @@ console.log(u1.equals(fake));   // false
 
 Bu `instanceof` dan kuchli — `instanceof` prototype chain tekshiradi (o'zgartirish mumkin), `#field in` esa haqiqiy class brand tekshiradi.
 
----
+</details>
 
-## Savol 17: Bu kodda nima xato? [Middle]
+### 12. Class'da `new.target` nima? [Senior]
 
-**Savol:**
-
-```javascript
-class Logger {
-  prefix = "[LOG]";
-
-  log(message) {
-    console.log(`${this.prefix} ${message}`);
-  }
-}
-
-const logger = new Logger();
-const log = logger.log;
-log("test");
-```
-
-**Javob:**
-
-`TypeError: Cannot read properties of undefined (reading 'prefix')` — `this` yo'qoldi.
-
-```javascript
-// log = logger.log — method reference olingan
-// log("test") — this = undefined (strict mode, class ichida)
-
-// ✅ Yechimlar:
-
-// 1. Arrow function field:
-class Logger {
-  prefix = "[LOG]";
-  log = (message) => {
-    console.log(`${this.prefix} ${message}`);
-  };
-}
-
-// 2. bind:
-const log = logger.log.bind(logger);
-
-// 3. Wrapper:
-const log = (msg) => logger.log(msg);
-```
-
-Bu class method'larning ko'p uchraydigan muammosi — callback sifatida berilganda `this` binding yo'qoladi. Ko'proq [10-this-keyword.md](10-this-keyword.md) da.
-
----
-
-## Savol 18: Class'da `new.target` nima? [Senior]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `new.target` — constructor ichida qaysi class `new` bilan chaqirilganini ko'rsatadi. Abstract class (instance yaratish taqiqlangan) yaratish uchun ishlatiladi:
 
@@ -739,5 +525,294 @@ new A(); // "A"
 new B(); // "B" — A constructor ichida, lekin new.target = B
 new C(); // "C"
 ```
+
+**Deep Dive:**
+
+Spec'da `new.target` aslida `NewTarget` deb ataladi va u `GetNewTarget()` abstract operation orqali olinadi. Bu qiymat funksiya `[[Construct]]` internal method orqali chaqirilganda `newTarget` argument sifatida uzatiladi. Derived class'da `super()` chaqirilganda parent constructor'ga `newTarget` sifatida child class uzatiladi — shuning uchun parent ichida ham `new.target` child'ga teng. Oddiy funksiya chaqiruvida (`[[Call]]`) `new.target` `undefined` bo'ladi.
+
+</details>
+
+---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Quyidagi kodning output'ini ayting [Middle+]
+
+**Savol:**
+
+```javascript
+class A {
+  constructor() {
+    this.name = "A";
+    console.log(this.greet());
+  }
+  greet() { return "Hello from A"; }
+}
+
+class B extends A {
+  constructor() {
+    super();
+    this.name = "B";
+  }
+  greet() { return "Hello from B"; }
+}
+
+const b = new B();
+console.log(b.name);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+"Hello from B"
+"B"
+```
+
+```javascript
+// new B() chaqirilganda:
+// 1. B constructor ishlaydi → super() chaqiriladi
+// 2. super() → A constructor ishlaydi
+// 3. A constructor ichida: this.name = "A"
+// 4. A constructor ichida: console.log(this.greet())
+//    this = b instance, b.greet() → B ning greet() chaqiriladi (override!)
+//    → "Hello from B"
+// 5. A constructor tugadi, B constructor'ga qaytadi
+// 6. this.name = "B" — A da yozilgan "A" ni override qiladi
+// 7. console.log(b.name) → "B"
+```
+
+**Muhim nuqta:** `super()` ichida ham `this` child instance'ga ishora qiladi. Shuning uchun `this.greet()` child'ning override method'ini chaqiradi — parent'nikini emas.
+
+</details>
+
+### 2. Quyidagi kodning output'ini ayting [Middle+]
+
+**Savol:**
+
+```javascript
+class Counter {
+  #count = 0;
+
+  increment() {
+    this.#count++;
+    return this;
+  }
+
+  get value() { return this.#count; }
+}
+
+const c = new Counter();
+console.log(c.increment().increment().increment().value);
+console.log(Object.keys(c));
+console.log(JSON.stringify(c));
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+3
+[]
+"{}"
+```
+
+```javascript
+// c.increment().increment().increment()
+// Har bir increment() this qaytaradi → chaining mumkin
+// #count: 0 → 1 → 2 → 3
+// .value → getter → 3
+
+// Object.keys(c) → []
+// #count private — ko'rinmaydi. Oddiy own property yo'q.
+
+// JSON.stringify(c) → "{}"
+// Private field'lar JSON.stringify da ko'rinmaydi
+// Public own property'lar yo'q → bo'sh object
+```
+
+</details>
+
+### 3. Quyidagi kodning output'ini ayting [Senior]
+
+**Savol:**
+
+```javascript
+class Parent {
+  static x = 1;
+  static getX() { return this.x; }
+}
+
+class Child extends Parent {
+  static x = 2;
+}
+
+console.log(Parent.getX());
+console.log(Child.getX());
+console.log(Child.hasOwnProperty("getX"));
+console.log(Child.getX === Parent.getX);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+1
+2
+false
+true
+```
+
+```javascript
+// Parent.getX() → this = Parent, Parent.x = 1 → 1
+// Child.getX() → this = Child, Child.x = 2 → 2
+//   (getX Child'da yo'q — Parent'dan meros. Lekin this = Child)
+
+// Child.hasOwnProperty("getX") → false
+//   (getX Child'ning o'zida yo'q, Parent'dan meros bo'lgan)
+
+// Child.getX === Parent.getX → true
+//   (bitta funksiya — Child.[[Prototype]] = Parent orqali topiladi)
+```
+
+**Muhim:** Static method'larda `this` — chaqirilgan class'ning o'zi. `Child.getX()` da `this` = `Child`, shuning uchun `this.x` = `Child.x` = 2.
+
+**Deep Dive:**
+
+`extends` keyword engine ichida ikkita prototype chain quradi: `Object.setPrototypeOf(Child.prototype, Parent.prototype)` (instance method meros) va `Object.setPrototypeOf(Child, Parent)` (static method meros). Shuning uchun `Child.getX` aslida `Child.[[Prototype]]` ya'ni `Parent` dan topiladi. Lekin `this` standart implicit binding qoidasi bo'yicha `Child` ga bog'lanadi — chunki `Child.getX()` shaklida chaqirilgan.
+
+</details>
+
+### 4. Quyidagi kodning output'ini ayting [Middle+]
+
+**Savol:**
+
+```javascript
+class A {
+  x = 1;
+  method() { return this.x; }
+}
+
+class B extends A {
+  x = 2;
+}
+
+const b = new B();
+console.log(b.method());
+console.log(b.x);
+console.log(Object.keys(b));
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+2
+2
+["x"]
+```
+
+```javascript
+// Class field'lar tartib bo'yicha initialize bo'ladi:
+// 1. super() chaqiriladi (B da default constructor)
+// 2. A ning field'lari: this.x = 1
+// 3. B ning field'lari: this.x = 2 (A dagi x ni OVERRIDE qildi)
+
+// b.method() → this = b, this.x = 2 → 2
+// b.x → 2
+// Object.keys(b) → ["x"] — bitta own property (ikkinchi assign birinchini yozdi)
+```
+
+</details>
+
+### 5. Bu kodda nima xato? [Middle]
+
+**Savol:**
+
+```javascript
+class Animal {
+  constructor(name) { this.name = name; }
+  speak() { return `${this.name} speaks`; }
+}
+
+class Dog extends Animal {
+  constructor(name, breed) {
+    this.breed = breed;
+    super(name);
+  }
+}
+
+const rex = new Dog("Rex", "Labrador");
+```
+
+<details>
+<summary>Javob</summary>
+
+`ReferenceError: Must call super constructor in derived class before accessing 'this'`
+
+```javascript
+// ❌ this.breed = breed → super() dan OLDIN this ishlatilgan!
+// Derived class'da this faqat super() chaqirilgandan keyin mavjud
+
+// ✅ To'g'ri:
+class Dog extends Animal {
+  constructor(name, breed) {
+    super(name);       // ✅ avval super
+    this.breed = breed; // keyin this
+  }
+}
+```
+
+**Sababi:** Derived class'da `this` object parent constructor tomonidan yaratiladi. `super()` chaqirilmaguncha `this` mavjud emas — bu JavaScript'ning prototype-based meros mexanizmining tabiiy cheklovi.
+
+</details>
+
+### 6. Bu kodda nima xato? [Middle]
+
+**Savol:**
+
+```javascript
+class Logger {
+  prefix = "[LOG]";
+
+  log(message) {
+    console.log(`${this.prefix} ${message}`);
+  }
+}
+
+const logger = new Logger();
+const log = logger.log;
+log("test");
+```
+
+<details>
+<summary>Javob</summary>
+
+`TypeError: Cannot read properties of undefined (reading 'prefix')` — `this` yo'qoldi.
+
+```javascript
+// log = logger.log — method reference olingan
+// log("test") — this = undefined (strict mode, class ichida)
+
+// ✅ Yechimlar:
+
+// 1. Arrow function field:
+class Logger {
+  prefix = "[LOG]";
+  log = (message) => {
+    console.log(`${this.prefix} ${message}`);
+  };
+}
+
+// 2. bind:
+const log = logger.log.bind(logger);
+
+// 3. Wrapper:
+const log = (msg) => logger.log(msg);
+```
+
+Bu class method'larning ko'p uchraydigan muammosi — callback sifatida berilganda `this` binding yo'qoladi. Ko'proq [10-this-keyword.md](10-this-keyword.md) da.
+
+</details>
 
 ---

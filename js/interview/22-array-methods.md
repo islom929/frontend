@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: map, filter, reduce farqi nima? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. map, filter, reduce farqi nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 | Method | Qaytaradi | Vazifa |
 |--------|-----------|--------|
@@ -28,29 +31,13 @@ const total = products.reduce((s, p) => s + p.price, 0); // 600
 
 Uchisi ham original array'ni **mutate qilmaydi**.
 
----
 
-## Savol 2: Output nima? sort default xulqi [Middle]
+</details>
 
-**Javob:**
+### 2. find vs filter — qachon qaysi birini ishlatish kerak? [Junior+]
 
-```javascript
-console.log([10, 9, 100, 2, 21].sort());
-```
-
-**Javob:**
-
-```
-[10, 100, 2, 21, 9]
-```
-
-Default `sort()` elementlarni **string** ga aylantirib, Unicode tartibda solishtiradi: `"10" < "100" < "2" < "21" < "9"`. Sonlar uchun **doim** comparator bering: `.sort((a, b) => a - b)`.
-
----
-
-## Savol 3: find vs filter — qachon qaysi birini ishlatish kerak? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | | `find` | `filter` |
 |---|---|---|
@@ -68,37 +55,13 @@ const user = users.filter(u => u.id === 42)[0];
 const user = users.find(u => u.id === 42);
 ```
 
----
 
-## Savol 4: Output nima? reduce bilan [Middle]
+</details>
 
-**Javob:**
+### 3. ES2023 immutable array methods qaysilar? [Middle]
 
-```javascript
-const result = [1, 2, 3, 4].reduce((acc, val) => {
-  console.log(`acc:${acc}, val:${val}`);
-  return acc + val;
-});
-
-console.log("result:", result);
-```
-
-**Javob:**
-
-```
-acc:1, val:2
-acc:3, val:3
-acc:6, val:4
-result: 10
-```
-
-`initialValue` berilmaganda — birinchi element accumulator bo'ladi, iteration ikkinchi elementdan boshlanadi. 4 elementda 3 ta iteration. **XAVF**: bo'sh array da TypeError! Doim initialValue bering.
-
----
-
-## Savol 5: ES2023 immutable array methods qaysilar? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Mutating | Non-mutating (ES2023) |
 |----------|----------------------|
@@ -123,11 +86,13 @@ const sorted = [3, 1, 2].toSorted((a, b) => a - b);
 
 React/Redux state management'da muhim — state'ni mutate qilmaslik qoidasi.
 
----
 
-## Savol 6: some va every nima? Bo'sh array uchun nima qaytaradi? [Middle]
+</details>
 
-**Javob:**
+### 4. some va every nima? Bo'sh array uchun nima qaytaradi? [Middle]
+
+<details>
+<summary>Javob</summary>
 
 `some` — **kamida bitta** mos element bor → `true`. `every` — **barchasi** mos → `true`. Ikkalasi ham **early termination** — natija aniq bo'lganda to'xtaydi.
 
@@ -141,11 +106,13 @@ React/Redux state management'da muhim — state'ni mutate qilmaslik qoidasi.
 [].every(() => false);  // true — "barcha elementlar shartga mos" (vacuous truth)
 ```
 
----
 
-## Savol 7: includes vs indexOf farqi nima? [Junior+]
+</details>
 
-**Javob:**
+### 5. includes vs indexOf farqi nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 | | `includes` | `indexOf` |
 |---|---|---|
@@ -161,94 +128,13 @@ React/Redux state management'da muhim — state'ni mutate qilmaslik qoidasi.
 // indexOf — pozitsiyani bilish kerak bo'lganda
 ```
 
----
 
-## Savol 8: Array.prototype.map polyfill yozing [Middle]
+</details>
 
-**Javob:**
+### 6. at() method nima? arr[-1] nima uchun ishlamaydi? [Junior+]
 
-```javascript
-Array.prototype.myMap = function(callback, thisArg) {
-  if (typeof callback !== "function") {
-    throw new TypeError(callback + " is not a function");
-  }
-  const result = new Array(this.length);
-  for (let i = 0; i < this.length; i++) {
-    if (i in this) { // sparse array — bo'sh slot'larni o'tkazish
-      result[i] = callback.call(thisArg, this[i], i, this);
-    }
-  }
-  return result;
-};
-
-// Test:
-[1, 2, 3].myMap(x => x * 2); // [2, 4, 6]
-[1, , 3].myMap(x => x * 2);  // [2, empty, 6] — sparse element skip
-```
-
-`i in this` — sparse array'dagi bo'sh slot'larni o'tkazib yuborish uchun. `callback.call(thisArg, ...)` — `thisArg` qo'llab-quvvatlash (spec bo'yicha).
-
----
-
-## Savol 9: Array.prototype.reduce polyfill yozing [Middle+]
-
-**Javob:**
-
-```javascript
-Array.prototype.myReduce = function(callback, initialValue) {
-  if (typeof callback !== "function") throw new TypeError();
-
-  let acc;
-  let startIdx = 0;
-
-  if (arguments.length >= 2) {
-    acc = initialValue;
-  } else {
-    if (this.length === 0) throw new TypeError("Reduce of empty array with no initial value");
-    acc = this[0];
-    startIdx = 1;
-  }
-
-  for (let i = startIdx; i < this.length; i++) {
-    if (i in this) {
-      acc = callback(acc, this[i], i, this);
-    }
-  }
-  return acc;
-};
-```
-
-`arguments.length >= 2` — `initialValue` `undefined` sifatida berilganda ham to'g'ri ishlaydi.
-
----
-
-## Savol 10: flat() ni implement qiling [Middle+]
-
-**Javob:**
-
-```javascript
-function myFlat(arr, depth = 1) {
-  if (depth <= 0) return [...arr];
-
-  return arr.reduce((result, item) => {
-    if (Array.isArray(item)) {
-      result.push(...myFlat(item, depth - 1));
-    } else {
-      result.push(item);
-    }
-    return result;
-  }, []);
-}
-
-myFlat([1, [2, [3, [4]]]], 1);        // [1, 2, [3, [4]]]
-myFlat([1, [2, [3, [4]]]], Infinity); // [1, 2, 3, 4]
-```
-
----
-
-## Savol 11: at() method nima? arr[-1] nima uchun ishlamaydi? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const arr = [10, 20, 30, 40, 50];
@@ -261,33 +147,13 @@ arr[-1];      // undefined — ❌ ishlamaydi!
 
 `arr[-1]` — JavaScript da `[]` property access. `-1` string key `"-1"` sifatida izlanadi — array'da bunday property yo'q → `undefined`. `at()` method esa manfiy index'ni `length + index` deb hisoblanadi.
 
----
 
-## Savol 12: Output nima? flatMap vs map + flat [Middle]
+</details>
 
-**Javob:**
+### 7. forEach dan break qilish mumkinmi? [Middle]
 
-```javascript
-const sentences = ["hello world", "foo bar baz"];
-
-console.log(sentences.map(s => s.split(" ")));
-console.log(sentences.flatMap(s => s.split(" ")));
-```
-
-**Javob:**
-
-```javascript
-// map: [["hello", "world"], ["foo", "bar", "baz"]] — nested
-// flatMap: ["hello", "world", "foo", "bar", "baz"] — flat
-```
-
-`flatMap` = `map` + `flat(1)` bitta qadamda. `flatMap` faqat **1 daraja** tekislaydi (chuqurroq flat kerak bo'lsa `.flat(depth)` ishlatish kerak).
-
----
-
-## Savol 13: forEach dan break qilish mumkinmi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **Yo'q.** `forEach` dan break qilish mumkin emas — butun array'ni aylantiradi.
 
@@ -316,32 +182,13 @@ for (const n of [1, 2, 3, 4]) {
 [1, 2, 3, 4].find(n => n === 3); // 3 — to'xtadi
 ```
 
----
 
-## Savol 14: fill() bilan reference type muammosi nima? [Middle+]
+</details>
 
-**Javob:**
+### 8. reduce bilan qanday real-world pattern'lar qilish mumkin? [Senior]
 
-```javascript
-// ❌ fill bilan object/array — BIR XIL reference!
-const grid = new Array(3).fill([]);
-grid[0].push(1);
-console.log(grid); // [[1], [1], [1]] — ❌ hammasi bir xil array!
-// grid[0] === grid[1] === grid[2] → true
-
-// ✅ Array.from — har safar yangi instance
-const grid2 = Array.from({ length: 3 }, () => []);
-grid2[0].push(1);
-console.log(grid2); // [[1], [], []] — ✅ mustaqil
-```
-
-`fill()` berilgan qiymatni **reference** sifatida qo'yadi. Array va object'lar uchun har bir slot bir xil reference'ni ko'rsatadi. `Array.from` callback har chaqiruvda yangi instance yaratadi.
-
----
-
-## Savol 15: reduce bilan qanday real-world pattern'lar qilish mumkin? [Senior]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // 1. groupBy
@@ -377,3 +224,200 @@ pick({ a: 1, b: 2, c: 3 }, ["a", "c"]); // { a: 1, c: 3 }
 ```
 
 ES2024 da `Object.groupBy()` va `Map.groupBy()` qo'shildi — endi reduce bilan groupBy yozish shart emas.
+
+**Deep Dive:** ECMAScript spec bo'yicha `reduce` callback 4 ta argument oladi: `(accumulator, currentValue, currentIndex, array)`. `initialValue` berilmaganda spec `TypeError` tashlashni talab qiladi agar array bo'sh bo'lsa. V8 da `reduce` inline bo'lganda TurboFan callback'ni inline qiladi va loop overhead'ni deyarli nolga tushiradi — lekin bu faqat callback turi barqaror bo'lganda (monomorphic) ishlaydi.
+
+</details>
+
+---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Output nima? sort default xulqi [Middle]
+
+
+```javascript
+console.log([10, 9, 100, 2, 21].sort());
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+[10, 100, 2, 21, 9]
+```
+
+Default `sort()` elementlarni **string** ga aylantirib, Unicode tartibda solishtiradi: `"10" < "100" < "2" < "21" < "9"`. Sonlar uchun **doim** comparator bering: `.sort((a, b) => a - b)`.
+
+
+</details>
+
+### 2. Output nima? reduce bilan [Middle]
+
+
+```javascript
+const result = [1, 2, 3, 4].reduce((acc, val) => {
+  console.log(`acc:${acc}, val:${val}`);
+  return acc + val;
+});
+
+console.log("result:", result);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+acc:1, val:2
+acc:3, val:3
+acc:6, val:4
+result: 10
+```
+
+`initialValue` berilmaganda — birinchi element accumulator bo'ladi, iteration ikkinchi elementdan boshlanadi. 4 elementda 3 ta iteration. **XAVF**: bo'sh array da TypeError! Doim initialValue bering.
+
+
+</details>
+
+### 3. Array.prototype.map polyfill yozing [Middle]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+Array.prototype.myMap = function(callback, thisArg) {
+  if (typeof callback !== "function") {
+    throw new TypeError(callback + " is not a function");
+  }
+  const result = new Array(this.length);
+  for (let i = 0; i < this.length; i++) {
+    if (i in this) { // sparse array — bo'sh slot'larni o'tkazish
+      result[i] = callback.call(thisArg, this[i], i, this);
+    }
+  }
+  return result;
+};
+
+// Test:
+[1, 2, 3].myMap(x => x * 2); // [2, 4, 6]
+[1, , 3].myMap(x => x * 2);  // [2, empty, 6] — sparse element skip
+```
+
+`i in this` — sparse array'dagi bo'sh slot'larni o'tkazib yuborish uchun. `callback.call(thisArg, ...)` — `thisArg` qo'llab-quvvatlash (spec bo'yicha).
+
+
+</details>
+
+### 4. Array.prototype.reduce polyfill yozing [Middle+]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+Array.prototype.myReduce = function(callback, initialValue) {
+  if (typeof callback !== "function") throw new TypeError();
+
+  let acc;
+  let startIdx = 0;
+
+  if (arguments.length >= 2) {
+    acc = initialValue;
+  } else {
+    // Sparse array uchun birinchi mavjud elementni topish
+    let found = false;
+    for (let j = 0; j < this.length; j++) {
+      if (j in this) {
+        acc = this[j];
+        startIdx = j + 1;
+        found = true;
+        break;
+      }
+    }
+    if (!found) throw new TypeError("Reduce of empty array with no initial value");
+  }
+
+  for (let i = startIdx; i < this.length; i++) {
+    if (i in this) {
+      acc = callback(acc, this[i], i, this);
+    }
+  }
+  return acc;
+};
+```
+
+`arguments.length >= 2` — `initialValue` `undefined` sifatida berilganda ham to'g'ri ishlaydi.
+
+
+</details>
+
+### 5. flat() ni implement qiling [Middle+]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+function myFlat(arr, depth = 1) {
+  if (depth <= 0) return [...arr];
+
+  return arr.reduce((result, item) => {
+    if (Array.isArray(item)) {
+      result.push(...myFlat(item, depth - 1));
+    } else {
+      result.push(item);
+    }
+    return result;
+  }, []);
+}
+
+myFlat([1, [2, [3, [4]]]], 1);        // [1, 2, [3, [4]]]
+myFlat([1, [2, [3, [4]]]], Infinity); // [1, 2, 3, 4]
+```
+
+
+</details>
+
+### 6. Output nima? flatMap vs map + flat [Middle]
+
+
+```javascript
+const sentences = ["hello world", "learn javascript today"];
+
+console.log(sentences.map(s => s.split(" ")));
+console.log(sentences.flatMap(s => s.split(" ")));
+```
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+// map: [["hello", "world"], ["learn", "javascript", "today"]] — nested
+// flatMap: ["hello", "world", "learn", "javascript", "today"] — flat
+```
+
+`flatMap` = `map` + `flat(1)` bitta qadamda. `flatMap` faqat **1 daraja** tekislaydi (chuqurroq flat kerak bo'lsa `.flat(depth)` ishlatish kerak).
+
+
+</details>
+
+### 7. fill() bilan reference type muammosi nima? [Middle+]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+// ❌ fill bilan object/array — BIR XIL reference!
+const grid = new Array(3).fill([]);
+grid[0].push(1);
+console.log(grid); // [[1], [1], [1]] — ❌ hammasi bir xil array!
+// grid[0] === grid[1] === grid[2] → true
+
+// ✅ Array.from — har safar yangi instance
+const grid2 = Array.from({ length: 3 }, () => []);
+grid2[0].push(1);
+console.log(grid2); // [[1], [], []] — ✅ mustaqil
+```
+
+`fill()` berilgan qiymatni **reference** sifatida qo'yadi. Array va object'lar uchun har bir slot bir xil reference'ni ko'rsatadi. `Array.from` callback har chaqiruvda yangi instance yaratadi.
+
+
+</details>

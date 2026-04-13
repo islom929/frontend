@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Object.groupBy() nima? reduce bilan farqi? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Object.groupBy() nima? reduce bilan farqi? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 `Object.groupBy()` — iterable elementlarini callback natijasiga qarab guruhlaydi. Har bir key uchun mos elementlar array'i bo'lgan object qaytaradi.
 
@@ -40,11 +43,12 @@ const oldGrouped = products.reduce((acc, p) => {
 
 **Muhim:** `Object.groupBy` natijasi — `Object.create(null)` — `Object.prototype` method'lari yo'q (`hasOwnProperty` ishlamaydi).
 
----
+</details>
 
-## Savol 2: Promise.withResolvers() nima? Qanday ishlatiladi? [Middle]
+### 2. Promise.withResolvers() nima? Qanday ishlatiladi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `Promise.withResolvers()` — `{ promise, resolve, reject }` qaytaradi. Promise'ning `resolve`/`reject` funksiyalarini constructor tashqarisida olish imkonini beradi.
 
@@ -75,40 +79,12 @@ const event = await waitForEvent(button, "click");
 
 Bu **Deferred pattern** — Promise'ni bir joyda yaratib, boshqa joyda resolve/reject qilish kerak bo'lganda ishlatiladi (event listener'lar, stream'lar, callback-based API'lar).
 
----
+</details>
 
-## Savol 3: Quyidagi kodning output'ini ayting [Middle]
+### 3. ES2025 Set method'lari haqida gapiring. Qanday method'lar bor? [Middle]
 
-```javascript
-const nums = [1, 2, 3, 4, 5, 6];
-const grouped = Object.groupBy(nums, n => n % 2 === 0 ? "even" : "odd");
-console.log(grouped.even);
-console.log(grouped.hasOwnProperty);
-```
-
-**Javob:**
-
-```javascript
-console.log(grouped.even);
-// [2, 4, 6]
-
-console.log(grouped.hasOwnProperty);
-// undefined ❌
-```
-
-`Object.groupBy()` natijasi **null-prototype object** — `Object.create(null)` bilan yaratiladi. Shuning uchun `hasOwnProperty`, `toString`, `constructor` kabi `Object.prototype` method'lari yo'q.
-
-```javascript
-// ✅ To'g'ri tekshirish
-"even" in grouped;             // true
-Object.hasOwn(grouped, "even"); // true
-```
-
----
-
-## Savol 4: ES2025 Set method'lari haqida gapiring. Qanday method'lar bor? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ES2025 da `Set` ga 7 ta yangi method qo'shildi — matematik to'plam operatsiyalari:
 
@@ -138,11 +114,12 @@ a.isDisjointFrom(b);      // false — umumiy element bor
 
 Barcha method'lar asl Set'ni **mutate qilmaydi**.
 
----
+</details>
 
-## Savol 5: Iterator Helpers nima? Array method'lardan farqi? [Middle+]
+### 4. Iterator Helpers nima? Array method'lardan farqi? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Iterator Helpers — `Iterator.prototype` ga qo'shilgan method'lar: `map`, `filter`, `take`, `drop`, `flatMap`, `reduce`, `toArray`, `forEach`, `some`, `every`, `find`. Ularning asosiy farqi — **lazy evaluation**.
 
@@ -189,11 +166,12 @@ naturals()
 // [2, 4, 6, 8, 10]
 ```
 
----
+</details>
 
-## Savol 6: using keyword nima? try/finally dan farqi? [Senior]
+### 5. using keyword nima? try/finally dan farqi? [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `using` — resurslarni avtomatik tozalash uchun yangi syntax (ES2025). Resource object'da `Symbol.dispose` (sync) yoki `Symbol.asyncDispose` (async) bo'lishi kerak.
 
@@ -254,63 +232,12 @@ class FileHandle {
 
 **Deep Dive:** Agar main code xato bersa VA dispose ham xato bersa — `SuppressedError` yaratiladi: `{ error: dispose_xatosi, suppressed: asosiy_xato }`. Bu ikkala xatoni ham saqlaydi.
 
----
+</details>
 
-## Savol 7: Quyidagi kodning output'ini ayting [Middle+]
+### 6. Map.groupBy() va Object.groupBy() farqi nima? Qachon qaysi birini ishlatish kerak? [Middle+]
 
-```javascript
-function* gen() {
-  yield 1;
-  yield 2;
-  yield 3;
-  yield 4;
-  yield 5;
-}
-
-const result = gen()
-  .map(n => {
-    console.log("map:", n);
-    return n * 10;
-  })
-  .filter(n => {
-    console.log("filter:", n);
-    return n > 20;
-  })
-  .take(2)
-  .toArray();
-
-console.log(result);
-```
-
-**Javob:**
-
-```
-map: 1
-filter: 10
-map: 2
-filter: 20
-map: 3
-filter: 30
-map: 4
-filter: 40
-[30, 40]
-```
-
-Iterator Helper'lar **lazy** — element birma-bir pipeline'dan o'tadi:
-
-1. `gen` → 1 → `map` → 10 → `filter` → 10 > 20? ❌ (o'tkazib yuborildi)
-2. `gen` → 2 → `map` → 20 → `filter` → 20 > 20? ❌ (o'tkazib yuborildi)
-3. `gen` → 3 → `map` → 30 → `filter` → 30 > 20? ✅ → `take` (1/2)
-4. `gen` → 4 → `map` → 40 → `filter` → 40 > 20? ✅ → `take` (2/2) — **TO'XTADI**
-5. `gen` → 5 — **HECH QACHON ISHLANMADI** (take 2 ta oldi, to'xtadi)
-
-Bu eager Array method'lardan farqi — array'da barcha 5 ta element map va filter'dan o'tgan bo'lardi.
-
----
-
-## Savol 8: Map.groupBy() va Object.groupBy() farqi nima? Qachon qaysi birini ishlatish kerak? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const users = [
@@ -339,11 +266,12 @@ byTeamObj.get(teams.backend);  // [Vali]
 | Key lookup | `grouped["key"]` | `grouped.get(key)` |
 | Qachon | Key string bo'lganda | Key object/reference bo'lganda |
 
----
+</details>
 
-## Savol 9: Import Attributes nima? Nima uchun kerak? [Middle]
+### 7. Import Attributes nima? Nima uchun kerak? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Import Attributes — `import` ga qo'shimcha metadata berish. Asosan JSON va boshqa non-JS fayllarni xavfsiz import qilish uchun.
 
@@ -367,11 +295,12 @@ import data from "./data.json" assert { type: "json" }; // ❌ eski (assert)
 import data from "./data.json" with { type: "json" };    // ✅ yangi (with)
 ```
 
----
+</details>
 
-## Savol 10: isWellFormed() va toWellFormed() nima? Qachon kerak? [Middle+]
+### 8. isWellFormed() va toWellFormed() nima? Qachon kerak? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 JavaScript string'lari UTF-16. Ba'zan string'da **lone surrogate** — juftisiz surrogate code unit bo'lishi mumkin. Bu `encodeURIComponent()`, `TextEncoder`, `fetch` kabi API'larda xatolik yoki noto'g'ri natija beradi.
 
@@ -401,11 +330,12 @@ Qachon ishlatiladi:
 - `TextEncoder` bilan encode qilishdan oldin
 - WebSocket/fetch orqali yuborishdan oldin
 
----
+</details>
 
-## Savol 11: Symbol.dispose va Symbol.asyncDispose farqi nima? [Senior]
+### 9. Symbol.dispose va Symbol.asyncDispose farqi nima? [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // Symbol.dispose — sync resource uchun
@@ -447,11 +377,14 @@ class DBConnection {
 
 Agar object'da ikkala Symbol ham bo'lsa — `await using` → `asyncDispose`, `using` → `dispose` chaqiradi.
 
----
+**Deep Dive:** TC39 Explicit Resource Management proposal spec'da `using` declaration `LexicalBinding` ga yangi semantika qo'shadi — scope tugaganda engine `GetDisposeMethod(value, sync)` chaqiradi, bu `value[Symbol.dispose]` ni oladi. Agar `Symbol.dispose` yo'q bo'lsa — `TypeError`. C# `IDisposable`/`using`, Python `__enter__`/`__exit__`/`with`, va Java `AutoCloseable`/`try-with-resources` dan ilhomlangan — lekin JavaScript versiyasi scope-based (block scope tugaganda), method-based emas.
 
-## Savol 12: RegExp v flag u flag dan nima farq qiladi? [Senior]
+</details>
 
-**Javob:**
+### 10. RegExp v flag u flag dan nima farq qiladi? [Senior]
+
+<details>
+<summary>Javob</summary>
 
 `v` flag — `u` ning kengaytirilgan versiyasi. Ikkalasini birga ishlatib bo'lmaydi.
 
@@ -484,11 +417,14 @@ Agar object'da ikkala Symbol ham bo'lsa — `await using` → `asyncDispose`, `u
 | String properties | ❌ | ✅ |
 | Birga | ❌ `uv` xato | — |
 
----
+**Deep Dive:** `v` flag (unicodeSets) spec'da `u` flag'ni to'liq o'z ichiga oladi va qo'shimcha character class syntax qo'shadi. `--` (difference) va `&&` (intersection) operatorlari faqat `[...]` character class ichida ishlaydi. `\p{RGI_Emoji_Flag_Sequence}` kabi "string properties" birinchi marta multi-code-point sequence'larni regex'da native match qilish imkonini beradi — ilgari bu faqat alternation bilan mumkin edi. V8 va SpiderMonkey bu flag'ni 2023 dan beri qo'llab-quvvatlaydi.
 
-## Savol 13: Array.fromAsync va Promise.all farqi nima? [Middle+]
+</details>
 
-**Javob:**
+### 11. Array.fromAsync va Promise.all farqi nima? [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const urls = ["/api/1", "/api/2", "/api/3"];
@@ -519,11 +455,12 @@ const par = await Promise.all(urls.map(async url => {
 
 **Qoida:** Parallel imkoni bo'lsa — `Promise.all`. Ketma-ket kerak bo'lsa (rate limit, dependency) yoki async iterable bo'lsa — `Array.fromAsync`.
 
----
+</details>
 
-## Savol 14: TC39 process nima? Stage lar nima? [Junior+]
+### 12. TC39 process nima? Stage lar nima? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 TC39 — ECMAScript standartini boshqaradigan komitet. Har bir yangi feature quyidagi bosqichlardan o'tadi:
 
@@ -536,7 +473,7 @@ TC39 — ECMAScript standartini boshqaradigan komitet. Har bir yangi feature quy
 | 3 | Candidate | Browser'lar implement qilmoqda | ✅ Xavfsiz (polyfill bilan) |
 | 4 | Finished | Standart! | ✅ Ishlating |
 
-Har yil yanvar oyida Stage 4 ga yetganlar shu yilgi ECMAScript versiyasiga kiritiladi.
+Har yil mart oyidagi TC39 yig'ilishigacha Stage 4 ga yetgan proposal'lar shu yilgi ECMAScript versiyasiga kiritiladi (iyun'da Ecma GA tomonidan rasman tasdiqlanadi).
 
 ```
 Misol: Object.groupBy() yoʻli
@@ -545,11 +482,12 @@ Misol: Object.groupBy() yoʻli
 2024 — Stage 4 → ES2024 ga kiritildi
 ```
 
----
+</details>
 
-## Savol 15: Duplicate Named Capturing Groups nima? [Middle]
+### 13. Duplicate Named Capturing Groups nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ES2025 dan boshlab regex'da turli alternative branch'larda bir xil nomli capture group ishlatish mumkin.
 
@@ -574,11 +512,12 @@ dateRe.exec("03/2024").groups;
 
 Bu turli formatdagi ma'lumotlarni parse qilishda juda foydali — bitta regex bilan bir nechta format'ni qo'llab-quvvatlash.
 
----
+</details>
 
-## Savol 16: DisposableStack nima? [Senior]
+### 14. DisposableStack nima? [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `DisposableStack` — bir nechta disposable resource'ni birga boshqarish uchun container. `using` bilan ishlatilganda stack'dagi barcha resource'lar teskari tartibda (LIFO) dispose qilinadi.
 
@@ -622,3 +561,94 @@ async function process() {
 - `adopt(value, onDispose)` — qiymat + cleanup callback
 - `defer(callback)` — dispose vaqtida chaqiriladigan callback
 - `move()` — resource'larni boshqa stack'ga ko'chiradi
+
+**Deep Dive:** `DisposableStack` spec'da `[[DisposableResourceStack]]` internal slot'da resource'larni saqlaydi. `move()` method yangi stack yaratadi va barcha resource'larni ko'chiradi — eski stack bo'shaydi va "disposed" holatga o'tadi. Agar dispose paytida bir nechta resource xato bersa — birinchi xato `SuppressedError.error` ga, ikkinchisi `SuppressedError.suppressed` ga joylashadi, zanjirlanib ketadi. Bu Go `defer` stack va C# `using` block semantikasining kombinatsiyasi.
+
+</details>
+
+---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Quyidagi kodning output'ini ayting [Middle]
+
+```javascript
+const nums = [1, 2, 3, 4, 5, 6];
+const grouped = Object.groupBy(nums, n => n % 2 === 0 ? "even" : "odd");
+console.log(grouped.even);
+console.log(grouped.hasOwnProperty);
+```
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+console.log(grouped.even);
+// [2, 4, 6]
+
+console.log(grouped.hasOwnProperty);
+// undefined ❌
+```
+
+`Object.groupBy()` natijasi **null-prototype object** — `Object.create(null)` bilan yaratiladi. Shuning uchun `hasOwnProperty`, `toString`, `constructor` kabi `Object.prototype` method'lari yo'q.
+
+```javascript
+// ✅ To'g'ri tekshirish
+"even" in grouped;             // true
+Object.hasOwn(grouped, "even"); // true
+```
+
+</details>
+
+### 2. Quyidagi kodning output'ini ayting [Middle+]
+
+```javascript
+function* gen() {
+  yield 1;
+  yield 2;
+  yield 3;
+  yield 4;
+  yield 5;
+}
+
+const result = gen()
+  .map(n => {
+    console.log("map:", n);
+    return n * 10;
+  })
+  .filter(n => {
+    console.log("filter:", n);
+    return n > 20;
+  })
+  .take(2)
+  .toArray();
+
+console.log(result);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+map: 1
+filter: 10
+map: 2
+filter: 20
+map: 3
+filter: 30
+map: 4
+filter: 40
+[30, 40]
+```
+
+Iterator Helper'lar **lazy** — element birma-bir pipeline'dan o'tadi:
+
+1. `gen` → 1 → `map` → 10 → `filter` → 10 > 20? ❌ (o'tkazib yuborildi)
+2. `gen` → 2 → `map` → 20 → `filter` → 20 > 20? ❌ (o'tkazib yuborildi)
+3. `gen` → 3 → `map` → 30 → `filter` → 30 > 20? ✅ → `take` (1/2)
+4. `gen` → 4 → `map` → 40 → `filter` → 40 > 20? ✅ → `take` (2/2) — **TO'XTADI**
+5. `gen` → 5 — **HECH QACHON ISHLANMADI** (take 2 ta oldi, to'xtadi)
+
+Bu eager Array method'lardan farqi — array'da barcha 5 ta element map va filter'dan o'tgan bo'lardi.
+
+</details>

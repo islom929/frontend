@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Closure nima? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Closure nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 Closure — funksiyaning o'zi **yaratilgan** paytdagi lexical environment'ga **reference** saqlab qolishi. Natijada funksiya tashqi scope'dagi o'zgaruvchilarga murojaat qila oladi — hatto tashqi funksiya tugab, call stack'dan chiqib ketgan bo'lsa ham.
 
@@ -37,94 +40,12 @@ Closure **reference** saqlaydi, **copy** emas. Agar tashqi o'zgaruvchi o'zgartir
 
 Har bir funksiya yaratilganda engine uning `[[Environment]]` internal slot'iga joriy LexicalEnvironment'ni saqlaydi. Funksiya chaqirilganda yangi EC yaratiladi va uning `[[OuterEnv]]` reference'i `[[Environment]]` slot'idagi environment'ga ulanadi. Shu orqali tashqi scope'ga yo'l ochiladi.
 
----
+</details>
 
-## Savol 2: Quyidagi kodning output'i nima? [Middle]
+### 2. Klassik loop + closure muammosini tushuntiring [Middle+]
 
-```javascript
-function createCounter() {
-  let count = 0;
-
-  return {
-    increment: () => ++count,
-    decrement: () => --count,
-    getCount: () => count
-  };
-}
-
-const c1 = createCounter();
-const c2 = createCounter();
-
-c1.increment();
-c1.increment();
-c1.increment();
-c2.increment();
-
-console.log(c1.getCount()); // ?
-console.log(c2.getCount()); // ?
-```
-
-**Javob:**
-
-```
-3
-1
-```
-
-Har bir `createCounter()` chaqiruvi **yangi scope** (Environment Record) yaratadi. `c1` va `c2` **alohida** scope'larga closure hosil qilgan — bir-biriga ta'sir qilmaydi.
-
-- `c1` scope: count 0 → 1 → 2 → 3
-- `c2` scope: count 0 → 1
-
-`increment`, `decrement`, `getCount` bir scope'da yaratilgan "aka-uka" funksiyalar — barchasi bitta `count` binding'ga reference saqlaydi. Lekin `c1` va `c2` ning `count` lari boshqa-boshqa binding'lar.
-
----
-
-## Savol 3: Closure reference saqlashini ko'rsating [Middle]
-
-**Savol:** Quyidagi kodning output'i nima?
-
-```javascript
-function outer() {
-  let value = 1;
-
-  function getValue() { return value; }
-  function setValue(v) { value = v; }
-
-  return { getValue, setValue };
-}
-
-const obj = outer();
-console.log(obj.getValue()); // ?
-obj.setValue(100);
-console.log(obj.getValue()); // ?
-```
-
-**Javob:**
-
-```
-1
-100
-```
-
-`getValue` va `setValue` bir xil scope'da yaratilgan — ikkalasi **bitta `value` binding'ga** reference saqlaydi. `setValue(100)` shu binding'ni o'zgartiradi → `getValue()` yangi qiymatni ko'radi.
-
-Bu closure'ning eng muhim xususiyati: **reference saqlaydi, copy emas**. Agar copy saqlansa edi — `setValue` o'zgartirganda `getValue` eski qiymatni qaytargan bo'lardi.
-
-```
-Memory model:
-outer Environment Record: { value: 1 → 100 }
-                              ↑            ↑
-getValue reference ──────────┘            │
-setValue reference ───────────────────────┘
-// Bitta binding — ikki funksiya ko'radi
-```
-
----
-
-## Savol 4: Klassik loop + closure muammosini tushuntiring [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `var` bilan for loop ichida closure hosil qilganda barcha closure'lar **bitta o'zgaruvchiga** reference saqlaydi:
 
@@ -162,11 +83,12 @@ for (var i = 0; i < 3; i++) {
 
 ECMAScript spec'da `for` loop bilan `let` ishlatilganida `CreatePerIterationEnvironment` abstract operation har iteratsiyada yangi Environment Record yaratadi va loop variable'ning joriy qiymatini copy qiladi. `var` uchun bunday mexanizm yo'q — faqat bitta VariableEnvironment binding.
 
----
+</details>
 
-## Savol 5: Closure va memory haqida nima bilasiz? [Senior]
+### 3. Closure va memory haqida nima bilasiz? [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Closure tashqi scope'ning Environment Record'ini heap'da **tirik saqlaydi** — GC closure reference mavjud ekan bu record'ni tozalay olmaydi.
 
@@ -189,224 +111,23 @@ function example() {
 // used closure orqali tirik qoladi
 ```
 
-**LEKIN:** `eval()` yoki `debugger` ishlatilsa — V8 qaysi o'zgaruvchilar kerak bo'lishini aniqlay olmaydi va **barcha** o'zgaruvchilarni Context'ga ko'chiradi. Bu memory leak'ga olib kelishi mumkin.
+**LEKIN:** dinamik kod baholash yoki `debugger` ishlatilsa — V8 qaysi o'zgaruvchilar kerak bo'lishini aniqlay olmaydi va **barcha** o'zgaruvchilarni Context'ga ko'chiradi. Bu memory leak'ga olib kelishi mumkin.
 
 Memory leak'larning asosiy sabablari:
 - `setInterval` to'xtatilmasa → closure abadiy tirik
 - DOM event listener remove qilinmasa → closure saqlanadi
 - Katta data closure scope'da qolsa → GC tozalay olmaydi
 
----
+**Deep Dive:**
 
-## Savol 6: Quyidagi kodning output'i nima? [Middle+]
+V8 da closure ishlatgan o'zgaruvchilar maxsus `Context` object'iga ko'chiriladi — bu heap-allocated structure. V8 parser `VariableResolver` fazasida har bir o'zgaruvchining `is_used_in_closure` flagini belgilaydi. Faqat shu flag true bo'lgan o'zgaruvchilar `ScopeInfo` ga yoziladi va Context'ga allocate qilinadi. Qolganlari stack frame'da qoladi va funksiya tugaganda avtomatik tozalanadi.
 
-```javascript
-function create() {
-  var result = [];
-  for (var i = 0; i < 3; i++) {
-    result.push(function() {
-      return i;
-    });
-  }
-  return result;
-}
+</details>
 
-const fns = create();
-console.log(fns[0]()); // ?
-console.log(fns[1]()); // ?
-console.log(fns[2]()); // ?
-```
+### 4. `once()`, `debounce()`, `throttle()` — bularning closure bilan aloqasi nima? [Middle+]
 
-**Javob:**
-
-```
-3
-3
-3
-```
-
-Bu klassik loop + closure muammosi. `var i` bitta binding — loop tugaganda `i = 3`. Barcha 3 ta funksiya shu bitta `i` ga reference saqlaydi → barchasi `3` qaytaradi.
-
-Tuzatish: `let` ishlatish yoki IIFE bilan har iteratsiyada yangi scope yaratish.
-
-```javascript
-// let bilan:
-for (let i = 0; i < 3; i++) {
-  result.push(function() { return i; });
-}
-// fns[0]() → 0, fns[1]() → 1, fns[2]() → 2
-```
-
----
-
-## Savol 7: Closure yordamida private variable yarating [Middle]
-
-**Savol:** `createPerson(name, age)` funksiyasini yozing. `name` va `age` tashqaridan to'g'ridan-to'g'ri o'zgartirilishi mumkin bo'lmasin. Faqat `getName()`, `getAge()`, `setAge(newAge)` (validation bilan) method'lari bo'lsin.
-
-**Javob:**
-
-```javascript
-function createPerson(name, age) {
-  let _name = name;
-  let _age = age;
-
-  return {
-    getName() {
-      return _name;
-    },
-    getAge() {
-      return _age;
-    },
-    setAge(newAge) {
-      if (typeof newAge !== "number" || newAge < 0 || newAge > 150) {
-        throw new Error("Invalid age");
-      }
-      _age = newAge;
-    },
-    toString() {
-      return `${_name} (${_age})`;
-    }
-  };
-}
-
-const person = createPerson("Alice", 25);
-console.log(person.getName()); // "Alice"
-person.setAge(26);
-console.log(person.getAge());  // 26
-
-// Private — tashqaridan kirish imkonsiz:
-console.log(person._name); // undefined
-person._name = "Hacker";   // yangi property, closure'dagi _name'ga tegmaydi
-console.log(person.getName()); // "Alice" — original saqlanadi
-```
-
-Bu pattern **encapsulation** — ichki holatni tashqi dunyodan himoya qilish. ES2022 da `class` ichida `#private` fields kiritilgan, lekin closure-based encapsulation functional code'da hali keng ishlatiladi.
-
----
-
-## Savol 8: `memoize` funksiyasini implement qiling [Middle+]
-
-**Javob:**
-
-```javascript
-function memoize(fn) {
-  const cache = new Map();
-  // cache closure ichida — tashqaridan accessible emas
-
-  return function (...args) {
-    const key = JSON.stringify(args);
-
-    if (cache.has(key)) {
-      return cache.get(key);
-    }
-
-    const result = fn.apply(this, args);
-    cache.set(key, result);
-    return result;
-  };
-}
-
-// Test:
-let callCount = 0;
-const factorial = memoize(function (n) {
-  callCount++;
-  if (n <= 1) return 1;
-  return n * factorial(n - 1);
-});
-
-console.log(factorial(5));  // 120 (hisobladi — callCount = 5)
-console.log(factorial(5));  // 120 (cache'dan — callCount o'zgarmadi)
-console.log(factorial(3));  // 6 (cache'dan — 3 allaqachon hisoblangan)
-```
-
-Cheklovlar: `JSON.stringify` bilan key yaratish — object argument'larda reference identity yo'qoladi. Production'da `WeakMap` (object key'lar uchun) yoki custom hash funksiya ishlatiladi.
-
----
-
-## Savol 9: Quyidagi kodda xato toping va tuzating [Middle+]
-
-```javascript
-function setupClickHandlers() {
-  const buttons = document.querySelectorAll(".btn");
-
-  for (var i = 0; i < buttons.length; i++) {
-    buttons[i].addEventListener("click", function() {
-      alert("Button " + i + " clicked");
-    });
-  }
-}
-```
-
-**Javob:**
-
-**Xato:** Barcha button'lar click qilinganda `"Button [buttons.length] clicked"` ko'rsatadi. Sabab: `var i` bitta binding, barcha callback'lar loop tugagandan keyingi `i` qiymatini ko'radi.
-
-**Tuzatish:**
-
-```javascript
-// ✅ Eng oddiy — let ishlatish:
-function setupClickHandlers() {
-  const buttons = document.querySelectorAll(".btn");
-
-  for (let i = 0; i < buttons.length; i++) {
-    buttons[i].addEventListener("click", function() {
-      alert("Button " + i + " clicked");
-    });
-  }
-}
-
-// ✅ Yoki forEach:
-function setupClickHandlers() {
-  document.querySelectorAll(".btn").forEach((button, index) => {
-    button.addEventListener("click", () => {
-      alert("Button " + index + " clicked");
-    });
-  });
-}
-```
-
----
-
-## Savol 10: Quyidagi kodning output'i nima? [Senior]
-
-```javascript
-function outer() {
-  var x = 10;
-
-  function inner() {
-    console.log(x); // A
-    var x = 20;
-    console.log(x); // B
-  }
-
-  inner();
-}
-
-outer();
-```
-
-**Javob:**
-
-```
-A: undefined
-B: 20
-```
-
-Bu **hoisting + shadowing + closure** kombinatsiyasi:
-
-1. `inner()` ichida `var x = 20` bor — `var x` hoist bo'ladi (Creation Phase da `x = undefined`)
-2. Bu local `x` tashqi `x = 10` ni **shadow** qiladi
-3. **A:** `console.log(x)` — local `x` ko'riladi (`undefined`), tashqi `x = 10` shadow bo'lgan
-4. `x = 20` assign bo'ladi
-5. **B:** `console.log(x)` — local `x = 20`
-
-Agar `inner()` ichida `var x = 20` bo'lmaganida — A qatorda `10` chiqardi (closure orqali tashqi scope). Lekin `var x` hoisting tufayli local binding yaratildi va shadowing sodir bo'ldi.
-
----
-
-## Savol 11: `once()`, `debounce()`, `throttle()` — bularning closure bilan aloqasi nima? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Bu uchta utility funksiya closure'ning eng ko'p ishlatiladigan real-world pattern'lari:
 
@@ -455,11 +176,12 @@ function throttle(fn, interval) {
 
 Barchasida bir xil pattern: **closure ichida state saqlash** (`called`, `timerId`, `lastTime`). Tashqaridan bu state'ni o'zgartirish mumkin emas.
 
----
+</details>
 
-## Savol 12: Closure va this ning farqi nima? [Senior]
+### 5. Closure va this ning farqi nima? [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Closure va `this` — ikkalasi ham funksiya kontekstiga tegishli, lekin tamoman farqli mexanizmlar:
 
@@ -495,59 +217,29 @@ const closureFn = obj.getNameClosure();
 const thisFn = obj.getNameThis();
 
 console.log(closureFn());     // "Object" — closure, doim bir xil
-console.log(thisFn());        // undefined (strict) yoki "Global" (non-strict)
+
+// thisFn() natijasi environment va strict mode'ga bog'liq:
+console.log(thisFn());
+// Strict mode (modul yoki "use strict"): TypeError — `this = undefined`,
+//    `undefined.name` → "Cannot read properties of undefined (reading 'name')"
+// Non-strict browser: ""  — `this = window`, `window.name` built-in default ""
+// Non-strict Node.js: undefined — `this = global`, `global.name` yo'q
 ```
+
+Muhim xulosa: `thisFn` obj'dan olingan bo'lsa ham, **bare call** (`thisFn()`) paytida `this` obj'ga **bog'lanmaydi**. Closure outer `obj.name` ga avtomatik reference saqlamaydi — `this` har chaqiruvda runtime'da qaytadan hal qilinadi. Bu "this yo'qotish" (lost this) muammosi — ko'p hollarda `.bind(obj)` yoki arrow function bilan hal qilinadi.
 
 Arrow function bu ikki mexanizmni birlashtiradi: scope bo'yicha o'zgaruvchilarni, lexical ravishda `this` ni oladi.
 
----
+**Deep Dive:**
 
-## Savol 13: Quyidagi kodning output'i nima? [Senior]
+Spec bo'yicha closure'ning `[[Environment]]` sloti `NewFunctionEnvironment` yaratilganda o'rnatiladi. `this` esa alohida mexanizm — ordinary function'da har chaqiruvda `[[Call]](thisArgument)` orqali yangi `this` binding beriladi. Arrow function'da esa `[[ThisMode]]` `"lexical"` bo'lgani uchun `this` resolving tashqi Environment Record'ga delegatsiya qilinadi — bu ham closure kabi `[[Environment]]` chain orqali ishlaydi.
 
-```javascript
-function createFunctions() {
-  var result = [];
-  for (var i = 0; i < 3; i++) {
-    result.push(
-      (function (j) {
-        return function () {
-          return j;
-        };
-      })(i)
-    );
-  }
-  return result;
-}
+</details>
 
-const fns = createFunctions();
-console.log(fns[0]()); // ?
-console.log(fns[1]()); // ?
-console.log(fns[2]()); // ?
-```
+### 6. Stale closure nima? Real-world misolini ko'rsating [Senior]
 
-**Javob:**
-
-```
-0
-1
-2
-```
-
-IIFE yordamida loop + closure muammosining yechimi. Har iteratsiyada IIFE chaqiriladi va `i` ning joriy qiymati `j` parametriga copy bo'ladi. IIFE ichidagi funksiya `j` ga closure hosil qiladi.
-
-```
-Iteratsiya 0: IIFE(0) → j = 0 → closure { j: 0 }
-Iteratsiya 1: IIFE(1) → j = 1 → closure { j: 1 }
-Iteratsiya 2: IIFE(2) → j = 2 → closure { j: 2 }
-```
-
-IIFE har chaqiruvda yangi scope yaratadi — `var` ning bitta binding muammosi hal bo'ladi. Zamonaviy JavaScript'da `let` ishlatish ancha oddiy.
-
----
-
-## Savol 14: Stale closure nima? Real-world misolini ko'rsating [Senior]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Stale closure — closure'ning **eskirgan** (outdated) qiymatga reference saqlashi. Closure yaratilganidan keyin tashqi o'zgaruvchi o'zgargan, lekin closure hali eski environment'ni ko'rayotgan bo'lsa — stale closure.
 
@@ -595,59 +287,16 @@ const ref = { current: null };
 // closure ref object'ga reference saqlaydi → ref.current doim yangi
 ```
 
----
+**Deep Dive:**
 
-## Savol 15: Closure bilan module pattern implement qiling [Middle]
+Stale closure muammosi React'da `useEffect` va `useCallback` hook'larida ko'p uchraydi. React'ning Fiber arxitekturasida har render yangi closure yaratadi, lekin eski effect callback hali ham oldingi render'dagi closure'ni ishlatishi mumkin. `useRef` bu muammoni hal qiladi — chunki ref object reference identity o'zgarmaydi, faqat `.current` property yangilanadi, va closure ref object'ning o'ziga reference saqlaydi.
 
-**Savol:** IIFE + closure yordamida `TodoModule` yarating: `addTodo(text)`, `removeTodo(id)`, `getTodos()`, `getCount()`.
+</details>
 
-**Javob:**
+### 7. V8 closure'ni qanday optimizatsiya qiladi? [Senior]
 
-```javascript
-const TodoModule = (function () {
-  const todos = [];
-  let nextId = 1;
-
-  function findIndex(id) {
-    return todos.findIndex(todo => todo.id === id);
-  }
-
-  return {
-    addTodo(text) {
-      const todo = { id: nextId++, text, completed: false };
-      todos.push(todo);
-      return todo;
-    },
-
-    removeTodo(id) {
-      const index = findIndex(id);
-      if (index === -1) return false;
-      todos.splice(index, 1);
-      return true;
-    },
-
-    getTodos() {
-      return todos.map(t => ({ ...t })); // copy qaytaradi
-    },
-
-    getCount() {
-      return todos.length;
-    }
-  };
-})();
-
-TodoModule.addTodo("Learn closures");
-console.log(TodoModule.getCount()); // 1
-console.log(TodoModule.todos);      // undefined — private
-```
-
-IIFE darhol bajariladi va object qaytaradi. `todos`, `nextId`, `findIndex` — IIFE scope'da, tashqaridan ko'rinmaydi.
-
----
-
-## Savol 16: V8 closure'ni qanday optimizatsiya qiladi? [Senior]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 V8 closure'lar uchun bir nechta optimizatsiya qo'llaydi:
 
@@ -667,8 +316,8 @@ function example() {
 Closure ichidagi variable access cache'lanadi — har safar scope chain bo'ylab yurmasdan, to'g'ridan-to'g'ri Context object'dagi index orqali murojaat.
 
 **3. Optimizatsiyani buzadigan narsalar:**
-- `eval()` — barcha o'zgaruvchilar Context'ga ko'chiriladi
-- `debugger` statement — xuddi eval kabi
+- Dinamik kod baholash — barcha o'zgaruvchilar Context'ga ko'chiriladi
+- `debugger` statement — yuqoridagi bilan bir xil ta'sir
 - `with` statement — scope chain dynamic bo'ladi
 
 **4. Prototype method vs Closure method:**
@@ -681,48 +330,16 @@ Closure ichidagi variable access cache'lanadi — har safar scope chain bo'ylab 
 
 Kichik miqdor uchun farq sezilmaydi. Minglab instance da prototype samaraliroq.
 
----
+**Deep Dive:**
 
-## Savol 17: Quyidagi kodning output'i nima? [Middle+]
+V8 da Context object har bir closure uchun heap'da alohida allocate qilinadi. Agar funksiya 5 ta o'zgaruvchini capture qilsa — Context object 5 slot'li bo'ladi. V8 `--trace-contexts` flag bilan Context allocation'ni kuzatish mumkin. Prototype method'lar esa `SharedFunctionInfo` orqali bitta bytecode va bitta feedback vector'ni share qiladi — memory va JIT compilation overhead sezilarli kamayadi.
 
-```javascript
-let x = 1;
+</details>
 
-function outer() {
-  let x = 2;
+### 8. Closure bilan private method'larni qanday yaratasiz? Class `#private` dan farqi nima? [Senior]
 
-  function inner() {
-    x++;
-    console.log(x);
-  }
-
-  return inner;
-}
-
-const fn = outer();
-fn(); // ?
-fn(); // ?
-console.log(x); // ?
-```
-
-**Javob:**
-
-```
-3
-4
-1
-```
-
-- `fn = outer()` — inner closure hosil qildi, outer scope'dagi `x = 2` ga reference
-- `fn()` 1-chaqiruv: `x++` → outer scope'dagi `x: 2 → 3`, output: `3`
-- `fn()` 2-chaqiruv: `x++` → outer scope'dagi `x: 3 → 4`, output: `4`
-- `console.log(x)` — **global** scope'dagi `x = 1`. Closure outer scope'dagi `x` ni o'zgartirdi, global `x` ga tegmadi (shadowing).
-
----
-
-## Savol 18: Closure bilan private method'larni qanday yaratasiz? Class `#private` dan farqi nima? [Senior]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **Closure-based privacy:**
 ```javascript
@@ -766,4 +383,447 @@ class Validator {
 
 Closure — functional style, class `#private` — OOP style. Ikkalasi ham haqiqiy privacy beradi. Tanlash loyiha arxitekturasiga bog'liq.
 
+**Deep Dive:**
+
+Class `#private` fields V8 ichida `PrivateNameDescriptor` orqali implement qilingan — har bir private field class yaratilganda noyob `Private Name` (Symbol-ga o'xshash, lekin spec'da alohida tur) oladi. Bu field'ga kirish `[[PrivateName]]` internal slot'da saqlangan nom orqali amalga oshadi. Closure-based privacy esa scope mechanism orqali — o'zgaruvchi boshqa scope'dan accessible emas. Ikkalasi ham runtime enforcement beradi, lekin private fields `in` operator bilan brand-check imkonini beradi.
+
+</details>
+
 ---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Quyidagi kodning output'i nima? [Middle]
+
+```javascript
+function createCounter() {
+  let count = 0;
+
+  return {
+    increment: () => ++count,
+    decrement: () => --count,
+    getCount: () => count
+  };
+}
+
+const c1 = createCounter();
+const c2 = createCounter();
+
+c1.increment();
+c1.increment();
+c1.increment();
+c2.increment();
+
+console.log(c1.getCount()); // ?
+console.log(c2.getCount()); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+3
+1
+```
+
+Har bir `createCounter()` chaqiruvi **yangi scope** (Environment Record) yaratadi. `c1` va `c2` **alohida** scope'larga closure hosil qilgan — bir-biriga ta'sir qilmaydi.
+
+- `c1` scope: count 0 → 1 → 2 → 3
+- `c2` scope: count 0 → 1
+
+`increment`, `decrement`, `getCount` bir scope'da yaratilgan "aka-uka" funksiyalar — barchasi bitta `count` binding'ga reference saqlaydi. Lekin `c1` va `c2` ning `count` lari boshqa-boshqa binding'lar.
+
+</details>
+
+### 2. Closure reference saqlashini ko'rsating [Middle]
+
+**Savol:** Quyidagi kodning output'i nima?
+
+```javascript
+function outer() {
+  let value = 1;
+
+  function getValue() { return value; }
+  function setValue(v) { value = v; }
+
+  return { getValue, setValue };
+}
+
+const obj = outer();
+console.log(obj.getValue()); // ?
+obj.setValue(100);
+console.log(obj.getValue()); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+1
+100
+```
+
+`getValue` va `setValue` bir xil scope'da yaratilgan — ikkalasi **bitta `value` binding'ga** reference saqlaydi. `setValue(100)` shu binding'ni o'zgartiradi → `getValue()` yangi qiymatni ko'radi.
+
+Bu closure'ning eng muhim xususiyati: **reference saqlaydi, copy emas**. Agar copy saqlansa edi — `setValue` o'zgartirganda `getValue` eski qiymatni qaytargan bo'lardi.
+
+```
+Memory model:
+outer Environment Record: { value: 1 → 100 }
+                              ↑            ↑
+getValue reference ──────────┘            │
+setValue reference ───────────────────────┘
+// Bitta binding — ikki funksiya ko'radi
+```
+
+</details>
+
+### 3. Quyidagi kodning output'i nima? [Middle+]
+
+```javascript
+function create() {
+  var result = [];
+  for (var i = 0; i < 3; i++) {
+    result.push(function() {
+      return i;
+    });
+  }
+  return result;
+}
+
+const fns = create();
+console.log(fns[0]()); // ?
+console.log(fns[1]()); // ?
+console.log(fns[2]()); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+3
+3
+3
+```
+
+Bu klassik loop + closure muammosi. `var i` bitta binding — loop tugaganda `i = 3`. Barcha 3 ta funksiya shu bitta `i` ga reference saqlaydi → barchasi `3` qaytaradi.
+
+Tuzatish: `let` ishlatish yoki IIFE bilan har iteratsiyada yangi scope yaratish.
+
+```javascript
+// let bilan:
+for (let i = 0; i < 3; i++) {
+  result.push(function() { return i; });
+}
+// fns[0]() → 0, fns[1]() → 1, fns[2]() → 2
+```
+
+</details>
+
+### 4. Closure yordamida private variable yarating [Middle]
+
+**Savol:** `createPerson(name, age)` funksiyasini yozing. `name` va `age` tashqaridan to'g'ridan-to'g'ri o'zgartirilishi mumkin bo'lmasin. Faqat `getName()`, `getAge()`, `setAge(newAge)` (validation bilan) method'lari bo'lsin.
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+function createPerson(name, age) {
+  let _name = name;
+  let _age = age;
+
+  return {
+    getName() {
+      return _name;
+    },
+    getAge() {
+      return _age;
+    },
+    setAge(newAge) {
+      if (typeof newAge !== "number" || newAge < 0 || newAge > 150) {
+        throw new Error("Invalid age");
+      }
+      _age = newAge;
+    },
+    toString() {
+      return `${_name} (${_age})`;
+    }
+  };
+}
+
+const person = createPerson("Alice", 25);
+console.log(person.getName()); // "Alice"
+person.setAge(26);
+console.log(person.getAge());  // 26
+
+// Private — tashqaridan kirish imkonsiz:
+console.log(person._name); // undefined
+person._name = "Hacker";   // yangi property, closure'dagi _name'ga tegmaydi
+console.log(person.getName()); // "Alice" — original saqlanadi
+```
+
+Bu pattern **encapsulation** — ichki holatni tashqi dunyodan himoya qilish. ES2022 da `class` ichida `#private` fields kiritilgan, lekin closure-based encapsulation functional code'da hali keng ishlatiladi.
+
+</details>
+
+### 5. `memoize` funksiyasini implement qiling [Middle+]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+function memoize(fn) {
+  const cache = new Map();
+  // cache closure ichida — tashqaridan accessible emas
+
+  return function (...args) {
+    const key = JSON.stringify(args);
+
+    if (cache.has(key)) {
+      return cache.get(key);
+    }
+
+    const result = fn.apply(this, args);
+    cache.set(key, result);
+    return result;
+  };
+}
+
+// Test:
+let callCount = 0;
+const factorial = memoize(function (n) {
+  callCount++;
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);
+});
+
+console.log(factorial(5));  // 120 (hisobladi — callCount = 5)
+console.log(factorial(5));  // 120 (cache'dan — callCount o'zgarmadi)
+console.log(factorial(3));  // 6 (cache'dan — 3 allaqachon hisoblangan)
+```
+
+Cheklovlar: `JSON.stringify` bilan key yaratish — object argument'larda reference identity yo'qoladi. Production'da `WeakMap` (object key'lar uchun) yoki custom hash funksiya ishlatiladi.
+
+</details>
+
+### 6. Quyidagi kodda xato toping va tuzating [Middle+]
+
+```javascript
+function setupClickHandlers() {
+  const buttons = document.querySelectorAll(".btn");
+
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].addEventListener("click", function() {
+      alert("Button " + i + " clicked");
+    });
+  }
+}
+```
+
+<details>
+<summary>Javob</summary>
+
+**Xato:** Barcha button'lar click qilinganda `"Button [buttons.length] clicked"` ko'rsatadi. Sabab: `var i` bitta binding, barcha callback'lar loop tugagandan keyingi `i` qiymatini ko'radi.
+
+**Tuzatish:**
+
+```javascript
+// ✅ Eng oddiy — let ishlatish:
+function setupClickHandlers() {
+  const buttons = document.querySelectorAll(".btn");
+
+  for (let i = 0; i < buttons.length; i++) {
+    buttons[i].addEventListener("click", function() {
+      alert("Button " + i + " clicked");
+    });
+  }
+}
+
+// ✅ Yoki forEach:
+function setupClickHandlers() {
+  document.querySelectorAll(".btn").forEach((button, index) => {
+    button.addEventListener("click", () => {
+      alert("Button " + index + " clicked");
+    });
+  });
+}
+```
+
+</details>
+
+### 7. Quyidagi kodning output'i nima? [Senior]
+
+```javascript
+function outer() {
+  var x = 10;
+
+  function inner() {
+    console.log(x); // A
+    var x = 20;
+    console.log(x); // B
+  }
+
+  inner();
+}
+
+outer();
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+A: undefined
+B: 20
+```
+
+Bu **hoisting + shadowing + closure** kombinatsiyasi:
+
+1. `inner()` ichida `var x = 20` bor — `var x` hoist bo'ladi (Creation Phase da `x = undefined`)
+2. Bu local `x` tashqi `x = 10` ni **shadow** qiladi
+3. **A:** `console.log(x)` — local `x` ko'riladi (`undefined`), tashqi `x = 10` shadow bo'lgan
+4. `x = 20` assign bo'ladi
+5. **B:** `console.log(x)` — local `x = 20`
+
+Agar `inner()` ichida `var x = 20` bo'lmaganida — A qatorda `10` chiqardi (closure orqali tashqi scope). Lekin `var x` hoisting tufayli local binding yaratildi va shadowing sodir bo'ldi.
+
+**Deep Dive:**
+
+Bu holatda V8 `inner` funksiya uchun tashqi `x` ga closure hosil qilMAYDI — chunki `inner` ichida o'zining `var x` bor. Parser scope resolution vaqtida `x` ni local scope'da topadi va `CONTEXT_ALLOCATED` emas, `STACK_ALLOCATED` qiladi. Agar local `var x` bo'lmaganida — `x` tashqi scope'ning Context object'iga reference orqali closure hosil qilgan bo'lardi.
+
+</details>
+
+### 8. Quyidagi kodning output'i nima? [Senior]
+
+```javascript
+function createFunctions() {
+  var result = [];
+  for (var i = 0; i < 3; i++) {
+    result.push(
+      (function (j) {
+        return function () {
+          return j;
+        };
+      })(i)
+    );
+  }
+  return result;
+}
+
+const fns = createFunctions();
+console.log(fns[0]()); // ?
+console.log(fns[1]()); // ?
+console.log(fns[2]()); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+0
+1
+2
+```
+
+IIFE yordamida loop + closure muammosining yechimi. Har iteratsiyada IIFE chaqiriladi va `i` ning joriy qiymati `j` parametriga copy bo'ladi. IIFE ichidagi funksiya `j` ga closure hosil qiladi.
+
+```
+Iteratsiya 0: IIFE(0) → j = 0 → closure { j: 0 }
+Iteratsiya 1: IIFE(1) → j = 1 → closure { j: 1 }
+Iteratsiya 2: IIFE(2) → j = 2 → closure { j: 2 }
+```
+
+IIFE har chaqiruvda yangi scope yaratadi — `var` ning bitta binding muammosi hal bo'ladi. Zamonaviy JavaScript'da `let` ishlatish ancha oddiy.
+
+**Deep Dive:**
+
+IIFE yechimi ishlashining sababi: har bir IIFE chaqiruvi `FunctionDeclarationInstantiation` orqali yangi Environment Record yaratadi va `j` parametri shu record'ga `CreateMutableBinding` + `InitializeBinding(i)` bilan yoziladi. Ichki funksiya shu record'ga `[[Environment]]` orqali closure hosil qiladi. Natijada har bir closure alohida Environment Record'dagi alohida `j` binding'ga ega bo'ladi.
+
+</details>
+
+### 9. Closure bilan module pattern implement qiling [Middle]
+
+**Savol:** IIFE + closure yordamida `TodoModule` yarating: `addTodo(text)`, `removeTodo(id)`, `getTodos()`, `getCount()`.
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+const TodoModule = (function () {
+  const todos = [];
+  let nextId = 1;
+
+  function findIndex(id) {
+    return todos.findIndex(todo => todo.id === id);
+  }
+
+  return {
+    addTodo(text) {
+      const todo = { id: nextId++, text, completed: false };
+      todos.push(todo);
+      return todo;
+    },
+
+    removeTodo(id) {
+      const index = findIndex(id);
+      if (index === -1) return false;
+      todos.splice(index, 1);
+      return true;
+    },
+
+    getTodos() {
+      return todos.map(t => ({ ...t })); // copy qaytaradi
+    },
+
+    getCount() {
+      return todos.length;
+    }
+  };
+})();
+
+TodoModule.addTodo("Learn closures");
+console.log(TodoModule.getCount()); // 1
+console.log(TodoModule.todos);      // undefined — private
+```
+
+IIFE darhol bajariladi va object qaytaradi. `todos`, `nextId`, `findIndex` — IIFE scope'da, tashqaridan ko'rinmaydi.
+
+</details>
+
+### 10. Quyidagi kodning output'i nima? [Middle+]
+
+```javascript
+let x = 1;
+
+function outer() {
+  let x = 2;
+
+  function inner() {
+    x++;
+    console.log(x);
+  }
+
+  return inner;
+}
+
+const fn = outer();
+fn(); // ?
+fn(); // ?
+console.log(x); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+3
+4
+1
+```
+
+- `fn = outer()` — inner closure hosil qildi, outer scope'dagi `x = 2` ga reference
+- `fn()` 1-chaqiruv: `x++` → outer scope'dagi `x: 2 → 3`, output: `3`
+- `fn()` 2-chaqiruv: `x++` → outer scope'dagi `x: 3 → 4`, output: `4`
+- `console.log(x)` — **global** scope'dagi `x = 1`. Closure outer scope'dagi `x` ni o'zgartirdi, global `x` ga tegmadi (shadowing).
+
+</details>

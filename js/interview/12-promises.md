@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Promise nima? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Promise nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 Promise — asinxron operatsiyaning kelajakdagi natijasini ifodalovchi **state machine**. U uchta holatdan birida bo'ladi:
 
@@ -26,11 +29,12 @@ promise
 
 Eng muhim xususiyat: Promise **faqat bir marta** settle bo'ladi — pending dan fulfilled yoki rejected ga. Qayta o'zgarmaydi.
 
----
+</details>
 
-## Savol 2: Promise constructor qanday ishlaydi? [Middle]
+### 2. Promise constructor qanday ishlaydi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `new Promise(executor)` — executor funksiya **sinxron** chaqiriladi va `resolve`, `reject` argumentlar oladi.
 
@@ -53,11 +57,12 @@ Muhim nuqtalar:
 - Faqat **birinchi** `resolve` yoki `reject` hisobga olinadi, keyingilari ignored
 - Executor ichida `throw` → avtomatik `reject(error)`
 
----
+</details>
 
-## Savol 3: `.then()`, `.catch()`, `.finally()` farqi nima? [Middle]
+### 3. `.then()`, `.catch()`, `.finally()` farqi nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Method | Qachon ishlaydi | Argument | Qaytaradi | Qiymatni o'zgartiradi? |
 |--------|----------------|----------|-----------|----------------------|
@@ -85,11 +90,12 @@ Promise.reject(new Error("xato"))
   .then(val => console.log("Davom:", val)); // "Davom: default"
 ```
 
----
+</details>
 
-## Savol 4: Promise.all() va Promise.allSettled() farqi nima? [Middle]
+### 4. Promise.all() va Promise.allSettled() farqi nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | | `Promise.all()` | `Promise.allSettled()` |
 |---|---|---|
@@ -119,11 +125,12 @@ Promise.allSettled(promises).then(results => {
 });
 ```
 
----
+</details>
 
-## Savol 5: Promise.race() va Promise.any() farqi nima? [Middle+]
+### 5. Promise.race() va Promise.any() farqi nima? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | | `Promise.race()` | `Promise.any()` |
 |---|---|---|
@@ -145,43 +152,12 @@ Promise.any(promises).then(val => console.log("any:", val));
 // "any: ok" — reject skip, birinchi fulfilled
 ```
 
----
+</details>
 
-## Savol 6: Quyidagi kodning output ini ayting [Middle+]
+### 6. Error propagation qanday ishlaydi? [Middle]
 
-**Savol:**
-
-```javascript
-console.log("1");
-
-new Promise(resolve => {
-  console.log("2");
-  resolve();
-  console.log("3");
-}).then(() => {
-  console.log("4");
-});
-
-console.log("5");
-```
-
-**Javob:**
-
-Output: **1, 2, 3, 5, 4**
-
-```
-1 — sync
-2 — Promise constructor SYNC ishlaydi!
-3 — resolve() funksiyani to'xtatmaydi
-5 — sync (main script davom etadi)
-4 — .then() callback — microtask (sync tugagandan keyin)
-```
-
----
-
-## Savol 7: Error propagation qanday ishlaydi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Promise chain'da xato `.catch()` topilguncha barcha `.then()`'larni **skip** qiladi:
 
@@ -203,11 +179,81 @@ Promise.resolve("start")
 - `.catch()` ichida `return` → chain **recovered** (fulfilled)
 - `.catch()` ichida `throw` → xato davom etadi
 
+</details>
+
+### 7. Promise.withResolvers() nima? (ES2024) [Middle+]
+
+<details>
+<summary>Javob</summary>
+
+`Promise.withResolvers()` — `{ promise, resolve, reject }` object qaytaradi. `resolve`/`reject` ni Promise'dan tashqarida ishlatish mumkin:
+
+```javascript
+// ❌ Eski usul:
+let resolve, reject;
+const p = new Promise((res, rej) => { resolve = res; reject = rej; });
+
+// ✅ Yangi usul (ES2024):
+const { promise, resolve, reject } = Promise.withResolvers();
+setTimeout(() => resolve("tayyor"), 1000);
+promise.then(val => console.log(val)); // "tayyor"
+```
+
+Real use case — event-based resolve:
+
+```javascript
+function waitForClick(element) {
+  const { promise, resolve } = Promise.withResolvers();
+  element.addEventListener("click", resolve, { once: true });
+  return promise;
+}
+
+const event = await waitForClick(button);
+```
+
+</details>
+
 ---
 
-## Savol 8: `Promise.all()` ni implement qiling [Middle+]
+## Amaliy savollar (Coding Challenges)
 
-**Javob:**
+### 1. Quyidagi kodning output'ini ayting [Middle+]
+
+**Savol:**
+
+```javascript
+console.log("1");
+
+new Promise(resolve => {
+  console.log("2");
+  resolve();
+  console.log("3");
+}).then(() => {
+  console.log("4");
+});
+
+console.log("5");
+```
+
+<details>
+<summary>Javob</summary>
+
+Output: **1, 2, 3, 5, 4**
+
+```
+1 — sync
+2 — Promise constructor SYNC ishlaydi!
+3 — resolve() funksiyani to'xtatmaydi
+5 — sync (main script davom etadi)
+4 — .then() callback — microtask (sync tugagandan keyin)
+```
+
+</details>
+
+### 2. `Promise.all()` ni implement qiling [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function myPromiseAll(promises) {
@@ -235,11 +281,12 @@ Muhim detaillar:
 - `results[i]` — **index** bo'yicha saqlash tartibni kafolatlaydi (qaysi birinchi tugashidan qat'i nazar)
 - Promise faqat bir marta settle — birinchi `reject` dan keyin qolganlari ignored
 
----
+</details>
 
-## Savol 9: `Promise.allSettled()` ni implement qiling [Senior]
+### 3. `Promise.allSettled()` ni implement qiling [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function myPromiseAllSettled(promises) {
@@ -282,11 +329,12 @@ myPromiseAllSettled([
 
 Farqi `Promise.all` dan: bu yerda `reject` **chaqirilmaydi** — har doim `resolve`. `.catch()` ichida ham `results[i]` ga yozamiz. `finally` orqali hammasi tugaganini tekshiramiz.
 
----
+</details>
 
-## Savol 10: `sleep` funksiyasini yozing [Junior+]
+### 4. `sleep` funksiyasini yozing [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function sleep(ms) {
@@ -304,40 +352,9 @@ async function demo() {
 sleep(1000).then(() => console.log("1 soniya o'tdi"));
 ```
 
----
+</details>
 
-## Savol 11: Promise.withResolvers() nima? (ES2024) [Middle+]
-
-**Javob:**
-
-`Promise.withResolvers()` — `{ promise, resolve, reject }` object qaytaradi. `resolve`/`reject` ni Promise'dan tashqarida ishlatish mumkin:
-
-```javascript
-// ❌ Eski usul:
-let resolve, reject;
-const p = new Promise((res, rej) => { resolve = res; reject = rej; });
-
-// ✅ Yangi usul (ES2024):
-const { promise, resolve, reject } = Promise.withResolvers();
-setTimeout(() => resolve("tayyor"), 1000);
-promise.then(val => console.log(val)); // "tayyor"
-```
-
-Real use case — event-based resolve:
-
-```javascript
-function waitForClick(element) {
-  const { promise, resolve } = Promise.withResolvers();
-  element.addEventListener("click", resolve, { once: true });
-  return promise;
-}
-
-const event = await waitForClick(button);
-```
-
----
-
-## Savol 12: Bu kodda nima xato? [Middle+]
+### 5. Bu kodda nima xato? [Middle+]
 
 **Savol:**
 
@@ -348,7 +365,8 @@ new Promise(async (resolve, reject) => {
 });
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **Anti-pattern:** Promise constructor ichida `async` ishlatish.
 
@@ -366,9 +384,9 @@ new Promise((resolve, reject) => {
 });
 ```
 
----
+</details>
 
-## Savol 13: Quyidagi kodning output ini ayting (Tricky) [Senior]
+### 6. Quyidagi kodning output'ini ayting (Tricky) [Senior]
 
 **Savol:**
 
@@ -386,9 +404,10 @@ Promise.resolve()
   .then(() => console.log("E"));
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
-Output: **A, C, D, B, E**
+Output: **A, C, D, E, B**
 
 ```
 Microtask Queue: [then_A, then_C]
@@ -398,23 +417,29 @@ then_A → "A" + return Promise.resolve("B")
 then_C → "C" → then_D queue ga
 
 Queue: [ThenableJob, then_D]
-ThenableJob → resolve("B") → then_B queue ga
+ThenableJob → Promise.resolve("B").then(resolveOuter) → resolveOuter queue ga
 then_D → "D" → then_E queue ga
 
-Queue: [then_B, then_E]
-then_B → "B"
+Queue: [resolveOuter, then_E]
+resolveOuter → resolve("B") → then_B queue ga
 then_E → "E"
+
+Queue: [then_B]
+then_B → "B"
 ```
 
 **Deep Dive:**
 
-`return Promise.resolve("B")` — thenable qaytarish. Spec bo'yicha `PromiseResolveThenableJob` yaratiladi (qo'shimcha microtask tick). Shuning uchun `"B"` `"C"` va `"D"` dan keyin chiqadi.
+`return Promise.resolve("B")` — `.then()` handler'dan thenable qaytarish. Spec (ECMA-262) bo'yicha `PromiseResolveThenableJob` yaratiladi — bu **2 ta qo'shimcha microtask tick** hosil qiladi (ThenableJob + resolveOuter). Shuning uchun `"B"` `"E"` dan ham keyin chiqadi.
 
----
+> **⚠️ Runtime eslatma:** Yuqoridagi tartib **ECMA-262 spec'ga mos** (2 extra tick). Lekin ba'zi V8 versiyalari `.then()` return native Promise uchun **1 tick** optimizatsiya qo'llashi mumkin — bu holda natija `A, C, D, B, E` bo'ladi. Farqli `await` kontekstida V8 7.2+ (ES2020+) 1 tick spec darajasida standardlashtirilgan, lekin `.then()` return uchun spec hali 2 tick talab qiladi. **Interview'da:** "spec bo'yicha 2 tick, lekin runtime optimization tufayli farq bo'lishi mumkin" deb eslatish eng xavfsiz javob.
 
-## Savol 14: Promise.race() ni implement qiling [Middle+]
+</details>
 
-**Javob:**
+### 7. Promise.race() ni implement qiling [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function myPromiseRace(promises) {
@@ -431,11 +456,12 @@ function myPromiseRace(promises) {
 
 Promise faqat bir marta settle — birinchi `resolve` yoki `reject` ishlaydi, qolganlari ignored.
 
----
+</details>
 
-## Savol 15: Retry pattern yozing [Middle+]
+### 8. Retry pattern yozing [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function retry(fn, maxRetries = 3, delay = 1000) {
@@ -456,3 +482,5 @@ retry(() => fetch("/api/data").then(r => {
 ```
 
 Pattern: recursive `.catch()` — xato bo'lganda `delay` ms kutib, `maxRetries - 1` bilan qayta chaqirish. `delay * 2` — har retry'da vaqt ikki baravar oshadi (exponential backoff).
+
+</details>

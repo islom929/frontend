@@ -6,9 +6,12 @@
 
 ---
 
-## Savol 1: Function Declaration, Function Expression va Arrow Function — farqlari nima? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Function Declaration, Function Expression va Arrow Function — farqlari nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 JavaScript da funksiya yaratishning **3 ta asosiy usuli** bor. Ularning farqi hoisting, `this` binding, `arguments`, va `new` bilan chaqirish imkoniyatlarida namoyon bo'ladi.
 
@@ -44,32 +47,12 @@ const arrow = () => console.log(this);
 arrow.call({ name: "Ali" }); // window/global — call e'tiborga olinmadi!
 ```
 
----
+</details>
 
-## Savol 2: Output nima bo'ladi? [Junior+]
+### 2. First-class function nima degani? [Junior+]
 
-```javascript
-console.log(a());  // ?
-console.log(b());  // ?
-console.log(c());  // ?
-
-function a() { return "A"; }
-var b = function() { return "B"; };
-const c = () => "C";
-```
-
-**Javob:**
-- `a()` → `"A"` ✅ — Function Declaration to'liq hoist bo'ladi
-- `b()` → ❌ `TypeError: b is not a function` — `var b` hoist bo'ladi lekin `undefined` qiymati bilan, funksiya tayinlanmagan
-- `c()` ga yetib bormaydi — `b()` da xato bo'lganligi uchun dastur to'xtaydi. Agar alohida tekshirsak: ❌ `ReferenceError: Cannot access 'c' before initialization` — `const` TDZ da
-
-🔍 **Tushuntirish:** Hoisting davomida `function a` to'liq ko'tariladi. `var b` faqat o'zgaruvchi sifatida `undefined` bilan ko'tariladi. `const c` esa TDZ (Temporal Dead Zone) da qoladi.
-
----
-
-## Savol 3: First-class function nima degani? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 JavaScript da funksiyalar — **birinchi darajali fuqaro (first-class citizen)**. Bu degani funksiyalar boshqa qiymatlar (`number`, `string`, `object`) kabi muomala qilinadi:
 
@@ -105,11 +88,12 @@ console.log(validate.name);   // "validate"
 console.log(validate.length); // 1 (parametr soni)
 ```
 
----
+</details>
 
-## Savol 4: IIFE nima? Nima uchun ishlatiladi? [Junior+]
+### 3. IIFE nima? Nima uchun ishlatiladi? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **IIFE** (Immediately Invoked Function Expression) — funksiya yaratilishi bilan darhol chaqiriladi. Scope izolyatsiyasi uchun ishlatiladi.
 
@@ -147,11 +131,12 @@ console.log(validate.length); // 1 (parametr soni)
 
 **Zamonaviy kodda** ES modules va `let`/`const` block scope IIFE ning ko'p use case larini almashtirdi.
 
----
+</details>
 
-## Savol 5: Higher-Order Function (HOF) nima? Misol bering. [Junior+]
+### 4. Higher-Order Function (HOF) nima? Misol bering. [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 HOF — boshqa funksiyani **argument sifatida qabul qiladigan** yoki **funksiyani qaytaradigan** funksiya.
 
@@ -190,11 +175,12 @@ loggedAdd(2, 3);
 
 Built-in HOF lar: `map`, `filter`, `reduce`, `forEach`, `sort`, `setTimeout`, `addEventListener`, `Promise.then`.
 
----
+</details>
 
-## Savol 6: Callback nima? Callback hell nima? [Junior+]
+### 5. Callback nima? Callback hell nima? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Callback — boshqa funksiyaga **argument sifatida beriladigan** funksiya. U HOF tomonidan kerak bo'lganda chaqiriladi.
 
@@ -233,11 +219,12 @@ async function getData(id) {
 }
 ```
 
----
+</details>
 
-## Savol 7: Pure Function nima? Side Effect nima? [Middle]
+### 6. Pure Function nima? Side Effect nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Pure function **ikki shartni** bajaradi:
 1. **Deterministic** — bir xil input doim bir xil output beradi
@@ -282,45 +269,12 @@ function logResult(x) {
 
 **Nima uchun muhim:** Pure function larni test qilish oson, memoize qilsa bo'ladi, parallellashtirsa bo'ladi. **React, Redux, functional programming** — hammasi pure function larga asoslangan.
 
----
+</details>
 
-## Savol 8: Output nima bo'ladi? [Middle]
+### 7. `arguments` vs Rest Parameters — farqi nima? [Middle]
 
-```javascript
-function foo(a, b, c) {
-  console.log(arguments.length);  // ?
-  console.log(arguments[2]);      // ?
-
-  arguments[0] = 100;
-  console.log(a);                 // ?
-}
-
-foo(1, 2, 3);
-```
-
-**Javob:**
-- `arguments.length` → `3` — 3 ta argument berilgan
-- `arguments[2]` → `3` — uchinchi argument
-- `a` → `100` ✅ — **non-strict mode** da `arguments` va named parameter lar **bog'langan** (linked). `arguments[0]` o'zgarganda `a` ham o'zgaradi.
-
-🔍 **Muhim:** Strict mode da bu bog'lanish **buziladi**:
-
-```javascript
-"use strict";
-function foo(a) {
-  arguments[0] = 100;
-  console.log(a); // 1 — bog'lanish yo'q!
-}
-foo(1);
-```
-
-Arrow function da `arguments` **umuman yo'q** — tashqi scope dan qidiradi.
-
----
-
-## Savol 9: `arguments` vs Rest Parameters — farqi nima? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // arguments — array-LIKE object (eski usul)
@@ -360,11 +314,12 @@ logMessage("error", "Server down", "DB timeout");
 
 **Xulosa:** Doim `...rest` parametrlarini ishlating. `arguments` — faqat legacy kod da uchraydi.
 
----
+</details>
 
-## Savol 10: Default Parameters qanday ishlaydi? [Middle]
+### 8. Default Parameters qanday ishlaydi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ES6 dan beri parametrlarga default qiymat berish mumkin. Default qiymat faqat argument `undefined` bo'lganda ishlatiladi (`null` emas!).
 
@@ -400,46 +355,12 @@ function greet(name, greeting = `Salom, ${name}!`) {
 greet("Ali"); // "Salom, Ali!"
 ```
 
----
+</details>
 
-## Savol 11: Output nima bo'ladi? [Middle]
+### 9. Currying nima? [Middle+]
 
-```javascript
-const funcs = [];
-for (var i = 0; i < 3; i++) {
-  funcs.push(function() { return i; });
-}
-console.log(funcs[0]()); // ?
-console.log(funcs[1]()); // ?
-console.log(funcs[2]()); // ?
-```
-
-**Javob:** Hammasi `3` qaytaradi! ✅
-
-🔍 **Tushuntirish:** `var` — function-scoped, bitta `i` bor. Loop tugaganda `i = 3`. Barcha 3 ta funksiya **bir xil** `i` ga closure qilgan — ularning hech biri o'z nusxasiga ega emas.
-
-**Yechimlar:**
-
-```javascript
-// ✅ Yechim 1: let ishlatish (block scope — har iteratsiyada yangi i)
-for (let i = 0; i < 3; i++) {
-  funcs.push(function() { return i; });
-}
-// funcs[0]() → 0, funcs[1]() → 1, funcs[2]() → 2
-
-// ✅ Yechim 2: IIFE bilan (har iteratsiyada yangi scope)
-for (var i = 0; i < 3; i++) {
-  funcs.push((function(j) {
-    return function() { return j; };
-  })(i));
-}
-```
-
----
-
-## Savol 12: Currying nima? Universal `curry` funksiyasini implement qiling. [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Currying — ko'p argumentli funksiyani **birma-bir argument qabul qiluvchi** funksiyalar zanjiriga aylantirish: `f(a, b, c)` → `f(a)(b)(c)`.
 
@@ -458,6 +379,172 @@ function curriedAdd(a) {
 }
 curriedAdd(1)(2)(3); // 6
 ```
+
+| | Currying | Partial Application |
+|---|---------|---------------------|
+| Argumentlar | Doim birma-bir | Bir nechtasini oldindan berish |
+| Qaytaradi | Zanjir funksiyalar | Bitta yangi funksiya |
+| `f(a,b,c)` | `f(a)(b)(c)` | `g = f(a, b); g(c)` |
+| JavaScript da | Maxsus `curry` kerak | `bind` yoki wrapper |
+
+</details>
+
+### 10. Partial Application nima? Currying dan farqi? [Middle+]
+
+<details>
+<summary>Javob</summary>
+
+**Partial Application** — funksiyaning **ba'zi argumentlarini oldindan berish** va qolganlarini keyinroq kutuvchi yangi funksiya olish.
+
+```javascript
+// Currying: f(a, b, c) → f(a)(b)(c) — DOIM birma-bir
+// Partial:  f(a, b, c) → g(c) — ba'zilarini oldindan berib yangi fn olish
+
+// bind bilan partial application
+function greet(greeting, name) {
+  return `${greeting}, ${name}!`;
+}
+const sayHello = greet.bind(null, "Hello"); // greeting = "Hello" qotirildi
+sayHello("Ali");  // "Hello, Ali!"
+sayHello("Vali"); // "Hello, Vali!"
+
+// O'z partial funksiyamiz
+function partial(fn, ...presetArgs) {
+  return function(...laterArgs) {
+    return fn(...presetArgs, ...laterArgs);
+  };
+}
+
+const double = partial(multiply, 2);
+double(5); // 10
+```
+
+</details>
+
+---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Output nima bo'ladi? [Junior+]
+
+```javascript
+console.log(a());  // ?
+console.log(b());  // ?
+console.log(c());  // ?
+
+function a() { return "A"; }
+var b = function() { return "B"; };
+const c = () => "C";
+```
+
+<details>
+<summary>Javob</summary>
+- `a()` → `"A"` ✅ — Function Declaration to'liq hoist bo'ladi
+- `b()` → ❌ `TypeError: b is not a function` — `var b` hoist bo'ladi lekin `undefined` qiymati bilan, funksiya tayinlanmagan
+- `c()` ga yetib bormaydi — `b()` da xato bo'lganligi uchun dastur to'xtaydi. Agar alohida tekshirsak: ❌ `ReferenceError: Cannot access 'c' before initialization` — `const` TDZ da
+
+**Tushuntirish:** Hoisting davomida `function a` to'liq ko'tariladi. `var b` faqat o'zgaruvchi sifatida `undefined` bilan ko'tariladi. `const c` esa TDZ (Temporal Dead Zone) da qoladi.
+
+</details>
+
+### 2. Output nima bo'ladi? [Middle]
+
+```javascript
+function showArgs(a, b, c) {
+  console.log(arguments.length);  // ?
+  console.log(arguments[2]);      // ?
+
+  arguments[0] = 100;
+  console.log(a);                 // ?
+}
+
+showArgs(1, 2, 3);
+```
+
+<details>
+<summary>Javob</summary>
+- `arguments.length` → `3` — 3 ta argument berilgan
+- `arguments[2]` → `3` — uchinchi argument
+- `a` → `100` ✅ — **non-strict mode** va **simple parameter list** (default/rest/destructuring yo'q) bilan `arguments` va named parameter lar **bog'langan** (ParameterMap orqali). `arguments[0]` o'zgarganda `a` ham o'zgaradi.
+
+**Muhim:** ParameterMap (bog'lanish) quyidagi holatlarda **buziladi**:
+
+```javascript
+// 1. Strict mode
+"use strict";
+function f1(a) {
+  arguments[0] = 100;
+  console.log(a); // 1 — bog'lanish yo'q
+}
+
+// 2. Non-strict mode, lekin default parameter bor
+function f2(a = 0) {  // default → ParameterMap bo'sh
+  arguments[0] = 100;
+  console.log(a); // 1 — bog'lanish yo'q, hatto non-strict'da ham
+}
+
+// 3. Non-strict mode, lekin rest parameter bor
+function f3(a, ...rest) {
+  arguments[0] = 100;
+  console.log(a); // 1 — bog'lanish yo'q
+}
+
+// 4. Non-strict mode, lekin destructuring parameter bor
+function f4({a}) {
+  arguments[0] = 100;
+  console.log(a); // original qiymat — bog'lanish yo'q
+}
+```
+
+Spec bo'yicha: **har qanday ES6 parameter feature** (default, rest, destructuring) ParameterMap'ni o'chiradi — hatto non-strict mode'da ham. Faqat klassik `function(a, b, c)` simple list non-strict'da bog'lanishga ega.
+
+Arrow function da `arguments` **umuman yo'q** — tashqi scope dan qidiradi.
+
+</details>
+
+### 3. Output nima bo'ladi? [Middle]
+
+```javascript
+const funcs = [];
+for (var i = 0; i < 3; i++) {
+  funcs.push(function() { return i; });
+}
+console.log(funcs[0]()); // ?
+console.log(funcs[1]()); // ?
+console.log(funcs[2]()); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+Hammasi `3` qaytaradi.
+
+`var` — function-scoped, bitta `i` bor. Loop tugaganda `i = 3`. Barcha 3 ta funksiya **bir xil** `i` ga closure qilgan — ularning hech biri o'z nusxasiga ega emas.
+
+**Yechimlar:**
+
+```javascript
+// ✅ Yechim 1: let ishlatish (block scope — har iteratsiyada yangi i)
+for (let i = 0; i < 3; i++) {
+  funcs.push(function() { return i; });
+}
+// funcs[0]() → 0, funcs[1]() → 1, funcs[2]() → 2
+
+// ✅ Yechim 2: IIFE bilan (har iteratsiyada yangi scope)
+for (var i = 0; i < 3; i++) {
+  funcs.push((function(j) {
+    return function() { return j; };
+  })(i));
+}
+```
+
+
+</details>
+
+### 4. Universal `curry` funksiyasini implement qiling. [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 **Universal `curry` implementation:**
 
@@ -494,49 +581,12 @@ triple(5); // 15
 
 `fn.length` — funksiya kutayotgan parametrlar soni (rest va default parametrlar hisobga olinmaydi). Curry har safar argumentlar yetarli ekanini tekshiradi. Yetmasa — closure orqali avvalgi argumentlarni saqlab yangi funksiya qaytaradi. Bu **lazy evaluation** printsipi.
 
----
+</details>
 
-## Savol 13: Partial Application nima? Currying dan farqi? [Middle+]
+### 5. Function Composition nima? `pipe` va `compose` ni implement qiling. [Senior]
 
-**Javob:**
-
-**Partial Application** — funksiyaning **ba'zi argumentlarini oldindan berish** va qolganlarini keyinroq kutuvchi yangi funksiya olish.
-
-```javascript
-// Currying: f(a, b, c) → f(a)(b)(c) — DOIM birma-bir
-// Partial:  f(a, b, c) → g(c) — ba'zilarini oldindan berib yangi fn olish
-
-// bind bilan partial application
-function greet(greeting, name) {
-  return `${greeting}, ${name}!`;
-}
-const sayHello = greet.bind(null, "Hello"); // greeting = "Hello" qotirildi
-sayHello("Ali");  // "Hello, Ali!"
-sayHello("Vali"); // "Hello, Vali!"
-
-// O'z partial funksiyamiz
-function partial(fn, ...presetArgs) {
-  return function(...laterArgs) {
-    return fn(...presetArgs, ...laterArgs);
-  };
-}
-
-const double = partial(multiply, 2);
-double(5); // 10
-```
-
-| | Currying | Partial Application |
-|---|---------|---------------------|
-| Argumentlar | Doim birma-bir | Bir nechtasini oldindan berish |
-| Qaytaradi | Zanjir funksiyalar | Bitta yangi funksiya |
-| `f(a,b,c)` | `f(a)(b)(c)` | `g = f(a, b); g(c)` |
-| JavaScript da | Maxsus `curry` kerak | `bind` yoki wrapper |
-
----
-
-## Savol 14: Function Composition nima? `pipe` va `compose` ni implement qiling. [Senior]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Function Composition — bir necha kichik funksiyalarni **birlashtirish** orqali yangi funksiya hosil qilish. `compose(f, g)(x)` = `f(g(x))`.
 
@@ -594,11 +644,12 @@ const processResponse = pipe(
 // processResponse('{"users": [...]}') → ["Ali (admin)", "Vali (user)"]
 ```
 
----
+</details>
 
-## Savol 15: `debounce` funksiyasini implement qiling. [Middle+]
+### 6. `debounce` funksiyasini implement qiling. [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Debounce — funksiyani **oxirgi chaqiruvdan N ms o'tgandan keyin** bajaradi. Agar vaqt tugashidan oldin yana chaqirilsa — taymer qaytadan boshlanadi.
 
@@ -667,11 +718,12 @@ function debounce(fn, delay, { leading = false } = {}) {
 }
 ```
 
----
+</details>
 
-## Savol 16: `throttle` funksiyasini implement qiling. [Middle+]
+### 7. `throttle` funksiyasini implement qiling. [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Throttle — funksiyani **har N ms da bir marta** bajaradi. Oraliqda qancha chaqirilishidan qat'i nazar, faqat bitta bajariladi.
 
@@ -740,11 +792,12 @@ function throttle(fn, limit) {
 }
 ```
 
----
+</details>
 
-## Savol 17: `memoize` funksiyasini implement qiling. [Middle+]
+### 8. `memoize` funksiyasini implement qiling. [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Memoization — funksiya natijalarini **cache lash** orqali takroriy hisoblashlarni oldini olish. Pure function lar uchun ideal.
 
@@ -771,12 +824,28 @@ function memoize(fn) {
 // Ishlatish — qimmat hisoblash
 const factorial = memoize(function fact(n) {
   if (n <= 1) return 1;
-  return n * fact(n - 1);
+  return n * fact(n - 1); // ⚠️ `fact` — INNER name, memoized wrapper emas!
 });
 
-factorial(100); // Hisoblaydi va cache ga saqlaydi
+factorial(100); // Hisoblaydi va cache ga saqlaydi (faqat n=100 uchun)
 factorial(100); // Cache hit — darhol qaytaradi
-factorial(99);  // Bu ham cache da! (100 hisoblanganda 99 ham hisoblangan)
+factorial(99);  // Cache da EMAS! Qayta hisoblaydi
+
+// ⚠️ NIMA UCHUN `factorial(99)` cache'da yo'q?
+// `fact(n - 1)` memoized `factorial` ni emas, INNER `fact` ni chaqiradi
+// (named function expression ichki scope'da faqat shu nom ko'rinadi)
+// → Recursive call'lar memoize wrapper'ni chetlab o'tadi
+// → Faqat top-level chaqiruvlar (factorial(100), factorial(99)) cache'ga tushadi
+
+// ✅ Barcha intermediate natijalarni cache'lash uchun:
+function factorial2(n) {
+  if (n <= 1) return 1;
+  return n * factorial2(n - 1); // recursive call top-level nom orqali
+}
+const memoFactorial = memoize(factorial2);
+// Endi memoFactorial(100) → factorial2(100) → factorial2(99) → ...
+// Lekin bu ham cache intermediate'larni saqlamaydi — chunki factorial2 original
+// (memoized emas). To'g'ri yechim: factorial2 ichida memoFactorial(n-1) chaqirish.
 ```
 
 **Deep Dive — maxSize bilan memoize:**
@@ -812,9 +881,9 @@ function memoize(fn, { maxSize = 100 } = {}) {
 
 ⚠️ `JSON.stringify` — oddiy key uchun yetadi, lekin circular reference yoki function argument uchun muammo. Production da custom hash yoki `WeakMap` ishlatiladi.
 
----
+</details>
 
-## Savol 18: Output nima bo'ladi? [Middle]
+### 9. Output nima bo'ladi? [Middle]
 
 ```javascript
 function test(a = 1, b = a * 2, c = b + 1) {
@@ -828,7 +897,8 @@ test(5, null);       // ?
 test(5, 0);          // ?
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 - `test()` → `1 2 3` — hammasi default
 - `test(5)` → `5 10 11` — `a=5`, `b=5*2=10`, `c=10+1=11`
@@ -836,118 +906,152 @@ test(5, 0);          // ?
 - `test(5, null)` → `5 null 1` — `null` **default emas!** `null + 1 = 1` (type coercion)
 - `test(5, 0)` → `5 0 1` — `0` berildi, default emas. `c = 0 + 1 = 1`
 
-🔍 **Muhim:** Default parameter faqat `undefined` da ishga tushadi. `null`, `0`, `""`, `false` — bularning barchasi "berilgan qiymat" hisoblanadi va default ishlamaydi.
+**Muhim:** Default parameter faqat `undefined` da ishga tushadi. `null`, `0`, `""`, `false` — bularning barchasi "berilgan qiymat" hisoblanadi va default ishlamaydi.
 
----
+</details>
 
-## Savol 19: Quyidagi kodni tuzating (Fix the bug). [Middle]
+### 10. JavaScript va Python default parameter — farqi nima? Quyidagi kodda bug qayerda? [Middle]
+
+**Savol 1:** `addToList` Python da mashhur "mutable default" bug'iga uchraydi. JS da ham shundaymi?
 
 ```javascript
-// ❌ Bug: har chaqiruvda oldingi natijalar qo'shiladi
 function addToList(item, list = []) {
   list.push(item);
   return list;
 }
 
-console.log(addToList("a")); // ["a"]
-console.log(addToList("b")); // ["b"] — kutilgan, lekin...
-// Python da xatolik bo'lardi (mutable default), JS da bu TO'G'RI ishlaydi!
+console.log(addToList("a")); // ?
+console.log(addToList("b")); // ?
+```
 
-// ❌ HAQIQIY muammo — bu usulda:
+**Savol 2:** Quyidagi variantda haqiqiy bug bor. Aniqlang va tuzating:
+
+```javascript
 const defaultList = [];
 function addToList2(item, list = defaultList) {
   list.push(item);
   return list;
 }
 
-console.log(addToList2("a")); // ["a"]
-console.log(addToList2("b")); // ["a", "b"] — ❌ oldingi "a" ham bor!
+console.log(addToList2("a")); // ?
+console.log(addToList2("b")); // ?
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
+
+**Javob 1 — `addToList`:** `["a"]` va `["b"]` — **bug yo'q, JS da to'g'ri ishlaydi**.
 
 ```javascript
-// ✅ Tuzatilgan — default parametrda tashqi reference ishlatmang
-function addToList2(item, list) {
-  // Har safar yangi array yaratish
+addToList("a"); // ["a"]  — yangi array
+addToList("b"); // ["b"]  — YANA yangi array
+```
+
+**Javob 2 — `addToList2`:** `["a"]` va `["a", "b"]` — **bu haqiqiy bug**.
+
+```javascript
+addToList2("a"); // ["a"]       — defaultList ga push
+addToList2("b"); // ["a", "b"]  — ❌ oldingi "a" hali ham bor!
+```
+
+**Python vs JavaScript farqi:**
+
+| | Python | JavaScript |
+|---|--------|------------|
+| Default expression | Funksiya **definition** vaqtida **bir marta** baholanadi | Har **chaqiruvda qayta baholanadi** |
+| `def f(x=[])` | Shared mutable default — klassik tuzoq | ✅ Muammo yo'q, har chaqiruvda yangi `[]` |
+| Tashqi reference | Shunga o'xshash tuzoq | `list = defaultList` bo'lsa shared — **bug** |
+
+**Tuzatish (`addToList2` uchun):**
+
+```javascript
+// ✅ 1-usul — default'da inline expression ishlating
+function addToList2(item, list = []) {
+  list.push(item);
+  return list;
+}
+
+// ✅ 2-usul — default'da copy yaratish (shared reference'dan himoya)
+function addToList3(item, list) {
   const result = list ? [...list] : [];
   result.push(item);
   return result;
 }
-
-// yoki sodda usul (JS da default = [] har safar YANGI array yaratadi):
-function addToList3(item, list = []) {
-  list.push(item);
-  return list;
-}
 ```
 
-🔍 **Tushuntirish:** JavaScript da `function(list = [])` dagi default expression **har chaqiruvda qayta baholanadi** — ya'ni har safar yangi `[]` yaratiladi. Bu Python dan farq! Lekin agar tashqi o'zgaruvchiga reference qo'ysangiz (`list = defaultList`), u shared bo'ladi va mutation barcha chaqiruvlarga ta'sir qiladi.
+**Xulosa:** JS'da `function(list = [])` expression'i har chaqiruvda yangi `[]` yaratadi (Python'dan farqli). Tuzoq faqat default'da **tashqi o'zgaruvchi** ga reference qilingan bo'lsa paydo bo'ladi — shunda mutation shared bo'ladi.
 
----
+</details>
 
-## Savol 20: Output nima bo'ladi? [Middle+]
+### 11. Output nima bo'ladi? [Middle+]
 
 ```javascript
 var x = 10;
 
-function foo() {
+function showValue() {
   console.log(x);      // ?
   var x = 20;
   console.log(x);      // ?
 }
 
-foo();
+showValue();
 console.log(x);        // ?
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 - Birinchi `console.log(x)` → `undefined` — `var x` hoist bo'ldi, lekin qiymati hali tayinlanmagan
 - Ikkinchi `console.log(x)` → `20` — endi `x = 20` tayinlangan
 - Uchinchi `console.log(x)` → `10` — global `x`, funksiya ichidagi `var x` faqat local scope da
 
-🔍 **Tushuntirish:** `var x = 20` declaration hoist bo'ladi (`var x` yuqoriga ko'tariladi, `= 20` joyida qoladi). Shuning uchun funksiya ichida `x` **local** o'zgaruvchi — global `x` ga ta'sir qilmaydi. Bu "variable shadowing".
+**Tushuntirish:** `var x = 20` declaration hoist bo'ladi (`var x` yuqoriga ko'tariladi, `= 20` joyida qoladi). Shuning uchun funksiya ichida `x` **local** o'zgaruvchi — global `x` ga ta'sir qilmaydi. Bu "variable shadowing".
 
----
+</details>
 
-## Savol 21: Output nima bo'ladi? [Senior]
+### 12. Output nima bo'ladi? [Senior]
 
 ```javascript
-function foo() {
+function greet() {
   console.log(this);
 }
 
-const bar = () => {
+const announce = () => {
   console.log(this);
 };
 
-const obj = { foo, bar };
+const obj = { greet, announce };
 
-obj.foo();           // ?
-obj.bar();           // ?
-foo.call({ a: 1 });  // ?
-bar.call({ a: 1 });  // ?
-new foo();           // ?
-// new bar();        // ?
+obj.greet();              // ?
+obj.announce();           // ?
+greet.call({ a: 1 });     // ?
+announce.call({ a: 1 });  // ?
+new greet();              // ?
+// new announce();        // ?
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
-- `obj.foo()` → `obj` ({foo: f, bar: f}) — implicit binding
-- `obj.bar()` → `window`/`global` (yoki `{}` module da) — arrow function `this` ni **tashqi scope dan oladi**, implicit binding ishlamaydi
-- `foo.call({ a: 1 })` → `{ a: 1 }` — explicit binding
-- `bar.call({ a: 1 })` → `window`/`global` — arrow function da `call` **this ni o'zgartirmaydi**
-- `new foo()` → `foo {}` — yangi bo'sh object (new binding)
-- `new bar()` → ❌ `TypeError: bar is not a constructor` — arrow function `[[Construct]]` slotiga ega emas
+- `obj.greet()` → `obj` ({greet: f, announce: f}) — implicit binding
+- `obj.announce()` → `window`/`global` (yoki `{}` module da) — arrow function `this` ni **tashqi scope dan oladi**, implicit binding ishlamaydi
+- `greet.call({ a: 1 })` → `{ a: 1 }` — explicit binding
+- `announce.call({ a: 1 })` → `window`/`global` — arrow function da `call` **this ni o'zgartirmaydi**
+- `new greet()` → `greet {}` — yangi bo'sh object (new binding)
+- `new announce()` → ❌ `TypeError: announce is not a constructor` — arrow function `[[Construct]]` slotiga ega emas
 
-🔍 Arrow function uchun **hech qanday** binding rule ishlamaydi — u doim tashqi lexical scope ning `this` ini ishlatadi.
+Arrow function uchun **hech qanday** binding rule ishlamaydi — u doim tashqi lexical scope ning `this` ini ishlatadi.
 
----
+**Deep Dive:**
 
-## Savol 22: `pipe` funksiyasini yozing — har bir bosqichda log chiqarsin. [Senior]
+Spec'da arrow function `[[ThisMode]]: "lexical"` ichki slotiga ega. `[[Construct]]` internal method'i yo'q — shuning uchun `new` bilan chaqirilsa `TypeError` tashlaydi. `[[Call]]` chaqirilganda `OrdinaryCallBindThis` qadami skip qilinadi — `this` resolve qilish uchun `GetThisEnvironment()` tashqi Environment Record'gacha yuradi. Shuningdek arrow function'da `arguments` object ham yaratilmaydi — `FunctionDeclarationInstantiation` da `[[ThisMode]]` tekshiriladi.
 
-**Javob:**
+</details>
+
+### 13. `pipe` funksiyasini yozing — har bir bosqichda log chiqarsin. [Senior]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function pipeWithLog(...fns) {
@@ -994,9 +1098,13 @@ const getUserName = asyncPipe(fetchUser, extractName, toUpperCase);
 await getUserName(1); // "ALI"
 ```
 
----
+**Deep Dive:**
 
-## Savol 23: Quyidagi kodni tuzating (Fix the bug). [Middle+]
+`pipe` va `compose` pattern spec'da maxsus qo'llab-quvvatlanmaydi — bu `Array.prototype.reduce`/`reduceRight` ustiga qurilgan userland abstraktsiya. TC39'da Pipeline operator (`|>`) proposal Stage 2 da — bu `value |> fn1 |> fn2` sintaksisini til darajasida qo'shadi. Hack-style pipeline tanlandi: `value |> fn1(%) |> fn2(%)` — bu expression-based, faqat unary function emas, istalgan expression ishlaydi.
+
+</details>
+
+### 14. Quyidagi kodni tuzating (Fix the bug). [Middle+]
 
 ```javascript
 // ❌ Bug: once funksiyasi to'g'ri ishlamayapti
@@ -1020,7 +1128,8 @@ console.log(result); // undefined ❌ — kutilgan: 50000
 pay(100000);         // chaqirilmadi ✅ — bu to'g'ri
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // ✅ Tuzatilgan — return qo'shish kerak!
@@ -1046,11 +1155,11 @@ console.log(pay(50000));  // To'lov: 50000 so'm → 50000 ✅
 console.log(pay(100000)); // → 50000 (oldingi natija qaytarildi, funksiya qayta chaqirilmadi) ✅
 ```
 
-🔍 **Xato sababi:** Asl kodda `fn(...args)` natijasi `return` qilinmagan. Shuningdek, `this` konteksti `apply` orqali saqlanmagan.
+**Xato sababi:** Asl kodda `fn(...args)` natijasi `return` qilinmagan. Shuningdek, `this` konteksti `apply` orqali saqlanmagan.
 
----
+</details>
 
-## Savol 24: Output nima bo'ladi? [Senior]
+### 15. Output nima bo'ladi? [Senior]
 
 ```javascript
 function A() {
@@ -1076,18 +1185,23 @@ const D = () => { this.x = 1; };
 // console.log(new D().x);  // ?
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 - `new A().x` → `2` — constructor **object** qaytardi → shu object ishlatiladi, `this` tashlanadi
 - `new B().x` → `1` — constructor **primitive** (`42`) qaytardi → ignore, `this` qaytariladi
 - `new C().x` → `1` — `null` primitive hisoblanadi (garchi `typeof null === "object"`) → ignore, `this` qaytariladi
 - `new D()` → ❌ `TypeError: D is not a constructor` — arrow function `[[Construct]]` yo'q
 
-🔍 **Qoida:** `new` bilan chaqirilganda, agar constructor **non-null object** qaytarsa — o'sha object ishlatiladi. Aks holda `this` (yangi yaratilgan object) qaytariladi.
+**Qoida:** `new` bilan chaqirilganda, agar constructor **non-null object** qaytarsa — o'sha object ishlatiladi. Aks holda `this` (yangi yaratilgan object) qaytariladi.
 
----
+**Deep Dive:**
 
-## Savol 25: Output nima bo'ladi? [Senior]
+Spec'dagi `[[Construct]]` algoritmi (OrdinaryCreateFromConstructor qadam): birinchi `OrdinaryCreateFromConstructor` yangi object yaratadi, keyin constructor body `[[Call]]` orqali `this = newObject` bilan bajariladi. Return qiymati tekshiriladi — `Type(result) === Object` bo'lsa (ECMAScript spec'da `null` Type `Null`, `Object` emas) — `result` qaytariladi. Aks holda `newObject` qaytariladi. Shuning uchun `return null` `this` ni saqlab qoladi — `null` spec'da object emas.
+
+</details>
+
+### 16. Output nima bo'ladi? [Senior]
 
 ```javascript
 const obj = {
@@ -1114,13 +1228,20 @@ const dec = obj.decrement();
 console.log(dec());  // ?
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 - `inc()` → `1` ✅ — `increment` regular method (`this = obj`), ichidagi arrow function **lexical this** = `obj`. `obj.count` 0 dan 1 ga.
 - `inc()` → `2` ✅ — yana `obj.count++`, 1 dan 2 ga.
 - `dec()` → `NaN` ❌ — `decrement` **arrow function** (`this` = global/module, `obj` emas!). Ichidagi regular function **default binding** ishlatadi (`this` = global). `global.count` → `undefined`. `undefined - 1` → `NaN`.
 
-🔍 **Tushuntirish:** `increment` da regular function + ichidagi arrow = **to'g'ri this zanjiri**. `decrement` da arrow function + ichidagi regular function = **ikkalasi ham this ni yo'qotadi**.
+**Tushuntirish:** `increment` da regular function + ichidagi arrow = **to'g'ri this zanjiri**. `decrement` da arrow function + ichidagi regular function = **ikkalasi ham this ni yo'qotadi**.
+
+**Deep Dive:**
+
+Bu xatti-harakat `[[ThisMode]]` internal slot bilan tushuntiriladi. `increment` regular function — `[[ThisMode]]: "global"` — shuning uchun `obj.increment()` da `OrdinaryCallBindThis` `this = obj` qiladi. Ichidagi arrow function esa `[[ThisMode]]: "lexical"` — `GetThisEnvironment()` orqali `increment` ning `this` ini (ya'ni `obj`) oladi. `decrement` arrow function bo'lgani uchun uning `this` i object literal scope'da — global. Ichidagi regular function `default binding` ishlatadi — yana global.
+
+</details>
 
 ---
 

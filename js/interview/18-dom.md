@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: DOM nima? HTML bilan farqi nima? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. DOM nima? HTML bilan farqi nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 DOM (Document Object Model) — brauzer HTML hujjatni parse qilib xotirada yaratadigan **daraxt strukturasi**. HTML — matn fayl (source code), DOM — tirik JavaScript object tree.
 
@@ -29,49 +32,12 @@ console.log(document.body);            // <body>
 
 Rendering pipeline: `HTML → Parser → DOM Tree → CSSOM → Render Tree → Layout → Paint → Composite`. JavaScript DOM ni o'zgartirsa Layout/Paint qayta ishlaydi (reflow/repaint). Parser incremental — hujjat to'liq kutilmaydi, kelgan qismi bilan DOM qurishni boshlaydi.
 
----
+</details>
 
-## Savol 2: `childNodes` va `children` farqi nima? Output nima? [Junior+]
+### 2. `querySelector` va `getElementById` farqi nima? [Junior+]
 
-**Javob:**
-
-```html
-<ul id="list">
-  <li>Birinchi</li>
-  <li>Ikkinchi</li>
-  <li>Uchinchi</li>
-</ul>
-```
-
-```javascript
-const list = document.getElementById("list");
-
-console.log(list.firstChild.nodeName);        // ?
-console.log(list.firstElementChild.nodeName); // ?
-console.log(list.childNodes.length);          // ?
-console.log(list.children.length);            // ?
-```
-
-**Javoblar:**
-
-```
-"#text"  // firstChild = whitespace text node (yangi qator)
-"LI"     // firstElementChild = birinchi element
-7        // childNodes: [text, li, text, li, text, li, text]
-3        // children: [li, li, li] — faqat elementlar
-```
-
-`childNodes` — BARCHA node turlari (text, comment ham). `children` — faqat Element node'lar.
-
-**Deep Dive:**
-
-Node types: Element (1), Text (3), Comment (8), Document (9), DocumentFragment (11). Node inheritance chain: `EventTarget → Node → Element → HTMLElement → HTMLDivElement`.
-
----
-
-## Savol 3: `querySelector` va `getElementById` farqi nima? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Usul | Qaytaradi | Live? | Tezlik |
 |------|-----------|-------|--------|
@@ -96,11 +62,12 @@ console.log(static_.length); // 3 — o'zgarmadi (snapshot)
 
 `getElementById` eng tez — brauzer ID lar uchun hash map saqlaydi (O(1)). `querySelector` CSS selector parser orqali DOM traverse qiladi — O(n). HTMLCollection da `forEach` yo'q — `Array.from()` kerak.
 
----
+</details>
 
-## Savol 4: `textContent`, `innerHTML`, `innerText` farqi nima? [Junior+]
+### 3. `textContent`, `innerHTML`, `innerText` farqi nima? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```html
 <div id="demo">
@@ -124,21 +91,22 @@ console.log(el.innerHTML);   // "<span>Ko'rinadigan</span>..."
 | `innerHTML` | Ha | Ko'rsatadi | O'rta | XSS xavfi |
 
 ```javascript
-// XSS hujum
+// XSS hujum misoli
 const userInput = '<img src=x onerror="alert(document.cookie)">';
-element.innerHTML = userInput;    // XSS!
-element.textContent = userInput;  // Xavfsiz — oddiy matn
+element.innerHTML = userInput;    // XSS! ❌
+element.textContent = userInput;  // Xavfsiz — oddiy matn ✅
 ```
 
 **Deep Dive:**
 
 `innerText` sekin chunki CSS `display`, `visibility` hisoblashi kerak — reflow trigger qiladi. `textContent` faqat DOM tree'dagi text node'larni yig'adi.
 
----
+</details>
 
-## Savol 5: `closest()` va `matches()` nima? [Middle]
+### 4. `closest()` va `matches()` nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 - `closest(selector)` — elementdan **yuqoriga** qarab eng yaqin mos ota elementni topadi (o'zini ham tekshiradi)
 - `matches(selector)` — element CSS selector'ga mos keladimi (boolean)
@@ -169,11 +137,12 @@ list.addEventListener("click", (e) => {
 });
 ```
 
----
+</details>
 
-## Savol 6: `data-*` attributes va `dataset` qanday ishlaydi? [Junior+]
+### 5. `data-*` attributes va `dataset` qanday ishlaydi? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```html
 <div id="card" data-user-id="42" data-user-name="Ali" data-is-active="true">
@@ -211,11 +180,12 @@ console.log(input.value);                 // "hozirgi" — JS o'zgartirgan
 
 Attribute — HTML dagi boshlang'ich qiymat. Property — DOM object dagi hozirgi qiymat. Ba'zilari sinxron (id, href), ba'zilari emas (value). CSS da `[data-state="active"] { color: green; }` ishlatiladi.
 
----
+</details>
 
-## Savol 7: `classList` API ni tushuntiring [Junior+]
+### 6. `classList` API ni tushuntiring [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const btn = document.querySelector("button");
@@ -233,45 +203,12 @@ btn.classList.contains("active");             // boolean
 btn.classList.replace("btn-primary", "btn-secondary");
 ```
 
----
+</details>
 
-## Savol 8: Xato toping — Live collection bilan loop [Middle]
+### 7. Reflow va Repaint nima? Layout Thrashing qanday bo'ladi? [Middle+]
 
-**Javob:**
-
-```javascript
-// Bu kod barcha elementlarni o'chirmaydi — nima uchun?
-const items = document.getElementsByClassName("item"); // LIVE!
-for (let i = 0; i < items.length; i++) {
-  items[i].remove();
-}
-```
-
-**Xato:** `getElementsByClassName` live HTMLCollection qaytaradi. `items[0]` o'chirilganda `items[1]` endi `items[0]` bo'ladi — index siljiydi. Faqat **yarmi** o'chiriladi.
-
-```javascript
-// Variant 1: orqadan
-for (let i = items.length - 1; i >= 0; i--) {
-  items[i].remove();
-}
-
-// Variant 2: while
-while (items.length > 0) {
-  items[0].remove();
-}
-
-// Variant 3: Static list (eng yaxshi)
-document.querySelectorAll(".item").forEach(el => el.remove());
-
-// Variant 4: replaceChildren()
-container.replaceChildren(); // barcha bolalarni o'chiradi
-```
-
----
-
-## Savol 9: Reflow va Repaint nima? Layout Thrashing qanday bo'ladi? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 - **Reflow (Layout)** — element o'lchami/pozitsiyasi qayta hisoblanadi. Qimmat operatsiya.
 - **Repaint** — faqat ko'rinish (rang, shadow) qayta chiziladi. Arzonroq.
@@ -296,35 +233,36 @@ Reflow trigger qiluvchi property'lar:
 element.offsetWidth;             // reflow
 element.offsetHeight;            // reflow
 element.getBoundingClientRect(); // reflow
-getComputedStyle(element);       // reflow
+getComputedStyle(element).width;  // reflow (layout-dependent property o'qilganda)
 ```
 
 Reflow-free:
 ```javascript
 // transform va opacity GPU da ishlaydi
 element.style.transform = "translateX(100px)"; // Layout ta'sir qilmaydi
-element.style.opacity = "0.5";                  // Paint ta'sir qilmaydi
+element.style.opacity = "0.5";                  // Layout va paint ta'sir qilmaydi — composite-only (GPU layer da to'g'ridan-to'g'ri)
 ```
 
 **Deep Dive:**
 
 Brauzer style yozishlarni batch qiladi, lekin `offsetWidth`, `clientHeight`, `getBoundingClientRect()` kabi o'qish operatsiyalari **forced reflow** qiladi — to'g'ri qiymat qaytarishi kerak. Best practice: `classList.add()` (bitta reflow) yoki `requestAnimationFrame()`.
 
----
+</details>
 
-## Savol 10: DocumentFragment nima? Nima uchun kerak? [Middle]
+### 8. DocumentFragment nima? Nima uchun kerak? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 DocumentFragment — DOM ning yengil virtual container'i. Unga element qo'shish reflow trigger qilmaydi.
 
 ```javascript
-// 1000 ta reflow
+// 1000 ta DOM mutation (zamonaviy browserlar batch qiladi, lekin sekinroq)
 const list = document.getElementById("list");
 for (let i = 0; i < 1000; i++) {
   const li = document.createElement("li");
   li.textContent = `Item ${i}`;
-  list.appendChild(li); // har safar reflow
+  list.appendChild(li); // har safar live DOM ga qo'shiladi
 }
 
 // 1 ta reflow — DocumentFragment bilan
@@ -346,13 +284,14 @@ const clone = template.content.cloneNode(true); // DocumentFragment
 
 **Deep Dive:**
 
-Fragment DOM ga qo'shilganda "eritiladi" — faqat bolalari qo'shiladi, fragment o'zi DOM da qolmaydi. `innerHTML` ham tez, lekin XSS xavfi bor va mavjud event listener'lar yo'qoladi.
+Fragment DOM ga qo'shilganda "eritiladi" — faqat bolalari qo'shiladi, fragment o'zi DOM da qolmaydi. innerHTML ham tez, lekin XSS xavfi bor va mavjud event listener'lar yo'qoladi.
 
----
+</details>
 
-## Savol 11: `requestAnimationFrame` nima? `setInterval` dan farqi? [Middle]
+### 9. `requestAnimationFrame` nima? `setInterval` dan farqi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `requestAnimationFrame(callback)` — brauzerga keyingi repaint oldidan callback bajarishni aytadi. Animatsiyalar uchun optimal.
 
@@ -385,13 +324,14 @@ requestAnimationFrame(() => {
 
 **Deep Dive:**
 
-`rAF` rendering pipeline boshida ishlaydi — Style/Layout/Paint oldidan. `setInterval` macrotask queue'da — frame timing bilan sync emas. `rAF` tab background'da to'xtaydi (battery tejash), `setInterval` davom etadi. `cancelAnimationFrame(id)` bilan bekor qilish mumkin.
+`rAF` rendering pipeline boshida ishlaydi — Style/Layout/Paint oldidan. `setInterval` macrotask queue'da — frame timing bilan sync emas. `rAF` tab background'da to'xtaydi (battery tejash), `setInterval` background tab'da sezilarli throttle qilinadi (min 1s, ba'zan 1min gacha). `cancelAnimationFrame(id)` bilan bekor qilish mumkin.
 
----
+</details>
 
-## Savol 12: `cloneNode` qanday ishlaydi? Event listener'lar nusxalanadimi? [Middle]
+### 10. `cloneNode` qanday ishlaydi? Event listener'lar nusxalanadimi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const original = document.querySelector(".template");
@@ -418,150 +358,12 @@ el.outerHTML = "<section>Yangi</section>";
 // el variable hali eski element ga ishora qilmoqda (detached)
 ```
 
----
+</details>
 
-## Savol 13: Output nima? `innerHTML +=` muammosi [Middle]
+### 11. Virtual DOM nima? DocumentFragment dan farqi? [Senior]
 
-**Javob:**
-
-```javascript
-const list = document.getElementById("list");
-list.innerHTML = '<li id="first">Birinchi</li>';
-
-const firstLi = document.getElementById("first");
-firstLi.addEventListener("click", () => console.log("Bosildi!"));
-
-// firstLi click — ishlaydi
-list.innerHTML += '<li>Ikkinchi</li>';
-// firstLi click — nima bo'ladi?
-```
-
-**Javob:** Click handler **ISHLAMAYDI**.
-
-`innerHTML +=` aslida:
-1. Eski innerHTML o'qiladi (string)
-2. Yangi string qo'shiladi
-3. **BUTUN** ichidagi DOM yo'q qilinadi
-4. Qayta DOM yaratiladi — lekin event listener'lar yo'qoldi!
-
-```javascript
-// firstLi endi DETACHED element ga ishora qilmoqda
-
-// To'g'ri usul:
-list.insertAdjacentHTML("beforeend", "<li>Ikkinchi</li>");
-// Mavjud elementlar va listener'lar saqlanadi
-```
-
----
-
-## Savol 14: Xato toping — XSS xavfli kod [Middle+]
-
-**Javob:**
-
-```javascript
-function showProfile(user) {
-  const container = document.getElementById("profile");
-  container.innerHTML = `
-    <h2>${user.name}</h2>
-    <p>Bio: ${user.bio}</p>
-    <a href="${user.website}">Website</a>
-  `;
-}
-
-showProfile({
-  name: '<script>alert("hacked")</script>',
-  bio: '<img src=x onerror="document.cookie">',
-  website: 'javascript:alert(1)'
-});
-```
-
-**3 ta XSS xavfi:**
-1. `innerHTML` bilan user input — script/img injection
-2. `href` ga user input — `javascript:` protocol
-3. Hech qanday sanitization yo'q
-
-**To'g'ri:**
-```javascript
-function showProfileSafe(user) {
-  const container = document.getElementById("profile");
-
-  const h2 = document.createElement("h2");
-  h2.textContent = user.name; // XSS xavfsiz
-
-  const p = document.createElement("p");
-  p.textContent = `Bio: ${user.bio}`;
-
-  const a = document.createElement("a");
-  const url = new URL(user.website, location.origin);
-  if (url.protocol === "http:" || url.protocol === "https:") {
-    a.href = url.href; // faqat http/https
-  }
-  a.textContent = "Website";
-
-  container.replaceChildren(h2, p, a);
-}
-```
-
----
-
-## Savol 15: Coding: 10,000 elementni performance-optimal qo'shing [Senior]
-
-**Javob:**
-
-```javascript
-// === Usul 1: To'g'ridan-to'g'ri appendChild ===
-console.time("direct");
-const list1 = document.getElementById("list1");
-for (let i = 0; i < 10000; i++) {
-  const li = document.createElement("li");
-  li.textContent = `Item ${i}`;
-  list1.appendChild(li);
-}
-console.timeEnd("direct"); // ~50-200ms
-
-// === Usul 2: DocumentFragment ===
-console.time("fragment");
-const list2 = document.getElementById("list2");
-const fragment = document.createDocumentFragment();
-for (let i = 0; i < 10000; i++) {
-  const li = document.createElement("li");
-  li.textContent = `Item ${i}`;
-  fragment.appendChild(li);
-}
-list2.appendChild(fragment);
-console.timeEnd("fragment"); // ~20-80ms
-
-// === Usul 3: innerHTML ===
-console.time("innerHTML");
-const list3 = document.getElementById("list3");
-list3.innerHTML = Array.from({ length: 10000 },
-  (_, i) => `<li>Item ${i}</li>`
-).join("");
-console.timeEnd("innerHTML"); // ~10-40ms
-// XSS xavfi, listener'lar yo'qoladi
-
-// === Usul 4: Off-screen element ===
-console.time("offscreen");
-const list4 = document.getElementById("list4");
-const clone = list4.cloneNode(false); // bo'sh nusxa (DOM da emas)
-for (let i = 0; i < 10000; i++) {
-  const li = document.createElement("li");
-  li.textContent = `Item ${i}`;
-  clone.appendChild(li); // off-screen — reflow yo'q
-}
-list4.parentNode.replaceChild(clone, list4); // bitta reflow
-console.timeEnd("offscreen"); // ~15-50ms
-```
-
-**Deep Dive:**
-
-Usul 4 eng samarali: `cloneNode(false)` DOM'dan uzilgan element yaratadi — reflow/repaint trigger qilmaydi. `replaceChild` bitta atomic operatsiya. Virtual scrolling (faqat ko'rinadigan elementlarni render qilish) — 10,000+ element uchun eng to'g'ri yechim.
-
----
-
-## Savol 16: Virtual DOM nima? DocumentFragment dan farqi? [Senior]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Virtual DOM — haqiqiy DOM ning JavaScript object sifatidagi engil nusxasi. React, Vue kabi framework'lar ishlatadi.
 
@@ -600,11 +402,12 @@ O'zgarish 3 → Reflow      O'zgarish 3 ┘
 
 Virtual DOM doim ham tezroq emas. Kichik o'zgarishlar uchun to'g'ridan-to'g'ri manipulation tezroq (VDOM diff/patch overhead). VDOM ning kuchi — developer experience (declarative UI) va katta UI'lar uchun optimizatsiya. Svelte compile-time da hal qiladi — runtime VDOM ishlatmaydi.
 
----
+</details>
 
-## Savol 17: `insertAdjacentHTML` qanday ishlaydi? 4 ta pozitsiyani ayting [Middle]
+### 12. `insertAdjacentHTML` qanday ishlaydi? 4 ta pozitsiyani ayting [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 /*
@@ -637,11 +440,12 @@ el.insertAdjacentText("beforeend", "Xavfsiz matn");
 
 `insertAdjacentHTML` mavjud elementlarni buzmasdan HTML qo'shadi — `innerHTML +=` dan farqli. Lekin user input bilan XSS xavfi bor. User input uchun `insertAdjacentText` xavfsiz variant.
 
----
+</details>
 
-## Savol 18: `getComputedStyle` va `style` farqi nima? [Middle]
+### 13. `getComputedStyle` va `style` farqi nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const box = document.querySelector(".box");
@@ -668,11 +472,12 @@ console.log(before.content);
 
 `getComputedStyle` CSS cascade final natijasini qaytaradi. `style` faqat inline. Ko'p stil o'zgartirish uchun `classList.add()` (bitta reflow) afzal — har bir `style.property` ham batch qilinsa ham, class orqali aniqroq va tezroq.
 
----
+</details>
 
-## Savol 19: Element yaratish va qo'shish usullarini solishtiring [Junior+]
+### 14. Element yaratish va qo'shish usullarini solishtiring [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const container = document.getElementById("container");
@@ -712,27 +517,254 @@ container.replaceChildren(
 | `prepend` | Ko'p Node/string | Ha | undefined |
 | `replaceChildren` | Ko'p Node/string | Ha | undefined |
 
+</details>
+
 ---
 
-## Savol 20: Coding: Todo list — DOM manipulation bilan [Middle+]
+## Amaliy savollar (Coding Challenges)
 
-**Javob:**
+### 1. `childNodes` va `children` farqi nima? Output nima? [Junior+]
+
+```html
+<ul id="list">
+  <li>Birinchi</li>
+  <li>Ikkinchi</li>
+  <li>Uchinchi</li>
+</ul>
+```
+
+```javascript
+const list = document.getElementById("list");
+
+console.log(list.firstChild.nodeName);        // ?
+console.log(list.firstElementChild.nodeName); // ?
+console.log(list.childNodes.length);          // ?
+console.log(list.children.length);            // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+**Javoblar:**
+
+```
+"#text"  // firstChild = whitespace text node (yangi qator)
+"LI"     // firstElementChild = birinchi element
+7        // childNodes: [text, li, text, li, text, li, text]
+3        // children: [li, li, li] — faqat elementlar
+```
+
+`childNodes` — BARCHA node turlari (text, comment ham). `children` — faqat Element node'lar.
+
+**Deep Dive:**
+
+Node types: Element (1), Text (3), Comment (8), Document (9), DocumentFragment (11). Node inheritance chain: `EventTarget → Node → Element → HTMLElement → HTMLDivElement`.
+
+</details>
+
+### 2. Xato toping — Live collection bilan loop [Middle]
+
+```javascript
+// Bu kod barcha elementlarni o'chirmaydi — nima uchun?
+const items = document.getElementsByClassName("item"); // LIVE!
+for (let i = 0; i < items.length; i++) {
+  items[i].remove();
+}
+```
+
+<details>
+<summary>Javob</summary>
+
+**Xato:** `getElementsByClassName` live HTMLCollection qaytaradi. `items[0]` o'chirilganda `items[1]` endi `items[0]` bo'ladi — index siljiydi. Faqat **yarmi** o'chiriladi.
+
+```javascript
+// Variant 1: orqadan
+for (let i = items.length - 1; i >= 0; i--) {
+  items[i].remove();
+}
+
+// Variant 2: while
+while (items.length > 0) {
+  items[0].remove();
+}
+
+// Variant 3: Static list (eng yaxshi)
+document.querySelectorAll(".item").forEach(el => el.remove());
+
+// Variant 4: replaceChildren()
+container.replaceChildren(); // barcha bolalarni o'chiradi
+```
+
+</details>
+
+### 3. Output nima? `innerHTML +=` muammosi [Middle]
+
+```javascript
+const list = document.getElementById("list");
+list.innerHTML = '<li id="first">Birinchi</li>';
+
+const firstLi = document.getElementById("first");
+firstLi.addEventListener("click", () => console.log("Bosildi!"));
+
+// firstLi click — ishlaydi
+list.innerHTML += '<li>Ikkinchi</li>';
+// firstLi click — nima bo'ladi?
+```
+
+<details>
+<summary>Javob</summary>
+
+**Javob:** Click handler **ISHLAMAYDI**.
+
+`innerHTML +=` aslida:
+1. Eski innerHTML o'qiladi (string)
+2. Yangi string qo'shiladi
+3. **BUTUN** ichidagi DOM yo'q qilinadi
+4. Qayta DOM yaratiladi — lekin event listener'lar yo'qoldi!
+
+```javascript
+// firstLi endi DETACHED element ga ishora qilmoqda
+
+// To'g'ri usul:
+list.insertAdjacentHTML("beforeend", "<li>Ikkinchi</li>");
+// Mavjud elementlar va listener'lar saqlanadi
+```
+
+</details>
+
+### 4. Xato toping — XSS xavfli kod [Middle+]
+
+```javascript
+function showProfile(user) {
+  const container = document.getElementById("profile");
+  container.innerHTML = `
+    <h2>${user.name}</h2>
+    <p>Bio: ${user.bio}</p>
+    <a href="${user.website}">Website</a>
+  `;
+}
+
+showProfile({
+  name: '<script>alert("hacked")</script>',
+  bio: '<img src=x onerror="document.cookie">',
+  website: 'javascript:alert(1)'
+});
+```
+
+<details>
+<summary>Javob</summary>
+
+**3 ta XSS xavfi:**
+1. innerHTML bilan user input — script/img injection
+2. `href` ga user input — `javascript:` protocol
+3. Hech qanday sanitization yo'q
+
+**To'g'ri:**
+```javascript
+function showProfileSafe(user) {
+  const container = document.getElementById("profile");
+
+  const h2 = document.createElement("h2");
+  h2.textContent = user.name; // XSS xavfsiz
+
+  const p = document.createElement("p");
+  p.textContent = `Bio: ${user.bio}`;
+
+  const a = document.createElement("a");
+  const url = new URL(user.website, location.origin);
+  if (url.protocol === "http:" || url.protocol === "https:") {
+    a.href = url.href; // faqat http/https
+  }
+  a.textContent = "Website";
+
+  container.replaceChildren(h2, p, a);
+}
+```
+
+</details>
+
+### 5. Coding: 10,000 elementni performance-optimal qo'shing [Senior]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+// === Usul 1: To'g'ridan-to'g'ri appendChild ===
+console.time("direct");
+const list1 = document.getElementById("list1");
+for (let i = 0; i < 10000; i++) {
+  const li = document.createElement("li");
+  li.textContent = `Item ${i}`;
+  list1.appendChild(li);
+}
+console.timeEnd("direct"); // eng sekin (har appendChild reflow trigger qiladi)
+
+// === Usul 2: DocumentFragment ===
+console.time("fragment");
+const list2 = document.getElementById("list2");
+const fragment = document.createDocumentFragment();
+for (let i = 0; i < 10000; i++) {
+  const li = document.createElement("li");
+  li.textContent = `Item ${i}`;
+  fragment.appendChild(li);
+}
+list2.appendChild(fragment);
+console.timeEnd("fragment"); // tezroq (bitta reflow)
+
+// === Usul 3: innerHTML ===
+console.time("innerHTML");
+const list3 = document.getElementById("list3");
+list3.innerHTML = Array.from({ length: 10000 },
+  (_, i) => `<li>Item ${i}</li>`
+).join("");
+console.timeEnd("innerHTML"); // tez (native parser), lekin XSS xavf + listener yo'qoladi
+
+// === Usul 4: Off-screen element ===
+console.time("offscreen");
+const list4 = document.getElementById("list4");
+const clone = list4.cloneNode(false); // bo'sh nusxa (DOM da emas)
+for (let i = 0; i < 10000; i++) {
+  const li = document.createElement("li");
+  li.textContent = `Item ${i}`;
+  clone.appendChild(li); // off-screen — reflow yo'q
+}
+list4.parentNode.replaceChild(clone, list4); // bitta reflow
+console.timeEnd("offscreen"); // tez (off-screen reflow yo'q, bitta replaceChild)
+```
+
+**Deep Dive:**
+
+Usul 4 eng samarali: `cloneNode(false)` DOM'dan uzilgan element yaratadi — reflow/repaint trigger qilmaydi. `replaceChild` bitta atomic operatsiya. Virtual scrolling (faqat ko'rinadigan elementlarni render qilish) — 10,000+ element uchun eng to'g'ri yechim.
+
+</details>
+
+### 6. Coding: Todo list — DOM manipulation bilan [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function createTodoApp(containerId) {
   const container = document.getElementById(containerId);
 
-  container.innerHTML = `
-    <input type="text" id="todo-input" placeholder="Yangi vazifa...">
-    <button id="add-btn">Qo'shish</button>
-    <ul id="todo-list"></ul>
-    <p id="counter">0 ta vazifa</p>
-  `;
+  // Boshlang'ich HTML tuzilmasi
+  const input = document.createElement("input");
+  input.type = "text";
+  input.id = "todo-input";
+  input.placeholder = "Yangi vazifa...";
 
-  const input = container.querySelector("#todo-input");
-  const addBtn = container.querySelector("#add-btn");
-  const list = container.querySelector("#todo-list");
-  const counter = container.querySelector("#counter");
+  const addBtn = document.createElement("button");
+  addBtn.id = "add-btn";
+  addBtn.textContent = "Qo'shish";
+
+  const list = document.createElement("ul");
+  list.id = "todo-list";
+
+  const counter = document.createElement("p");
+  counter.id = "counter";
+  counter.textContent = "0 ta vazifa";
+
+  container.replaceChildren(input, addBtn, list, counter);
 
   function updateCounter() {
     const total = list.children.length;
@@ -799,6 +831,8 @@ function createTodoApp(containerId) {
 - Event delegation — bitta handler, dinamik elementlar uchun ishlaydi
 - `classList.toggle()` — toggle pattern
 - `closest()` — nested elementlarda to'g'ri target topish
+
+</details>
 
 ---
 

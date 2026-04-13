@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Hoisting nima? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Hoisting nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 Hoisting — JavaScript engine'ning Creation Phase da declaration'larni scope'da registratsiya qilish mexanizmi. Kod fizik ravishda "ko'tarilmaydi" — engine execution context yaratilganda barcha declaration'larni topadi va environment record'ga yozadi.
 
@@ -22,13 +25,14 @@ let y = 20;
 function greet() { console.log("Hello"); }
 ```
 
-Aslida "hoisting" — bu Creation Phase dagi early binding. Engine parse vaqtida declaration'larni topadi va ularni environment record'ga yozadi — kod bajarilishidan oldin.
+Aslida "hoisting" — bu Creation Phase dagi early binding. Muhim farq: **parsing** bosqichida (AST yaratishda) engine declaration'larni static topadi va saqlab qo'yadi, keyin **Creation Phase**'da (har EC yaratilganda) parser'ning metadata'si asosida Environment Record'larni runtime'da to'ldiradi (`CreateMutableBinding` + `InitializeBinding` chaqiriladi). Ikki bosqich alohida: parsing bir marta bajariladi, Creation Phase har EC uchun.
 
----
+</details>
 
-## Savol 2: let va const hoist bo'ladimi? [Middle]
+### 2. let va const hoist bo'ladimi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Ha, `let` va `const` **hoist bo'ladi** — lekin `var` dan farqli ravishda ular `undefined` bilan emas, `uninitialized` holatda saqlanadi. Bu **Temporal Dead Zone (TDZ)** deb ataladi — scope boshidan declaration qatoriga qadar o'zgaruvchiga murojaat taqiq.
 
@@ -53,11 +57,12 @@ test();
 | Initialize | `undefined` | `uninitialized` (TDZ) |
 | E'londan oldin o'qish | `undefined` qaytaradi | `ReferenceError` beradi |
 
----
+</details>
 
-## Savol 3: TDZ (Temporal Dead Zone) nima? [Middle]
+### 3. TDZ (Temporal Dead Zone) nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 TDZ — scope boshlanganidan `let`/`const`/`class` declaration qatoriga qadar bo'lgan zona. Bu zonada o'zgaruvchiga har qanday murojaat (o'qish yoki yozish) `ReferenceError` beradi.
 
@@ -84,75 +89,12 @@ let tdzVar = 10;
 // typeof odatda xato bermaydi, lekin TDZ dagi o'zgaruvchi uchun beradi
 ```
 
----
+</details>
 
-## Savol 4: Quyidagi kodning output'ini ayting [Middle]
+### 4. Function declaration vs function expression hoisting farqi nima? [Junior+]
 
-```javascript
-console.log(a);
-console.log(b);
-
-var a = 1;
-let b = 2;
-
-function c() {
-  console.log(a);
-  console.log(b);
-}
-
-c();
-```
-
-**Javob:**
-
-```
-undefined
-ReferenceError: Cannot access 'b' before initialization
-```
-
-Kod 2-qatorda to'xtaydi — ReferenceError tufayli qolgan qatorlar bajarilmaydi.
-
-- `var a` → Creation Phase da `undefined` bilan initialize → console.log(a) = undefined
-- `let b` → Creation Phase da `uninitialized` (TDZ) → console.log(b) = ReferenceError
-- `c()` ga hech qachon yetmaydi
-
----
-
-## Savol 5: Quyidagi kodning output'ini ayting [Middle+]
-
-```javascript
-var x = 1;
-
-function foo() {
-  console.log(x);
-  var x = 2;
-}
-
-foo();
-```
-
-**Javob:**
-
-```
-undefined
-```
-
-`foo()` da local `var x` bor — bu function scope'ga hoist bo'ladi va `undefined` bilan initialize qilinadi. `console.log(x)` bajarilganda engine **local** `x` ni topadi (undefined) — global `x` (1) ga **bormaydi**. Bu variable shadowing — local scope global'ni yashiradi.
-
-```
-foo() Creation Phase:
-  var x = undefined (local)
-
-foo() Execution Phase:
-  console.log(x) → local x = undefined (global x shadowed)
-  x = 2 → local x endi 2
-```
-
----
-
-## Savol 6: Function declaration vs function expression hoisting farqi nima? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **Function declaration** Creation Phase da to'liq funksiya bilan initialize qilinadi — e'lon qilishdan oldin chaqirish mumkin. **Function expression** da faqat o'zgaruvchi hoist bo'ladi — funksiya Execution Phase da assign bo'ladi.
 
@@ -176,86 +118,12 @@ var multiply = function(a, b) {
 
 Muhim farq: `var` bilan expression **TypeError** beradi (undefined mavjud, lekin function emas), `let`/`const` bilan esa **ReferenceError** beradi (TDZ).
 
----
+</details>
 
-## Savol 7: Quyidagi kodning output'ini ayting [Middle+]
+### 5. var vs let vs const farqlarini jadval bilan tushuntiring [Junior+]
 
-```javascript
-function test() {
-  foo();
-  bar();
-
-  function foo() {
-    console.log("foo");
-  }
-
-  var bar = function() {
-    console.log("bar");
-  };
-}
-
-test();
-```
-
-**Javob:**
-
-```
-foo
-TypeError: bar is not a function
-```
-
-test() Creation Phase:
-- `foo` → `function foo() {...}` (function declaration — to'liq hoist)
-- `bar` → `undefined` (var hoist — function expression hoist bo'lmaydi)
-
-Execution Phase:
-- `foo()` → ✅ ishlaydi, "foo" chiqadi
-- `bar()` → ❌ `undefined()` → TypeError: bar is not a function
-
----
-
-## Savol 8: Quyidagi kodning output'ini ayting [Senior]
-
-```javascript
-console.log(foo);
-
-var foo = 10;
-
-function foo() {
-  return 20;
-}
-
-var foo = 30;
-
-console.log(foo);
-```
-
-**Javob:**
-
-```
-function foo() { return 20; }
-30
-```
-
-Creation Phase:
-1. `function foo()` qayta ishlanadi → `foo = function foo() {...}`
-2. `var foo = 10` → foo allaqachon mavjud → **skip** (var override qilmaydi)
-3. `var foo = 30` → foo allaqachon mavjud → **skip**
-
-Execution Phase:
-1. `console.log(foo)` → `function foo() {...}` (Creation Phase natijasi)
-2. `foo = 10` (assignment — override)
-3. (function declaration — Execution da hech narsa qilmaydi, allaqachon hoist bo'lgan)
-4. `foo = 30` (assignment — override)
-5. `console.log(foo)` → 30
-
-Qoida: function declaration Creation Phase da `var` dan ustun. Lekin Execution Phase da assignment'lar tartib bo'yicha override qiladi.
-
----
-
-## Savol 9: var vs let vs const farqlarini jadval bilan tushuntiring [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Xususiyat | `var` | `let` | `const` |
 |-----------|-------|-------|---------|
@@ -278,9 +146,166 @@ count++; // ✅
 // var — ishlatMANG (faqat legacy kod bilan)
 ```
 
+</details>
+
 ---
 
-## Savol 10: Bu kodda xato bor. Toping va tuzating [Middle]
+## Amaliy savollar (Coding Challenges)
+
+### 1. Quyidagi kodning output'ini ayting [Middle]
+
+```javascript
+console.log(a);
+console.log(b);
+
+var a = 1;
+let b = 2;
+
+function c() {
+  console.log(a);
+  console.log(b);
+}
+
+c();
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+undefined
+ReferenceError: Cannot access 'b' before initialization
+```
+
+Kod 2-qatorda to'xtaydi — ReferenceError tufayli qolgan qatorlar bajarilmaydi.
+
+- `var a` → Creation Phase da `undefined` bilan initialize → console.log(a) = undefined
+- `let b` → Creation Phase da `uninitialized` (TDZ) → console.log(b) = ReferenceError
+- `c()` ga hech qachon yetmaydi
+
+</details>
+
+### 2. Quyidagi kodning output'ini ayting [Middle+]
+
+```javascript
+var x = 1;
+
+function showValue() {
+  console.log(x);
+  var x = 2;
+}
+
+showValue();
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+undefined
+```
+
+`showValue()` da local `var x` bor — bu function scope'ga hoist bo'ladi va `undefined` bilan initialize qilinadi. `console.log(x)` bajarilganda engine **local** `x` ni topadi (undefined) — global `x` (1) ga **bormaydi**. Bu variable shadowing — local scope global'ni yashiradi.
+
+```
+showValue() Creation Phase:
+  var x = undefined (local)
+
+showValue() Execution Phase:
+  console.log(x) → local x = undefined (global x shadowed)
+  x = 2 → local x endi 2
+```
+
+</details>
+
+### 3. Quyidagi kodning output'ini ayting [Middle+]
+
+```javascript
+function test() {
+  greet();
+  notify();
+
+  function greet() {
+    console.log("greet");
+  }
+
+  var notify = function() {
+    console.log("notify");
+  };
+}
+
+test();
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+greet
+TypeError: notify is not a function
+```
+
+test() Creation Phase:
+- `greet` → `function greet() {...}` (function declaration — to'liq hoist)
+- `notify` → `undefined` (var hoist — function expression hoist bo'lmaydi)
+
+Execution Phase:
+- `greet()` → ✅ ishlaydi, "greet" chiqadi
+- `notify()` → ❌ `undefined()` → TypeError: notify is not a function
+
+</details>
+
+### 4. Quyidagi kodning output'ini ayting [Senior]
+
+```javascript
+console.log(value);
+
+var value = 10;
+
+function value() {
+  return 20;
+}
+
+var value = 30;
+
+console.log(value);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+[Function: value]
+30
+```
+
+> **Eslatma:** Birinchi `console.log` natijasi Node.js'da `[Function: value]`, Chrome DevTools'da `ƒ value() { return 20; }` sifatida ko'rinadi. Quyida bajarilish tartibi batafsil tushuntiriladi.
+
+Creation Phase (spec `FunctionDeclarationInstantiation` algoritmi):
+1. **Var declaration'lar avval** qayta ishlanadi:
+   - `var value = 10` → `CreateMutableBinding(value)` + `InitializeBinding(undefined)` → `value = undefined`
+   - `var value = 30` → binding allaqachon mavjud → **skip** (duplicate var ignored)
+2. **Function declaration'lar keyin** qayta ishlanadi:
+   - `function value()` → mavjud `value` binding'ni `SetMutableBinding` bilan **override** qiladi → `value = function value() {...}`
+
+Creation Phase oxiri: `value = function value() {...}` (function wins)
+
+Execution Phase:
+1. `console.log(value)` → `function value() {...}` (Creation Phase natijasi)
+2. `value = 10` (assignment — oddiy `PutValue`, override)
+3. Function declaration — Execution'da hech narsa qilmaydi (allaqachon Creation'da initialize bo'lgan)
+4. `value = 30` (assignment — oddiy `PutValue`, override)
+5. `console.log(value)` → 30
+
+**Qoida:** `FunctionDeclarationInstantiation` algoritmida function declaration'lar var declaration'lardan **keyin** qayta ishlanadi va ularni override qiladi (spec 29.f-g qadamlar). Execution Phase'da esa assignment'lar tartib bo'yicha oddiy `PutValue` orqali ishlaydi — hoisting yo'q.
+
+**Deep Dive:**
+
+ECMAScript spec'dagi `FunctionDeclarationInstantiation` algoritmida function declaration'lar `var` declaration'lardan **keyin** qayta ishlanadi — shuning uchun bir xil nomdagi binding'ni override qiladi. Spec'da aniq yozilgan: agar allaqachon mavjud binding bo'lsa va u function declaration emas — function declaration uni yozib tashlaydi (`SetMutableBinding`). Lekin Execution Phase'da assignment'lar oddiy `PutValue` orqali tartib bo'yicha ishlaydi.
+
+</details>
+
+### 5. Bu kodda xato bor. Toping va tuzating [Middle]
 
 ```javascript
 function getItems() {
@@ -301,7 +326,8 @@ console.log(fns[1]()); // kutilgan: 1
 console.log(fns[2]()); // kutilgan: 2
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Haqiqiy output: `3, 3, 3` — kutilgan emas!
 
@@ -330,9 +356,9 @@ console.log(fns[2]()); // 2 ✅
 
 Bu klassik closure + var muammosi — `let` block-scoped bo'lgani uchun har iteratsiyada yangi binding yaratadi va har bir callback o'z qiymatini eslab qoladi.
 
----
+</details>
 
-## Savol 11: Quyidagi kodning output'ini ayting [Senior]
+### 6. Quyidagi kodning output'ini ayting [Senior]
 
 ```javascript
 let a = 1;
@@ -343,7 +369,8 @@ let a = 1;
 }
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```
 ReferenceError: Cannot access 'a' before initialization
@@ -353,9 +380,13 @@ Block `{}` ichida `let a = 2` bor — bu block scope'da yangi `a` yaratadi. Bu y
 
 Tashqi `let a = 1` ga bormaydi — chunki ichki `a` shadowing qiladi. Agar `let a = 2` bo'lmaganida — tashqi `a = 1` ko'rinar edi.
 
----
+**Deep Dive:**
 
-## Savol 12: Hoisting va class — output savol [Middle+]
+Spec bo'yicha `let`/`const` binding'lar `CreateMutableBinding` (yoki `CreateImmutableBinding`) bilan yaratiladi, lekin `InitializeBinding` **chaqirilmaydi** — declaration qatoriga yetgunicha. TDZ davomida binding mavjud, lekin `uninitialized` holatda. `GetBindingValue` chaqirilganda binding hali initialized bo'lmasa — spec aniq `ReferenceError` throw qilishni talab qiladi.
+
+</details>
+
+### 7. Hoisting va class — output savol [Middle+]
 
 ```javascript
 const instance = new MyClass();
@@ -367,7 +398,8 @@ class MyClass {
 }
 ```
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```
 ReferenceError: Cannot access 'MyClass' before initialization
@@ -388,4 +420,4 @@ const instance = new MyClass(); // ✅
 
 Bu function declaration bilan asosiy farq — function declaration to'liq hoist bo'ladi, class esa TDZ da.
 
----
+</details>

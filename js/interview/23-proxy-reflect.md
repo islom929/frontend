@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Proxy nima va u qanday ishlaydi? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Proxy nima va u qanday ishlaydi? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 Proxy — JavaScript'ning meta-programming vositasi bo'lib, object ustidagi fundamental operatsiyalarni (property o'qish, yozish, o'chirish, funksiya chaqirish va boshqalar) **ushlash va qayta belgilash** imkonini beradi. `new Proxy(target, handler)` bilan yaratiladi.
 
@@ -33,43 +36,13 @@ console.log(user.age); // 30 — target ham o'zgardi
 
 Proxy va target bitta object'ga murojaat qiladi — proxy faqat oraliq qatlam. Proxy orqali yozilgan property target'da ham o'zgaradi.
 
----
 
-## Savol 2: Output nima? Proxy get trap [Middle]
+</details>
 
-**Javob:**
+### 2. Proxy ning 13 ta trap'ini sanab bering [Middle]
 
-```javascript
-const handler = {
-  get(target, prop) {
-    return prop in target ? target[prop] : `"${prop}" topilmadi`;
-  }
-};
-
-const obj = new Proxy({ x: 1, y: 2 }, handler);
-
-console.log(obj.x);
-console.log(obj.y);
-console.log(obj.z);
-console.log("x" in obj);
-```
-
-**Javob:**
-
-```
-1
-2
-"z" topilmadi
-true
-```
-
-`obj.x` va `obj.y` — target'da bor, shuning uchun haqiqiy qiymat qaytariladi. `obj.z` — target'da yo'q, `prop in target` → `false`, shuning uchun fallback string qaytariladi. `"x" in obj` — `has` trap yo'q, shuning uchun standart xatti-harakat: `true`.
-
----
-
-## Savol 3: Proxy ning 13 ta trap'ini sanab bering [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | # | Trap | Ushlaydi | Trigger |
 |---|------|----------|---------|
@@ -89,11 +62,13 @@ true
 
 `apply` va `construct` faqat funksiya target uchun ishlaydi. Qolgan 11 ta barcha object'lar uchun.
 
----
 
-## Savol 4: Reflect nima va nima uchun Proxy ichida ishlatish kerak? [Middle]
+</details>
 
-**Javob:**
+### 3. Reflect nima va nima uchun Proxy ichida ishlatish kerak? [Middle]
+
+<details>
+<summary>Javob</summary>
 
 Reflect — har bir Proxy trap'iga 1:1 mos keladigan static method'lar to'plami. Proxy ichida `target[prop]` o'rniga `Reflect.get(target, prop, receiver)` ishlatish **best practice** — uchta sabab:
 
@@ -119,49 +94,13 @@ const handler = {
 };
 ```
 
----
 
-## Savol 5: Output nima? receiver muammosi [Senior]
+</details>
 
-**Javob:**
+### 4. set trap da nima uchun true qaytarish kerak? [Middle]
 
-```javascript
-const parent = {
-  _value: 10,
-  get value() { return this._value; }
-};
-
-const child = Object.create(
-  new Proxy(parent, {
-    get(target, prop) {
-      return target[prop]; // Reflect ishlatilmagan!
-    }
-  })
-);
-child._value = 20;
-
-console.log(child.value);
-```
-
-**Javob:**
-
-```
-10
-```
-
-`child.value` → prototype chain bo'ylab proxy'ga boradi → `get` trap chaqiriladi → `target[prop]` = `parent.value` getter → getter'dagi `this` = `parent` (target) → `parent._value` = `10`.
-
-Agar `Reflect.get(target, prop, receiver)` ishlatilganida — `receiver` = `child` bo'lardi → getter'dagi `this` = `child` → `child._value` = `20` qaytardi.
-
-**Deep Dive:**
-
-`Reflect.get` ning uchinchi argumenti `receiver` — bu spec'dagi `[[Get]](propertyKey, Receiver)` ning ikkinchi argumenti. Getter funksiya chaqirilganda `this` shu receiver ga o'rnatiladi. `target[prop]` qilganda esa receiver har doim `target` o'zi bo'ladi.
-
----
-
-## Savol 6: set trap da nima uchun true qaytarish kerak? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ECMAScript spetsifikatsiyasi bo'yicha `[[Set]]` internal method boolean qaytaradi — `true` (muvaffaqiyatli) yoki `false` (muvaffaqiyatsiz). Proxy'ning set trap'i ham shu qoidaga amal qiladi. Agar trap `false` yoki falsy qiymat (undefined dahil) qaytarsa va strict mode bo'lsa — engine `TypeError` tashlaydi.
 
@@ -185,11 +124,13 @@ const proxy = new Proxy({}, {
 
 ES Modules doim strict mode'da ishlaydi — shuning uchun zamonaviy loyihalarda `return true` yo'q bo'lsa deyarli har doim xato chiqadi.
 
----
 
-## Savol 7: Proxy invariants nima? Misol bilan tushuntiring [Senior]
+</details>
 
-**Javob:**
+### 5. Proxy invariants nima? Misol bilan tushuntiring [Senior]
+
+<details>
+<summary>Javob</summary>
 
 Proxy invariant'lar — ECMAScript spec belgilagan qoidalar bo'lib, Proxy trap'larining buzishi mumkin bo'lmagan cheklovlar. Bu qoidalar JavaScript'ning xavfsizlik garantiyalarini saqlaydi — `Object.freeze()` yoki `Object.seal()` kabi operatsiyalar haqiqatan ham ishlashini ta'minlaydi.
 
@@ -226,11 +167,14 @@ proxy.id;
 
 Invariant'lar engine tomonidan **automatic** tekshiriladi — developer bu tekshiruvni o'chirib qo'ya olmaydi.
 
----
+**Deep Dive:** ECMAScript spec'da har bir Proxy internal method (masalan `[[Get]]`) oxirida `ValidateGetTrap` kabi validation bosqichi bor — trap natijasi va target'ning property descriptor'i solishtiriladi. Bu tekshiruv `Object.getOwnPropertyDescriptor(target, prop)` chaqiradi — shuning uchun invariant enforcement'ning o'zi ham runtime cost qo'shadi. Proxy invariant'lari JavaScript'ning "integrity level" kafolatlarini himoya qiladi — `Object.freeze` va `Object.seal` semantic'lari proxy orqali ham buzilmasligini ta'minlaydi.
 
-## Savol 8: Proxy.revocable() nima va qachon ishlatiladi? [Middle+]
+</details>
 
-**Javob:**
+### 6. Proxy.revocable() nima va qachon ishlatiladi? [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 `Proxy.revocable(target, handler)` — bekor qilish mumkin bo'lgan proxy yaratadi. `{ proxy, revoke }` object qaytaradi. `revoke()` chaqirilgandan keyin proxy'ning barcha operatsiyalari `TypeError` tashlaydi — proxy butunlay ishlamay qoladi.
 
@@ -254,11 +198,13 @@ revoke(); // proxy bekor qilindi
 
 `revoke()` chaqirilganda proxy ichki `[[Handler]]` va `[[Target]]` ni `null` ga o'zgartiradi — boshqa qayta tiklab bo'lmaydi.
 
----
 
-## Savol 9: Proxy bilan private field (#) muammosi nima? Qanday hal qilasiz? [Senior]
+</details>
 
-**Javob:**
+### 7. Proxy bilan private field (#) muammosi nima? Qanday hal qilasiz? [Senior]
+
+<details>
+<summary>Javob</summary>
 
 Private field'lar (`#`) brand check qiladi — faqat o'sha class instance'ida mavjud. Proxy boshqa object — shuning uchun proxy orqali method chaqirilganda `this` = proxy bo'ladi, lekin proxy'da `#field` yo'q → `TypeError`.
 
@@ -299,51 +245,14 @@ proxy.getBalance(); // ✅ 1000
 
 `bind(target)` bilan method chaqirilganda `this` = `target` (haqiqiy class instance) bo'ladi — private field'larga kira oladi.
 
----
+**Deep Dive:** Private field'lar spec'da `[[PrivateName]]` internal slot orqali ishlaydi — engine object'da alohida "brand" tekshiradi. Bu `WeakMap` semantikasiga o'xshash, lekin engine darajasida optimallashtirilgan. TC39 da Proxy + private fields muammosi atayin hal qilinmagan — committee bu cheklovni xavfsizlik uchun zarur deb hisoblaydi, chunki proxy private data'ga kirish imkonini bermasa encapsulation kuchli qoladi.
 
-## Savol 10: Output nima? Proxy set + strict mode [Middle]
+</details>
 
-**Javob:**
+### 8. Vue 3 reactivity Proxy asosida qanday ishlaydi? [Middle+]
 
-```javascript
-"use strict";
-
-const proxy = new Proxy({}, {
-  set(target, prop, value) {
-    if (prop === "age" && value < 0) {
-      console.log("Rad etildi");
-      return false;
-    }
-    target[prop] = value;
-    return true;
-  }
-});
-
-proxy.name = "Ali";
-console.log(proxy.name);
-
-try {
-  proxy.age = -5;
-} catch (e) {
-  console.log(e.constructor.name);
-}
-```
-
-**Javob:**
-
-```
-Ali
-Rad etildi
-TypeError
-```
-
-`proxy.name = "Ali"` — `set` trap `true` qaytaradi → muvaffaqiyatli. `proxy.age = -5` — `console.log("Rad etildi")` chiqadi, keyin `return false` → strict mode'da engine `TypeError` tashlaydi. `e.constructor.name` = `"TypeError"`.
-
----
-
-## Savol 11: Vue 3 reactivity Proxy asosida qanday ishlaydi? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Vue 3 har bir reactive object'ni Proxy bilan wrap qiladi. Asosiy mexanizm — **track** (dependency kuzatish) va **trigger** (effect qayta ishga tushirish):
 
@@ -384,11 +293,221 @@ function reactive(target) {
 
 Vue 2 `Object.defineProperty` ishlatardi — dynamic property qo'shish/o'chirish kuzatilmasdi (`Vue.set()` kerak edi), array index o'zgarishi ushlanmasdi. Vue 3 Proxy bilan bu cheklovlar yo'q.
 
+
+</details>
+
+### 9. Proxy performance haqida nima bilasiz? Qachon ishlatmaslik kerak? [Senior]
+
+<details>
+<summary>Javob</summary>
+
+Proxy har bir operatsiyada qo'shimcha function call qo'shadi. V8 engine Proxy'ni oddiy object kabi optimize qila olmaydi — inline caching va hidden class optimization ishlamaydi. Hot path'da sezilarli sekinlashuv beradi (aniq overhead V8 versiyasi va trap murakkabligiga bog'liq).
+
+| Ishlatish kerak | Ishlatmaslik kerak |
+|-----------------|-------------------|
+| Validation — runtime type check | Hot loop — million marta chaqiriladigan kod |
+| Reactivity — framework (Vue 3) | Performance-critical path — rendering |
+| Logging/Debug — development | Katta data set — har element uchun proxy |
+| Access control — security | Oddiy getter/setter yetarli bo'lganda |
+
+**Optimization pattern** — lazy proxy (faqat access bo'lganda nested object proxy qilish):
+
+```javascript
+// ❌ Barcha nested object'larni oldindan proxy qilish
+function deepProxy(obj) {
+  for (const key of Object.keys(obj)) {
+    if (typeof obj[key] === "object") obj[key] = deepProxy(obj[key]);
+  }
+  return new Proxy(obj, handler);
+}
+
+// ✅ Lazy — faqat access bo'lganda proxy qilish
+const proxy = new Proxy(obj, {
+  get(target, prop, receiver) {
+    const value = Reflect.get(target, prop, receiver);
+    if (typeof value === "object" && value !== null) {
+      return new Proxy(value, handler); // faqat kirgandagina
+    }
+    return value;
+  }
+});
+```
+
+Vue 3 ham shu lazy pattern ishlatadi — `reactive()` object faqat access bo'lgan property'larni recursive proxy qiladi.
+
+**Deep Dive:** V8 da Proxy object'lari "exotic object" sifatida treat qilinadi — TurboFan optimizing compiler Proxy property access'ni inline cache (IC) bilan optimallashtira olmaydi, chunki har bir `get`/`set` trap ixtiyoriy JS kodi. Benchmark'larda Proxy property access oddiy object'dan ~5-10x sekin. MobX 5+ va Vue 3 Proxy ishlatadi, lekin Solid.js Proxy'dan qochadi va Signal pattern bilan reaktivlik ta'minlaydi — bu performance-critical rendering'da afzallik beradi.
+
+</details>
+
+### 10. Reflect.get va target[prop] farqi nima? [Middle+]
+
+<details>
+<summary>Javob</summary>
+
+Asosiy farq — **receiver** argumenti. `Reflect.get(target, prop, receiver)` uchinchi argument bilan getter'dagi `this` ni belgilaydi. `target[prop]` esa doim `target` ni `this` qiladi.
+
+```javascript
+const base = {
+  _x: 10,
+  get x() { return this._x; }
+};
+
+// target[prop] bilan
+const proxy1 = new Proxy(base, {
+  get(target, prop) { return target[prop]; }
+});
+const child1 = Object.create(proxy1);
+child1._x = 99;
+console.log(child1.x); // 10 ❌ — this = base (target)
+
+// Reflect.get bilan
+const proxy2 = new Proxy(base, {
+  get(target, prop, receiver) { return Reflect.get(target, prop, receiver); }
+});
+const child2 = Object.create(proxy2);
+child2._x = 99;
+console.log(child2.x); // 99 ✅ — this = child2 (receiver)
+```
+
+Ikkinchi farq — `Reflect.set` va `Reflect.defineProperty` xato o'rniga boolean qaytaradi:
+
+```javascript
+// Object.defineProperty — try/catch kerak
+try {
+  Object.defineProperty(frozenObj, "x", { value: 1 });
+} catch (e) { /* handle */ }
+
+// Reflect.defineProperty — if/else yetarli
+if (!Reflect.defineProperty(frozenObj, "x", { value: 1 })) {
+  // handle failure
+}
+```
+
+
+
+</details>
+
 ---
 
-## Savol 12: Negative array indexing qanday implement qilasiz? [Middle+]
+## Amaliy savollar (Coding Challenges)
 
-**Javob:**
+### 1. Output nima? Proxy get trap [Middle]
+
+
+```javascript
+const handler = {
+  get(target, prop) {
+    return prop in target ? target[prop] : `"${prop}" topilmadi`;
+  }
+};
+
+const obj = new Proxy({ x: 1, y: 2 }, handler);
+
+console.log(obj.x);
+console.log(obj.y);
+console.log(obj.z);
+console.log("x" in obj);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+1
+2
+"z" topilmadi
+true
+```
+
+`obj.x` va `obj.y` — target'da bor, shuning uchun haqiqiy qiymat qaytariladi. `obj.z` — target'da yo'q, `prop in target` → `false`, shuning uchun fallback string qaytariladi. `"x" in obj` — `has` trap yo'q, shuning uchun standart xatti-harakat: `true`.
+
+
+</details>
+
+### 2. Output nima? receiver muammosi [Senior]
+
+
+```javascript
+const parent = {
+  _value: 10,
+  get value() { return this._value; }
+};
+
+const child = Object.create(
+  new Proxy(parent, {
+    get(target, prop) {
+      return target[prop]; // Reflect ishlatilmagan!
+    }
+  })
+);
+child._value = 20;
+
+console.log(child.value);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+10
+```
+
+`child.value` → prototype chain bo'ylab proxy'ga boradi → `get` trap chaqiriladi → `target[prop]` = `parent.value` getter → getter'dagi `this` = `parent` (target) → `parent._value` = `10`.
+
+Agar `Reflect.get(target, prop, receiver)` ishlatilganida — `receiver` = `child` bo'lardi → getter'dagi `this` = `child` → `child._value` = `20` qaytardi.
+
+**Deep Dive:**
+
+`Reflect.get` ning uchinchi argumenti `receiver` — bu spec'dagi `[[Get]](propertyKey, Receiver)` ning ikkinchi argumenti. Getter funksiya chaqirilganda `this` shu receiver ga o'rnatiladi. `target[prop]` qilganda esa receiver har doim `target` o'zi bo'ladi.
+
+
+</details>
+
+### 3. Output nima? Proxy set + strict mode [Middle]
+
+
+```javascript
+"use strict";
+
+const proxy = new Proxy({}, {
+  set(target, prop, value) {
+    if (prop === "age" && value < 0) {
+      console.log("Rad etildi");
+      return false;
+    }
+    target[prop] = value;
+    return true;
+  }
+});
+
+proxy.name = "Ali";
+console.log(proxy.name);
+
+try {
+  proxy.age = -5;
+} catch (e) {
+  console.log(e.constructor.name);
+}
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+Ali
+Rad etildi
+TypeError
+```
+
+`proxy.name = "Ali"` — `set` trap `true` qaytaradi → muvaffaqiyatli. `proxy.age = -5` — `console.log("Rad etildi")` chiqadi, keyin `return false` → strict mode'da engine `TypeError` tashlaydi. `e.constructor.name` = `"TypeError"`.
+
+
+</details>
+
+### 4. Negative array indexing qanday implement qilasiz? [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function createNegativeArray(arr) {
@@ -423,11 +542,10 @@ console.log(arr.length); // 5 — length ishlaydi
 
 `Number(prop)` bilan property nomni raqamga aylantirish kerak. `Number.isInteger` tekshiruv — faqat butun sonlar uchun (length, push kabi boshqa property'larni buzmaslik uchun). `Reflect.get` fallback — `length`, `push`, `map` va boshqa array method/property'lar oddiydek ishlaydi.
 
----
 
-## Savol 13: Bu kodda nima xato? Proxy + frozen object [Senior]
+</details>
 
-**Javob:**
+### 5. Bu kodda nima xato? Proxy + frozen object [Senior]
 
 ```javascript
 const config = Object.freeze({ apiUrl: "https://api.example.com" });
@@ -441,6 +559,9 @@ const proxy = new Proxy(config, {
 
 console.log(proxy.apiUrl); // ?
 ```
+
+<details>
+<summary>Javob</summary>
 
 **Xato:** Proxy invariant buzilishi — `TypeError` tashlaydi.
 
@@ -457,51 +578,14 @@ const proxy = new Proxy(config, {
 });
 ```
 
----
+**Deep Dive:** `Object.freeze` spec'da `[[PreventExtensions]]` + barcha own property'larni `{writable: false, configurable: false}` qiladi. Proxy `get` trap chaqirilgandan keyin engine `Object.getOwnPropertyDescriptor(target, prop)` bilan descriptor tekshiradi — agar `configurable: false` va `writable: false` bo'lsa, trap qaytargan qiymat `SameValue` bilan target'dagi qiymatga teng bo'lishi shart. Shu sababli frozen object ustida Proxy faqat side-effect (logging) uchun foydali — qiymatni o'zgartirish mumkin emas.
 
-## Savol 14: Proxy performance haqida nima bilasiz? Qachon ishlatmaslik kerak? [Senior]
+</details>
 
-**Javob:**
+### 6. createObservable implement qiling [Middle+]
 
-Proxy har bir operatsiyada qo'shimcha function call qo'shadi. V8 engine Proxy'ni oddiy object kabi optimize qila olmaydi — inline caching va hidden class optimization ishlamaydi. Taxminiy overhead: property access 3-10x sekin.
-
-| Ishlatish kerak | Ishlatmaslik kerak |
-|-----------------|-------------------|
-| Validation — runtime type check | Hot loop — million marta chaqiriladigan kod |
-| Reactivity — framework (Vue 3) | Performance-critical path — rendering |
-| Logging/Debug — development | Katta data set — har element uchun proxy |
-| Access control — security | Oddiy getter/setter yetarli bo'lganda |
-
-**Optimization pattern** — lazy proxy (faqat access bo'lganda nested object proxy qilish):
-
-```javascript
-// ❌ Barcha nested object'larni oldindan proxy qilish
-function deepProxy(obj) {
-  for (const key of Object.keys(obj)) {
-    if (typeof obj[key] === "object") obj[key] = deepProxy(obj[key]);
-  }
-  return new Proxy(obj, handler);
-}
-
-// ✅ Lazy — faqat access bo'lganda proxy qilish
-const proxy = new Proxy(obj, {
-  get(target, prop, receiver) {
-    const value = Reflect.get(target, prop, receiver);
-    if (typeof value === "object" && value !== null) {
-      return new Proxy(value, handler); // faqat kirgandagina
-    }
-    return value;
-  }
-});
-```
-
-Vue 3 ham shu lazy pattern ishlatadi — `reactive()` object faqat access bo'lgan property'larni recursive proxy qiladi.
-
----
-
-## Savol 15: createObservable implement qiling [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `createObservable(obj)` — property o'zgarganda subscriber'larga xabar bersin:
 
@@ -548,47 +632,5 @@ Asosiy nuqtalar:
 - `"*"` wildcard — barcha o'zgarishlar uchun
 - Unsubscribe — `Set.delete` qaytaruvchi funksiya
 
----
 
-## Savol 16: Reflect.get va target[prop] farqi nima? [Middle+]
-
-**Javob:**
-
-Asosiy farq — **receiver** argumenti. `Reflect.get(target, prop, receiver)` uchinchi argument bilan getter'dagi `this` ni belgilaydi. `target[prop]` esa doim `target` ni `this` qiladi.
-
-```javascript
-const base = {
-  _x: 10,
-  get x() { return this._x; }
-};
-
-// target[prop] bilan
-const proxy1 = new Proxy(base, {
-  get(target, prop) { return target[prop]; }
-});
-const child1 = Object.create(proxy1);
-child1._x = 99;
-console.log(child1.x); // 10 ❌ — this = base (target)
-
-// Reflect.get bilan
-const proxy2 = new Proxy(base, {
-  get(target, prop, receiver) { return Reflect.get(target, prop, receiver); }
-});
-const child2 = Object.create(proxy2);
-child2._x = 99;
-console.log(child2.x); // 99 ✅ — this = child2 (receiver)
-```
-
-Ikkinchi farq — `Reflect.set` va `Reflect.defineProperty` xato o'rniga boolean qaytaradi:
-
-```javascript
-// Object.defineProperty — try/catch kerak
-try {
-  Object.defineProperty(frozenObj, "x", { value: 1 });
-} catch (e) { /* handle */ }
-
-// Reflect.defineProperty — if/else yetarli
-if (!Reflect.defineProperty(frozenObj, "x", { value: 1 })) {
-  // handle failure
-}
-```
+</details>

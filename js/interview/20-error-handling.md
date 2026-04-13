@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: JavaScript dagi asosiy Error turlari qaysilar va farqlari nima? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. JavaScript dagi asosiy Error turlari qaysilar va farqlari nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 JavaScript da barcha xatolar `Error` base class'idan meros oladi. Har bir tur muayyan xato kategoriyasini bildiradi:
 
@@ -26,7 +29,7 @@ console.log(err instanceof TypeError); // true
 console.log(err instanceof Error);     // true — barcha subclass'lar
 
 // SyntaxError — try/catch bilan ushlash mumkin emas (parse vaqtida)
-// Lekin eval() va JSON.parse() ichidagisini ushlash mumkin:
+// Lekin JSON.parse() ichidagisini ushlash mumkin:
 try {
   JSON.parse("invalid");
 } catch (e) {
@@ -36,90 +39,15 @@ try {
 
 **Deep Dive:**
 
-`SyntaxError` boshqalardan tubdan farq qiladi — u parse vaqtida sodir bo'ladi (kod bajarilmagan). Shuning uchun global try/catch bilan ushlash mumkin emas. Faqat `eval()`, `JSON.parse()`, `new Function()` ichidagi syntax xatolarni ushlash mumkin — chunki ular runtime da parse qiladi.
+`SyntaxError` boshqalardan tubdan farq qiladi — u parse vaqtida sodir bo'ladi (kod bajarilmagan). Shuning uchun global try/catch bilan ushlash mumkin emas. Faqat `JSON.parse()` kabi runtime da parse qiladigan funksiyalar ichidagi syntax xatolarni ushlash mumkin.
 
----
 
-## Savol 2: Output nima? try/catch/finally execution order [Middle]
+</details>
 
-**Javob:**
+### 2. Nima uchun Error throw qilish kerak, string emas? [Junior+]
 
-```javascript
-function test() {
-  try {
-    console.log("A");
-    throw new Error("xato");
-    console.log("B");
-  } catch (error) {
-    console.log("C");
-    return "catch";
-  } finally {
-    console.log("D");
-  }
-  console.log("E");
-}
-
-console.log(test());
-```
-
-**Javob:**
-
-```
-A
-C
-D
-catch
-```
-
-`"A"` — try boshi. throw sodir bo'ladi — `"B"` o'tkaziladi. `"C"` — catch ishlaydi. `return "catch"` — **lekin avval** finally ishlaydi. `"D"` — finally DOIM ishlaydi, hatto return bo'lsa ham. Keyin catch'dagi `return "catch"` qaytadi. `"E"` — hech qachon ishlamaydi, chunki catch'da `return` bor.
-
----
-
-## Savol 3: Output nima? finally da return [Middle+]
-
-**Javob:**
-
-```javascript
-function tricky() {
-  try {
-    throw new Error("xato!");
-  } catch (error) {
-    console.log("catch:", error.message);
-    return 1;
-  } finally {
-    return 2;
-  }
-}
-
-console.log(tricky());
-```
-
-**Javob:**
-
-```
-catch: xato!
-2
-```
-
-`finally` ichidagi `return` catch'dagi `return 1` ni **override** qiladi. finally completion har doim ustun — try/catch'dagi return va hatto throw ham yo'qoladi. **QOIDA: finally ichida hech qachon return yozmang!**
-
-```javascript
-// Yana bir xavfli holat — throw ham yo'qoladi:
-function swallow() {
-  try {
-    throw new Error("muhim!");
-  } finally {
-    return "ok"; // ⚠️ Error yo'qoldi — tashqariga hech qachon chiqmaydi!
-  }
-}
-console.log(swallow()); // "ok" — xato yutildi
-```
-
----
-
-## Savol 4: Nima uchun Error throw qilish kerak, string emas? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // ❌ String throw — stack trace yo'q
@@ -145,11 +73,13 @@ try {
 
 `Error` obyektida `stack` property bor — xato qaysi fayl, qaysi qator, qaysi funksiyalar zanjirida sodir bo'lganini ko'rsatadi. String'da bu ma'lumot yo'q — production da debugging deyarli mumkin emas. `instanceof` tekshiruvi ham faqat Error obyektlarida ishlaydi.
 
----
 
-## Savol 5: Custom Error class qanday yaratiladi? [Middle]
+</details>
 
-**Javob:**
+### 3. Custom Error class qanday yaratiladi? [Middle]
+
+<details>
+<summary>Javob</summary>
 
 `extends Error` bilan meros olish, `super(message)` chaqirish, `this.name` ni o'rnatish:
 
@@ -190,11 +120,13 @@ ES6 dan oldin `Error` subclass qilish muammoli edi — `Object.setPrototypeOf` k
 ValidationError instance → ValidationError.prototype → Error.prototype → Object.prototype
 ```
 
----
 
-## Savol 6: Error.cause nima va qanday ishlatiladi? [Middle]
+</details>
 
-**Javob:**
+### 4. Error.cause nima va qanday ishlatiladi? [Middle]
+
+<details>
+<summary>Javob</summary>
 
 `Error.cause` (ES2022) — xatoning asl sababini saqlash. Ikkinchi argument sifatida `{ cause }` options obyekti beriladi:
 
@@ -220,110 +152,13 @@ try {
 
 Bu nima uchun kerak: ko'p qatlamli dasturlarda past darajadagi texnik xato (ENOENT, JSON parse, ECONNREFUSED) yuqori darajadagi xatoga aylantiriladi. `cause` yo'q bo'lganda asl sabab yo'qoladi. `cause` bilan xatolar zanjiri to'liq saqlanadi — debugging osonlashadi.
 
----
 
-## Savol 7: Output nima? try/catch va async [Middle+]
+</details>
 
-**Javob:**
+### 5. unhandledrejection eventi nima va qanday ishlatiladi? [Middle+]
 
-```javascript
-function test() {
-  try {
-    setTimeout(() => {
-      throw new Error("async xato");
-    }, 0);
-    console.log("A");
-  } catch (error) {
-    console.log("B:", error.message);
-  }
-  console.log("C");
-}
-
-test();
-```
-
-**Javob:**
-
-```
-A
-C
-// Keyin: Uncaught Error: async xato (console error)
-```
-
-`try/catch` faqat **sinxron** throw'ni ushlaydi. `setTimeout` callback boshqa execution context'da (keyingi event loop tick'da) bajariladi — o'sha paytda try/catch allaqachon tugagan. Shuning uchun `"A"` va `"C"` chiqadi, keyin callback ishlaganda xato ushlanmaydi va global error bo'ladi.
-
-```javascript
-// ✅ To'g'ri usul — callback ichida try/catch
-setTimeout(() => {
-  try {
-    throw new Error("async xato");
-  } catch (error) {
-    console.log("Ushlandi:", error.message); // ✅
-  }
-}, 0);
-
-// ✅ Yoki Promise + await
-try {
-  await new Promise((_, reject) => {
-    setTimeout(() => reject(new Error("async xato")), 0);
-  });
-} catch (error) {
-  console.log("Ushlandi:", error.message); // ✅
-}
-```
-
----
-
-## Savol 8: Bu kodda nima xato va qanday tuzatiladi? [Middle]
-
-**Javob:**
-
-```javascript
-async function fetchData() {
-  const response = await fetch("/api/data");
-  const data = await response.json();
-  return data;
-}
-
-// Chaqirish
-fetchData();
-console.log("Done");
-```
-
-**3 ta xato bor:**
-
-1. **HTTP error tekshiruvi yo'q** — `fetch()` faqat network error da reject bo'ladi, 404/500 HTTP status'lar uchun reject qilmaydi.
-
-2. **Error handling yo'q** — `async` funksiya Promise qaytaradi, lekin `.catch()` yoki `try/catch` yo'q. Agar xato bo'lsa — `UnhandledPromiseRejection`.
-
-3. **Natijani ishlatish mumkin emas** — `await` yo'q, `console.log("Done")` darhol ishlaydi, data hali kelmagan.
-
-```javascript
-// ✅ Tuzatilgan versiya
-async function fetchData() {
-  const response = await fetch("/api/data");
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-try {
-  const data = await fetchData();
-  console.log("Data:", data);
-  console.log("Done");
-} catch (error) {
-  console.error("Xato:", error.message);
-}
-```
-
----
-
-## Savol 9: unhandledrejection eventi nima va qanday ishlatiladi? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `unhandledrejection` — Promise reject bo'lib, hech qayerda `.catch()` yoki `try/catch` bilan ushlanmaganda browser/Node.js tomonidan trigger qilinadigan event. Bu xatolarni global darajada ushlashning oxirgi himoya qatlami.
 
@@ -356,56 +191,13 @@ Bu **asosiy** error handling o'rniga emas, qo'shimcha sifatida ishlatiladi. Har 
 
 Event loop'da microtask queue'dagi barcha microtask'lar tugagandan keyin, agar biror Promise rejected holatda va hech qanday rejection handler yo'q bo'lsa — engine `unhandledrejection` event'ini dispatch qiladi. Agar keyinroq `.catch()` qo'shilsa — `rejectionhandled` eventi trigger bo'ladi.
 
----
 
-## Savol 10: Output nima? Error propagation [Middle+]
+</details>
 
-**Javob:**
+### 6. Re-throwing pattern nima? Qachon ishlatiladi? [Middle+]
 
-```javascript
-function a() {
-  console.log("a start");
-  b();
-  console.log("a end");
-}
-
-function b() {
-  console.log("b start");
-  c();
-  console.log("b end");
-}
-
-function c() {
-  console.log("c start");
-  throw new Error("c xato");
-  console.log("c end");
-}
-
-try {
-  a();
-} catch (error) {
-  console.log("caught:", error.message);
-}
-console.log("done");
-```
-
-**Javob:**
-
-```
-a start
-b start
-c start
-caught: c xato
-done
-```
-
-`c()` da throw sodir bo'ladi — `"c end"` ishlamaydi. `b()` da catch yo'q — `"b end"` ishlamaydi, xato yuqoriga. `a()` da catch yo'q — `"a end"` ishlamaydi, xato yana yuqoriga. Global try/catch'da ushlanadi — `"caught: c xato"`. Keyin normal execution davom etadi — `"done"`. Bu **stack unwinding** — throw dan keyin eng yaqin catch'gacha barcha frame'lar skip qilinadi.
-
----
-
-## Savol 11: Re-throwing pattern nima? Qachon ishlatiladi? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Re-throwing — catch blokda faqat boshqara oladigan xatolarni ushlash, qolganlarini qayta `throw` qilish. Bu eng muhim error handling pattern'laridan biri.
 
@@ -427,11 +219,13 @@ function processInput(data) {
 
 **Nima uchun:** Agar barcha xatolarni catch qilib, hammasini bir xil boshqarsangiz — kutilmagan xatolar (TypeError, RangeError) yashirinib qoladi. Faqat bilgan va boshqara oladigan xatolarni ushlash — qolganlarini yuqoriga uzatish kerak. Bu "catch what you can handle, re-throw what you can't" prinsipi.
 
----
 
-## Savol 12: Result pattern nima? throw dan qanday farq qiladi? [Senior]
+</details>
 
-**Javob:**
+### 7. Result pattern nima? throw dan qanday farq qiladi? [Senior]
+
+<details>
+<summary>Javob</summary>
 
 Result pattern — `try/catch` va `throw` o'rniga natija obyekti qaytarish: `{ ok: true, data }` yoki `{ ok: false, error }`. Go tilida standart, JavaScript da kutilgan xatolar uchun ishlatiladi.
 
@@ -466,11 +260,13 @@ if (!ok) console.log(error);
 
 Performance: zamonaviy engine'larda try/catch overhead minimal (V8 TurboFan optimized). Lekin `throw` stack trace yaratadi — bu costly operatsiya. Agar xato **tez-tez** sodir bo'lsa (validatsiya loop ichida) — Result pattern tezroq. Agar xato **kamdan-kam** sodir bo'lsa — `throw` yaxshi.
 
----
 
-## Savol 13: Operational vs Programmer errors farqi nima? [Senior]
+</details>
 
-**Javob:**
+### 8. Operational vs Programmer errors farqi nima? [Senior]
+
+<details>
+<summary>Javob</summary>
 
 **Operational errors** — dastur to'g'ri yozilgan, lekin tashqi omillar sababli xato: network timeout, fayl topilmadi, user input noto'g'ri, rate limit, disk to'ldi. Bular **kutilgan** va **boshqarish mumkin** — retry, fallback, foydalanuvchiga xabar.
 
@@ -506,11 +302,13 @@ const err = new AppError("null reference", 500, false);
 
 Node.js da `uncaughtException` dan keyin `process.exit(1)` tavsiya qilinadi — chunki programmer error application state'ni noaniq holatga olib kelishi mumkin. PM2, Docker, Kubernetes kabi process manager'lar avtomatik restart qiladi. Operational error'lar uchun esa dastur normal davom etishi kerak.
 
----
 
-## Savol 14: Circuit Breaker pattern'ini tushuntiring va implement qiling [Senior]
+</details>
 
-**Javob:**
+### 9. Circuit Breaker pattern'ini tushuntiring va implement qiling [Senior]
+
+<details>
+<summary>Javob</summary>
 
 Circuit Breaker — tashqi servisga ko'p marta muvaffaqiyatsiz so'rov yuborilgandan keyin yangi so'rovlarni **vaqtincha to'xtatish** pattern'i. Servisni haddan tashqari yuklashni va cascading failure'ni oldini oladi.
 
@@ -578,11 +376,13 @@ const breaker = new CircuitBreaker(
 
 Real production da qo'shimcha narsalar kerak: health check endpoint, sliding window (so'nggi N sekunddagi xatolar), half-open da faqat bitta so'rov o'tkazish (semaphore), logging/metrics. Netflix Hystrix (Java) va opossum (Node.js) kutubxonalari to'liq implementatsiya beradi.
 
----
 
-## Savol 15: Graceful degradation pattern'ini tushuntiring [Senior]
+</details>
 
-**Javob:**
+### 10. Graceful degradation pattern'ini tushuntiring [Senior]
+
+<details>
+<summary>Javob</summary>
 
 Graceful degradation — asosiy data manba ishlamasa bir necha bosqichda fallback'larga o'tish. Foydalanuvchi har doim natija oladi — to'liq yoki qisman.
 
@@ -624,47 +424,14 @@ async function getUserData(userId) {
 
 Pattern'ning 3 ta prinsipi: (1) Har bir bosqich o'z try/catch'ida — bitta bosqich xatosi boshqasiga ta'sir qilmaydi. (2) Muvaffaqiyatli natijada cache yangilanadi — keyingi xatoda yangi cache ishlatiladi. (3) Fallback natija har doim qaytadi — foydalanuvchi "500 error" ko'rmaydi.
 
----
+**Deep Dive:** Resilience engineering'da bu pattern "bulkhead" prinsipi bilan bog'liq — har bir bosqich izolyatsiyalangan, bitta bosqich xatosi boshqalarni cascading failure'ga olib kelmaydi. Netflix va Amazon kabi kompaniyalar multi-tier fallback (primary API → replica → cache → static default) ishlatadi. Browser'da Service Worker cache layer ham shu pattern'ning infratuzilma darajasidagi implementatsiyasi.
 
-## Savol 16: retry funksiyasini exponential backoff bilan implement qiling [Middle+]
+</details>
 
-**Javob:**
+### 11. window.onerror vs addEventListener("error") farqi nima? [Middle+]
 
-```javascript
-async function retry(fn, { maxRetries = 3, delay = 1000, backoff = 2 } = {}) {
-  let lastError;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn(attempt);
-    } catch (error) {
-      lastError = error;
-      if (attempt === maxRetries) break;
-
-      const waitTime = delay * Math.pow(backoff, attempt);
-      // Jitter qo'shish — bir vaqtda ko'p client qayta urinmasligi uchun
-      const jitter = waitTime * Math.random() * 0.1;
-      await new Promise(r => setTimeout(r, waitTime + jitter));
-    }
-  }
-
-  throw new Error(`${maxRetries + 1} urinish muvaffaqiyatsiz`, { cause: lastError });
-}
-
-// Kutish vaqtlari (delay=1000, backoff=2):
-// Urinish 0: darhol
-// Urinish 1: ~1000ms kutish
-// Urinish 2: ~2000ms kutish
-// Urinish 3: ~4000ms kutish
-```
-
-Exponential backoff server'ni haddan tashqari yuklashni oldini oladi. Jitter (tasodifiy kechikish) qo'shish muhim — agar 1000 ta client bir vaqtda xato olsa va 1s keyin hammasi qayta urinsa — server yana overload bo'ladi. Jitter bilan so'rovlar tarqaladi.
-
----
-
-## Savol 17: window.onerror vs addEventListener("error") farqi nima? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | | `window.onerror` | `addEventListener("error")` |
 |---|---|---|
@@ -695,47 +462,13 @@ window.addEventListener("error", (event) => {
 
 Resurs xatolari (img, script) bubble qilmaydi — shuning uchun **capture phase** da (`true` argument bilan) ushlash kerak.
 
----
 
-## Savol 18: Output nima? Promise error handling [Middle+]
+</details>
 
-**Javob:**
+### 12. Promise.allSettled vs Promise.all — error handling farqi? [Middle]
 
-```javascript
-Promise.resolve(1)
-  .then(val => {
-    console.log("A:", val);
-    throw new Error("xato");
-  })
-  .then(val => {
-    console.log("B:", val);
-  })
-  .catch(err => {
-    console.log("C:", err.message);
-    return 42;
-  })
-  .then(val => {
-    console.log("D:", val);
-  });
-```
-
-**Javob:**
-
-```
-A: 1
-C: xato
-D: 42
-```
-
-`"A: 1"` — birinchi then, val = 1. throw sodir bo'ladi. `"B"` — **o'tkaziladi**, chunki xato bo'ldi — eng yaqin `.catch()`'ga boradi. `"C: xato"` — catch xatoni ushladi va `42` qaytardi. `"D: 42"` — catch'dan keyin zanjir davom etadi, catch'ning return qiymati keyingi then'ga o'tadi.
-
-**MUHIM**: `.catch()` xatoni **recovery** qiladi — catch'dan keyin zanjir normal davom etadi. Agar catch ichida yana throw qilsangiz — keyingi catch ga o'tadi.
-
----
-
-## Savol 19: Promise.allSettled vs Promise.all — error handling farqi? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | | `Promise.all` | `Promise.allSettled` |
 |---|---|---|
@@ -769,11 +502,13 @@ const succeeded = results.filter(r => r.status === "fulfilled").map(r => r.value
 const failed = results.filter(r => r.status === "rejected").map(r => r.reason);
 ```
 
----
 
-## Savol 20: Error handling best practices ro'yxatini ayting [Senior]
+</details>
 
-**Javob:**
+### 13. Error handling best practices ro'yxatini ayting [Senior]
+
+<details>
+<summary>Javob</summary>
 
 1. **Doim `Error` throw qiling** — string, number emas. Stack trace uchun.
 
@@ -785,7 +520,7 @@ const failed = results.filter(r => r.status === "rejected").map(r => r.reason);
 
 5. **Har bir async operatsiyada catch bo'lsin** — `.catch()` yoki `try/catch` + `await`.
 
-6. **Error.cause ishlatng** — xato zanjirini saqlash uchun (ES2022).
+6. **Error.cause ishlating** — xato zanjirini saqlash uchun (ES2022).
 
 7. **Custom error class'lar yarating** — `instanceof` bilan aniq tekshirish, statusCode, qo'shimcha field'lar.
 
@@ -816,3 +551,313 @@ app.use((error, req, res, next) => {
   });
 });
 ```
+
+**Deep Dive:** Express'da error-handling middleware'ni aniqlash uchun 4 ta parameter bilan `(error, req, res, next)` imzo ishlatiladi — Express `function.length` ni tekshirib error middleware'ni oddiy middleware'dan ajratadi. Node.js 15+ da `unhandledRejection` default `throw` qiladi — jarayon tushadi. `Error.captureStackTrace(this, this.constructor)` (V8-specific) custom error'larda stack trace'ni constructor frame'dan boshlaydi — debug uchun toza stack trace beradi.
+
+</details>
+
+---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Output nima? try/catch/finally execution order [Middle]
+
+
+```javascript
+function test() {
+  try {
+    console.log("A");
+    throw new Error("xato");
+    console.log("B");
+  } catch (error) {
+    console.log("C");
+    return "catch";
+  } finally {
+    console.log("D");
+  }
+  console.log("E");
+}
+
+console.log(test());
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+A
+C
+D
+catch
+```
+
+`"A"` — try boshi. throw sodir bo'ladi — `"B"` o'tkaziladi. `"C"` — catch ishlaydi. `return "catch"` — **lekin avval** finally ishlaydi. `"D"` — finally DOIM ishlaydi, hatto return bo'lsa ham. Keyin catch'dagi `return "catch"` qaytadi. `"E"` — hech qachon ishlamaydi, chunki catch'da `return` bor.
+
+
+</details>
+
+### 2. Output nima? finally da return [Middle+]
+
+
+```javascript
+function tricky() {
+  try {
+    throw new Error("xato!");
+  } catch (error) {
+    console.log("catch:", error.message);
+    return 1;
+  } finally {
+    return 2;
+  }
+}
+
+console.log(tricky());
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+catch: xato!
+2
+```
+
+`finally` ichidagi `return` catch'dagi `return 1` ni **override** qiladi. finally completion har doim ustun — try/catch'dagi return va hatto throw ham yo'qoladi. **QOIDA: finally ichida hech qachon return yozmang!**
+
+```javascript
+// Yana bir xavfli holat — throw ham yo'qoladi:
+function swallow() {
+  try {
+    throw new Error("muhim!");
+  } finally {
+    return "ok"; // Error yo'qoldi — tashqariga hech qachon chiqmaydi!
+  }
+}
+console.log(swallow()); // "ok" — xato yutildi
+```
+
+
+</details>
+
+### 3. Output nima? try/catch va async [Middle+]
+
+
+```javascript
+function test() {
+  try {
+    setTimeout(() => {
+      throw new Error("async xato");
+    }, 0);
+    console.log("A");
+  } catch (error) {
+    console.log("B:", error.message);
+  }
+  console.log("C");
+}
+
+test();
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+A
+C
+// Keyin: Uncaught Error: async xato (console error)
+```
+
+`try/catch` faqat **sinxron** throw'ni ushlaydi. `setTimeout` callback boshqa execution context'da (keyingi event loop tick'da) bajariladi — o'sha paytda try/catch allaqachon tugagan. Shuning uchun `"A"` va `"C"` chiqadi, keyin callback ishlaganda xato ushlanmaydi va global error bo'ladi.
+
+```javascript
+// ✅ To'g'ri usul — callback ichida try/catch
+setTimeout(() => {
+  try {
+    throw new Error("async xato");
+  } catch (error) {
+    console.log("Ushlandi:", error.message); // ✅
+  }
+}, 0);
+
+// ✅ Yoki Promise + await
+try {
+  await new Promise((_, reject) => {
+    setTimeout(() => reject(new Error("async xato")), 0);
+  });
+} catch (error) {
+  console.log("Ushlandi:", error.message); // ✅
+}
+```
+
+
+</details>
+
+### 4. Bu kodda nima xato va qanday tuzatiladi? [Middle]
+
+```javascript
+async function fetchData() {
+  const response = await fetch("/api/data");
+  const data = await response.json();
+  return data;
+}
+
+// Chaqirish
+fetchData();
+console.log("Done");
+```
+
+<details>
+<summary>Javob</summary>
+
+**3 ta xato bor:**
+
+1. **HTTP error tekshiruvi yo'q** — `fetch()` faqat network error da reject bo'ladi, 404/500 HTTP status'lar uchun reject qilmaydi.
+
+2. **Error handling yo'q** — `async` funksiya Promise qaytaradi, lekin `.catch()` yoki `try/catch` yo'q. Agar xato bo'lsa — `UnhandledPromiseRejection`.
+
+3. **Natijani ishlatish mumkin emas** — `await` yo'q, `console.log("Done")` darhol ishlaydi, data hali kelmagan.
+
+```javascript
+// ✅ Tuzatilgan versiya
+async function fetchData() {
+  const response = await fetch("/api/data");
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+try {
+  const data = await fetchData();
+  console.log("Data:", data);
+  console.log("Done");
+} catch (error) {
+  console.error("Xato:", error.message);
+}
+```
+
+
+</details>
+
+### 5. Output nima? Error propagation [Middle+]
+
+
+```javascript
+function a() {
+  console.log("a start");
+  b();
+  console.log("a end");
+}
+
+function b() {
+  console.log("b start");
+  c();
+  console.log("b end");
+}
+
+function c() {
+  console.log("c start");
+  throw new Error("c xato");
+  console.log("c end");
+}
+
+try {
+  a();
+} catch (error) {
+  console.log("caught:", error.message);
+}
+console.log("done");
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+a start
+b start
+c start
+caught: c xato
+done
+```
+
+`c()` da throw sodir bo'ladi — `"c end"` ishlamaydi. `b()` da catch yo'q — `"b end"` ishlamaydi, xato yuqoriga. `a()` da catch yo'q — `"a end"` ishlamaydi, xato yana yuqoriga. Global try/catch'da ushlanadi — `"caught: c xato"`. Keyin normal execution davom etadi — `"done"`. Bu **stack unwinding** — throw dan keyin eng yaqin catch'gacha barcha frame'lar skip qilinadi.
+
+
+</details>
+
+### 6. retry funksiyasini exponential backoff bilan implement qiling [Middle+]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+async function retry(fn, { maxRetries = 3, delay = 1000, backoff = 2 } = {}) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn(attempt);
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxRetries) break;
+
+      const waitTime = delay * Math.pow(backoff, attempt);
+      // Jitter qo'shish — bir vaqtda ko'p client qayta urinmasligi uchun
+      const jitter = waitTime * Math.random() * 0.1;
+      await new Promise(r => setTimeout(r, waitTime + jitter));
+    }
+  }
+
+  throw new Error(`${maxRetries + 1} urinish muvaffaqiyatsiz`, { cause: lastError });
+}
+
+// Kutish vaqtlari (delay=1000, backoff=2):
+// Urinish 0: darhol
+// Urinish 1: ~1000ms kutish
+// Urinish 2: ~2000ms kutish
+// Urinish 3: ~4000ms kutish
+```
+
+Exponential backoff server'ni haddan tashqari yuklashni oldini oladi. Jitter (tasodifiy kechikish) qo'shish muhim — agar 1000 ta client bir vaqtda xato olsa va 1s keyin hammasi qayta urinsa — server yana overload bo'ladi. Jitter bilan so'rovlar tarqaladi.
+
+
+</details>
+
+### 7. Output nima? Promise error handling [Middle+]
+
+
+```javascript
+Promise.resolve(1)
+  .then(val => {
+    console.log("A:", val);
+    throw new Error("xato");
+  })
+  .then(val => {
+    console.log("B:", val);
+  })
+  .catch(err => {
+    console.log("C:", err.message);
+    return 42;
+  })
+  .then(val => {
+    console.log("D:", val);
+  });
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+A: 1
+C: xato
+D: 42
+```
+
+`"A: 1"` — birinchi then, val = 1. throw sodir bo'ladi. `"B"` — **o'tkaziladi**, chunki xato bo'ldi — eng yaqin `.catch()`'ga boradi. `"C: xato"` — catch xatoni ushladi va `42` qaytardi. `"D: 42"` — catch'dan keyin zanjir davom etadi, catch'ning return qiymati keyingi then'ga o'tadi.
+
+**MUHIM**: `.catch()` xatoni **recovery** qiladi — catch'dan keyin zanjir normal davom etadi. Agar catch ichida yana throw qilsangiz — keyingi catch ga o'tadi.
+
+
+</details>

@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Stack va Heap farqi nima? Qaysi ma'lumotlar qayerda saqlanadi? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Stack va Heap farqi nima? Qaysi ma'lumotlar qayerda saqlanadi? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 JavaScript engine xotirani ikki hududda boshqaradi:
 
@@ -20,8 +23,8 @@ JavaScript engine xotirani ikki hududda boshqaradi:
 | **Xato** | Stack Overflow (chuqur recursion) | Out of Memory (ko'p object) |
 
 ```javascript
-let name = "Ali";         // "Ali" → STACK (primitive — value)
-let age = 25;              // 25 → STACK (primitive — Smi)
+let name = "Ali";         // "Ali" → HEAP (string — HeapString, pointer stack'da)
+let age = 25;              // 25 → STACK (primitive — Smi, inline saqlanadi)
 
 let user = {               // pointer → STACK, object → HEAP
   name: "Ali",
@@ -36,20 +39,28 @@ console.log(user.name);   // "Vali" — bitta object!
 ```
 STACK                         HEAP
 ┌────────────────┐           ┌──────────────────┐
-│ name: "Ali"    │           │                  │
-│ age: 25        │           │  { name: "Ali",  │
-│ user: ─────────────────→   │    age: 25 }     │
-│ copy: ─────────────────→   │                  │
+│ name: ─────────────────→   │  "Ali"           │
+│ age: 25 (Smi)  │           │                  │
+│ user: ─────────────────→   │  { name: "Ali",  │
+│ copy: ─────────────────→   │    age: 25 }     │
 └────────────────┘           └──────────────────┘
 ```
 
-V8 da heap bir nechta bo'limga bo'lingan: New Space (yangi object'lar — Scavenger GC), Old Space (yashagan object'lar — Mark-Compact GC), Large Object Space, Code Space (JIT compiled), Map Space (Hidden Classes).
+V8 da heap bir nechta bo'limga bo'lingan (2023+ V8 v11 layout):
+- **New Space** — yangi object'lar (Scavenger GC, semi-space A/B)
+- **Old Space** — yashagan object'lar + Hidden Class (Map) object'lar (Mark-Compact GC)
+- **Large Object Space** — katta object'lar (yuzlab KB dan katta)
+- **Code Space** — JIT compiled machine code
+- **Read-Only Space** — immutable shared data (string table, built-in constants)
 
----
+> ⚠️ Eski materiallar "Map Space" alohida ko'rsatadi — V8 v11 (2023+) dan beri Map Space **olib tashlangan**, Hidden Class (Map) object'lari endi Old Space'da saqlanadi.
 
-## Savol 2: Copy by value va copy by reference farqi nima? [Junior+]
+</details>
 
-**Javob:**
+### 2. Copy by value va copy by reference farqi nima? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 Primitive turlari (number, string, boolean, undefined, null, symbol, bigint) **copy by value** — o'zgaruvchiga tayinlanganda qiymatning mustaqil nusxasi yaratiladi, birini o'zgartirish ikkinchisiga ta'sir qilmaydi.
 
@@ -77,44 +88,17 @@ console.log(arr1);  // [1, 2, 3, 4] — o'zgarmadi ✅
 
 Bu farq React/Redux da muhim: state'ni mutate qilsangiz reference bir xil qoladi → `===` true → re-render bo'lmaydi. Immutable update (spread, map, filter) yangi reference yaratadi.
 
----
+</details>
 
-## Savol 3: Quyidagi kodning output'ini ayting [Middle]
+### 3. Garbage Collection qanday ishlaydi? Mark-and-Sweep nima? [Middle]
 
-```javascript
-function modify(obj, num) {
-  obj.x = 10;
-  num = 10;
-}
-
-let myObj = { x: 1 };
-let myNum = 1;
-
-modify(myObj, myNum);
-
-console.log(myObj.x); // ?
-console.log(myNum);   // ?
-```
-
-**Javob:**
-
-```
-10
-1
-```
-
-`myObj` — reference type. Funksiyaga pointer nusxasi beriladi, `obj.x = 10` orqali **original** object o'zgaradi. `myNum` — primitive. Funksiyaga **qiymat nusxasi** beriladi, `num = 10` faqat local nusxani o'zgartiradi, original `myNum` o'zgarmaydi.
-
----
-
-## Savol 4: Garbage Collection qanday ishlaydi? Mark-and-Sweep nima? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 JavaScript avtomatik memory management ishlatadi — Garbage Collector keraksiz object'larni topib tozalaydi.
 
 Zamonaviy standart — **Mark-and-Sweep** algoritmi:
-1. **Root** lardan boshlash: global object, call stack variables, active closures
+1. **Root** lardan boshlash: global object, call stack frame variables, VM internal handles (closure'lar root emas — ular stack variables orqali **reachable**)
 2. **Mark**: root'dan reachable bo'lgan barcha object'larni belgilash (BFS/DFS)
 3. **Sweep**: belgilanmagan (unreachable) object'larni tozalash
 
@@ -128,16 +112,17 @@ ROOT → A ✓ → B ✓ → C ✓
 Bu algoritm **circular reference** muammosini hal qiladi — ikkita object bir-biriga reference qilsa ham, root'dan reachable bo'lmasa tozalanadi. Eski Reference Counting algoritmi buni hal qila olmasdi.
 
 V8 **Generational GC** ishlatadi:
-- **Young Generation** (Scavenger, ~1-5ms) — yangi object'lar, tez tozalaydi
-- **Old Generation** (Mark-Compact, ~50-200ms) — yashagan object'lar, chuqur tozalaydi
+- **Young Generation** (Scavenger/Minor GC) — yangi object'lar, tez tozalaydi (odatda qisqa pauzalar)
+- **Old Generation** (Mark-Compact/Major GC) — yashagan object'lar, chuqur tozalaydi (concurrent marking tufayli main thread pauzasi qisqa)
 
-**Orinoco** tizimi — incremental, concurrent, parallel GC ni birlashtiradi, UI ~60fps saqlanadi.
+**Orinoco** tizimi — incremental, concurrent, parallel GC ni birlashtiradi. Aniq pauza vaqtlari V8 versiyasi, heap hajmi va workload'ga bog'liq — benchmark'siz raqam berish noto'g'ri.
 
----
+</details>
 
-## Savol 5: Memory leak nima? Eng keng tarqalgan turlari qaysilar? [Middle]
+### 4. Memory leak nima? Eng keng tarqalgan turlari qaysilar? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Memory leak — dastur ishlayotganida xotira to'planib ketishi, lekin GC uni tozalay olmasligi. Sababi: object'ga biz unutgan/tashlab qo'ygan reference mavjud — GC uchun "kerakli".
 
@@ -168,44 +153,12 @@ class ComponentFixed {
 }
 ```
 
----
+</details>
 
-## Savol 6: Quyidagi kodning output'ini ayting [Middle+]
+### 5. WeakMap va Map farqi nima? Qachon WeakMap ishlatish kerak? [Middle+]
 
-```javascript
-let a = { value: 1 };
-let b = a;
-let c = { value: 1 };
-
-console.log(a === b);  // ?
-console.log(a === c);  // ?
-
-b.value = 2;
-console.log(a.value);  // ?
-
-b = { value: 3 };
-console.log(a.value);  // ?
-```
-
-**Javob:**
-
-```
-true
-false
-2
-2
-```
-
-- `a === b` → `true` — ikkalasi **bitta** object'ga ishora qiladi (pointer copy)
-- `a === c` → `false` — tarkibi bir xil, lekin **turli** object'lar (heap'da turli joyda)
-- `b.value = 2` → `a.value` ham 2 bo'ladi — bitta object (b pointer orqali mutate)
-- `b = { value: 3 }` → b yangi object'ga ishora qildi, lekin `a` hali eski object'da → `a.value` hali 2
-
----
-
-## Savol 7: WeakMap va Map farqi nima? Qachon WeakMap ishlatish kerak? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Xususiyat | `Map` | `WeakMap` |
 |-----------|-------|-----------|
@@ -233,67 +186,12 @@ WeakMap ishlatish kerak bo'lgan holatlar:
 2. **Private data** — class instance bilan birga GC bo'lsin
 3. **Memoization** — argument object GC bo'lganda cache ham tozalansin
 
----
+</details>
 
-## Savol 8: Bu kodda memory leak bormi? Toping va tuzating. [Middle+]
+### 6. WeakRef nima? Qachon ishlatiladi? [Middle+]
 
-```javascript
-function createCounter() {
-  const history = [];
-  let count = 0;
-
-  return {
-    increment() {
-      count++;
-      history.push({ value: count, timestamp: Date.now() });
-    },
-    getCount() { return count; },
-    getHistory() { return history; }
-  };
-}
-
-const counter = createCounter();
-setInterval(() => counter.increment(), 100);
-```
-
-**Javob:**
-
-**2 ta muammo:**
-1. **`history` array cheksiz o'sadi** — har 100ms da yangi object qo'shiladi, hech qachon tozalanmaydi
-2. **`setInterval` to'xtatilmaydi** — clearInterval yo'q
-
-```javascript
-function createCounterFixed(maxHistory = 1000) {
-  const history = [];
-  let count = 0;
-
-  return {
-    increment() {
-      count++;
-      history.push({ value: count, timestamp: Date.now() });
-      if (history.length > maxHistory) {
-        history.splice(0, history.length - maxHistory); // eski entry tozalash ✅
-      }
-    },
-    getCount() { return count; },
-    getHistory() { return history; },
-    startAutoIncrement(ms = 100) {
-      const id = setInterval(() => this.increment(), ms);
-      return () => clearInterval(id); // cleanup function qaytarish ✅
-    }
-  };
-}
-
-const counter = createCounterFixed(500);
-const stop = counter.startAutoIncrement(100);
-// Kerak bo'lmaganda: stop();
-```
-
----
-
-## Savol 9: WeakRef nima? Qachon ishlatiladi? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `WeakRef` (ES2021) — object'ga **kuchsiz reference** yaratadi. Oddiy (strong) reference GC ga "bu object kerak" deydi. WeakRef esa GC ga to'sqinlik qilmaydi — object'ga boshqa strong reference bo'lmasa, GC tozalashi mumkin.
 
@@ -316,53 +214,12 @@ Ishlatiladi: **cache** tizimlari (katta object'larni kerak bo'lganda GC tozalash
 
 Muhim: GC **qachon** ishlashi noaniq — `deref()` istalgan paytda `undefined` qaytarishi mumkin. Dastur logikasini bunga asoslamang — faqat optimization uchun.
 
----
+</details>
 
-## Savol 10: Quyidagi kodning output'ini ayting [Middle+]
+### 7. Chrome DevTools da memory leak qanday topiladi? [Middle+]
 
-```javascript
-function outer() {
-  let large = new Array(1000000).fill("x");
-
-  return function inner() {
-    return large.length;
-  };
-}
-
-const fn = outer();
-console.log(fn()); // ?
-
-// large GC tozalay oladimi?
-```
-
-**Javob:**
-
-```
-1000000
-```
-
-`large` GC tozalay **olmaydi** — `inner` funksiya closure orqali `large` ga reference ushlab turadi. `fn` o'zgaruvchisi tirik ekan, `large` (1M elementli array) xotirada qoladi.
-
-GC tozalashi uchun: `fn = null` qilish kerak — shunda `inner` → `large` reference chain uziladi va GC tozalay oladi.
-
-Yaxshiroq yondashuv — faqat kerakli ma'lumotni capture qilish:
-
-```javascript
-function outerFixed() {
-  const large = new Array(1000000).fill("x");
-  const length = large.length; // faqat kerakli data
-
-  return function inner() {
-    return length; // large reference qilmaydi → GC tozalaydi ✅
-  };
-}
-```
-
----
-
-## Savol 11: Chrome DevTools da memory leak qanday topiladi? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **Comparison Workflow** — eng samarali usul:
 
@@ -379,24 +236,25 @@ function outerFixed() {
 
 **Shallow Size** — object o'zi egallagan xotira. **Retained Size** — object + u ushlab turgan barcha sub-object'lar. Retained Size muhimroq — leak hajmini ko'rsatadi.
 
----
+</details>
 
-## Savol 12: V8 da Generational GC nima? Young va Old Generation farqi? [Senior]
+### 8. V8 da Generational GC nima? Young va Old Generation farqi? [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 V8 **Generational Hypothesis** ga asoslanadi: ko'pchilik object'lar qisqa muddatli. Shuning uchun heap ikki avlodga bo'lingan:
 
-**Young Generation (New Space, 1-8MB):**
+**Young Generation (New Space):**
 - Barcha yangi object'lar shu yerda yaratiladi
 - Ikki **semi-space** (From, To) — Cheney's copying algorithm
-- **Scavenger** (Minor GC) — tez (~1-5ms), tez-tez ishlaydi
+- **Scavenger** (Minor GC) — tez, tez-tez ishlaydi (odatda millisekund'lar darajasida)
 - Tirik object'larni From → To ko'chiradi, keyin almashadi
 - 2 marta omon qolgan object → Old Generation ga **promote** bo'ladi
 
 **Old Generation (Old Space, yuzlab MB):**
-- Yashagan (promoted) object'lar shu yerda
-- **Mark-Compact** (Major GC) — sekinroq (~50-200ms), kamroq ishlaydi
+- Yashagan (promoted) object'lar + Hidden Class (Map) object'lar (V8 v11+)
+- **Mark-Compact** (Major GC) — kamroq ishlaydi, lekin concurrent marking tufayli main thread pauzasi ancha qisqa
 - 3 bosqich: Mark (reachable belgilash) → Sweep (unreachable tozalash) → Compact (fragmentation kamaytirish)
 
 **Orinoco** — V8 ning zamonaviy GC tizimi:
@@ -404,13 +262,16 @@ V8 **Generational Hypothesis** ga asoslanadi: ko'pchilik object'lar qisqa muddat
 - **Concurrent marking** — background thread da, JS to'xtamaydi
 - **Parallel** — bir nechta GC thread birgalikda ishlaydi
 
-Bu kombinatsiya tufayli Major GC ham main thread ni minimal to'xtatadi (~60fps saqlanadi).
+Bu kombinatsiya tufayli Major GC ham main thread ni minimal to'xtatadi — modern V8 da GC pauzalari aksariyat workload'lar uchun sezilarli emas (aniq raqamlar V8 versiyasi va heap hajmiga bog'liq).
 
----
+**Deep Dive:** V8 ning Young Generation semi-space hajmi `--max-semi-space-size` bilan boshqariladi (default 16MB, 64-bit). Object 2 ta Scavenge GC'dan omon qolsa Old Space'ga promote bo'ladi. Orinoco concurrent marking worker thread'larda `write barrier` yordamida ishlaydi — main thread object graph'ni o'zgartirsa, barrier bu o'zgarishni marking thread'ga signal qiladi.
 
-## Savol 13: `structuredClone` va `JSON.parse(JSON.stringify())` farqi nima? [Middle]
+</details>
 
-**Javob:**
+### 9. `structuredClone` va `JSON.parse(JSON.stringify())` farqi nima? [Middle]
+
+<details>
+<summary>Javob</summary>
 
 | Xususiyat | `JSON.parse(JSON.stringify())` | `structuredClone()` |
 |-----------|-------------------------------|---------------------|
@@ -420,7 +281,7 @@ Bu kombinatsiya tufayli Major GC ham main thread ni minimal to'xtatadi (~60fps s
 | Circular ref | ❌ TypeError | ✅ To'g'ri ishlaydi |
 | Function | ❌ Yo'qoladi | ❌ Yo'qoladi |
 | undefined | ❌ Yo'qoladi | ✅ Saqlanadi |
-| Tezlik | Sekinroq (serialize+parse) | Tezroq (binary copy) |
+| Tezlik | Ko'p hollarda tezroq (oddiy object uchun) | Sekinroq, lekin to'g'riroq (ko'p turlarni qo'llab-quvvatlaydi) |
 
 ```javascript
 const obj = { date: new Date(), set: new Set([1,2,3]) };
@@ -436,11 +297,12 @@ console.log(clone.set);  // Set {1, 2, 3} ✅
 
 Qoida: shallow copy → spread/`Object.assign` (eng tez). Deep copy → `structuredClone` (to'g'ri + tez). Serialize kerak → JSON (network/storage uchun).
 
----
+</details>
 
-## Savol 14: Object pooling nima? Qachon ishlatiladi? [Senior]
+### 10. Object pooling nima? Qachon ishlatiladi? [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Object pooling — ko'p object yaratish-yo'q qilish o'rniga, mavjud object'larni qayta ishlatish patterni. GC yukini kamaytiradi va performance oshiradi.
 
@@ -479,11 +341,12 @@ Qachon **kerak emas**: oddiy CRUD, kam object yaratish, bir martalik amallar —
 
 **Deep Dive:** V8 da Young Generation (Scavenger) allaqachon copying collector — qisqa muddatli object'lar uchun optimallashtirilgan. Object pooling asosan Old Generation ga promote bo'lishni oldini olish uchun foydali.
 
----
+</details>
 
-## Savol 15: FinalizationRegistry nima? Real-world use case ayting. [Senior]
+### 11. FinalizationRegistry nima? Real-world use case ayting. [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `FinalizationRegistry` (ES2021) — object GC tomonidan tozalanganda callback chaqirish imkonini beradi. Bu tashqi resurslarni cleanup qilish uchun foydali.
 
@@ -531,11 +394,14 @@ class SmartCache {
 
 Muhim: callback **QACHON** chaqirilishi kafolatlanmagan — GC o'z vaqtida tozalaydi. Deterministik cleanup kerak bo'lsa — `try/finally` yoki ES2025 `using`/`Symbol.dispose` ishlatish kerak.
 
----
+**Deep Dive:** ECMAScript spec bo'yicha `FinalizationRegistry` callback microtask emas, balki host-defined "cleanup job" sifatida schedule qilinadi — brauzerda bu odatda GC cycle'dan keyin, keyingi task'da bajariladi. `unregister` token bilan registry'dan entry olib tashlash ham mumkin — bu `WeakRef` + `FinalizationRegistry` juftligida stale cleanup'ni oldini olish uchun muhim.
 
-## Savol 16: `AbortController` event listener cleanup uchun qanday ishlatiladi? [Middle+]
+</details>
 
-**Javob:**
+### 12. `AbortController` event listener cleanup uchun qanday ishlatiladi? [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 `addEventListener` ning `signal` optsiyasi orqali bir nechta listener'ni bir yo'la olib tashlash mumkin — `abort()` chaqirilganda barcha listener'lar avtomatik remove bo'ladi:
 
@@ -561,66 +427,12 @@ class Component {
 
 Bu pattern ayniqsa SPA component'larida foydali — `destroy()`/`unmount()` da bitta `abort()` chaqirish barcha listener'larni tozalaydi. `removeEventListener` bilan funksiya reference saqlash va har biriga alohida chaqirish kerak edi.
 
----
+</details>
 
-## Savol 17: `deepClone` funksiyasini implement qiling [Senior]
+### 13. React useEffect da memory leak qanday oldini olish mumkin? [Middle+]
 
-**Savol:** `structuredClone` ishlatmasdan, circular reference'larni ham qo'llab-quvvatlaydigan `deepClone` yozing.
-
-**Javob:**
-
-```javascript
-function deepClone(obj, seen = new WeakMap()) {
-  // Primitive yoki null — to'g'ridan-to'g'ri qaytarish
-  if (obj === null || typeof obj !== "object") return obj;
-
-  // Circular reference tekshirish
-  if (seen.has(obj)) return seen.get(obj);
-
-  // Maxsus turlar
-  if (obj instanceof Date) return new Date(obj.getTime());
-  if (obj instanceof RegExp) return new RegExp(obj.source, obj.flags);
-  if (obj instanceof Map) {
-    const map = new Map();
-    seen.set(obj, map);
-    obj.forEach((val, key) => map.set(deepClone(key, seen), deepClone(val, seen)));
-    return map;
-  }
-  if (obj instanceof Set) {
-    const set = new Set();
-    seen.set(obj, set);
-    obj.forEach(val => set.add(deepClone(val, seen)));
-    return set;
-  }
-
-  // Array yoki Object
-  const clone = Array.isArray(obj) ? [] : {};
-  seen.set(obj, clone); // circular ref uchun oldindan saqlash
-
-  for (const key of Reflect.ownKeys(obj)) {
-    clone[key] = deepClone(obj[key], seen);
-  }
-  return clone;
-}
-
-// Test:
-const obj = { a: 1, b: { c: 2 }, d: new Date(), e: new Set([1, 2]) };
-obj.self = obj; // circular
-
-const clone = deepClone(obj);
-console.log(clone.b.c);        // 2
-console.log(clone.d instanceof Date); // true
-console.log(clone.self === clone);    // true — circular saqlanadi
-console.log(clone === obj);           // false — turli object
-```
-
-**Deep Dive:** `WeakMap` circular reference'larni saqlash uchun ideal — allaqachon clone qilingan object'ni qayta uchratsak, WeakMap'dan olamiz. `Reflect.ownKeys` — Symbol property'larni ham o'z ichiga oladi (`Object.keys` faqat string key).
-
----
-
-## Savol 18: React useEffect da memory leak qanday oldini olish mumkin? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 React `useEffect` da **cleanup function** qaytarish — component unmount bo'lganda yoki dependency o'zgarganda chaqiriladi:
 
@@ -670,42 +482,12 @@ useEffect(() => {
 
 Cleanup kerak bo'lgan holatlar: `addEventListener`, `setInterval`/`setTimeout`, WebSocket, subscription, async fetch.
 
----
+</details>
 
-## Savol 19: Quyidagi kodning output'ini ayting [Middle+]
+### 14. V8 da xotirani monitoring qilish va profiling qanday qilinadi? (Node.js) [Senior]
 
-```javascript
-const weakMap = new WeakMap();
-let obj1 = { a: 1 };
-let obj2 = { b: 2 };
-
-weakMap.set(obj1, "first");
-weakMap.set(obj2, "second");
-
-console.log(weakMap.has(obj1)); // ?
-
-obj1 = null;
-// GC ishlagandan keyin:
-console.log(weakMap.has(obj1)); // ?
-```
-
-**Javob:**
-
-```
-true
-false
-```
-
-- Birinchi `weakMap.has(obj1)` → `true` — `obj1` hali tirik, WeakMap da entry bor
-- `obj1 = null` dan keyin — `weakMap.has(obj1)` aslida `weakMap.has(null)` → `false`
-
-Muhim nuance: `obj1 = null` qilganda WeakMap dan entry **ham** yo'qoladi (GC tozalaganda), lekin `weakMap.has(null)` ning o'zi `false` qaytaradi chunki `null` WeakMap key bo'la olmaydi. Hatto `obj1` ga yangi object tayinlasangiz ham — eski entry yo'q, chunki eski object'ga boshqa reference yo'q.
-
----
-
-## Savol 20: V8 da xotirani monitoring qilish va profiling qanday qilinadi? (Node.js) [Senior]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Node.js da V8 xotira holati `process.memoryUsage()` orqali ko'riladi:
 
@@ -749,3 +531,262 @@ node --trace-gc app.js
 1. `setInterval(() => console.log(process.memoryUsage().heapUsed), 5000)` — heap o'sishini kuzatish
 2. `heapUsed` faqat o'sib borsa → leak bor
 3. `--inspect` bilan Chrome DevTools Heap Snapshot + Comparison workflow
+
+**Deep Dive:** `process.memoryUsage()` dagi `rss` (Resident Set Size) — OS tomonidan jarayonga ajratilgan jami fizik xotira. `heapTotal` va `heapUsed` faqat V8 managed heap — `external` esa C++ object'lar (Buffer, TypedArray backing store) egallagan xotira. `arrayBuffers` (Node 13+) alohida ko'rsatiladi. `--trace-gc` flag har GC cycle uchun turi, davomiyligi va freed memory miqdorini chiqaradi.
+
+</details>
+
+---
+
+## Amaliy savollar (Coding Challenges)
+
+### 1. Quyidagi kodning output'ini ayting [Middle]
+
+```javascript
+function modify(obj, num) {
+  obj.x = 10;
+  num = 10;
+}
+
+let myObj = { x: 1 };
+let myNum = 1;
+
+modify(myObj, myNum);
+
+console.log(myObj.x); // ?
+console.log(myNum);   // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+10
+1
+```
+
+`myObj` — reference type. Funksiyaga pointer nusxasi beriladi, `obj.x = 10` orqali **original** object o'zgaradi. `myNum` — primitive. Funksiyaga **qiymat nusxasi** beriladi, `num = 10` faqat local nusxani o'zgartiradi, original `myNum` o'zgarmaydi.
+
+</details>
+
+### 2. Quyidagi kodning output'ini ayting [Middle+]
+
+```javascript
+let a = { value: 1 };
+let b = a;
+let c = { value: 1 };
+
+console.log(a === b);  // ?
+console.log(a === c);  // ?
+
+b.value = 2;
+console.log(a.value);  // ?
+
+b = { value: 3 };
+console.log(a.value);  // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+true
+false
+2
+2
+```
+
+- `a === b` → `true` — ikkalasi **bitta** object'ga ishora qiladi (pointer copy)
+- `a === c` → `false` — tarkibi bir xil, lekin **turli** object'lar (heap'da turli joyda)
+- `b.value = 2` → `a.value` ham 2 bo'ladi — bitta object (b pointer orqali mutate)
+- `b = { value: 3 }` → b yangi object'ga ishora qildi, lekin `a` hali eski object'da → `a.value` hali 2
+
+</details>
+
+### 3. Bu kodda memory leak bormi? Toping va tuzating. [Middle+]
+
+```javascript
+function createCounter() {
+  const history = [];
+  let count = 0;
+
+  return {
+    increment() {
+      count++;
+      history.push({ value: count, timestamp: Date.now() });
+    },
+    getCount() { return count; },
+    getHistory() { return history; }
+  };
+}
+
+const counter = createCounter();
+setInterval(() => counter.increment(), 100);
+```
+
+<details>
+<summary>Javob</summary>
+
+**2 ta muammo:**
+1. **`history` array cheksiz o'sadi** — har 100ms da yangi object qo'shiladi, hech qachon tozalanmaydi
+2. **`setInterval` to'xtatilmaydi** — clearInterval yo'q
+
+```javascript
+function createCounterFixed(maxHistory = 1000) {
+  const history = [];
+  let count = 0;
+
+  return {
+    increment() {
+      count++;
+      history.push({ value: count, timestamp: Date.now() });
+      if (history.length > maxHistory) {
+        history.splice(0, history.length - maxHistory); // eski entry tozalash ✅
+      }
+    },
+    getCount() { return count; },
+    getHistory() { return history; },
+    startAutoIncrement(ms = 100) {
+      const id = setInterval(() => this.increment(), ms);
+      return () => clearInterval(id); // cleanup function qaytarish ✅
+    }
+  };
+}
+
+const counter = createCounterFixed(500);
+const stop = counter.startAutoIncrement(100);
+// Kerak bo'lmaganda: stop();
+```
+
+</details>
+
+### 4. Quyidagi kodning output'ini ayting [Middle+]
+
+```javascript
+function outer() {
+  let large = new Array(1000000).fill("x");
+
+  return function inner() {
+    return large.length;
+  };
+}
+
+const fn = outer();
+console.log(fn()); // ?
+
+// large GC tozalay oladimi?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+1000000
+```
+
+`large` GC tozalay **olmaydi** — `inner` funksiya closure orqali `large` ga reference ushlab turadi. `fn` o'zgaruvchisi tirik ekan, `large` (1M elementli array) xotirada qoladi.
+
+GC tozalashi uchun: `fn = null` qilish kerak — shunda `inner` → `large` reference chain uziladi va GC tozalay oladi.
+
+Yaxshiroq yondashuv — faqat kerakli ma'lumotni capture qilish:
+
+```javascript
+function outerFixed() {
+  const large = new Array(1000000).fill("x");
+  const length = large.length; // faqat kerakli data
+
+  return function inner() {
+    return length; // large reference qilmaydi → GC tozalaydi ✅
+  };
+}
+```
+
+</details>
+
+### 5. Quyidagi kodning output'ini ayting [Middle+]
+
+```javascript
+const weakMap = new WeakMap();
+let obj1 = { a: 1 };
+let obj2 = { b: 2 };
+
+weakMap.set(obj1, "first");
+weakMap.set(obj2, "second");
+
+console.log(weakMap.has(obj1)); // ?
+
+obj1 = null;
+// GC ishlagandan keyin:
+console.log(weakMap.has(obj1)); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+true
+false
+```
+
+- Birinchi `weakMap.has(obj1)` → `true` — `obj1` hali tirik, WeakMap da entry bor
+- `obj1 = null` dan keyin — `weakMap.has(obj1)` aslida `weakMap.has(null)` → `false`
+
+Muhim nuance: `obj1 = null` qilganda WeakMap dan entry **ham** yo'qoladi (GC tozalaganda), lekin `weakMap.has(null)` ning o'zi `false` qaytaradi chunki `null` WeakMap key bo'la olmaydi. Hatto `obj1` ga yangi object tayinlasangiz ham — eski entry yo'q, chunki eski object'ga boshqa reference yo'q.
+
+</details>
+
+### 6. `deepClone` funksiyasini implement qiling [Senior]
+
+**Savol:** `structuredClone` ishlatmasdan, circular reference'larni ham qo'llab-quvvatlaydigan `deepClone` yozing.
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+function deepClone(obj, seen = new WeakMap()) {
+  // Primitive yoki null — to'g'ridan-to'g'ri qaytarish
+  if (obj === null || typeof obj !== "object") return obj;
+
+  // Circular reference tekshirish
+  if (seen.has(obj)) return seen.get(obj);
+
+  // Maxsus turlar
+  if (obj instanceof Date) return new Date(obj.getTime());
+  if (obj instanceof RegExp) return new RegExp(obj.source, obj.flags);
+  if (obj instanceof Map) {
+    const map = new Map();
+    seen.set(obj, map);
+    obj.forEach((val, key) => map.set(deepClone(key, seen), deepClone(val, seen)));
+    return map;
+  }
+  if (obj instanceof Set) {
+    const set = new Set();
+    seen.set(obj, set);
+    obj.forEach(val => set.add(deepClone(val, seen)));
+    return set;
+  }
+
+  // Array yoki Object
+  const clone = Array.isArray(obj) ? [] : {};
+  seen.set(obj, clone); // circular ref uchun oldindan saqlash
+
+  for (const key of Reflect.ownKeys(obj)) {
+    clone[key] = deepClone(obj[key], seen);
+  }
+  return clone;
+}
+
+// Test:
+const obj = { a: 1, b: { c: 2 }, d: new Date(), e: new Set([1, 2]) };
+obj.self = obj; // circular
+
+const clone = deepClone(obj);
+console.log(clone.b.c);        // 2
+console.log(clone.d instanceof Date); // true
+console.log(clone.self === clone);    // true — circular saqlanadi
+console.log(clone === obj);           // false — turli object
+```
+
+**Deep Dive:** `WeakMap` circular reference'larni saqlash uchun ideal — allaqachon clone qilingan object'ni qayta uchratsak, WeakMap'dan olamiz. `Reflect.ownKeys` — Symbol property'larni ham o'z ichiga oladi (`Object.keys` faqat string key).
+
+</details>
