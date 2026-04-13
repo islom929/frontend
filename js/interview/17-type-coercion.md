@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: `==` va `===` farqi nima? Qachon `==` ishlatish mumkin? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. `==` va `===` farqi nima? Qachon `==` ishlatish mumkin? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 `===` (strict equality) — type va qiymatni tekshiradi, **hech qanday coercion yo'q**. Agar type'lar farqli bo'lsa — darhol `false`. `==` (abstract equality) — type'lar farqli bo'lsa, ECMAScript spec'dagi murakkab algoritm bo'yicha avval coercion qiladi, keyin taqqoslaydi.
 
@@ -40,47 +43,12 @@ if (value == null) {
 
 `==` algoritmi (ECMAScript 7.2.14 IsLooselyEqual): type teng → `===` kabi; null/undefined → `true`; Boolean bor → avval `Number` ga; String vs Number → String `Number` ga; Object bor → `ToPrimitive` chaqiriladi. Har bir qadam recursive — natijani bashorat qilish qiyin.
 
----
+</details>
 
-## Savol 2: Quyidagi kodning output'ini ayting [Middle+]
+### 2. typeof operatori haqida nima bilasiz? typeof null nima qaytaradi va nima uchun? [Junior+]
 
-**Javob:**
-
-```javascript
-console.log([] == false);       // ?
-console.log([] == ![]);         // ?
-console.log("" == false);       // ?
-console.log(null == 0);         // ?
-console.log(null == undefined); // ?
-```
-
-Natijalar:
-
-```javascript
-[] == false       // true
-// Qadam: false → 0, [] → ToPrimitive → "" → 0, 0 == 0 → true
-
-[] == ![]         // true (eng ajablanarli!)
-// ![] → false ([] truthy → ![] = false)
-// [] == false → yuqoridagi kabi → true
-
-"" == false       // true
-// false → 0, "" → 0, 0 == 0 → true
-
-null == 0         // false
-// null faqat undefined ga == teng, boshqa hech narsaga
-
-null == undefined // true
-// Spec maxsus qoida — null va undefined faqat bir-biriga == teng
-```
-
-Bu misollar `==` nima uchun xavfli ekanini ko'rsatadi — `[] == ![]` `true` bo'lishi hech kim kutmaydi.
-
----
-
-## Savol 3: typeof operatori haqida nima bilasiz? typeof null nima qaytaradi va nima uchun? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `typeof` qiymatning type'ini string sifatida qaytaradi. 8 ta mumkin natija: `"string"`, `"number"`, `"boolean"`, `"undefined"`, `"symbol"`, `"bigint"`, `"object"`, `"function"`.
 
@@ -96,11 +64,12 @@ typeof NaN          // "number" — NaN ham number!
 
 To'g'ri null tekshirish: `value === null`. Array tekshirish: `Array.isArray(value)`. Aniq type: `Object.prototype.toString.call(value)` → `"[object Array]"`, `"[object Null]"`, `"[object Date]"`.
 
----
+</details>
 
-## Savol 4: Truthy va Falsy qiymatlar nima? Falsy qiymatlarni sanab bering [Junior+]
+### 3. Truthy va Falsy qiymatlar nima? Falsy qiymatlarni sanab bering [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 JavaScript da faqat **8 ta falsy** qiymat bor — qolgan **hamma narsa truthy**:
 
@@ -128,11 +97,12 @@ Boolean(new Boolean(false)) // true — wrapper object!
 
 **Amaliy xato:** Bo'sh array/object tekshirishda `if(arr)` emas, `if(arr.length === 0)` ishlatish kerak — chunki `[]` truthy.
 
----
+</details>
 
-## Savol 5: Type coercion nima? Explicit va implicit farqi? [Junior+]
+### 4. Type coercion nima? Explicit va implicit farqi? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Type coercion — bir type'ni boshqasiga o'zgartirish.
 
@@ -155,43 +125,12 @@ ECMAScript spec da 4 ta Abstract Operation bor: `ToString`, `ToNumber`, `ToBoole
 
 **Amaliy qoida:** Explicit coercion ishlatish — kodni o'qilishi va xatolarni topish oson.
 
----
+</details>
 
-## Savol 6: Quyidagi kodning output'ini ayting (Coercion) [Middle+]
+### 5. ToPrimitive qanday ishlaydi? Symbol.toPrimitive nima? [Middle+]
 
-**Javob:**
-
-```javascript
-console.log(1 + "2" + 3);        // ?
-console.log(1 + 2 + "3");        // ?
-console.log("5" - 3);            // ?
-console.log(true + true + "3");  // ?
-console.log(null + 1);           // ?
-console.log(undefined + 1);     // ?
-console.log([] + {});            // ?
-console.log(+[]);                // ?
-```
-
-Natijalar:
-
-```javascript
-1 + "2" + 3       // "123" — 1+"2"→"12", "12"+3→"123"
-1 + 2 + "3"       // "33"  — 1+2→3, 3+"3"→"33"
-"5" - 3            // 2    — "5"→5, 5-3→2
-true + true + "3"  // "23" — 1+1→2, 2+"3"→"23"
-null + 1           // 1    — null→0, 0+1→1
-undefined + 1      // NaN  — undefined→NaN, NaN+1→NaN
-[] + {}            // "[object Object]" — ""+"[object Object]"
-+[]                // 0    — []→""→0
-```
-
-Asosiy qoidalar: `+` operatorida bir tomon string bo'lsa — concatenation; `-`, `*`, `/` da doim ToNumber; `null → 0`, `undefined → NaN` — bu eng ko'p xato keltiradi.
-
----
-
-## Savol 7: ToPrimitive qanday ishlaydi? Symbol.toPrimitive nima? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Object primitive emas. Engine object'ni primitive ga aylantirishi kerak bo'lganda ToPrimitive chaqiriladi. U **hint** parametri oladi:
 
@@ -199,7 +138,7 @@ Object primitive emas. Engine object'ni primitive ga aylantirishi kerak bo'lgand
 |------|---------|--------|
 | `"string"` | `String()`, template literal | `toString()` → `valueOf()` |
 | `"number"` | `Number()`, unary `+`, `-`, `<`, `>` | `valueOf()` → `toString()` |
-| `"default"` | `+`, `==` | `valueOf()` → `toString()` (Date'da `toString()` birinchi) |
+| `"default"` | `+`, `==` | `valueOf()` → `toString()` (Date `[Symbol.toPrimitive]` orqali `"default"` ni `"string"` kabi ishlatadi) |
 
 `Symbol.toPrimitive` — eng yuqori prioritet. Agar mavjud bo'lsa, `valueOf`/`toString` e'tiborga olinmaydi:
 
@@ -221,11 +160,12 @@ wallet + 50;     // 150    — hint "default"
 
 Array uchun: `valueOf()` → o'zini qaytaradi (object!), keyin `toString()` → `.join(",")`. Shu sababli `[1,2] + [3,4]` → `"1,2" + "3,4"` → `"1,23,4"`.
 
----
+</details>
 
-## Savol 8: `null` va `undefined` farqi nima? ToNumber da qanday farq qiladi? [Junior+]
+### 6. `null` va `undefined` farqi nima? ToNumber da qanday farq qiladi? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `undefined` — o'zgaruvchi e'lon qilingan lekin qiymat berilmagan, yoki funksiya hech narsa return qilmagan holat. `null` — dasturchi tomonidan ataylab "bo'sh/hech narsa yo'q" qiymat berilgan holat.
 
@@ -254,11 +194,12 @@ undefined + 5     // NaN — NaN + 5 = NaN
 
 Bu farq production da xatolarga olib keladi — `undefined` aralashgan arifmetik natijani `NaN` ga aylantiradi va NaN hamma joyga "tarqaladi".
 
----
+</details>
 
-## Savol 9: Symbol nima? Nima uchun kerak? [Middle]
+### 7. Symbol nima? Nima uchun kerak? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Symbol — ES6 da qo'shilgan primitive type. Har bir Symbol **unique** — hatto bir xil tavsif bilan yaratilgan ikkitasi ham teng emas. Asosiy maqsad — **nom to'qnashuvini oldini olish**. Object property key sifatida ishlatilganda, Symbol key'lar `for...in`, `Object.keys()` da ko'rinmaydi.
 
@@ -285,11 +226,12 @@ Reflect.ownKeys(user);               // ["name", Symbol(id)]
 
 Type coercion cheklovi: implicit string konversiya `TypeError` beradi (`"x" + sym`). Bu atayin — tasodifiy konversiyani oldini olish.
 
----
+</details>
 
-## Savol 10: BigInt nima? Number dan farqi? [Middle]
+### 8. BigInt nima? Number dan farqi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 BigInt — ES2020 da qo'shilgan primitive, `Number.MAX_SAFE_INTEGER` (2^53 - 1) dan katta butun sonlar uchun. Number bu chegaradan oshganda aniqlik yo'qotadi:
 
@@ -310,11 +252,12 @@ JSON.stringify({ id: 123n }) // ❌ TypeError — custom serialization kerak
 
 Use case'lar: katta database ID'lari, kriptografik hisob-kitoblar, moliyaviy aniq hisob. JSON bilan ishlashda replacer funksiyasi bilan `toString()` ga aylantirish kerak.
 
----
+</details>
 
-## Savol 11: Map va Object farqi nima? Qachon qaysi birini ishlatish kerak? [Middle]
+### 9. Map va Object farqi nima? Qachon qaysi birini ishlatish kerak? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Xususiyat | Object | Map |
 |-----------|--------|-----|
@@ -343,11 +286,12 @@ map.has("toString"); // false — toza
 
 **Qoida:** Tez-tez o'zgaradigan key-value → Map. Tuzilishi oldindan ma'lum, JSON kerak → Object. Non-string key kerak → Map.
 
----
+</details>
 
-## Savol 12: WeakMap va Map farqi nima? Qachon WeakMap ishlatiladi? [Middle+]
+### 10. WeakMap va Map farqi nima? Qachon WeakMap ishlatiladi? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 WeakMap key'lari **weakly referenced** — boshqa joyda strong reference yo'q bo'lsa, GC key-value juftlikni o'chirishi mumkin. Shu sababli WeakMap iterate qilib bo'lmaydi (size, keys, values, forEach yo'q).
 
@@ -375,11 +319,12 @@ class User {
 
 **Use case'lar:** private data, DOM element metadata, caching (object yo'qolsa — cache ham tozalanadi). WeakSet ham xuddi shunday — faqat object saqlaydi, GC-friendly.
 
----
+</details>
 
-## Savol 13: `structuredClone()` nima? `JSON.parse(JSON.stringify())` dan farqi? [Middle]
+### 11. `structuredClone()` nima? `JSON.parse(JSON.stringify())` dan farqi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `structuredClone()` — ES2022 da qo'shilgan built-in deep copy. JSON hack'dan kuchli:
 
@@ -415,11 +360,12 @@ s.undef;                // undefined ✅
 
 **Cheklovi:** Function va Symbol klonlanmaydi. Prototype chain yo'qoladi — class instance'lar oddiy object bo'lib qoladi.
 
----
+</details>
 
-## Savol 14: `Object.is()` nima? `===` dan farqi? [Middle+]
+### 12. `Object.is()` nima? `===` dan farqi? [Middle+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `Object.is()` — ECMAScript spec'dagi **SameValue** algoritmini implement qiladi. `===` dan ikkita farqi bor:
 
@@ -450,11 +396,12 @@ function sameValue(a, b) {
 
 React'da `Object.is` ishlatiladi — state o'zgarishini aniqlashda `-0` va `NaN` to'g'ri handle bo'lishi muhim.
 
----
+</details>
 
-## Savol 15: Set nima? Array dan farqi? Duplikatlarni qanday olib tashlash mumkin? [Junior+]
+### 13. Set nima? Array dan farqi? Duplikatlarni qanday olib tashlash mumkin? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Set — faqat unique qiymatlarni saqlaydigan data structure. Asosiy farq: dublikat qo'shilmaydi, `has()` O(1), `delete()` O(1).
 
@@ -477,11 +424,12 @@ new Set([...a].filter(x => !b.has(x)));      // {1,2}
 
 **Cheklovi:** Index orqali access yo'q (`set[0]` ishlamaydi), `map/filter/reduce` to'g'ridan-to'g'ri yo'q — Array ga aylantirib ishlatish kerak.
 
----
+</details>
 
-## Savol 16: NaN nima? Qanday tekshiriladi? Nima uchun NaN === NaN false? [Middle]
+### 14. NaN nima? Qanday tekshiriladi? Nima uchun NaN === NaN false? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `NaN` — "Not a Number", lekin `typeof NaN === "number"`. U noto'g'ri matematik operatsiya natijasida hosil bo'ladi (`0/0`, `parseInt("abc")`). IEEE 754 floating-point standarti bo'yicha NaN **hech narsaga teng emas, o'ziga ham**. Bu atayin — NaN noaniq qiymatni bildiradi, ikki noaniq qiymat teng bo'la olmaydi.
 
@@ -505,11 +453,119 @@ Math.max(1, NaN, 3) // NaN
 
 **Qoida:** Doim `Number.isNaN()` ishlating, eski `isNaN()` emas.
 
+</details>
+
+### 15. `||`, `&&`, `??` operatorlarining farqi nima? [Middle]
+
+<details>
+<summary>Javob</summary>
+
+Bu uchala operator ham boolean qaytarmaydi — **qiymatni o'zini** qaytaradi:
+
+| Operator | Qoida | Tekshiradi |
+|----------|-------|-----------|
+| `\|\|` | Birinchi **truthy** qiymatni qaytaradi | falsy (8 ta) |
+| `&&` | Birinchi **falsy** qiymatni qaytaradi | falsy (8 ta) |
+| `??` | Birinchi **non-nullish** qiymatni qaytaradi | faqat null/undefined |
+
+```javascript
+// || — birinchi truthy:
+0 || "" || "salom"      // "salom"
+0 || null || undefined   // undefined (hech biri truthy emas)
+
+// && — birinchi falsy:
+1 && "ha" && "oxirgi"   // "oxirgi" (hech biri falsy emas)
+1 && 0 && "boo"         // 0 (birinchi falsy)
+
+// ?? — faqat null/undefined:
+0 ?? "default"          // 0  ← 0 null/undefined emas!
+"" ?? "default"         // "" ← "" null/undefined emas!
+null ?? "default"       // "default"
+undefined ?? "default"  // "default"
+```
+
+**Muhim farq:** `||` da `0`, `""`, `false` ham fallback'ga o'tadi. `??` da faqat `null`/`undefined`. Shu sababli `??` ko'pincha `||` dan xavfsizroq — `0` va `""` valid qiymat bo'lsa yo'qolmaydi.
+
+</details>
+
 ---
 
-## Savol 17: `instanceof` implement qiling [Middle+]
+## Amaliy savollar (Coding Challenges)
 
-**Javob:**
+### 1. Quyidagi kodning output'ini ayting [Middle+]
+
+```javascript
+console.log([] == false);       // ?
+console.log([] == ![]);         // ?
+console.log("" == false);       // ?
+console.log(null == 0);         // ?
+console.log(null == undefined); // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+Natijalar:
+
+```javascript
+[] == false       // true
+// Qadam: false → 0, [] → ToPrimitive → "" → 0, 0 == 0 → true
+
+[] == ![]         // true (eng ajablanarli!)
+// ![] → false ([] truthy → ![] = false)
+// [] == false → yuqoridagi kabi → true
+
+"" == false       // true
+// false → 0, "" → 0, 0 == 0 → true
+
+null == 0         // false
+// null faqat undefined ga == teng, boshqa hech narsaga
+
+null == undefined // true
+// Spec maxsus qoida — null va undefined faqat bir-biriga == teng
+```
+
+Bu misollar `==` nima uchun xavfli ekanini ko'rsatadi — `[] == ![]` `true` bo'lishi hech kim kutmaydi.
+
+</details>
+
+### 2. Quyidagi kodning output'ini ayting (Coercion) [Middle+]
+
+```javascript
+console.log(1 + "2" + 3);        // ?
+console.log(1 + 2 + "3");        // ?
+console.log("5" - 3);            // ?
+console.log(true + true + "3");  // ?
+console.log(null + 1);           // ?
+console.log(undefined + 1);     // ?
+console.log([] + {});            // ?
+console.log(+[]);                // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+Natijalar:
+
+```javascript
+1 + "2" + 3       // "123" — 1+"2"→"12", "12"+3→"123"
+1 + 2 + "3"       // "33"  — 1+2→3, 3+"3"→"33"
+"5" - 3            // 2    — "5"→5, 5-3→2
+true + true + "3"  // "23" — 1+1→2, 2+"3"→"23"
+null + 1           // 1    — null→0, 0+1→1
+undefined + 1      // NaN  — undefined→NaN, NaN+1→NaN
+[] + {}            // "[object Object]" — ""+"[object Object]"
++[]                // 0    — []→""→0
+```
+
+Asosiy qoidalar: `+` operatorida bir tomon string bo'lsa — concatenation; `-`, `*`, `/` da doim ToNumber; `null → 0`, `undefined → NaN` — bu eng ko'p xato keltiradi.
+
+</details>
+
+### 3. `instanceof` implement qiling [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 `instanceof` prototype chain bo'ylab `Constructor.prototype` ni qidiradi:
 
@@ -546,43 +602,9 @@ myInstanceof("str", String); // false — primitive
 
 **Cheklov:** Cross-iframe da ishlamaydi — turli iframe'dagi `Array.prototype` farqli object. Shu sababli `Array.isArray()` ishlatish kerak.
 
----
+</details>
 
-## Savol 18: `||`, `&&`, `??` operatorlarining farqi nima? [Middle]
-
-**Javob:**
-
-Bu uchala operator ham boolean qaytarmaydi — **qiymatni o'zini** qaytaradi:
-
-| Operator | Qoida | Tekshiradi |
-|----------|-------|-----------|
-| `\|\|` | Birinchi **truthy** qiymatni qaytaradi | falsy (8 ta) |
-| `&&` | Birinchi **falsy** qiymatni qaytaradi | falsy (8 ta) |
-| `??` | Birinchi **non-nullish** qiymatni qaytaradi | faqat null/undefined |
-
-```javascript
-// || — birinchi truthy:
-0 || "" || "salom"      // "salom"
-0 || null || undefined   // undefined (hech biri truthy emas)
-
-// && — birinchi falsy:
-1 && "ha" && "oxirgi"   // "oxirgi" (hech biri falsy emas)
-1 && 0 && "boo"         // 0 (birinchi falsy)
-
-// ?? — faqat null/undefined:
-0 ?? "default"          // 0  ← 0 null/undefined emas!
-"" ?? "default"         // "" ← "" null/undefined emas!
-null ?? "default"       // "default"
-undefined ?? "default"  // "default"
-```
-
-**Muhim farq:** `||` da `0`, `""`, `false` ham fallback'ga o'tadi. `??` da faqat `null`/`undefined`. Shu sababli `??` ko'pincha `||` dan xavfsizroq — `0` va `""` valid qiymat bo'lsa yo'qolmaydi.
-
----
-
-## Savol 19: Quyidagi kodda xato toping va tuzating [Middle+]
-
-**Javob:**
+### 4. Quyidagi kodda xato toping va tuzating [Middle+]
 
 ```javascript
 // ❌ Xatoli kod:
@@ -601,6 +623,9 @@ processInput("");     // "No input" ← BUG! "" valid string
 processInput(null);   // "No input" ← OK
 processInput(null);   // lekin typeof null === "object" ga yetmaydi
 ```
+
+<details>
+<summary>Javob</summary>
 
 Muammolar:
 1. `!value` — `0` va `""` ham falsy, valid input yo'qoladi
@@ -624,11 +649,12 @@ processInput(null); // "No input" ✅
 processInput({a:1}); // "a" ✅
 ```
 
----
+</details>
 
-## Savol 20: `deepEqual` implement qiling — ikki qiymatni chuqur taqqoslash [Senior]
+### 5. `deepEqual` implement qiling — ikki qiymatni chuqur taqqoslash [Senior]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function deepEqual(a, b) {
@@ -696,3 +722,7 @@ deepEqual({ a: 1 }, { a: 2 });                              // false
 ```
 
 **Edge case'lar:** Circular reference uchun `WeakMap` bilan "ko'rilgan" object'larni track qilish kerak. Symbol property'larni ham tekshirish uchun `Reflect.ownKeys()` ishlatiladi.
+
+**Deep Dive:** ECMAScript spec'da 4 ta equality algoritmi bor: `SameValue` (`Object.is`), `SameValueZero` (`Map`/`Set` key comparison, `includes`), `IsStrictlyEqual` (`===`), va `IsLooselyEqual` (`==`). Node.js `assert.deepStrictEqual` ichida `SameValue` ishlatadi — `NaN === NaN` true, `-0 !== +0`. `structuredClone` esa spec'dagi `StructuredSerializeInternal` algoritmini ishlatadi — bu deep equality emas, balki deep copy, lekin u ham circular reference'larni identity map orqali track qiladi.
+
+</details>

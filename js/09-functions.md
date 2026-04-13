@@ -1,6 +1,6 @@
 # Bo'lim 9: Functions — First-Class Citizens
 
-> Function — JavaScript ning yuragi. Ular "birinchi darajali fuqarolar" — o'zgaruvchiga saqlash, argument sifatida berish, funksiyadan qaytarish mumkin. Functional programming ning asosi shu yerda.
+> Function — JavaScript da first-class citizen. O'zgaruvchiga saqlash, argument sifatida berish, funksiyadan qaytarish mumkin. Functional programming ning asosi shu yerda.
 
 ---
 
@@ -21,6 +21,9 @@
 - [Rest Parameters vs Arguments](#rest-parameters-vs-arguments)
 - [Default Parameters](#default-parameters)
 - [Function `name` va `length` Properties](#function-name-va-length-properties)
+- [Recursion](#recursion)
+- [Tail Call Optimization (TCO)](#tail-call-optimization-tco)
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -57,7 +60,8 @@ const calculateTax = function(income, rate) {
 const calculateTax = (income, rate) => income * rate;
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ECMAScript spec bo'yicha uchala usul ham `Function` object yaratadi, lekin **ichki slotlari** farq qiladi:
 
@@ -103,6 +107,8 @@ V8 engine ichida funksiya yaratilganda:
 3. **JSFunction** object yaratiladi — runtime object
 4. **[[Environment]]** slot'ga joriy LexicalEnvironment reference saqlanadi (bu closures uchun muhim — [05-closures.md](05-closures.md) da batafsil)
 5. Arrow function uchun `[[ThisMode]]: "lexical"` belgilanadi — ya'ni o'zining `this` si yo'q, tashqi scope'dan oladi
+
+</details>
 
 ### Hoisting Farqlari
 
@@ -191,7 +197,8 @@ class Timer {
 
 Bu haqda ko'proq [10-this-keyword.md](10-this-keyword.md) da.
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **To'liq taqqoslash:**
 
@@ -241,6 +248,8 @@ const createUser = (name, age) => ({ name, age, createdAt: Date.now() });
 // () siz { } ni function body deb tushunadi!
 ```
 
+</details>
+
 ### Qachon Qaysi Birini Ishlatish?
 
 | Holat | Tavsiya | Sabab |
@@ -264,7 +273,8 @@ Bu xususiyat nima uchun muhim? Ko'pgina dasturlash tillarida (masalan, eski Java
 
 ECMAScript spetsifikatsiyasi bo'yicha funksiya aslida **callable object** — ya'ni oddiy ob'ektga `[[Call]]` internal method qo'shilgan maxsus versiya. Shu sababli funksiyaga property qo'shish, `typeof` bilan tekshirish, va ob'ekt kabi ishlash mumkin:
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ECMAScript spec bo'yicha funksiya — bu **callable object**. Ya'ni, oddiy object'ga `[[Call]]` internal method qo'shilgan versiyasi:
 
@@ -300,7 +310,10 @@ console.log(validateEmail.length);       // 1 (parameter soni)
 console.log(validateEmail.errorMessage); // "Email formati noto'g'ri"
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **1. O'zgaruvchiga saqlash:**
 
@@ -375,6 +388,8 @@ function executeMiddlewares(req, middlewares) {
 }
 ```
 
+</details>
+
 ---
 
 ## IIFE — Immediately Invoked Function Expression
@@ -408,7 +423,8 @@ IIFE JavaScript tarixida juda muhim rol o'ynagan. ES6 dan oldin `let`, `const` v
 2. **Module pattern** — public/private separation
 3. **Bir martalik initialization** kod
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Engine IIFE ni qanday process qiladi:
 
@@ -466,7 +482,10 @@ function() {
 void function() { console.log("void"); }();
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **Module Pattern — IIFE bilan encapsulation:**
 
@@ -528,6 +547,8 @@ const config = (function() {
 // config tayyor — initialization logic tashqariga chiqmadi
 console.log(config.apiUrl); // "http://localhost:3000"
 ```
+
+</details>
 
 ### Hozir IIFE Kerakmi?
 
@@ -597,7 +618,8 @@ JavaScript da HOF lar hamma joyda: `map`, `filter`, `reduce`, `addEventListener`
 └───────────────────────────────────────────────────┘
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 HOF ning ishlash mexanizmi spec bo'yicha oddiy — funksiya argument sifatida kelganda, u oddiy qiymat kabi **reference** bo'yicha uzatiladi. Funksiya object'ga reference — bu oddiy pointer.
 
@@ -616,7 +638,10 @@ function map(array, transformFn) {
 
 V8 da HOF optimization: Agar callback **inline arrow function** bo'lsa, TurboFan uni **inline** qilishi mumkin — ya'ni funksiya chaqiruvini yo'qotib, kodni to'g'ridan-to'g'ri joylashtiradi. Bu sezilarli performance yutug'i.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **1. Funksiyani qabul qiluvchi HOF — Array methods:**
 
@@ -726,6 +751,8 @@ const withVAT = myMap(prices, (price) => price * 1.12); // 12% QQS
 console.log(withVAT); // [112000, 280000, 560000]
 ```
 
+</details>
+
 ---
 
 ## Callbacks
@@ -751,7 +778,8 @@ setTimeout(function callback() {
 console.log("Darhol"); // Bu AVVAL chiqadi!
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Async callback'lar qanday ishlaydi — bu Event Loop bilan bog'liq:
 
@@ -787,7 +815,10 @@ Async callback'lar qanday ishlaydi — bu Event Loop bilan bog'liq:
 
 Bu haqda ko'proq [11-event-loop.md](11-event-loop.md) da.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **Synchronous callback — ma'lumotni filter qilish:**
 
@@ -870,6 +901,8 @@ readConfig("./config.json", function(error, config) {
 });
 ```
 
+</details>
+
 ---
 
 ## Pure Functions va Side Effects
@@ -902,7 +935,8 @@ function addToTotal(amount) {
 }
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Pure function'lar nima uchun muhim?
 
@@ -931,7 +965,10 @@ Impure Function:
 
 V8 engine ichida pure function'lar TurboFan tomonidan yanada yaxshi optimize qilinishi mumkin, chunki engine natijani predict qila oladi va **constant folding** qilishi mumkin.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **Pure function yozish qoidalari:**
 
@@ -1034,6 +1071,8 @@ async function processPayment(order) {
 }
 ```
 
+</details>
+
 ---
 
 ## Currying
@@ -1073,7 +1112,8 @@ curriedMultiply(2)(3); // 6
 const curriedMultiply2 = (a) => (b) => a * b;
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Currying — bu **closures** ning to'g'ridan-to'g'ri qo'llanishi. Har bir qaytarilgan funksiya tashqi scope'dagi argument ni closure orqali eslab qoladi.
 
@@ -1096,7 +1136,10 @@ Qadam 2: (qaytarilgan funksiya)(3)
   → return 2 * 3 = 6
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **Universal `curry` funksiyasi:**
 
@@ -1128,7 +1171,7 @@ curriedPrice(100000)(0.12, 5000);     // 107000
 curriedPrice(100000, 0.12, 5000);     // 107000
 
 // Partial application — qayta ishlatish uchun
-const withUzbekTax = curriedPrice(100000)(0.12); // taxRate oldindan berildi
+const withUzbekTax = curriedPrice(100000)(0.12); // basePrice va taxRate oldindan berildi, faqat discount qoldi
 withUzbekTax(5000);  // 107000
 withUzbekTax(10000); // 102000
 ```
@@ -1179,6 +1222,8 @@ const handleAgeChange = handleInputChange("age")(isValidAge);
 // <input onChange={handleAgeChange} />
 ```
 
+</details>
+
 ---
 
 ## Partial Application
@@ -1209,7 +1254,8 @@ const addTo3 = sum.bind(null, 1, 2); // a=1, b=2 oldindan berildi
 addTo3(3); // 6 — faqat c berildi
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Partial application ichida closure mexanizmi ishlaydi — oldindan berilgan argumentlar closure orqali saqlanadi va keyingi chaqiruvda ular bilan birlashtirilib original funksiyaga uzatiladi.
 
@@ -1237,7 +1283,10 @@ Misol: log.bind(null, "ERROR")
 
 Custom `partial` funksiyasi (placeholder bilan) ham xuddi shu prinsipda ishlaydi — lekin `bind` dan farqli, u argumentlarning **istalgan pozitsiyasida** placeholder qo'yish imkonini beradi. Bu closures'ning amaliy qo'llanishi — [05-closures.md](05-closures.md) dagi mexanizm bu yerda to'g'ridan-to'g'ri ishlatilmoqda.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **`bind` bilan partial application:**
 
@@ -1317,6 +1366,8 @@ function TodoList({ todos, onToggle, onDelete }) {
 }
 ```
 
+</details>
+
 ---
 
 ## Function Composition
@@ -1329,7 +1380,8 @@ Composition functional programming ning **eng asosiy prinsipi**: kichik, sodda, 
 
 Ikki asosiy usul bor: `compose(f, g, h)` — o'ngdan chapga (`f(g(h(x)))`), va `pipe(h, g, f)` — chapdan o'ngga, tabiiy o'qish tartibida. Zamonaviy kodda `pipe` ko'proq ishlatiladi chunki u o'qishga osonroq.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Composition ichida nima sodir bo'ladi:
 
@@ -1351,7 +1403,10 @@ Vizual pipeline:
 └──────────┘    └──────────────┘    └─────────────────┘
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **`compose` va `pipe` implementatsiyasi:**
 
@@ -1454,6 +1509,8 @@ const processOrder = pipeAsync(
 const result = await processOrder(newOrder);
 ```
 
+</details>
+
 ---
 
 ## Memoization
@@ -1466,7 +1523,8 @@ Memoization nima uchun muhim? Og'ir hisob-kitoblar (masalan, Fibonacci, faktoria
 
 **Qachon ishlatish kerak:** funksiya **pure** bo'lganda, hisob-kitob **sekin** bo'lganda, va bir xil argumentlar bilan **ko'p marta** chaqirilganda. **Qachon ishlatmaslik kerak:** funksiya impure bo'lganda (side effect, random, time), argumentlar har doim unikal bo'lganda (cache befoyda), yoki memory cheklangan bo'lganda.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Memoization oddiy — ichida **Map** (yoki object) bor, argument ni key sifatida, natijani value sifatida saqlaydi:
 
@@ -1490,7 +1548,10 @@ Memoization oddiy — ichida **Map** (yoki object) bor, argument ni key sifatida
 └──────────────────────────────────────────────┘
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **Oddiy `memoize` implementatsiyasi:**
 
@@ -1601,6 +1662,8 @@ const report2 = calculateExpensiveReport(transactions, "2025-01-01", "2025-01-31
 // report1 === report2 — bir xil reference!
 ```
 
+</details>
+
 ---
 
 ## Debounce va Throttle
@@ -1609,9 +1672,9 @@ const report2 = calculateExpensiveReport(transactions, "2025-01-01", "2025-01-31
 
 **Debounce** va **Throttle** — ko'p chaqiriladigan funksiyalarni **cheklash** pattern'lari. Ikkalasi ham performance optimization uchun ishlatiladi, lekin har biri boshqa muammoni hal qiladi.
 
-**Debounce** — foydalanuvchi **to'xtagandan keyin** bitta marta bajaradi. Tasavvur qiling, lift tugmasini bossangiz, lift darhol yopilmaydi — boshqa odam ham kirishini kutadi. Agar 3 soniya hech kim bosmasa — eshik yopiladi. Xuddi shunday, debounce foydalanuvchi yozishni to'xtatganidan keyin gina search so'rovini yuboradi.
+**Debounce** — foydalanuvchi **to'xtagandan keyin** bitta marta bajaradi. Har bir yangi chaqiruv oldingi timer'ni bekor qiladi va qaytadan boshlanadi. Faqat oxirgi chaqiruvdan keyin belgilangan vaqt o'tganda callback bajariladi. Masalan, search input'da debounce qo'yilsa — foydalanuvchi yozishni to'xtatganidan keyingina search so'rovi yuboriladi.
 
-**Throttle** — berilgan vaqt oralig'ida **ko'pi bilan bitta marta** bajaradi. Buni **chastota cheklovchi** deb tushunish mumkin — qancha tez bosmang, har 300ms da birgina marta ishlaydi. Scroll event, resize, yoki sensor ma'lumotlarini qayta ishlashda throttle ishlatiladi.
+**Throttle** — berilgan vaqt oralig'ida **ko'pi bilan bitta marta** bajaradi. Qancha tez chaqirmang, har N millisekund'da faqat birgina marta ishlaydi. Scroll event, resize, yoki sensor ma'lumotlarini qayta ishlashda throttle ishlatiladi.
 
 Bu ikki pattern zamonaviy frontend dasturlashda **deyarli har doim** kerak: search input'larda debounce, scroll/resize handler'larda throttle, API rate limiting'da throttle. Lodash va boshqa kutubxonalarda tayyor implementatsiyalar bor, lekin ularni o'zingiz yoza olish — closure va timer'lar bilan ishlashni to'liq tushunganingiz isboti.
 
@@ -1629,7 +1692,8 @@ Executions:    ─f()────────f()────────f()─�
           Darhol      300ms keyin  300ms keyin
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Ikkala pattern ham `setTimeout` va closures ga asoslanadi:
 
@@ -1657,7 +1721,10 @@ Throttle mexanizmi:
 └─────────────────────────────────────────────┘
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **Debounce — noldan yozamiz:**
 
@@ -1834,6 +1901,8 @@ const debouncedSave = debounce(saveToServer, 1000);
 // return () => debouncedSave.cancel();
 ```
 
+</details>
+
 ---
 
 ## `arguments` Object
@@ -1846,7 +1915,8 @@ const debouncedSave = debounce(saveToServer, 1000);
 
 **Muhim:** `arguments` **haqiqiy massiv emas** — u `Array.prototype` ga ega emas. `map`, `filter`, `reduce` kabi method'lar to'g'ridan-to'g'ri ishlamaydi — avval `Array.from(arguments)` yoki `[...arguments]` bilan haqiqiy massivga aylantirish kerak.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ECMAScript spec bo'yicha `arguments` object — bu **exotic object** (oddiy objectdan farqli). Uning ba'zi maxsus xususiyatlari:
 
@@ -1897,6 +1967,8 @@ function test(a, b) {
 test(1, 2);
 ```
 
+</details>
+
 ### Arrow Function da arguments YO'Q
 
 Bu — ko'p so'raladigan narsa. Arrow function o'zining `arguments` object'iga **ega emas**. Agar `arguments` ga murojaat qilsa, u **tashqi scope'dan** (closure orqali) olishga harakat qiladi:
@@ -1924,7 +1996,8 @@ const showArgs = () => {
 showArgs(1, 2, 3);
 ```
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **`arguments` ni Array ga aylantirish:**
 
@@ -1962,6 +2035,8 @@ function sum(...numbers) {
 const sum2 = (...numbers) => numbers.reduce((total, num) => total + num, 0);
 ```
 
+</details>
+
 ---
 
 ## Rest Parameters vs Arguments
@@ -1972,7 +2047,8 @@ const sum2 = (...numbers) => numbers.reduce((total, num) => total + num, 0);
 
 Nima uchun rest parameters kerak bo'ldi? `arguments` ob'ektining kamchiliklari (array-like, arrow function'da yo'q, strict mode muammolari) ko'p xatolarga sabab bo'lardi. Rest parameters bu muammolarning barchasini hal qildi va zamonaviy kodda `arguments` ishlatish uchun hech qanday sabab qolmadi. Bugungi kunda `arguments` faqat legacy kodda uchraydi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
 arguments object:
@@ -1989,7 +2065,10 @@ test(1, 2, 3, 4);
 
 V8 ichida rest parameters optimizatsiyasi: V8 rest parameters uchun `arguments` object yaratmaydi — to'g'ridan-to'g'ri Array yaratadi. Bu **yanada tezroq** ishlaydi, chunki `arguments` exotic object yaratish qo'shimcha overhead talab qiladi.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Rest parametrlar doim OXIRIDA bo'lishi kerak
@@ -2074,6 +2153,8 @@ emitter.emit("userCreated", "Ali", "ali@mail.com");
 // (Welcome email yuborildi)
 ```
 
+</details>
+
 ---
 
 ## Default Parameters
@@ -2105,7 +2186,8 @@ greet(null);      // "Salom, null!" — null da default ISHLAMAYDI!
 greet("");        // "Salom, !" — bo'sh string ham default emas
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ECMAScript spec bo'yicha default parameter'lar qanday ishlaydi:
 
@@ -2173,7 +2255,10 @@ TDZ qoidasi amal qiladi:
 └─────────────────────────────────────┘
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **Object destructuring bilan default:**
 
@@ -2258,6 +2343,8 @@ transferMoney("Ali", "Vali");               // Error: "amount" parametri majburi
 transferMoney();                            // Error: "from" parametri majburiy! ❌
 ```
 
+</details>
+
 ---
 
 ## Function `name` va `length` Properties
@@ -2270,7 +2357,8 @@ Har bir funksiya object bo'lgani uchun ([First-Class Functions](#first-class-fun
 
 **`length` property** — funksiyaning e'lon qilingan **majburiy parametrlari** soni. Bu rest parameters (`...args`) va default value bilan berilgan parametrlarni **hisoblamaydi**. `length` meta-programming da, masalan `curry` funksiyasida, kerakli argumentlar sonini aniqlash uchun ishlatiladi — yuqoridagi [Currying](#currying) bo'limidagi `curry` implementatsiyamiz aynan `fn.length` ga tayanadi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ECMAScript spec bo'yicha `name` va `length` — bu funksiya yaratilganda engine tomonidan avtomatik o'rnatiladigan xususiyatlar. Ikkisi ham `configurable: true` (o'zgartirilishi mumkin), lekin `writable: false` (to'g'ridan-to'g'ri assign bilan o'zgartirib bo'lmaydi).
 
@@ -2314,7 +2402,10 @@ Function Object Properties (auto-generated):
 
 `length` ning default parameter qoidasi diqqatga sazovor: birinchi default parameter **va undan keyingi barcha parametrlar** hisoblanmaydi. Ya'ni `function f(a, b = 1, c)` da `length = 1` — `b` default bo'lgani uchun hisoblanmaydi, `c` esa `b` dan keyin kelgani uchun hisoblanmaydi (hatto `c` da default yo'q bo'lsa ham).
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **`name` property — turli holatlarda:**
 
@@ -2405,6 +2496,656 @@ const handlers = {
 // DevTools da:
 // bad():  Error at Object.<anonymous> (file.js:2)
 // good(): Error at handleUserCreate (file.js:5)  ← ancha foydali!
+```
+
+</details>
+
+---
+
+## Recursion
+
+### Nazariya
+
+Recursion — funksiya o'zini o'zi chaqirishi. Bu oddiy tushuncha bo'lsa ham, uning ichki mexanizmi chuqur — har bir recursive chaqiruv yangi **execution context** yaratadi, call stack'ga yangi frame qo'shiladi, va har bir frame o'zining local variable'lari va argumentlariga ega bo'ladi.
+
+Recursive funksiya ikki qismdan iborat bo'lishi **shart**:
+
+1. **Base case (to'xtash sharti)** — recursion'ni to'xtatadigan shart. Bu yo'q bo'lsa, funksiya cheksiz chaqiriladi va **stack overflow** bo'ladi
+2. **Recursive case** — funksiya o'zini o'zi chaqiradigan qism. Har safar muammo **kichikroq** bo'lishi kerak — base case'ga yaqinlashish
+
+```
+Recursion mexanizmi — Call Stack:
+
+factorial(4):
+┌──────────────────────────────┐
+│  factorial(1) → return 1     │  ← base case — to'xtash
+│  factorial(2) → 2 * ???      │  ← factorial(1) javobini kutmoqda
+│  factorial(3) → 3 * ???      │  ← factorial(2) javobini kutmoqda
+│  factorial(4) → 4 * ???      │  ← factorial(3) javobini kutmoqda
+│  main()                      │
+└──────────────────────────────┘
+
+Base case topilgandan keyin — stack TESKARI tartibda yechiladi:
+factorial(1) → 1
+factorial(2) → 2 * 1 = 2
+factorial(3) → 3 * 2 = 6
+factorial(4) → 4 * 6 = 24       ← oxirgi javob
+```
+
+**Stack overflow** — call stack'ning sig'imi cheklangan (odatda ~10,000-15,000 frame). Base case yo'q yoki noto'g'ri bo'lsa, stack to'lib ketadi:
+
+```javascript
+// ❌ Base case yo'q — stack overflow!
+function infinite() {
+  return infinite(); // RangeError: Maximum call stack size exceeded
+}
+```
+
+**Recursion vs Iteration** — qachon qaysi biri?
+
+| Xususiyat | Recursion | Iteration |
+|-----------|-----------|-----------|
+| Tree/graph traversal | Tabiiy va oson | Murakkab (stack kerak) |
+| Memory | Har safar yangi stack frame | Bitta frame |
+| Stack overflow xavfi | Ha | Yo'q |
+| O'qilishi | Ko'pincha toza | Ba'zan murakkab |
+| Performance | Odatda sekinroq | Odatda tezroq |
+| Nested structures | Juda qulay | Qiyin |
+
+**Mutual recursion** — ikki (yoki undan ortiq) funksiya bir-birini chaqiradi:
+
+```javascript
+function isEven(n) {
+  if (n === 0) return true;
+  return isOdd(n - 1);
+}
+
+function isOdd(n) {
+  if (n === 0) return false;
+  return isEven(n - 1);
+}
+
+isEven(4); // true  — isEven(4) → isOdd(3) → isEven(2) → isOdd(1) → isEven(0) → true
+isOdd(3);  // true  — isOdd(3) → isEven(2) → isOdd(1) → isEven(0) → true
+           // isEven(0) true qaytardi → bu qiymat zanjir bo'ylab qaytadi
+           // Natija: isOdd(3) = true ✅ (3 toq son)
+```
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Stack frame mexanizmi**: Har recursive chaqiruv yangi **stack frame** yaratadi — return address, local variables, this binding, scope chain shu frame'da saqlanadi. Frame stack pointer'ni quyiga suradi, return qilganda orqaga ko'tariladi.
+
+**Stack size limitlari**:
+- **V8** (Chrome/Node.js): ~984 KB, ~10,000-15,000 frames
+- **SpiderMonkey** (Firefox): ~1 MB, ~50,000 frames
+- **JavaScriptCore** (Safari): ~1 MB
+
+Frame limit aniq son emas — har frame hajmi local variable soniga bog'liq. V8'da `--stack-size=N` flag bilan oshirish mumkin, lekin bu temporary — algoritmni iterative'ga aylantirish yaxshiroq.
+
+**Recursion overhead**: Har call uchun parameter passing, frame allocation, EC creation, function prologue/epilogue. Bu overhead O(1) har call, lekin million'lab call'larda yig'iladi. V8 ba'zi recursive funksiyalarni inline qiladi (TurboFan), lekin chuqur recursion'da yordam bermaydi.
+
+**Stack overflow — nima sodir bo'ladi**: Stack heap'ga tegib, engine `RangeError: Maximum call stack size exceeded` tashlaydi. V8 **TCO ni implement qilmagan**, shuning uchun klassik recursive code'da doim stack overflow xavfi bor — trampoline yoki iterative conversion kerak.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
+
+**Factorial — klassik recursion:**
+
+```javascript
+function factorial(n) {
+  // Base case
+  if (n <= 1) return 1;
+  // Recursive case
+  return n * factorial(n - 1);
+}
+
+factorial(5); // 120
+// 5 * factorial(4)
+// 5 * 4 * factorial(3)
+// 5 * 4 * 3 * factorial(2)
+// 5 * 4 * 3 * 2 * factorial(1)
+// 5 * 4 * 3 * 2 * 1 = 120
+```
+
+**Fibonacci — naive vs memoized:**
+
+```javascript
+// ❌ Naive — O(2^n) — juda sekin!
+function fibNaive(n) {
+  if (n <= 1) return n;
+  return fibNaive(n - 1) + fibNaive(n - 2);
+}
+// fibNaive(40) — bir necha sekund kutadi!
+// Sabab: bir xil qiymatlar qayta-qayta hisoblanadi
+// fib(5) → fib(4) + fib(3)
+//          fib(3) + fib(2)   fib(2) + fib(1)  ← fib(3) 2 MARTA!
+
+// ✅ Memoized — O(n) — juda tez!
+function fibMemo(n, memo = {}) {
+  if (n in memo) return memo[n]; // Cache da bormi?
+  if (n <= 1) return n;
+
+  memo[n] = fibMemo(n - 1, memo) + fibMemo(n - 2, memo);
+  return memo[n];
+}
+fibMemo(40);  // darhol javob — 102334155
+fibMemo(100); // 354224848179262000000 — IEEE 754 tufayli oxirgi raqamlar aniq emas!
+// Aniq natija uchun BigInt kerak: 354224848179261915075n
+```
+
+**Deep flatten array — ichma-ich massivni tekislash:**
+
+```javascript
+function deepFlatten(arr) {
+  const result = [];
+
+  for (const item of arr) {
+    if (Array.isArray(item)) {
+      // Recursive case — ichki massivni ham flatten qil
+      result.push(...deepFlatten(item));
+    } else {
+      // Base case — oddiy element
+      result.push(item);
+    }
+  }
+
+  return result;
+}
+
+deepFlatten([1, [2, [3, [4, [5]]]]]);
+// [1, 2, 3, 4, 5]
+
+deepFlatten([1, [2, 3], [4, [5, [6, 7]]], 8]);
+// [1, 2, 3, 4, 5, 6, 7, 8]
+```
+
+**Tree traversal — daraxt bo'ylab yurish:**
+
+```javascript
+const fileSystem = {
+  name: "root",
+  children: [
+    {
+      name: "src",
+      children: [
+        { name: "index.js", children: [] },
+        { name: "utils.js", children: [] },
+        {
+          name: "components",
+          children: [
+            { name: "Header.js", children: [] },
+            { name: "Footer.js", children: [] }
+          ]
+        }
+      ]
+    },
+    { name: "package.json", children: [] }
+  ]
+};
+
+// Barcha fayllarni topish (DFS — Depth-First Search)
+function getAllFiles(node, path = "") {
+  const currentPath = path ? `${path}/${node.name}` : node.name;
+
+  // Base case — barg (leaf) node — children bo'sh
+  if (node.children.length === 0) {
+    return [currentPath];
+  }
+
+  // Recursive case — har bir child ni tekshir
+  const files = [];
+  for (const child of node.children) {
+    files.push(...getAllFiles(child, currentPath));
+  }
+  return files;
+}
+
+getAllFiles(fileSystem);
+// ["root/src/index.js", "root/src/utils.js",
+//  "root/src/components/Header.js", "root/src/components/Footer.js",
+//  "root/package.json"]
+```
+
+**Binary search — recursive:**
+
+```javascript
+function binarySearch(arr, target, low = 0, high = arr.length - 1) {
+  // Base case — element topilmadi
+  if (low > high) return -1;
+
+  const mid = Math.floor((low + high) / 2);
+
+  if (arr[mid] === target) return mid;          // Topildi!
+  if (arr[mid] < target) {
+    return binarySearch(arr, target, mid + 1, high);  // O'ng yarmi
+  }
+  return binarySearch(arr, target, low, mid - 1);     // Chap yarmi
+}
+
+const sorted = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91];
+binarySearch(sorted, 23);  // 5 (index)
+binarySearch(sorted, 100); // -1 (topilmadi)
+```
+
+**Trampolining — stack overflow'ni oldini olish:**
+
+```javascript
+// Trampoline pattern — recursive funksiyani iterative ga aylantiradi
+function trampoline(fn) {
+  return function(...args) {
+    let result = fn(...args);
+    // Natija funksiya bo'lsa — uni chaqirishda davom et
+    while (typeof result === "function") {
+      result = result(); // ← yangi stack frame emas, eskisi o'rniga!
+    }
+    return result;
+  };
+}
+
+// Oddiy recursion — katta n da stack overflow
+function sumRecursive(n, acc = 0) {
+  if (n === 0) return acc;
+  return sumRecursive(n - 1, acc + n); // ❌ Stack overflow n > ~10000
+}
+
+// Trampoline versiya — stack overflow bo'lmaydi
+function sumTrampoline(n, acc = 0) {
+  if (n === 0) return acc;
+  return () => sumTrampoline(n - 1, acc + n); // ← funksiya qaytaradi, chaqirmaydi!
+}
+
+const safeSum = trampoline(sumTrampoline);
+safeSum(100000); // 5000050000 — stack overflow yo'q!
+// Har bir qadam bitta stack frame ishlatadi — while loop ichida
+```
+
+</details>
+
+---
+
+## Tail Call Optimization (TCO)
+
+### Nazariya
+
+Tail Call Optimization (TCO) — ES6 (ES2015) spetsifikatsiyasida aniqlangan optimizatsiya. Agar funksiyaning **oxirgi operatsiyasi** (tail position) boshqa funksiyani chaqirish bo'lsa, engine yangi stack frame yaratmasdan, mavjud frame'ni qayta ishlatishi mumkin. Bu recursive funksiyalarning stack overflow bo'lmasligini ta'minlaydi.
+
+**Muhim:** TCO spetsifikatsiyada bor, lekin hozircha **faqat Safari (JavaScriptCore)** implement qilgan. V8 (Chrome/Node.js) va SpiderMonkey (Firefox) implement qilmagan — sabablari: debugging qiyinligi (stack trace yo'qoladi) va performance trade-off'lar.
+
+```
+Tail Position — funksiyaning OXIRGI operatsiyasi recursive chaqiruv bo'lishi kerak:
+
+✅ Tail Position (TCO mumkin):
+function factorial(n, acc = 1) {
+  if (n <= 1) return acc;
+  return factorial(n - 1, n * acc);  ← OXIRGI operatsiya — faqat chaqiruv
+}
+
+❌ Tail Position EMAS (TCO mumkin emas):
+function factorial(n) {
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);  ← OXIRGI operatsiya — ko'paytirish (* )
+}                                  factorial qaytgandan KEYIN ko'paytirish kerak
+                                   shuning uchun frame'ni saqlash majburiy
+```
+
+```
+TCO qanday ishlaydi — stack frame'lar:
+
+TCO siz (oddiy recursion):                TCO bilan:
+┌──────────────┐                          ┌──────────────┐
+│ fact(1, 120) │                          │              │
+│ fact(2, 60)  │                          │              │
+│ fact(3, 20)  │    →   Stack o'sib       │ fact(5,1)    │ → Frame qayta ishlatiladi
+│ fact(4, 5)   │        boradi            │  ↓ fact(4,5) │ → xuddi shu frame
+│ fact(5, 1)   │                          │  ↓ fact(3,20)│ → xuddi shu frame
+│ main()       │                          │  ↓ fact(2,60)│ → xuddi shu frame
+└──────────────┘                          │  ↓ fact(1,120)→ return 120
+                                          │ main()       │
+                                          └──────────────┘
+6 ta frame                                2 ta frame (main + 1)
+```
+
+**Continuation-Passing Style (CPS)** — alternative approach. Natijani qaytarish o'rniga, uni callback (continuation) ga uzatish. Bu TCO ga qulayroq shakl, lekin o'qilishi qiyin:
+
+```javascript
+// Oddiy
+function add(a, b) { return a + b; }
+
+// CPS versiya
+function addCPS(a, b, cont) { cont(a + b); }
+addCPS(2, 3, result => console.log(result)); // 5
+```
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Spec darajasida TCO**: ES6 (2015) da **Proper Tail Calls** (PTC) spec'ga kiritildi. Tail position — funksiya oxirgi operatsiyasi bevosita `return f(...)` bo'lishi kerak. `return f(x) + 1`, `return await f()`, `try { return f() }` — tail position EMAS.
+
+**Engine implementatsiyasi**:
+- ✅ **Safari (JavaScriptCore)** — strict mode'da implement qilingan
+- ❌ **V8 (Chrome/Node.js)** — implement qilinmagan
+- ❌ **SpiderMonkey (Firefox)** — implement qilinmagan
+
+**Nima uchun V8 qilmagan**:
+1. **Debugging muammosi** — TCO bilan stack trace'da intermediate frame'lar yo'qoladi
+2. **STC alternativa** — V8 jamoasi explicit `continue f(x)` syntax taklif qilgan (hozircha qabul qilinmagan)
+3. **Use case kamligi** — JavaScript'da `for`/`while` loop'lar keng ishlatiladi, pure functional recursion kam
+
+**TCO qanday ishlaydi (assembly darajasida)**:
+```
+Oddiy call:  push return addr → push frame → allocate → jump
+Tail call:   overwrite frame → jump (return addr yo'q)
+```
+Effektiv: tail call → `jmp` instruction, `call` emas. Stack o'smaydi.
+
+**Trampoline — TCO'siz alternativa**: recursive funksiya o'zini darhol chaqirmaydi, **thunk** (parameterless function) qaytaradi. Tashqi loop thunk'larni chaqirib boraveradi:
+```
+while (typeof result === 'function') {
+  result = result();  // har iteratsiya bir stack frame
+}
+```
+Stack hech qachon o'smaydi, memory O(1).
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
+
+**Non-tail vs Tail recursive factorial:**
+
+```javascript
+// ❌ Non-tail recursive — har bir frame saqlash kerak
+function factorialNonTail(n) {
+  if (n <= 1) return 1;
+  return n * factorialNonTail(n - 1);
+  //     ↑ ko'paytirish — recursive chaqiruvdan KEYIN amalga oshadi
+  //     shuning uchun engine frame'ni saqlab turishi kerak
+}
+
+// ✅ Tail recursive — accumulator pattern
+function factorialTail(n, accumulator = 1) {
+  if (n <= 1) return accumulator;
+  return factorialTail(n - 1, n * accumulator);
+  // ↑ FAQAT recursive chaqiruv — boshqa hech narsa yo'q
+  // ko'paytirish chaqiruvdan OLDIN — argument sifatida
+  // engine bu frame'ni xavfsiz tashlab yuborishi mumkin
+}
+
+factorialTail(5);
+// factorialTail(5, 1)   → factorialTail(4, 5)
+// factorialTail(4, 5)   → factorialTail(3, 20)
+// factorialTail(3, 20)  → factorialTail(2, 60)
+// factorialTail(2, 60)  → factorialTail(1, 120)
+// factorialTail(1, 120) → return 120
+```
+
+**Tail recursive Fibonacci:**
+
+```javascript
+// ✅ Tail recursive — ikkita accumulator
+function fibTail(n, a = 0, b = 1) {
+  if (n === 0) return a;
+  if (n === 1) return b;
+  return fibTail(n - 1, b, a + b);
+  // ↑ FAQAT recursive chaqiruv — tail position
+}
+
+fibTail(10); // 55
+// fibTail(10, 0, 1) → fibTail(9, 1, 1) → fibTail(8, 1, 2) → ...
+// → fibTail(1, 34, 55) → return 55
+```
+
+**Trampoline — TCO ni qo'lda emulatsiya qilish:**
+
+```javascript
+// Trampoline helper — universal
+function trampoline(fn) {
+  return function trampolined(...args) {
+    let result = fn(...args);
+    while (typeof result === "function") {
+      result = result();
+    }
+    return result;
+  };
+}
+
+// Thunk qaytaruvchi funksiya — chaqirmaydi, faqat "keyinga qoldirilgan chaqiruv" qaytaradi
+function factorialThunk(n, acc = 1) {
+  if (n <= 1) return acc;              // ← qiymat qaytaradi (to'xtash)
+  return () => factorialThunk(n - 1, n * acc); // ← thunk qaytaradi (davom etish)
+}
+
+const safeFact = trampoline(factorialThunk);
+safeFact(100000); // Infinity (raqam katta), lekin stack overflow YO'Q!
+
+// Katta raqamlar uchun BigInt bilan:
+function factBigInt(n, acc = 1n) {
+  if (n <= 1n) return acc;
+  return () => factBigInt(n - 1n, n * acc);
+}
+
+const safeFactBig = trampoline(factBigInt);
+safeFactBig(100n); // 9332621544394415268169923885626...n — to'g'ri javob!
+```
+
+**Amaliy misol — chuqur nested object'da qidirish (trampoline bilan):**
+
+```javascript
+function findInObject(obj, key) {
+  const stack = [obj]; // o'zimizning "stack" — call stack emas!
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+
+    if (current && typeof current === "object") {
+      if (key in current) return current[key];
+
+      for (const val of Object.values(current)) {
+        stack.push(val); // Stack'ga qo'shish — recursion o'rniga iteration
+      }
+    }
+  }
+
+  return undefined;
+}
+
+const deepObj = {
+  a: { b: { c: { d: { target: "TOPILDI!" } } } }
+};
+
+findInObject(deepObj, "target"); // "TOPILDI!"
+// Stack overflow xavfi yo'q — call stack emas, oddiy array ishlatilmoqda
+```
+
+</details>
+
+---
+
+## Edge Cases va Gotchas
+
+### Block'da function declaration — strict vs sloppy mode farqi
+
+ES6 dan oldin `if`/`for` bloklari ichidagi `function fn(){}` declaration'i **standartlashtirilmagan** edi — har engine o'zicha handle qilardi. ES6 bu behavior'ni standartlashtirdi, lekin **strict mode** va **sloppy mode** o'rtasida hali ham farq bor:
+
+```javascript
+// --- Strict mode (modul yoki "use strict") ---
+"use strict";
+if (true) {
+  function greet() { return "Salom"; }
+}
+// greet(); // ❌ ReferenceError: greet is not defined
+// Strict mode'da block-scoped — if bloki tashqarisida accessible emas
+
+// --- Sloppy mode (script, no strict) ---
+if (true) {
+  function greet() { return "Salom"; }
+}
+console.log(greet()); // "Salom" ✅ — function-scoped (Annex B)
+// Sloppy mode'da function declaration function scope'iga hoist bo'ladi
+```
+
+**Nima uchun:** ECMAScript spec'ning **Annex B** (legacy web compatibility) sloppy mode'da block-level function declaration'larni function scope'iga hoist qilishni belgilaydi. Strict mode'da bu behavior yo'q — function block scope'ida qoladi (`let` kabi).
+
+**Yechim:** Block ichida conditional funksiya yaratish kerak bo'lsa — function **expression** ishlating:
+
+```javascript
+let greet;
+if (condition) {
+  greet = function() { return "Salom"; };  // ✅ expression, block yoki strict muhim emas
+}
+```
+
+---
+
+### Named function expression — ism faqat ichki scope'da visible
+
+Named function expression (`const f = function innerName() {}`) yaratganda, `innerName` — **faqat funksiya body ichida** mavjud. Tashqi scope'da bu nom topilmaydi. Bu spec qoidasi — recursive self-reference uchun o'ylab chiqilgan pattern.
+
+```javascript
+// Named function expression — "fact" faqat ichki scope'da:
+const factorial = function fact(n) {
+  if (n <= 1) return 1;
+  return n * fact(n - 1); // ✅ ichki "fact" ishlaydi (recursive call)
+};
+
+console.log(factorial(5));   // 120 ✅
+console.log(factorial.name); // "fact" — rasmiy name
+
+// Tashqi scope'da "fact" mavjud EMAS:
+// console.log(fact(5)); // ❌ ReferenceError: fact is not defined
+
+// Bu pattern'ning AFZALLIGI — tashqi o'zgaruvchi o'zgarsa ham ishlaydi:
+let fn = factorial;
+// factorial = null; // "factorial" reference'ni bekor qilish
+// fn(5) hali ham 120 qaytaradi — ichki "fact" tashqi o'zgarishga bog'liq emas
+
+// Anonymous expression'da esa — tashqi reference ga bog'liq:
+const brokenFact = function(n) {
+  if (n <= 1) return 1;
+  return n * brokenFact(n - 1); // ❌ tashqi "brokenFact" ga bog'liq
+};
+// Agar "brokenFact" qayta tayinlansa — recursion buziladi
+```
+
+**Nima uchun:** Named function expression ichki nomni alohida **function expression scope**'da bind qiladi — bu scope faqat function body ichida mavjud va **read-only**. Spec'da bu `FunctionExpression` runtime semantics'ida belgilangan — recursive self-reference'ni tashqi o'zgaruvchilarga bog'liqliksiz ta'minlash uchun.
+
+**Use case:** Recursive function expression, stack trace'da ma'lumot berish (anonymous vs named), library'larda debugging friendly funksiyalar.
+
+---
+
+### Async recursion — stack overflow bo'lmaydi, lekin memory oshadi
+
+Promise-based (async/await) recursion'da klassik **stack overflow** muammosi mavjud emas — chunki har `await` call stack'ni bo'shatadi va keyingi davom'ni microtask queue'ga joylashtiradi. Lekin bu "bepul" emas — har Promise object memory'da saqlanadi.
+
+```javascript
+// ❌ Sync recursion — stack overflow
+function syncCount(n) {
+  if (n === 0) return "done";
+  return syncCount(n - 1);
+}
+// syncCount(100000); // ❌ RangeError: Maximum call stack size exceeded
+
+// ✅ Async recursion — no stack overflow
+async function asyncCount(n) {
+  if (n === 0) return "done";
+  // Har await:
+  // 1. Current function execution to'xtaydi
+  // 2. Call stack clear bo'ladi
+  // 3. Keyingi qism microtask queue'ga boradi
+  // 4. Event loop tayyor bo'lganda davom etadi
+  return asyncCount(n - 1);
+}
+
+// Bu ishlaydi (oxir-oqibat), lekin:
+// await asyncCount(100000); // "done"
+//   - Stack overflow YO'Q ✅
+//   - Lekin 100000 ta Promise object memory'da vaqtincha saqlanadi
+//   - Juda sekin (microtask scheduling overhead)
+```
+
+**Nima uchun:** `await` har safar current execution context'ni to'xtatadi va keyingi kodni microtask'ga qo'yadi (spec'da `Await` abstract operation). Bu call stack'dan frame olib tashlaydi — keyingi recursive call yangi "top-level" stack'dan boshlanadi. Memory'da esa Promise'lar GC gacha saqlanadi.
+
+**Trade-off:** Async recursion — stack overflow yechimi, lekin **memory-efficient emas**. Chuqur iteration kerak bo'lsa — iterative loop yoki trampoline afzalroq.
+
+---
+
+### IIFE + strict mode = `this` `undefined` (not global)
+
+IIFE ichida `"use strict"` direktivasi yozilsa, `this` global object **emas**, `undefined` bo'ladi. Bu eski kod (ES5 legacy) pattern'larida kutilmagan xatoliklarga sabab bo'lishi mumkin.
+
+```javascript
+// Non-strict IIFE — this = globalThis
+(function() {
+  console.log(this === globalThis); // true
+  this.data = {}; // ✅ ishlaydi (globalThis.data = {})
+})();
+
+// Strict IIFE — this = undefined
+(function() {
+  "use strict";
+  console.log(this); // undefined
+  // this.data = {}; // ❌ TypeError: Cannot set properties of undefined
+})();
+
+// Arrow IIFE — lexical this (outer scope'dan)
+(() => {
+  console.log(this); // Modul'da: {} (module exports), browser: window/globalThis
+})();
+```
+
+**Nima uchun:** Strict mode bilan `this` binding qoidalari o'zgaradi — "default binding" `globalThis`'ga emas, `undefined`'ga teng. Bu intentional spec decision — global scope'ni silent mutate qilish xavfini kamaytirish uchun.
+
+**Yechim:** IIFE ichida global'ga kirish kerak bo'lsa — `globalThis` ni explicit ishlating, `this` ga ishonmang:
+
+```javascript
+(function() {
+  "use strict";
+  globalThis.config = { /* ... */ }; // ✅ explicit
+})();
+```
+
+---
+
+### `.bind()` qayta bind qilib bo'lmaydi — birinchi bind ustun
+
+`Function.prototype.bind` qaytargan **bound function**'ni qayta `bind()` qilib yoki `.call()`/`.apply()` bilan boshqa `this` kontekstida chaqirib bo'lmaydi. Birinchi bind'da o'rnatilgan `[[BoundThis]]` — permanent.
+
+```javascript
+function greet() {
+  return this.name;
+}
+
+const obj1 = { name: "Ali" };
+const obj2 = { name: "Vali" };
+
+// Birinchi bind — obj1
+const boundGreet = greet.bind(obj1);
+console.log(boundGreet()); // "Ali"
+
+// ❌ Qayta bind urinishi — obj2 ga:
+const rebound = boundGreet.bind(obj2);
+console.log(rebound()); // "Ali" — hali ham obj1! ❌
+
+// ❌ call/apply bilan ham:
+console.log(boundGreet.call(obj2));  // "Ali" — boundThis ustun
+console.log(boundGreet.apply(obj2)); // "Ali"
+```
+
+**Nima uchun:** Spec bo'yicha `bind` ichki **`[[BoundTargetFunction]]`**, **`[[BoundThis]]`**, **`[[BoundArguments]]`** slot'larni yaratadi. Bound function chaqirilganda uning `[[Call]]` ichki method'i `[[BoundThis]]` qiymatini **ignore qilib bo'lmaydi** — `call(obj2)` ham buni o'zgartirmaydi. Qayta `bind(obj2)` ham yangi bound function yaratadi, lekin uning target'i — eski bound function (uning `[[BoundThis]]` hali ham obj1).
+
+**Yechim:** Boshqa context kerak bo'lsa — original (non-bound) funksiyaga qayting:
+
+```javascript
+// ✅ Original function'ni saqlang:
+const originalGreet = greet;  // bind qilinmagan
+const boundToObj1 = originalGreet.bind(obj1);
+const boundToObj2 = originalGreet.bind(obj2);
+
+console.log(boundToObj1()); // "Ali"
+console.log(boundToObj2()); // "Vali"
 ```
 
 ---
@@ -2977,4 +3718,4 @@ Bu bo'limda biz JavaScript Functions ning **barcha muhim tomonlarini** ko'rib ch
 
 ---
 
-**Keyingi bo'lim:** [10-this-keyword.md](10-this-keyword.md) — `this` keyword mastery: 4 ta binding rule (new, explicit, implicit, default), `call`/`apply`/`bind` farqi, arrow function va lexical `this`, `this` yo'qotish muammolari va yechimlari.
+> **Keyingi bo'lim:** [10-this-keyword.md](10-this-keyword.md) — `this` keyword mastery: 4 ta binding rule priority tartibida (new, explicit, implicit, default), `call`/`apply`/`bind` farqi va ichki mexanizmi, arrow function va lexical `this`, `this` yo'qotish muammolari (method callback'da, nested function'da) va yechimlari, `this` turli kontekstlarda (global, function, method, class, event handler), strict mode ta'siri, va `globalThis` ES2020 cross-environment global object.

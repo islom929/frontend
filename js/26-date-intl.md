@@ -23,7 +23,9 @@
 - [Intl.ListFormat](#intllistformat)
 - [Intl.DisplayNames](#intldisplaynames)
 - [Temporal API (Stage 3)](#temporal-api-stage-3)
+- [Intl.DurationFormat](#intldurationformat)
 - [Common Mistakes](#common-mistakes)
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
 
@@ -44,7 +46,8 @@ Date object yaratishning 4 ta usuli bor — har biri turli kontekst uchun:
 
 `Date()` ni `new` siz chaqirish — doim **string** qaytaradi, Date object emas. Bu ko'p uchraydigan xato manbai.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 `new Date()` chaqirilganda engine quyidagilarni bajaradi:
 
@@ -72,7 +75,10 @@ Date Object — internal structure:
     = 2024-03-13T16:00:00.000Z
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // 1. Hozirgi vaqt — eng ko'p ishlatiladigan usul
@@ -108,12 +114,14 @@ typeof notDate; // "string" — Date method'lari ishlamaydi!
 
 // ✅ Date.now() — hozirgi timestamp (ms), object yaratmasdan
 const timestamp = Date.now();
-typeof timestamp; // "number" — object emas, tezroq
+typeof timestamp; // "number" — Date object yaratishga hojat yo'q, kam overhead
 
 // Date.parse() — string → timestamp
 Date.parse("2024-03-13T16:00:00Z"); // 1710345600000
 Date.parse("invalid"); // NaN — noto'g'ri string
 ```
+
+</details>
 
 ---
 
@@ -136,7 +144,8 @@ Date object'dan sana/vaqt komponentlarini olish uchun getter method'lar ishlatil
 | `getTime()` | Timestamp | ms | = `Date.now()` shu sana uchun |
 | `getTimezoneOffset()` | UTC farq | minutlarda | UTC dan orqadagi minutlar |
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 const date = new Date("2024-03-13T16:30:45.123Z");
@@ -162,8 +171,11 @@ date.getUTCMinutes();      // 30
 date.getTime(); // 1710347445123
 
 // Timezone offset — UTC dan farq (minutlarda)
-date.getTimezoneOffset(); // -300 (UTC+5 uchun, ya'ni UTC dan 300 min oldinda)
-// ⚠️ Manfiy = UTC dan OLDINDA, musbat = UTC dan ORQADA
+date.getTimezoneOffset(); // -300 (Toshkent UTC+5 da — 5 soat = 300 minut)
+// ⚠️ Belgi sanadu: getTimezoneOffset() = UTC − local (minutlarda)
+// Toshkent (UTC+5): UTC − (UTC+5) = −5 soat = −300 min → manfiy
+// New York (UTC−5): UTC − (UTC−5) = +5 soat = +300 min → musbat
+// Qisqasi: UTC+X zonasi → −X*60, UTC−X zonasi → +X*60
 
 // Oy nomini olish — getter + lookup
 const months = [
@@ -172,6 +184,8 @@ const months = [
 ];
 months[date.getMonth()]; // "Mart"
 ```
+
+</details>
 
 ---
 
@@ -183,7 +197,8 @@ Setter method'lar Date object'ning ichki timestamp'ini **mutate** qiladi — yan
 
 Setter'larning muhim xususiyati — **overflow handling**. Agar berilgan qiymat diapazondan chiqsa, Date avtomatik tuzatadi: masalan, 32-yanvar → 1-fevral bo'ladi. Bu xususiyat sana arifmetikasi uchun foydali.
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 const date = new Date("2024-03-13T16:00:00Z");
@@ -217,6 +232,8 @@ const ts = date.setFullYear(2030);
 typeof ts; // "number" — Date emas!
 ```
 
+</details>
+
 ---
 
 ## UTC vs Local Time
@@ -230,7 +247,8 @@ Date object ichida doim **UTC timestamp** saqlanadi. Local va UTC getter'lar ora
 
 `getTimezoneOffset()` — UTC va local time orasidagi farqni **minutlarda** qaytaradi. Muhim: manfiy qiymat UTC dan **oldinda** turgan timezone'ni bildiradi (masalan, UTC+5 = -300).
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
 Date internal value: 1710345600000 (UTC timestamp)
@@ -250,7 +268,10 @@ UTC-8 zonasida (PST):
   getHours()     → 8   (16 - 8 = 8)
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // UTC va local vaqtni solishtirish
@@ -281,6 +302,8 @@ const payload = {
 };
 ```
 
+</details>
+
 ---
 
 ## Date Formatting Methods
@@ -302,7 +325,8 @@ Date object'ning bir nechta formatting method'lari bor. Lekin ko'pchilik ular **
 | `toUTCString()` | `"Wed, 13 Mar 2024 16:00:00 GMT"` | ✅ Standart format |
 | `valueOf()` / `getTime()` | `1710345600000` | ✅ Timestamp |
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 const date = new Date("2024-03-13T16:00:00Z");
@@ -336,6 +360,8 @@ date.getTime();  // 1710345600000 — bir xil
 +date;           // 1710345600000 — unary plus ham ishlaydi
 ```
 
+</details>
+
 ---
 
 ## Date Math — Arifmetik Amallar
@@ -349,7 +375,8 @@ Sana arifmetikasi asosan quyidagilar uchun ishlatiladi:
 - Sanaga kun/soat/minut qo'shish yoki ayirish
 - Sanalarni solishtirish
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Ikki sana orasidagi farq (ms)
@@ -412,6 +439,8 @@ const t3 = Date.now();
 const t4 = Date.now();
 console.log(`${t4 - t3} ms`);
 ```
+
+</details>
 
 ---
 
@@ -552,7 +581,8 @@ Formatter ikki qismdan iborat:
 1. **Locale** — til va mintaqa (`"uz-UZ"`, `"en-US"`, `"de-DE"`)
 2. **Options** — qanday formatda ko'rsatish (dateStyle, timeStyle, yoki granular options)
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 `Intl.DateTimeFormat` ichida ICU (International Components for Unicode) kutubxonasi ishlatiladi. Bu kutubxona barcha zamonaviy browser va Node.js da mavjud. Locale ma'lumotlari CLDR (Common Locale Data Repository) dan olinadi — bu Unicode Consortium tomonidan boshqariladigan katta ma'lumotlar bazasi.
 
@@ -570,7 +600,10 @@ Intl.DateTimeFormat ishlash jarayoni:
    timestamp → UTC → local timezone → pattern bo'yicha format
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Oddiy ishlatish
@@ -638,6 +671,8 @@ new Intl.DateTimeFormat("en-US", {
 }).format(date); // "9:30:00 PM +05"
 ```
 
+</details>
+
 ---
 
 ## Intl.NumberFormat
@@ -653,7 +688,8 @@ new Intl.DateTimeFormat("en-US", {
 | `"percent"` | Foiz | `12%` |
 | `"unit"` | Birlik (km, kg, °C) | `100 km/h` |
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Oddiy son formatlash — locale bo'yicha separator'lar
@@ -749,6 +785,8 @@ new Intl.NumberFormat("en-IN").format(1234567);
 // "12,34,567" (Hindiston — lakhs/crores tizimi)
 ```
 
+</details>
+
 ---
 
 ## Intl.RelativeTimeFormat
@@ -761,7 +799,8 @@ Formatter ikki asosiy option qabul qiladi:
 - **`numeric`**: `"always"` (default) → "1 kun oldin", `"auto"` → "kecha" (agar mumkin bo'lsa)
 - **`style`**: `"long"` (default), `"short"`, `"narrow"`
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Asosiy ishlatish
@@ -819,6 +858,8 @@ function getRelativeTime(date, baseDate = new Date()) {
 // getRelativeTime(new Date("2024-03-06")); // "1 hafta oldin"
 ```
 
+</details>
+
 ---
 
 ## Intl.PluralRules
@@ -838,7 +879,8 @@ Unicode CLDR bo'yicha kategorialari:
 | `"many"` | (slavyan tillarda) | - |
 | `"other"` | 2+ items | 2+ ta kitob |
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Ingliz tili — "one" va "other"
@@ -890,6 +932,8 @@ pluralize("ru", 3, {
 }); // "элемента"
 ```
 
+</details>
+
 ---
 
 ## Intl.Collator
@@ -903,7 +947,8 @@ Muammolar `Intl.Collator`siz:
 - Case-insensitive sort — `toUpperCase()` / `toLowerCase()` har doim to'g'ri ishlamaydi
 - Aksentli belgilar — `"é"` va `"e"` ni bir xil deb hisoblash yoki hisoblasmaslik
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Oddiy sort — Unicode tartibida (ko'pincha noto'g'ri)
@@ -935,14 +980,17 @@ const numCollator = new Intl.Collator("en", { numeric: true });
 // Performance — sort() ichida localeCompare vs Collator
 const names = ["Ёлка", "Яблоко", "Арбуз", "Банан"];
 
-// ❌ localeCompare har chaqiruvda yangi formatter yaratadi
+// ❌ localeCompare har chaqiruvda collator'ni ichki ravishda qayta yaratishi mumkin
+// (implementation'ga qarab — ayrim engine'lar cache qiladi, ayrimlari yo'q)
 names.sort((a, b) => a.localeCompare(b, "ru"));
 
-// ✅ Collator bir marta yaratiladi — 10x tezroq
+// ✅ Collator bir marta yaratiladi va qayta ishlatiladi — katta array'larda ancha samaraliroq
 const ruCollator = new Intl.Collator("ru");
 names.sort(ruCollator.compare);
 // ["Арбуз", "Банан", "Ёлка", "Яблоко"] ✅
 ```
+
+</details>
 
 ---
 
@@ -957,7 +1005,8 @@ names.sort(ruCollator.compare);
 - `"word"` — so'zlar
 - `"sentence"` — gaplar
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Grapheme — ko'zga ko'rinadigan belgilar
@@ -1013,6 +1062,8 @@ truncate("Hello World", 5);    // "Hello…"
 truncate("👨‍👩‍👧‍👦🇺🇿🎉", 2); // "👨‍👩‍👧‍👦🇺🇿…" ✅
 ```
 
+</details>
+
 ---
 
 ## Intl.ListFormat
@@ -1027,7 +1078,8 @@ truncate("👨‍👩‍👧‍👦🇺🇿🎉", 2); // "👨‍👩‍👧‍�
 | `"disjunction"` | "A, B, or C" | Birini tanlash |
 | `"unit"` | "A, B, C" | Birliklar ro'yxati |
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Conjunction — "va" bilan
@@ -1058,7 +1110,10 @@ new Intl.ListFormat("en", { type: "conjunction", style: "long" })
   .format(["A", "B"]); // "A and B"
 
 new Intl.ListFormat("en", { type: "conjunction", style: "short" })
-  .format(["A", "B"]); // "A & B" (ba'zi locale'larda)
+  .format(["A", "B"]); // "A & B" (CLDR en-US: short-form "{0} & {1}")
+
+new Intl.ListFormat("en", { type: "conjunction", style: "short" })
+  .format(["A", "B", "C"]); // "A, B, & C" (Oxford comma bilan)
 
 new Intl.ListFormat("en", { type: "conjunction", style: "narrow" })
   .format(["A", "B"]); // "A, B"
@@ -1069,6 +1124,8 @@ lf.format(["Apple"]); // "Apple" (vergulsiz)
 // Ikkita element
 lf.format(["Apple", "Banana"]); // "Apple and Banana" (vergulsiz)
 ```
+
+</details>
 
 ---
 
@@ -1087,7 +1144,8 @@ lf.format(["Apple", "Banana"]); // "Apple and Banana" (vergulsiz)
 | `"calendar"` | Kalendar | `"gregory"` → `"Gregorian Calendar"` |
 | `"dateTimeField"` | Vaqt maydoni | `"month"` → `"month"` |
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Mintaqalar (davlatlar)
@@ -1139,13 +1197,20 @@ const options = languages.map(code => ({
 // ]
 ```
 
+</details>
+
 ---
 
 ## Temporal API (Stage 3)
 
 ### Nazariya
 
-**Temporal** — Date object'ni almashtirishga mo'ljallangan yangi standart API. 2024-yil holatida Stage 3 da (TC39) — browser'lar hali to'liq implement qilmagan, lekin polyfill'lar mavjud. Temporal Date'ning barcha muammolarini hal qiladi:
+**Temporal** — Date object'ni almashtirishga mo'ljallangan yangi standart API. Proposal TC39'ga 2018-yilda kiritilgan va 2021-yildan beri Stage 3 da. 2026-yil boshida:
+- **Firefox** — 125+ versiyadan (2024-mart) experimental implementation shipping
+- **Chrome/Safari** — implementation jarayoni davom etmoqda, flag orqasida sinovda
+- **Polyfill** — `@js-temporal/polyfill` production'da ishlatishga yaroqli
+
+Temporal Date'ning barcha muammolarini hal qiladi:
 
 | Date muammosi | Temporal yechimi |
 |--------------|-----------------|
@@ -1187,7 +1252,8 @@ Temporal Type'lar:
 └─────────────────────────────────────────────────┘
 ```
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // ⚠️ Temporal hali barcha browser'larda mavjud emas
@@ -1218,12 +1284,26 @@ const prevMonth = date.subtract({ months: 1 });
 // Duration — ikki sana orasidagi farq
 const start = Temporal.PlainDate.from("2024-01-01");
 const end = Temporal.PlainDate.from("2024-03-13");
+
+// ⚠️ PlainDate.until() default largestUnit = "day"
+// (PlainDate da vaqt komponentlari yo'q → days level'da balance qiladi)
 const duration = start.until(end);
+// P72D — 72 kun (oy/kunga ajratilmaydi!)
+
+duration.days;          // 72
+duration.total("day");  // 72 — days-only duration uchun ishlaydi
+
+// Months/days ajratish uchun largestUnit explicit berish kerak
+const calendarDuration = start.until(end, { largestUnit: "month" });
 // P2M12D — 2 oy 12 kun
 
-duration.months; // 2
-duration.days;   // 12
-duration.total("days"); // 72 (jami kunlar)
+calendarDuration.months; // 2
+calendarDuration.days;   // 12
+
+// ⚠️ Calendar units (month, year) → day konversiya uchun relativeTo MAJBURIY
+// Sabab: 1 oy = necha kun? Fevral 28/29, iyul 31 — anchor kerak
+calendarDuration.total({ unit: "day", relativeTo: start }); // 72
+// calendarDuration.total("day"); // ❌ RangeError — relativeTo yo'q
 
 // ZonedDateTime — timezone bilan
 const zdt = Temporal.ZonedDateTime.from({
@@ -1244,6 +1324,69 @@ const instant = Temporal.Instant.fromEpochMilliseconds(oldDate.getTime());
 const zonedDT = instant.toZonedDateTimeISO("Asia/Tashkent");
 ```
 
+</details>
+
+---
+
+## Intl.DurationFormat
+
+### Nazariya
+
+`Intl.DurationFormat` — vaqt oralig'larini (`Temporal.Duration` yoki oddiy object) locale-aware formatda ko'rsatish uchun. ECMA-402 2025 da qabul qilingan yangi API. 2026-yil holatida Chrome 129+, Firefox 134+, Node.js 22+ da mavjud.
+
+Bu API Temporal.Duration bilan juda mos: `start.until(end)` dan olingan duration'ni to'g'ridan-to'g'ri formatlash mumkin.
+
+| Style | Misol natija (en) |
+|-------|-------------------|
+| `"long"` | `"2 hours, 30 minutes, 15 seconds"` |
+| `"short"` | `"2 hr, 30 min, 15 sec"` |
+| `"narrow"` | `"2h 30m 15s"` |
+| `"digital"` | `"2:30:15"` |
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
+
+```javascript
+// Oddiy object bilan
+const fmt = new Intl.DurationFormat("en", { style: "long" });
+fmt.format({ hours: 2, minutes: 30, seconds: 15 });
+// "2 hours, 30 minutes, 15 seconds"
+
+// Qisqa format
+new Intl.DurationFormat("en", { style: "short" })
+  .format({ hours: 2, minutes: 30 });
+// "2 hr, 30 min"
+
+// Raqamli format — digital clock
+new Intl.DurationFormat("en", { style: "digital" })
+  .format({ hours: 2, minutes: 30, seconds: 15 });
+// "2:30:15"
+
+// Locale farqi
+new Intl.DurationFormat("uz", { style: "long" })
+  .format({ hours: 2, minutes: 30 });
+// "2 soat 30 daqiqa" (taxminan)
+
+// Temporal.Duration bilan integratsiya
+const start = Temporal.PlainTime.from("09:00:00");
+const end = Temporal.PlainTime.from("17:30:00");
+const workDuration = start.until(end);
+// PT8H30M
+
+new Intl.DurationFormat("en", { style: "long" }).format(workDuration);
+// "8 hours, 30 minutes"
+
+// Individual units'ni nazorat qilish
+new Intl.DurationFormat("en", {
+  hours: "long",
+  minutes: "short",
+  seconds: "narrow",
+}).format({ hours: 1, minutes: 2, seconds: 3 });
+// "1 hour, 2 min, 3s"
+```
+
+</details>
+
 ---
 
 ## Common Mistakes
@@ -1257,8 +1400,8 @@ const date = new Date(2024, 3, 13); // 3 = April!
 // ✅ Mart uchun 2 berish kerak
 const march = new Date(2024, 2, 13); // 2 = March
 
-// ✅ Yoki ISO string ishlatish (1-based oy)
-const march2 = new Date("2024-03-13T00:00:00");
+// ✅ Yoki ISO string ishlatish (1-based oy) — Z bilan UTC aniq ko'rsatiladi
+const march2 = new Date("2024-03-13T00:00:00Z"); // Z siz local time parse qilinadi!
 ```
 
 **Nima uchun:** `Date` API Java'ning `java.util.Date` dan olingan — u ham 0-based oy ishlatadi. Bu 1995-yildagi dizayn xatosi — Temporal API'da tuzatilgan.
@@ -1339,6 +1482,144 @@ function addWeekSafe(date) {
   return copy;
 }
 ```
+
+---
+
+## Edge Cases va Gotchas
+
+Ushbu bo'lim Common Mistakes'da qamrab olinmagan, lekin production'da qattiq bug'larga olib keladigan nozik holatlarni tavsiflaydi.
+
+### Gotcha 1: DST transition — `+24 soat` ≠ `keyingi kun`
+
+Daylight Saving Time (DST) — yilda 2 marta local clock oldinga (spring forward) yoki orqaga (fall back) siljiydi. Lekin UTC timestamp **uzluksiz** davom etadi. Bu "kun qo'shish" logikasini buzadi.
+
+```javascript
+// US/Eastern da 2024-yil 10-mart — DST boshlanishi (spring forward)
+// Local clock: 02:00 → 03:00 (1 soat yo'qoladi)
+
+const d = new Date("2024-03-09T12:00:00-05:00"); // EST (UTC-5)
+
+// ❌ Timestamp + 86400000 (24*60*60*1000 ms)
+const next = new Date(d.getTime() + 86_400_000);
+// next.toString() → local da 13:00 (12:00 emas!)
+// Sabab: DST transition paytida local clock 23 soat o'tdi, UTC timestamp 24 soat o'tdi
+
+// ✅ setDate() bilan — local calendar day qo'shadi
+const copy = new Date(d);
+copy.setDate(copy.getDate() + 1);
+// copy → local da 12:00 (kutilganidek, DST ta'sir qilmaydi)
+```
+
+**Nima uchun:** `Date` ichida UTC timestamp saqlanadi. `+86_400_000 ms` matematik jihatdan to'g'ri, lekin local interpretatsiya DST o'zgarishini hisobga olmaydi. `setDate()` esa local calendar komponentlari bilan ishlaydi, shuning uchun DST-safe.
+
+**Yechim:** Local "kun qo'shish" kerak bo'lsa, `setDate()` ishlating yoki `Temporal.ZonedDateTime.add({ days: 1 })` — Temporal DST'ni avtomatik to'g'ri boshqaradi.
+
+---
+
+### Gotcha 2: `setMonth()` ketma-ket chaqiruvlar cumulative overflow
+
+Har bir setter o'zgartirilgan `Date`ni boshqa setter uchun ishlatsa, overflow cascade bo'ladi. Bir setterdagi overflow keyingi setter'ga "chirigan" date beradi.
+
+```javascript
+// ❌ Ketma-ket set — har bir overflow keyingisiga ta'sir qiladi
+const d = new Date(2024, 0, 31); // 2024-01-31
+d.setMonth(1); // Fevral → overflow → Mart 2 (2024-leap, 31→29+2)
+d.setDate(15); // Endi: 2024-03-15 (kutilgan 2024-02-15 emas!)
+
+// ✅ Batcha set yoki konstruktor
+const safe = new Date(2024, 1, 15); // 2024-02-15 — overflow yo'q
+```
+
+**Nima uchun:** `setMonth(1)` Date'ni mutate qiladi — keyingi `setDate(15)` allaqachon **Mart** da turgan date'ga qo'llaniladi, Fevral emas. Bu "date time-travel" bug — setters orasida Date "silently" oldinga sakraydi.
+
+**Yechim:** Multi-field update'larda `setFullYear(y, m, d)` (bitta chaqiruv bilan barcha uchtasini berish) yoki Temporal API immutable API'sini ishlating.
+
+---
+
+### Gotcha 3: `JSON.parse()` Date'ni avtomatik revive qilmaydi
+
+`JSON.stringify(new Date())` avtomatik `toJSON()` chaqiradi va ISO string qaytaradi. Lekin `JSON.parse()` bu string'ni **hech qachon Date object'ga qaytarmaydi**. Natijada round-trip ma'lumot tipi o'zgaradi.
+
+```javascript
+const obj = { createdAt: new Date("2024-03-13T16:00:00Z") };
+const json = JSON.stringify(obj);
+// '{"createdAt":"2024-03-13T16:00:00.000Z"}'
+
+const parsed = JSON.parse(json);
+typeof parsed.createdAt;     // "string" ❌ — Date emas!
+parsed.createdAt.getTime();  // TypeError: not a function
+
+// ✅ Reviver funksiya bilan avtomatik Date qilish
+const dateReviver = (key, value) => {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    return new Date(value);
+  }
+  return value;
+};
+
+const revived = JSON.parse(json, dateReviver);
+revived.createdAt.getTime(); // 1710345600000 ✅
+```
+
+**Nima uchun:** JSON format'ida "date" tipi yo'q — faqat string, number, boolean, null, array, object. ECMAScript spec `toJSON()` bilan **stringify** ni standardlashtirgan, lekin **parse** da tipni tiklash hech qachon standartlashtirilmagan (qaysi string Date ekanligini aniqlash noaniq muammo).
+
+**Yechim:** Backend'dan kelgan JSON'da Date maydonlari bo'lsa, reviver funksiya ishlating yoki manual ravishda `new Date(obj.field)` chaqiring. Temporal API'da ham xuddi shunday holat.
+
+---
+
+### Gotcha 4: Unicode grapheme ≠ code point ≠ code unit
+
+JavaScript string `length` property **UTF-16 code units** soni, spread `[...str]` esa **code point'lar** soni. Lekin foydalanuvchi ko'radigan "belgi" — **grapheme cluster**. Bu uch metrika emoji va combining marks bilan farq qiladi.
+
+```javascript
+const family = "👨‍👩‍👧‍👦"; // Oila emoji: 4 emoji + 3 ZWJ
+
+family.length;                          // 11 (UTF-16 code units)
+[...family].length;                     // 7 (code points: 4 emoji + 3 ZWJ)
+
+const seg = new Intl.Segmenter("en", { granularity: "grapheme" });
+[...seg.segment(family)].length;        // 1 ✅ (grapheme cluster)
+
+// Character counter ilova misoli
+const text = "Hello 👋🏽 world";
+
+text.length;                // 13 (code units)
+[...text].length;           // 12 (code points — 👋🏽 = 2 CP)
+[...seg.segment(text)].length; // 11 ✅ (graphemes — 👋🏽 = 1)
+```
+
+**Nima uchun:** Unicode'da bir "inson belgisi" bir nechta code point'dan iborat bo'lishi mumkin — skin tone modifier (`\u{1F3FD}`), ZWJ sequence, combining accents (`é` = `e` + `\u0301`). Spec operatsiyalar turli abstraksiya darajasida ishlaydi.
+
+**Yechim:** Foydalanuvchi tomon "belgi soni" ko'rsatilganda (tweet counter, input maxlength) **Intl.Segmenter** ishlating. `.length` faqat memory/encoding balans uchun.
+
+---
+
+### Gotcha 5: `Intl.DateTimeFormat` loop ichida — o'tkir performance trap
+
+Har iteration'da yangi formatter yaratish katta array'larda sezilarli pastroq throughput beradi. CLDR data load + ICU pattern compile — har instantiation'da takrorlanadi. Bu ko'pchilik developer'lar sezmaydigan kechikish manbai.
+
+```javascript
+const dates = Array.from({ length: 10000 }, (_, i) =>
+  new Date(2024, 0, 1 + i % 365)
+);
+
+// ❌ Loop ichida formatter qayta-qayta yaratiladi
+const bad = dates.map(d =>
+  new Intl.DateTimeFormat("en-US", { dateStyle: "long" }).format(d)
+);
+
+// ✅ Bir marta yarating, qayta ishlating
+const formatter = new Intl.DateTimeFormat("en-US", { dateStyle: "long" });
+const good = dates.map(d => formatter.format(d));
+
+// toLocaleDateString() ham o'xshash — har chaqiruvda ichki formatter
+// ❌ Ba'zi engine'lar cache qiladi, lekin kafolatlanmagan
+const bad2 = dates.map(d => d.toLocaleDateString("en-US", { dateStyle: "long" }));
+```
+
+**Nima uchun:** `Intl.*` konstruktorlari ichida ICU pattern parsing, CLDR data lookup va format skeleton compilation bor. Bu operatsiyalar ar-zaletib takrorlanganda o'nlab millisekundlarni yig'adi. V8 ba'zi `toLocale*` chaqiruvlari uchun ichki cache'ga ega, lekin bu spec talabi emas.
+
+**Yechim:** Har formatter variant uchun bitta instance saqlang (module-level constant yoki memoize). React/Vue komponentlar ichida `useMemo`/`computed` bilan o'rang.
 
 ---
 
@@ -1477,7 +1758,8 @@ formatPrice(1234.5, "EUR", "de-DE");    // "1.234,50 €"
 | **Intl.ListFormat** | "A, B va C" — ro'yxat formatlash |
 | **Intl.DisplayNames** | "US" → "United States" — kodlar → inson o'qiy oladigan nomlar |
 | **Temporal** | Date o'rniga — immutable, 1-indexed month, timezone-safe |
+| **Intl.DurationFormat** | Duration'larni locale-aware formatlash — Temporal bilan mos |
 
 ---
 
-**Keyingi bo'lim:** [27-es2024-beyond.md](27-es2024-beyond.md) — ES2024+ yangiliklari: `Object.groupBy()`, `Set` methods, Iterator Helpers, `using` keyword, va kelgusi TC39 proposals.
+> **Keyingi bo'lim:** [27-es2024-beyond.md](27-es2024-beyond.md) — ES2024+ yangiliklari: `Object.groupBy()`, `Set` methods, Iterator Helpers, `using` keyword, va kelgusi TC39 proposals.

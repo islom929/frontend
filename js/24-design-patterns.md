@@ -29,6 +29,7 @@
 - [Iterator Pattern](#iterator-pattern)
 
 ### Yakuniy
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -51,7 +52,19 @@ Factory pattern — object yaratish logikasini bitta joyga markazlashtiradi. Cli
 
 **Yechim:** Bitta funksiya yoki method barcha yaratish logikasini o'z ichiga oladi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Factory funksiya har safar chaqirilganda yangi object literal yaratadi. V8 bu object'larni **Hidden Class** (V8 source kodida `Map` deb nomlanadi — JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha) orqali optimize qiladi — agar factory doim bir xil property tartibida object qaytarsa, barcha natijalar bir xil hidden class'ga ega bo'ladi va property access monomorphic IC (inline cache) bilan tezlashadi. Lekin `switch` ichida har xil shape'dagi object'lar qaytarilsa (masalan, admin'da `canManageUsers` bor, viewer'da yo'q), har bir tur alohida hidden class oladi — bu megamorphic access'ga olib keladi.
+
+Class-based factory'da `new` operator constructor'ni chaqirganda V8 oldindan hidden class tayyor qiladi. Har bir subclass (`EmailNotification`, `SMSNotification`) o'zining prototype chain'iga ega — factory client koddan bu prototype tafsilotlarini yashiradi. Factory funksiya closure bo'lsa, ichki class reference'lar closure'ning `[[Environment]]` record'ida saqlanadi — bu GC tomonidan factory reference mavjud ekan tozalanmaydi.
+
+Factory pattern'da memory perspective — har bir chaqiruv yangi object allocate qiladi. Agar method'lar object literal ichida aniqlansa, har bir object uchun yangi function object yaratiladi. Class-based yondashuvda method'lar prototype'da bitta marta yaratiladi va barcha instance'lar share qiladi — bu memory efficient.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Oddiy factory — turga qarab object yaratish:
 
@@ -159,6 +172,8 @@ notification.send(); // Email → ali@mail.com: Salom!
 
 **Qachon ishlatmaslik:** Bitta oddiy constructor yetarli bo'lganda — keraksiz abstraction qo'shmaslik.
 
+</details>
+
 ---
 
 ## Singleton Pattern
@@ -171,7 +186,19 @@ Singleton — bitta class'dan faqat **bitta instance** yaratilishini kafolatlayd
 
 **Yechim:** Class o'zi faqat bitta instance yaratilishini nazorat qiladi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+ES Module singleton'ning asosi — **Module Map** cache. Node.js yoki browser module loader `import` qilganda module specifier'ni Module Map'da qidiradi. Agar topilsa, qayta execute qilmaydi — cached module'ning `[[Namespace]]` object'ini qaytaradi. Shuning uchun `export const config = new AppConfig()` faqat bir marta bajariladi — bu singleton'ning eng ishonchli mexanizmi.
+
+`static #instance` approach'da `constructor` ichidagi `if (Database.#instance) return Database.#instance` — bu `new` operator'ning natijasini override qiladi. `new` odatda yangi object allocate qiladi, lekin constructor explicit object qaytarsa, `new` shu qaytarilgan object'ni beradi (spec: `[[Construct]]` internal method). Private static field `#instance` class body scope'da yashaydi — tashqaridan mutatsiya qilish imkonsiz.
+
+`Object.freeze(instance)` qo'shilsa, object'ning property descriptor'lari `writable: false`, `configurable: false` ga o'zgaradi. V8 frozen object'larni ichki **constant** sifatida belgilaydi — bu property access'ni yanada tezlashtiradi, chunki engine property o'zgarmasligini biladi va deoptimization trigger bo'lmaydi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ES Modules bilan singleton — **eng oddiy va tavsiya qilinadigan** usul. ES Module o'zi singleton — bir marta bajariladi va cache'lanadi:
 
@@ -205,7 +232,7 @@ export const config = new AppConfig();
 import { config } from "./config.js";
 config.set("apiUrl", "https://staging.api.com");
 
-// server.js — boshqa faylda import — XUDDI SHU instance
+// server.js — boshqa faylda import — AYNAN SHU instance
 import { config } from "./config.js";
 console.log(config.get("apiUrl")); // "https://staging.api.com" — o'zgangan!
 ```
@@ -247,6 +274,8 @@ db1.query("SELECT * FROM users");
 
 **Qachon ishlatmaslik:** Unit test'larda muammo qiladi (global state), dependency injection qiyinlashadi. Keraksiz singleton — code smell. ES Modules bilan oddiy export ko'p holatlarda yetarli.
 
+</details>
+
 ---
 
 ## Builder Pattern
@@ -259,7 +288,19 @@ Builder pattern — murakkab object'ni **qadam-baqadam** (step-by-step) yaratish
 
 **Yechim:** Builder object har bir konfiguratsiyani alohida method bilan qabul qiladi va oxirida `build()` bilan final object'ni qaytaradi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Method chaining'ning asosi — har bir method `return this` qiladi. `this` reference shu object'ga ishora qiladi, yangi object yaratilmaydi. V8 bu chained call'larni optimize qiladi: `from()`, `select()`, `where()` ketma-ket chaqirilganda, har safar bir xil receiver (`this`) bo'lgani uchun inline cache (IC) monomorphic holatda qoladi va method lookup tez ishlaydi.
+
+Private field'lar (`#table`, `#fields`) V8 ichida class instance'ning internal slot'larida saqlanadi. Bu property'lar hidden class'da ko'rinmaydi — ular alohida `PrivateName` identifier orqali access qilinadi. Shuning uchun builder'ning ichki holati tashqaridan `Object.keys()` yoki `for...in` bilan ko'rinmaydi.
+
+`build()` chaqirilganda yangi string concatenation bo'ladi. V8 string concatenation'ni `ConsString` (rope structure) bilan lazy bajaradi — haqiqiy birlashma faqat string o'qilganda sodir bo'ladi. Builder pattern'da intermediate object'lar (builder o'zi) `build()` dan keyin reference bo'lmasa GC tomonidan tozalanadi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // ❌ Muammo — 8 ta parameter, qaysi biri nima?
@@ -345,6 +386,8 @@ console.log(query);
 
 **Qachon ishlatish:** Object yaratish 4+ parameter talab qilganda, optional konfiguratsiyalar ko'p bo'lganda, method chaining orqali oson o'qiladigan API kerak bo'lganda.
 
+</details>
+
 ---
 
 # STRUCTURAL PATTERNS
@@ -363,7 +406,19 @@ Module pattern — ma'lumotlarni **encapsulate** qilish (yashirish) va faqat ker
 
 **Yechim:** IIFE + closure yoki ES Module scope bilan private/public farqlash.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+IIFE `(function() { ... })()` bajarilganda engine yangi **Execution Context** yaratadi va uning **Environment Record**'ida barcha ichki variable'lar (`count`, `MAX`, `validate`) saqlanadi. Qaytarilgan object'ning method'lari (`increment`, `decrement`) bu Environment Record'ga closure orqali reference saqlaydi. Tashqi kod bu record'ga to'g'ridan-to'g'ri kira olmaydi — bu encapsulation'ning engine-level mexanizmi.
+
+IIFE tugagandan keyin uning Execution Context stack'dan chiqadi, lekin Environment Record GC tomonidan tozalanmaydi — chunki qaytarilgan object'ning funksiyalari `[[Environment]]` internal slot orqali unga reference saqlaydi. Bu closure'ning memory implication'i — private variable'lar module reference mavjud ekan hayotda qoladi.
+
+ES Module'da engine boshqacha ishlaydi — module body'si `Module Environment Record`'da bajariladi. Bu record'dagi `export` qilinmagan binding'lar (`let count`) module tashqarisidan spec bo'yicha accessible emas. `import { increment }` qilganda — bu reference copy emas, **live binding** — eksport qiluvchi module'dagi o'zgaruvchiga to'g'ridan-to'g'ri bog'langan.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 IIFE-based module (eski usul, lekin tushunchani bilish kerak):
 
@@ -422,6 +477,8 @@ export function reset() { count = 0; return count; }
 
 **Revealing Module Pattern** — barcha funksiyalarni private yozib, faqat keraklisini export/return qilish. Bu nom o'zgartirishni osonlashtiradi va public API bir joyda ko'rinadi.
 
+</details>
+
 ---
 
 ## Decorator Pattern
@@ -434,7 +491,19 @@ Decorator — mavjud object yoki funksiyaning **asl kodini o'zgartirmay** unga y
 
 **Yechim:** Wrapper funksiya yoki class — original'ni ichiga oladi, yangi behavior qo'shadi, original operatsiyani ham chaqiradi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Funksiya decorator pattern'da `withLogging(fn)` yangi funksiya qaytaradi — bu funksiya closure orqali original `fn` reference'ni `[[Environment]]` record'ida saqlaydi. Har bir decorator qatlami bitta qo'shimcha closure frame va bitta yangi function object yaratadi. `withLogging(withTiming(fn))` — bu 2 ta nested closure, 2 ta function object allocation.
+
+`fn.apply(this, args)` chaqiruvi muhim — bu `this` binding'ni to'g'ri uzatadi. `apply` ichida engine `[[Call]]` internal method'ni `this` va `args` bilan chaqiradi. Agar `this` uzatilmasa, decorator wrapped funksiyaning context'ini yo'qotadi. Spread operator (`...args`) rest parameter orqali arguments'ni Array ga yig'adi — bu Arguments object yaratishdan ko'ra V8 da samaraliroq.
+
+Class-level decorator (TC39 Stage 3) prototype chain'ni extend qiladi yoki property descriptor'larni o'zgartiradi. `Object.defineProperty` orqali method'ning `value`, `writable`, `configurable` attribute'lari qayta yoziladi. V8 bu o'zgarishni hidden class transition sifatida qayd qiladi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Funksiya decorator — asl funksiyani o'zgartirmay yangi xatti-harakat qo'shish:
 
@@ -489,6 +558,8 @@ trackedCalc([{ price: 100, qty: 2 }, { price: 50, qty: 3 }]);
 
 **Real-world:** Express middleware, NestJS `@Controller()`, `@Get()`, Angular decorator'lari, MobX `@observable`, TypeScript decorator'lar.
 
+</details>
+
 ---
 
 ## Adapter Pattern
@@ -501,7 +572,19 @@ Adapter — mos kelmaydigan ikki interface'ni birga ishlashga majburlaydi. Eski 
 
 **Yechim:** Oraliq adapter object — bir interface'dan ikkinchisiga tarjima qiladi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Adapter object composition pattern'ga asoslangan — adapter instance ichida adaptee (eski object) reference saqlanadi (`this.oldAPI`). Bu `constructor`'da property sifatida yoziladi va V8 hidden class'ga qo'shiladi. Property forwarding'da adapter method chaqirilganda, engine birinchi adapter'ning hidden class'idan method'ni topadi, keyin adapter ichida `this.oldAPI.processXMLPayment()` uchun yana property lookup sodir bo'ladi — bu 2 ta IC (inline cache) check.
+
+Adapter qo'shimcha abstraction layer — har bir method chaqiruvi adapter orqali o'tganda bitta qo'shimcha function call frame qo'shiladi. Lekin V8 TurboFan optimizing compiler bu kichik method'larni **inline** qilishi mumkin — adapter method body'sini chaqiruvchi funksiya ichiga joylashtiradi, bu call overhead'ni yo'qotadi.
+
+Memory jihatdan adapter bitta qo'shimcha object — adaptee reference va adapter method'lari uchun. Agar adapter ko'p instance yaratilmasa (odatda bitta), memory ta'siri minimal.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Eski API'ni yangi format'ga moslashtirish:
 
@@ -586,6 +669,8 @@ logger.error("DB connection failed"); // [Pino error] DB connection failed
 
 **Real-world:** Database ORM'lar (turli DB driver'larni yagona API orqali), `fetch` polyfill'lari, framework migration (jQuery → vanilla JS).
 
+</details>
+
 ---
 
 ## Facade Pattern
@@ -598,7 +683,19 @@ Facade — murakkab subsystem'ga **oddiy, yagona interface** beradi. Client kod 
 
 **Yechim:** Bitta facade class/funksiya barcha murakkablikni yashiradi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Facade engine darajasida maxsus hech narsa qilmaydi — bu sof architectural pattern. Facade constructor'da bir nechta subsystem object'larini yaratadi (`this.audio`, `this.video`), har biri facade instance'ning property'si sifatida hidden class'ga qo'shiladi. Method chaqirilganda facade ichidagi subsystem method'lariga delegation sodir bo'ladi.
+
+Facade'ning memory cost'i — facade object + barcha subsystem instance'lari. Agar subsystem'lar og'ir bo'lsa (ko'p property, method), facade constructor'da barchasini eager yaratish costly bo'lishi mumkin. Lazy initialization (faqat kerak bo'lganda yaratish) bu muammoni hal qiladi.
+
+V8 perspective'dan facade method'lari odatda bir nechta subsystem method'ni ketma-ket chaqiradi. TurboFan bu ketma-ket call'larni optimize qiladi — har bir subsystem property access uchun IC monomorphic bo'lsa (doim bir xil type), tezlashuv katta. Facade pattern'ning asosiy qiymati runtime performance'da emas, code organization'da.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Murakkab subsystem — audio, video, subtitle, analytics
@@ -663,6 +760,8 @@ player.stop();
 
 **Real-world:** jQuery (`$` — DOM, AJAX, animation, event'larni bitta API ga birlashtiradi), `fetch` (XMLHttpRequest ustidan facade), React'da `ReactDOM.render()`, Node.js `fs.readFile` (low-level syscall'lar ustidan).
 
+</details>
+
 ---
 
 ## Proxy Pattern
@@ -675,7 +774,19 @@ Proxy pattern — object'ga kirishni nazorat qilish uchun oraliq qatlam. JS Prox
 
 **Yechim:** Proxy object asl object'ning interface'ini saqlaydi, lekin kirish oldidan/keyin qo'shimcha logic bajaradi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+JavaScript `Proxy` — spec'da **exotic object** deb ataladi. Oddiy object'lardan farqi — `[[Get]]`, `[[Set]]`, `[[HasProperty]]` kabi internal method'lar trap handler'lar orqali intercept qilinadi. V8 Proxy object uchun oddiy hidden class optimization'larni to'liq qo'llay olmaydi — har bir property access trap funksiyani chaqiradi, inline cache ko'p hollarda ishlamaydi. Shuning uchun Proxy ordinary object'dan sezilarli darajada sekinroq — aniq farq V8 versiyasi, trap complexity va operation turiga bog'liq, hot path'da seziladigan darajada bo'lishi mumkin.
+
+`new Proxy(target, handler)` yaratilganda engine ichki `[[ProxyHandler]]` va `[[ProxyTarget]]` internal slot'larni saqlaydi. `get` trap chaqirilganda `Reflect.get(target, prop, receiver)` spec bo'yicha target object'ning `[[Get]]` internal method'ini to'g'ridan-to'g'ri chaqiradi — bu trap ichida target'ning asl behavior'ini saqlash uchun ishlatiladi.
+
+Virtual proxy (class-based, `Proxy` ishlatmagan) oddiy object — V8 hidden class optimization to'liq ishlaydi. `this.realImage = null` dan `this.realImage = new HeavyImage()` ga o'zgarganda hidden class transition sodir bo'ladi. Lazy initialization memory-efficient — og'ir object faqat kerak bo'lganda heap'da allocate qilinadi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Virtual proxy — lazy initialization (og'ir resursni faqat kerak bo'lganda yaratish):
 
@@ -751,6 +862,8 @@ function createCachingProxy(apiClient, ttlMs = 60000) {
 }
 ```
 
+</details>
+
 ---
 
 # BEHAVIORAL PATTERNS
@@ -767,9 +880,21 @@ Observer pattern — **bitta subject** (kuzatiluvchi) holati o'zgarganda, unga *
 
 **Muammo:** Bitta object holati o'zgarganda bir nechta boshqa object'larni xabardor qilish kerak, lekin ular orasida qattiq bog'liqlik bo'lmasligi kerak.
 
-**Yechim:** Subject observer'lar ro'yxatini saqlaydi, holat o'zgarganda barchasiga `notify` qiladi.
+**Yechim:** Subject observer'lar ro'yxatini saqlaydi, holat o'zganganda barchasiga `notify` qiladi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Observer'lar `Map<string, Function[]>` strukturasida saqlanadi. Har bir `on()` chaqiruvida callback funksiya array'ga push qilinadi — bu funksiya reference sifatida saqlanadi, copy emas. Subject bu callback'larga **strong reference** saqlaydi, shuning uchun observer object boshqa joyda reference yo'qolsa ham GC tomonidan tozalanmaydi — bu memory leak'ning asosiy sababi.
+
+`emit()` da `[...listeners].forEach()` — spread operator bilan copy olish muhim. Agar iterate paytida `once` listener o'zini arraydan o'chirsa, original array'ning length'i o'zgaradi va boshqa listener'lar skip bo'lishi mumkin. Shallow copy bu muammoni hal qiladi, lekin har bir emit'da yangi array allocate qiladi.
+
+`once()` implementatsiyasi closure pattern — wrapper funksiya original listener'ni closure'da saqlaydi. `wrapper._original = listener` — bu qo'shimcha property off() da original listener bo'yicha qidirish uchun. V8 funksiyaga dynamic property qo'shganda hidden class transition sodir bo'ladi. Ko'p listener'lar ro'yxatdan o'tganda `indexOf()` O(n) — katta listener array'larda `Set` ishlatish samaraliroq.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 EventEmitter — JavaScript'dagi Observer pattern'ning standart implementatsiyasi:
 
@@ -852,6 +977,8 @@ store.emit("login", { name: "Vali", email: "vali@mail.com" });
 
 **Real-world:** Node.js `EventEmitter`, DOM `addEventListener`, RxJS Observable, React state management (setState → re-render).
 
+</details>
+
 ---
 
 ## Pub/Sub Pattern
@@ -868,7 +995,19 @@ Pub/Sub (Publish/Subscribe) — Observer pattern'ga o'xshash, lekin **asosiy far
 | Mediator | Yo'q — to'g'ridan-to'g'ri aloqa | Bor — event bus / message broker |
 | Scalability | Kichik tizimlar uchun mos | Katta, distributed tizimlar uchun |
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+EventBus `Map<string, Set<Function>>` ishlatadi — `Set` Observer'dagi `Array`'dan farqli ravishda duplicate handler'larni oldini oladi va `delete()` O(1) — `indexOf()` + `splice()` ning O(n) dan tezroq. Lekin `Set` iteration tartibi insertion order bo'yicha — bu spec kafolati (ES2015+).
+
+Pub/Sub'da memory leak muammosi Observer'dan ham kuchliroq — chunki event bus odatda global (module scope'da), u barcha subscriber funksiyalarga strong reference saqlaydi. Agar subscriber component destroy bo'lsa lekin unsubscribe qilinmasa, bus orqali butun component va uning closure chain'i memory'da qoladi. `WeakRef` bilan subscriber saqlash bu muammoni hal qiladi — `WeakRef` GC'ga object'ni tozalashga ruxsat beradi, lekin har safar `deref()` qilish va null check kerak.
+
+`subscribe()` unsubscribe funksiyani qaytaradi — bu closure orqali `channel` va `handler` reference'larni saqlaydi. Bu pattern memory-efficient: alohida "subscription ID" yoki lookup structure kerak emas — closure o'zi yetarli. `try/catch` har bir handler atrofida muhim — bitta handler'ning xatosi boshqalarni bloklamasligi uchun.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 class EventBus {
@@ -928,6 +1067,8 @@ unsub(); // birinchi subscriber olib tashlandi
 
 **Real-world:** Redis Pub/Sub, WebSocket event handling, React Context + useReducer, Vuex/Pinia actions, microservice'lar arasi communication, RabbitMQ, Kafka.
 
+</details>
+
 ---
 
 ## Strategy Pattern
@@ -940,7 +1081,19 @@ Strategy — bir xil vazifani bajarishning **bir nechta usuli** (algoritm, strat
 
 **Yechim:** Har bir algoritm alohida strategy, context object kerakli strategy'ni ishlatadi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+JavaScript'da strategy'lar odatda object literal yoki funksiya sifatida ifodalanadi. `strategies` object'dagi har bir property (`creditCard`, `paypal`) o'z hidden class'iga ega object'ga ishora qiladi. `strategies[strategyName]` — bu computed property access, V8 buni megamorphic IC sifatida qayd qiladi (chunki key runtime'da o'zgaradi).
+
+`this.#strategy = strategy` — bu reference almashish, copy emas. Eski strategy object'ga boshqa reference bo'lmasa GC tozalaydi. Strategy funksiya sifatida berilganda (`#strategy = fn`), context object closure capture qilmaydi — faqat funksiya reference saqlanadi. Bu memory-efficient: har bir strategy almashtiruvda yangi allocation yo'q.
+
+Strategy pattern `if/else` dan farqi engine level'da ham bor: `if/else` branch'lari uchun V8 branch prediction ishlatadi va ko'p branch'larda prediction miss ko'payadi. Object property lookup esa IC (inline cache) orqali optimize qilinadi. Lekin amalda bu farq micro-optimization — pattern'ning asosiy qiymati code maintainability'da.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Strategy'lar — har biri alohida
@@ -1014,6 +1167,8 @@ processor.pay(200, { walletAddress: "0xabc123def456" });
 
 **Real-world:** Sorting algoritm'lari, authentication strategiyalari (JWT, OAuth, API key), validation, compression (gzip, brotli), caching (memory, Redis, file).
 
+</details>
+
 ---
 
 ## Command Pattern
@@ -1026,7 +1181,19 @@ Command — har bir amalni (action) **object** sifatida encapsulate qiladi. Bu u
 
 **Yechim:** Har bir amal alohida command object — execute() va undo() bilan.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Har bir command — alohida class instance. `new AddTextCommand(editor, text, position)` chaqirilganda V8 yangi object allocate qiladi va constructor argument'larni instance property sifatida saqlaydi. Barcha `AddTextCommand` instance'lari bir xil hidden class'ga ega — `execute()` va `undo()` prototype'da share qilinadi, har bir instance uchun takrorlanmaydi.
+
+Undo stack (`#history = []`) va redo stack (`#redoStack = []`) command object reference'larni saqlaydi. Har bir command o'z holat ma'lumotlarini (`this.text`, `this.position`, `this.deletedText`) saqlaydi — bu undo imkonini beradi. Memory perspective: uzoq editing session'da history stack cheksiz o'sishi mumkin. Real-world implementatsiyalarda stack size limit qo'yiladi — eski command'lar dequeue qilinadi va GC tozalaydi.
+
+`this.#redoStack = []` — yangi amal bajarilganda redo stack butunlay yangi empty array bilan almashtiriladi. Eski array va undagi barcha command object'lar reference yo'qolgani uchun GC candidate bo'ladi. `splice` o'rniga yangi array assign qilish V8 da tezroq — eski array'ni tozalash GC'ga qoldiriladi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Command interface — har bir command execute() va undo() ga ega
@@ -1123,6 +1290,8 @@ console.log(editor.getContent()); // "Salom dunyo!"
 
 **Real-world:** Text editor'lar (VS Code undo/redo), Git (commit = command), Redux action'lari, Task queue'lar.
 
+</details>
+
 ---
 
 ## Mediator Pattern
@@ -1135,7 +1304,19 @@ Mediator — bir nechta component orasidagi aloqani **markazlashtiradi**. Compon
 
 **Yechim:** Mediator barcha aloqani boshqaradi — component'lar faqat mediator'ni biladi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Mediator pattern'da har bir component faqat mediator'ga reference saqlaydi (`user.chatRoom = this`). Mediator esa barcha component'larga reference saqlaydi (`#users = new Map()`). Bu **star topology** — N ta component uchun faqat N ta reference (mediator → component) + N ta reverse reference (component → mediator), jami 2N. Mediator'siz to'g'ridan-to'g'ri aloqada N*(N-1) reference kerak bo'lardi.
+
+`Map` ichida `name → user` sifatida saqlash O(1) lookup beradi. `broadcast()` da `this.#users.forEach()` Map iterator protocol ishlatadi — Map insertion order bo'yicha iterate qiladi. `forEach` callback har bir entry uchun chaqiriladi — V8 bu callback'ni inline qilishi mumkin agar body kichik bo'lsa.
+
+Circular reference mavjud: mediator → user → mediator. V8'ning GC'si mark-and-sweep algorithm ishlatadi — bu circular reference'larni to'g'ri tozalaydi (reference counting'dan farqli). Agar mediator va barcha user'lar unreachable bo'lsa, butun graph GC tomonidan tozalanadi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 class ChatRoom {
@@ -1207,6 +1388,8 @@ vali.broadcast("Hammaga salom!");
 
 **Real-world:** Chat application'lar, Air Traffic Control, Express middleware (app = mediator), React Context, Redux store.
 
+</details>
+
 ---
 
 ## State Pattern
@@ -1219,7 +1402,19 @@ State — object'ning **xatti-harakati holat (state) ga qarab o'zgaradi**. Har b
 
 **Yechim:** Har bir holat alohida class — context object joriy holat orqali method'larni chaqiradi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+State pattern'da `this.#state` property turli class instance'larini saqlaydi — `PendingState`, `PaidState`, `ShippedState`. Har safar `setState(new PaidState(this))` chaqirilganda yangi state object allocate qilinadi va eski state object reference yo'qoladi (GC tozalaydi). V8 uchun `this.#state` ning type'i har safar o'zgaradi — bu **polymorphic** property access, monomorphic IC'dan sekinroq.
+
+`this.#state.pay()` chaqirilganda engine birinchi `#state` property'ni o'qiydi, keyin state object'ning prototype chain'idan `pay()` method'ni qidiradi. Har bir state class o'z prototype'iga ega — `PendingState.prototype.pay`, `PaidState.prototype.ship`. Agar `#state` doim turli type bo'lsa, V8 bu call site'ni megamorphic deb belgilaydi va slow path ishlatadi.
+
+State object constructor'da `this.order = order` — bu context'ga back-reference. Circular reference hosil bo'ladi: order → state → order. Mark-and-sweep GC buni muammosiz hal qiladi. Har bir state transition'da yangi state object yaratish o'rniga, state object'larni cache qilish (flyweight pattern) memory allocation'ni kamaytiradi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Holat interface
@@ -1293,6 +1488,8 @@ order.deliver(); // "Buyurtma yetkazib berildi"
 
 **Real-world:** E-commerce order flow, TCP connection states, UI component state'lari, game character state'lari, workflow engine'lar.
 
+</details>
+
 ---
 
 ## Chain of Responsibility
@@ -1305,7 +1502,19 @@ Chain of Responsibility — so'rov (request) handler'lar zanjiri bo'ylab uzatila
 
 **Yechim:** Har bir qadam alohida handler — ular zanjir bo'lib, so'rovni ketma-ket qayta ishlaydi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Middleware pipeline'ning `next()` funksiyasi closure orqali `index` counter va `middlewares` array'ga reference saqlaydi. Har bir `next()` chaqiruvida `index++` orqali keyingi middleware'ga o'tiladi. Bu `[[Environment]]` record'da `index` mutable binding sifatida saqlanadi — har bir chaqiruvda yangi closure yaratilmaydi, bitta closure ichidagi counter o'zgaradi.
+
+`async/await` bilan middleware pattern "onion model" hosil qiladi — `await next()` keyingi middleware'ga o'tadi, u tugagandan keyin joriy middleware'ning qolgan qismi bajariladi. Engine har bir `await` da microtask queue'ga Promise resolution'ni qo'yadi. N ta middleware uchun N ta Promise object va N ta microtask yaratiladi — bu memory overhead, lekin amalda middleware soni kam (10-20) bo'lgani uchun sezilarli emas.
+
+`next()` chaqirilmasa zanjir to'xtaydi — keyingi middleware'lar execute bo'lmaydi. Bu function composition pattern — har bir middleware keyingisini chaqirish yoki chaqirmaslik huquqiga ega. Express.js'da `next` funksiyaga `error` argument berish error-handling middleware'ga o'tish imkonini beradi — bu Chain of Responsibility'ning error branch'i.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Middleware pipeline — Express.js pattern:
 
@@ -1382,6 +1591,8 @@ await pipeline.execute({
 
 **Real-world:** Express.js/Koa middleware (`app.use()`), DOM event bubbling, Promise `.then()` chain, Node.js streams pipe.
 
+</details>
+
 ---
 
 ## Iterator Pattern
@@ -1394,7 +1605,19 @@ Iterator — collection elementlariga **ketma-ket kirish** uchun standart interf
 
 **Yechim:** Iterator — yagona interface (`next()` metodi, `{ value, done }` qaytaradi) orqali har qanday collection'ni traverse qilish.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+`Symbol.iterator` — well-known Symbol. Engine `for...of` chaqirilganda object'dan `[Symbol.iterator]()` method'ni qidiradi. Bu method iterator object qaytaradi — `{ next() }` interface bilan. Har bir `next()` chaqiruvida `{ value, done }` object yaratiladi. V8 bu kichik object'larni **allocation elimination** orqali optimize qiladi — agar `value` va `done` faqat loop ichida ishlatilsa, object heap'da yaratilmaydi, register'larda saqlanadi.
+
+Generator funksiya (`*[Symbol.iterator]()`) ichki **state machine** sifatida compile qilinadi. Har bir `yield` nuqtasi alohida state. V8 generator'ni suspend/resume qilganda, generator'ning execution context'i (local variable'lar, stack frame) **generator object** ichida saqlanadi — bu oddiy funksiyadan farqli ravishda context GC tomonidan tozalanmaydi, generator complete bo'lguncha.
+
+`yield*` delegation'da ichki iterable'ning iterator'i yaratiladi va har bir `next()` chaqiruvida ichki iterator'ga forward qilinadi. Tree traversal'da rekursiv `yield*` har bir node uchun yangi generator object yaratadi — chuqur tree'larda bu sezilarli memory overhead. `for...of` loop tugaganda yoki `break` qilinganda engine `return()` method'ni chaqiradi (agar mavjud bo'lsa) — bu generator'ni tozalash imkonini beradi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Custom iterable — `Symbol.iterator` bilan:
 
@@ -1468,6 +1691,378 @@ console.log([...tree]); // ["root", "A", "A1", "A2", "B", "B1"]
 ```
 
 **Real-world:** JavaScript built-in iterable'lar (Array, String, Map, Set), generator'lar (14-bo'lim), database cursor'lar, pagination, lazy evaluation.
+
+</details>
+
+---
+
+## Edge Cases va Gotchas
+
+Design pattern'lar bo'yicha 5 ta nozik, production'da tez-tez uchrab, debug qilish qiyin bo'lgan gotcha. Har biri pattern-specific va Common Mistakes bilan overlap qilmaydi.
+
+### Gotcha 1: Singleton cross-module-system — bitta modul **ikki marta** load qilinishi mumkin
+
+Module bundler'lar (Webpack, Vite, Rollup), dual CommonJS/ESM package'lar, yoki har xil path'lar orqali load qilish — bitta "singleton" modul aslida **ikki instance** yaratishi mumkin. Node.js'da `require("./config.js")` va `require("./Config.js")` (katta-kichik harf farqi) alohida cache entry bo'lishi mumkin. Webpack bir xil modul'ni turli chunk'larga join qilsa — ikki copy. Bu "dual package hazard" deb ataladi.
+
+```javascript
+// config.js — "singleton"
+class AppConfig {
+  constructor() {
+    this.instanceId = Math.random();
+    console.log("AppConfig yaratildi:", this.instanceId);
+  }
+}
+export const config = new AppConfig();
+```
+
+```javascript
+// app.js
+import { config } from "./config.js";
+console.log(config.instanceId); // 0.123456
+
+// legacy.js (boshqa path)
+import { config } from "./Config.js"; // ← katta C (Windows filesystem case-insensitive)
+console.log(config.instanceId); // 0.789012 — ❌ BOSHQA instance!
+
+// CommonJS vs ESM dual package hazard:
+// main: "./dist/index.mjs" (ESM)
+// require: "./dist/index.cjs" (CommonJS)
+// Node.js ularni alohida cache qiladi — ikki alohida instance!
+```
+
+**Debug belgilari:**
+- "Singleton" state noma'lum sabablarga ko'ra reset bo'ladi
+- Library ichida bir versiya, app ichida boshqa versiya
+- `instanceof` check'lar fail bo'ladi (turli instance)
+- `console.log(a === b)` — false, lekin ikkalasi ham "singleton" deb hisoblangan
+
+**Yechim:**
+```javascript
+// ✅ globalThis orqali cross-context singleton
+function getAppConfig() {
+  const key = Symbol.for("app.config"); // Symbol.for — global registry
+  if (!globalThis[key]) {
+    globalThis[key] = new AppConfig();
+  }
+  return globalThis[key];
+}
+
+// Har qanday module system dan chaqirilsa — aynan bir instance
+// Symbol.for("app.config") — global registry'da saqlanadi
+// globalThis — Node.js/browser/Worker har joyda mavjud
+```
+
+**Nima uchun:** JavaScript module system'lari (CommonJS, ESM, AMD, Webpack, Vite) har biri o'z module cache'iga ega. Modul resolution path'ga bog'liq — har yangi path yangi cache entry. `Symbol.for("key")` esa **global Symbol Registry** ishlatadi — bu cross-realm va cross-module-system shared state uchun yagona standart mexanizm.
+
+**Yechim:** Critical singleton'lar uchun `Symbol.for()` + `globalThis` pattern. Library publisher'lar uchun "peerDependency" qo'llash — bitta versiya kafolatlanishi. Monorepo'da dedupe sozlamalari (Yarn `nohoist`, pnpm `public-hoist-pattern`).
+
+### Gotcha 2: Decorator composition order — outer → inner execution
+
+Decorator'lar composition'da order muhim, lekin intuitive emas. `withLogging(withTiming(fn))` — birinchi o'qilganda "timing ichida logging" deb tuyuladi, lekin aslida **outer (logging)** birinchi ishlaydi, inner (timing) ichkarida. Execution onion model — decorator'lar layered.
+
+```javascript
+function withLogging(fn, label) {
+  return function(...args) {
+    console.log(`[${label}] IN`);
+    const result = fn.apply(this, args);
+    console.log(`[${label}] OUT`);
+    return result;
+  };
+}
+
+function withTiming(fn, label) {
+  return function(...args) {
+    console.time(label);
+    const result = fn.apply(this, args);
+    console.timeEnd(label);
+    return result;
+  };
+}
+
+function calculate() {
+  return 42;
+}
+
+// Variant 1: withLogging(withTiming(calculate))
+const v1 = withLogging(withTiming(calculate, "calc"), "log");
+v1();
+// [log] IN           ← outer logging birinchi
+// calc: 0.05ms       ← inner timing
+// [log] OUT          ← outer logging oxirgi
+
+// Variant 2: withTiming(withLogging(calculate)) — ORDER TESKARI!
+const v2 = withTiming(withLogging(calculate, "log"), "calc");
+v2();
+// calc: (start)      ← outer timing birinchi
+// [log] IN           ← inner logging
+// [log] OUT
+// calc: 0.08ms       ← outer timing (log overhead ham hisoblangan)
+
+// ⚠️ Variant 2 da timing LOG overhead'ni ham o'lchaydi — noto'g'ri benchmark!
+```
+
+**Real-world trap — HTTP middleware:**
+```javascript
+// ❌ Xato order — auth logging'dan oldin
+app.use(auth);      // 1-chi ishlaydi
+app.use(logger);    // 2-chi ishlaydi
+// Logger request'ni ko'radi, lekin auth qilingan
+// Auth fail bo'lgan request'lar log'lanmaydi!
+
+// ✅ To'g'ri order — logger eng tashqarida
+app.use(logger);    // 1-chi — har request log'lanadi
+app.use(auth);      // 2-chi — log'dan keyin auth
+// Endi unauthorized request'lar ham log'ga tushadi (muhim debugging uchun)
+```
+
+**Nima uchun:** Function composition math: `f(g(x))` — `g` avval, keyin `f`. Lekin decorator pattern'da `f = withLogging(g)` — `f` **yangi funksiya**, uning body'sida `g` chaqiriladi. Chaqirish paytida: `f()` → logging IN → `g()` execute → logging OUT. Ya'ni outer wrapper birinchi va oxirgi kodda, inner o'rtada — "onion" model.
+
+**Yechim:** Decorator composition'da har doim **outer → middle → inner → middle → outer** sekvensini tasavvur qiling. Test yozayotganda har layer'ning effektini alohida tekshiring. Timing/benchmark decorator'lari eng **tashqi** yoki eng **ichki** bo'lishi kerakligini ongli tanlang (tashqi = butun chain'ni o'lchaydi, ichki = faqat original fn'ni).
+
+### Gotcha 3: Command pattern unbounded history — memory leak
+
+Undo/redo stack'lari cheksiz o'sishi mumkin. Uzun editing session (text editor, graphic editor, form builder) — har amal stack'ga push qilinadi va hech qachon tozalanmaydi. Command object'larning ichida og'ir data (image buffer, parsed AST, clone'lar) bo'lsa — memory tez tugaydi.
+
+```javascript
+// ❌ Cheksiz history — memory leak
+class Editor {
+  #history = [];
+
+  execute(command) {
+    command.execute();
+    this.#history.push(command); // ← cheksiz o'sish
+  }
+
+  undo() {
+    const cmd = this.#history.pop();
+    cmd?.undo();
+  }
+}
+
+// 8 soatlik editing session'da 10000+ command
+// Har command ichida image snapshot saqlasa → gigabayt memory!
+
+// ✅ Sliding window — fixed size history
+class BoundedEditor {
+  #history = [];
+  #redoStack = [];
+  #maxSize = 100; // faqat oxirgi 100 amal
+
+  execute(command) {
+    command.execute();
+    this.#history.push(command);
+
+    // ✅ Eski command'larni o'chirish
+    if (this.#history.length > this.#maxSize) {
+      this.#history.shift(); // FIFO: eng eski o'chadi
+    }
+
+    this.#redoStack = []; // yangi amal — redo tozalanadi
+  }
+
+  undo() {
+    const cmd = this.#history.pop();
+    if (!cmd) return;
+    cmd.undo();
+    this.#redoStack.push(cmd);
+  }
+}
+
+// ✅ Yaxshiroq: Snapshot pattern + compaction
+class SnapshotEditor {
+  #history = [];
+  #snapshotInterval = 50; // har 50 amalda snapshot
+  #snapshots = [];
+
+  execute(command) {
+    command.execute();
+    this.#history.push(command);
+
+    if (this.#history.length % this.#snapshotInterval === 0) {
+      // Har 50 amalda "baseline snapshot" — eski command'lar keraksiz
+      this.#snapshots.push(this.getCurrentState());
+      this.#history = []; // command history reset
+    }
+  }
+
+  // Restore faqat latest snapshot + command'lar orqali
+}
+```
+
+**Nima uchun:** JavaScript GC mark-and-sweep — array ichidagi reference'lar "reachable" deb hisoblanadi, GC tozalay olmaydi. Command pattern'ning "temporal undo" ning asosiy idiomasi — har amalning teskarisini saqlash. Lekin tarix **cheksiz** bo'lsa, RAM xuddi stack trace'ning saqlanishi kabi ortadi. Production editor'lar (VS Code, Figma) snapshot + differential history bilan ishlaydi.
+
+**Yechim:** Har doim `maxHistorySize` limit qo'ying (50-500 oralig'ida odatda yetarli). Og'ir command'lar uchun snapshot pattern — har N amalda baseline saqlab, oraliq command'larni tozalash. Memory profiling bilan command size'ni nazorat qiling.
+
+### Gotcha 4: Factory return type inconsistency — `instanceof` check'lar buziladi
+
+Factory funksiya gohi object literal, gohi class instance qaytarsa — `instanceof` check'lar ishonchsiz bo'ladi. Modern kodbase'da TypeScript type check'lar runtime'da mavjud emas, shuning uchun runtime `instanceof` tekshiruvlari cross-factory ishlatiladi.
+
+```javascript
+class AdminUser {
+  constructor(data) {
+    Object.assign(this, data);
+    this.role = "admin";
+  }
+  hasPermission(p) { return true; }
+}
+
+// ❌ Noto'g'ri — factory qachon class, qachon literal qaytaradi
+function createUser(type, data) {
+  if (type === "admin") {
+    return new AdminUser(data); // class instance
+  }
+  // Boshqalar — POJO
+  return { ...data, role: type };
+}
+
+const admin = createUser("admin", { name: "Ali" });
+const user = createUser("viewer", { name: "Vali" });
+
+console.log(admin instanceof AdminUser);  // true ✅
+console.log(user instanceof AdminUser);   // false ❌ — lekin user.role === "viewer"
+
+// ❌ Runtime type check — adminUser uchun sababsiz if
+function processUser(u) {
+  if (u instanceof AdminUser) {
+    return u.hasPermission("delete"); // faqat admin uchun ishlaydi
+  }
+  // viewer: u.hasPermission yo'q — method undefined!
+  return false;
+}
+
+// ❌ Yana: JSON.parse keyin instanceof false
+const json = JSON.stringify(admin);
+const restored = JSON.parse(json);
+console.log(restored instanceof AdminUser); // false ❌ — faqat POJO bo'ldi
+
+// ✅ Consistent — hamma doim class instance
+class User {
+  constructor(data) { Object.assign(this, data); }
+  hasPermission(p) { return false; }
+}
+
+class AdminUser extends User {
+  hasPermission(p) { return true; }
+}
+
+class ViewerUser extends User {
+  hasPermission(p) { return p === "read"; }
+}
+
+function createUser(type, data) {
+  switch (type) {
+    case "admin":  return new AdminUser(data);
+    case "viewer": return new ViewerUser(data);
+    default:       return new User(data);
+  }
+}
+
+// Endi barcha user'lar User instance, method'lar guaranteed
+const u = createUser("viewer", { name: "Vali" });
+console.log(u instanceof User);           // true ✅
+console.log(u.hasPermission("read"));     // true — method mavjud
+
+// ✅ Yoki discriminated union pattern — POJO + type field
+function createUserPojo(type, data) {
+  return { ...data, __type: type, role: type };
+}
+
+function isAdmin(user) {
+  return user?.__type === "admin"; // duck typing, instanceof kerak emas
+}
+```
+
+**Nima uchun:** `instanceof` prototype chain tekshiradi — faqat class instance'larda ishlaydi. Object literal'ning prototype'i `Object.prototype` — custom class'larga mos kelmaydi. `JSON.parse` doim POJO qaytaradi — serialize/deserialize cycle class identity'ni yo'qotadi. Type guard uchun `instanceof` ishlatilsa, factory inconsistency silent bug'larga olib keladi.
+
+**Yechim:** Factory'da **consistent return type** tanlang: (1) **hamma class** — base class + subclass'lar, method'lar guaranteed, `instanceof` ishonchli; yoki (2) **hamma POJO** + discriminated union (`__type` field) — serialization-friendly, duck typing bilan tekshirish. Aralashtirib ishlatmang.
+
+### Gotcha 5: State pattern transition bypass — validation chetlab o'tiladi
+
+State machine'ning asosiy qiymati — **allowed transitions**ni enforcement qilish. Lekin `context.setState(new PaidState(ctx))` ni **tashqaridan** public method sifatida ochsangiz, validation chetlab o'tiladi. Transitions faqat state class'lar ichidan (`pay() → setState(new PaidState)`) bo'lishi kerak.
+
+```javascript
+// ❌ Xato: setState public
+class Order {
+  #state;
+  constructor() { this.#state = new PendingState(this); }
+
+  setState(state) { this.#state = state; } // ⚠️ public — har qanday transition mumkin
+
+  pay() { this.#state.pay(); }
+  ship() { this.#state.ship(); }
+}
+
+class PendingState {
+  constructor(order) { this.order = order; }
+  pay() {
+    // Validation: to'lov kerak
+    this.order.setState(new PaidState(this.order));
+  }
+}
+
+class PaidState {
+  constructor(order) { this.order = order; }
+  ship() {
+    this.order.setState(new ShippedState(this.order));
+  }
+}
+
+const order = new Order();
+
+// ❌ Legitimate flow
+order.pay();
+order.ship(); // OK — pay → ship
+
+// ❌ Illegitimate flow — validation chetlab o'tiladi!
+const order2 = new Order();
+order2.setState(new ShippedState(order2)); // ⚠️ Direct transition!
+order2.ship(); // ishlaydi — lekin to'lov yo'q edi!
+
+// ─── Xatoni qanday topish ───
+// Test'lar faqat legitimate flow ishlatsa — bug topilmaydi
+// Production'da race condition yoki noto'g'ri API call setState ni ochiq state'ga o'tkazadi
+
+// ✅ To'g'ri: setState private yoki internal
+class OrderSafe {
+  #state;
+
+  constructor() {
+    this.#state = new PendingState(this);
+  }
+
+  // Public API — faqat action'lar, transitions yo'q
+  pay(paymentData) { this.#state.pay(paymentData); }
+  ship(address)    { this.#state.ship(address); }
+  deliver()        { this.#state.deliver(); }
+  cancel()         { this.#state.cancel(); }
+
+  // Internal — state class'lar chaqiradi (private method, tashqaridan kirish yo'q)
+  // State class'larga OrderSafe instance beriladi, ular #internalSetState chaqiradi
+
+  // Yoki Symbol orqali "private" API
+  [Symbol.for("OrderSafe.internal.setState")](state) {
+    // Validation: agar kerak bo'lsa
+    this.#state = state;
+  }
+}
+
+// State class'lar Symbol key orqali transition qiladi:
+class PendingStateSafe {
+  constructor(order) { this.order = order; }
+  pay(data) {
+    if (!data?.amount) throw new Error("Amount kerak");
+    const transitionKey = Symbol.for("OrderSafe.internal.setState");
+    this.order[transitionKey](new PaidStateSafe(this.order));
+  }
+}
+
+// ✅ Yaxshiroq: state machine library (xstate)
+// XState — declarative state machine, visual debugging, transition validation built-in
+```
+
+**Nima uchun:** State pattern'ning invariant'i: **ma'lum state'da faqat ruxsat etilgan transitions bajariladi**. Agar state o'zgartirish public API bo'lsa, bu invariant buziladi. `PaidState` ga o'tish faqat `pay()` muvaffaqiyatli tugagandan keyin bo'lishi kerak — direct `setState(PaidState)` bu qoidani yutadi. Xuddi `private` field'lar kabi, state transition internal bo'lishi kerak.
+
+**Yechim:** State transition method'ini **private** (`#setState`) yoki `Symbol.for()` orqali "hidden" qiling. State class'lar shu symbol key orqali transition qiladi, tashqi kod esa faqat action method'lari (`pay`, `ship`) orqali interact qiladi. Production uchun **XState** kabi library'lar — visual state chart, transition guards, history, parallel states bilan to'liq state machine support.
 
 ---
 

@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Object yaratishning qanday usullari bor? [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Object yaratishning qanday usullari bor? [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 JavaScript da object yaratishning to'rtta asosiy usuli:
 
@@ -36,11 +39,12 @@ const user4 = new UserClass("Alice");
 | `Object.create(proto)` | berilgan proto | Custom prototype chain |
 | Class | `Class.prototype` | Zamonaviy OOP |
 
----
+</details>
 
-## Savol 2: Property descriptor nima? [Middle]
+### 2. Property descriptor nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Har bir object property'si meta-ma'lumotlarga ega — bu **property descriptor**. Uch xil flag bor:
 
@@ -70,11 +74,12 @@ delete obj.id;         // ❌ o'chirilmaydi
 
 `Object.defineProperty` bilan yaratilgan property'larda default qiymatlar **`false`** — oddiy assign bilan yaratilganda esa **`true`**.
 
----
+</details>
 
-## Savol 3: `Object.freeze`, `Object.seal`, `Object.preventExtensions` farqi nima? [Middle]
+### 3. `Object.freeze`, `Object.seal`, `Object.preventExtensions` farqi nima? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | | Yangi property | O'zgartirish | O'chirish |
 |---|---|---|---|
@@ -104,11 +109,12 @@ function deepFreeze(obj) {
 }
 ```
 
----
+</details>
 
-## Savol 4: Shallow copy va deep copy farqi nima? Qanday usullar bor? [Middle]
+### 4. Shallow copy va deep copy farqi nima? Qanday usullar bor? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 **Shallow copy** — birinchi daraja copy, nested object'lar reference bo'lib qoladi:
 ```javascript
@@ -134,41 +140,12 @@ console.log(a.inner.y); // 2 — ✅ original saqlanadi
 
 Zamonaviy kod'da `structuredClone` eng yaxshi tanlov — function copy kerak bo'lmasa.
 
----
+</details>
 
-## Savol 5: Quyidagi kodning output'i nima? [Middle+]
+### 5. `for...in` vs `Object.keys()` vs `Reflect.ownKeys()` farqi nima? [Middle]
 
-```javascript
-const a = { x: 1, y: { z: 2 } };
-const b = Object.assign({}, a);
-const c = { ...a };
-
-b.x = 10;
-c.y.z = 30;
-
-console.log(a.x);   // ?
-console.log(a.y.z);  // ?
-console.log(b.y.z);  // ?
-```
-
-**Javob:**
-
-```
-1
-30
-30
-```
-
-- `b.x = 10` → `a.x` o'zgarmaydi (birinchi daraja copy)
-- `c.y.z = 30` → `a.y.z` **HAM** o'zgaradi (shallow — `y` reference bo'lib qolgan)
-- `b.y.z = 30` → b ham c ham a bilan **bir xil** `y` object'ga reference saqlaydi
-- Barchasi bitta `y` object: `a.y === b.y === c.y`
-
----
-
-## Savol 6: `for...in` vs `Object.keys()` vs `Reflect.ownKeys()` farqi nima? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | Metod | Own | Inherited | Non-enumerable | Symbol |
 |-------|-----|-----------|---------------|--------|
@@ -190,11 +167,12 @@ obj[Symbol("id")] = 3;
 
 Zamonaviy kod'da `for...in` o'rniga `Object.keys()` / `Object.entries()` ishlatish tavsiya etiladi — inherited property'lardan kutilmagan xulq bo'lmaydi.
 
----
+</details>
 
-## Savol 7: `Object.hasOwn()` nima va `hasOwnProperty` dan farqi? [Junior+]
+### 6. `Object.hasOwn()` nima va `hasOwnProperty` dan farqi? [Junior+]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 `Object.hasOwn()` (ES2022) — property object'ning **o'ziga** tegishli ekanini tekshiradi. `hasOwnProperty` ning xavfsiz versiyasi:
 
@@ -213,11 +191,12 @@ Object.hasOwn(tricky, "hasOwnProperty"); // true — to'g'ri
 
 Zamonaviy kod'da doim `Object.hasOwn()` ishlatish kerak.
 
----
+</details>
 
-## Savol 8: Getter va Setter nima? Qachon ishlatiladi? [Middle]
+### 7. Getter va Setter nima? Qachon ishlatiladi? [Middle]
 
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 Getter/Setter — property o'qilganda/yozilganda avtomatik chaqiriladigan funksiyalar. Tashqaridan oddiy property, ichida logika:
 
@@ -246,11 +225,231 @@ Use cases:
 3. **Lazy initialization** — birinchi o'qilganda hisoblash, keyingilarida cache
 4. **Backward compatibility** — eski property nomini saqlab, ichida yangi logika
 
+</details>
+
+### 8. Optional chaining (`?.`) qanday ishlaydi va qachon ishlatiladi? [Junior+]
+
+<details>
+<summary>Javob</summary>
+
+Optional chaining — chuqur nested property'ga xavfsiz murojaat. Agar zanjirdagi biror qism `null` yoki `undefined` bo'lsa — `TypeError` o'rniga `undefined` qaytaradi:
+
+```javascript
+const user = {
+  profile: {
+    address: { city: "NYC" }
+  }
+};
+
+// Optional chaining yo'q — manual tekshirish:
+const city1 = user && user.profile && user.profile.address && user.profile.address.city;
+
+// Optional chaining bilan:
+const city2 = user?.profile?.address?.city;       // "NYC"
+const zip = user?.profile?.address?.zip;          // undefined (xato emas)
+const phone = user?.contact?.phone;               // undefined (xato emas)
+
+// Method chaqirish:
+user?.profile?.toString?.();  // "[object Object]"
+user?.missing?.method?.();    // undefined
+
+// Index access:
+const first = user?.items?.[0]; // undefined
+```
+
+Qachon ishlatish kerak: tashqi API'dan kelgan data, optional config, nullable type'lar bilan ishlashda.
+
+Qachon ishlatMASLIK kerak: doim mavjud bo'lishi kerak bo'lgan property'lar uchun — `?.` xatoni yashiradi, debugging qiyinlashadi.
+
+</details>
+
+### 9. V8 Hidden Class nima va performance'ga qanday ta'sir qiladi? [Senior]
+
+<details>
+<summary>Javob</summary>
+
+V8 har bir object uchun **Hidden Class** (ichki nomi "Map") yaratadi — bu object'ning "shakli" (shape). Bir xil tartibda bir xil property'lar qo'shilgan object'lar bitta Hidden Class'ni share qiladi.
+
+Hidden Class'ning maqsadi — **inline caching**. Agar V8 bilsa ki ikkita object bir xil shape'da — birinchi object'da property access optimizatsiya qilinsa, ikkinchisida ham shu optimizatsiya ishlaydi.
+
+```javascript
+// ✅ Yaxshi — bir xil tartibda property qo'shish
+function createPoint(x, y) {
+  const p = {};
+  p.x = x;  // Hidden Class: C0 → C1 (x qo'shildi)
+  p.y = y;  // Hidden Class: C1 → C2 (y qo'shildi)
+  return p;
+}
+const p1 = createPoint(1, 2); // Shape: C2
+const p2 = createPoint(3, 4); // Shape: C2 — SHARE ✅
+
+// ❌ Yomon — turli tartibda property qo'shish
+const a = {}; a.x = 1; a.y = 2; // Shape: A
+const b = {}; b.y = 2; b.x = 1; // Shape: B — BOSHQA shape!
+// V8 inline caching foyda bermaydi
+```
+
+Performance qoidalari:
+1. Object'larga property'larni **bir xil tartibda** qo'shing
+2. Object yaratgandan keyin yangi property **qo'shMANG** (constructor'da hammasi bo'lsin)
+3. Property **o'chirMANG** (`delete`) — shape buziladi
+4. Property type'ini **o'zgartirMANG** (number → string) — deoptimization
+
+**Deep Dive:**
+
+V8 ichida Hidden Class `Map` deb ataladi (JavaScript `Map` data structure bilan aralashtirilmasin — bu **butunlay boshqa tushuncha**, faqat nomi bir xil). Har bir Map `DescriptorArray` ga ega — unda property nomlari va ularning xotiradagi offset'lari saqlanadi. `delete` operator ishlatilganda object `Map` dan `Dictionary Mode` (hash table) ga o'tadi — inline cache ishlamay qoladi va hot path'da sezilarli sekinlashuv beradi (aniq farq V8 versiyasi, workload va property count'ga bog'liq). V8 `%HasFastProperties(obj)` internal function orqali object hali Map-based ekanini tekshirish mumkin (faqat `--allow-natives-syntax` flag bilan).
+
+</details>
+
+### 10. `Object.groupBy()` nima va qanday ishlaydi? [Junior+]
+
+<details>
+<summary>Javob</summary>
+
+`Object.groupBy()` (ES2024) — array elementlarini callback natijasi bo'yicha guruhlaydi:
+
+```javascript
+const users = [
+  { name: "Alice", role: "admin" },
+  { name: "Bob", role: "user" },
+  { name: "Charlie", role: "admin" },
+  { name: "Diana", role: "user" }
+];
+
+const byRole = Object.groupBy(users, user => user.role);
+// {
+//   admin: [{ name: "Alice", role: "admin" }, { name: "Charlie", role: "admin" }],
+//   user: [{ name: "Bob", role: "user" }, { name: "Diana", role: "user" }]
+// }
+```
+
+ES2024 dan oldin bu `reduce` bilan qo'lda qilinardi:
+
+```javascript
+const byRole = users.reduce((groups, user) => {
+  const key = user.role;
+  (groups[key] ??= []).push(user);
+  return groups;
+}, {});
+```
+
+`Map.groupBy()` ham bor — key sifatida non-string qiymat kerak bo'lsa (masalan object).
+
+</details>
+
+### 11. `structuredClone` nima va JSON hack dan farqi? [Middle]
+
+<details>
+<summary>Javob</summary>
+
+`structuredClone()` (ES2022) — browser'ning Structured Clone Algorithm'i asosida deep copy yaratadi:
+
+| Xususiyat | `JSON.parse(JSON.stringify())` | `structuredClone()` |
+|---|---|---|
+| Date | ❌ → string | ✅ Date saqlanadi |
+| Map/Set | ❌ → {} | ✅ saqlanadi |
+| RegExp | ❌ → {} | ✅ saqlanadi |
+| undefined | ❌ yo'qoladi | ✅ saqlanadi |
+| NaN/Infinity | ❌ → null | ✅ saqlanadi |
+| Circular ref | ❌ TypeError | ✅ ishlaydi |
+| Function | ❌ yo'qoladi | ❌ DataCloneError |
+| Symbol keys | ❌ yo'qoladi | ❌ copy qilmaydi |
+| DOM Node | ❌ Error | ❌ Error |
+
+```javascript
+const obj = {
+  date: new Date(),
+  set: new Set([1, 2, 3]),
+  undef: undefined,
+  nan: NaN
+};
+obj.self = obj; // circular
+
+const clone = structuredClone(obj);
+console.log(clone.date instanceof Date); // true
+console.log(clone.set instanceof Set);   // true
+console.log(clone.self === clone);       // true — circular resolved
+```
+
+</details>
+
 ---
 
-## Savol 9: `deepClone` funksiyasini implement qiling [Senior]
+## Amaliy savollar (Coding Challenges)
 
-**Javob:**
+### 1. Quyidagi kodning output'i nima? [Middle+]
+
+```javascript
+const a = { x: 1, y: { z: 2 } };
+const b = Object.assign({}, a);
+const c = { ...a };
+
+b.x = 10;
+c.y.z = 30;
+
+console.log(a.x);   // ?
+console.log(a.y.z);  // ?
+console.log(b.y.z);  // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+1
+30
+30
+```
+
+- `b.x = 10` → `a.x` o'zgarmaydi (birinchi daraja copy)
+- `c.y.z = 30` → `a.y.z` **HAM** o'zgaradi (shallow — `y` reference bo'lib qolgan)
+- `b.y.z = 30` → b ham c ham a bilan **bir xil** `y` object'ga reference saqlaydi
+- Barchasi bitta `y` object: `a.y === b.y === c.y`
+
+</details>
+
+### 2. Quyidagi kodning output'i nima? [Middle+]
+
+```javascript
+const obj = { a: 1 };
+
+Object.defineProperty(obj, "b", {
+  value: 2,
+  enumerable: false,
+  writable: true
+});
+
+obj[Symbol("c")] = 3;
+
+console.log(Object.keys(obj));              // ?
+console.log(Object.getOwnPropertyNames(obj)); // ?
+console.log(Reflect.ownKeys(obj));           // ?
+console.log(JSON.stringify(obj));            // ?
+```
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+Object.keys(obj);                // ["a"]
+// ✅ Faqat own + enumerable string keys
+
+Object.getOwnPropertyNames(obj); // ["a", "b"]
+// ✅ Own string keys (enumerable + non-enumerable), Symbol yo'q
+
+Reflect.ownKeys(obj);            // ["a", "b", Symbol(c)]
+// ✅ BARCHA own keys: string + Symbol, enumerable + non-enumerable
+
+JSON.stringify(obj);             // '{"a":1}'
+// ✅ Faqat enumerable string keys, Symbol keys va non-enumerable yo'q
+```
+
+</details>
+
+### 3. `deepClone` funksiyasini implement qiling [Senior]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function deepClone(obj, seen = new WeakMap()) {
@@ -304,11 +503,22 @@ console.log(cloned !== original); // true (alohida object)
 
 `WeakMap` circular reference'ni handle qiladi: object birinchi ko'rilganda `seen` ga yoziladi, qayta uchrasa — saqlangan clone qaytariladi.
 
----
+**⚠️ Cheklovlar (bu implementatsiya bajarmaydi):**
+- **Prototype chain yo'qoladi** — `clone` har doim `Object.prototype` yoki `Array.prototype` bilan yaratiladi. Agar `original instanceof CustomClass` bo'lgan bo'lsa, `cloned instanceof CustomClass` **false** bo'ladi. Tuzatish: `Object.create(Object.getPrototypeOf(obj))` bilan yaratish.
+- **Property descriptor'lar yo'qoladi** — `clone[key] = ...` oddiy assignment, shuning uchun getter/setter, non-enumerable, non-writable flag'lar yo'qoladi. Tuzatish: `Object.defineProperty` bilan descriptor'larni ham copy qilish.
+- **Function'lar reference bo'lib qoladi** — funksiyalar primitive emas, lekin kod ularni shallow copy qiladi. Real clone imkonsiz (closure scope yo'qoladi).
+- **Built-in'lar** — `Error`, `URL`, `TypedArray`, `ArrayBuffer`, `DataView`, `Promise` kabi ko'p tiplar maxsus handle qilinmagan.
 
-## Savol 10: `deepEqual` funksiyasini implement qiling [Senior]
+**Deep Dive:**
 
-**Javob:**
+`structuredClone()` ichida brauzerning Structured Clone Algorithm (HTML spec) ishlatiladi — bu `postMessage`, IndexedDB, va Cache API da ham ishlatiladigan bir xil algoritm. U `[[Transfer]]` va `[[Clone]]` internal method'larini chaqiradi. Custom `deepClone` dan farqi — `structuredClone` `ArrayBuffer` transferable object'larni, TypedArray'larni, `Error`, `Blob`, `File`, `ImageData` kabi ko'p built-in tiplarni ham qo'llab-quvvatlaydi. Lekin `structuredClone` ham prototype chain'ni saqlamaydi va funksiyalar uchun `DataCloneError` throw qiladi.
+
+</details>
+
+### 4. `deepEqual` funksiyasini implement qiling [Senior]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function deepEqual(a, b) {
@@ -357,179 +567,20 @@ deepEqual(new Date(0), new Date(0));                      // true
 deepEqual([1, 2], [1, 2, 3]);                             // false
 ```
 
----
+**Deep Dive:**
 
-## Savol 11: `Object.groupBy()` nima va qanday ishlaydi? [Junior+]
+ECMAScript spec'da **uchta alohida equality algoritmi** bor — ularni aralashtirmaslik muhim:
 
-**Javob:**
+| Algoritm | Ishlatilish joyi | `-0` vs `+0` | `NaN` vs `NaN` |
+|----------|------------------|--------------|----------------|
+| **IsStrictlyEqual** | `===`, `!==` operator'lari | `true` | **`false`** |
+| **SameValue** | `Object.is`, property descriptor invariants | `false` | `true` |
+| **SameValueZero** | `Array.includes`, `Map.has`, `Set.has` | `true` | `true` |
 
-`Object.groupBy()` (ES2024) — array elementlarini callback natijasi bo'yicha guruhlaydi:
+Primitive'lar uchun `===` **value equality** tekshiradi (not reference), object'lar uchun esa reference identity. Deep equality uchun spec'da alohida operation yo'q — bu userland implementatsiya. Node.js'ning `assert.deepStrictEqual` ichida `innerDeepEqual` funksiyasi `Object.keys`, `Object.getOwnPropertySymbols`, va `getPrototypeOf` kombinatsiyasini ishlatib recursive taqqoslash qiladi — va u SameValue semantikasini ishlatadi (NaN === NaN true).
 
-```javascript
-const users = [
-  { name: "Alice", role: "admin" },
-  { name: "Bob", role: "user" },
-  { name: "Charlie", role: "admin" },
-  { name: "Diana", role: "user" }
-];
+Shuning uchun custom `deepEqual` yozayotganda primitive taqqoslash uchun odatda `Object.is` (SameValue) ishlatiladi — `NaN` va `-0`/`+0` to'g'ri taqqoslanishi uchun.
 
-const byRole = Object.groupBy(users, user => user.role);
-// {
-//   admin: [{ name: "Alice", role: "admin" }, { name: "Charlie", role: "admin" }],
-//   user: [{ name: "Bob", role: "user" }, { name: "Diana", role: "user" }]
-// }
-```
-
-ES2024 dan oldin bu `reduce` bilan qo'lda qilinardi:
-
-```javascript
-const byRole = users.reduce((groups, user) => {
-  const key = user.role;
-  (groups[key] ??= []).push(user);
-  return groups;
-}, {});
-```
-
-`Map.groupBy()` ham bor — key sifatida non-string qiymat kerak bo'lsa (masalan object).
-
----
-
-## Savol 12: `structuredClone` nima va JSON hack dan farqi? [Middle]
-
-**Javob:**
-
-`structuredClone()` (ES2022) — browser'ning Structured Clone Algorithm'i asosida deep copy yaratadi:
-
-| Xususiyat | `JSON.parse(JSON.stringify())` | `structuredClone()` |
-|---|---|---|
-| Date | ❌ → string | ✅ Date saqlanadi |
-| Map/Set | ❌ → {} | ✅ saqlanadi |
-| RegExp | ❌ → {} | ✅ saqlanadi |
-| undefined | ❌ yo'qoladi | ✅ saqlanadi |
-| NaN/Infinity | ❌ → null | ✅ saqlanadi |
-| Circular ref | ❌ TypeError | ✅ ishlaydi |
-| Function | ❌ yo'qoladi | ❌ DataCloneError |
-| Symbol keys | ❌ yo'qoladi | ❌ copy qilmaydi |
-| DOM Node | ❌ Error | ❌ Error |
-
-```javascript
-const obj = {
-  date: new Date(),
-  set: new Set([1, 2, 3]),
-  undef: undefined,
-  nan: NaN
-};
-obj.self = obj; // circular
-
-const clone = structuredClone(obj);
-console.log(clone.date instanceof Date); // true
-console.log(clone.set instanceof Set);   // true
-console.log(clone.self === clone);       // true — circular resolved
-```
-
----
-
-## Savol 13: Quyidagi kodning output'i nima? [Middle+]
-
-```javascript
-const obj = { a: 1 };
-
-Object.defineProperty(obj, "b", {
-  value: 2,
-  enumerable: false,
-  writable: true
-});
-
-obj[Symbol("c")] = 3;
-
-console.log(Object.keys(obj));              // ?
-console.log(Object.getOwnPropertyNames(obj)); // ?
-console.log(Reflect.ownKeys(obj));           // ?
-console.log(JSON.stringify(obj));            // ?
-```
-
-**Javob:**
-
-```javascript
-Object.keys(obj);                // ["a"]
-// ✅ Faqat own + enumerable string keys
-
-Object.getOwnPropertyNames(obj); // ["a", "b"]
-// ✅ Own string keys (enumerable + non-enumerable), Symbol yo'q
-
-Reflect.ownKeys(obj);            // ["a", "b", Symbol(c)]
-// ✅ BARCHA own keys: string + Symbol, enumerable + non-enumerable
-
-JSON.stringify(obj);             // '{"a":1}'
-// ✅ Faqat enumerable string keys, Symbol keys va non-enumerable yo'q
-```
-
----
-
-## Savol 14: Optional chaining (`?.`) qanday ishlaydi va qachon ishlatiladi? [Junior+]
-
-**Javob:**
-
-Optional chaining — chuqur nested property'ga xavfsiz murojaat. Agar zanjirdagi biror qism `null` yoki `undefined` bo'lsa — `TypeError` o'rniga `undefined` qaytaradi:
-
-```javascript
-const user = {
-  profile: {
-    address: { city: "NYC" }
-  }
-};
-
-// Optional chaining yo'q — manual tekshirish:
-const city1 = user && user.profile && user.profile.address && user.profile.address.city;
-
-// Optional chaining bilan:
-const city2 = user?.profile?.address?.city;       // "NYC"
-const zip = user?.profile?.address?.zip;          // undefined (xato emas)
-const phone = user?.contact?.phone;               // undefined (xato emas)
-
-// Method chaqirish:
-user?.profile?.toString?.();  // "[object Object]"
-user?.missing?.method?.();    // undefined
-
-// Index access:
-const first = user?.items?.[0]; // undefined
-```
-
-Qachon ishlatish kerak: tashqi API'dan kelgan data, optional config, nullable type'lar bilan ishlashda.
-
-Qachon ishlatMASLIK kerak: doim mavjud bo'lishi kerak bo'lgan property'lar uchun — `?.` xatoni yashiradi, debugging qiyinlashadi.
-
----
-
-## Savol 15: V8 Hidden Class nima va performance'ga qanday ta'sir qiladi? [Senior]
-
-**Javob:**
-
-V8 har bir object uchun **Hidden Class** (ichki nomi "Map") yaratadi — bu object'ning "shakli" (shape). Bir xil tartibda bir xil property'lar qo'shilgan object'lar bitta Hidden Class'ni share qiladi.
-
-Hidden Class'ning maqsadi — **inline caching**. Agar V8 bilsa ki ikkita object bir xil shape'da — birinchi object'da property access optimizatsiya qilinsa, ikkinchisida ham shu optimizatsiya ishlaydi.
-
-```javascript
-// ✅ Yaxshi — bir xil tartibda property qo'shish
-function createPoint(x, y) {
-  const p = {};
-  p.x = x;  // Hidden Class: C0 → C1 (x qo'shildi)
-  p.y = y;  // Hidden Class: C1 → C2 (y qo'shildi)
-  return p;
-}
-const p1 = createPoint(1, 2); // Shape: C2
-const p2 = createPoint(3, 4); // Shape: C2 — SHARE ✅
-
-// ❌ Yomon — turli tartibda property qo'shish
-const a = {}; a.x = 1; a.y = 2; // Shape: A
-const b = {}; b.y = 2; b.x = 1; // Shape: B — BOSHQA shape!
-// V8 inline caching foyda bermaydi
-```
-
-Performance qoidalari:
-1. Object'larga property'larni **bir xil tartibda** qo'shing
-2. Object yaratgandan keyin yangi property **qo'shMANG** (constructor'da hammasi bo'lsin)
-3. Property **o'chirMANG** (`delete`) — shape buziladi
-4. Property type'ini **o'zgartirMANG** (number → string) — deoptimization
+</details>
 
 ---

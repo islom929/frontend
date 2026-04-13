@@ -1,49 +1,7 @@
-# Javascript Kurs rejasi
-
-## Kurs Strukturasi
-
-| # | Bo'lim | Mavzu |
-|---|--------|-------|
-| **QISM 1** | **JS ENGINE VA ASOSLAR** | |
-| 01 | [JS Engine](#01-js-enginemd--javascript-engine-ichidan) | JavaScript Engine Ichidan |
-| 02 | [Execution Context](#02-execution-contextmd--execution-context) | Execution Context |
-| 03 | [Hoisting](#03-hoistingmd--hoisting-ichki-mexanizm) | Hoisting Ichki Mexanizm |
-| **QISM 2** | **SCOPE VA CLOSURES** | |
-| 04 | [Scope](#04-scopemd--scope-chain) | Scope Chain |
-| 05 | [Closures](#05-closuresmd--closures-chuqur-tushuncha) | Closures Chuqur Tushuncha |
-| **QISM 3** | **OBJECTS VA PROTOTYPES** | |
-| 06 | [Objects](#06-objectsmd--objects-ichidan) | Objects Ichidan |
-| 07 | [Prototypes](#07-prototypesmd--prototypal-inheritance) | Prototypal Inheritance |
-| 08 | [Classes](#08-classesmd--es6-classes) | ES6 Classes |
-| **QISM 4** | **FUNCTIONS CHUQUR** | |
-| 09 | [Functions](#09-functionsmd--functions-first-class-citizens) | Functions First-Class Citizens |
-| 10 | [this Keyword](#10-this-keywordmd--this-keyword-mastery) | this Keyword Mastery |
-| **QISM 5** | **ASYNCHRONOUS JAVASCRIPT** | |
-| 11 | [Event Loop](#11-event-loopmd--event-loop) | Event Loop |
-| 12 | [Promises](#12-promisesmd--promises) | Promises |
-| 13 | [Async/Await](#13-async-awaitmd--asyncawait) | Async/Await |
-| **QISM 6** | **ADVANCED CONCEPTS** | |
-| 14 | [Iterators & Generators](#14-iterators-generatorsmd--iterators-va-generators) | Iterators va Generators |
-| 15 | [Modules](#15-modulesmd--modules) | Modules |
-| **QISM 7** | **MEMORY VA PERFORMANCE** | |
-| 16 | [Memory](#16-memorymd--memory-management) | Memory Management |
-| 17 | [Type Coercion](#17-type-coercionmd--type-coercion-va-equality) | Type Coercion va Equality |
-| **QISM 8** | **DOM VA BROWSER APIs** | |
-| 18 | [DOM](#18-dommd--dom-manipulation) | DOM Manipulation |
-| 19 | [Events](#19-eventsmd--events) | Events |
-| 19.5 | [Browser APIs](#195-browser-apismd--browser-apis) | Browser APIs |
-| **QISM 9** | **ERROR HANDLING** | |
-| 20 | [Error Handling](#20-error-handlingmd--error-handling) | Error Handling |
-| **QISM 10** | **ES6+ VA ZAMONAVIY JS** | |
-| 21 | [Modern JS](#21-modern-jsmd--modern-javascript-es6) | Modern JavaScript (ES6+) |
-| 22 | [Array Methods](#22-array-methodsmd--array-methods-mastery) | Array Methods Mastery |
-| 23 | [Proxy & Reflect](#23-proxy-reflectmd--proxy-va-reflect) | Proxy va Reflect |
-| 24 | [Design Patterns](#24-design-patternsmd--design-patterns) | Design Patterns |
-| 25 | [String Methods](#25-string-methodsmd--string-methods) | String Methods |
-| 26 | [Date & Intl](#26-date-intlmd--date-va-intl-api) | Date va Intl API |
-| 27 | [ES2024+](#27-es2024-beyondmd--es2024-va-kelgusi-standartlar) | ES2024+ va Kelgusi Standartlar |
+# JS Course — Mavzular Ro'yxati
 
 ---
+
 
 ### QISM 1: JS ENGINE VA ASOSLAR (Bo'lim 1-3)
 
@@ -61,6 +19,8 @@
 - Memory Heap — nima saqlanadi, qanday ishlaydi
 - Stack vs Heap farqi (qisqacha, 16-bo'limda chuqurroq)
 
+**Keyingi bo'limga ilova:** → `02-execution-context.md` — Execution Context nima, qanday yaratiladi, Creation va Execution phase'lari.
+
 ### `02-execution-context.md` — Execution Context
 **Sub-sectionlar:**
 - Global Execution Context (GEC) — nimalar sodir bo'ladi
@@ -73,6 +33,9 @@
 - Environment Record — Declarative vs Object
 - `this` keyword qanday aniqlanadi (qisqacha, 10-bo'limda to'liq)
 - Execution Context Stack = Call Stack ekanligini ko'rsatish
+- Dynamic Code Evaluation — dynamic execution xavflari, direct vs indirect, Function constructor, alternativalar
+
+**Keyingi bo'limga ilova:** → `03-hoisting.md` — Hoisting ichki mexanizmi, var/let/const hoisting farqlari, TDZ.
 
 ### `03-hoisting.md` — Hoisting Ichki Mexanizm
 **Sub-sectionlar:**
@@ -86,6 +49,8 @@
 - `var` vs `let` vs `const` — to'liq taqqoslash jadvali
 - Hoisting priority — function > variable
 - Class hoisting — TDZ bilan, function dan farqi
+
+**Keyingi bo'limga ilova:** → `04-scope.md` — Scope Chain, lexical vs dynamic scoping, variable lookup.
 
 ---
 
@@ -110,6 +75,9 @@
   - `with` statement taqiqlanadi
   - `arguments.callee` taqiqlanadi
   - Octal literal syntax taqiqlanadi
+- Labeled Statements — break/continue label bilan, nested loop control, block label
+
+**Keyingi bo'limga ilova:** → `05-closures.md` — Closures chuqur tushuncha, lexical environment, memory.
 
 ### `05-closures.md` — Closures Chuqur Tushuncha
 **Sub-sectionlar:**
@@ -128,6 +96,8 @@
 - Memory Leaks closures orqali — qanday oldini olish
 - Klassik loop + closure muammosi (var vs let)
 - Performance considerations
+
+**Keyingi bo'limga ilova:** → `06-objects.md` — Objects ichidan: property descriptors, getters/setters, immutability, deep/shallow copy.
 
 ---
 
@@ -157,6 +127,8 @@
 - Optional chaining bilan object traversal
 - Shorthand property names va method definitions
 
+**Keyingi bo'limga ilova:** → `07-prototypes.md` — Prototypal inheritance, prototype chain, `new` keyword ichidan.
+
 ### `07-prototypes.md` — Prototypal Inheritance
 **Sub-sectionlar:**
 - `[[Prototype]]` internal slot — nima
@@ -174,6 +146,8 @@
 - Property shadowing on prototypes
 - Performance: prototype method vs instance method
 - `Object.prototype` methodlari — toString, valueOf, constructor
+
+**Keyingi bo'limga ilova:** → `08-classes.md` — ES6 Classes, syntactic sugar, extends, super, private fields.
 
 ### `08-classes.md` — ES6 Classes
 **Sub-sectionlar:**
@@ -193,6 +167,36 @@
 - Classes vs Prototypes — detallarini ko'rsatish (transpile qilganda nima bo'ladi)
 - Mixins — ko'p merosxo'rlik muammosi va yechimi
 - Composition vs Inheritance — qachon qaysi biri
+
+**Keyingi bo'limga ilova:** → `08.5-oop.md` — OOP paradigmasi, 4 ustun, SOLID, composition vs inheritance.
+
+### `08.5-oop.md` — OOP (Object-Oriented Programming)
+**Sub-sectionlar:**
+- OOP nima — paradigma sifatida, multi-paradigm JS
+- OOP 4 Ustuni:
+  - Encapsulation — closures, private fields (#), WeakMap pattern, Symbol
+  - Abstraction — abstract class pattern (new.target), facade pattern
+  - Inheritance — prototypal vs classical, inheritance chain
+  - Polymorphism — method overriding, duck typing, method overloading emulatsiyasi, Symbol.toPrimitive
+- Prototypal vs Classical OOP — farqi, diagramma, runtime flexibility
+- Delegation Pattern — OLOO, forwarding, delegation vs inheritance
+- Method Chaining (Fluent Interface) — return this, immutable chaining, async chaining
+- Symbol.hasInstance — custom instanceof, interface-like type checking
+- SOLID Printsiplari — JS misollar bilan:
+  - S — Single Responsibility
+  - O — Open/Closed
+  - L — Liskov Substitution
+  - I — Interface Segregation (mixin'lar bilan)
+  - D — Dependency Inversion (dependency injection)
+- Coupling va Cohesion — tight vs loose, high vs low, ideal dizayn
+- Law of Demeter — "train wreck" antipattern, yaqin do'stlar printsipi
+- Tell Don't Ask Principle — so'rama-ayt, OOP vs procedural farqi
+- Composition vs Inheritance — "has-a" vs "is-a", gorilla-banana muammosi
+- OOP vs Functional Programming — taqqoslash, qachon qaysi biri
+- Proxy bilan OOP — metaprogramming, validation, observable, access control
+- Common Mistakes — deep hierarchy, god object, noto'g'ri inheritance
+
+**Keyingi bo'limga ilova:** → `09-functions.md` — Functions first-class citizens, HOF, currying, memoization.
 
 ---
 
@@ -216,6 +220,10 @@
 - Default parameters — qanday ishlaydi
 - Function `name` property — debugging uchun
 - Function `length` property — parameter soni
+- Recursion — base case, recursive case, call stack, stack overflow, mutual recursion, trampolining
+- Tail Call Optimization (TCO) — ES6, tail position, Safari, CPS, trampoline emulatsiya
+
+**Keyingi bo'limga ilova:** → `10-this-keyword.md` — this keyword mastery, 4 ta binding rule, call/apply/bind.
 
 ### `10-this-keyword.md` — this Keyword Mastery
 **Sub-sectionlar:**
@@ -235,6 +243,8 @@
 - `this` in different contexts: global, function, method, class, event handler
 - Strict mode ta'siri this ga
 - `globalThis` (ES2020) — cross-environment global object
+
+**Keyingi bo'limga ilova:** → `11-event-loop.md` — Event Loop, microtask/macrotask, async mexanizmi.
 
 ---
 
@@ -265,6 +275,9 @@
 - `process.nextTick()` vs `queueMicrotask()` — Node.js da
 - Starvation — microtask queue to'xtovsiz to'lsa nima bo'ladi
 - Real-world misol: UI blocking va uning yechimi
+- Scheduler API — scheduler.postTask(), priority levels, AbortController, TaskController
+
+**Keyingi bo'limga ilova:** → `12-promises.md` — Promises, state machine, chaining, static methods.
 
 ### `12-promises.md` — Promises
 **Sub-sectionlar:**
@@ -286,6 +299,8 @@
 - Promise vs Callback — farqi, afzalliklari
 - Common mistakes: unhandled rejections, forgotten returns in then chains
 - Under the hood: microtask queue bilan aloqasi
+
+**Keyingi bo'limga ilova:** → `13-async-await.md` — Async/Await, parallel execution, async patterns.
 
 ### `13-async-await.md` — Async/Await
 **Sub-sectionlar:**
@@ -309,6 +324,8 @@
   - Unhandled rejections
 - Under the hood: async/await = generator + promise (state machine)
 
+**Keyingi bo'limga ilova:** → `14-iterators-generators.md` — Iterators, Generators, lazy evaluation.
+
 ---
 
 ### QISM 6: ADVANCED CONCEPTS (Bo'lim 14-15)
@@ -330,6 +347,8 @@
 - Async generators va `for await...of`
 - Use cases: Lazy evaluation, Infinite sequences, State machines, Async flow control, Pagination
 
+**Keyingi bo'limga ilova:** → `15-modules.md` — Modules, CommonJS vs ES Modules, dynamic imports.
+
 ### `15-modules.md` — Modules
 **Sub-sectionlar:**
 - Nima uchun modullar kerak — global scope pollution
@@ -349,6 +368,8 @@
 - Circular dependencies — nima bo'ladi, qanday oldini olish
 - Module bundlers — Webpack, Vite, esbuild qisqacha
 - Tree shaking — nima, qanday ishlaydi, nima uchun ES Modules kerak
+
+**Keyingi bo'limga ilova:** → `16-memory.md` — Memory management, GC, memory leaks.
 
 ---
 
@@ -378,6 +399,8 @@
 - Performance tips — memory efficient kod yozish
 - `structuredClone()` va Structured Clone Algorithm — qanday ishlaydi
 
+**Keyingi bo'limga ilova:** → `17-type-coercion.md` — Type coercion, equality, truthy/falsy.
+
 ### `17-type-coercion.md` — Type Coercion va Equality
 **Sub-sectionlar:**
 - Primitive types to'liq ro'yxat: string, number, boolean, null, undefined, symbol, bigint
@@ -398,6 +421,13 @@
 - Set vs Array — unique values, performance
 - WeakMap, WeakSet — use cases (private data, caching, DOM metadata)
 - Structured Clone — `structuredClone()` — nima copy qiladi, nima qilmaydi
+- IEEE 754 va Floating Point — 0.1+0.2 muammosi, precision loss, -0, NaN, Infinity
+- Number Methods — isNaN vs Number.isNaN, isFinite, isInteger, isSafeInteger, EPSILON, MAX_SAFE_INTEGER, formatting
+- Math Object — round/floor/ceil/trunc, random, max/min, pow, sqrt, log
+- Object.is() va SameValue Algorithm — 4 ta equality algorithm taqqoslashi
+- Bitwise Operators — &, |, ^, ~, <<, >>, >>>, permission flags, bitmask, color manipulation
+
+**Keyingi bo'limga ilova:** → `18-dom.md` — DOM manipulation, traversal, performance.
 
 ---
 
@@ -422,6 +452,9 @@
   - DocumentFragment
   - `requestAnimationFrame` bilan DOM update
 - Virtual DOM tushunchasi — nima uchun React/Vue ishlatadi
+- Web Components — Custom Elements, Shadow DOM, HTML Templates, Slots, lifecycle, form-associated
+
+**Keyingi bo'limga ilova:** → `19-events.md` — Events, bubbling/capturing, delegation.
 
 ### `19-events.md` — Events
 **Sub-sectionlar:**
@@ -441,6 +474,8 @@
 - Event listeners va memory — remove qilish ahamiyati, AbortController pattern
 - Passive event listeners — `{ passive: true }` scroll performance
 - Touch va Pointer events — mobile support
+
+**Keyingi bo'limga ilova:** → `19.5-browser-apis.md` — Browser APIs: Fetch, Observers, Workers, Storage.
 
 ### `19.5-browser-apis.md` — Browser APIs
 **Sub-sectionlar:**
@@ -485,6 +520,19 @@
   - Drag and Drop API — draggable, dragover, drop events
   - `requestIdleCallback` — idle vaqtda ishlash
   - Performance API — timing, marks, measures, navigation timing
+- **Concurrency:**
+  - SharedArrayBuffer — shared memory, cross-origin isolation
+  - Atomics — thread-safe operations, wait/notify, waitAsync
+- **Qo'shimcha zamonaviy APIs:**
+  - Page Visibility API — visibilityState, visibilitychange
+  - Broadcast Channel API — tab'lar arasi communication
+  - Beacon API — sahifa yopilishda ma'lumot yuborish
+- **Web Vitals:**
+  - Core Web Vitals — LCP, INP, CLS
+  - Performance API — mark, measure, PerformanceObserver
+  - Navigation/Resource Timing
+
+**Keyingi bo'limga ilova:** → `20-error-handling.md` — Error handling, custom errors, async error patterns.
 
 ---
 
@@ -513,6 +561,10 @@
   - Result pattern — `{ ok, data, error }`
   - Optional chaining — safe property access
   - Error reporting — Sentry, LogRocket qisqacha
+- Stack Traces va Debugging — Error.stack, stackTraceLimit, source maps, error serialization
+- Console API — console.table/time/group/count/assert/trace/dir, CSS styling, production
+
+**Keyingi bo'limga ilova:** → `21-modern-js.md` — Modern JavaScript ES6+ features.
 
 ---
 
@@ -538,6 +590,9 @@
   - `d` flag — match indices (ES2022)
   - `v` flag — Unicode Sets (ES2024)
 - JSON: parse (reviver), stringify (replacer, space, toJSON)
+- RegExp Advanced — catastrophic backtracking, ReDoS, NFA vs DFA, safe patterns, performance
+
+**Keyingi bo'limga ilova:** → `22-array-methods.md` — Array methods mastery, reduce deep dive, method chaining.
 
 ### `22-array-methods.md` — Array Methods Mastery
 **Sub-sectionlar:**
@@ -556,6 +611,8 @@
 - Performance: for loop vs methods, early termination (some/every/find)
 - Typed Arrays qisqacha — Int8Array, Float64Array, etc.
 
+**Keyingi bo'limga ilova:** → `23-proxy-reflect.md` — Proxy va Reflect, meta-programming.
+
 ### `23-proxy-reflect.md` — Proxy va Reflect
 **Sub-sectionlar:**
 - Proxy nima — meta-programming
@@ -572,6 +629,8 @@
   - Access control — property'ga kirish cheklash
   - API caching/memoization
 - Performance considerations — Proxy overhead
+
+**Keyingi bo'limga ilova:** → `24-design-patterns.md` — JavaScript design patterns.
 
 ### `24-design-patterns.md` — Design Patterns
 **Sub-sectionlar:**
@@ -596,7 +655,9 @@
   - Iterator Pattern — sequential access (built-in iterators bilan)
 - Har bir pattern uchun: Muammo, Yechim, Real-world misol, Qachon ishlatish/ishlatmaslik
 
-### `25-string-methods.md` — String Methods
+**Keyingi bo'limga ilova:** → `25-string-methods.md` — String methods to'liq.
+
+### `25-string-methods.md` — String Methods (YANGI)
 **Sub-sectionlar:**
 - String primitive vs String object — autoboxing
 - Character access: `charAt()`, bracket notation `[]`, `charCodeAt()`, `codePointAt()`
@@ -626,7 +687,9 @@
 - `isWellFormed()`, `toWellFormed()` (ES2024) — lone surrogate tekshirish
 - Performance: string concatenation, template literals vs +, array.join
 
-### `26-date-intl.md` — Date va Intl API
+**Keyingi bo'limga ilova:** → `26-date-intl.md` — Date object va Intl API.
+
+### `26-date-intl.md` — Date va Intl API (YANGI)
 **Sub-sectionlar:**
 - **Date Object:**
   - Date yaratish — constructor, Date.now(), Date.parse()
@@ -659,7 +722,9 @@
   - Temporal.Now, Temporal.PlainDate, Temporal.ZonedDateTime — asosiy tushunchalar
   - Date → Temporal migration path
 
-### `27-es2024-beyond.md` — ES2024+ va Kelgusi Standartlar
+**Keyingi bo'limga ilova:** → `27-es2024-beyond.md` — ES2024+ yangiliklar.
+
+### `27-es2024-beyond.md` — ES2024+ va Kelgusi Standartlar (YANGI)
 **Sub-sectionlar:**
 - **ES2024 yangiliklar:**
   - `Object.groupBy()` / `Map.groupBy()` — collection guruhlash
@@ -682,3 +747,4 @@
   - Record and Tuple — `#{ x: 1 }`, `#[1, 2]` — immutable primitives
   - JSON Modules — `import data from './data.json' with { type: 'json' }`
 - Har bir feature uchun: Nima muammoni hal qiladi, Syntax, Real-world misol, Browser/Node.js support holati
+

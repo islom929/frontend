@@ -17,6 +17,8 @@
 - [Revocable Proxy](#revocable-proxy)
 - [Amaliy Use Cases](#amaliy-use-cases)
 - [Performance Considerations](#performance-considerations)
+- [Membrane Pattern — Advanced Isolation](#membrane-pattern--advanced-isolation)
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -37,7 +39,8 @@ Meta-programming — dastur o'zining tuzilishi yoki xatti-harakatini runtime da 
 
 Proxy intercession uchun yaratilgan. ECMAScript spetsifikatsiyasi har bir object uchun 13 ta **essential internal method** belgilaydi: `[[Get]]`, `[[Set]]`, `[[HasProperty]]`, `[[Delete]]`, `[[Call]]`, `[[Construct]]` va boshqalar. Oddiy object'larda bu metodlar standart xatti-harakatga ega. Proxy esa bu internal method'larning har birini **custom logic** bilan almashtirishga imkon beradi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ECMAScript spec bo'yicha har bir object — bu internal method'lar to'plami. Ordinary object'larda bu metodlar standart algoritm bo'yicha ishlaydi. Proxy esa **exotic object** — uning internal method'lari handler'dagi trap funksiyalarni chaqiradi.
 
@@ -61,6 +64,8 @@ ECMAScript Internal Methods → Proxy Traps:
 
 Agar handler'da tegishli trap bo'lmasa — Proxy operatsiyani to'g'ridan-to'g'ri target object'ga yo'naltiradi (transparent forwarding). Bu degani trap'siz Proxy asl object kabi ishlaydi.
 
+</details>
+
 ---
 
 ## Proxy Yaratish
@@ -74,7 +79,8 @@ Agar handler'da tegishli trap bo'lmasa — Proxy operatsiyani to'g'ridan-to'g'ri
 
 Proxy yaratilgandan keyin — barcha operatsiyalar proxy orqali o'tadi. Proxy'ga yozilgan property target'da ham o'zgaradi. Proxy va target bitta object'ga murojaat qiladi — proxy faqat **oraliq qatlam**.
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Eng oddiy proxy — handler bo'sh object. Barcha operatsiyalar to'g'ridan-to'g'ri target'ga yo'naltiriladi:
 
@@ -109,7 +115,10 @@ proxy.age = 26;   // SET: age = 26
 console.log(user.age); // 26 — target ham o'zgardi
 ```
 
-### Under the Hood
+</details>
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
 Proxy arxitekturasi:
@@ -131,6 +140,8 @@ new proxy()   │ construct()  │────▶ new target()
 
 V8 engine'da Proxy — `JSProxy` degan maxsus internal type. U oddiy `JSObject` dan farqli ravishda har bir property access'da handler'ni tekshiradi. Shuning uchun Proxy oddiy object'dan **sekinroq** — har bir operatsiyada qo'shimcha function call bo'ladi.
 
+</details>
+
 ---
 
 ## get va set Trap'lar
@@ -151,7 +162,8 @@ V8 engine'da Proxy — `JSProxy` degan maxsus internal type. U oddiy `JSObject` 
 - `receiver` — proxy o'zi yoki meros olgan object
 - **Return:** `true` qaytarishi **shart**. `false` yoki `undefined` qaytarsa strict mode'da `TypeError`.
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Property o'qishda default qiymat berish — yo'q property uchun `undefined` o'rniga fallback:
 
@@ -203,7 +215,10 @@ user.email = "ali@example.com"; // ✅
 // user.email = "invalid";      // ❌ Error: email noto'g'ri format
 ```
 
-### Under the Hood
+</details>
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 `get` trap ishga tushish ketma-ketligi:
 
@@ -232,6 +247,8 @@ proxy.name
                                     └── target.name qaytaradi
 ```
 
+</details>
+
 ---
 
 ## has, deleteProperty, ownKeys
@@ -243,7 +260,7 @@ Bu trap'lar property **mavjudligini tekshirish**, **o'chirish** va **sanab chiqi
 **has(target, property):**
 - `in` operatori ishga tushganda chaqiriladi: `"prop" in proxy`
 - `true` yoki `false` qaytarishi kerak
-- `for...in` loop ham `has` trap'ni chaqiradi
+- **Diqqat:** `for...in` loop `has` trap'ni **chaqirmaydi** — u `ownKeys` va `getOwnPropertyDescriptor` trap'larni ishlatadi
 
 **deleteProperty(target, property):**
 - `delete proxy.prop` ishga tushganda chaqiriladi
@@ -254,7 +271,8 @@ Bu trap'lar property **mavjudligini tekshirish**, **o'chirish** va **sanab chiqi
 - `Object.keys()`, `Object.getOwnPropertyNames()`, `Object.getOwnPropertySymbols()`, `for...in`, `JSON.stringify()` ishga tushganda chaqiriladi
 - String va Symbol'lardan iborat array qaytarishi kerak
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Private property'larni yashirish — `_` bilan boshlanadigan property'larga tashqaridan kirishni taqiqlash:
 
@@ -307,7 +325,10 @@ console.log(safeData._token);      // undefined — kirib bo'lmaydi
 delete safeData.age;               // ✅ age o'chirildi
 ```
 
-### Under the Hood
+</details>
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 `ownKeys` trap qaytargan massiv `Object.keys()` va `Object.getOwnPropertyNames()` uchun har xil filtrlangan. `Object.keys()` faqat **enumerable** property'larni qaytaradi — shuning uchun `ownKeys` natijasi `getOwnPropertyDescriptor` trap orqali yana tekshiriladi. Agar `getOwnPropertyDescriptor` trap berilmagan bo'lsa — target'dagi haqiqiy descriptor ishlatiladi.
 
@@ -328,6 +349,8 @@ handler.ownKeys(target) → ["name", "age"]
   ▼
 Faqat enumerable: true bo'lganlar → Object.keys() natijasi
 ```
+
+</details>
 
 ---
 
@@ -350,7 +373,8 @@ Bu trap'lar faqat **funksiya** target'lar uchun ishlaydi. Oddiy object target'da
 - `newTarget` — asl chaqirilgan constructor (extends bilan ishlashda muhim)
 - **Object qaytarishi shart** — primitive qaytarsa `TypeError`
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Funksiya chaqiruvini ushlash — logging, timing, argument validation:
 
@@ -419,11 +443,16 @@ const db2 = new SingletonDB("postgres://localhost/other");
 console.log(db1 === db2); // true — bitta instance
 ```
 
-### Under the Hood
+</details>
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 `apply` trap faqat `target` callable bo'lganda ishlaydi. ECMAScript spec bo'yicha object'ning `[[Call]]` internal method'i bo'lishi kerak — bu faqat funksiyalarda bor. Oddiy object'ni proxy qilib `apply` trap qo'ysangiz — `proxy()` chaqirganda `TypeError: proxy is not a function` xatosi chiqadi, chunki target'da `[[Call]]` yo'q.
 
 `construct` trap ham xuddi shunday — faqat `target` da `[[Construct]]` internal method bor bo'lsa ishlaydi. Arrow function'larda `[[Construct]]` yo'q — shuning uchun ularni `new` bilan chaqirib bo'lmaydi, proxy qilsangiz ham.
+
+</details>
 
 ---
 
@@ -442,7 +471,8 @@ Qolgan 6 ta trap kamroq ishlatiladi, lekin to'liq meta-programming uchun kerak:
 | `isExtensible(target)` | Kengaytirish tekshirish | `Object.isExtensible(proxy)` |
 | `preventExtensions(target)` | Kengaytirishni taqiqlash | `Object.preventExtensions(proxy)` |
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 `getOwnPropertyDescriptor` va `defineProperty` — immutable object yaratish, property'lar o'zgartirilishini bloklash:
 
@@ -504,6 +534,8 @@ console.log(Object.keys(virtualObj));
 console.log(virtualObj.virtual1); // "Qiymati: virtual1"
 ```
 
+</details>
+
 ---
 
 ## Reflect API
@@ -545,7 +577,7 @@ Reflect.deleteProperty(obj, "role"); // true
 
 // === Reflect.ownKeys(target) ===
 // Object.keys + non-enumerable + Symbol key'lar — hammasi
-Reflect.ownKeys(obj); // ["name", "age"]
+Reflect.ownKeys(obj); // ["name", "age", "id"]
 
 // === Reflect.defineProperty(target, propertyKey, attributes) ===
 // Object.defineProperty dan farqi: throw o'rniga false qaytaradi
@@ -591,7 +623,8 @@ Reflect.preventExtensions(obj); // true
 Reflect.isExtensible(obj); // false — endi yangi property qo'shib bo'lmaydi
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Reflect va Object metod'larining asosiy farqi — xatolarga munosabat:
 
@@ -619,6 +652,8 @@ if (!Reflect.defineProperty(obj, "id", { value: 2 })) {
 }
 ```
 
+</details>
+
 ---
 
 ## Reflect + Proxy — receiver va Invariants
@@ -639,7 +674,8 @@ Proxy trap ichida `target[prop]` o'rniga `Reflect.get(target, prop, receiver)` i
 | `getPrototypeOf` | Non-extensible object uchun haqiqiy prototype'dan boshqa qiymat qaytarib bo'lmaydi |
 | `isExtensible` | Target bilan bir xil bo'lishi **shart** |
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 `receiver` muammosi — prototype chain'da getter bilan:
 
@@ -696,7 +732,10 @@ const proxy = new Proxy(obj, {
 //           // but the proxy did not return its actual value
 ```
 
-### Under the Hood
+</details>
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Invariant'lar nima uchun kerak? Ular JavaScript'ning **xavfsizlik** va **bashorat qilish** garantiyalarini saqlaydi. Agar kod `Object.freeze(obj)` bilan object'ni muzlatsa — hech kim (hatto Proxy ham) bu kafolatni buza olmaydi. Bu `Object.freeze`, `Object.seal`, `Object.preventExtensions` kabi operatsiyalarning ishonchliligini ta'minlaydi.
 
@@ -719,6 +758,8 @@ Engine invariant check:
   └── TypeError tashlaydi
 ```
 
+</details>
+
 ---
 
 ## Revocable Proxy
@@ -729,7 +770,8 @@ Engine invariant check:
 
 Revoke qilingan proxy'ni qayta tiklab bo'lmaydi — bu **bir tomonlama** operatsiya. `revoke()` chaqirilgandan keyin proxy ichki `[[Handler]]` va `[[Target]]` reference'larini `null` ga o'zgartiradi — target object'ga boshqa proxy orqali kirib bo'lmaydi.
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Vaqtinchalik API access — ma'lum vaqtdan keyin bekor qilish:
 
@@ -781,6 +823,8 @@ function giveTemporaryAccess(sensitiveData) {
   // endi thirdPartyLib proxy orqali data'ga kira olmaydi
 }
 ```
+
+</details>
 
 ---
 
@@ -1045,9 +1089,12 @@ Vue 2 (Object.defineProperty):          Vue 3 (Proxy):
 ├── Array index kuzatilmaydi            ├── Array o'zgarishlari to'liq ✅
 ├── Vue.set() kerak yangi prop uchun    ├── Map, Set qo'llab-quvvat ✅
 ├── Har bir prop uchun alohida          ├── Bitta proxy butun object ✅
-│   getter/setter                       ├── Tezroq va kamroq memory ✅
-└── Sekinroq — katta object'larda       └── Lazy — faqat kirish bo'lganda
+│   getter/setter (init'da walk)        ├── Lazy init — kirish bo'lganda
+└── Init sekin — katta object'larda     └── Init tez, per-access overhead
+    O(n) getter o'rnatish                    mavjud lekin nested lazy
 ```
+
+**Trade-off:** Vue 3 yondashuvi **initialization** jihatidan tezroq va xotira-samarali — Vue 2 har property uchun getter/setter o'rnatardi va butun object tree'ni walk qilardi. Vue 3 esa faqat kirilgan property'lar uchun lazy proxy yaratadi. Lekin **per-access** jihatidan Proxy Object.defineProperty'dan sekinroq (har `get`/`set` trap function call oshiradi). Asl afzallik: feature'lar (dynamic prop, array, Map/Set) va initialization performance, raw access speed emas.
 
 ### 6. Data Binding — Model-View Sync
 
@@ -1086,15 +1133,17 @@ model.title = "Xayr"; // [View] Title: Xayr | Count: 1
 
 ### Nazariya
 
-Proxy har bir operatsiyada qo'shimcha function call qo'shadi — bu **overhead** yaratadi. V8 engine Proxy'ni oddiy object'dek optimize qila olmaydi — inline caching va hidden class optimization Proxy uchun ishlamaydi.
+Proxy har bir operatsiyada qo'shimcha function call qo'shadi — bu **overhead** yaratadi. V8 engine Proxy'ni oddiy object'dek optimize qila olmaydi — inline caching va hidden class optimization Proxy uchun to'liq ishlamaydi (zamonaviy V8 ba'zi Proxy pattern'lar uchun optimizatsiyalar qo'shgan, lekin oddiy property access'ga yetmaydi).
 
-**Benchmark natijalar (taxminiy):**
+**Umumiy tendentsiya:**
 
 | Operatsiya | Oddiy Object | Proxy (bo'sh handler) | Proxy (trap bilan) |
 |-----------|-------------|---------------------|-------------------|
-| Property o'qish | ~1x | ~3-5x sekinroq | ~5-10x sekinroq |
-| Property yozish | ~1x | ~3-5x sekinroq | ~5-10x sekinroq |
-| Funksiya chaqirish | ~1x | ~2-3x sekinroq | ~3-5x sekinroq |
+| Property o'qish | Eng tez (inline cache) | Sezilarli sekinroq | Yana sekinroq (trap body + engine roundtrip) |
+| Property yozish | Eng tez | Sezilarli sekinroq | Yana sekinroq |
+| Funksiya chaqirish | Eng tez | Kamroq overhead | Trap body'ga bog'liq |
+
+Aniq tezlik farqi V8 versiyasi, trap complexity, va operation turiga bog'liq. Hot path'da (game loop, animation frame, katta collection iteration) farq ko'p marta bo'lishi mumkin — oddiy business logic'da esa deyarli sezilmaydi.
 
 **Qachon Proxy ishlatish kerak:**
 - Validation — development va runtime type checking
@@ -1109,7 +1158,8 @@ Proxy har bir operatsiyada qo'shimcha function call qo'shadi — bu **overhead**
 - Oddiy getter/setter yetarli bo'lsa — `Object.defineProperty` tezroq
 - Katta data set'lar ustida — har bir element uchun proxy yaratish
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // ❌ Har bir array element uchun proxy — juda sekin
@@ -1128,6 +1178,644 @@ const proxiedArray = new Proxy(bigArray, {
   }
 });
 ```
+
+</details>
+
+---
+
+## Membrane Pattern — Advanced Isolation
+
+### Nazariya
+
+**Membrane** (membrana) — Proxy'ning eng ilg'or pattern'laridan biri. Asosiy g'oya: ikki object graph (masalan, "trusted" va "untrusted" kod) o'rtasida **to'liq chegara** yaratish va chegaradan o'tayotgan barcha object'larni avtomatik ravishda **wrap/unwrap** qilish.
+
+Oddiy Proxy bitta object'ni wrap qiladi, lekin shu object ichida **boshqa object'lar** bo'lsa — ular wrap qilinmagan holatda tashqariga "oqib" chiqishi mumkin. Masalan: `proxy.user` — user object'i **original** (proxied emas). Agar untrusted kod `proxy.user.password = "pwned"` deb yozsa — sizning security proxy'ingiz buni ko'rmaydi, chunki `user` wrap qilinmagan.
+
+**Membrane yechimi:** chegaradan o'tayotgan har qanday **object** (return qiymati, argument) — avtomatik ravishda shu chegaraning Proxy'siga wrap qilinadi. Va aksincha — chegaradan tashqariga qaytayotgan object unwrap qilinadi. Bu **transitive isolation** — butun object graph izolyatsiya qilinadi.
+
+**Ishlatish joylari:**
+- **Security sandboxing** — untrusted JavaScript'ni izolyatsiya qilish (masalan, plugin, user script, iframe o'rnini bosuvchi)
+- **Revocable permissions** — bitta revoke butun grafga ta'sir qiladi, recursive
+- **Read-only enforcement** — "frozen" membrane: barcha nested object'lar ham read-only
+- **SES (Secure ECMAScript)** va **Realms API** proposal'larida membrane foydalaniladi
+- **Caja** (Google), **Figma** plugin sandbox, **MetaMask Snaps** — real dunyo misollar
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Membrane'ning asosiy murakkabligi — **identity preservation**: agar siz bir xil target object'ni ikki marta membrane orqali olsangiz, ikkala marta **bir xil proxy**'ni qaytaring. Aks holda `===` taqqoslash, `WeakMap` key'lar, `Set` membership — hammasi buziladi.
+
+**Algoritm:**
+1. `wetToDry` va `dryToWet` — ikki `WeakMap`, har yo'nalish uchun cache
+2. Har object chegarani kesib o'tganda — cache'dan proxy'ni olish yoki yangi yaratish
+3. Return qiymati va argumentlar ham recursively wrap/unwrap
+4. Primitive'lar (string, number, boolean, null, undefined) transparent o'tadi
+
+**Soddalashtirilgan semantika:**
+- "wet side" — asl object'lar (internal)
+- "dry side" — wrap qilingan proxy'lar (external, ishlatuvchi tomon)
+- Dry tomon'ga chiqayotgan object — `wetToDry` cache'da qidiriladi, yo'q bo'lsa yangi proxy yaratiladi
+- Wet tomon'ga kirayotgan object (argument sifatida) — `dryToWet` cache'da qidiriladi, yoki unwrap qilinadi
+
+Membrane'ning haqiqiy implementatsiyasi `WeakMap` identity, symmetric wrap/unwrap, function va prototype chain handling — juda nozik. Quyida soddalashtirilgan versiya ko'rsatiladi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
+
+**Soddalashtirilgan read-only membrane:**
+
+```javascript
+function createReadOnlyMembrane(wetObject) {
+  // Identity cache — bir xil target ikki marta wrap qilinmasligi uchun
+  const wetToDry = new WeakMap();
+
+  function wrap(value) {
+    // Primitive'lar transparent
+    if (value === null || (typeof value !== "object" && typeof value !== "function")) {
+      return value;
+    }
+
+    // Cache'dan qidirish
+    if (wetToDry.has(value)) {
+      return wetToDry.get(value);
+    }
+
+    // Yangi proxy yaratish
+    const proxy = new Proxy(value, {
+      get(target, prop, receiver) {
+        const result = Reflect.get(target, prop, receiver);
+        return wrap(result); // ← chegaradan chiqayotgan narsa wrap qilinadi
+      },
+      set() {
+        throw new Error("Read-only membrane: mutation taqiqlangan");
+      },
+      deleteProperty() {
+        throw new Error("Read-only membrane: delete taqiqlangan");
+      },
+      defineProperty() {
+        throw new Error("Read-only membrane: defineProperty taqiqlangan");
+      },
+      setPrototypeOf() {
+        throw new Error("Read-only membrane: setPrototypeOf taqiqlangan");
+      }
+    });
+
+    wetToDry.set(value, proxy);
+    return proxy;
+  }
+
+  return wrap(wetObject);
+}
+
+// Test — nested object'lar ham avtomatik himoyalangan
+const internal = {
+  user: {
+    name: "Ali",
+    address: {
+      city: "Toshkent",
+      zip: "100000"
+    }
+  },
+  settings: ["dark", "uz"]
+};
+
+const readonly = createReadOnlyMembrane(internal);
+
+// ✅ O'qish ishlaydi
+console.log(readonly.user.name);           // "Ali"
+console.log(readonly.user.address.city);   // "Toshkent"
+console.log(readonly.settings[0]);         // "dark"
+
+// ❌ Barcha mutation'lar bloklanadi — istalgan darajada
+try { readonly.user.name = "Vali"; } catch (e) { console.log(e.message); }
+// "Read-only membrane: mutation taqiqlangan"
+
+try { readonly.user.address.city = "X"; } catch (e) { console.log(e.message); }
+// "Read-only membrane: mutation taqiqlangan" — nested ham bloklangan!
+
+try { readonly.settings.push("en"); } catch (e) { console.log(e.message); }
+// "Read-only membrane: mutation taqiqlangan" — array ham bloklangan!
+
+// Identity preservation — bir xil object ikki marta wrap qilinmaydi
+const addr1 = readonly.user.address;
+const addr2 = readonly.user.address;
+console.log(addr1 === addr2); // true ✅ — cache tufayli bir xil proxy
+```
+
+**Revocable Membrane — butun graph uchun bir yo'la revoke:**
+
+```javascript
+function createRevocableMembrane(wetObject, handler = {}) {
+  const wetToDry = new WeakMap();
+  const revokers = []; // barcha revoker'larni to'plash
+
+  function wrap(value) {
+    if (value === null || (typeof value !== "object" && typeof value !== "function")) {
+      return value;
+    }
+
+    if (wetToDry.has(value)) {
+      return wetToDry.get(value);
+    }
+
+    const { proxy, revoke } = Proxy.revocable(value, {
+      get(target, prop, receiver) {
+        if (handler.get) {
+          const result = handler.get(target, prop, receiver);
+          return wrap(result);
+        }
+        return wrap(Reflect.get(target, prop, receiver));
+      },
+      set(target, prop, val, receiver) {
+        if (handler.set) return handler.set(target, prop, val, receiver);
+        return Reflect.set(target, prop, val, receiver);
+      },
+      apply(target, thisArg, args) {
+        // Argument'lar ichkariga kirayotganda — unwrap (soddalashtirilgan)
+        const result = Reflect.apply(target, thisArg, args);
+        return wrap(result); // result tashqariga chiqyapti — wrap
+      }
+    });
+
+    wetToDry.set(value, proxy);
+    revokers.push(revoke);
+    return proxy;
+  }
+
+  const membraned = wrap(wetObject);
+
+  return {
+    proxy: membraned,
+    revoke() {
+      // Barcha proxy'larni bir yo'la revoke qilish
+      revokers.forEach(r => r());
+      revokers.length = 0;
+    }
+  };
+}
+
+// Use case: third-party plugin'ga access berish
+function loadUntrustedPlugin(pluginFn, appData) {
+  const { proxy: safeData, revoke } = createRevocableMembrane(appData, {
+    // Faqat ruxsat etilgan field'larga access
+    get(target, prop) {
+      const allowed = ["publicConfig", "userName", "theme"];
+      if (!allowed.includes(prop)) {
+        throw new Error(`Access denied to "${prop}"`);
+      }
+      return target[prop];
+    }
+  });
+
+  try {
+    pluginFn(safeData); // plugin membraned data bilan ishlaydi
+  } finally {
+    // Plugin tugadi — butun access bir yo'la revoke qilinadi
+    revoke();
+    // Endi plugin saqlab qo'ygan har qanday reference (nested ham!) TypeError beradi
+  }
+}
+
+// Untrusted plugin kod
+function maliciousPlugin(appData) {
+  console.log(appData.userName); // ✅ ruxsat etilgan
+
+  // Plugin nested object'ga reference saqlashga harakat qiladi
+  const stolenRef = appData.publicConfig;
+
+  setTimeout(() => {
+    // 1 sekund keyin access qilishga harakat — REVOKED
+    try {
+      console.log(stolenRef.secretKey); // ❌ TypeError: revoked
+    } catch (e) {
+      console.log("Plugin access denied after revoke:", e.message);
+    }
+  }, 1000);
+
+  // try { appData.password; } catch (e) { ... } // ❌ Access denied
+}
+
+loadUntrustedPlugin(maliciousPlugin, {
+  publicConfig: { theme: "dark" },
+  userName: "Ali",
+  password: "secret"
+});
+```
+
+**Membrane semantikasining muhim jihatlari:**
+
+1. **Identity preservation** — `WeakMap` orqali bir xil target bir xil proxy'ni qaytaradi, `===` ishlaydi
+2. **Transitive wrapping** — har qaytarilgan object/function avtomatik wrap qilinadi, chuqurlik cheklanmagan
+3. **Symmetric wrap/unwrap** — membrane ikki tomonlama: out'ga chiqayotgan narsa wrap, in'ga kirayotgan argument unwrap (to'liq implementatsiyada)
+4. **Revocation cascading** — bitta `revoke()` butun object graph'ni o'lik qiladi, nested reference'lar ham yaramaydi
+5. **Primitive'lar transparent** — string, number, boolean membrane'dan bemalol o'tadi (ular immutable va reference'siz)
+
+**Haqiqiy production implementatsiyalar:**
+- **ShadowRealm API** (Stage 3 TC39 proposal) — Realms va membrane pattern standart'ga kiritilmoqda
+- **SES (Secure ECMAScript)** — Agoric/MetaMask tomonidan ishlab chiqilgan secure JavaScript runtime
+- **MetaMask Snaps** — extension plugin'lar uchun isolated execution environment
+- **Figma plugins** — plugin'lar iframe + membrane bilan izolyatsiyalangan
+
+Oddiy loyihalarda membrane kerak emas — bu **high-security** yoki **plugin system** quruvchilar uchun. Lekin pattern'ni tushunish Proxy'ning haqiqiy kuchini ko'rsatadi: oddiy proxy bitta object'ni wrap qiladi, membrane esa **butun object universe**'ni izolyatsiya qiladi.
+
+</details>
+
+---
+
+## Edge Cases va Gotchas
+
+Proxy bo'yicha 5 ta nozik, production'da tez-tez uchrab, debug qilish qiyin bo'lgan gotcha.
+
+### Gotcha 1: `proxy === target` har doim `false` — identity equality
+
+Proxy va target **ikki alohida reference**, garchi ular bir xil xulq-atvor ko'rsatsa ham. Bu `===`, `WeakMap`/`WeakSet` membership, `Set.has`, `Map` keys — hammasiga ta'sir qiladi. Object identity Proxy orqali "transparent" emas.
+
+```javascript
+const target = { name: "Ali" };
+const proxy = new Proxy(target, {});
+
+// ❌ Identity equality — har doim false
+console.log(proxy === target); // false
+console.log(target === proxy); // false
+
+// ❌ WeakMap — proxy va target ikki alohida key
+const wm = new WeakMap();
+wm.set(target, "original");
+console.log(wm.get(proxy)); // undefined — proxy boshqa key!
+wm.set(proxy, "proxied");
+console.log(wm.size); // konceptual: 2 ta yozuv
+
+// ❌ Set membership
+const seen = new Set();
+seen.add(target);
+console.log(seen.has(proxy)); // false
+
+// ❌ Array.includes (reference search)
+const arr = [target];
+console.log(arr.includes(proxy)); // false
+console.log(arr.indexOf(proxy));  // -1
+
+// ─── Real-world implication: cache/dedupe ───
+// Cache key sifatida ishlatishda target yoki proxy ni consistent tanlash kerak
+const cache = new WeakMap();
+
+function getOrCompute(obj, computeFn) {
+  if (cache.has(obj)) return cache.get(obj);
+  const result = computeFn(obj);
+  cache.set(obj, result);
+  return result;
+}
+
+// ❌ Noto'g'ri pattern: gohi proxy, gohi target
+const result1 = getOrCompute(target, o => o.name.length);
+const result2 = getOrCompute(proxy, o => o.name.length);
+// Ikki marta compute bo'ladi — cache miss!
+
+// ✅ To'g'ri: consistent reference ishlatish
+// Yoki hamma joyda proxy, yoki hamma joyda target
+
+// ─── Helper: "unwrap" pattern ───
+// Agar bo'lsa ham proxy'ni original target'ga map qilish kerak bo'lsa
+const targetRegistry = new WeakMap(); // proxy → target
+
+function makeProxy(target, handler) {
+  const proxy = new Proxy(target, handler);
+  targetRegistry.set(proxy, target);
+  return proxy;
+}
+
+function unwrap(obj) {
+  return targetRegistry.get(obj) ?? obj; // proxy bo'lsa target, bo'lmasa o'zi
+}
+
+const p = makeProxy(target, {});
+console.log(unwrap(p) === target); // true ✅ — explicit unwrap
+```
+
+**Nima uchun:** JavaScript'da object identity `===` native reference comparison — ikki o'zgaruvchi bir xil heap address'ga ishora qiladimi. Proxy spec'da Proxy **alohida exotic object** sifatida yaratiladi — u target'dan farqli object hisoblanadi, garchi internal method'lari target'ga forward qilsa ham. Bu design qarori — aks holda Proxy introspection (masalan, "bu proxy'mi?" degan check) imkonsiz bo'lardi.
+
+**Yechim:** Agar kodingizda cache, dedup, identity-based logic bo'lsa — **consistent reference** ishlating (hamma joyda proxy yoki hamma joyda target). Original'ni olish kerak bo'lsa — alohida `WeakMap` registry orqali explicit unwrap pattern. "Proxy bo'lsa target'ga tarjima qil" uchun library (Vue 3 `toRaw()`) ishlating.
+
+### Gotcha 2: `typeof proxy` target turiga bog'liq — function target "function" qaytaradi
+
+`typeof` operator Proxy'ni **target turiga qarab** baholaydi: object target → `"object"`, function target → `"function"`. Proxy'ning mavjudligi `typeof` natijasini o'zgartirmaydi. Bu "is this a proxy?" detection'ni qiyinlashtiradi.
+
+```javascript
+// Object target
+const objProxy = new Proxy({}, {});
+console.log(typeof objProxy); // "object"
+
+// Function target
+function greet() { return "Hello"; }
+const fnProxy = new Proxy(greet, {});
+console.log(typeof fnProxy); // "function" ✅
+
+// ⚠️ Oddiy object'ni function'ga "o'xshatib" bo'lmaydi
+const fakeCallable = new Proxy({}, {
+  apply() { return "called"; }
+});
+console.log(typeof fakeCallable); // "object" — target object, "function" bo'lmaydi
+// fakeCallable(); // ❌ TypeError: fakeCallable is not a function
+// apply trap faqat callable target bilan ishlaydi
+
+// ✅ Callable proxy faqat function target bilan
+const realCallable = new Proxy(function() {}, {
+  apply(target, thisArg, args) {
+    return `called with ${args}`;
+  }
+});
+console.log(typeof realCallable); // "function" ✅
+console.log(realCallable(1, 2));  // "called with 1,2"
+
+// ─── "Bu proxy'mi?" detection — JavaScript'da mumkin emas ───
+// util.types.isProxy(value) faqat Node.js internal API, browser'da yo'q
+// typeof, instanceof, Object.prototype.toString — hech biri Proxy'ni aniqlay olmaydi!
+
+function isProxy(obj) {
+  // Bu FUNDAMENTAL'dan mumkin emas — Proxy har qanday operatsiyani intercept qila oladi
+  // Shu jumladan detection urinishlarini ham
+  return false; // ❓
+}
+
+// ─── Faqat internal tracking bilan ───
+const knownProxies = new WeakSet();
+
+function trackedProxy(target, handler) {
+  const proxy = new Proxy(target, handler);
+  knownProxies.add(proxy);
+  return proxy;
+}
+
+const p = trackedProxy({}, {});
+console.log(knownProxies.has(p)); // true ✅ — o'zimiz track qilganlar
+```
+
+**Nima uchun:** `typeof` spec bo'yicha object'ning `[[Call]]` internal method'i borligini tekshiradi — bor bo'lsa "function", yo'q bo'lsa "object" (yoki primitive type). Proxy spec'da Proxy o'zining `[[Call]]`'ini **faqat target'da `[[Call]]` bor bo'lsa** meros qiladi. Shuning uchun object target bilan proxy — callable emas, function target bilan proxy — callable.
+
+**Yechim:** "Callable proxy" kerak bo'lsa — target sifatida function ishlating (hatto bo'sh function `() => {}` bo'lsa ham). Proxy detection kerak bo'lsa — tashqaridan `WeakSet` registry orqali. Proxy'ni tashqaridan "aniqlab bo'lmaydi" — bu uning asosiy feature'i, xavfsizlik uchun muhim (untrusted kod proxy'ni detect qila olmasligi kerak).
+
+### Gotcha 3: `JSON.stringify(proxy)` har property uchun `get` trap chaqiradi — side effect'lar trigger bo'ladi
+
+`JSON.stringify` object'ning har property'sini iteratsiya qiladi va har biri uchun `get` trap chaqirilishi kerak. Shu jumladan u **`toJSON`** property'sini ham tekshiradi. Side-effect'li `get` trap'da (masalan, reactive dependency tracking yoki logging) bu kutilmagan ko'p trigger'ga olib keladi.
+
+```javascript
+let getCount = 0;
+const target = { name: "Ali", age: 25, city: "Toshkent" };
+
+const proxy = new Proxy(target, {
+  get(target, prop, receiver) {
+    getCount++;
+    console.log(`GET: ${String(prop)}`);
+    return Reflect.get(target, prop, receiver);
+  }
+});
+
+// JSON.stringify — har property uchun get trap + toJSON check
+const json = JSON.stringify(proxy);
+console.log(getCount);
+// Output:
+// GET: toJSON          ← JSON.stringify avval toJSON mavjudligini tekshiradi
+// GET: name
+// GET: age
+// GET: city
+// getCount: 4
+
+// ⚠️ Reactive system'da — har stringify butun object'ni "access qilgan" deb sanaladi
+// Dependency tracking bu stringify call'ni "user shu property'larni o'qidi" deb bilib qoladi
+// Natijada shu component keraksiz re-render bo'lishi mumkin
+
+// ─── Real Vue 3 muammosi: reactive + JSON.stringify ───
+// const state = reactive({ user: { name: "Ali" }, count: 0 });
+// const json = JSON.stringify(state); // barcha nested property'lar "track" bo'ladi
+// Effect endi BARCHA property o'zgarishida re-run bo'ladi — kutilmagan
+
+// ✅ Yechim 1: toRaw() — reactive'dan original'ga (Vue 3 pattern)
+function toRaw(proxy) {
+  return targetMap.get(proxy) ?? proxy;
+}
+// JSON.stringify(toRaw(state)) — trap chaqirilmaydi
+
+// ✅ Yechim 2: Stringify oldidan dependency tracking'ni pauza qilish
+let trackingEnabled = true;
+const proxyWithPause = new Proxy(target, {
+  get(target, prop, receiver) {
+    if (trackingEnabled) {
+      trackDependency(target, prop);
+    }
+    return Reflect.get(target, prop, receiver);
+  }
+});
+
+// Serialization paytida tracking'ni o'chirish
+function safeStringify(obj) {
+  trackingEnabled = false;
+  try {
+    return JSON.stringify(obj);
+  } finally {
+    trackingEnabled = true;
+  }
+}
+
+// ✅ Yechim 3: Custom toJSON
+const proxyWithToJSON = new Proxy(target, {
+  get(target, prop, receiver) {
+    if (prop === "toJSON") {
+      // Custom serialization — side-effect'lar yo'q
+      return () => ({ ...target });
+    }
+    trackDependency(target, prop);
+    return Reflect.get(target, prop, receiver);
+  }
+});
+```
+
+**Nima uchun:** `JSON.stringify` spec'da quyidagicha ishlaydi: (1) `toJSON` method mavjudligini tekshirish (Date kabi built-in object'lar uchun), (2) agar bor bo'lsa chaqirish va natijani serialize qilish, (3) aks holda enumerable own property'larni iteratsiya qilish. Har qadam `[[Get]]` internal method chaqiradi — Proxy'da bu `get` trap'ga map bo'ladi. Har trap call engine'ning side-effect orientirovkasi bo'lmagan — spec to'liq transparent forwarding'ni taxmin qiladi.
+
+**Yechim:** Reactive/tracking'li proxy'larda `JSON.stringify` dan oldin **tracking'ni vaqtincha o'chirish**, yoki `toRaw()` bilan original'ni olish, yoki `toJSON` trap'da side-effect'siz path yaratish. Vue 3 `toRaw()` aynan shu muammoni hal qiladi.
+
+### Gotcha 4: Accidental Thenable — `Promise.resolve(proxy)` `then` trap'ga yopishib qoladi
+
+JavaScript Promise'lar **duck typing** orqali "thenable" aniqlaydi — object'da `then` property'si funksiya bo'lsa, u thenable hisoblanadi. Agar proxy'ning `get` trap'i **har qanday property** uchun function qaytarsa (masalan, logger proxy) — Promise uni thenable deb oladi va infinite loop yoki xato beradi.
+
+```javascript
+// ❌ Logger proxy — har property uchun function qaytaradi
+const logger = new Proxy({}, {
+  get(target, prop) {
+    return (...args) => {
+      console.log(`[${String(prop)}]`, ...args);
+    };
+  }
+});
+
+logger.info("test");  // [info] test ✅
+logger.error("oops"); // [error] oops ✅
+
+// ⚠️ Lekin Promise bilan ishlatishga urinish:
+async function run() {
+  const result = await logger; // ⚠️ await logger.then chaqiradi!
+  // Proxy get('then') → function(resolve, reject) qaytaradi
+  // Promise machinery bu function'ni chaqiradi: then(resolve, reject)
+  // Logger esa "[then]" log qiladi va undefined qaytaradi
+  // → await natijasi undefined
+  console.log("Result:", result); // undefined
+}
+run();
+
+// ─── Ko'proq xavfli holat — infinite loop ───
+const trickier = new Proxy({}, {
+  get(target, prop) {
+    // Har property uchun yangi thenable qaytaradi
+    return {
+      then(resolve) {
+        resolve(trickier); // ← yana proxy'ni resolve qiladi!
+      }
+    };
+  }
+});
+
+// await trickier — trickier.then(resolve) chaqiradi
+// resolve(trickier) — yana Promise trickier.then'ni chaqiradi
+// Infinite recursion yoki hang
+
+// ✅ Yechim 1: then property'ni explicit handle qilish
+const safeLogger = new Proxy({}, {
+  get(target, prop) {
+    // Symbol va "then"/"catch"/"finally" uchun undefined qaytarish
+    if (prop === "then" || prop === "catch" || prop === "finally") {
+      return undefined;
+    }
+    if (typeof prop === "symbol") {
+      return undefined; // Symbol.toPrimitive, Symbol.iterator va h.k.
+    }
+    return (...args) => console.log(`[${prop}]`, ...args);
+  }
+});
+
+async function runSafe() {
+  const result = await safeLogger; // ✅ then === undefined → not thenable
+  console.log(result); // safeLogger o'zi (Proxy object)
+}
+
+// ✅ Yechim 2: Promise.resolve bilan explicit wrap
+const wrappedLogger = Promise.resolve({ logger: safeLogger });
+// Endi logger Promise ichida, thenable resolution yo'q
+const { logger: lg } = await wrappedLogger;
+lg.info("test"); // ✅
+
+// ─── Real-world: API client proxy ───
+// ❌ Har method call uchun proxy — await bilan muammo
+const api = new Proxy({}, {
+  get(target, endpoint) {
+    return (...args) => fetch(`/api/${endpoint}`, ...args);
+  }
+});
+
+// await api; // ⚠️ api.then() chaqiriladi → fetch("/api/then", resolve, reject)
+// HTTP request "/api/then" ga jo'natiladi — bug!
+```
+
+**Nima uchun:** ECMAScript Promise spec "thenable" ni duck typing bilan aniqlaydi: `typeof obj.then === "function"`. `await` va `Promise.resolve()` bu check'ni o'tkazadi. Proxy'ning `get` trap'i har qanday property'ga javob beradi — shu jumladan `then`'ga ham. Agar trap function qaytarsa, engine proxy'ni thenable deb qabul qiladi va `then(resolve, reject)` chaqiradi. Bu "structural subtyping" ning chegarasi — JavaScript runtime explicit "this is a thenable" deklaratsiyasini talab qilmaydi.
+
+**Yechim:** Proxy yaratganda `get` trap'da `then` (va boshqa Promise method'lari `catch`, `finally`) uchun **`undefined` qaytarish**. Shuningdek `Symbol` property'lar uchun ham (masalan `Symbol.toPrimitive` — `String(proxy)` chaqirilganda muammo bo'ladi). "Virtual API" pattern'larida bu **majburiy defensive check**.
+
+### Gotcha 5: Chained proxies — execution order **outer → inner**
+
+`new Proxy(new Proxy(target, inner), outer)` — ikki proxy zanjiri. Property access'da **outer handler birinchi** chaqiriladi, inner keyinroq. Stack trace chuqur va confusing — debugging juda qiyin. Middleware pattern yaratayotganda bu order muhim.
+
+```javascript
+const target = { value: 42 };
+
+const inner = new Proxy(target, {
+  get(target, prop, receiver) {
+    console.log(`[INNER] get ${String(prop)}`);
+    return Reflect.get(target, prop, receiver);
+  },
+  set(target, prop, value, receiver) {
+    console.log(`[INNER] set ${String(prop)} = ${value}`);
+    return Reflect.set(target, prop, value, receiver);
+  }
+});
+
+const outer = new Proxy(inner, {
+  get(target, prop, receiver) {
+    console.log(`[OUTER] get ${String(prop)}`);
+    return Reflect.get(target, prop, receiver);
+    // ← Reflect.get(inner, ...) — inner'ning get trap'ini trigger qiladi
+  },
+  set(target, prop, value, receiver) {
+    console.log(`[OUTER] set ${String(prop)} = ${value}`);
+    return Reflect.set(target, prop, value, receiver);
+  }
+});
+
+outer.value;
+// Output order:
+// [OUTER] get value   ← outer birinchi
+// [INNER] get value   ← outer forwarding qilgach, inner
+// Natija: 42
+
+outer.value = 100;
+// [OUTER] set value = 100
+// [INNER] set value = 100
+// target.value = 100
+
+// ─── Middleware pattern — order matter ───
+// Loglash, caching, validation middleware'larni chain qilish
+function loggingMiddleware(target) {
+  return new Proxy(target, {
+    get(t, p, r) {
+      console.log(`[log] GET ${String(p)}`);
+      return Reflect.get(t, p, r);
+    }
+  });
+}
+
+function cachingMiddleware(target) {
+  const cache = new Map();
+  return new Proxy(target, {
+    get(t, p, r) {
+      if (cache.has(p)) {
+        console.log(`[cache] HIT ${String(p)}`);
+        return cache.get(p);
+      }
+      console.log(`[cache] MISS ${String(p)}`);
+      const value = Reflect.get(t, p, r);
+      cache.set(p, value);
+      return value;
+    }
+  });
+}
+
+// Order matters!
+const data = { result: "expensive computation" };
+
+// Order 1: log → cache
+const withCache1 = cachingMiddleware(loggingMiddleware(data));
+withCache1.result;
+// [cache] MISS result    ← outer (cache) birinchi
+// [log] GET result       ← inner (log) keyin — har miss'da log
+withCache1.result;
+// [cache] HIT result    ← cache hit — log ishlamaydi (short-circuit)
+
+// Order 2: cache → log
+const withCache2 = loggingMiddleware(cachingMiddleware(data));
+withCache2.result;
+// [log] GET result       ← outer (log) birinchi — har chaqiruvda
+// [cache] MISS result    ← inner (cache)
+withCache2.result;
+// [log] GET result       ← yana log (har chaqiruvda)
+// [cache] HIT result     ← cache hit
+
+// Kutilgan behavior'ga qarab order tanlanadi:
+// - "Har chaqiruvda log" → log OUTER
+// - "Faqat cache miss'da log" → log INNER
+```
+
+**Nima uchun:** JavaScript engine proxy operatsiyasini xuddi oddiy property access kabi evaluate qiladi — tashqi object'dan ichki object'ga. `outer.prop` → `outer` ning `[[Get]]` chaqiriladi → bu `outer.handler.get(inner, prop, outer)` — inner proxy target sifatida beriladi. Handler ichidagi `Reflect.get(inner, prop)` → `inner.handler.get(target, prop, inner)`. Ya'ni chain outer-to-inner execution order'ida.
+
+**Yechim:** Middleware chain'larni tuzayotganda execution order'ni **aniq hujjatlashtiring**. Trap ichida `Reflect.*` orqali "next" middleware'ga forward qilish — Express-style middleware pattern'iga o'xshash. Debugging uchun har middleware o'z label'iga ega bo'lishi kerak (console.log prefix). Test case'lar order-sensitive bo'lganda yaxshi test'lar yozing.
 
 ---
 

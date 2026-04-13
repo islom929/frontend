@@ -17,6 +17,8 @@
 - [Variable Shadowing](#variable-shadowing)
 - [Variable Lookup](#variable-lookup)
 - [Strict Mode](#strict-mode)
+- [Labeled Statements](#labeled-statements)
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -39,7 +41,8 @@ JavaScript da uchta asosiy scope turi mavjud:
 
 Bu uch tur bir-birining ichiga joylashishi (nesting) mumkin — natijada **scope chain** (scope zanjiri) hosil bo'ladi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ECMAScript spetsifikatsiyasida scope tushunchasi **Environment Record** orqali implement qilingan. Har bir scope uchun yangi Environment Record yaratiladi. Bu record ichida shu scope'dagi barcha binding'lar (o'zgaruvchi-qiymat juftliklari) saqlanadi.
 
@@ -56,7 +59,10 @@ Global Environment Record ikki qismdan iborat:
 - **Object Environment Record** — `var` va `function` declaration'lar bu yerda, global object (`window`/`globalThis`) ning property'lari sifatida
 - **Declarative Environment Record** — `let`, `const`, `class` declaration'lar bu yerda, global object'ga tushMAYDI
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Uchta scope turini bir misolda ko'rsatadigan kod:
 
@@ -85,6 +91,8 @@ processUser("Alice");
 // ❌ ReferenceError — prefix function scope'da, global'da ko'rinmaydi
 ```
 
+</details>
+
 ---
 
 ## Global Scope
@@ -98,11 +106,12 @@ Global scope'da ikki xil narsa saqlanadi:
 1. **`var` va `function` declaration'lar** — global object (`window` browser'da, `global` Node.js da) ning property'lariga aylanadi
 2. **`let`, `const`, `class` declaration'lar** — global scope'da mavjud, lekin global object'ning property'si bo'lMAYDI
 
-Bu farq juda muhim — `var` bilan e'lon qilingan global o'zgaruvchi `window.variableName` orqali ham accessible, `let`/`const` bilan e'lon qilingan esa faqat identifier orqali.
+`var` bilan e'lon qilingan global o'zgaruvchi `window.variableName` orqali ham accessible, `let`/`const` bilan e'lon qilingan esa faqat identifier orqali.
 
 **`globalThis` (ES2020)** — cross-environment global object'ga murojaat qilish uchun standart yo'l. Browser'da `globalThis === window`, Node.js da `globalThis === global`, Web Worker'da `globalThis === self`. ES2020 dan oldin har bir environment uchun alohida nom ishlatish kerak edi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Global scope'ning Environment Record tuzilishi:
 
@@ -123,7 +132,10 @@ Global Environment Record
 
 `var` global declaration nima uchun `globalThis` property bo'ladi? ECMAScript spec bo'yicha global code'dagi `var` statement **CreateGlobalVarBinding** abstract operation ni chaqiradi — bu operation global object'ga property qo'shadi. `let`/`const` esa **CreateGlobalLetBinding** ni chaqiradi — bu global object'ga tegmaydi, faqat declarative record'ga yozadi.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 `var` vs `let`/`const` ning global scope'dagi farqi:
 
@@ -156,6 +168,8 @@ var utils = { format: () => "B" };
 // (batafsil 15-modules.md da)
 ```
 
+</details>
+
 ---
 
 ## Function Scope
@@ -170,7 +184,8 @@ Funksiya parametrlari ham function scope'ga tegishli — ular shu funksiyaning l
 
 Har bir funksiya chaqiruvi **yangi scope** yaratadi. Bitta funksiya 10 marta chaqirilsa — 10 ta alohida function scope hosil bo'ladi, har birida o'z local o'zgaruvchilari.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Funksiya chaqirilganda engine yangi **Function Execution Context** yaratadi. Bu context'ning **VariableEnvironment** component'ida `var` declaration'lar, **LexicalEnvironment** component'ida `let`/`const` declaration'lar saqlanadi.
 
@@ -192,7 +207,10 @@ Function Execution Context
 
 `var` ning function scope xulq-atvori tufayli, agar `if` block ichida `var` ishlatilsa, u function scope'ga "ko'tariladi" (hoist bo'ladi):
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 `var` ning function scope xulq-atvori:
 
@@ -226,6 +244,8 @@ console.log(counter()); // 1 — har chaqiruvda YANGI scope, yangi count
 // ✅ oldingi chaqiruvdagi count yo'q bo'lgan — yangi EC yaratildi
 ```
 
+</details>
+
 ---
 
 ## Block Scope
@@ -246,7 +266,8 @@ Block scope yaratadigan konstruktsiyalar:
 
 `for` loop'da `let` ishlatilganida har bir iteratsiya uchun **yangi block scope** yaratiladi — bu closure bilan ishlashda juda muhim farq (batafsil [05-closures.md](05-closures.md) da).
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Engine block scope uchun yangi **Declarative Environment Record** yaratadi. Bu record joriy execution context'ning LexicalEnvironment'iga ulanadi. Block tugaganda bu record yo'qoladi (GC tomonidan tozalanadi, agar closure reference saqlamasa).
 
@@ -268,7 +289,10 @@ Iteratsiya 2:
 
 `var` bilan `for` da faqat **bitta** binding yaratiladi — barcha iteratsiyalar shu bitta `i` ni ko'radi. `let` bilan har iteratsiya **yangi** binding oladi — har biri o'z `i` qiymatiga ega.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Block scope ning amaliy farqi:
 
@@ -316,6 +340,8 @@ Standalone block statement:
 // ✅ Foyda: vaqtinchalik o'zgaruvchilar tashqi scope'ni ifloslamaydi
 ```
 
+</details>
+
 ---
 
 ## Lexical Scope (Static Scope)
@@ -330,7 +356,8 @@ Bu shuni anglatadi: funksiya tanasiga qarab, uning qaysi tashqi o'zgaruvchilarga
 
 Lexical scope'ning muhim oqibati — funksiya qayerda chaqirilmasin, u o'zi yaratilgan scope'dagi o'zgaruvchilarga murojaat qiladi. Bu xulq-atvor **closure** ning asosi (batafsil [05-closures.md](05-closures.md) da).
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Har bir funksiya yaratilganda (define qilinganda — e'lon yoki expression bilan), engine uning **`[[Environment]]`** internal slot'iga **joriy LexicalEnvironment** ni saqlaydi. Bu slot funksiyaning "tug'ilgan joyi" ni eslab qoladi.
 
@@ -359,7 +386,10 @@ Doim outer() scope'iga, keyin global scope'ga murojaat qiladi.
 
 Bu mexanizm compile-time (parse-time) da belgilanadi — engine AST ni traverse qilib, har bir identifier qaysi scope'ga tegishli ekanini **statik** aniqlaydi. V8 da bu jarayon "scope analysis" deyiladi va bytecode generation paytida sodir bo'ladi.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Lexical scope ishini ko'rsatuvchi misol — funksiya boshqa scope'da chaqirilsa ham o'z scope'ini ishlatadi:
 
@@ -404,6 +434,8 @@ console.log(triple(5));  // 15 — factor = 3 (ikkinchi chaqiruvdan)
 // ✅ Har bir chaqiruv alohida scope yaratdi, har birida o'z factor qiymati
 ```
 
+</details>
+
 ---
 
 ## Dynamic Scope vs Lexical Scope
@@ -414,7 +446,7 @@ Scope aniqlashning ikkita fundamental yondashuvi bor:
 
 1. **Lexical (Static) Scope** — scope kod **yozilgan** joyga qarab aniqlanadi (compile-time). JavaScript, C, Java, Python, Go — barchasi lexical scope ishlatadi.
 
-2. **Dynamic Scope** — scope funksiya **chaqirilgan** joyga qarab aniqlanadi (runtime). Bash shell, bazi Lisp dialektlari, Perl (maxsus `local` bilan) — dynamic scope'ga misol.
+2. **Dynamic Scope** — scope funksiya **chaqirilgan** joyga qarab aniqlanadi (runtime). Bash shell, ba'zi Lisp dialektlari, Perl (maxsus `local` bilan) — dynamic scope'ga misol.
 
 Asosiy farq:
 
@@ -427,9 +459,10 @@ Asosiy farq:
 | **Performance** | Tezroq — statik analiz mumkin | Sekinroq — har chaqiruvda qidirish |
 | **JS da** | Ha — standart | Yo'q (lekin `this` o'xshash xulq ko'rsatadi) |
 
-JavaScript da `this` keyword dynamic scope'ga o'xshash ishlaydi — u funksiya **chaqirilgan** kontekstga qarab o'zgaradi (batafsil [10-this-keyword.md](10-this-keyword.md) da). Lekin o'zgaruvchilar uchun JavaScript faqat lexical scope ishlatadi.
+JavaScript da `this` keyword dynamic scope'ga **yuzaki o'xshaydi** — u funksiya **chaqirilgan** kontekstga qarab o'zgaradi (batafsil [10-this-keyword.md](10-this-keyword.md) da). Lekin bu aynan dynamic scope emas: `this` chaqiruvchi kod tomonidan aniqlangan **yagona binding**, u scope chain orqali o'zgaruvchilarni qidirmaydi. Haqiqiy dynamic scope'da barcha identifier'lar (nafaqat `this`) chaqiruv zanjiri bo'ylab qidirilgan bo'lar edi. JavaScript da esa o'zgaruvchi lookup doim lexical scope — faqat `this` binding call-site'ga bog'liq.
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Agar JavaScript dynamic scope ishlatganida nima bo'lishini ko'rsatuvchi solishtirma:
 
@@ -458,6 +491,8 @@ callWithLocal();
 //    callWithLocal() scope'idagi value = "local" ishlatilardi
 ```
 
+</details>
+
 ---
 
 ## Scope Chain
@@ -480,7 +515,8 @@ Scope chain'ning muhim qoidalari:
 - **Birinchi topilgan qiymat** — qidiruv birinchi topilgan joyda to'xtaydi (shadowing)
 - **Scope chain o'zgarmaydi** — u funksiya yaratilgan paytda belgilanadi (lexical)
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Scope chain fizik ravishda **Environment Record'larning `[[OuterEnv]]` zanjiri** orqali implement qilingan. Har bir Environment Record o'zining tashqi (parent) Environment Record'iga reference saqlaydi.
 
@@ -519,7 +555,10 @@ console.log(x + y + z) bajarilganda:
 
 V8 engine'da scope chain traversal optimizatsiya qilingan: agar engine parse-time da identifier qaysi scope'ga tegishli ekanini aniqlay olsa, u **to'g'ridan-to'g'ri** shu scope'ga murojaat qiladi — zanjir bo'ylab ketma-ket qidirmaydi. Bu "scope resolution" deyiladi va bytecode'da index orqali amalga oshiriladi.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Chuqur scope chain misoli:
 
@@ -555,6 +594,8 @@ console.log(router.routes[0]);
 // { fullPath: "/api/users", handler: fn, app: "MyApp", appVersion: "1.0", isDebug: true }
 ```
 
+</details>
+
 ---
 
 ## Scope Chain va Execution Context Bog'liqligi
@@ -577,7 +618,8 @@ Aloqani aniq ko'rsatuvchi jarayon:
 3. Yangi EC'ning LexicalEnvironment'ining `[[OuterEnv]]` reference'i → funksiyaning `[[Environment]]` slot'idagi qiymatga o'rnatiladi
 4. Natija: yangi EC ichidan tashqi scope'ga yo'l ochiladi — scope chain tayyor
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
 // Source code:
@@ -615,7 +657,10 @@ outer();
 
 Call Stack va Scope Chain **bir-biridan mustaqil**. Call Stack funksiyalarning **chaqiruv tartibini** boshqaradi (LIFO), Scope Chain esa o'zgaruvchilarning **qidiruv yo'lini** belgilaydi (lexical nesting). Funksiya call stack'dan chiqsa ham, uning scope'i closure orqali saqlanib qolishi mumkin.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Execution Context va Scope Chain'ning birga ishlashini ko'rsatuvchi misol:
 
@@ -645,6 +690,8 @@ first();
 // Step 2: second() — b=2
 ```
 
+</details>
+
 ---
 
 ## Variable Shadowing
@@ -654,14 +701,16 @@ first();
 Variable shadowing — ichki scope'da tashqi scope'dagi o'zgaruvchi bilan **bir xil nomli** yangi o'zgaruvchi e'lon qilish. Bu holda ichki scope'da yangi (local) o'zgaruvchi tashqi o'zgaruvchini "yashiradi" — ichki scope ichidan tashqi o'zgaruvchiga murojaat qilish imkonsiz bo'ladi.
 
 Shadowing qoidalari:
-- `let` / `const` **shadow qila oladi** `var`, `let`, `const`, va function parameter'larni
-- `var` **shadow qila oladi** tashqi scope'dagi `var` ni (lekin block scope'da emas, function scope'da)
-- `var` **shadow qila olMaydi** ayniyat (block scope'da) `let`/`const` ni — `SyntaxError` beradi
-- Shadowed o'zgaruvchining original qiymati o'zgarmaydi — ichki scope'dagi o'zgaruvchi alohida binding
+
+- `let` / `const` **shadow qila oladi** — tashqi scope'dagi `var`, `let`, `const` yoki function parameter'ni yashirishi mumkin (ichki block'da yangi binding orqali)
+- `var` **shadow qila oladi** tashqi function scope'dagi `var` ni (lekin bu block ichida emas, yangi function scope'da amalga oshadi)
+- `var` **to'qnashadi** bir xil function scope'dagi `let`/`const` bilan — bu SyntaxError beradi, chunki `var` function scope'ga ko'tariladi va u yerdagi `let`/`const` binding bilan kolleziya qiladi
+- Shadowed tashqi o'zgaruvchining original qiymati o'zgarmaydi — ichki scope'dagi o'zgaruvchi mutlaqo alohida binding'dir
 
 Shadow bo'lgan o'zgaruvchiga qayta murojaat qilishning **yagona yo'li** — global scope'da `globalThis.variableName` orqali (faqat `var` yoki global property bo'lsa).
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Shadowing'ning turli holatlari:
 
@@ -699,6 +748,8 @@ function example() {
 }
 ```
 
+</details>
+
 ---
 
 ## Variable Lookup
@@ -719,7 +770,8 @@ Variable lookup ikki kontekstda farq qiladi:
 - **Read (o'qish)** — `console.log(x)` — qiymatni olish, topilmasa `ReferenceError`
 - **Write (yozish)** — `x = 10` — assign qilish, strict mode'da topilmasa `ReferenceError`, non-strict'da implicit global
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ECMAScript spec'da variable lookup **ResolveBinding** abstract operation orqali amalga oshiriladi:
 
@@ -736,7 +788,10 @@ Bu recursive jarayon — har bir scope'da tekshirib, topilmasa tashqariga o'tadi
 
 V8 optimizatsiyasi: V8 parse-time da har bir identifier uchun scope depth va index ni aniqlaydi. Runtime da zanjir bo'ylab qidirmasdan, to'g'ridan-to'g'ri kerakli scope'dagi index'ga murojaat qiladi. Bu **scope caching** deyiladi.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Lookup jarayoni qadam-baqadam:
 
@@ -788,6 +843,8 @@ console.log(leaked); // "Oops!" — global scope iflos bo'ldi
 console.log(globalThis.leaked); // "Oops!" — globalThis property
 ```
 
+</details>
+
 ---
 
 ## Strict Mode
@@ -802,7 +859,75 @@ Strict mode ikki darajada yoqiladi:
 
 ES6 **modullar** (`import`/`export`) va **class** tanasi avtomatik strict mode'da ishlaydi — alohida `"use strict"` yozish shart emas.
 
-### Strict Mode Qoidalari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`"use strict"` — directive prologue**:
+
+`"use strict"` — bu maxsus syntactic construct emas, balki **string literal**. Engine uni alohida tushunadi faqat agar:
+1. Script yoki function tanasining **birinchi statement**'i bo'lsa
+2. Faqat string literal (ifoda emas — `"use" + "strict"` ishlamaydi)
+3. **Directive prologue** ichida (eng yuqori positions)
+
+```javascript
+function strict() {
+  "use strict";  // ✅ birinchi statement — directive
+  // ...
+}
+
+function notStrict() {
+  console.log("hello");
+  "use strict"; // ❌ Birinchi emas — oddiy string, ignored
+  // ...
+}
+```
+
+**Engine perspektivasidan strict mode**:
+
+V8 va boshqa engine'lar parsing paytida `"use strict"` directive'ini topib, qolgan kodni "strict mode parser" bilan parse qiladi. Bu degani:
+
+1. **Parse-time errors**: Syntax xatolari (duplicate params, with statement) parser'da reject qilinadi
+2. **Runtime semantics**: `this` binding, `delete`, `eval` xatti-harakatlari boshqacha
+3. **Optimizatsiya imkoniyati**: Strict code'ni V8 tezroq optimize qila oladi, chunki xavfli operatsiyalar yo'q
+
+**Modullarda implicit strict mode**:
+
+ES6 modullar (`<script type="module">`, `.mjs` fayllar, `import`/`export`) **avtomatik strict mode**'da. Class tanalari ham. Bu spec qarori — modern JavaScript code default'da strict bo'lishi kerak.
+
+```javascript
+// module.mjs
+function example() {
+  undeclaredVar = 10; // ❌ ReferenceError — implicit strict
+}
+
+// regular.js  
+function example() {
+  undeclaredVar = 10; // ✅ ishlaydi — strict yo'q
+}
+```
+
+**V8 da strict mode optimizatsiyasi**:
+
+V8 strict functions'ni alohida flag bilan belgilaydi va quyidagi optimizatsiyalarni qila oladi:
+
+1. **No `arguments.caller`**: caller chain saqlash kerak emas
+2. **No `with`**: scope chain analysis statik
+3. **No silent assign failures**: read-only property'lar darhol throw qiladi
+4. **Better inlining**: this binding aniq
+
+Bu optimizatsiyalar tufayli strict mode funksiyalar ko'pincha non-strict funksiyalarga nisbatan samaraliroq compile va execute bo'ladi — aniq tezlik farqi loyiha va workload'ga bog'liq.
+
+**Engine uchun strict mode ning umumiy foydasi:**
+
+1. **Scope optimizatsiyasi** — `with` va (strict) `eval` ning scope'ni buzish imkoniyati yo'q bo'lgani uchun engine compile-time da scope'ni to'liq aniqlay oladi → tezroq variable lookup
+2. **TDZ enforcement** — `let`/`const` hoisting bilan ishlashda TDZ check'lari aniqroq ishlaydi
+3. **`this` security** — tasodifan global object'ni o'zgartirish xavfi yo'qoladi — method'lar kutilgan kontekstda chaqirilishga majbur
+4. **Hidden class stability (V8)** — `with` yo'qligi object shape'larni barqarorroq qiladi → inline caching samaraliroq ishlaydi
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Strict mode'da taqiqlangan va o'zgartirilgan xulq-atvorlar:
 
@@ -913,18 +1038,9 @@ eval("var x = 10");
 // Non-strict'da x tashqi scope'ga chiqardi
 ```
 
-### Under the Hood
+**9. Production'da strict mode — modullar va class orqali avtomatik:**
 
-Strict mode engine uchun nima beradi:
-
-1. **Scope optimizatsiyasi** — `with` va `eval` ning scope'ni buzish imkoniyati yo'q bo'lgani uchun engine compile-time da scope'ni to'liq aniqlay oladi → tezroq variable lookup
-2. **TDZ enforcement** — `let`/`const` hoisting bilan ishlashda TDZ check'lari aniqroq
-3. **`this` security** — tasodifan global object'ni o'zgartirish xavfi yo'qoladi
-4. **Hidden class stability (V8)** — `with` yo'qligi object shape'larni barqarorroq qiladi → inline caching samaraliroq
-
-### Kod Misollari
-
-Production'da strict mode — deyarli barcha zamonaviy loyihalarda modullar ishlatilgani uchun avtomatik:
+Zamonaviy loyihalarda `"use strict"` yozish deyarli kerak emas — modullar va class tanalari avtomatik strict mode'da:
 
 ```javascript
 // module.js — avtomatik strict mode
@@ -943,6 +1059,274 @@ class UserService {
   }
 }
 ```
+
+</details>
+
+---
+
+## Labeled Statements
+
+### Nazariya
+
+Label — identifier va colon (`:`) dan iborat bo'lib, loop yoki block'ga **nom berish** imkonini beradi. Labellar nested (ichma-ich) loop'larda `break` va `continue` ni **tashqi loop'ga** yo'naltirish uchun ishlatiladi. Oddiy `break` faqat eng ichki loop'ni to'xtatadi — labeled `break` esa istalgan tashqi loop'ni to'xtatishi mumkin.
+
+```
+Label sintaksisi:
+
+labelName: statement
+
+Loop label:          Block label:
+outer: for (...)     myBlock: {
+  inner: for (...)     // ... kod ...
+    break outer;       break myBlock;  ← block'dan chiqish
+                     }
+```
+
+Label'lar bilan ishlaydigan statement'lar:
+
+1. **`break label`** — berilgan label'li loop yoki block'ni **to'liq to'xtatadi**
+2. **`continue label`** — berilgan label'li loop'ning **keyingi iteration'iga** o'tadi (`continue` faqat loop'larda ishlaydi, block'larda emas)
+3. **Block label** — `label: { ... break label; }` — block'dan erta chiqish uchun. Bu funksiya yaratmasdan "early exit" qilish imkonini beradi
+
+```
+Nested loop'da break vs break label:
+
+outer: for (let i = 0; i < 3; i++) {
+  inner: for (let j = 0; j < 3; j++) {
+    break;          ← faqat inner loop to'xtaydi, outer davom etadi
+    break inner;    ← bir xil natija — inner loop to'xtaydi
+    break outer;    ← IKKALA loop ham to'xtaydi — tashqariga chiqadi
+  }
+}
+
+continue bilan:
+outer: for (let i = 0; i < 3; i++) {
+  inner: for (let j = 0; j < 3; j++) {
+    continue;       ← inner loop'ning keyingi iteratsiyasi
+    continue outer; ← outer loop'ning keyingi iteratsiyasi (j loop to'xtaydi)
+  }
+}
+```
+
+**Nima uchun kam ishlatiladi?** Label'lar kod'ni o'qishni qiyinlashtiradi. Ko'pchilik dasturchilar buning o'rniga funksiya ajratib, `return` ishlatishni afzal ko'radi. Lekin ba'zi hollarda — masalan, murakkab matrix qidiruv yoki ko'p darajali ma'lumot qayta ishlashda — label performance va qulaylik jihatidan yaxshiroq bo'lishi mumkin.
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
+
+**Nested loop'da break outer — elementni topib, ikkala loop'ni to'xtatish:**
+
+```javascript
+const matrix = [
+  [1,  2,  3,  4],
+  [5,  6,  7,  8],
+  [9, 10, 11, 12]
+];
+
+let targetRow = -1;
+let targetCol = -1;
+const target = 7;
+
+// Label siz — flag o'zgaruvchi kerak bo'lardi
+// let found = false;
+// for (...) { for (...) { if (found) break; } if (found) break; }
+
+// ✅ Label bilan — ancha toza
+search: for (let i = 0; i < matrix.length; i++) {
+  for (let j = 0; j < matrix[i].length; j++) {
+    if (matrix[i][j] === target) {
+      targetRow = i;
+      targetCol = j;
+      break search; // ← ikkala loop ham to'xtaydi!
+    }
+  }
+}
+
+console.log(`${target} topildi: [${targetRow}][${targetCol}]`);
+// "7 topildi: [1][2]"
+```
+
+**Continue outer — tashqi loop'ning keyingi iteratsiyasiga o'tish:**
+
+```javascript
+// Har bir foydalanuvchining birinchi faol buyurtmasini topish
+const users = [
+  { name: "Ali",  orders: [{ id: 1, status: "cancelled" }, { id: 2, status: "active" }] },
+  { name: "Vali", orders: [{ id: 3, status: "cancelled" }, { id: 4, status: "cancelled" }] },
+  { name: "Gani", orders: [{ id: 5, status: "active" }] }
+];
+
+const firstActiveOrders = [];
+
+userLoop: for (const user of users) {
+  for (const order of user.orders) {
+    if (order.status === "active") {
+      firstActiveOrders.push({ user: user.name, orderId: order.id });
+      continue userLoop; // ← bu user uchun topildi, keyingi user'ga o'tish
+    }
+  }
+  // Bu yerga faqat hech qanday active order topilmagan user'lar uchun keladi
+  console.log(`${user.name} — faol buyurtma yo'q`);
+}
+
+// Console: "Vali — faol buyurtma yo'q"
+// firstActiveOrders: [{ user: "Ali", orderId: 2 }, { user: "Gani", orderId: 5 }]
+```
+
+**Block label — funksiyasiz early exit:**
+
+```javascript
+// Block label — murakkab shartli logika uchun
+function processData(data) {
+  let result = null;
+
+  validation: {
+    if (!data) {
+      console.log("Data yo'q");
+      break validation; // ← block'dan chiqish
+    }
+    if (!data.type) {
+      console.log("Type yo'q");
+      break validation;
+    }
+    if (!data.value) {
+      console.log("Value yo'q");
+      break validation;
+    }
+    // Hamma validation o'tdi
+    result = `${data.type}: ${data.value}`;
+  }
+
+  return result; // validation'dan break qilinganda null qaytadi
+}
+
+processData(null);                    // "Data yo'q" → null
+processData({ type: "name" });        // "Value yo'q" → null
+processData({ type: "name", value: "Ali" }); // "name: Ali"
+```
+
+</details>
+
+---
+
+## Edge Cases va Gotchas
+
+### `for` loop'dagi `let` — har iteratsiya yangi binding, `var` bitta
+
+Bu klassik JavaScript gotcha: `for (let i = 0; ...)` ichida har bir iteratsiyada **yangi `i` binding** yaratiladi. Engine block'ni har iteratsiya boshida qayta yaratadi. `var` bilan esa faqat **bitta** binding bo'ladi — barcha iteratsiyalar shu bitta o'zgaruvchini share qiladi. Bu closure bilan ishlashda juda katta farq keltiradi.
+
+```javascript
+// let bilan — har iteratsiya yangi i
+const letFns = [];
+for (let i = 0; i < 3; i++) {
+  letFns.push(() => i);
+}
+console.log(letFns.map(fn => fn())); // [0, 1, 2] — har closure o'z i'sini eslaydi
+
+// var bilan — bitta i, loop tugaganda i = 3
+const varFns = [];
+for (var i = 0; i < 3; i++) {
+  varFns.push(() => i);
+}
+console.log(varFns.map(fn => fn())); // [3, 3, 3] — hamma bitta i ga reference
+```
+
+**Yechim:** Zamonaviy kodda doim `let`/`const` ishlating. `for` loop'da `let` closure bilan doim to'g'ri ishlaydi.
+
+---
+
+### Named function expression nomi tashqarida ko'rinmaydi
+
+`var fn = function myName() { ... }` — bu **named function expression**. `myName` identifikatori **faqat funksiya tanasi ichida** accessible (recursion yoki debugging uchun). Tashqaridan uni `myName()` deb chaqirib bo'lmaydi — faqat `fn()` orqali.
+
+```javascript
+const factorial = function fact(n) {
+  if (n <= 1) return 1;
+  return n * fact(n - 1); // ✅ fact funksiya ichida accessible
+};
+
+console.log(factorial(5)); // 120 ✅
+// console.log(fact(5)); // ❌ ReferenceError — tashqarida yo'q
+```
+
+**Nima uchun:** Named function expression'ning nomi uning o'z scope'iga biriktirilgan — bu ichki scope faqat funksiya body'sini o'z ichiga oladi. Tashqi scope bu nomni ko'rmaydi. Bu spec qoida: `FunctionExpression` tanasi yangi Environment Record'ga ega bo'lib, unda faqat funksiya nomi binding sifatida saqlanadi.
+
+**Foyda:** Recursion ichkaridan ishonchli ishlaydi (hatto tashqi o'zgaruvchi qayta belgilansa ham), va stack trace'da funksiya nomi ko'rinadi — debugging'ni osonlashtiradi.
+
+---
+
+### `try`/`catch` parameter faqat `catch` scope'da — alohida block scope
+
+`catch (error)` ning `error` parametri o'ziga xos **block scope**'ga ega — faqat `catch` block ichidan accessible. Bu ichki block'da `error` nomini qayta ishlatish mumkin (shadow), lekin tashqi scope bilan to'qnashmaydi.
+
+```javascript
+try {
+  throw new Error("outer error");
+} catch (error) {
+  console.log(error.message); // "outer error"
+
+  try {
+    throw new Error("inner error");
+  } catch (error) {
+    // ✅ Yangi catch — yangi error binding (shadow)
+    console.log(error.message); // "inner error"
+  }
+
+  console.log(error.message); // "outer error" — tashqi catch tiklandi
+}
+
+// console.log(error); // ❌ ReferenceError — catch scope tugadi
+```
+
+**Yechim:** Oddatda nested catch'da `err` yoki `e` kabi boshqa nom ishlating — chalkashlik kamayadi. Yoki ikki darajali error handling kerak bo'lsa, alohida funksiyalar ajrating.
+
+---
+
+### `with` statement — strict mode'da parse-time SyntaxError
+
+Non-strict mode'da `with` scope chain'ga object property'larni "qo'shadi" — bu engine optimization'larini butunlay buzadi. Strict mode'da esa `with` **parse-time SyntaxError**'ga olib keladi — hatto kod umuman run bo'lmaydi.
+
+```javascript
+// Non-strict — ishlaydi, lekin engine optimization'lar buziladi
+const obj = { x: 10, y: 20 };
+with (obj) {
+  console.log(x + y); // 30 — scope chain'ga obj qo'shildi
+}
+
+// Strict mode — parse-time'da rad etiladi
+"use strict";
+with ({ x: 10 }) { // ❌ SyntaxError: Strict mode code may not include a with statement
+  console.log(x);
+}
+```
+
+**Nima uchun parse-time:** Oddiy runtime ReferenceError'dan farqli, `with` strict mode bilan mos kelmasligini engine **parsing bosqichida** aniqlaydi — script umuman yuklanmaydi. Bu sabab: modullar va class tanalari avtomatik strict mode'da bo'lgani uchun `with` zamonaviy JavaScript'da amalda taqiqlangan.
+
+**Yechim:** `with` o'rniga destructuring yoki oddiy o'zgaruvchi ishlating: `const { x, y } = obj;`.
+
+---
+
+### Global `var` qayta yozilishi mumkin, global `let`/`const` esa — yo'q
+
+Global scope'da `var` bilan e'lon qilingan o'zgaruvchi `globalThis` object'ga **writable property** sifatida qo'shiladi — uni `globalThis.name = newValue` orqali o'zgartirish mumkin. Global `let`/`const` esa declarative environment record'da saqlanadi va `globalThis`'ga qo'shilmaydi — uni tashqi kod `globalThis` orqali o'zgartira olmaydi.
+
+```javascript
+// Global scope
+var varGlobal = "initial";
+let letGlobal = "initial";
+
+// Tashqi kod (masalan boshqa script):
+globalThis.varGlobal = "hacked"; // ✅ var — writable property, o'zgardi
+globalThis.letGlobal = "hacked"; // ✅ yangi property qo'shildi
+                                  // LEKIN asl letGlobal o'zgarmadi
+
+console.log(varGlobal); // "hacked" — asl binding o'zgardi
+console.log(letGlobal); // "initial" — asl binding o'z joyida
+console.log(globalThis.letGlobal); // "hacked" — yangi alohida property
+```
+
+**Nima uchun:** `var` `globalThis`'ga binding object orqali bog'liq — property o'zgarishi binding'ni o'zgartiradi. `let`/`const` esa declarative record'da alohida, `globalThis` property'lari bilan hech qanday aloqasi yo'q.
+
+**Yechim:** Global state'ni har doim `const` bilan e'lon qiling (immutable reference) va modullar orqali ajratilgan namespace ishlating. Global `var` xavfli — uchinchi tomon kod uni o'zgartirishi mumkin.
 
 ---
 
@@ -1351,13 +1735,18 @@ function processData(data, data) {  // Qator A
 ```javascript
 // Qator A: ❌ SyntaxError — strict mode'da duplicate parameter taqiq
 // Qator B: ❌ ReferenceError — strict mode'da implicit global taqiq (let/const/var yo'q)
-// Qator C: ❌ Bu aslida SyntaxError emas — var undefined ishlaydi (local shadow),
-//          lekin bu juda yomon amaliyot
-// Qator D: ✅ let NaN ishlaydi — NaN global property'ni shadow qiladi
-// Qator E: ❌ SyntaxError — strict mode'da variable'ni delete qilish taqiq
+// Qator C: 🟡 Texnik jihatdan ishlaydi — `undefined` reserved word EMAS, u global
+//          property. `var undefined = 5` local variable yaratadi va global
+//          undefined'ni shadow qiladi. Lekin bu juda yomon amaliyot va reader'ni
+//          chalkashtiradi — hech qachon qilmang.
+// Qator D: 🟡 Texnik jihatdan ishlaydi — `NaN` ham reserved word emas, global
+//          property. `let NaN = 10` local shadow yaratadi. Lekin ham yomon amaliyot.
+// Qator E: ❌ SyntaxError — strict mode'da identifier'ni delete qilish taqiq
 ```
 
-**Tushuntirish:** Strict mode bir nechta xavfli pattern'larni taqiqlaydi. Duplicate parameters, implicit globals va o'zgaruvchilarni `delete` qilish — barchasi compile-time da aniqlanadi va SyntaxError beradi. Amalda bu xatolar A qatorda to'xtaydi — engine parse qilayotganda birinchi SyntaxError'ni topishi bilan to'xtaydi.
+**Tushuntirish:** Strict mode bir nechta xavfli pattern'larni taqiqlaydi. **Haqiqiy xatolar** (A, B, E) — duplicate parameters, implicit globals va identifier `delete`. Bular compile-time da aniqlanadi. **Texnik jihatdan ishlaydigan lekin yomon amaliyot** (C, D) — `undefined` va `NaN` reserved word emas, shuning uchun ularni shadow qilish mumkin, lekin hech qachon bunday qilmaslik kerak — kod chalkash va xavfli bo'ladi.
+
+**Amalda:** Agar bu kodni ishga tushirsangiz, parser Qator A'da birinchi SyntaxError'ni topib to'xtaydi — script umuman run bo'lmaydi. SyntaxError'lar parse-time'da aniqlanadi, shuning uchun B va E gacha hech qachon yetmaydi.
 
 </details>
 

@@ -19,6 +19,7 @@
 - [`this` in Different Contexts](#this-in-different-contexts)
 - [Strict Mode Ta'siri](#strict-mode-tasiri)
 - [`globalThis` (ES2020)](#globalthis-es2020)
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -31,7 +32,7 @@
 
 `this` — JavaScript ning eng chalkash, eng ko'p xato qilinadigan, lekin eng muhim tushunchasidir. U har bir Execution Context ichida mavjud bo'lgan maxsus keyword bo'lib, **joriy funksiya qaysi kontekstda chaqirilganini** ko'rsatadi.
 
-Eng muhim narsa: `this` **funksiya qayerda yozilganiga** emas, **qanday chaqirilganiga** bog'liq. Bu JavaScript ni Java, C#, Python kabi tillardan tubdan farq qiladi — o'sha tillarda `this` (yoki `self`) doim joriy ob'ektga ishora qiladi va **compile-time** da aniqlanadi; JavaScript da esa `this` **runtime** da, call-site ga qarab aniqlanadi.
+Eng muhim narsa: `this` **funksiya qayerda yozilganiga** emas, **qanday chaqirilganiga** bog'liq. Bu JavaScript ni Java, C#, Python kabi tillardan tubdan farq qiladi — o'sha tillarda `this` (yoki `self`) doim joriy ob'ektga ishora qiladi va **statik tarzda** (class/object tuzilishiga qarab) aniqlanadi; JavaScript da esa `this` **runtime** da, call-site ga qarab aniqlanadi.
 
 Bu nima uchun muhim? `this` ni tushunmasdan React component'larda event handler'lar, Node.js da middleware'lar, va oddiy OOP kodda doimiy xatolarga duch kelasiz. `this` binding 4 ta qoida (new, explicit, implicit, default) va ularning priority tartibini bilish — JavaScript dasturchi uchun **fundamental skill**.
 
@@ -51,7 +52,8 @@ greetFn(); // "Salom, men undefined" — this = window (yoki undefined strict mo
 
 **Bitta funksiya** — lekin **ikki xil** `this`. Nima uchun? Chunki `this` **call-site** ga bog'liq — funksiya qayerda **chaqirildi**, qayerda yozilganiga emas.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ECMAScript spec bo'yicha, har bir funksiya chaqirilganda engine quyidagi qadamlarni bajaradi:
 
@@ -81,6 +83,8 @@ Bu [02-execution-context.md](02-execution-context.md) da ko'rganimizdek, Executi
 │                                      │
 └──────────────────────────────────────┘
 ```
+
+</details>
 
 ### Call-site — `this` Aniqlanadigan Joy
 
@@ -178,10 +182,9 @@ funksiya chaqirildi
 function UserAccount(name, email) {
   // new ishlatilganda:
   // 1. Yangi bo'sh object yaratiladi: {}
-  // 2. this = shu yangi object
-  // 3. Yangi object ning [[Prototype]] = UserAccount.prototype
-  // 4. Funksiya tanasi bajariladi (this.name = name, ...)
-  // 5. Agar return object bo'lmasa — this qaytariladi
+  // 2. Yangi object ning [[Prototype]] = UserAccount.prototype ga o'rnatiladi
+  // 3. Funksiya this = yangi object bilan chaqiriladi (tanasi bajariladi)
+  // 4. Agar return object bo'lmasa — this (yangi object) qaytariladi
 
   this.name = name;
   this.email = email;
@@ -194,7 +197,8 @@ console.log(user.email);     // "ali@example.com"
 console.log(user.createdAt); // 2026-02-06T...
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ECMAScript spec bo'yicha `new` operator quyidagi qadamlarni bajaradi (OrdinaryCreateFromConstructor):
 
@@ -214,6 +218,8 @@ const result = UserAccount.call(newObj, "Ali", "ali@example.com");
 // Agar qaytarmasa yoki primitive qaytarsa — newObj qaytariladi
 return (typeof result === 'object' && result !== null) ? result : newObj;
 ```
+
+</details>
 
 ### `new` bilan return — Tricky Case
 
@@ -293,6 +299,28 @@ aliIntroduce("Salom", "!");    // "Salom, men Ali!"
 aliIntroduce("Assalom", "."); // "Assalom, men Ali." — DOIM ali
 ```
 
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+ECMAScript spec bo'yicha `Function.prototype.call(thisArg, ...args)` chaqirilganda:
+
+1. `IsCallable(func)` tekshiriladi — agar `false` bo'lsa `TypeError`
+2. `PrepareForTailCall()` — tail call optimization uchun
+3. `Call(func, thisArg, args)` abstract operation chaqiriladi — bu ichida `func.[[Call]](thisArg, args)` ishga tushadi
+4. `OrdinaryCallBindThis` ichida `thisArg` coercion qo'llaniladi:
+   - **Strict mode:** `thisArg` aynan o'zi ishlatiladi — `null`, `undefined`, primitive ham o'zgartirilmaydi
+   - **Non-strict mode:** `null`/`undefined` bo'lsa `globalThis` ga almashtiriladi; primitive bo'lsa `ToObject(thisArg)` bilan boxed object ga aylantiriladi (`42` -> `Number{42}`)
+
+`Function.prototype.bind(thisArg, ...args)` esa **BoundFunctionCreate** abstract operation orqali yangi funksiya yaratadi. Bu funksiya **exotic object** bo'lib, unda:
+- `[[BoundTargetFunction]]` — original funksiya
+- `[[BoundThis]]` — qotirilgan `this` qiymati
+- `[[BoundArguments]]` — partial application argumentlari
+- `[[Call]]` internal method chaqirilganda `[[BoundThis]]` har doim `thisArgument` sifatida uzatiladi
+
+Qayta `bind` ishlamasligining sababi: `bound.bind(newThis)` yangi BoundFunction yaratadi, lekin `[[Call]]` chaqirilganda ichki `[[BoundTargetFunction]].[[Call]]` ga `[[BoundThis]]` uzatiladi — birinchi bound function ning `[[BoundThis]]` si doim ustun.
+
+</details>
+
 ### Priority: Explicit > Implicit
 
 ```javascript
@@ -364,6 +392,23 @@ const calculator = {
 calculator.add(10).add(5).subtract(3);
 console.log(calculator.getResult()); // 12
 ```
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+ECMAScript spec bo'yicha implicit binding **Reference Record** mexanizmi orqali ishlaydi. `obj.method()` chaqirilganda engine ichida quyidagi jarayon sodir bo'ladi:
+
+1. `obj.method` expression evaluate bo'lganda natija **Reference Record** qaytadi — bu `{[[Base]]: obj, [[ReferencedName]]: "method", [[Strict]]: false/true}` structurasi
+2. `()` (call) operatori ishga tushganda engine `GetValue(ref)` orqali funksiyani oladi, lekin Reference Record ni ham saqlaydi
+3. **`EvaluateCall`** abstract operation chaqiriladi — bu ichida `IsPropertyReference(ref)` tekshiriladi
+4. Agar `IsPropertyReference` `true` bo'lsa (ya'ni Reference Record ning `[[Base]]` object bo'lsa) — `GetThisValue(ref)` chaqiriladi, bu `ref.[[Base]]` ni qaytaradi
+5. Shu `[[Base]]` qiymati `thisArgument` sifatida funksiyaga uzatiladi
+
+"Lost binding" aynan shu mechanism tufayli sodir bo'ladi: `const fn = obj.method` expression da `GetValue(ref)` chaqiriladi va **faqat funksiya qiymati** olinadi — Reference Record yo'qoladi. Keyin `fn()` chaqirilganda yangi Reference Record yaratiladi, lekin uning `[[Base]]` `undefined` bo'ladi (standalone call), shuning uchun default binding ishga tushadi.
+
+V8 da property access + call ketma-ketligi uchun **LoadIC + CallIC** inline cache'lar ishlatiladi. Method call pattern (`obj.method()`) aniqlanganida V8 buni **monomorphic call site** sifatida optimizatsiya qiladi — Hidden Class tekshiruvi + function pointer bir operatsiyada amalga oshiriladi.
+
+</details>
 
 ### Faqat Oxirgi Object Hisobga Olinadi
 
@@ -438,6 +483,25 @@ function showThisStrict() {
 }
 showThisStrict(); // undefined
 ```
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+ECMAScript spec bo'yicha default binding **OrdinaryCallBindThis** abstract operation ichida amalga oshiriladi. Funksiya oddiy (standalone) chaqirilganda:
+
+1. Call expression evaluate bo'lganda Reference Record ning `[[Base]]` `undefined` bo'ladi (chunki `.` yoki `[]` property access yo'q)
+2. `EvaluateCall` ichida `IsPropertyReference(ref)` `false` qaytaradi
+3. `thisValue` sifatida `undefined` olinadi
+4. `OrdinaryCallBindThis(F, calleeContext, thisArgument)` chaqiriladi:
+   - `F.[[ThisMode]]` tekshiriladi — agar `"strict"` bo'lsa, `thisArgument` (`undefined`) **aynan o'zi** `thisValue` bo'ladi
+   - Agar `"global"` (non-strict) bo'lsa — `thisArgument` `undefined` yoki `null` ekanligini tekshiradi va uni **`calleeRealm.[[GlobalEnv]].[[GlobalThisValue]]`** bilan almashtiradi — bu global object (`window`/`global`)
+5. `calleeContext.[[ThisBinding]]` shu qiymat bilan o'rnatiladi
+
+Bu non-strict da `this = window`, strict da `this = undefined` bo'lishining aniq spec mexanizmi. Non-strict mode dagi bu "coercion" xatti-harakati ES5 dan oldingi backward compatibility uchun saqlanib qolgan — zamonaviy spec dizayni bu xatti-harakatni xato deb hisoblaydi.
+
+V8 da strict mode funksiyalar uchun `this` coercion qadami butunlay skip qilinadi — bu micro-optimization beradi, chunki `Object()` wrapper yaratish va global object lookup kerak bo'lmaydi.
+
+</details>
 
 ### Global Scope dagi `this`
 
@@ -668,7 +732,7 @@ console.log(person.age);  // 25
 
 ### Nazariya
 
-Arrow function — `this` bilan ishlashda eng farqli funksiya turi. Arrow function **o'zining `this`iga ega emas** — u `this` ni **tashqi (lexical) scope**dan oladi, xuddi closure orqali o'zgaruvchi olganidek. Shu sababli arrow function ning `this`ini `call`, `apply`, `bind` bilan **o'zgartirib bo'lmaydi**.
+Arrow function — `this` bilan ishlashda eng farqli funksiya turi. Arrow function **o'zining `this`iga ega emas** — u `this` ni **tashqi (lexical) scope**dan oladi, closure mexanizmi orqali tashqi scope'dagi o'zgaruvchiga murojaat qilgandek. Shu sababli arrow function ning `this`ini `call`, `apply`, `bind` bilan **o'zgartirib bo'lmaydi**.
 
 Arrow function ES6 da aynan `this` binding muammosini hal qilish uchun kiritilgan. ES5 da `setTimeout`, `forEach`, va boshqa callback'larda `this` yo'qolishi juda keng tarqalgan muammo edi — dasturchilar `var self = this` yoki `.bind(this)` bilan vaqtincha yechim topishardi. Arrow function bu muammoni tilning o'zida hal qildi. Lekin arrow function'ni ob'ekt method yoki prototype method sifatida ishlatish **xato** — chunki u `this` ni lexical scope'dan oladi, ob'ektdan emas.
 
@@ -970,6 +1034,29 @@ setTimeout(service.notify.bind(null, "Ready"), 1000); // "[MyApp] Ready"
 
 ## `this` in Different Contexts
 
+### Nazariya
+
+JavaScript kodda `this` — har xil kontekstlarda turli qiymatlarga ega bo'lishi mumkin. Bu yuqorida o'rgangan **4 ta binding rule**'ning amaliy natijasi: global scope, oddiy function, object method, class, event handler, `setTimeout` callback, prototype method — har bir kontekstda `this` aniq qoidalar bo'yicha hisoblanadi.
+
+Bu section JavaScript kodda uchraydigan **barcha asosiy kontekstlarni** birma-bir ko'rib chiqadi va har birida `this` qiymati qanday aniqlanishini ko'rsatadi. Bu ma'lumot real-world dasturlashda eng ko'p uchraydigan `this` muammolarini **oldindan ko'ra bilish** va oldini olish uchun zarur.
+
+Har bir kontekstda `this` ning qiymati call-site va binding rule'ga bog'liq — shuning uchun bir xil funksiya turli joylarda ishlatilganda turlicha natija berishi mumkin. Bu sectionni o'qib tugatgach, siz istalgan JavaScript kodga qarab `this` ning qiymatini darhol aniqlay olasiz.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+ECMAScript spec bo'yicha `this` qiymati turli Environment Record turlari orqali boshqariladi. Har bir execution context o'zining Environment Record iga ega va `this` shu record dan olinadi:
+
+**Global Environment Record** — `[[GlobalThisValue]]` internal slot ga ega. Browser da bu `window` (Proxy wrapped `WindowProxy`), Node.js da `global` object. Global scope dagi `this` aynan shu slot dan qaytadi. `GetThisEnvironment()` abstract operation Environment Record lar chain bo'ylab yuqoriga yuradi va `HasThisBinding()` `true` qaytargan birinchi record dan `GetThisBinding()` chaqiradi.
+
+**Module Environment Record** — ES modules (`import`/`export`) uchun. Module top-level da `this` spec bo'yicha `undefined` — chunki Module Environment Record ning `GetThisBinding()` metodi doim `undefined` qaytaradi. Bu modules ning strict mode da ishlashidan emas (strict mode faqat function ichidagi default binding ga ta'sir qiladi), balki module uchun **alohida spec qoidasi**.
+
+**Function Environment Record** — funksiya chaqirilganda yaratiladi va `[[ThisValue]]` internal slot ga ega. Bu slot `BindThisValue(V)` metodi orqali o'rnatiladi. Arrow function uchun Function Environment Record ning `[[ThisBindingStatus]]` `"lexical"` bo'ladi — bu holda `HasThisBinding()` `false` qaytaradi va `GetThisEnvironment()` tashqi Environment Record ga o'tadi.
+
+V8 da har bir context uchun `this` qiymati **Context object** ning fixed offset dagi slot da saqlanadi. Function call bo'lganda V8 `this` ni register yoki stack orqali uzatadi — bu memory lookup emas, shuning uchun property access kabi sekin emas.
+
+</details>
+
 ### 1. Global Context
 
 ```javascript
@@ -1039,7 +1126,7 @@ const button = document.getElementById("submitBtn");
 // Regular function — this = event target element
 button.addEventListener("click", function(event) {
   console.log(this);           // <button id="submitBtn">
-  console.log(this === event.target); // true (ko'p hollarda)
+  console.log(this === event.currentTarget); // true (har doim)
   this.disabled = true;        // button ni disable qilish
 });
 
@@ -1151,6 +1238,24 @@ function strict() {
 strict();
 ```
 
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+ECMAScript spec bo'yicha strict mode `this` xatti-harakatini **`[[ThisMode]]`** internal slot orqali boshqaradi. Har bir funksiya objectda `[[ThisMode]]` quyidagi qiymatlardan biriga ega: `"lexical"` (arrow function), `"strict"`, yoki `"global"` (non-strict).
+
+Funksiya yaratilganda (`OrdinaryFunctionCreate`) spec `[[ThisMode]]` ni aniqlaydi:
+1. Agar arrow function bo'lsa — `"lexical"`
+2. Agar funksiya strict mode code ichida bo'lsa (`[[Strict]]` = `true`) — `"strict"`
+3. Aks holda — `"global"`
+
+`OrdinaryCallBindThis(F, calleeContext, thisArgument)` ichida `[[ThisMode]]` quyidagicha ishlatiladi:
+- `"strict"`: `thisValue = thisArgument` — hech qanday coercion yo'q. `null` `null` bo'lib qoladi, `undefined` `undefined` bo'lib qoladi, `42` boxed `Number` ga aylantirilMAYDI
+- `"global"`: agar `thisArgument` `undefined` yoki `null` bo'lsa — `thisValue = calleeRealm.[[GlobalEnv]].[[GlobalThisValue]]` (global object); agar primitive bo'lsa — `ToObject(thisArgument)` bilan wrapper object yaratiladi
+
+`IsStrict` flag funksiya parse qilingan paytda aniqlanadi. V8 da bu flag funksiya ning `SharedFunctionInfo` objectida saqlanadi. Strict mode funksiyalar uchun V8 `this` argument uchun coercion kodni butunlay emit qilmaydi (code generation da skip qilinadi) — bu compiled code hajmini kamaytiradi va execution tezligini oshiradi.
+
+</details>
+
 ### Strict va Non-strict Taqqoslash
 
 | Holat | Non-strict | Strict |
@@ -1219,7 +1324,8 @@ JavaScript turli muhitlarda ishlaydi va har birida global ob'ekt boshqacha nomla
 
 `globalThis` `this` bilan bog'liq chunki global scope'dagi `this` aynan shu global ob'ekt. Non-strict mode'da oddiy funksiya ichidagi default `this` ham aynan `globalThis` ga teng. Shuning uchun `this` binding qoidalarini to'liq tushunish uchun `globalThis` ni bilish zarur.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -1247,7 +1353,10 @@ ES2020 dan KEYIN:
 
 ECMAScript spec bo'yicha `globalThis` — bu `[[GlobalThisValue]]` internal slot'dan olinadigan qiymat. Har bir Realm (execution environment) o'zining global `this` qiymatiga ega va `globalThis` aynan shu qiymatga direct reference.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 **Cross-platform utility:**
 
@@ -1304,6 +1413,231 @@ testStrict();
 // this !== globalThis — module da this = undefined
 // lekin globalThis hali ham global object'ga ishora qiladi
 ```
+
+</details>
+
+---
+
+## Edge Cases va Gotchas
+
+### Getter/Setter'da `this` — receiver (access site'dagi object)
+
+Getter/setter'ning `this` qiymati — **property'ni accessing object**, accessor e'lon qilingan object emas. Agar getter prototype'da bo'lsa va child object orqali chaqirilsa, `this = child` bo'ladi — bu prototype method'lari bilan bir xil xulq-atvor, lekin getter'ning "property-like" syntax'i bu nuansni yashirishi mumkin.
+
+```javascript
+const parent = {
+  value: 42,
+  get doubled() {
+    return this.value * 2; // this = accessing object
+  },
+  set doubled(v) {
+    this.value = v / 2;
+  }
+};
+
+console.log(parent.doubled); // 84 — this = parent
+
+// Child bilan — shadowed receiver:
+const child = Object.create(parent);
+child.value = 10;
+
+console.log(child.doubled); // 20 — getter run bilan this = child (not parent!)
+// Ya'ni getter parent.prototype'da, lekin this = child
+
+child.doubled = 60;
+console.log(child.value);   // 30 — setter mutated CHILD, not parent
+console.log(parent.value);  // 42 — parent o'zgarmadi ✅
+```
+
+**Nima uchun:** ECMAScript spec'ning `OrdinaryGet`/`OrdinarySet` abstract operation'larida accessor'ga `Receiver` argumenti uzatiladi — bu property access'ni bajargan object. Getter/setter function chaqirilganida `this = Receiver`. Prototype chain lookup natijasida topilgan accessor, lekin `this` chain'ning tepasida (access site), eng pastda (declaration site) emas.
+
+**Amaliy ta'sir:** Classes bilan inheritance'da `get`/`set` override qilinmagan bo'lsa ham — child'da ishlatilganda child'ning `this` si ishlatiladi. Bu "abstract property" pattern uchun foydali.
+
+---
+
+### `super.method()` — derived class instance'ning `this`'i
+
+`super.method()` chaqiruvi parent'ning method'ini bajaradi, **lekin `this` — derived class instance'i**. Bu subtle detail — ko'pchilik dasturchilar super method'ining parent class'ning "own" context'ida ishlashini taxmin qiladilar.
+
+```javascript
+class Logger {
+  log(message) {
+    // this = chaqiruvchi class instance
+    console.log(`[${this.constructor.name}] ${message}`);
+  }
+}
+
+class UserService extends Logger {
+  log(message) {
+    // super.log() chaqiriladi, lekin this = UserService instance
+    super.log(message.toUpperCase());
+  }
+}
+
+const service = new UserService();
+service.log("created");
+// "[UserService] CREATED" — UserService, Logger emas!
+// super.log() ichida this.constructor = UserService (chaqiruvchi class)
+```
+
+**Nima uchun:** ECMAScript spec'da `super.method()` chaqiruvi `MakeSuperPropertyReference` abstract operation orqali amalga oshiriladi. Bu operation:
+1. Method'ni **parent's prototype**'dan topadi (lookup parent'da)
+2. `[[ThisValue]]` sifatida current function'ning **o'z `this`**'ini uzatadi (derived class instance)
+
+Ya'ni `super` faqat **method resolution** ni parent'ga yo'naltiradi, `this` binding'ni o'zgartirmaydi. Bu `OrdinaryGet(parentProto, "method", thisValue)` — `thisValue` = current `this`.
+
+**Amaliy ta'sir:** Parent method'da `this.customProp` ishlatilsa — u derived class'da mavjud bo'lishi kerak. Otherwise, `undefined`. Parent method'ni haqiqiy "parent-only" context'da chaqirish uchun `Parent.prototype.method.call(originalContext)` ishlatiladi.
+
+---
+
+### `async` method'da `await` dan keyin `this` saqlanadi
+
+`async` method ichida `await` ishlatilganda, execution to'xtaydi va keyingi davom asynchronously ishlaydi — **lekin `this` binding saqlanadi**. Bu `.then(function() {...})` pattern'dan farqli, chunki `await` execution context state'ni restore qiladi.
+
+```javascript
+class DataService {
+  constructor() {
+    this.cache = new Map();
+    this.name = "DataService";
+  }
+
+  async fetchAndCache(id) {
+    // this = DataService instance ✅
+    console.log(`[${this.name}] Fetching ${id}`);
+
+    const data = await fetch(`/api/${id}`).then(r => r.json());
+
+    // ⭐ await dan keyin — this HALI HAM instance ✅
+    this.cache.set(id, data);
+    console.log(`[${this.name}] Cached ${id}`);
+
+    return data;
+  }
+}
+
+// Lekin .then callback ichida — this yo'qoladi:
+class BadService {
+  constructor() { this.cache = new Map(); }
+
+  fetchAndCache(id) {
+    return fetch(`/api/${id}`)
+      .then(function(response) {
+        // ❌ this = undefined (oddiy function .then callback)
+        this.cache.set(id, response); // TypeError
+      });
+  }
+}
+```
+
+**Nima uchun:** `async`/`await` syntax'da engine execution context'ni "suspend" va "resume" qiladi — lekin `[[ThisBinding]]` saqlanadi. Spec'da `Await` abstract operation execution'ni microtask queue'ga qo'yadi, davom etish paytida esa aynan shu execution context restore qilinadi — `this` slot ham shular bilan birga.
+
+`.then(function() {})` esa har safar **yangi** function call — yangi execution context, yangi `this` binding qoidalari. Default binding → `undefined` yoki global.
+
+**Yechim:** `.then()` ishlatishda callback sifatida arrow function (`.then(response => this.cache.set(...))`) yoki `.then((r) => r.json()).then((data) => { this.cache.set(...) })`.
+
+---
+
+### `bind` + partial args + `new` — argumentlar birlashadi, `this` ignore
+
+`bind` bilan partial application qilingan function'ga `new` operator qo'llanganda, **bind'ning `this`'i ignore qilinadi** (new binding ustun), **lekin bind argumentlari new args bilan birlashadi**.
+
+```javascript
+function Product(brand, model, price) {
+  this.brand = brand;
+  this.model = model;
+  this.price = price;
+  this.createdAt = new Date();
+}
+
+// bind bilan "brand" va "model" oldindan beriladi:
+const MacBookPro = Product.bind(
+  { type: "phone" },  // ❌ bu this ignore qilinadi new bilan
+  "Apple",             // boundArg[0]
+  "MacBook Pro"        // boundArg[1]
+);
+
+// new bilan faqat price qoldi:
+const laptop = new MacBookPro(25_000_000);
+
+console.log(laptop.brand);    // "Apple" ✅
+console.log(laptop.model);    // "MacBook Pro" ✅
+console.log(laptop.price);    // 25000000 ✅
+console.log(laptop.type);     // undefined — bind'ning this ignore qilingan
+console.log(laptop.createdAt); // Date object — yangi instance
+
+// Args birlashishi:
+// bind partial: ["Apple", "MacBook Pro"]
+// new args:     [25000000]
+// Final args:   ["Apple", "MacBook Pro", 25000000]
+```
+
+**Nima uchun:** ECMAScript spec'ning `[[Construct]]` internal method'i bound function uchun:
+1. `[[BoundTargetFunction]]` (original function) topadi
+2. `[[BoundThis]]` ni **ignore qiladi** (chunki `new` eng yuqori priority)
+3. `[[BoundArguments]]` + new call args ni birlashtirib target function'ga uzatadi
+4. `newTarget` — bound function'ning o'zi
+
+Ya'ni `new` bound function'ni "unwrap" qiladi — original target'ni new bilan chaqiradi. Bu `Function.prototype.bind` ning design feature'i: bound function'ni `new` bilan ishlatish imkonini berish.
+
+**Use case:** Factory pattern, curried constructor, partial application with classes.
+
+---
+
+### Class field arrow — alohida per-instance fn (`this` safety vs memory)
+
+Class field'da arrow function aniqlash (`handler = () => {...}`) `this`'ni doim to'g'ri bog'laydi, **lekin har instance uchun alohida function** yaratadi — bu prototype method'dan farqli memory profile.
+
+```javascript
+// Prototype method — bitta shared function:
+class ButtonA {
+  constructor(label) { this.label = label; }
+
+  click() {  // prototype'da — barcha instance share
+    console.log(this.label);
+  }
+}
+
+// Arrow field — HAR instance'da alohida function:
+class ButtonB {
+  constructor(label) { this.label = label; }
+
+  click = () => {  // own property — alohida fn per instance
+    console.log(this.label);
+  };
+}
+
+// 10000 ta instance:
+const btnsA = Array.from({ length: 10000 }, (_, i) => new ButtonA(`btn${i}`));
+const btnsB = Array.from({ length: 10000 }, (_, i) => new ButtonB(`btn${i}`));
+
+// Shared vs Own function:
+console.log(btnsA[0].click === btnsA[1].click); // true — shared (prototype)
+console.log(btnsB[0].click === btnsB[1].click); // false — alohida ✅
+
+// `this` safety farqi:
+const btnA = new ButtonA("A");
+const btnB = new ButtonB("B");
+
+const cbA = btnA.click;
+// cbA(); // ❌ TypeError — this = undefined, label yo'q
+
+const cbB = btnB.click;
+cbB(); // "B" ✅ — arrow this lexical, instance'ga bog'langan
+```
+
+**Memory trade-off:**
+
+| | Prototype method | Arrow field |
+|-|-----------------|-------------|
+| **Memory (10000 instance)** | 1 × function object | 10000 × function object |
+| **`this` callback'da** | ❌ yo'qoladi | ✅ saqlanadi |
+| **Ishlatish** | Critical perf, OOP | UI handler, React class |
+
+**Nima uchun:** Class field syntax'da `name = value` constructor body ichida ishlaydi — har `new` chaqirilganda initializer expression evaluate bo'ladi. Arrow function expression har instance uchun yangi function object yaratadi, uning `[[ThisBinding]]` `"lexical"` — constructor scope'dagi `this`'ni (ya'ni yangi instance) capture qiladi.
+
+**Qachon qaysi birini tanlash:**
+- **Prototype method (default):** Memory efficient, OOP to'g'ri pattern
+- **Arrow field:** Faqat callback/event handler'da `this` yo'qolishi mumkin bo'lgan joyda. React class component'larda bir necha handler uchun ishlatiladi. Critical path'da prototype + manual `bind` afzalroq.
 
 ---
 
@@ -1549,7 +1883,7 @@ person.greet();                      // A: "Ali"
 
 const greet = person.greet;
 greet();                             // B: undefined (non-strict) yoki TypeError (strict)
-// Default binding: this = window → window.name = undefined
+// Default binding: this = window → window.name = "" (browser da default bo'sh string)
 // Strict mode da: this = undefined → TypeError
 
 person.greet.call({ name: "Vali" }); // C: "Vali"
@@ -1654,9 +1988,9 @@ obj.regularMethod();
 // B: "Outer"
 //    → Arrow function: this ni regularMethod dan oladi = obj
 //
-// C: undefined
+// C: "" (browser da) yoki undefined (non-browser da)
 //    → Regular function: oddiy chaqiruv → default binding → this = window
-//    → window.name = undefined (yoki "" browser da)
+//    → window.name = "" (browser da default bo'sh string)
 
 obj.arrowMethod();
 // D: undefined (yoki "" browser da)
@@ -1724,7 +2058,7 @@ emitter.emit("data");
 1. `emitter.emit("data")` — `this = emitter` (implicit binding) → `[Emitter] Emitting: data`
 2. `this.events[event].forEach(cb => cb())` — `cb` bu `handler.onData` ning **reference**'i
 3. `cb()` — oddiy funksiya chaqiruvi (`.` oldida object yo'q)
-4. Default binding: `this = window` (non-strict) → `window.name` = `undefined` (yoki `""`)
+4. Default binding: `this = window` (non-strict) → `window.name` = `""` (browser da default bo'sh string)
 5. `handler.onData` method reference olindi, lekin `handler` object bilan **aloqasi uzildi**
 
 **To'g'ri qilish:**
@@ -1900,4 +2234,4 @@ G: Object   (setTimeout dan keyin)
 
 ---
 
-**Keyingi bo'lim:** [11-event-loop.md](11-event-loop.md) — Event Loop: JavaScript single-threaded runtime, Call Stack, Web APIs, Callback Queue, Microtask Queue, macrotask vs microtask, `setTimeout(fn, 0)` nima uchun darhol ishlamaydi, `requestAnimationFrame`, Node.js event loop farqlari.
+> **Keyingi bo'lim:** [11-event-loop.md](11-event-loop.md) — Event Loop: JavaScript single-threaded runtime, Call Stack, Web APIs, Callback Queue, Microtask Queue, macrotask vs microtask priority, `setTimeout(fn, 0)` nima uchun darhol ishlamaydi, `requestAnimationFrame` va `queueMicrotask`, Node.js libuv event loop arxitekturasi va browser bilan farqlari.

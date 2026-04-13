@@ -16,6 +16,7 @@
 - [Circular Dependencies](#circular-dependencies)
 - [Module Bundlers](#module-bundlers)
 - [Tree Shaking](#tree-shaking)
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -35,7 +36,31 @@ Modullar quyidagi muammolarni hal qiladi:
 4. **Code reuse** — bir marta yozilgan modul istalgan joyda qayta ishlatiladi
 5. **Lazy loading** — kerakli modulni kerak bo'lganda yuklash (performance)
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Module system evolutsiyasi**:
+- 2009: CommonJS (Node.js) — synchronous, file-based
+- 2009: AMD (RequireJS) — browser uchun async
+- 2011: UMD — universal format
+- 2015: ES Modules (ES6 spec) — native, static, tree-shakable
+- 2017: Browser ESM (`<script type="module">`)
+- 2019: Node.js ESM (`.mjs`, `"type": "module"`)
+
+**Module system engine perspektivasidan nima beradi**:
+1. **Static analysis** — import/export compile-time'da aniq, bundler tree-shaking qila oladi
+2. **Scope isolation** — global scope ifloslanishi yo'q, V8 har file uchun alohida hidden class optimizatsiyasi qila oladi
+3. **Dead code elimination** — qaysi export ishlatilmayotganini aniqlash mumkin
+
+**Module resolution**: har tizim o'z algoritmiga ega:
+- **CommonJS**: `node_modules` traversal, parent directory'ga chiqish
+- **ES Modules**: browser — URL based, Node.js — `package.json` `"exports"` field
+- **Browser ESM**: relative (`./`), absolute (`/`), URL (`https://`)
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Global scope pollution muammosi:
 
@@ -59,6 +84,8 @@ function greet() { return "Hello " + name; } // ← greet() ham override bo'ldi!
 // </script>
 ```
 
+</details>
+
 ---
 
 ## Module Pattern (IIFE)
@@ -69,7 +96,33 @@ ES Modules va CommonJS dan oldin modullarni IIFE (Immediately Invoked Function E
 
 Bu pattern bugun ham ba'zi hollarda uchraydi — masalan, browser da script bilan yuklangan legacy kutubxonalar (jQuery, Lodash), va bundler chiqishi (webpack bundles). Lekin zamonaviy loyihalarda ES Modules'ga almashtirilgan.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**IIFE Module Pattern — closure asosida ishlaydi**: function darhol chaqiriladi, return qilingan object closure orqali private o'zgaruvchilarga reference saqlaydi.
+
+```
+IIFE Memory layout:
+
+Global Scope:
+  UserModule = { addUser, getUser, count } ← public API
+                          ↓
+                          [[Environment]] → IIFE Environment Record
+                                              ├── users: []          ← private
+                                              ├── nextId: 1          ← private
+                                              └── validateEmail()    ← private
+```
+
+Function tugagandan keyin ham Environment Record heap'da qoladi — chunki returned object uni ushlab turadi. Bu **stale execution context** — call stack'da yo'q, lekin closure orqali tirik.
+
+**Bundler output'da IIFE**: Webpack/Rollup/esbuild bundle'lar odatda IIFE yoki UMD formatida chiqariladi — browser'da global scope ifloslanishini oldini olish va legacy environment'larga moslik uchun.
+
+**Performance**: IIFE darhol ishga tushadi (lazy emas). ES Modules'dan sekinroq optimization — chunki static analysis qiyin.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Classic Module Pattern:
 
@@ -133,6 +186,8 @@ MyApp.api = (function() {
 MyApp.utils.formatDate(new Date());
 ```
 
+</details>
+
 ---
 
 ## CommonJS — Node.js Standart
@@ -147,7 +202,8 @@ CommonJS ning asosiy xususiyatlari:
 3. **Runtime** — `require()` istalgan joyda chaqirilishi mumkin — `if` ichida, funksiya ichida, loop ichida. Bu static analysis qilishni qiyinlashtiradi.
 4. **Copy of value** — primitive lar export qilinganda **qiymat nusxasi** beriladi (reference emas). Object lar esa reference sifatida beriladi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Node.js `require()` chaqirilganda quyidagi jarayonni bajaradi:
 
@@ -177,7 +233,10 @@ module.exports = { x };
 // exports, require, module, __filename, __dirname — shu wrapper'dan keladi
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Asosiy export/import:
 
@@ -271,6 +330,8 @@ const plugins = ['auth', 'logging', 'cache'];
 const loaded = plugins.map(name => require(`./plugins/${name}`));
 ```
 
+</details>
+
 ---
 
 ## ES Modules — Zamonaviy Standart
@@ -286,7 +347,8 @@ ESM ning asosiy xususiyatlari:
 4. **Strict mode** — har bir ES Module avtomatik `"use strict"` da ishlaydi.
 5. **O'z scope'i** — har bir modul o'z top-level scope'iga ega (global scope'ga chiqmaydi).
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ES Module yuklash uch bosqichda amalga oshadi:
 
@@ -337,7 +399,10 @@ increment();
 console.log(count); // 1 ← YANGI qiymat! Live binding
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Named exports:
 
@@ -455,6 +520,8 @@ Browser da ESM:
 <script nomodule src="fallback.js"></script>
 ```
 
+</details>
+
 ---
 
 ## CommonJS vs ES Modules — To'liq Taqqoslash
@@ -471,14 +538,15 @@ Bu ikki tizim o'rtasidagi farqlar fundamental — ular turli paytlarda, turli ma
 | **Binding** | **Value copy** (primitives) | **Live bindings** (reference) |
 | **Conditional** | ✅ `if` ichida `require()` | ❌ static import top-level da (dynamic `import()` bilan mumkin) |
 | **Strict mode** | Yo'q (qo'lda qo'shish kerak) | **Avtomatik** |
-| **`this`** | `module.exports` | `undefined` |
+| **`this`** | `exports` (dastlab `module.exports` bilan bir xil) | `undefined` |
 | **Tree shaking** | ❌ Qiyin | ✅ Static tahlil tufayli oson |
 | **File extension** | `.js`, `.cjs` | `.mjs` yoki `"type": "module"` |
 | **Node.js** | ✅ Default | ✅ 12+ (flag), 14+ (stable) |
 | **Browser** | ❌ Bundler kerak | ✅ Native `<script type="module">` |
 | **Top-level await** | ❌ | ✅ (ES2022) |
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Live binding vs value copy — eng muhim farq:
 
@@ -535,6 +603,8 @@ const { map, filter } = lodash;
 const mod = await import('./esm-module.mjs');
 ```
 
+</details>
+
 ---
 
 ## Dynamic Imports — import()
@@ -549,7 +619,37 @@ Dynamic import'ning asosiy use case'lari:
 3. **Lazy loading** — faqat user kerak qilganda yuklash (route-based splitting)
 4. **CommonJS → ESM interop** — CJS modulda ESM import qilish uchun
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`import()` — operator, function emas**: Spec'da `import()` syntactic operator sifatida belgilangan. Bu degani `import.call(...)`, `const fn = import` — hammasi `SyntaxError`. Engine `import()` ni alohida AST node sifatida ko'radi — bu bundler'lar code splitting va browser runtime resolution uchun ishlatadi.
+
+**Module loading pipeline (browser)**:
+```
+import('./module.js')
+  ↓
+1. Specifier resolution → cache lookup
+2. Network fetch → MIME type check (application/javascript)
+3. Parse → AST → nested import'larni topish
+4. Recursive resolution (cycle detection bilan)
+5. Link — import binding'lar live'ga ulangan
+6. Evaluate → module namespace object
+7. Promise resolve(namespace)
+```
+
+**Module caching**: har resolved module cache'da saqlanadi. Ikkinchi `import('./module.js')` network request yubormaydi. Muhim: cache key URL string asosida:
+```javascript
+await import('./module.js');         // entry 1
+await import('./module.js?v=2');     // entry 2 — turli URL
+await import('./folder/../module.js'); // entry 3 — turli string
+```
+
+**Bundler code splitting**: Webpack/Rollup/Vite har `import()` chaqiruvini alohida **chunk**'ga ajratadi. Runtime'da faqat kerakli chunk fetch qilinadi — bu SPA'larda route-based lazy loading uchun asos.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Asosiy ishlatish:
 
@@ -635,6 +735,8 @@ async function initApp() {
 }
 ```
 
+</details>
+
 ---
 
 ## Import Attributes (ES2025)
@@ -645,7 +747,35 @@ Import Attributes (oldin "Import Assertions" deb atalgan) — import statement'g
 
 Bu xususiyat xavfsizlik uchun muhim: server JSON fayl o'rniga JavaScript qaytarishi mumkin, va bu kodni browser bajarishi — XSS hujumiga olib keladi. `with { type: 'json' }` browser ga "bu faqat JSON bo'lishi kerak" deydi — JavaScript kelsa reject qiladi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Tarixi**: Birinchi proposal "Import Assertions" (`assert { type: 'json' }`) — loader behavior'iga ta'sir qilmagan. Committee yangi versiyani tasdiqladi: `with` keyword'i va **loading behavior**ga ta'sir qiladigan semantika. Eski `assert` deprecated.
+
+**MIME type security**: Browser Content-Type'ni tekshiradi:
+```
+GET /data.json
+Content-Type: application/json  → ✅ Parse as JSON
+Content-Type: text/javascript   → ❌ TypeError, rejected
+```
+
+Bu XSS himoyasi: server kompromis bo'lsa va JSON o'rniga JavaScript qaytarsa — browser uni execute qilmaydi.
+
+**Cache key attributes bilan**: bir xil URL, turli type → turli cache entry'lar:
+```javascript
+import data from './file' with { type: 'json' };  // Entry 1
+import data from './file' with { type: 'css' };   // Entry 2 — turli!
+```
+
+**Standart type'lar (ES2025)**:
+- `type: 'json'` — browser + Node.js 22+
+- `type: 'css'` — faqat browser (`CSSStyleSheet` object)
+- Kelajakda: `wasm`, `html`, `text`
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // JSON import
@@ -664,6 +794,8 @@ import pkg from './package.json' with { type: 'json' };
 console.log(pkg.version);
 ```
 
+</details>
+
 ---
 
 ## Circular Dependencies
@@ -676,7 +808,49 @@ Circular dependency — A moduli B ni import qiladi, B esa A ni import qiladi. B
 
 **ESM da:** Live bindings tufayli holat biroz yaxshiroq — import qilingan binding keyinchalik to'ldiriladi. Lekin initialization tartibiga e'tibor berish kerak — agar binding hali assign bo'lmagan bo'lsa, `ReferenceError` yoki `undefined` bo'lishi mumkin.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**CommonJS — cache-based circular detection**: Node.js har modul uchun `require.cache` entry yaratadi **kod ishga tushishdan oldin**. Circular bo'lganda, ikkinchi `require()` kimga qaytsa — o'sha modulning **yarim to'la** exports object'ini oladi.
+
+```
+T0: require('a')
+T1: cache['a'] = { exports: {} }  ← bo'sh entry
+T2: a code executing... require('b')
+T3:   cache['b'] = { exports: {} }
+T4:   b code: require('a') → cache hit! a.exports = {} (yarim to'la!)
+T5:   b finishes, b.exports = {fromB: ...}
+T6: back to a, a.exports = {fromA: ..., b}
+```
+
+**ES Modules — 3-fazali loading**:
+1. **Parsing** — import/export deklaratsiyalarini topish
+2. **Linking** — binding'larni ulashish (qiymat hali yo'q, faqat reference)
+3. **Evaluation** — top-level code execution, binding'lar qiymat bilan to'ldiriladi
+
+Circular dependency **Linking faza**da hal qilinadi — binding'lar ikkala yo'nalishda ham ulanadi, qiymat keyinroq keladi.
+
+**Live bindings — ESM vs CJS farqi**:
+```javascript
+// counter.mjs
+export let count = 0;
+export function increment() { count++; }
+
+// app.mjs
+import { count, increment } from './counter.mjs';
+console.log(count); // 0
+increment();
+console.log(count); // 1 ← YANGILANADI! (CJS'da 0 qolar edi)
+```
+
+ESM'da import — **read-only reference** (getter), CJS'da — **value copy** (destructuring).
+
+**ESM TDZ xatosi** — CJS dan qattiqroq: agar import qilingan binding hali initialize bo'lmagan bo'lsa, `ReferenceError` tashlaydi (CJS sukutlash bilan `undefined` qaytarardi — debugging qiyin edi).
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 CommonJS da circular dependency:
 
@@ -729,6 +903,8 @@ export async function getB() {
 // mediator.mjs — A va B o'rtasidagi aloqani boshqaradi
 ```
 
+</details>
+
 ---
 
 ## Module Bundlers
@@ -747,7 +923,33 @@ Zamonaviy bundler'lar:
 | **Rollup** | Tree shaking yaxshi, library uchun ideal | Tez | NPM kutubxonalar |
 | **Parcel** | Zero-config | Tez | Kichik/o'rta loyihalar |
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Bundler 5 fazali jarayon**:
+1. **Entry resolution** — entry point'larni topish
+2. **Dependency graph** — har faylni parse qilish, import'larni recursive traverse qilish
+3. **Transformation** — loader'lar (TS → JS, SCSS → CSS, JSX), tree shaking, dead code elimination
+4. **Chunk splitting** — dynamic import boundary'lari alohida chunk'ga, vendor chunks
+5. **Output generation** — module wrapping (IIFE/UMD/ESM), minification, source maps, file hashing
+
+**Module resolution algorithm** — bundler `import './foo'` uchun:
+```
+1. ./foo.js
+2. ./foo.json
+3. ./foo/index.js
+4. ./foo/package.json (main/module/exports field)
+```
+Bare specifier (`'react'`) uchun `node_modules` traversal — parent directory'ga chiqadi.
+
+**Vite — farqli approach**: dev mode'da **bundlamaydi**, browser native ESM'ni ishlatadi. Har module alohida HTTP request orqali yuboriladi (HTTP/2 multiplexing). Bu dev startup'ni sezilarli tezlashtiradi — ayniqsa katta loyihalarda farq yaqqol sezilarli (aniq farq project hajmi, dependency'lar soni va cache holatiga bog'liq). Production'da esa Rollup bilan bundle qiladi.
+
+**esbuild/swc nima uchun tez?** — Go/Rust'da yozilgan native tool'lar, parallel ishlaydi. Babel/Webpack esa JavaScript'da — single-threaded va V8 GC overhead'i bor. Native tool'lar sezilarli tezroq bo'lishi mumkin (aniq farq workload va benchmark setup'iga bog'liq — single file transform'da farq kattaroq, end-to-end bundle'da esa transformation'dan tashqari plugin'lar ham hissasiz o'zgartiradi). Shu sababli Vite, Next.js (swc), Parcel (swc) native tool'larga o'tmoqda.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Bundler nima qiladi — soddalashtirilgan misol:
 
@@ -776,17 +978,20 @@ console.log(double(21)); // 42
 // `sub` — ishlatilmagan → tree shaking bilan olib tashlangan
 ```
 
+</details>
+
 ---
 
 ## Tree Shaking
 
 ### Nazariya
 
-Tree shaking — bundle'dan **ishlatilmagan kodni** olib tashlash jarayoni. Nomi "daraxtni silkitish" dan olingan — daraxtni silkitsangiz qurugan barglar tushadi. Bundler dependency graph'ni tahlil qilib, hech qayerda import qilinmagan export'larni **dead code** deb belgilaydi va bundle'dan olib tashlaydi. Bu bundle hajmini sezilarli kamaytiradi.
+Tree shaking — bundle'dan **ishlatilmagan kodni** olib tashlash jarayoni. Bundler dependency graph'ni tahlil qilib, hech qayerda import qilinmagan export'larni **dead code** deb belgilaydi va bundle'dan olib tashlaydi. Bu bundle hajmini sezilarli kamaytiradi.
 
 Tree shaking **faqat ES Modules** bilan samarali ishlaydi. Sabab: ESM import/export'lari **static** — compile-time da qaysi export ishlatilganini aniqlash mumkin. CommonJS `require()` **dynamic** — runtime da qaysi property olinishini oldindan bilish mumkin emas.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
 Tree Shaking jarayoni:
@@ -809,7 +1014,10 @@ Tree Shaking jarayoni:
    sub, multiply — bundle'dan O'CHIRILADI
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Tree shaking ishlashi va ishlamasligi:
 
@@ -850,6 +1058,217 @@ export function track() { /* ... */ }
 ```
 
 Faqat ko'rsatilgan fayllar side effect'li — qolganlari safe to remove.
+
+</details>
+
+---
+
+## Edge Cases va Gotchas
+
+### ESM import'lar **hoisted** — side effects faylning `console.log` dan oldin ishlaydi
+
+Static `import` deklaratsiyalari har doim modul tepasiga **hoisted** qilinadi. Siz ularni fayl o'rtasida yoki oxirida yozsangiz ham — engine ularni birinchi navbatda evaluate qiladi. Bu degani: import qilingan modul'ning top-level kodi (side effects) sizning **har qanday koddingizdan oldin** bajariladi.
+
+```javascript
+// analytics.mjs
+console.log("analytics loaded"); // side effect
+
+// app.mjs
+console.log("app start");
+import './analytics.mjs'; // syntactically pastda, lekin hoisted
+console.log("app end");
+
+// Output:
+// analytics loaded   ← Import side effect BIRINCHI!
+// app start
+// app end
+```
+
+**Nima uchun:** ECMAScript spec'da ESM 3 bosqichli loading'ga ega: **Parse → Link → Evaluate**. Parse bosqichida engine barcha `import` deklaratsiyalarini topadi (ular qaerda yozilganidan qat'i nazar) va dependency graph'ga qo'shadi. Evaluation bosqichida **dependency tartibida** modullar bajariladi — shuning uchun import qilingan modul side effect'lari har doim sizning kodi'ngizdan oldin ishlaydi.
+
+**Amaliy ta'sir:**
+- **Conditional import ishlamaydi** — `if (cond) import './foo.mjs'` SyntaxError. Static import runtime shart'larga bog'liq bo'la olmaydi. Shart kerak bo'lsa — `import()` (dynamic).
+- **Side effect'ga tayangan kod xavfli** — agar sizning "birinchi qator" `console.log("start")` bo'lsa, aslida u birinchi emas. Imported modul log'lari oldin chiqadi.
+
+**Yechim:** Side effect'ni kutilgan joyga qo'yish kerak bo'lsa — **dynamic import** ishlating:
+
+```javascript
+console.log("app start");
+await import('./analytics.mjs'); // endi bu yerda
+console.log("app end");
+```
+
+---
+
+### Dynamic `import()` cache key — URL string, semantik normalizatsiya YO'Q
+
+`import()` har chaqirilganda module'ni cache'dan oladi — lekin cache key **aynan shu string**. Bir xil module'ning turli yozuvlari (`./a.mjs` va `./folder/../a.mjs`) **turli cache entry** yaratadi, memory waste va unexpected behavior keltirib chiqaradi.
+
+```javascript
+// ❌ Turli string → turli cache entry (lekin bir xil fayl!)
+await import('./module.mjs');            // Entry 1
+await import('./folder/../module.mjs');  // Entry 2 — "turli URL" deb hisoblangan
+await import('./module.mjs?v=2');        // Entry 3 — query string turli
+await import('./MODULE.mjs');            // Entry 4 — case-sensitive OS'larda turli
+
+// Har biri alohida network fetch + parse + evaluation
+// Har biri alohida module namespace object — memory bo'yicha alohida
+```
+
+**Nima uchun:** ESM spec'da module identity **Module Specifier Resolution** natijasi bilan aniqlanadi. Browser URL'ni normalize qiladi (masalan `/./` → `/`), lekin **query string** va **fragment** (`#`) hisobga olinadi. Node.js `?v=2` ni turli entry deb biladi — shu sababli cache busting uchun (HMR kabi) bu ishlatiladi.
+
+**Amaliy oqibatlar:**
+- **Memory waste** — bir xil modul bir necha marta yuklanadi
+- **Singleton pattern buziladi** — har import yangi module state'ini yaratadi
+- **Unexpected duplication** — `import './shared.mjs'` va `import '/abs/path/shared.mjs'` — ikkalasi bir xil faylga ishora qilsa ham turli modullar
+
+**Yechim:**
+- **Bitta canonical path** ishlating — import'larni normalize qiling (tooling, ESLint rule)
+- **Cache busting** kerak bo'lsa — query string ataylab ishlating (HMR, versioning)
+- **`import.meta.resolve()`** (ES2024+) — URL'ni canonical form'ga o'tkazish uchun
+
+```javascript
+// ✅ import.meta.resolve — standart yo'l
+const url = import.meta.resolve('./module.mjs'); // absolute URL
+const module = await import(url);
+```
+
+---
+
+### `import *` namespace imports — tree shaking **ishlamaydi**
+
+`import * as Lib from 'library'` — butun namespace'ni import qiladi. Bundler tree shake qila olmaydi — chunki namespace object dinamik ravishda accessible (`Lib[someKey]`) va static analiz xavfsizlik uchun **butun modul**ni saqlab qoladi.
+
+```javascript
+// ❌ Tree shaking ISHLAMAYDI — butun library bundle'ga tushadi
+import * as lodash from 'lodash-es';
+lodash.map([1, 2, 3], x => x * 2); // Faqat map ishlatilmoqda, lekin butun lodash bundled
+
+// Bundler fikrlashi: "Lib['map']" yozish mumkin edi, shuning uchun HAMMA narsa kerak
+// Result: ~70KB bundle (~4KB map o'rniga)
+
+// ✅ Tree shaking ISHLAYDI — named imports
+import { map, filter } from 'lodash-es';
+map([1, 2, 3], x => x * 2); // Faqat map + filter bundle'da
+
+// Yoki qaytroq — faqat kerakli fayl:
+import map from 'lodash-es/map.js';
+map([1, 2, 3], x => x * 2); // Eng minimal bundle
+```
+
+**Nima uchun:** Tree shaking `mark & sweep` algoritmi bilan ishlaydi — bundler dependency graph bo'ylab yurib, ishlatilgan export'larni mark qiladi. Lekin `namespace[key]` pattern — bu **dynamic property access**, compile-time'da qaysi key ishlatilishi noma'lum. Bundler **xavfsizlik** uchun butun namespace'ni saqlab qoladi (agar ba'zi key runtime'da ishlatilsa, ular mavjud bo'lishi kerak).
+
+**Xavfli tomoni:** Kutubxona namespace import bilan yozilgan bo'lsa (masalan React types), foydalanuvchi bundle ekstra KB'lar bilan sarflanadi — development'da ko'rinmaydi, lekin production bundle'da sezilarli.
+
+**Yechim:**
+- **Named imports** — har doim afzal
+- **Sub-path imports** — `lodash-es/map.js` kabi (eng mayda granulatsiya)
+- **Namespace'ni faqat type-only yoki debug uchun** ishlating (masalan TypeScript `import type *`)
+
+---
+
+### `package.json` conditional exports — import va require turli fayllarga resolve bo'lishi
+
+Modern kutubxonalar `package.json`'da **conditional exports** ishlatadi — bir xil modul nomi turli kontekstlarda (ESM, CJS, browser, Node.js) **turli fayllarga** resolve bo'ladi. Bu foydali, lekin debug'da chalkashlik manbai.
+
+```json
+// package.json
+{
+  "name": "my-lib",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.mjs",   // ESM uchun
+      "require": "./dist/cjs/index.cjs",  // CJS uchun
+      "browser": "./dist/browser/index.js", // Browser bundler uchun
+      "default": "./dist/fallback.js"
+    },
+    "./utils": {
+      "import": "./dist/esm/utils.mjs",
+      "require": "./dist/cjs/utils.cjs"
+    }
+  }
+}
+```
+
+**Gotcha — ikki holat bir loyihada:**
+
+```javascript
+// ESM fayl (app.mjs)
+import lib from 'my-lib';         // → ./dist/esm/index.mjs
+console.log(lib.VERSION);          // "1.0.0"
+
+// CJS fayl (legacy.cjs)
+const lib = require('my-lib');     // → ./dist/cjs/index.cjs
+console.log(lib.VERSION);          // "1.0.0"
+
+// ❌ Lekin: state alohida!
+// import'dan kelgan lib va require'dan kelgan lib —
+// IKKITA alohida modul instance, alohida state, alohida cache
+```
+
+**Nima uchun:** Har resolution context (import vs require) `package.json.exports` field'ning turli branch'iga boradi. ESM va CJS har biri alohida module system — ular orasida module state **share qilmaydi**. Bu "dual package hazard" deb ataladi va singleton pattern'larni buzadi (masalan, React bir xil versiyada ikki marta yuklanishi mumkin — ESM va CJS alohida).
+
+**Yechim:**
+- **Loyihada bitta module system'ni ishlating** — `"type": "module"` (ESM) yoki to'liq CJS
+- **Library muallif'lari** uchun: `package.json.exports.import` va `require` **bir xil JavaScript state'ga qaytsin** (masalan, ikkalasi ham re-export pattern orqali bitta core file'dan)
+- **Debug:** Node.js `--experimental-specifier-resolution` va `--conditions` flag'lari bilan resolution tracing
+
+---
+
+### Side-effect-only imports — `import './polyfill.mjs'` tree shaking'ga chidamli
+
+`import './foo.mjs'` (named/default import'siz) — "shu modulni ishga tushir, ma'lumot olma" ma'nosida. Bu pattern **polyfill'lar**, **global registration** (Web Components), **CSS injection** uchun ishlatiladi. Bundler uni **tree shake qila olmaydi**, chunki side effect kutilmoqda.
+
+```javascript
+// ✅ Polyfill import — tree shaking OLIB TASHLAMAYDI
+import 'core-js/stable';                // Butun polyfill
+import 'regenerator-runtime/runtime';    // Generator polyfill
+
+// Hech qanday variable assign qilinmaydi, lekin faylning top-level kodi ishlaydi
+// → polyfill'lar globalThis'ga Array.prototype.flat kabi method'lar qo'shadi
+
+// Web Components registration
+import './my-element.mjs'; // customElements.define() ichida chaqiradi
+
+// CSS modules (bundler support)
+import './styles.css'; // bundler CSS'ni document.head'ga qo'shadi
+
+// ✅ Side-effect + named import — ikkalasi ham ishlaydi
+import { something } from './module.mjs'; // named + side effects
+```
+
+**Gotcha — accidental tree shaking:**
+
+Agar sizning library side-effect'ga tayansa va `package.json`'da `"sideEffects": false` belgilansa — bundler sizning modulni ishlatilmasa **olib tashlaydi**, hatto import bo'lgan bo'lsa ham:
+
+```json
+// package.json (NOTO'G'RI sozlama):
+{
+  "sideEffects": false
+}
+
+// Foydalanuvchi kodi:
+import 'my-lib/register'; // Customisers.define() chaqiradi
+
+// ❌ Bundler bu faylni olib tashlaydi — "hech qanday import yo'q, side effect yo'q deb aytilgan"
+// Web Component ro'yxatdan o'tmaydi, crash production'da
+```
+
+**Nima uchun:** `sideEffects: false` bundler'ga ruxsat beradi — "ishlatilmagan import'larni olib tashlash xavfsiz". Agar moduling side effect'ga tayansa (polyfill, register), bu sozlama **buzuq bundle** yaratadi.
+
+**Yechim:**
+```json
+// ✅ Aniq ayting — qaysi fayllarda side effect bor
+{
+  "sideEffects": [
+    "./src/polyfills.js",
+    "./src/register.js",
+    "*.css"  // CSS har doim side-effect
+  ]
+}
+```
+
+Bu bundler'ga aniq signal beradi: "qolgan fayllar pure, lekin bular side effect bor — olib tashlamang".
 
 ---
 

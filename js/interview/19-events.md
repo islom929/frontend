@@ -4,9 +4,12 @@
 
 ---
 
-## Savol 1: Event Bubbling va Capturing nima? Tartibini ayting [Junior+]
+## Nazariy savollar
 
-**Javob:**
+### 1. Event Bubbling va Capturing nima? Tartibini ayting [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 DOM da har bir event 3 fazadan o'tadi:
 1. **Capturing** — tashqaridan ichga (document → target)
@@ -31,43 +34,15 @@ inner.addEventListener("click", () => console.log("inner BUBBLE"));
 
 **Deep Dive:**
 
-Target element da handler'lar **yozilgan tartibda** ishlaydi (capture/bubble ahamiyati yo'q). Ba'zi eventlar bubble qilmaydi: `focus`/`blur` (o'rniga `focusin`/`focusout`), `mouseenter`/`mouseleave`, `load`, `error`.
+DOM spec bo'yicha target element da (eventPhase === AT_TARGET) **barcha handler'lar registratsiya tartibida** ishlaydi — capture flag farq qilmaydi. Ya'ni birinchi qo'shilgan handler birinchi ishlaydi, capture yoki bubble ekaniga qaramay. Ba'zi eventlar bubble qilmaydi: `focus`/`blur` (o'rniga `focusin`/`focusout`), `mouseenter`/`mouseleave`, `load`, `error`.
 
----
 
-## Savol 2: Output nima? Event flow tartibi [Middle]
+</details>
 
-**Javob:**
+### 2. `stopPropagation()` vs `preventDefault()` farqi nima? [Middle]
 
-```javascript
-document.addEventListener("click", () => console.log("1: document BUBBLE"));
-document.addEventListener("click", () => console.log("2: document CAPTURE"), true);
-document.body.addEventListener("click", () => console.log("3: body BUBBLE"));
-document.body.addEventListener("click", () => console.log("4: body CAPTURE"), true);
-button.addEventListener("click", () => console.log("5: button BUBBLE"));
-button.addEventListener("click", () => console.log("6: button CAPTURE"), true);
-
-// button bosilganda:
-```
-
-**Javob:**
-
-```
-2: document CAPTURE
-4: body CAPTURE
-6: button CAPTURE
-5: button BUBBLE
-3: body BUBBLE
-1: document BUBBLE
-```
-
-Capturing (tashqaridan): document → body. Target (yozilgan tartibda): button CAPTURE → BUBBLE. Bubbling (ichdan): body → document.
-
----
-
-## Savol 3: `stopPropagation()` vs `preventDefault()` farqi nima? [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 | | `stopPropagation()` | `preventDefault()` |
 |---|---|---|
@@ -103,11 +78,13 @@ button.addEventListener("click", () => {
 });
 ```
 
----
 
-## Savol 4: Event Delegation nima? Qanday implement qilinadi? [Middle]
+</details>
 
-**Javob:**
+### 3. Event Delegation nima? Qanday implement qilinadi? [Middle]
+
+<details>
+<summary>Javob</summary>
 
 Ota elementga bitta handler qo'yish — bubbling orqali bolalar eventini ushlash:
 
@@ -132,11 +109,13 @@ list.addEventListener("click", (e) => {
 
 `closest()` kerak: `e.target` eng ichki element. `<li class="item"><span>Text</span></li>` — span bosilsa `e.target = span`. `closest(".item")` yuqoriga qarab `li` ni topadi.
 
----
 
-## Savol 5: `event.target` vs `event.currentTarget` farqi [Junior+]
+</details>
 
-**Javob:**
+### 4. `event.target` vs `event.currentTarget` farqi [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const list = document.getElementById("list");
@@ -153,47 +132,13 @@ list.addEventListener("click", function(e) {
 | Delegation da | Turli elementlar | Doim bir xil |
 | Arrow fn da | O'zgarmaydi | `this !== currentTarget` |
 
----
 
-## Savol 6: Xato toping — delegation da target tekshirish [Middle]
+</details>
 
-**Javob:**
+### 5. Custom Events qanday yaratiladi? [Middle+]
 
-```javascript
-document.body.addEventListener("click", (e) => {
-  if (e.target.classList.contains("delete-btn")) {
-    const row = e.target.parentElement.parentElement;
-    row.remove();
-  }
-});
-```
-
-**Muammo:**
-
-```html
-<button class="delete-btn">
-  <svg class="icon">...</svg>  <!-- bosilsa target = svg! -->
-</button>
-```
-
-`e.target` ichki element (svg) bo'lishi mumkin. `parentElement.parentElement` — qattiq coded, DOM o'zgarsa buziladi.
-
-**To'g'ri:**
-
-```javascript
-document.body.addEventListener("click", (e) => {
-  const deleteBtn = e.target.closest(".delete-btn");
-  if (!deleteBtn) return;
-  const row = deleteBtn.closest("tr");
-  if (row) row.remove();
-});
-```
-
----
-
-## Savol 7: Custom Events qanday yaratiladi? [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 const event = new CustomEvent("user-login", {
@@ -215,42 +160,13 @@ if (cancelled) console.log("preventDefault chaqirildi");
 
 **Use cases:** component'lar aro kommunikatsiya, plugin tizimlari, Event Bus pattern.
 
----
 
-## Savol 8: Output nima? Event handler va microtask/macrotask [Middle+]
+</details>
 
-**Javob:**
+### 6. `removeEventListener` nima uchun ishlamayapti? [Junior+]
 
-```javascript
-button.addEventListener("click", () => {
-  console.log("1: Click handler");
-
-  Promise.resolve().then(() => console.log("2: Microtask"));
-
-  setTimeout(() => console.log("3: Timeout"), 0);
-
-  console.log("4: Sync after");
-});
-
-// Button bosilganda:
-```
-
-**Javob:**
-
-```
-1: Click handler
-4: Sync after
-2: Microtask
-3: Timeout
-```
-
-Handler synchronous kod to'liq ishlaydi, keyin microtask'lar (Promise), keyin macrotask'lar (setTimeout).
-
----
-
-## Savol 9: `removeEventListener` nima uchun ishlamayapti? [Junior+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 button.addEventListener("click", () => console.log("A"));
@@ -282,31 +198,37 @@ button.removeEventListener("click", handler, true);  // ishlaydi
 button.removeEventListener("click", handler);         // ISHLAMAYDI — default false
 ```
 
----
 
-## Savol 10: Passive event listener nima? Nima uchun kerak? [Middle+]
+</details>
 
-**Javob:**
+### 7. Passive event listener nima? Nima uchun kerak? [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 `{ passive: true }` — brauzerga "preventDefault chaqirilmaydi" kafolati. Scroll/touch uchun performance oshiradi — brauzer handler kutmaydi.
 
 ```javascript
-// Sekin — brauzer kutadi
-document.addEventListener("scroll", handleScroll);
+// Sekin — brauzer kutadi (scroll'ni block qilishi mumkin deb)
+document.addEventListener("touchmove", handleTouch);
 
-// Tez — brauzer kutmaydi
-document.addEventListener("scroll", handleScroll, { passive: true });
+// Tez — brauzer kutmaydi (preventDefault chaqirilmasligini biladi)
+document.addEventListener("touchmove", handleTouch, { passive: true });
+// passive asosan touchstart, touchmove, wheel uchun muhim
+// scroll event cancelable emas — passive farq qilmaydi
 
 // passive da preventDefault = warning, ishlamaydi
 ```
 
 Chrome 51+ da document-level `touchstart`, `touchmove`, `wheel` — **default passive: true**. Agar `preventDefault` haqiqatan kerak — `{ passive: false }` aniq yozish kerak.
 
----
 
-## Savol 11: Event listener va memory leak. Qanday oldini olish mumkin? [Middle]
+</details>
 
-**Javob:**
+### 8. Event listener va memory leak. Qanday oldini olish mumkin? [Middle]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // Memory leak — global listener remove qilinmagan
@@ -335,11 +257,13 @@ function setupWidget(container) {
 - Global listener'lar (window, document) — alohida o'chirilishi kerak
 - SPA da har navigatsiyada cleanup qilish shart
 
----
 
-## Savol 12: Keyboard events: `e.key` vs `e.code` farqi [Junior+]
+</details>
 
-**Javob:**
+### 9. Keyboard events: `e.key` vs `e.code` farqi [Junior+]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 document.addEventListener("keydown", (e) => {
@@ -366,11 +290,13 @@ if (e.code === "KeyW") moveUp();
 
 `keypress` — **deprecated**, ishlatmang. `keydown` + `keyup` yetarli.
 
----
 
-## Savol 13: Touch va Pointer Events farqi [Senior]
+</details>
 
-**Javob:**
+### 10. Touch va Pointer Events farqi [Senior]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 // Touch events — faqat sensorli ekranlar
@@ -392,15 +318,270 @@ element.addEventListener("pointerdown", (e) => {
 | `touchmove` | `pointermove` | `mousemove` |
 | `touchend` | `pointerup` | `mouseup` |
 
-Mobile da event tartibi: `pointerdown → touchstart → pointerup → touchend → mousedown → mouseup → click`.
+Mobile da odatiy event tartibi (Chrome/Edge, boshqa brauzerlar farq qilishi mumkin): `pointerdown → touchstart → pointerup → touchend → mousedown → mouseup → click`. Aniq tartib brauzer va platform'ga bog'liq.
 
 **Tavsiya:** Pointer Events ishlatish — barcha qurilmalar uchun bitta API.
 
+**Deep Dive:** W3C Pointer Events spec bo'yicha brauzer touch event'ni `pointerdown` sifatida dispatch qilgandan keyin 300ms kutadi — bu "tap vs click" farqlash uchun. `touch-action: manipulation` CSS property bilan bu delay'ni yo'q qilish mumkin. Pointer Events `pointerId` orqali multi-touch'ni track qiladi — har bir barmoq alohida `pointerId` oladi, `setPointerCapture(id)` bilan element'ga bind qilinadi.
+
+</details>
+
+### 11. addEventListener options to'liq ro'yxatini ayting [Senior]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+element.addEventListener("click", handler, {
+  capture: false,              // capturing phase da
+  once: true,                  // bir marta, avtomatik remove
+  passive: true,               // preventDefault chaqirilmaslik kafolati
+  signal: controller.signal    // AbortController bilan remove
+});
+```
+
+| Option | Default | Vazifasi |
+|--------|---------|----------|
+| `capture` | `false` | Capturing fazada ushlash |
+| `once` | `false` | Bir marta ishlab o'chirilish |
+| `passive` | `false`* | preventDefault bloklash |
+| `signal` | — | AbortController bilan cleanup |
+
+*`touchstart`/`touchmove`/`wheel` da document/window uchun Chrome default `passive: true` qilgan.
+
+**Deep Dive:** DOM spec'da `addEventListener` uchinchi argument `boolean | AddEventListenerOptions` union type. `signal` option WHATWG DOM spec'ga 2020 da qo'shilgan — ichida `AbortSignal` `abort` event'ini tinglaydi va `removeEventListener` ni avtomatik chaqiradi. `once: true` esa engine ichida handler'ni birinchi invocation'da `removeEventListener` bilan o'chiradi — bu `{ once: true }` ni spec darajasida kafolatlaydi.
+
+</details>
+
+### 12. `return false` addEventListener da ishlaydimi? [Junior+]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+// addEventListener da return false HECH NIMA QILMAYDI!
+link.addEventListener("click", () => {
+  return false; // ❌ hech narsa to'xtatmaydi — link navigate qiladi
+});
+
+// Faqat onclick PROPERTY da ishlaydi (HTML event handler attribute ham)
+link.onclick = function() { return false; };
+// ✅ faqat preventDefault() chaqiriladi (navigatsiya to'xtaydi)
+// ❌ stopPropagation() CHAQIRILMAYDI — event bubble davom etadi
+//
+// Muhim farq:
+// - Vanilla JS onclick: return false → FAQAT preventDefault
+// - jQuery .on(): return false → preventDefault + stopPropagation (IKKALASI)
+// - addEventListener: return false → HECH NARSA
+```
+
+**To'g'ri:**
+```javascript
+link.addEventListener("click", (e) => {
+  e.preventDefault();    // navigatsiya to'xtaydi
+  e.stopPropagation();   // bubbling to'xtaydi
+});
+```
+
+
+</details>
+
+### 13. SPA da event listener cleanup pattern [Senior]
+
+<details>
+<summary>Javob</summary>
+
+```javascript
+// Har navigatsiyada yangi listener qo'shiladi — LEAK
+function initPage() {
+  window.addEventListener("scroll", handleScroll); // har safar +1 listener!
+}
+
+// To'g'ri — AbortController lifecycle pattern
+class PageComponent {
+  constructor() {
+    this.controller = new AbortController();
+  }
+
+  mount() {
+    const { signal } = this.controller;
+
+    window.addEventListener("scroll", this.handleScroll, { signal });
+    window.addEventListener("resize", this.handleResize, { signal });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.close();
+    }, { signal });
+  }
+
+  unmount() {
+    this.controller.abort(); // barcha listener'lar o'chiriladi
+  }
+
+  handleScroll = () => { /* ... */ };
+  handleResize = () => { /* ... */ };
+}
+
+// Ishlatish:
+const page = new PageComponent();
+page.mount();
+
+// Boshqa sahifaga o'tganda:
+page.unmount(); // 3 ta listener bir marta o'chirildi
+```
+
+**Deep Dive:**
+
+React da `useEffect` cleanup, Vue da `onUnmounted` — ichida xuddi shu pattern. AbortController zamonaviy va xavfsiz — `removeEventListener` da reference saqlash muammosi yo'q.
+
+
+</details>
+
 ---
 
-## Savol 14: Coding: Debounced search handler [Middle+]
+## Amaliy savollar (Coding Challenges)
 
-**Javob:**
+### 1. Output nima? Event flow tartibi [Middle]
+
+```javascript
+document.addEventListener("click", () => console.log("1: document BUBBLE"));
+document.addEventListener("click", () => console.log("2: document CAPTURE"), true);
+document.body.addEventListener("click", () => console.log("3: body BUBBLE"));
+document.body.addEventListener("click", () => console.log("4: body CAPTURE"), true);
+button.addEventListener("click", () => console.log("5: button BUBBLE"));
+button.addEventListener("click", () => console.log("6: button CAPTURE"), true);
+
+// button bosilganda:
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+2: document CAPTURE
+4: body CAPTURE
+5: button BUBBLE
+6: button CAPTURE
+3: body BUBBLE
+1: document BUBBLE
+```
+
+Capturing (tashqaridan): document → body. **Target:** button BUBBLE → CAPTURE — **registratsiya tartibi** (5 avval registered → 5 avval ishlaydi, capture flag target'da farq qilmaydi). Bubbling (ichdan): body → document.
+
+
+</details>
+
+### 2. Xato toping — delegation da target tekshirish [Middle]
+
+```javascript
+document.body.addEventListener("click", (e) => {
+  if (e.target.classList.contains("delete-btn")) {
+    const row = e.target.parentElement.parentElement;
+    row.remove();
+  }
+});
+```
+
+<details>
+<summary>Javob</summary>
+
+**Muammo:**
+
+```html
+<button class="delete-btn">
+  <svg class="icon">...</svg>  <!-- bosilsa target = svg! -->
+</button>
+```
+
+`e.target` ichki element (svg) bo'lishi mumkin. `parentElement.parentElement` — qattiq coded, DOM o'zgarsa buziladi.
+
+**To'g'ri:**
+
+```javascript
+document.body.addEventListener("click", (e) => {
+  const deleteBtn = e.target.closest(".delete-btn");
+  if (!deleteBtn) return;
+  const row = deleteBtn.closest("tr");
+  if (row) row.remove();
+});
+```
+
+
+</details>
+
+### 3. Output nima? Event handler va microtask/macrotask [Middle+]
+
+
+```javascript
+button.addEventListener("click", () => {
+  console.log("1: Click handler");
+
+  Promise.resolve().then(() => console.log("2: Microtask"));
+
+  setTimeout(() => console.log("3: Timeout"), 0);
+
+  console.log("4: Sync after");
+});
+
+// Button bosilganda:
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+1: Click handler
+4: Sync after
+2: Microtask
+3: Timeout
+```
+
+Handler synchronous kod to'liq ishlaydi, keyin microtask'lar (Promise), keyin macrotask'lar (setTimeout).
+
+
+</details>
+
+### 4. Xato toping — `var` bilan loop ichida handler [Middle]
+
+```javascript
+const buttons = document.querySelectorAll("button");
+for (var i = 0; i < buttons.length; i++) {
+  buttons[i].addEventListener("click", () => {
+    console.log("Button:", i);
+  });
+}
+// Barcha buttonlar oxirgi qiymat ko'rsatadi!
+```
+
+<details>
+<summary>Javob</summary>
+
+`var` function scope — bitta `i` barcha handler'larga umumiy. Loop tugaganda `i` = `buttons.length`.
+
+**To'g'ri:**
+
+```javascript
+// let — block scope
+for (let i = 0; i < buttons.length; i++) {
+  buttons[i].addEventListener("click", () => {
+    console.log("Button:", i);
+  });
+}
+
+// Yoki delegation
+container.addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (btn) console.log("Button:", btn.dataset.index);
+});
+```
+
+
+</details>
+
+### 5. Coding: Debounced search handler [Middle+]
+
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function debounce(fn, delay) {
@@ -440,94 +621,13 @@ searchInput.addEventListener("input", (e) => {
 - `AbortController` — eski request cancel
 - `encodeURIComponent` — URL xavfsizligi
 
----
 
-## Savol 15: addEventListener options to'liq ro'yxatini ayting [Senior]
+</details>
 
-**Javob:**
+### 6. Coding: EventEmitter implement qiling [Middle+]
 
-```javascript
-element.addEventListener("click", handler, {
-  capture: false,              // capturing phase da
-  once: true,                  // bir marta, avtomatik remove
-  passive: true,               // preventDefault chaqirilmaslik kafolati
-  signal: controller.signal    // AbortController bilan remove
-});
-```
-
-| Option | Default | Vazifasi |
-|--------|---------|----------|
-| `capture` | `false` | Capturing fazada ushlash |
-| `once` | `false` | Bir marta ishlab o'chirilish |
-| `passive` | `false`* | preventDefault bloklash |
-| `signal` | — | AbortController bilan cleanup |
-
-*`touchstart`/`touchmove`/`wheel` da document/window uchun Chrome default `passive: true` qilgan.
-
----
-
-## Savol 16: Xato toping — `var` bilan loop ichida handler [Middle]
-
-**Javob:**
-
-```javascript
-const buttons = document.querySelectorAll("button");
-for (var i = 0; i < buttons.length; i++) {
-  buttons[i].addEventListener("click", () => {
-    console.log("Button:", i);
-  });
-}
-// Barcha buttonlar oxirgi qiymat ko'rsatadi!
-```
-
-`var` function scope — bitta `i` barcha handler'larga umumiy. Loop tugaganda `i` = `buttons.length`.
-
-**To'g'ri:**
-
-```javascript
-// let — block scope
-for (let i = 0; i < buttons.length; i++) {
-  buttons[i].addEventListener("click", () => {
-    console.log("Button:", i);
-  });
-}
-
-// Yoki delegation
-container.addEventListener("click", (e) => {
-  const btn = e.target.closest("button");
-  if (btn) console.log("Button:", btn.dataset.index);
-});
-```
-
----
-
-## Savol 17: `return false` addEventListener da ishlaydimi? [Junior+]
-
-**Javob:**
-
-```javascript
-// addEventListener da return false HECH NIMA QILMAYDI!
-link.addEventListener("click", () => {
-  return false; // hech narsa to'xtatmaydi — link navigate qiladi
-});
-
-// Faqat onclick PROPERTY da ishlaydi
-link.onclick = () => { return false; }; // preventDefault + stopPropagation
-```
-
-**To'g'ri:**
-```javascript
-link.addEventListener("click", (e) => {
-  e.preventDefault();    // navigatsiya to'xtaydi
-  e.stopPropagation();   // bubbling to'xtaydi
-});
-```
-
----
-
-## Savol 18: Coding: EventEmitter implement qiling [Middle+]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 class EventEmitter {
@@ -579,60 +679,13 @@ emitter.emit("data", "yana");
 // (B ishlamaydi — once)
 ```
 
----
 
-## Savol 19: SPA da event listener cleanup pattern [Senior]
+</details>
 
-**Javob:**
+### 7. Coding: Event delegation bilan Tab Component [Middle]
 
-```javascript
-// Har navigatsiyada yangi listener qo'shiladi — LEAK
-function initPage() {
-  window.addEventListener("scroll", handleScroll); // har safar +1 listener!
-}
-
-// To'g'ri — AbortController lifecycle pattern
-class PageComponent {
-  constructor() {
-    this.controller = new AbortController();
-  }
-
-  mount() {
-    const { signal } = this.controller;
-
-    window.addEventListener("scroll", this.handleScroll, { signal });
-    window.addEventListener("resize", this.handleResize, { signal });
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") this.close();
-    }, { signal });
-  }
-
-  unmount() {
-    this.controller.abort(); // barcha listener'lar o'chiriladi
-  }
-
-  handleScroll = () => { /* ... */ };
-  handleResize = () => { /* ... */ };
-}
-
-// Ishlatish:
-const page = new PageComponent();
-page.mount();
-
-// Boshqa sahifaga o'tganda:
-page.unmount(); // 3 ta listener bir marta o'chirildi
-```
-
-**Deep Dive:**
-
-React da `useEffect` cleanup, Vue da `onUnmounted` — ichida xuddi shu pattern. AbortController zamonaviy va xavfsiz — `removeEventListener` da reference saqlash muammosi yo'q.
-
----
-
-## Savol 20: Coding: Event delegation bilan Tab Component [Middle]
-
-**Javob:**
+<details>
+<summary>Javob</summary>
 
 ```javascript
 function createTabs(container) {
@@ -674,6 +727,9 @@ document.addEventListener("tab-change", (e) => {
 - `closest("[data-tab]")` — nested elementlar uchun xavfsiz
 - `contains()` — faqat shu tabs ichidagi elementlar
 - Custom event — boshqa component'lar xabardor bo'ladi
+
+
+</details>
 
 ---
 

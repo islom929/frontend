@@ -14,6 +14,7 @@
 - [WeakRef va FinalizationRegistry](#weakref-va-finalizationregistry)
 - [WeakMap va WeakSet](#weakmap-va-weakset)
 - [Performance Tips — Memory Efficient Kod](#performance-tips--memory-efficient-kod)
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -41,55 +42,54 @@ Stack overflow — juda chuqur yoki cheksiz recursion natijasida stack hajmi tug
 | **Boshqaruv** | Avtomatik — frame pop | Garbage Collector |
 | **Xato** | Stack Overflow | Out of Memory |
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
-V8 engine da heap bir nechta bo'limlarga (**spaces**) bo'lingan. Har bir bo'lim o'z maqsadiga ega va alohida GC strategiyasi bilan boshqariladi:
+V8 engine da heap bir nechta bo'limlarga (**spaces**) bo'lingan. Har bir bo'lim o'z maqsadiga ega va alohida GC strategiyasi bilan boshqariladi. V8 arxitekturasi versiyalar bo'ylab soddalashgan — quyidagi zamonaviy V8 (2023+) layout'i:
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                      V8 Heap Layout                     │
-│                                                         │
-│   ┌─────────────────────────────────────────────────┐   │
-│   │              New Space (Young Generation)        │   │
-│   │   ┌──────────────────┬───────────────────┐      │   │
-│   │   │   Semi-space A   │   Semi-space B    │      │   │
-│   │   │   (From/To)      │   (From/To)       │      │   │
-│   │   │   1-8 MB         │   1-8 MB          │      │   │
-│   │   └──────────────────┴───────────────────┘      │   │
-│   │   Yangi object'lar shu yerda yaratiladi          │   │
-│   │   GC: Scavenger (Minor GC) — juda tez            │   │
-│   └─────────────────────────────────────────────────┘   │
-│                                                         │
-│   ┌─────────────────────────────────────────────────┐   │
-│   │              Old Space (Old Generation)          │   │
-│   │   ┌──────────────────────────────────────┐      │   │
-│   │   │  Old Pointer Space                    │      │   │
-│   │   │  (boshqa object'larga reference bor)  │      │   │
-│   │   └──────────────────────────────────────┘      │   │
-│   │   ┌──────────────────────────────────────┐      │   │
-│   │   │  Old Data Space                       │      │   │
-│   │   │  (faqat data — string, number, ...)   │      │   │
-│   │   └──────────────────────────────────────┘      │   │
-│   │   Yashagan object'lar shu yerga ko'chiriladi    │   │
-│   │   GC: Mark-Compact (Major GC) — sekinroq        │   │
-│   └─────────────────────────────────────────────────┘   │
-│                                                         │
-│   ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
-│   │ Large Object  │  │    Code      │  │    Map       │  │
-│   │ Space         │  │    Space     │  │    Space     │  │
-│   │ (>kMaxRegular │  │ (JIT code)  │  │ (Hidden      │  │
-│   │  HeapObject)  │  │             │  │  Classes)    │  │
-│   └──────────────┘  └──────────────┘  └─────────────┘  │
-└────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                      V8 Heap Layout                       │
+│                                                           │
+│   ┌──────────────────────────────────────────────────┐   │
+│   │             Young Generation (New Space)           │   │
+│   │   ┌────────────────────┬────────────────────┐     │   │
+│   │   │   Semi-space From  │   Semi-space To    │     │   │
+│   │   │   (bir necha MB)   │   (bir necha MB)   │     │   │
+│   │   └────────────────────┴────────────────────┘     │   │
+│   │   Yangi object'lar shu yerda yaratiladi            │   │
+│   │   GC: Scavenger (Minor GC) — juda tez              │   │
+│   └──────────────────────────────────────────────────┘   │
+│                                                           │
+│   ┌──────────────────────────────────────────────────┐   │
+│   │              Old Space (Old Generation)            │   │
+│   │   Yashab qolgan oddiy object'lar + Hidden Classes  │   │
+│   │   (Maps) + boshqa long-lived data — YAGONA space   │   │
+│   │   GC: Mark-Sweep-Compact (Major GC)                │   │
+│   └──────────────────────────────────────────────────┘   │
+│                                                           │
+│   ┌──────────────┐ ┌──────────────┐ ┌──────────────┐    │
+│   │ Large Object │ │    Code      │ │  Read-Only   │    │
+│   │    Space     │ │    Space     │ │    Space     │    │
+│   │(>kMaxRegular │ │  (JIT code)  │ │ (immutable   │    │
+│   │HeapObject    │ │              │ │  built-ins)  │    │
+│   │ ~kB chegara) │ │              │ │              │    │
+│   └──────────────┘ └──────────────┘ └──────────────┘    │
+└──────────────────────────────────────────────────────────┘
 ```
 
-- **New Space** — 1–8 MB, ikki **semi-space** ga bo'lingan (Cheney's algorithm). Object yaratilganda dastlab shu yerga tushadi. **Scavenger** (Minor GC) tez-tez tozalaydi — tirik object'larni From space dan To space ga ko'chiradi, keyin ikki space o'rin almashadi.
-- **Old Space** — yashab qolgan (ikki GC tsiklidan omon qolgan) object'lar shu yerga **promote** bo'ladi. **Mark-Compact** (Major GC) kamroq, lekin chuqurroq tozalaydi. Old Pointer Space (boshqa object'larga reference bor) va Old Data Space (faqat primitive data) ga bo'linadi.
-- **Large Object Space** — katta object'lar (~300KB dan katta) to'g'ridan-to'g'ri shu yerga joylashadi. Bu object'lar boshqa space'lar orasida ko'chirilmaydi.
-- **Code Space** — JIT compiled code (TurboFan natijasi). Bajariladigan mashina kodi shu yerda saqlanadi.
-- **Map Space** — Hidden Classes (Maps) saqlanadi. Har bir object'ning "shape" ini tavsiflaydigan metadata — property nomlari, tartib, offset — shu yerda. Hidden Classes haqida batafsil [01-js-engine.md](01-js-engine.md) da.
+- **New Space (Young Generation)** — ikki **semi-space** (From/To) ga bo'lingan, Cheney's copying algorithm ishlatiladi. Yangi yaratilgan object'lar shu yerga tushadi. **Scavenger** (Minor GC) tez-tez tozalaydi: tirik object'larni From space dan To space ga ko'chiradi, so'ng ikki space o'rin almashadi. Hajmi heap konfiguratsiyasiga qarab bir necha MB.
+- **Old Space (Old Generation)** — yashab qolgan (odatda 2 ta Scavenger tsiklidan omon qolgan) object'lar shu yerga **promote** bo'ladi. Eski V8 versiyalarida Old Space "Old Pointer Space" va "Old Data Space" ga bo'lingan, keyin esa alohida "Map Space" (Hidden Classes uchun) bor edi — **zamonaviy V8 (v11, 2023+)** da bu bo'laklar yagona Old Space'ga birlashtirildi. Hidden Classes endi boshqa long-lived object'lar bilan bir joyda saqlanadi. **Mark-Sweep-Compact** (Major GC) kamroq, lekin chuqurroq tozalaydi.
+- **Large Object Space** — `kMaxRegularHeapObjectSize` chegarasidan katta object'lar to'g'ridan-to'g'ri shu yerga joylashadi (aniq chegara versiyaga va pointer compression sozlamalariga bog'liq, odatda yuzlab KB tartibida). Bu object'lar ko'chirilmaydi — faqat mark-sweep.
+- **Code Space** — JIT compiled kod (Ignition bytecode emas, TurboFan/Maglev tomonidan yaratilgan mashina kodi). Bajariladigan instruksiyalar shu yerda.
+- **Read-Only Space** — built-in'lar, string literals, immutable roots — isolate ishlagan umr davomida o'zgarmaydigan data. GC bunga hech qachon tegmaydi.
 
-### Kod Misollari
+> **Eslatma — V8 "Map" vs JavaScript `Map`:** V8 source kodida **Hidden Class** deb ataladigan object shape descriptor'lari tarixiy sabablarga ko'ra `Map` sinfi orqali ifodalanadi (va shu uchun eski V8 versiyalarida "Map Space" mavjud edi). Bu **JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha** — ikkalasining o'xshashligi faqat nomda. Hidden Classes haqida batafsil [01-js-engine.md](01-js-engine.md), [06-objects.md](06-objects.md) da. Keyinchalik ushbu faylning "WeakMap va WeakSet" bo'limida muhokama qilinadigan `Map` — JavaScript data structure.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Stack va Heap da qiymatlar qanday joylashishini ko'rsatadigan misol:
 
@@ -97,13 +97,13 @@ Stack va Heap da qiymatlar qanday joylashishini ko'rsatadigan misol:
 function greet(name) {
   // greet() frame stack ga qo'shiladi
   // name parametri — stack da (primitive)
-  let message = "Salom, " + name;  // message — stack da (primitive)
+  let message = "Salom, " + name;  // message — heap da (HeapString)
   return message;
   // greet() frame stack dan olib tashlanadi (avtomatik)
 }
 
 let result = greet("Islom");
-// result = "Salom, Islom" — stack da yangi primitive qiymat
+// result — stack da pointer, "Salom, Islom" string heap da (HeapString)
 ```
 
 ```javascript
@@ -133,7 +133,7 @@ let date = new Date();                    // Date → heap, pointer → stack
 │   │  │  obj ─────────│─┘    │    │   ┌──────────────┐         │     │
 │   │  │  arr ─────────│──────│────────▶│ [1, 2, 3]    │         │     │
 │   │  ├──────────────┤ │     │    │   └──────────────┘         │     │
-│   │  │ foo() frame   │ │     │    │                             │     │
+│   │  │ calc() frame   │ │     │    │                             │     │
 │   │  │  a = true     │ │     │    │   ┌──────────────┐         │     │
 │   │  │  b = 42       │ │     │    │   │ function()   │         │     │
 │   │  │  data ────────│─┘     │    │   └──────────────┘         │     │
@@ -146,7 +146,7 @@ let date = new Date();                    // Date → heap, pointer → stack
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-Stack Overflow misoli — cheksiz recursion stack hajmini tugatsda:
+Stack Overflow misoli — cheksiz recursion stack hajmini tugatganda:
 
 ```javascript
 // ❌ Stack Overflow — cheksiz recursion
@@ -155,6 +155,8 @@ function infinite() {
 }
 infinite(); // RangeError: Maximum call stack size exceeded
 ```
+
+</details>
 
 ---
 
@@ -170,22 +172,27 @@ JavaScript da qiymatlar ikki fundamental turga bo'linadi: **primitive** va **ref
 
 Bu farq React/Redux da muhim ahamiyatga ega. State'ni mutate qilsangiz reference bir xil qoladi — `===` true beradi — React o'zgarishni sezmaydi va re-render qilmaydi. Shuning uchun immutable update (spread, map, filter) ishlatiladi — yangi reference yaratiladi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 V8 da primitive qiymatlar bilan ishlashda bir nechta optimizatsiya mavjud:
 
 **String Interning** — V8 ba'zi string'larni intern qiladi. Bir xil qiymatli qisqa string'lar bitta xotira joyini ishlatishi mumkin (memory tejash uchun). Lekin bu faqat engine ichki optimizatsiyasi — tashqaridan observable emas, string hali ham immutable va copy by value semantikasida ishlaydi.
 
-**Small Integer (Smi) Caching** — V8 da kichik integer'lar (-2³¹ dan 2³¹-1 gacha) **Smi (Small Integer)** formatida to'g'ridan-to'g'ri pointer ichida saqlanadi — alohida heap allocation kerak emas. Bu integer arifmetikani floating-point dan tezroq qiladi.
+**Small Integer (Smi) tagged representation** — V8 da kichik integer'lar **Smi (Small Integer)** formatida to'g'ridan-to'g'ri pointer ichida saqlanadi: pointer'ning eng kichik biti tag sifatida ishlatiladi, qolgan bitlar integer qiymatini to'g'ridan-to'g'ri ko'rsatadi — alohida heap allocation kerak emas. Diapazoni arxitekturaga bog'liq: klassik 32-bit V8 da Smi = 31-bit (-2³⁰ dan 2³⁰−1 gacha); **pointer compression** yoqilgan 64-bit V8 da (zamonaviy default) ham 31-bit Smi ishlatiladi. Ushbu optimizatsiya integer arifmetikani floating-point (HeapNumber) dan sezilarli tezroq qiladi — arithmetic paytida hech qanday pointer dereference kerak emas.
 
 ```javascript
-// V8 Smi — pointer ichida, heap emas — juda tez:
-let x = 42;      // Smi — heap allocation yo'q
-let y = 3.14;    // HeapNumber — heap da (double precision float)
-let z = 2 ** 53; // HeapNumber — Smi chegarasidan tashqari
+// V8 Smi — pointer ichida, heap allocation yo'q — juda tez:
+let x = 42;              // Smi — 31-bit diapazonda
+let y = 3.14;            // HeapNumber — heap da (IEEE 754 double)
+let z = 2 ** 30;         // Smi chegarasidan tashqari → HeapNumber
+let w = -(2 ** 30) - 1;  // Smi chegarasidan tashqari → HeapNumber
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Copy by Value vs Copy by Reference:
 
@@ -230,7 +237,7 @@ console.log(user1.age); // 30 — user1 ham o'zgardi! chunki bitta object
 console.log(user1 === user2); // true — aynan bitta reference
 ```
 
-Funksiya argumentlarida ham xuddi shunday ishlaydi:
+Funksiya argumentlarida ham bir xil mexanizm ishlaydi:
 
 ```javascript
 // Primitives — funksiyaga QIYMAT (nusxa) beriladi:
@@ -289,6 +296,8 @@ console.log(myCart2 === newCart2); // false — turli reference'lar
 // ✅ setState({ ...state, items: [...state.items, newItem] }); — yangi reference
 ```
 
+</details>
+
 ---
 
 ## Garbage Collection
@@ -346,7 +355,7 @@ Shuning uchun zamonaviy engine'lar **Mark-and-Sweep** ga o'tgan.
 
 Bu algoritm boshqacha savol beradi: "Object'ga root dan yetib borsa bo'ladimi?" Yetib bo'lmaydigan object — keraksiz, ref count necha bo'lishidan qat'iy nazar.
 
-**Root** lar — GC ning boshlang'ich nuqtalari: global object (`window`/`globalThis`), hozirgi call stack dagi o'zgaruvchilar, va active closure'lar.
+**Root** lar — GC ning boshlang'ich nuqtalari: global object (`window`/`globalThis`), hozirgi call stack da turgan frame'lar va ulardagi lokal o'zgaruvchilar/argumentlar, CPU registrlardagi tirik qiymatlar, shuningdek engine/browser ushlab turgan C++ tomonidagi handle'lar (masalan, `v8::Persistent`, DOM binding'lar). Closure'lar alohida root emas — ular heap'dagi `LexicalEnvironment` object'i bo'lib, stack frame yoki boshqa object orqali reachable bo'lsagina tirik hisoblanadi.
 
 Algoritm 3 bosqichda ishlaydi:
 
@@ -411,14 +420,14 @@ createCycle();
 
 V8 **Generational Hypothesis** ga asoslanadi: ko'pchilik object'lar qisqa muddatli — yaratilgandan keyin tezda keraksiz bo'ladi. Shuning uchun heap ikki avlodga bo'lingan — har biri o'z GC strategiyasi bilan:
 
-**Young Generation (New Space)** — yangi yaratilgan object'lar shu yerga tushadi. Hajmi kichik (1-8 MB), **Scavenger** (Minor GC) tez-tez tozalaydi (~1-5ms). Ikki semi-space (From va To) orasida tirik object'larni ko'chiradi (Cheney's copying algorithm). Object ikki GC tsiklidan omon qolsa — Old Generation ga **promote** bo'ladi.
+**Young Generation (New Space)** — yangi yaratilgan object'lar shu yerga tushadi. Hajmi kichik (odatda bir necha MB). **Scavenger** (Minor GC) tez-tez ishlaydi va tirik object'larni From space dan To space ga ko'chiradi (Cheney's copying algorithm). Young Generation kichik bo'lgani uchun Scavenger pauza'si odatda juda qisqa — amaldagi hajm va tirik object'lar soniga bog'liq. Object ikki GC tsiklidan omon qolsa — Old Generation ga **promote** bo'ladi.
 
-**Old Generation (Old Space)** — yashab qolgan object'lar shu yerda. Hajmi kattaroq (yuzlab MB), **Mark-Compact** (Major GC) kamroq, lekin chuqurroq tozalaydi (~50-200ms). Mark bosqichida reachable object'larni belgilaydi, keyin Compact bosqichida tirik object'larni zich joylashtiradi (fragmentation ni oldini olish).
+**Old Generation (Old Space)** — yashab qolgan object'lar shu yerda. Hajmi kattaroq (yuzlab MB gacha borishi mumkin). **Mark-Sweep-Compact** (Major GC) kamroq ishlaydi, lekin chuqurroq tozalaydi: Mark bosqichida reachable object'larni belgilaydi, Sweep bosqichida belgilanmaganlarni bo'shatadi, Compact bosqichida tirik object'larni zich joylashtiradi (fragmentatsiyani kamaytirish uchun). Concurrent va incremental marking tufayli zamonaviy V8 da main thread pauza'lari aksariyat hollarda qisqa — aniq raqamlar heap hajmi, live set size, va hardware'ga bog'liq.
 
 ```
    ┌──────────────────────────────────────────────────────┐
    │                  YOUNG GENERATION                     │
-   │                  (New Space: 1-8MB)                   │
+   │                (New Space: bir necha MB)              │
    │    ┌──────────────────┐  ┌──────────────────┐        │
    │    │   From Space      │  │   To Space        │        │
    │    │  ●  ●  ◌  ●  ◌  │  │  (bo'sh)          │        │
@@ -427,16 +436,17 @@ V8 **Generational Hypothesis** ga asoslanadi: ko'pchilik object'lar qisqa muddat
    │    │  ◌ = o'lik        │  │                   │        │
    │    └──────────────────┘  └──────────────────┘        │
    │    Scavenger: tirik → To Space, From↔To almashadi    │
-   │    ⚡ Juda TEZ (~1-5ms)                               │
+   │    ⚡ Qisqa pauza (small live set — tez copy)         │
    └────────────────────────────┬─────────────────────────┘
                                 │ 2 marta omon qoldi → promote
                                 ▼
    ┌──────────────────────────────────────────────────────┐
    │                  OLD GENERATION                       │
-   │                  (Old Space: yuzlab MB)               │
+   │              (Old Space: yuzlab MB gacha)             │
    │    ●  ●  ●  ●  ◌  ●  ●  ◌  ●  ●  ●  ●  ◌  ●      │
-   │    Mark-Compact: mark → sweep → compact              │
-   │    🐢 Sekinroq (~50-200ms), lekin kamroq ishlaydi     │
+   │    Mark-Sweep-Compact: mark → sweep → compact         │
+   │    🐢 Kamroq ishlaydi, concurrent marking bilan       │
+   │       main thread pauza'si qisqa bo'ladi              │
    └──────────────────────────────────────────────────────┘
 ```
 
@@ -497,7 +507,72 @@ V8 ning zamonaviy GC tizimi **Orinoco** deb ataladi. U yuqoridagi barcha usullar
 | **Concurrent Sweeping** | Sweep ham background da |
 | **Lazy Sweeping** | Sweep ni kerak bo'lganda qilish — birdaniga emas |
 
-Orinoco tufayli V8 ~60fps saqlab turadi, GC deyarli sezilmaydi. Lekin juda ko'p object yaratilsa (masalan, tight loop da millionlab object), Major GC uzoqroq pause qilishi mumkin.
+Orinoco tufayli GC pauza'lari asosan background thread'larga ko'chiriladi, shuning uchun main thread responsiveness saqlanadi va UI qotib qolishlar sezilarli darajada kamayadi. Lekin allocation pressure yuqori bo'lsa (masalan, tight loop'da millionlab qisqa umrli object yaratilsa) Major GC ish hajmi oshadi va pauza'lar kattalashishi mumkin — shuning uchun quyiroqda muhokama qilinadigan "object pooling" va "hot loop da allocation kamaytirish" kabi texnikalar foydali.
+
+### Under the Hood — Tri-color Marking, Write Barrier, Remembered Set
+
+Concurrent va incremental GC qanday qilib asosiy dastur parallel ishlab turganda ham tutashliq (correctness) ni saqlaydi? Bu uchta asosiy mexanizm ustiga quriladi: **tri-color marking**, **write barrier** va **remembered set**.
+
+**1. Tri-color Marking** — Dijkstra/Lamport abstraksiyasi. Har bir object uchta rangdan birida bo'ladi:
+
+```
+   ⚪ OQ (White)   — hali kuzatilmagan. Mark faza oxirida oq qolganlar = garbage.
+   ⚫ QORA (Black)  — ko'rilgan va uning BARCHA child'lari kuzatilgan.
+   🔘 KULRANG (Gray) — ko'rilgan, lekin child'lari hali kuzatilmagan (worklist'da).
+```
+
+Algoritm: root'lar kulrang qilinadi va worklist'ga qo'shiladi. Har qadamda kulrang object olinadi, uning child'lari oq bo'lsa kulrang qilinadi va qora'ga o'tkaziladi. Worklist bo'shaganda fazaga yakun yasaladi — oq object'lar tozalanadi.
+
+```
+   Boshlang'ich:                     Mark paytida:                  Oxir:
+   ┌───┐ ┌───┐ ┌───┐                 ┌───┐ ┌───┐ ┌───┐              ┌───┐ ┌───┐ ┌───┐
+   │ R │ │ A │ │ B │                 │ R │ │ A │ │ B │              │ R │ │ A │ │ B │
+   │ ⚪ │ │ ⚪ │ │ ⚪ │                 │ ⚫ │ │ 🔘│ │ 🔘│              │ ⚫ │ │ ⚫ │ │ ⚫ │
+   └───┘ └───┘ └───┘                 └───┘ └───┘ └───┘              └───┘ └───┘ └───┘
+     │                                 │                                │
+   ┌───┐ ┌───┐                       ┌───┐ ┌───┐                      ┌───┐ ┌───┐
+   │ C │ │ D │                       │ C │ │ D │                      │ C │ │ D │
+   │ ⚪ │ │ ⚪ │                       │ ⚪ │ │ ⚪ │                      │ ⚫ │ │ ⚪ │ ← yo'q!
+   └───┘ └───┘                       └───┘ └───┘                      └───┘ └───┘
+   (D hech kimga                                                      D oq qoldi —
+    bog'lanmagan)                                                     Sweep tozalaydi
+```
+
+**Tri-color invariant:** hech qachon qora object to'g'ridan-to'g'ri oq object'ga reference saqlab turmasligi kerak. Agar shunday bo'lsa — oq object adashib sweep'ga tushishi mumkin (use-after-free). Mana shu invariant concurrent marking paytida **write barrier** orqali saqlanadi.
+
+**2. Write Barrier** — har safar JavaScript kod object field'iga yozish qilganda (`obj.x = other`) engine kichik "barrier" kodi ishga tushiradi. V8 da bu "Dijkstra-style incremental write barrier" — agar mutator (JS kodi) qora object'ga oq object'ni yozsa, barrier oq object'ni kulrang qilib worklist'ga qo'shadi yoki manba'ni qora'dan kulrang'ga tushiradi (snapshot-at-the-beginning variant). Bu konsistensiyani kafolatlaydi, lekin har bir yozish uchun kichik overhead qo'shadi — shuning uchun tight loop'larda allocation'dan qochish ham, mutation'dan qochish ham foydali.
+
+```javascript
+// Write barrier konseptsiyasi (pseudocode):
+obj.child = newChild;
+// ↓ engine generated:
+write_barrier(obj, &obj.child, newChild);
+// ↓ barrier ichida:
+if (marking_in_progress && is_black(obj) && is_white(newChild)) {
+  mark_gray(newChild); // oq → kulrang, worklist'ga qo'shish
+}
+obj.child = newChild; // haqiqiy store
+```
+
+**3. Remembered Set** — generational GC uchun muhim optimizatsiya. Scavenger faqat Young Generation'ni tozalaydi, lekin Old → Young reference'lar ham root hisoblanadi (aks holda Scavenger Old'dagi reference tufayli tirik object'ni tozalab yuborardi). Har safar Scavenger ishlaganda butun Old Space'ni skan qilish juda qimmat bo'ladi — buning o'rniga V8 **remembered set** yuritadi: Old → Young reference'lar ro'yxati. Har yozish paytida write barrier tekshiradi: "bu store Old object'dan Young object'gami?" — agar ha bo'lsa, source card/slot remembered set'ga qo'shiladi.
+
+```
+   OLD SPACE                          YOUNG SPACE
+   ┌─────────┐                        ┌─────────┐
+   │ Old obj │──── reference ────────▶│Young obj│
+   └─────────┘                        └─────────┘
+        │                                  ▲
+        │ yozilganda write barrier          │
+        │ remembered set'ga yozadi          │
+        ▼                                   │
+   [Remembered Set]                        │
+   slot: Old obj.field  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┘
+
+   Scavenger ishlaganda: butun Old Space skan qilinmaydi,
+   faqat remembered set root sifatida kuzatiladi.
+```
+
+**Amaliy ta'siri:** bu mexanizmlar tufayli zamonaviy V8 da GC overhead kichik bo'ladi, lekin allocation-heavy va mutation-heavy kod write barrier overhead'ini ham ko'taradi. Xotira samaradorligi va CPU samaradorligi o'rtasida nozik balans bor — shuning uchun "allocation dan qochish" umumiy optimizatsiya maslahati.
 
 ---
 
@@ -657,7 +732,7 @@ function teardownFixed() {
 
 ### 4. Closures — Katta Data ni Ushlab Turish
 
-Closure tashqi scope'dagi **barcha** o'zgaruvchilarga reference saqlaydi (V8 optimizatsiya qiladi, lekin worst case da). Agar closure katta data ni reference qilsa — u data GC tozalay olmaydi:
+Spec darajasida closure o'zi yaratilgan `LexicalEnvironment`'ga reference saqlaydi — ya'ni tashqi scope'dagi **barcha** o'zgaruvchilar potentsial ushlab turilishi mumkin. V8 escape analysis bilan qaysi o'zgaruvchilar haqiqatan closure body'sida ishlatilishini aniqlaydi va kerak bo'lmaganlarni context slot'idan chiqarib tashlashga harakat qiladi, lekin bu optimizatsiya har doim ham ishlamaydi — `eval`, `with`, `arguments`, yoki xatto murakkab control flow uni bekor qilishi mumkin. Agar closure body'si katta o'zgaruvchini eslatib qolsa (optimizatsiya ishlamasa yoki haqiqatan kerak bo'lsa) — u data GC tozalay olmaydi:
 
 ```javascript
 // ❌ Memory Leak — closure butun katta dataset ni ushlab turadi
@@ -956,7 +1031,8 @@ Real-time metrikalar — `Ctrl+Shift+P` → "Show Performance Monitor":
 
 Muhim ogohlantirish: GC **qachon** ishlashi noaniq va engine'ga bog'liq. `WeakRef.deref()` istalgan paytda `undefined` qaytarishi mumkin — dastur logikasini bunga asoslamang. Bu API'lar faqat optimization (cache, monitoring) uchun mos, dasturning to'g'ri ishlashi uchun emas.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
    Strong vs Weak Reference
@@ -992,7 +1068,10 @@ WeakRef va GC lifecycle:
    MUHIM: 2 va 3 orasidagi vaqt NOANIQ — GC hal qiladi
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 WeakRef asoslari:
 
@@ -1081,6 +1160,8 @@ bigData = null; // tashqaridan reference yo'q
 // GC ishlagandan keyin: cache.get("query-1") → undefined
 ```
 
+</details>
+
 ---
 
 ## WeakMap va WeakSet
@@ -1089,18 +1170,19 @@ bigData = null; // tashqaridan reference yo'q
 
 **WeakMap** va **WeakSet** — ES6 dan beri mavjud maxsus kolleksiyalar. Ularning key'lari (key) **weak reference** bilan saqlanadi — key'ga boshqa strong reference bo'lmasa, GC entry'ni avtomatik olib tashlaydi. Bu `WeakRef` dan farqli ravishda ancha oldin (ES2015) kiritilgan va amalda ko'proq ishlatiladi.
 
-WeakMap/WeakSet ning muhim cheklovlari: key faqat **object** bo'lishi mumkin (primitive emas), **iterable emas** (`size`, `keys()`, `values()`, `forEach()` yo'q). Nima uchun iterate bo'lmaydi? Chunki GC istalgan vaqtda entry olib tashlashi mumkin — iterate paytida natija noaniq bo'lardi.
+WeakMap/WeakSet ning muhim cheklovlari: key faqat **object** yoki **non-registered Symbol** (`Symbol()` — ha, `Symbol.for()` — yo'q) bo'lishi mumkin (ES2023+), **iterable emas** (`size`, `keys()`, `values()`, `forEach()` yo'q). Nima uchun iterate bo'lmaydi? Chunki GC istalgan vaqtda entry olib tashlashi mumkin — iterate paytida natija noaniq bo'lardi.
 
 | Xususiyat | `Map` | `WeakMap` |
 |-----------|-------|-----------|
-| **Key turi** | Har qanday | Faqat **object** |
+| **Key turi** | Har qanday | Faqat **object** yoki **non-registered Symbol** (ES2023+) |
 | **GC** | Key ni strong ushlab turadi | Key weak — GC tozalashi mumkin |
 | **Iterable** | Ha (`for...of`, `.keys()`, `.entries()`) | **Yo'q** |
 | **`.size`** | Ha | **Yo'q** |
 | **`.clear()`** | Ha | **Yo'q** |
 | **Use case** | Umumiy key-value | Private data, metadata, GC-friendly cache |
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 ```
    === MAP ===
@@ -1121,7 +1203,10 @@ WeakMap/WeakSet ning muhim cheklovlari: key faqat **object** bo'lishi mumkin (pr
                (butun entry yo'qoladi)
 ```
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 Map vs WeakMap farqi:
 
@@ -1245,6 +1330,8 @@ nodeA = null;
 // nodeA GC tozalaydi → WeakSet dan ham yo'qoladi ✅
 ```
 
+</details>
+
 ---
 
 ## Performance Tips — Memory Efficient Kod
@@ -1322,22 +1409,38 @@ function processItemsOptimized(items) {
 
 ### 3. TypedArray — Katta Sonli Data uchun
 
+Homogen sonli data (masalan, audio sample'lari, pixel buffer, koordinata massivi) uchun `TypedArray` oddiy `Array` dan sezilarli darajada samaraliroq — aniq afzalliklar esa V8'ning array optimizatsiyalari bilan birga ko'rib chiqilishi kerak:
+
 ```javascript
-// ❌ Oddiy Array — har element alohida heap allocation:
+// Oddiy Array — V8 elementlar homogen bo'lsa PACKED_DOUBLE_ELEMENTS
+// kind'ga o'tib element'larni inline (boxing'siz) saqlashi mumkin,
+// lekin shape yaxlitligi buzilsa (masalan, bo'sh slot, undefined, obyekt)
+// HOLEY yoki GENERIC kind'ga deoptimize bo'ladi va har element boxed bo'ladi:
 const regularArray = new Array(1_000_000);
 for (let i = 0; i < 1_000_000; i++) {
-  regularArray[i] = i * 1.5; // HeapNumber — har biri ~16 bytes
+  regularArray[i] = i * 1.5;
 }
-// ~16MB+ xotira, GC uchun 1M ta object
+// Memory overhead: header + element kind metadata + har element uchun
+// 8 bayt (ideal holat) yoki ko'proq (deopt paytida HeapNumber box'lar).
+// Shape yaxlitligiga tayanadi — kod evolyutsiyasi bilan buzilishi mumkin.
 
-// ✅ Float64Array — zich, bitta buffer:
+// Float64Array — kontraktual zich, predictable layout:
 const typedArray = new Float64Array(1_000_000);
 for (let i = 0; i < 1_000_000; i++) {
-  typedArray[i] = i * 1.5; // to'g'ridan-to'g'ri buffer'ga yoziladi
+  typedArray[i] = i * 1.5;
 }
-// ~8MB xotira, GC uchun 1 ta object (buffer)
-// Audio, video, 3D, binary data uchun ideal
+// Aniq 8 MB (1M × 8 bayt) + kichik buffer header. Shape optimizatsiyasiga
+// bog'liq emas — har doim zich, predictable.
 ```
+
+**`TypedArray` ning amaliy afzalliklari:**
+- **Predictable layout** — V8 ning "elements kind" optimizatsiyasiga bog'liq emas, har doim bir xil zich format
+- **Transferable** — `postMessage` orqali Worker'larga `ArrayBuffer` ni zero-copy transfer qilish mumkin
+- **Interop** — WebGL, WebAudio, WASM, Canvas ImageData, crypto — barcha browser API'lar `TypedArray` bilan ishlaydi
+- **SIMD-friendly** — zich memory layout SIMD (vector) instruksiyalari uchun ideal
+- **GC load** — butun buffer bitta object sifatida kuzatiladi, har element'ni alohida mark qilish kerak emas
+
+Audio, video, 3D, binary protocol parser, katta matritsa/tensor operatsiyalari uchun `TypedArray` default tanlov bo'lishi kerak.
 
 ### 4. structuredClone vs JSON — Deep Copy
 
@@ -1396,6 +1499,182 @@ for (let i = 0; i < 100000; i++) {
 }
 const result = parts.join(","); // bitta operatsiya — samaraliroq
 ```
+
+---
+
+## Edge Cases va Gotchas
+
+Memory management bo'yicha nozik, production'da tez-tez uchrab, debug qilish qiyin bo'lgan 5 ta gotcha. Har biri spec/engine darajasida sabab bilan tushuntirilgan.
+
+### Gotcha 1: `WeakRef.deref()` bir microtask ichida tirik, lekin keyingisida undefined
+
+Spec'ga ko'ra, `WeakRef.deref()` bitta **synchronous job** (turn) davomida bir xil natija qaytarishi kafolatlanadi — agar `deref()` bir marta object qaytargan bo'lsa, shu turn oxirigacha yana `deref()` qilsangiz ham aynan o'sha object keladi. Lekin **keyingi microtask yoki task'da** GC aralashishi mumkin va `undefined` qaytishi mumkin. Bu kafolat diqqat bilan ishlatilmasa — `await` dan keyin kutilmagan natija beradi.
+
+```javascript
+let obj = { data: "important" };
+const ref = new WeakRef(obj);
+obj = null;
+
+// ❌ Xavfli pattern:
+async function readTwice() {
+  const first = ref.deref();
+  if (!first) return "gone";
+  console.log(first.data);  // ishlaydi
+
+  await Promise.resolve(); // turn chegarasi!
+
+  const second = ref.deref();
+  console.log(second?.data); // undefined bo'lishi mumkin — GC aralashgan bo'lishi mumkin!
+}
+
+// ✅ To'g'ri: deref() natijasini lokal o'zgaruvchiga olish
+async function readTwiceSafe() {
+  const snapshot = ref.deref();
+  if (!snapshot) return "gone";
+  console.log(snapshot.data);
+  await Promise.resolve();
+  console.log(snapshot.data); // snapshot strong reference — await dan keyin ham tirik ✅
+}
+```
+
+**Nima uchun:** `deref()` chaqirilgan payt yangi strong reference (qaytarilgan qiymat) yaratadi — bu turn davomida object tirik qoladi. Lekin uni lokal o'zgaruvchiga saqlamasangiz, await bo'yicha yield qilgach reference yo'qoladi va keyingi microtask'da `WeakRef` yana "naked" holatga qaytadi.
+
+**Yechim:** `WeakRef` natijasini darhol lokal strong reference'ga copy qiling va keyingi ishda shu lokal variable bilan ishlang.
+
+### Gotcha 2: `FinalizationRegistry` callback ishonchli emas — cleanup logic'ni bog'lamang
+
+`FinalizationRegistry` callback'i **"might be called, might not be called, at an unspecified time"** — spec aniq shu so'zlarni ishlatadi. Engine dastur tugashidan oldin callback'larni chaqirmasligi mumkin, GC umuman ishlamasligi mumkin (masalan, yetarli memory bor bo'lsa), yoki callback cross-realm scenariy'da suppress qilinishi mumkin.
+
+```javascript
+// ❌ Resource cleanup FinalizationRegistry ga tayanmaslik:
+class FileHandle {
+  constructor(path) {
+    this.fd = openFile(path);
+    registry.register(this, this.fd);  // fayl GC da yopiladi deb umid qilamiz
+  }
+}
+const registry = new FinalizationRegistry((fd) => closeFile(fd));
+
+// Muammo: GC qachon ishlashi noma'lum. Fayl descriptor'lari to'planib ketadi
+// ("EMFILE: too many open files" errori production'da tushadi)
+
+// ✅ Explicit cleanup (disposable pattern):
+class FileHandle {
+  constructor(path) { this.fd = openFile(path); }
+  [Symbol.dispose]() { closeFile(this.fd); } // ES2023+ using declarations
+  close() { closeFile(this.fd); }            // manual
+}
+
+// ES2023+ using syntax:
+{
+  using handle = new FileHandle("/data");
+  // ... ishlatish ...
+} // handle[Symbol.dispose]() avtomatik chaqiriladi — deterministic cleanup ✅
+```
+
+**Nima uchun:** GC heuristikalari memory pressure, heap size, va scheduling'ga bog'liq. Agar dastur hech qachon memory pressure'ga tushmasa, GC butunlay skip bo'lishi mumkin. Shuning uchun `FinalizationRegistry` **faqat best-effort optimization** uchun (masalan, cache invalidation) — hech qachon **correctness** ga tayanmasligi kerak.
+
+**Yechim:** Deterministic cleanup kerak bo'lsa — `try/finally`, RAII pattern (using declarations ES2023+), yoki manual `.close()` ishlatish. `FinalizationRegistry` — faqat "agar tozalansa — yomon emas" holatlar uchun.
+
+### Gotcha 3: `WeakMap` value'sida strong reference saqlash — leak xavfi qaytadi
+
+`WeakMap` kaliti weak'dir, lekin **value strong**'dir. Agar value kalit'ga yoki kalit'ga ishora qilib turgan boshqa object'ga reference saqlasa — circular reference paydo bo'ladi va WeakMap'ning weak semantikasi buziladi.
+
+```javascript
+const cache = new WeakMap();
+
+// ❌ Leak — value kalit'ga reference saqlaydi:
+function attach(element) {
+  const metadata = {
+    element: element,  // ← value kalit'ga strong reference!
+    clicks: 0
+  };
+  cache.set(element, metadata);
+}
+
+let btn = document.querySelector("#myBtn");
+attach(btn);
+btn.remove();
+btn = null;
+// Entry GC tozalashi KERAK edi, lekin:
+// - cache entry value hali ham btn ga reference qiladi
+// - value root emas, lekin WeakMap kalit'ni ushlab turadigan "reachability path" hosil qiladi
+// Aslida V8 bu pattern'ni aniqlay oladi va tozalaydi (ephemeron semantikasi),
+// LEKIN quyidagi versiya aniq leak beradi:
+
+const observers = [];
+function attachBad(element) {
+  const metadata = { element, clicks: 0 };
+  cache.set(element, metadata);
+  observers.push(metadata); // ← tashqi strong ref metadata'ga → element hech qachon GC bo'lmaydi!
+}
+
+// ✅ Value kalit'ga reference saqlamasin:
+function attachGood(element) {
+  cache.set(element, { clicks: 0, createdAt: Date.now() });
+}
+
+// ✅ Agar element kerak bo'lsa — callback parametri orqali oling:
+function forEachTracked(callback) {
+  // WeakMap iterate qilinmaydi — callback kalit orqali chaqirilishi kerak
+}
+```
+
+**Nima uchun:** WeakMap aslida **ephemeron** semantikasini qo'llaydi (V8 da): entry faqat kalit reachable bo'lsa saqlanadi va faqat o'sha paytda value'ni ushlab turadi. Lekin agar value'ga **tashqi strong reference** bo'lsa (masalan `observers` array), value tirik qoladi va shu orqali kalit ham transitive reachable bo'ladi — GC tozalay olmaydi.
+
+**Yechim:** WeakMap value'sida kalit'ga yoki boshqa shu kalit bilan bog'liq object'ga strong reference saqlamang. Agar metadata kalit bilan birga kerak bo'lsa — uni callback orqali passing qiling yoki alohida WeakRef ishlating.
+
+### Gotcha 4: Detached ArrayBuffer — `TypedArray` view bo'sh bo'lib qoladi
+
+`ArrayBuffer` ni `postMessage` orqali Worker'ga transfer qilish **zero-copy** — lekin transfer'dan keyin original buffer **detached** bo'lib qoladi. Har qanday `TypedArray` view shu buffer ustida ishlagan bo'lsa — darhol 0 uzunlikka aylanadi va barcha read/write `TypeError` beradi.
+
+```javascript
+const buffer = new ArrayBuffer(1024);
+const view = new Uint8Array(buffer);
+view[0] = 42;
+console.log(view.length); // 1024
+
+const worker = new Worker("worker.js");
+worker.postMessage(buffer, [buffer]); // transfer — zero-copy
+
+console.log(view.length); // 0 — DETACHED!
+console.log(buffer.byteLength); // 0 — DETACHED!
+view[0] = 99;
+// TypeError: Cannot perform %TypedArray%.prototype.set on a detached ArrayBuffer
+```
+
+**Nima uchun:** `postMessage(data, transferList)` ikkinchi argumenti buffer egaligini qabul qiluvchi thread'ga o'tkazadi. Yuboruvchi thread'da buffer "detached" holatga o'tadi — memory aslida allocated bo'ladi, lekin ushbu realm'da undan foydalanib bo'lmaydi. Bu **intentional**: zero-copy transfer uchun ikkita thread bitta buffer'ga egalik qila olmasligi kerak (race condition'ni oldini olish).
+
+**Yechim:** Agar buffer ikkala tomonda ham kerak bo'lsa — transfer qilmang, oddiy structured clone ishlating (lekin bu copy bo'ladi). Yoki `SharedArrayBuffer` ishlating (atomic operations va `Atomics` bilan) — lekin bu cross-origin isolation talab qiladi va faqat `COOP/COEP` header'lari sozlangan joylarda ishlaydi.
+
+### Gotcha 5: `Float64Array` da `NaN` mavjudligi `indexOf` ni buzadi
+
+`TypedArray` methods (`indexOf`, `includes`) `===` taqqoslash'ni ishlatadi — bu `NaN !== NaN` semantikasini beradi. Float array'da NaN qidirayotgan bo'lsangiz — `indexOf` har doim `-1` qaytaradi, garchi NaN aslida mavjud bo'lsa ham.
+
+```javascript
+const arr = new Float64Array([1.5, NaN, 3.7, NaN]);
+
+console.log(arr.indexOf(NaN));   // -1 ❌ (NaN mavjud, lekin topilmadi)
+console.log(arr.includes(NaN));  // true ✅ (SameValueZero ishlatadi — NaN ga match)
+
+// Oddiy Array ham shunday:
+const regular = [1.5, NaN, 3.7];
+console.log(regular.indexOf(NaN));  // -1 ❌
+console.log(regular.includes(NaN)); // true ✅ (ES2016+)
+
+// Index topish uchun manual search:
+function findNaN(typedArr) {
+  for (let i = 0; i < typedArr.length; i++) {
+    if (Number.isNaN(typedArr[i])) return i;
+  }
+  return -1;
+}
+console.log(findNaN(arr)); // 1
+```
+
+**Nima uchun:** `indexOf` spec (Array.prototype.indexOf + TypedArray variant) **Strict Equality Comparison** (`===`) ishlatadi — va IEEE 754 standarti bo'yicha `NaN === NaN` `false` qaytaradi. `includes` esa ES2016 da qo'shilgan va **SameValueZero** algoritmi bilan ishlaydi, unda `NaN` o'ziga teng hisoblanadi.
+
+**Yechim:** NaN qidirish uchun `includes` (mavjudligini tekshirish) yoki manual loop `Number.isNaN` bilan (index topish uchun). `indexOf` ni float array'larda NaN bilan hech qachon ishonchli deb hisoblamang.
 
 ---
 
@@ -1806,4 +2085,4 @@ console.log(p2.x);         // 0 — reset qilingan ✅
 
 ---
 
-**Keyingi bo'lim:** [17-type-coercion.md](17-type-coercion.md) — Type Coercion va Equality: implicit/explicit conversion, `==` vs `===`, truthy/falsy, Symbol, BigInt, Map vs Object, Set vs Array.
+> **Keyingi bo'lim:** [17-type-coercion.md](17-type-coercion.md) — Type Coercion va Equality: primitive turlar va `typeof`, implicit vs explicit conversion, `ToString`/`ToNumber`/`ToBoolean`/`ToPrimitive` algoritmlari, `==` vs `===` (Abstract Equality), truthy/falsy qiymatlar, `instanceof` va `Symbol.hasInstance`, Symbol va well-known symbols, BigInt, `Map` vs `Object`, `Set` vs `Array`, IEEE 754 floating point, `Object.is()` va 4 xil equality algoritmi.

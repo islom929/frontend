@@ -14,6 +14,7 @@
 - [Property Enumeration](#property-enumeration)
 - [Zamonaviy Object Metodlari](#zamonaviy-object-metodlari)
 - [Computed Properties va Shorthand](#computed-properties-va-shorthand)
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -62,7 +63,11 @@ const userProto = {
 const user = Object.create(userProto);
 user.name = "Alice";
 user.age = 25;
-// user.__proto__ === userProto ✅
+
+// Prototype tekshirish — zamonaviy usul:
+console.log(Object.getPrototypeOf(user) === userProto); // true ✅
+// Eski usul `user.__proto__ === userProto` ham ishlaydi, lekin
+// `__proto__` legacy deb belgilangan — Object.getPrototypeOf() afzal
 ```
 
 **4. Class (ES6)** — constructor function'ning syntactic sugar'i:
@@ -80,9 +85,10 @@ class User {
 const user = new User("Alice", 25);
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
-V8 da object yaratilganda engine **Hidden Class** (Map deyiladi) yaratadi. Hidden Class object'ning "shakli" (shape) — qaysi property'lar bor va ular memory'da qanday joylashgan. Bir xil ketma-ketlikda bir xil property'lar qo'shilgan object'lar **bitta** Hidden Class'ni share qiladi — bu inline caching va optimizatsiya uchun muhim.
+V8 da object yaratilganda engine **Hidden Class** yaratadi. (V8 source kodida bu internal strukturaga `Map` deb nom beriladi — lekin bu JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha, ular shunchaki bir xil so'zni ishlatadi.) Hidden Class object'ning "shakli" (shape) — qaysi property'lar bor va ular memory'da qanday joylashgan. Bir xil ketma-ketlikda bir xil property'lar qo'shilgan object'lar **bitta** Hidden Class'ni share qiladi — bu inline caching va optimizatsiya uchun muhim (batafsil [01-js-engine.md](01-js-engine.md) da).
 
 ```
 const a = { x: 1, y: 2 };
@@ -97,6 +103,8 @@ const d = { x: 1, y: 2, z: 3 };
 ```
 
 V8 optimizatsiyasi uchun: object'larga property'larni **bir xil tartibda** qo'shish — Hidden Class'larni share qilishga yordam beradi, bu esa property access'ni tezlashtiradi.
+
+</details>
 
 ---
 
@@ -136,7 +144,24 @@ console.log(Object.getOwnPropertyDescriptor(user, "name"));
 // }
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+ECMAScript spec bo'yicha har bir property aslida **Property Descriptor Record** — bu `{[[Value]], [[Writable]], [[Enumerable]], [[Configurable]]}` (data descriptor) yoki `{[[Get]], [[Set]], [[Enumerable]], [[Configurable]]}` (accessor descriptor) fieldlardan iborat internal record.
+
+`Object.defineProperty(obj, key, desc)` chaqirilganda engine ichida **[[DefineOwnProperty]](key, desc)** internal method ishga tushadi. Bu method quyidagi qadamlarni bajaradi:
+
+1. `ToPropertyDescriptor(desc)` — berilgan JS objectni Property Descriptor Record ga aylantiradi
+2. `ValidateAndApplyPropertyDescriptor` — yangi descriptor mavjud descriptor bilan solishtiriladi
+3. Agar property `configurable: false` bo'lsa, faqat cheklangan o'zgarishlar ruxsat etiladi (`writable: true -> false` mumkin, lekin `false -> true` mumkin emas)
+4. Data va accessor descriptor aralashtirib bo'lmaydi — agar mavjud property data descriptor bo'lsa va accessor descriptor berilsa, engine avval eski descriptor ni to'liq o'chiradi
+
+V8 ichida property descriptor'lar **PropertyDetails** structurasida bit flaglar sifatida saqlanadi. `writable`, `enumerable`, `configurable` har biri bitta bit egallaydi. `Object.defineProperty` bilan yaratilgan property'larda spec bo'yicha default qiymatlar `false` (oddiy assign bilan yaratilganda esa `true`). Bu farq spec ning `CreateDataProperty` (assign/literal) vs `DefinePropertyOrThrow` (`Object.defineProperty`) abstract operation'lari orasidagi farqdan kelib chiqadi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 `Object.defineProperty()` bilan property'ning xulq-atvorini batafsil sozlash mumkin. `Object.defineProperty` bilan yaratilgan property'larda default qiymatlar **`false`** (`writable`, `enumerable`, `configurable` hammasi `false`):
 
@@ -162,8 +187,6 @@ Object.defineProperties(config, {
   PORT: { value: 3000, enumerable: true }
 });
 ```
-
-### Kod Misollari
 
 `configurable: false` ning ta'siri — qaytib bo'lmaydiganlik:
 
@@ -196,6 +219,8 @@ obj.semiLocked = 30; // ❌ endi o'zgarmaydi
 // ❌ TypeError — false → true qaytarish mumkin emas
 ```
 
+</details>
+
 ---
 
 ## Getters va Setters
@@ -208,7 +233,24 @@ Getter/setter ikkita asosiy maqsadga xizmat qiladi:
 1. **Computed properties** — har o'qilganda qiymat hisoblash
 2. **Validation** — qiymat yozilganda tekshirish
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+ECMAScript spec bo'yicha getter/setter — bu **accessor property**. Accessor property data property dan farqli ravishda `[[Value]]` va `[[Writable]]` o'rniga **`[[Get]]`** va **`[[Set]]`** internal slotlariga ega. `[[Get]]` — property o'qilganda chaqiriladigan funksiya (yoki `undefined`), `[[Set]]` — yozilganda chaqiriladigan funksiya.
+
+Property access (`obj.prop`) bo'lganda engine **[[Get]](prop, receiver)** internal method ni chaqiradi. Bu method ichida `OrdinaryGet` abstract operation ishlaydi:
+1. Property topiladi va uning descriptor olinadi
+2. Agar descriptor accessor bo'lsa — `[[Get]]` funksiya `Call(getter, receiver)` orqali chaqiriladi
+3. Agar data descriptor bo'lsa — `[[Value]]` qaytariladi
+
+Assign (`obj.prop = val`) bo'lganda **[[Set]](prop, value, receiver)** chaqiriladi va `OrdinarySet` ishlaydi — accessor bo'lsa `Call(setter, receiver, value)` bajariladi.
+
+V8 da accessor property'lar `AccessorPair` internal objectda saqlanadi. Bu objectda `getter` va `setter` funksiya pointer'lari bor. V8 inline cache (IC) accessor property'larni ham cache qiladi, lekin data property'larga nisbatan sekinroq — chunki har safar funksiya chaqiruvi (function call overhead) bo'ladi. Shu sababli performance-critical kodda getter/setter o'rniga oddiy property + explicit method chaqiruvi afzalroq bo'lishi mumkin.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 const user = {
@@ -262,6 +304,8 @@ t.fahrenheit = 32;
 console.log(t._celsius);   // 0 — setter: (32-32) * 5/9
 ```
 
+</details>
+
 ---
 
 ## Object Immutability
@@ -280,7 +324,29 @@ Tekshirish metodlari: `Object.isExtensible()`, `Object.isSealed()`, `Object.isFr
 
 Muhim: **barcha uchta faqat SHALLOW** ishlaydi — ichki (nested) object'larga ta'sir qilmaydi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+ECMAScript spec da object immutability uchta **integrity level** orqali boshqariladi. Har biri object ning internal method'larini cheklaydi:
+
+**`Object.preventExtensions()`** — object ning **`[[IsExtensible]]`** internal slot ini `false` ga o'rnatadi. Bu `[[DefineOwnProperty]]` ni chaqirganda yangi property qo'shishni bloklaydi. `OrdinaryDefineOwnProperty` ichida `IsExtensible(O)` tekshiriladi — `false` bo'lsa va property mavjud bo'lmasa, `false` qaytadi (strict mode da TypeError).
+
+**`Object.seal()`** — spec da `SetIntegrityLevel(O, "sealed")` abstract operation chaqiriladi. Bu operation:
+1. `[[PreventExtensions]](O)` — yangi property bloklash
+2. Barcha own property'larning `[[Configurable]]` flagini `false` ga o'rnatish (`[[DefineOwnProperty]]` orqali)
+3. `configurable: false` bo'lganda property o'chirib bo'lmaydi va descriptor turi o'zgartirilmaydi
+
+**`Object.freeze()`** — `SetIntegrityLevel(O, "frozen")` chaqiriladi:
+1. `[[PreventExtensions]](O)` + barcha property'lar `configurable: false`
+2. Data property'lar uchun `writable: false` ham qo'shiladi
+3. Accessor property'lar (getter/setter) **freeze bo'lmaydi** — `[[Get]]/[[Set]]` funksiyalar o'zgartirilmaydi, lekin ular chaqirilishi davom etadi
+
+V8 ichida freeze/seal operatsiyalari object ning Hidden Class (Map) ini almashtiradi — yangi Map yaratiladi, unda `frozen`/`sealed` flag `true` bo'ladi. Bu keyingi property access operatsiyalarida tez tekshirish imkonini beradi (IC fast path).
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // preventExtensions — yangi property qo'shib bo'lmaydi
@@ -311,7 +377,7 @@ Deep freeze implement qilish:
 function deepFreeze(obj) {
   Object.freeze(obj);
 
-  Object.getOwnPropertyNames(obj).forEach(prop => {
+  Reflect.ownKeys(obj).forEach(prop => {
     const value = obj[prop];
     if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
       deepFreeze(value);
@@ -331,6 +397,8 @@ const config = deepFreeze({
 config.db.host = "hacked"; // ❌ o'zgarmaydi — deep freeze
 console.log(config.db.host); // "localhost"
 ```
+
+</details>
 
 ---
 
@@ -362,11 +430,11 @@ console.log(original.address.city); // "LA" — original buzildi
 const deep1 = structuredClone(original);
 // ✅ Circular reference qo'llab-quvvatlaydi
 // ✅ Date, Map, Set, ArrayBuffer, RegExp copy qiladi
-// ❌ Function, Symbol, DOM node copy qilmaydi
+// ❌ Function, Symbol, DOM node → DataCloneError tashlaydi
 
 // 2. JSON hack — cheklovlar bor
 const deep2 = JSON.parse(JSON.stringify(original));
-// ❌ undefined, Function, Symbol, Infinity, NaN yo'qoladi
+// ❌ undefined, Function, Symbol yo'qoladi; Infinity, NaN → null ga aylanadi
 // ❌ Date → string ga aylanadi (qaytmaydi)
 // ❌ Map, Set, RegExp yo'qoladi
 // ❌ Circular reference → TypeError
@@ -401,23 +469,40 @@ function deepClone(obj, seen = new WeakMap()) {
 }
 ```
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
-`structuredClone()` browser'ning **Structured Clone Algorithm** ini ishlatadi — bu xuddi `postMessage()` (Web Worker'larga data yuborish) da ishlatiladigan algoritm. U object'ni serialize qilib, keyin yangi object sifatida deserialize qiladi.
+`structuredClone()` ichida HTML spec ning **StructuredSerializeInternal / StructuredDeserialize** algoritmi ishlaydi — bu `postMessage()` va IndexedDB da ham ishlatiladigan algoritm.
+
+Circular reference handling: algoritm **`memory`** deb nomlangan internal `Map<original, clone>` saqlaydi. Har bir object clone qilinayotganda avval `memory` da tekshiriladi — agar oldin clone qilingan bo'lsa, shu clone qaytariladi. Bu circular reference va shared reference muammosini hal qiladi:
+
+```
+A → B → C → A  (circular)
+1. Clone(A): memory = {A: A'}, A.b = Clone(B)
+2. Clone(B): memory = {A: A', B: B'}, B.c = Clone(C)
+3. Clone(C): memory = {A: A', B: B', C: C'}, C.a = Clone(A) → memory da A' topildi → A' qaytariladi
+Natija: A' → B' → C' → A' (circular saqlanadi, yangi graph)
+```
+
+Algoritm ichida har bir type uchun alohida serialization logic bor: `Date` uchun `[[DateValue]]` internal slot copy qilinadi, `RegExp` uchun `[[RegExpMatcher]]` + `[[OriginalSource]]` + `[[OriginalFlags]]`, `Map`/`Set` uchun entry'lar recursive clone qilinadi. `Function`, `Symbol`, `WeakMap`/`WeakRef` esa **non-serializable** — `DataCloneError` DOMException throw qilinadi.
+
+V8 da `structuredClone` native C++ da implement qilingan (`v8::ValueSerializer`/`v8::ValueDeserializer`), shuning uchun JS-level recursive clone'dan tezroq ishlashi kutiladi. `JSON.parse(JSON.stringify())` usuli esa faqat JSON-safe (non-circular, primitive qiymatlar, plain object/array) data uchun ishlaydi — V8 ning JSON parser'i juda optimallashtirilgan bo'lgani uchun bu yondashuv ham amaliyotda samarali. Aniq tezlik farqlari workload va object strukturasiga bog'liq — production kodda benchmark bilan tekshirish tavsiya etiladi.
 
 Copy usullarini taqqoslash:
 
 | Xususiyat | Spread / assign | JSON hack | `structuredClone` | Recursive |
 |---|---|---|---|---|
-| Nested objects | ❌ Shallow | ✅ Deep | ✅ Deep | ✅ Deep |
-| Circular ref | ❌ | ❌ Error | ✅ | ✅ (WeakMap) |
-| Date | ❌ ref | ❌ → string | ✅ | ✅ |
-| Map/Set | ❌ ref | ❌ yo'qoladi | ✅ | ✅ |
-| Function | ❌ ref | ❌ yo'qoladi | ❌ Error | ⚠️ ref |
-| RegExp | ❌ ref | ❌ → {} | ✅ | ✅ |
-| undefined | ✅ | ❌ yo'qoladi | ✅ | ✅ |
-| Symbol keys | ✅ (spread) | ❌ | ❌ | ✅ (Reflect.ownKeys) |
-| Performance | Eng tez | O'rta | O'rta | Sekin |
+| Nested objects | Shallow (faqat birinchi level) | ✅ Deep | ✅ Deep | ✅ Deep |
+| Circular ref | ❌ shallow | ❌ Error | ✅ | ✅ (WeakMap orqali) |
+| Date | reference copy | → string bo'lib qoladi | ✅ saqlanadi | ✅ (manual handling) |
+| Map/Set | reference copy | yo'qoladi (empty obj) | ✅ saqlanadi | ✅ (manual handling) |
+| Function | reference copy | yo'qoladi | ❌ DataCloneError | reference copy |
+| RegExp | reference copy | yo'qoladi (empty obj) | ✅ saqlanadi | ✅ (manual handling) |
+| undefined | ✅ saqlanadi | yo'qoladi | ✅ saqlanadi | ✅ saqlanadi |
+| Symbol keys | ✅ (spread) | yo'qoladi | yo'qoladi (silent drop) | ✅ (Reflect.ownKeys orqali) |
+| Complexity | Juda oddiy | Oddiy | Oddiy | Yuqori (qo'lda yozish) |
+
+</details>
 
 ---
 
@@ -437,7 +522,32 @@ Object property'larini sanab o'tishning bir nechta usuli bor — har biri turli 
 | `Object.getOwnPropertySymbols()` | ✅ | ❌ | ✅ | ✅ | ✅ (faqat) |
 | `Reflect.ownKeys()` | ✅ | ❌ | ✅ | ✅ | ✅ |
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+ECMAScript spec da property enumeration uchun ikki asosiy internal method va bir nechta abstract operation mavjud:
+
+**`[[OwnPropertyKeys]]()`** — object ning barcha own property key'larini qaytaradi. Spec bo'yicha key'lar qat'iy tartibda qaytariladi:
+1. Integer index property'lar — ascending numeric order (0, 1, 2, ...)
+2. String property'lar — yaratilish (insertion) tartibida
+3. Symbol property'lar — yaratilish tartibida
+
+`Reflect.ownKeys()` to'g'ridan-to'g'ri `[[OwnPropertyKeys]]()` ni chaqiradi — shuning uchun u BARCHA key'larni (string + symbol, enumerable + non-enumerable) qaytaradi.
+
+**`EnumerableOwnProperties(O, kind)`** abstract operation esa `Object.keys()`, `Object.values()`, `Object.entries()` uchun ishlatiladi. Bu operation:
+1. `[[OwnPropertyKeys]]()` ni chaqiradi
+2. Har bir key uchun `[[GetOwnProperty]](key)` bilan descriptor oladi
+3. Faqat `enumerable: true` bo'lgan property'larni filtrlaydi
+4. `kind` parametriga qarab key, value, yoki [key, value] qaytaradi
+
+`for...in` loop uchun esa spec da `EnumerateObjectProperties(O)` abstract operation ishlatiladi — bu **prototype chain** bo'ylab ham yuradi. Engine `[[GetPrototypeOf]]()` orqali prototype chain ni traverse qiladi va har bir level dagi enumerable string key'larni yig'adi (Symbol key'lar skip qilinadi). Lekin spec tartibni kafolatlamaydi — V8 amalda `[[OwnPropertyKeys]]` tartibiga amal qiladi, lekin inherited property'lar tartibi implementation-defined.
+
+V8 da `Object.keys()` kabi operatsiyalar uchun **enum cache** mavjud — agar object ning Hidden Class (Map) o'zgarmagan bo'lsa, oldingi enumeration natijasi cache dan qaytariladi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 const parent = { inherited: true };
@@ -483,13 +593,69 @@ const doubled = Object.fromEntries(
 // { apple: 3, banana: 1.5, cherry: 6 }
 ```
 
+</details>
+
 ---
 
 ## Zamonaviy Object Metodlari
 
-### `Object.hasOwn()` (ES2022)
+### Nazariya
 
-`hasOwnProperty` ning zamonaviy, xavfsiz versiyasi:
+ES2022 va ES2024 da `Object` global obyektiga ikki muhim static method qo'shildi: `Object.hasOwn()` va `Object.groupBy()`. Ular eski API'larning kamchiliklarini hal qiladi va zamonaviy JavaScript da keng qo'llaniladi.
+
+**`Object.hasOwn(obj, key)`** — `hasOwnProperty` ning xavfsiz almashtiruvchisi. ESLint ham `no-prototype-builtins` qoidasi orqali instance method o'rniga shu static method'ni tavsiya qiladi.
+
+**`Object.groupBy(items, keyFn)`** — array elementlarini callback natijasi bo'yicha guruhlash. Ilgari `reduce` bilan qo'lda yozish kerak edi.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`Object.hasOwn` nima uchun yaxshiroq**:
+
+ES2022 dan oldin, `hasOwnProperty` instance method sifatida `Object.prototype` da edi. Bu ikki muammoni keltirib chiqaradi:
+
+1. **`Object.create(null)`**: Prototype'siz object'larda `hasOwnProperty` mavjud emas — `TypeError`
+2. **Override**: Object o'z `hasOwnProperty` ni override qilishi mumkin — natija noto'g'ri
+
+`Object.hasOwn` static method sifatida shu muammolarni hal qiladi: u har doim `Object` orqali chaqiriladi, hech qachon override qilinmaydi.
+
+Spec implementatsiyasi:
+```
+Object.hasOwn(obj, key):
+  1. O = ToObject(obj)
+  2. P = ToPropertyKey(key)
+  3. return HasOwnProperty(O, P)
+```
+
+`HasOwnProperty` abstract operation `[[GetOwnProperty]]` internal method'ni chaqiradi va prototype chain'ga **kirmaydi** — faqat object'ning own property'larini tekshiradi.
+
+**`Object.groupBy` algoritmi**:
+
+```
+Object.groupBy(items, callbackFn):
+  1. groups = Object.create(null)  ← prototype'siz object
+  2. for each item in items (with index):
+     a. key = callbackFn(item, index)
+     b. propertyKey = ToPropertyKey(key)
+     c. if groups[propertyKey] does not exist:
+        groups[propertyKey] = []
+     d. groups[propertyKey].push(item)
+  3. return groups
+```
+
+Eng muhimi: `groups` — `Object.create(null)` bilan yaratilgan, **prototype'siz** object. Bu degani:
+- `__proto__`, `toString`, `constructor` kabi inherited property'lar yo'q
+- Xavfsiz key sifatida ishlatilishi mumkin — hech qanday property collision yo'q
+- `for...in` ham toza ishlaydi
+
+`Map.groupBy()` ham mavjud — natija `Map` qaytaradi (key'lar object yoki primitive bo'lishi mumkin).
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
+
+**`Object.hasOwn()` (ES2022)** — `hasOwnProperty` ning zamonaviy versiyasi:
 
 ```javascript
 const obj = Object.create(null); // prototype yo'q — hasOwnProperty metodi yo'q
@@ -506,9 +672,7 @@ tricky.hasOwnProperty("hasOwnProperty"); // false — noto'g'ri!
 Object.hasOwn(tricky, "hasOwnProperty"); // true — to'g'ri
 ```
 
-### `Object.groupBy()` (ES2024)
-
-Array elementlarini callback natijasi bo'yicha guruhlash:
+**`Object.groupBy()` (ES2024)** — array elementlarini callback natijasi bo'yicha guruhlash:
 
 ```javascript
 const products = [
@@ -529,6 +693,8 @@ const byPrice = Object.groupBy(products, p =>
   p.price > 1 ? "expensive" : "cheap"
 );
 ```
+
+</details>
 
 ---
 
@@ -556,6 +722,21 @@ console.log(obj.email);     // "alice@mail.com"
 console.log(obj.userName);  // "Alice"
 console.log(obj.getEmail()); // "alice@mail.com"
 ```
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+ECMAScript spec da computed property name **ComputedPropertyName** grammar production orqali parse qilinadi: `[ AssignmentExpression ]`. Object literal evaluate bo'lganda har bir property uchun **PropertyDefinitionEvaluation** abstract operation chaqiriladi.
+
+Computed property uchun jarayon:
+1. `[ ]` ichidagi expression **runtime** da evaluate qilinadi (compile-time emas)
+2. Natija `ToPropertyKey()` abstract operation orqali property key ga aylantiriladi
+3. `ToPropertyKey` ichida `ToPrimitive(argument, "string")` chaqiriladi — agar natija Symbol bo'lsa Symbol qaytadi, aks holda `ToString()` qo'llaniladi
+4. Hosil bo'lgan key bilan `CreateDataPropertyOrThrow(object, key, value)` chaqiriladi
+
+Bu degani computed property name sifatida ixtiyoriy expression ishlatish mumkin — `Symbol()`, funksiya chaqiruvi, ternary operator, hatto `await` expression ham. Lekin key har safar object literal evaluate bo'lganda **qayta hisoblanadi**.
+
+V8 da object literal ichidagi computed property'lar **boilerplate optimization** ni buzadi. Oddiy (non-computed) property'lar uchun V8 compile-time da `ObjectBoilerplateDescription` yaratadi va keyin `CloneObjectIC` orqali tez clone qiladi. Computed property bor bo'lsa bu optimization ishlamaydi — har safar property'lar runtime da bitta-bitta qo'shiladi, bu esa yangi Hidden Class transition'lar ketma-ketligiga olib keladi.
 
 **Shorthand Property Names** — o'zgaruvchi nomi va property nomi bir xil bo'lsa:
 
@@ -599,6 +780,148 @@ const missing = user?.nonExistent?.method?.(); // undefined
 // Index access:
 const arr = user?.items?.[0]; // undefined
 ```
+
+</details>
+
+---
+
+## Edge Cases va Gotchas
+
+### `structuredClone` class instance'larni "plain object"ga aylantiradi
+
+`structuredClone` HTML structured clone algoritmi bilan ishlaydi — u object'ning **ma'lumotini** clone qiladi, lekin **prototype**'ni saqlamaydi. Class instance'larni clone qilganda prototype yo'qoladi va natija oddiy `Object` bo'ladi — method'lar ishlamaydi.
+
+```javascript
+class User {
+  constructor(name, age) {
+    this.name = name;
+    this.age = age;
+  }
+  greet() { return `Hi, I'm ${this.name}`; }
+}
+
+const alice = new User("Alice", 25);
+alice.greet(); // "Hi, I'm Alice" ✅
+
+const cloned = structuredClone(alice);
+console.log(cloned.name); // "Alice" — ma'lumot saqlanadi
+console.log(cloned instanceof User); // false — prototype YO'Q
+// cloned.greet(); // ❌ TypeError: cloned.greet is not a function
+```
+
+**Yechim:** Agar class instance clone qilish kerak bo'lsa — constructor'ni qayta chaqirish: `new User(cloned.name, cloned.age)`. Yoki class ichida `clone()` method yozish — `return new User(this.name, this.age)`.
+
+---
+
+### `Object.freeze` va `const` — farqi
+
+Ko'p dasturchilar bularni bir xil deb o'ylaydi. Aslida ular boshqa darajada ishlaydi: `const` **variable binding**'ni o'zgartirilmas qiladi (o'zgaruvchini qayta assign qilib bo'lmaydi), `Object.freeze` esa **object ma'lumotini** (content'ini) o'zgartirilmas qiladi.
+
+```javascript
+// const — binding immutable, lekin content mutable
+const user = { name: "Alice" };
+user.name = "Bob";        // ✅ Ishlaydi — object content o'zgartirish mumkin
+// user = { name: "Bob" }; // ❌ TypeError — binding o'zgartirib bo'lmaydi
+
+// Object.freeze — content immutable, lekin binding (agar let bo'lsa) mutable
+let frozen = Object.freeze({ name: "Alice" });
+frozen.name = "Bob";       // ❌ silent fail / strict TypeError — content lock
+frozen = { name: "Bob" };  // ✅ Ishlaydi — let binding o'zgartirish mumkin
+
+// Ikkalasini birga ishlatish — to'liq immutable:
+const truly = Object.freeze({ name: "Alice" });
+truly.name = "Bob";  // ❌ content lock
+// truly = {};       // ❌ binding lock
+```
+
+**Yechim:** "Fully immutable" ma'lumot kerak bo'lsa — `const` + `Object.freeze` birgalikda. Nested object'lar uchun `deepFreeze()` kerak.
+
+---
+
+### Symbol keys `JSON.stringify` va `for...in`'da ko'rinmaydi
+
+Symbol-keyed property'lar oddiy enumeration va serialization method'laridan yashirin. Bu ba'zan foydali (metadata uchun), ba'zan kutilmagan bug.
+
+```javascript
+const id = Symbol("id");
+const obj = {
+  name: "Alice",
+  [id]: 12345
+};
+
+// for...in — faqat string keys
+for (const key in obj) {
+  console.log(key); // "name" — Symbol key yo'q
+}
+
+// Object.keys — faqat string keys
+console.log(Object.keys(obj)); // ["name"]
+
+// JSON.stringify — Symbol keys butunlay ignore qilinadi
+console.log(JSON.stringify(obj)); // '{"name":"Alice"}'
+
+// Symbol keyga kirish — alohida API kerak:
+console.log(Object.getOwnPropertySymbols(obj)); // [Symbol(id)]
+console.log(obj[id]); // 12345
+console.log(Reflect.ownKeys(obj)); // ["name", Symbol(id)] — hammasi
+```
+
+**Yechim:** Symbol keys metadata uchun mukammal (serialization'dan yashirin). Lekin agar barcha data iterate qilish kerak bo'lsa — `Reflect.ownKeys()` ishlating, u string va Symbol keys'ni birga qaytaradi.
+
+---
+
+### `in` operator prototype chain bo'ylab qidiradi
+
+`in` operator object'da property mavjudmi yoki yo'qligini tekshiradi, LEKIN u **prototype chain**'ni ham qamrab oladi. Bu `Object.hasOwn()` dan asosiy farqi.
+
+```javascript
+const parent = { inherited: "from parent" };
+const child = Object.create(parent);
+child.own = "child property";
+
+// "in" operator — own + inherited
+console.log("own" in child);       // true
+console.log("inherited" in child); // true ← prototype chain'dan
+console.log("toString" in child);  // true ← Object.prototype'dan!
+
+// Object.hasOwn — faqat own
+console.log(Object.hasOwn(child, "own"));       // true
+console.log(Object.hasOwn(child, "inherited")); // false ← own emas
+console.log(Object.hasOwn(child, "toString"));  // false
+```
+
+**Yechim:** "Object'ning o'zida bu property bormi?" degan savol uchun `Object.hasOwn()` ishlating. "Bu property'ga murojaat qilsam u ishlaydimi?" degan savol uchun `in` ishlatish mumkin.
+
+---
+
+### Integer-like string keys numeric order'da enumerate qilinadi
+
+JavaScript object property tartibi ko'rinadigandek — insertion order bo'yicha. LEKIN **integer-like string keys** (ya'ni `"0"`, `"1"`, `"100"` kabi) har doim **numeric ascending order**'da keladi, qolgan string keys'dan **oldin**. Bu kutilmagan tartib'ga olib keladi.
+
+```javascript
+const obj = {
+  "10": "ten",
+  "1": "one",
+  "banana": "fruit",
+  "2": "two",
+  "apple": "fruit"
+};
+
+console.log(Object.keys(obj));
+// ["1", "2", "10", "banana", "apple"]
+// ❌ Insertion tartibida emas!
+// ✅ Integer-like keys avval (1, 2, 10 — ascending numeric)
+// ✅ Keyin string keys insertion tartibida ("banana", "apple")
+
+// Bu spec tomonidan kafolatlangan tartib:
+// 1. Integer index keys — ascending
+// 2. String keys — insertion order
+// 3. Symbol keys — insertion order
+```
+
+**Nima uchun:** ECMAScript spec bo'yicha `[[OwnPropertyKeys]]()` internal method shu tartibda qaytaradi. Bu arrays bilan consistency uchun kiritilgan (array index'lar ham string: `arr["0"]`, `arr["1"]`).
+
+**Yechim:** Agar aniq tartib kerak bo'lsa — `Map` ishlating (insertion order kafolatlangan, har xil key turlari orasida tartib buzilmaydi) yoki `Object.keys()` natijasini manually sort qiling.
 
 ---
 
@@ -718,14 +1041,30 @@ console.log(copy);
 ### ✅ To'g'ri usul:
 
 ```javascript
-const copy = structuredClone(original);
+// ❌ original ichida function bor — structuredClone BUTUN ob'ektni rad etadi:
+try {
+  const copy = structuredClone(original);
+} catch (e) {
+  console.log(e); // DOMException (DataCloneError) — fn tufayli BUTUN clone rad etiladi
+}
+
+// ✅ Function'siz ob'ektda structuredClone to'liq ishlaydi:
+const safe = {
+  date: new Date(),
+  pattern: /test/gi,
+  undef: undefined,              // ✅ structuredClone undefined'ni SAQLAYDI
+  map: new Map([["a", 1]]),
+  set: new Set([1, 2, 3])
+};
+const copy = structuredClone(safe);
 // ✅ date → Date object saqlanadi
 // ✅ pattern → RegExp saqlanadi
-// ❌ fn — structuredClone ham function copy qilmaydi (DataCloneError)
+// ✅ undef → undefined sifatida saqlanadi (JSON bilan yo'qolar edi)
 // ✅ map → Map saqlanadi
+// ✅ set → Set saqlanadi
 ```
 
-**Nima uchun:** JSON faqat JSON-safe qiymatlarni qo'llab-quvvatlaydi. `Date`, `RegExp`, `Map`, `Set`, `undefined`, `Function`, `Symbol`, `Infinity`, `NaN` — barchasi yo'qoladi yoki noto'g'ri convert bo'ladi.
+**Nima uchun:** JSON faqat JSON-safe qiymatlarni qo'llab-quvvatlaydi. `undefined`, `Function`, `Symbol` yo'qoladi; `Infinity`, `NaN` → `null` ga aylanadi; `Date` → string ga aylanadi; `Map`, `Set`, `RegExp` → bo'sh object ga aylanadi. `structuredClone` esa HTML spec algoritmi bilan ishlaydi — u `undefined`, `Date`, `Map`, `Set`, `RegExp` va circular reference'larni yaxshi saqlaydi, lekin `Function`, `Symbol` va DOM node'larni rad etadi (`DataCloneError`).
 
 ---
 
@@ -804,7 +1143,7 @@ console.log(a.inner.y);  // ?
 
 ### Mashq 3: deepEqual Implement Qilish (Qiyin)
 
-**Savol:** `deepEqual(a, b)` funksiyasini yozing. Ikki qiymatning chuqur tenglgini tekshiradi.
+**Savol:** `deepEqual(a, b)` funksiyasini yozing. Ikki qiymatning chuqur tengligini tekshiradi.
 
 <details>
 <summary>Javob</summary>

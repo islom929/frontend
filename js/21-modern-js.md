@@ -18,6 +18,9 @@
 - [Numeric Separators](#numeric-separators)
 - [Regular Expressions](#regular-expressions)
 - [JSON — parse va stringify](#json--parse-va-stringify)
+- [RegExp Advanced — Performance va Xavfsizlik](#regexp-advanced--performance-va-xavfsizlik)
+- [Advanced Nullish Patterns — Real Production](#advanced-nullish-patterns--real-production)
+- [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
 - [Xulosa](#xulosa)
@@ -32,13 +35,17 @@ Destructuring — object yoki array ichidagi qiymatlarni alohida o'zgaruvchilarg
 
 Destructuring nima uchun kerak: (1) kamroq kod — `const name = user.name; const age = user.age;` o'rniga `const { name, age } = user;`, (2) aniqlik — funksiya parametrlarida qaysi property'lar ishlatilishini ko'rsatadi, (3) swap, nested data extract kabi operatsiyalarni sodda qiladi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Object destructuring — engine `ToObject()` operatsiyasini chaqiradi (agar primitive bo'lsa — wrapper object yaratiladi, `null`/`undefined` bo'lsa — TypeError). Keyin har bir destructuring pattern uchun `GetV()` — ya'ni property access — bajariladi. Default value faqat property qiymati **`undefined`** bo'lganda qo'llaniladi (`null` bo'lsa default ishlamaydi — chunki `null !== undefined`).
 
 Array destructuring — engine `Symbol.iterator` ni chaqiradi va har bir element uchun `next()` ishlatadi. Shuning uchun har qanday iterable (String, Map, Set, generator) array destructuring bilan ishlaydi.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // === Object Destructuring ===
@@ -129,6 +136,8 @@ function getFirstLast([first, ...rest]) {
 getFirstLast([10, 20, 30]); // { first: 10, last: 30 }
 ```
 
+</details>
+
 ---
 
 ## Spread va Rest Operators
@@ -141,11 +150,15 @@ getFirstLast([10, 20, 30]); // { first: 10, last: 30 }
 
 **Rest** (yig'ish) — bir nechta elementni bitta array yoki object'ga yig'adi. Funksiya parametrida: `function(...args)`, destructuring'da: `const { a, ...rest } = obj`. Rest element doim **oxirida** bo'lishi kerak — o'rtada yoki boshida bo'lishi SyntaxError.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Array spread — engine `Symbol.iterator` protocol'ini ishlatadi. Har qanday iterable spread qilish mumkin: Array, String, Map, Set, generator, NodeList. Object spread — `Object.keys()` + property copy. Engine ichida `CopyDataProperties()` abstract operation chaqiriladi — bu faqat **own enumerable** property'larni copy qiladi (prototype'dagi property'lar copy bo'lmaydi).
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // === Spread — Array ===
@@ -203,6 +216,8 @@ console.log(others); // [2, 3, 4]
 // const [...rest, last] = [1, 2, 3]; // SyntaxError!
 ```
 
+</details>
+
 ---
 
 ## Template Literals
@@ -213,7 +228,36 @@ Template literal (backtick string) — `` ` `` bilan o'ralgan string turi. 3 ta 
 
 `${}` ichidagi expression `ToString()` abstract operation orqali string'ga aylantiriladi. Har qanday expression bo'lishi mumkin: o'zgaruvchi, funksiya chaqiruvi, ternary, arifmetik operatsiya.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**ToString conversion**: `${expr}` ichidagi qiymat `ToString` abstract operation orqali string'ga aylantiriladi:
+
+```javascript
+`${42}`        // "42"
+`${null}`      // "null"
+`${[1, 2]}`    // "1,2"     (Array.toString)
+`${{a: 1}}`    // "[object Object]"
+`${Symbol()}`  // ❌ TypeError — Symbol string'ga avtomatik convert qilinmaydi
+```
+
+Symbol uchun explicit: `${String(Symbol())}` yoki `${sym.toString()}`.
+
+**Cooked vs Raw strings**: Tagged template ichida `strings.raw` orqali escape qilinmagan versiyaga kirish mumkin:
+```javascript
+function tag(strings) {
+  console.log(strings[0]);     // "Hello\nWorld" (newline)
+  console.log(strings.raw[0]); // "Hello\\nWorld" (literal \n)
+}
+tag`Hello\nWorld`;
+```
+
+**V8 caching**: Bir xil template literal uchun `strings` array memoize qilinadi — har chaqiruvda yangi yaratilmaydi. Bu lit-html va styled-components kabi kutubxonalarda cache yaratish uchun ishlatiladi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // String interpolation
@@ -249,6 +293,8 @@ const list = `
 // </ul>
 ```
 
+</details>
+
 ---
 
 ## Tagged Templates
@@ -261,11 +307,15 @@ Tagged template signature: `function tag(strings, ...values)`. `strings` — sta
 
 Bu pattern real-world da keng ishlatiladi: `styled-components` (CSS), `sql` template tags (SQL injection prevention), `html` (sanitization), `graphql` (query builder).
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Engine tagged template'ni chaqirganda: (1) `strings` array'i **frozen** (immutable) holda beriladi, (2) `strings.raw` property orqali escape qilinmagan raw string'larni olish mumkin — `\n` sifatida, yangi qator sifatida emas, (3) Bir xil template literal qayta-qayta chaqirilsa, engine bir xil `strings` array'ini qayta ishlatadi (identity check bilan cache qilish mumkin).
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Tag funksiya — strings va values ni alohida oladi
@@ -326,6 +376,8 @@ const path = String.raw`C:\Users\Ali\Desktop`;
 console.log(path); // "C:\Users\Ali\Desktop" — backslash escape qilinmadi
 ```
 
+</details>
+
 ---
 
 ## Default Parameters
@@ -336,11 +388,15 @@ Default parameter — funksiya argumenti berilmaganda (`undefined`) ishlatiladig
 
 Default parameter'lar **chapdan o'ngga** evaluate bo'ladi — shuning uchun oldingi parameter'ga keyingi default'da murojaat qilish mumkin. Har bir chaqiruvda default expression qayta evaluate bo'ladi — statik emas, dinamik. Bu object va array uchun muhim — har chaqiruvda yangi instance yaratiladi.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Default parameter'lar o'z **TDZ** (Temporal Dead Zone) ga ega. Har bir parameter alohida scope'da declare qilinadi. Keyingi parameter oldingi parameter'ga murojaat qilishi mumkin, lekin aksincha — yo'q (TDZ xatosi). Function body alohida scope'da — default parameter'lar bilan bir xil scope'da emas.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Asosiy
@@ -383,6 +439,8 @@ createUser("Ali");     // Error: age argument kerak
 createUser("Ali", 25); // { name: "Ali", age: 25 }
 ```
 
+</details>
+
 ---
 
 ## Optional Chaining
@@ -397,11 +455,15 @@ Optional chaining (`?.`) (ES2020) — `null` yoki `undefined` bo'lishi mumkin bo
 
 `?.` **short-circuit** evaluation qiladi — agar `null`/`undefined` uchraganda, o'ng tomondagi hech narsa evaluate bo'lmaydi. Bu side-effect'li expression'lar uchun muhim.
 
-### Under the Hood
+<details>
+<summary><strong>Under the Hood</strong></summary>
 
 Engine `?.` ni ko'rganda: (1) chap tomonni evaluate qiladi, (2) natija `null` yoki `undefined` mi tekshiradi (`== null` — ikkalasini ham qamraydi), (3) ha bo'lsa — butun zanjirni `undefined` bilan tugatadi (short-circuit), (4) yo'q bo'lsa — oddiy property access davom etadi.
 
-### Kod Misollari
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 const user = {
@@ -450,6 +512,8 @@ console.log(data?.title);  // "" — undefined emas!
 console.log(data?.active); // false — undefined emas!
 ```
 
+</details>
+
 ---
 
 ## Nullish Coalescing
@@ -462,7 +526,39 @@ Bu farq production da muhim: agar `0` yoki `""` yoki `false` valid qiymat bo'lsa
 
 `??` operator `||` va `&&` bilan qavsisiz aralashtirib bo'lmaydi — SyntaxError. Bu ambiguity oldini olish uchun.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Short-circuit**: `??` agar chap operand `null`/`undefined` bo'lmasa, o'ng operandni **evaluate qilmaydi**:
+```javascript
+const a = "hello";
+const result = a ?? expensiveCall(); // expensiveCall CHAQIRILMAYDI
+```
+
+**`||` va `??` aralashtirish TAQIQLANADI**: `a || b ?? c` — `SyntaxError`. Sabab — precedence ambiguity (`(a || b) ?? c` va `a || (b ?? c)` turli natija). Spec explicit qavsni majbur qiladi.
+
+**`??` vs `||` farqi** — qachon falsy qiymat saqlanadi:
+
+| Holat | `val \|\| def` | `val ?? def` |
+|-------|----------------|--------------|
+| `val = 0` | `def` | **`0`** ✅ |
+| `val = ""` | `def` | **`""`** ✅ |
+| `val = false` | `def` | **`false`** ✅ |
+| `val = null` | `def` | `def` |
+| `val = undefined` | `def` | `def` |
+
+`??` faqat `null`/`undefined` uchun fallback beradi — `0`, `""`, `false` valid qiymatlarni saqlaydi. Bu konfiguratsiya va default qiymatlarda xato manbai bo'ladi.
+
+**Eng kuchli pattern** — optional chaining bilan:
+```javascript
+const config = data?.user?.settings ?? defaultConfig;
+```
+React, Vue code'da yuzlab marta ishlatiladi — null check'ni butunlay yo'qotadi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // || vs ?? — asosiy farq
@@ -492,13 +588,17 @@ console.log(theme); // "light" — theme null bo'lgani uchun
 
 // ❌ || va && bilan aralashtirib bo'lmaydi (qavsisiz)
 // const x = a || b ?? c; // SyntaxError!
+const a = null, b = 0, c = "default";
 const x = (a || b) ?? c; // ✅ qavs bilan — to'g'ri
+console.log(x); // "default" — a va b falsy, natija c
 ```
 
 | Expression | `0` | `""` | `false` | `NaN` | `null` | `undefined` |
 |------------|-----|------|---------|-------|--------|-------------|
 | `val \|\| fallback` | fallback | fallback | fallback | fallback | fallback | fallback |
 | `val ?? fallback` | **0** | **""** | **false** | **NaN** | fallback | fallback |
+
+</details>
 
 ---
 
@@ -508,9 +608,34 @@ const x = (a || b) ?? c; // ✅ qavs bilan — to'g'ri
 
 `for...of` — **iterable** qiymatlar ustida iteratsiya (Array, String, Map, Set, NodeList, arguments, generator). `Symbol.iterator` protocol'ini ishlatadi. **Qiymatlarni** beradi.
 
-`for...in` — object'ning **enumerable string property key'lari** ustida iteratsiya. **Prototype chain** dagi property'larni ham o'z ichiga oladi. Faqat object uchun mo'ljallangan — array uchun ishlatish TAVSIYA QILINMAYDI (tartib kafolatlanmaydi, prototype property'lar kirib qoladi).
+`for...in` — object'ning **enumerable string property key'lari** ustida iteratsiya. **Prototype chain** dagi property'larni ham o'z ichiga oladi. Faqat object uchun mo'ljallangan — array uchun ishlatish TAVSIYA QILINMAYDI (key'lar string bo'ladi, prototype property'lar kirib qoladi, va non-index enumerable property'lar ham chiqadi).
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`for...of` — Iterator Protocol**: har iteratsiyada iterable'ning `[Symbol.iterator]()` orqali olingan iterator'ning `next()` methodini chaqiradi. `done: true` bo'lguncha davom etadi.
+
+**`for...in` — `[[OwnPropertyKeys]]` + prototype chain**: object'ning enumerable string key'larini va **prototype chain** dagi key'larni ham qaytaradi.
+
+**Nima uchun `for...in` array uchun xavfli**:
+```javascript
+Array.prototype.customMethod = function() {};
+const arr = [10, 20, 30];
+
+for (const key in arr) {
+  console.log(key); // "0", "1", "2", "customMethod"
+                    //                  ↑ prototype pollution!
+}
+```
+
+Lodash, MooTools kabi eski library'lar `Array.prototype` ga method qo'shgan paytlarda ko'p bug manbai bo'lgan. Shuning uchun array uchun doim `for`/`for...of`/`forEach` ishlating.
+
+**Performance**: oddiy `for` loop odatda eng tez (minimal overhead, JIT uchun maksimal optimizatsiya imkoniyati), keyin `for...of` (iterator protocol chaqiruvi), `forEach` (callback function chaqiruvi), va `for...in` (prototype chain traversal tufayli eng sekin). Aniq farq V8 versiyasi, loop body, va loop o'lchamiga bog'liq. Hot loop va katta data uchun `for` yoki `for...of` afzal, DX uchun `forEach`/`map`/`filter` — ko'pincha farq ahamiyatsiz.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // for...of — qiymatlar ustida (iterable)
@@ -556,6 +681,8 @@ for (const char of "Hello 👋") {
 | Map/Set | ✅ entry/value beradi | ❌ ishlamaydi |
 | Prototype | Bermaydi | **Beradi** — hasOwn tekshiruv kerak |
 
+</details>
+
 ---
 
 ## Logical Assignment Operators
@@ -570,7 +697,39 @@ ES2021 da 3 ta yangi assignment operator qo'shildi — mavjud logical operator'l
 
 **Short-circuit** — agar assign kerak bo'lmasa, o'ng tomon evaluate HAM bo'lmaydi. Bu `a = a || b` dan farqi: oddiy versiyada doim assign sodir bo'ladi (hatto qiymat o'zgarmasa ham), logical assignment'da assign faqat kerak bo'lganda sodir bo'ladi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Spec ekvivalenti**: `a ||= b` ≡ `a || (a = b)`, `a ??= b` ≡ `a ?? (a = b)`. Lekin **muhim nuansa** — assignment **shartli** bajariladi:
+
+```javascript
+a = a || b;  // DOIM yoziladi (hatto a truthy bo'lsa ham)
+a ||= b;     // faqat a falsy bo'lsa yoziladi
+```
+
+**Nima uchun bu farq muhim** — setter/Proxy ishlatilgan kontekstda keraksiz side effect'lar oldini oladi:
+```javascript
+const obj = {
+  _val: 10,
+  set val(v) { console.log("setter!"); this._val = v; }
+};
+obj.val = obj.val || 20;  // "setter!" chiqadi (har doim yoziladi)
+obj.val ||= 20;           // hech narsa (val truthy edi)
+```
+
+**Memoization pattern** — eng tez-tez ishlatiladigan use case:
+```javascript
+const cache = {};
+function getOrFetch(key) {
+  cache[key] ??= expensive(key);  // faqat yo'q bo'lsa hisoblanadi
+  return cache[key];
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // ||= — falsy bo'lganda assign (0, "", false, null, undefined, NaN)
@@ -607,6 +766,8 @@ function setup(options = {}) {
 setup({ port: 8080 }); // { port: 8080, host: "localhost", debug: false }
 ```
 
+</details>
+
 ---
 
 ## Numeric Separators
@@ -615,7 +776,23 @@ setup({ port: 8080 }); // { port: 8080, host: "localhost", debug: false }
 
 Numeric separator (`_`) (ES2021) — katta sonlarni o'qish osonlashtiradigan vizual ajratgich. Runtime da hech qanday ta'siri yo'q — faqat kod o'qish uchun. `1_000_000 === 1000000`. Har qanday son turida ishlatish mumkin: integer, float, binary, octal, hex, BigInt.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Faqat lexer darajasida**: Numeric separator parser AST yaratishdan oldin, lexer bosqichida olib tashlanadi. Runtime cost = 0 — JIT compiler raw raqam ko'radi (`1_000_000` va `1000000` bir xil bytecode beradi).
+
+**Grammar qoidalari** (SyntaxError beradigan holatlar):
+- `_1000` — identifier sifatida o'qiladi (boshida `_`)
+- `1000_` — oxirida bo'lishi mumkin emas
+- `1__000` — ketma-ket ikki `_` mumkin emas
+- `1._5` — decimal nuqta yonida bo'lishi mumkin emas
+
+Boshqa tillardan ilhom: Java 7+, Python 3.6+, Rust, Swift, C++14 (apostrophe bilan). JavaScript ES2021 da qabul qildi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // O'nli (decimal)
@@ -640,6 +817,8 @@ const huge = 9_007_199_254_740_993n;
 console.log(1_000_000 === 1000000); // true — runtime da farq yo'q
 ```
 
+</details>
+
 ---
 
 ## Regular Expressions
@@ -647,6 +826,30 @@ console.log(1_000_000 === 1000000); // true — runtime da farq yo'q
 ### Nazariya
 
 Regular Expression (RegExp) — matn ichida pattern bo'yicha qidirish, almashtirish va validatsiya uchun. JavaScript'da RegExp — birinchi darajali obyekt, maxsus literal sintaksisi bor: `/pattern/flags`. Ikki xil yaratish: literal (`/abc/g`) va constructor (`new RegExp("abc", "g")`). Constructor dinamik pattern uchun ishlatiladi.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Engine turi**: JavaScript RegExp — **NFA-based** (Non-deterministic Finite Automaton) + backtracking. V8'ning Irregexp engine regex'ni native machine code'ga JIT compile qiladi. Bu tez, lekin **catastrophic backtracking** muammosi bor.
+
+**Catastrophic backtracking**: NFA ba'zi pattern'larda eksponensial sekinlashadi:
+```javascript
+const regex = /^(a+)+$/;
+const text = "aaaaaaaaaaaaaaaaaaaaaaaa!"; // 24 'a' va '!'
+regex.test(text); // Ko'p sekund hang — exact timing hardware va V8 versiyaga bog'liq
+```
+
+Sabab: `(a+)+` har 'a' uchun turli guruh kombinatsiyalarini sinab ko'radi, 24 'a' → 2²⁴ ≈ 16M urinish. Bu **ReDoS** (Regular Expression Denial of Service) xavfi — CVE'lar: express, marked, lodash (eski versiyalar).
+
+**Yechimlar**: manual pattern rewrite, input length limit, `re2` kutubxonasi (DFA-based, exponential blowup yo'q).
+
+**Lookahead/Lookbehind** — **zero-width assertion**'lar, match'da o'rin egallamaydi:
+- `/foo(?=bar)/` — "foo" topilsa va keyingi belgilar "bar" bo'lsa
+- `/(?<=\$)\d+/` — raqam, oldida `$` bo'lishi shart
+
+Lookbehind ES2018 da qo'shilgan (Python, Java, .NET'da avvaldan bor edi).
+
+</details>
 
 ### Flags
 
@@ -661,7 +864,8 @@ Regular Expression (RegExp) — matn ichida pattern bo'yicha qidirish, almashtir
 | `d` | hasIndices | Match indeks'larini qaytaradi (ES2022) |
 | `y` | sticky | `lastIndex` pozitsiyasidan boshlab exact match |
 
-### Kod Misollari
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // Asosiy
@@ -674,6 +878,8 @@ console.log(emailRegex.test("ali@example.com")); // true
 "ab ab ab".match(/ab/);          // ["ab"] — faqat birinchisi
 "ab ab ab".match(/ab/g);         // ["ab", "ab", "ab"] — hammasi
 ```
+
+</details>
 
 ### Named Groups
 
@@ -701,12 +907,15 @@ console.log(reformatted); // "15/03/2024"
 // Lookahead — (?=...) positive, (?!...) negative
 // "Bu pattern KEYIN kelishi kerak, lekin match'ga kirmaydi"
 "100px 200em 300px".match(/\d+(?=px)/g); // ["100", "300"] — faqat px oldidagi sonlar
-"100px 200em 300px".match(/\d+(?!px)/g); // ["200", "30"] — px OLMAGANLAR
+"100px 200em 300px".match(/\d+(?!px)/g); // ["10", "200", "30"] — px OLMAGANLAR
+// "10" — \d+ "100" dan "10" ga backtrack qildi, "10" keyin "0" keladi, "px" emas → mos
+// "30" — xuddi shunaqa, "300" dan "30" ga backtrack
 
 // Lookbehind — (?<=...) positive, (?<!...) negative
 // "Bu pattern OLDIN kelgan bo'lishi kerak"
 "$100 €200 $300".match(/(?<=\$)\d+/g);   // ["100", "300"] — $ keyin kelganlar
-"$100 €200 $300".match(/(?<!\$)\d+/g);   // ["200"] — $ OLMAGANLARI (qisman)
+"$100 €200 $300".match(/(?<!\$)\d+/g);   // ["00", "200", "00"] — $ dan KEYIN boshlanMAGANLAR
+// "00" — "$1" dan keyin "00" boshlanadi, "0" oldida "1" bor ($ emas) → mos
 ```
 
 ### matchAll
@@ -724,7 +933,7 @@ for (const match of text.matchAll(regex)) {
   console.log(match[0]);  // "Ali 25 yosh", "Vali 30 yosh"
   console.log(match[1]);  // "Ali", "Vali"
   console.log(match[2]);  // "25", "30"
-  console.log(match.index); // 0, 14
+  console.log(match.index); // 0, 13
 }
 ```
 
@@ -755,7 +964,35 @@ console.log(matchD.indices.groups.word); // [0, 5] — named group pozitsiyasi
 
 `JSON.stringify()` ba'zi qiymatlarni **skip** qiladi yoki o'zgartiradi: `undefined`, `function`, `Symbol` — object'da skip, array'da `null` ga aylanadi. `Infinity`, `NaN` → `null`. `Date` → `.toISOString()` string. `BigInt` → `TypeError` (to'g'ridan-to'g'ri stringify mumkin emas). `toJSON()` method bor obyekt — shu method natijasini stringify qiladi.
 
-### Kod Misollari
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**JSON spec** (ECMA-404, RFC 8259): strict format — double-quoted strings, no comments, no trailing commas, no functions. JavaScript implementatsiyasi to'liq shunga mos.
+
+**`stringify` skip qiladi**: `undefined`, function, Symbol — object'da skip, array'da `null` ga aylanadi. `Infinity`, `NaN` → `null`. `BigInt` → `TypeError`. `Date` → `toJSON()` natijasi (ISO string).
+
+**`toJSON()` hook**: agar object'da `toJSON()` method bo'lsa, `JSON.stringify` avtomatik uni chaqiradi:
+```javascript
+const date = new Date('2024-01-15');
+JSON.stringify({ date }); // '{"date":"2024-01-15T00:00:00.000Z"}'
+// Date.prototype.toJSON avtomatik chaqirildi
+```
+
+**Reviver — post-order walking**: `JSON.parse(text, reviver)` har key-value uchun chaqiriladi — **children oldin, parent keyin**. Oxirgi chaqiruv `key === ""` (empty string) — root:
+```javascript
+JSON.parse('{"a":1,"b":{"c":2}}', (key, value) => {
+  console.log(key, value);
+  return value;
+});
+// "a" 1 → "c" 2 → "b" {c:2} → "" {a:1, b:{c:2}}
+```
+
+**Performance**: V8'da native C++ implementation — JavaScript funksiyalardan tezroq. Lekin reviver/replacer ishlatilsa, V8 fast path'dan chiqadi va sekinlashadi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
 // === JSON.parse — reviver bilan ===
@@ -871,6 +1108,799 @@ JSON.stringify([1, undefined, function(){}, Symbol(), 2]);
 BigInt.prototype.toJSON = function() { return this.toString(); };
 JSON.stringify({ big: 1n }); // '{"big":"1"}'
 ```
+
+</details>
+
+---
+
+## RegExp Advanced — Performance va Xavfsizlik
+
+### Nazariya
+
+**Catastrophic backtracking** — regex engine pattern'ga mos kelmagan string'ni tekshirganda, barcha mumkin bo'lgan kombinatsiyalarni sinab ko'radi (backtracking). Agar pattern noto'g'ri yozilgan bo'lsa, kombinatsiyalar soni **eksponensial** o'sadi — natijada regex bir necha soniya yoki daqiqa davomida "osib qoladi". Bu CPU ni 100% band qiladi va UI to'xtaydi.
+
+**ReDoS (Regular Expression Denial of Service)** — xavfsizlik xavfi. Hujumchi maxsus tayyorlangan input yuborib, server yoki browser'ni "osib qolishga" majbur qiladi. User input'ni regex bilan tekshirishda juda ehtiyot bo'lish kerak — ayniqsa server-side da.
+
+**Backtracking engine:** JavaScript regex engine — NFA (Nondeterministic Finite Automaton) tipida. NFA backtracking qiladi — muvaffaqiyatsiz bo'lsa orqaga qaytib boshqa yo'lni sinaydi. DFA (Deterministic) engine'lar backtracking qilmaydi, shuning uchun tezroq — lekin backreference va lookahead'ni qo'llab-quvvatlamaydi. JavaScript da faqat NFA.
+
+**Xavfli pattern'lar:**
+- **Nested quantifiers** — `(a+)+`, `(a*)*`, `(a+){2,}` — ichki va tashqi quantifier'lar kombinatsiyasi. Input `"aaaaaaaaaaaaaaX"` uchun `(a+)+$` — 2^n ta yo'l sinab ko'radi
+- **Overlapping alternation** — `(a|a)+` yoki `(.*|.+)+` — har bir pozitsiyada ikkala variant ham mos keladi, kombinatsiyalar ko'payadi
+- **Greedy + backtrack** — `.*` kabi greedy pattern'dan keyin aniq belgi — `".*"` kabi pattern uzun string'larda sekin
+
+**Safe regex yozish qoidalari:**
+- Atomic groups va possessive quantifiers backtracking'ni oldini oladi — lekin JavaScript da **mavjud emas** (Perl, Java da bor)
+- **Anchors** (`^`, `$`) — engine'ga qidiruv oraliqni chegaralash
+- **Specific character classes** — `\d+` yoki `[a-z]+` — `.+` dan ancha tez, chunki kamroq belgilar mos keladi
+- **Lazy quantifiers** (`+?`, `*?`) — ba'zi holatlarda tezroq, lekin doim emas
+- Input uzunligini **cheklash** — regex'dan oldin `if (str.length > 1000) return false;`
+- Regex'ni **test qilish** — [regex101.com](https://regex101.com) da debugger bilan
+
+**Common regex patterns:**
+- Email (sodda): `/^[^\s@]+@[^\s@]+\.[^\s@]+$/` — production uchun email validation regex bilan qilmaslik kerak, server-side check + confirmation email yaxshiroq
+- URL: `/^https?:\/\/[^\s/$.?#].[^\s]*$/`
+- Phone: `/^\+?[\d\s-()]{7,15}$/`
+- UUID: `/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**NFA backtracking algoritmi**: `(a+)+$` pattern va `"aaaaaX"` input uchun — har 'a' ikki guruhlash variantiga ega (outer yoki inner), total `2^n` kombinatsiya. 24 'a' = 16M urinish, 30 'a' = 1B, 40 'a' = 1T.
+
+**ReDoS turlari**:
+- **Polynomial** — `O(n²)`/`O(n³)` — bir necha sekund, lekin tugaydi
+- **Exponential** — `O(2^n)` — practically infinite hang
+
+**V8 protection**: V8 regex engine (Irregexp) ichki stack depth limit va recursion guard'larga ega — haddan tashqari chuqur backtracking'da engine bailout qiladi. Lekin bu to'liq himoya emas: catastrophic pattern uzun vaqt bloklaydi keyin baribir tugaydi. Real production himoyasi uchun **input length cheklash + safe pattern yozish + Web Worker ichida timeout bilan ishga tushirish** kerak.
+
+**RE2 kutubxonasi** — Google'ning NFA/DFA hybrid alternativasi. Catastrophic backtracking yo'q, har regex `O(n×m)` da bajariladi. Lekin backreference, lookahead va lookbehind cheklangan. Node.js uchun `re2` npm package.
+
+**Real ReDoS CVE'lar** (ishlash namunalari): `ansi-regex` (CVE-2021-3807), `semver` (CVE-2022-25883), `http-cache-semantics` (CVE-2022-25881), `nth-check` (CVE-2021-3803), `trim-newlines` (CVE-2021-33623). Bu package'larning barchasi keng tarqalgan dependency bo'lgan va npm ecosystem'da ReDoS patch'lari tarixan eng ko'p security advisory'lardan biri. Sabablari asosan: nested quantifier'lar (`(a+)+`), overlapping alternation (`(a|a)+`), yoki greedy backtracking patterns (`.*$`) uzun input'larda.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
+
+```javascript
+// === Catastrophic backtracking — xavfli pattern ===
+
+// ❌ XAVFLI — nested quantifier
+const dangerousRegex = /^(a+)+$/;
+
+// Qisqa input — tez ishlaydi
+console.time("short");
+dangerousRegex.test("aaaaaaa");          // true — tez
+console.timeEnd("short"); // < 1ms
+
+// Uzun input, oxirida mos kelmaydigan belgi — juda SEKIN
+console.time("long");
+dangerousRegex.test("aaaaaaaaaaaaaaaaaaaaaaaaaaX");
+console.timeEnd("long"); // SEKUNDLAR! yoki osib qoladi
+
+// Nima uchun? "aaaa...X" uchun engine:
+// 1. (aaaa...)(a) — X ga mos kelmadi, orqaga
+// 2. (aaa...)(aa) — X ga mos kelmadi, orqaga
+// 3. (aaa...)(a)(a) — X ga mos kelmadi...
+// Har bir 'a' 2 ta variant (ichki yoki tashqi guruhga) = 2^n kombinatsiya!
+```
+
+```javascript
+// === Xavfsiz alternativalar ===
+
+// ❌ Xavfli: nested quantifiers
+const bad1 = /^(a+)+$/;
+// ✅ Xavfsiz: nested quantifier'ni olib tashlash
+const good1 = /^a+$/;
+
+// ❌ Xavfli: overlapping alternation bilan quantifier
+const bad2 = /^(\w+|\d+)+$/;
+// ✅ Xavfsiz: overlap yo'q qilish
+const good2 = /^\w+$/;
+
+// ❌ Xavfli: greedy .* ketma-ket
+const bad3 = /^".*".*"$/;
+// ✅ Xavfsiz: specific character class
+const good3 = /^"[^"]*"[^"]*"$/;
+
+// ❌ Xavfli: email regex (catastrophic backtracking mumkin)
+const badEmail = /^([a-zA-Z0-9.]+)+@([a-zA-Z0-9.]+)+$/;
+// ✅ Xavfsiz: sodda va ishonarli
+const goodEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+```
+
+```javascript
+// === ReDoS himoya — input validation ===
+
+function safeRegexTest(pattern, input, maxLength = 1000) {
+  // 1. Input uzunligini cheklash
+  if (typeof input !== "string" || input.length > maxLength) {
+    return false;
+  }
+
+  // 2. Timeout bilan test (Web Worker ichida ishlatish mumkin)
+  try {
+    return pattern.test(input);
+  } catch (e) {
+    return false;
+  }
+}
+
+// === Common safe patterns ===
+
+const patterns = {
+  // Email — sodda, 99% holatlarda yetarli
+  email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+
+  // URL
+  url: /^https?:\/\/[^\s/$.?#].[^\s]*$/,
+
+  // Telefon raqam (xalqaro)
+  phone: /^\+?[\d\s\-()]{7,15}$/,
+
+  // UUID v4
+  uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+
+  // IP Address (IPv4)
+  ipv4: /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/,
+
+  // Hex color
+  hexColor: /^#([0-9a-f]{3}|[0-9a-f]{6})$/i,
+
+  // Parol kuchi: kamida 8 belgi, 1 katta, 1 kichik, 1 raqam
+  strongPassword: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/
+};
+
+// Test
+console.log(patterns.email.test("ali@mail.com"));       // true
+console.log(patterns.uuid.test("550e8400-e29b-41d4-a716-446655440000")); // true
+console.log(patterns.hexColor.test("#ff5733"));          // true
+console.log(patterns.strongPassword.test("Parol123"));   // true
+```
+
+```javascript
+// === Regex performance taqqoslash ===
+
+const testStr = "a]" + "a".repeat(25); // 27 belgi
+
+// ⚠️ Ortiqcha capture group — kichik overhead (lekin exponential EMAS)
+const slow = /^([a-zA-Z0-9])+$/; // har bir belgi uchun capture yangilanadi
+
+// ✅ Yaxshiroq — capture group shart emas
+const fast = /^[a-zA-Z0-9]+$/; // capture overhead yo'q, tezroq
+
+console.time("slow regex");
+slow.test(testStr);
+console.timeEnd("slow regex");
+
+console.time("fast regex");
+fast.test(testStr);
+console.timeEnd("fast regex");
+// fast regex ancha tez — capture group overhead yo'q
+
+// Qoida: agar capture kerak bo'lmasa, (?:...) yoki guruhsiz yozing
+// Qoida: .+ o'rniga [specific-chars]+ ishlating
+// Qoida: regex'dan oldin input.length tekshiring
+```
+
+</details>
+
+---
+
+## Advanced Nullish Patterns — Real Production
+
+### Nazariya
+
+Optional chaining (`?.`), nullish coalescing (`??`), va logical assignment operator'lari (`||=`, `&&=`, `??=`) alohida foydali, lekin ular **birga ishlatilganda** haqiqatan kuchli pattern'lar beradi. Bu section real-world production kodida tez-tez uchraydigan kombinatsiyalarni ko'rsatadi — React, Vue, Node.js backend kodida yuzlab marta ishlatiladigan shablonlar.
+
+Asosiy printsip: `null`/`undefined`'ni **aniq va explicit** handle qilish, lekin `0`, `""`, `false` kabi valid falsy qiymatlarni yo'qotmaslik. Eski JavaScript'da bu pattern'lar ko'p bo'lgan `&& || (default)` va `if (x !== null && x !== undefined)` yordamchi funksiyalar bilan yozilardi — hozir zamonaviy syntax bilan ancha qisqaroq.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Operator precedence** muhim:
+- `??` precedence: **3** (`&&` va `||` dan past)
+- `?.` precedence: **17** (`.` bilan bir xil, eng yuqori)
+- `||=`, `&&=`, `??=`: **2** (assignment, eng past)
+
+Shu sababli `a?.b?.c ?? default` toza ishlaydi — `?.` chain avval evaluate bo'ladi, `??` natijani oladi.
+
+**Short-circuit qoidasi:**
+- `a ?? b` — `a` null/undefined bo'lmasa, `b` evaluate qilinmaydi
+- `a?.b.c` — `a` null/undefined bo'lsa, `b.c` evaluate qilinmaydi (short-circuit butun zanjirga tarqaladi)
+- `a ||= b` — `a` truthy bo'lsa, `b` evaluate qilinmaydi VA **assign ham qilinmaydi**
+
+**V8 optimizatsiyasi:** zamonaviy V8 bu syntax'ni inline caches bilan ishlaydi — ya'ni `obj?.prop` monomorphic hidden class bilan to'g'ridan-to'g'ri `obj.prop` kabi tez ishlaydi (null branch CPU branch predictor tomonidan deyarli hech qanday overhead'siz handle qilinadi).
+
+</details>
+
+### Kod Misollari — Production Pattern'lar
+
+**Pattern 1: Default Configuration Merge**
+
+```javascript
+// ❌ Eski usul — verbose, 0/""/false xavfi
+function setupConfig(options) {
+  return {
+    host: options.host || "localhost",    // ❌ options.host === "" bo'lsa "localhost"
+    port: options.port || 3000,            // ❌ options.port === 0 bo'lsa 3000
+    debug: options.debug || false,         // ❌ options.debug === false → false (OK chance!)
+    timeout: options.timeout || 5000,      // ❌ options.timeout === 0 bo'lsa 5000
+  };
+}
+
+// ✅ Zamonaviy — nullish + logical assignment
+function setupConfig(options = {}) {
+  options.host ??= "localhost";
+  options.port ??= 3000;
+  options.debug ??= false;
+  options.timeout ??= 5000;
+  return options;
+}
+
+// ✅ Immutable versiyasi — spread + ??
+function setupConfigImmutable(options = {}) {
+  return {
+    host: options.host ?? "localhost",
+    port: options.port ?? 3000,
+    debug: options.debug ?? false,
+    timeout: options.timeout ?? 5000,
+  };
+}
+
+// Test:
+setupConfigImmutable({ port: 0, debug: false, host: "" });
+// { host: "", port: 0, debug: false, timeout: 5000 }
+// ✅ Barcha valid qiymatlar saqlandi — yo'qotilmadi
+```
+
+**Pattern 2: Deep Property Access with Fallback**
+
+```javascript
+const response = await fetch("/api/user");
+const data = await response.json();
+
+// ❌ Eski — manual null check'lar
+const city = data && data.user && data.user.address && data.user.address.city
+  ? data.user.address.city
+  : "Noma'lum";
+
+// ✅ Zamonaviy — optional chaining + nullish
+const city2 = data?.user?.address?.city ?? "Noma'lum";
+
+// ─── Nested defaults with arrays ───
+// API response: { users: [{ profile: { name: null } }] }
+
+// ❌ Eski
+const name = data.users[0] && data.users[0].profile && data.users[0].profile.name
+  || "Mehmon";  // ❌ null name "Mehmon" beradi, lekin "" bo'lsa ham "Mehmon" beradi
+
+// ✅ Zamonaviy
+const name2 = data?.users?.[0]?.profile?.name ?? "Mehmon";
+// data.users[0].profile.name === null → "Mehmon"
+// data.users[0].profile.name === "" → "" (valid empty string)
+// data.users[0] === undefined → "Mehmon"
+```
+
+**Pattern 3: Lazy Memoization — Compute Only If Needed**
+
+```javascript
+// ❌ Eski — har chaqiruvda tekshirish va assign
+const cache = {};
+function getOrCompute(key) {
+  if (cache[key] === undefined) {
+    cache[key] = expensiveComputation(key);
+  }
+  return cache[key];
+}
+
+// ✅ Zamonaviy — ??= bir qatorda
+const cache = {};
+function getOrCompute(key) {
+  return cache[key] ??= expensiveComputation(key);
+  // cache[key] null/undefined bo'lsa, compute qilinadi va assign bo'ladi
+  // Aks holda — hech narsa evaluate qilinmaydi (expensiveComputation chaqirilmaydi)
+}
+
+// Map bilan (Map'da ??= to'g'ridan-to'g'ri ishlamaydi, lekin):
+const mapCache = new Map();
+function getOrComputeMap(key) {
+  if (!mapCache.has(key)) {
+    mapCache.set(key, expensiveComputation(key));
+  }
+  return mapCache.get(key);
+}
+
+// Yoki kombinatsiya:
+function memoized(key) {
+  return mapCache.get(key) ?? (() => {
+    const value = expensiveComputation(key);
+    mapCache.set(key, value);
+    return value;
+  })();
+}
+```
+
+**Pattern 4: Safe Method Invocation (Observer/Callback Pattern)**
+
+```javascript
+// ❌ Eski — manual if
+function notifyObservers(event, data) {
+  if (event.onUpdate && typeof event.onUpdate === "function") {
+    event.onUpdate(data);
+  }
+}
+
+// ✅ Zamonaviy — optional method call
+function notifyObservers(event, data) {
+  event.onUpdate?.(data); // callback bor bo'lsa chaqiriladi
+}
+
+// React pattern — callback prop'lar
+function Button({ onClick, onDoubleClick, onHover }) {
+  return {
+    handleClick: (e) => onClick?.(e),         // ✅ undefined bo'lsa hech narsa
+    handleDoubleClick: (e) => onDoubleClick?.(e),
+    handleHover: (e) => onHover?.(e),
+  };
+}
+
+// Event emitter pattern
+class EventEmitter {
+  constructor() {
+    this.handlers = {};
+  }
+
+  emit(event, ...args) {
+    // Agar handler yo'q bo'lsa — silent skip
+    this.handlers[event]?.forEach(handler => handler(...args));
+  }
+}
+```
+
+**Pattern 5: State Update with Conditional Merge**
+
+```javascript
+// React-like state update
+function updateUser(user, updates) {
+  return {
+    ...user,
+    // Faqat mavjud field'larni yangilash — undefined bo'lsa eski qiymat saqlanadi
+    name: updates.name ?? user.name,
+    email: updates.email ?? user.email,
+    // Nested update
+    address: updates.address
+      ? { ...user.address, ...updates.address }
+      : user.address,
+    // Computed fields
+    lastModified: Date.now(),
+  };
+}
+
+// Alternative: conditional spread (faqat mavjud field'lar uchun)
+function updateUserV2(user, updates) {
+  return {
+    ...user,
+    ...(updates.name !== undefined && { name: updates.name }),
+    ...(updates.email !== undefined && { email: updates.email }),
+    lastModified: Date.now(),
+  };
+}
+
+// Updates: { name: "Yangi ism" } — faqat name yangilanadi, email saqlanadi
+```
+
+**Pattern 6: Array/Object Length Checks with Fallback**
+
+```javascript
+// ❌ Eski — length tekshirish uzoq
+const count = (arr && arr.length) || 0;          // ❌ length === 0 bo'lsa 0 (chance OK)
+const firstItem = (arr && arr[0]) || "default"; // ❌ arr[0] === 0 bo'lsa "default"
+
+// ✅ Zamonaviy
+const count2 = arr?.length ?? 0;
+const firstItem2 = arr?.[0] ?? "default";
+
+// Object keys count
+const keyCount = Object.keys(obj ?? {}).length;
+
+// Collection emptiness tekshirish
+function isEmpty(collection) {
+  if (collection == null) return true;          // null/undefined
+  if (Array.isArray(collection)) return collection.length === 0;
+  if (collection instanceof Map || collection instanceof Set) return collection.size === 0;
+  if (typeof collection === "object") return Object.keys(collection).length === 0;
+  return true;
+}
+
+// Usage
+if (isEmpty(data?.items)) {
+  showEmptyState();
+}
+```
+
+**Pattern 7: Chained Function Calls with Error Guard**
+
+```javascript
+// ❌ Eski — har chaqiruvdan oldin tekshirish
+function processData(data) {
+  if (data && data.transform) {
+    const transformed = data.transform();
+    if (transformed && transformed.validate) {
+      const validated = transformed.validate();
+      if (validated && validated.save) {
+        return validated.save();
+      }
+    }
+  }
+  return null;
+}
+
+// ✅ Zamonaviy — chained optional calls
+function processData(data) {
+  return data?.transform?.()?.validate?.()?.save?.() ?? null;
+}
+
+// Har bir step null qaytarsa — zanjir to'xtaydi va null qaytadi
+// Side-effect yo'q (expensiveMethod chaqirilmaydi)
+```
+
+**Pattern 8: Combining All — Real Production Example**
+
+```javascript
+// Config loader with fallback chain
+async function loadConfig() {
+  const config = {};
+
+  // 1. Environment variables (Node.js)
+  config.apiUrl ??= process.env.API_URL;
+  config.apiKey ??= process.env.API_KEY;
+
+  // 2. Config file
+  try {
+    const fileConfig = await loadFromFile("./config.json");
+    config.apiUrl ??= fileConfig?.api?.url;
+    config.apiKey ??= fileConfig?.api?.key;
+    config.timeout ??= fileConfig?.api?.timeout;
+  } catch (e) {
+    console.warn("Config file not found");
+  }
+
+  // 3. Defaults
+  config.apiUrl ??= "http://localhost:3000";
+  config.apiKey ??= "dev-key";
+  config.timeout ??= 5000;
+  config.retries ??= 3;
+
+  return config;
+}
+
+// ??= zanjiri priority chain yaratadi:
+// env → file → default
+// Har bosqich faqat oldingi bosqich null/undefined bo'lsa yangilanadi
+```
+
+**Qoidalar (best practice):**
+1. `??` — default values uchun (`||` o'rniga, `0`/`""`/`false` saqlash kerak bo'lganda)
+2. `?.` — faqat null bo'lishi **mumkin** bo'lgan joylarda (keraksiz `?.` kodga noaniqlik keltiradi)
+3. `??=` — memoization, lazy init, config merge
+4. Optional chaining yozish uchun emas (`obj?.prop = val` — SyntaxError)
+5. `??` ni `||`/`&&` bilan qavs'siz aralashtirmang — SyntaxError
+
+---
+
+## Edge Cases va Gotchas
+
+Modern JavaScript sintaksisi bo'yicha 5 ta nozik, production'da tez-tez uchrab, debug qilish qiyin bo'lgan gotcha.
+
+### Gotcha 1: `{ ...null }` → `{}` lekin `const { x } = null` → TypeError
+
+Spread operator `null`/`undefined` bilan **xato bermaydi** — bo'sh object qaytaradi. Lekin destructuring xuddi shu qiymatlar bilan **TypeError** beradi. Bu asymmetry kutilmagan.
+
+```javascript
+// ✅ Spread — null/undefined bilan xavfsiz
+const a = { ...null };       // {} — xato emas!
+const b = { ...undefined };  // {} — xato emas!
+const c = { ...{} };         // {}
+const d = [...[]];           // []
+// Array spread null/undefined bilan — TypeError (iterable emas)
+// const e = [...null];      // ❌ TypeError
+
+// ❌ Destructuring — null/undefined bilan TypeError
+// const { x } = null;       // TypeError: Cannot destructure property 'x' of null
+// const { y } = undefined;  // TypeError
+// const [z] = null;         // TypeError
+
+// ✅ Default bilan himoyalash
+const { x } = null ?? {};        // undefined — xato emas
+const { y } = undefined ?? {};   // undefined
+const [z] = null ?? [];          // undefined
+
+// ─── Funksiya parametrlarida ───
+// ❌ Xavfli — caller null yuborsa crash
+function processUser({ name, age }) {
+  return `${name}, ${age}`;
+}
+// processUser(null); // TypeError!
+
+// ✅ Default + nullish
+function processUser({ name, age } = {}) {
+  return `${name ?? "Noma'lum"}, ${age ?? 0}`;
+}
+processUser();            // "Noma'lum, 0"
+processUser({});          // "Noma'lum, 0"
+// processUser(null);      // Hali ham TypeError — default faqat undefined uchun
+processUser(null ?? {});  // "Noma'lum, 0" — ??qisqartma
+
+// ✅ Eng xavfsiz pattern
+function processUserSafe(input) {
+  const { name, age } = input ?? {};
+  return `${name ?? "Noma'lum"}, ${age ?? 0}`;
+}
+```
+
+**Nima uchun:** Object spread spec'i `CopyDataProperties(target, source)` ishlatadi, `source === null/undefined` bo'lsa — step 2'da `return target` (darhol qaytaradi, xato yo'q). Destructuring esa `RequireObjectCoercible` chaqiradi — `null`/`undefined` bo'lsa `TypeError` tashlaydi, chunki property access qilmoqchi. Array destructuring `GetIterator` ishlatadi — `null`/`undefined` iterable emas, xato.
+
+**Yechim:** Destructuring bilan ishlayotganda doim `?? {}` yoki `?? []` fallback ishlating. Funksiya parameter destructuring'da default `= {}` qo'shing, lekin bu faqat `undefined` ishlaydi — `null` uchun ichki `?? {}` kerak.
+
+### Gotcha 2: Object spread **symbol key'larni ham copy qiladi** — JSON.stringify esa yo'q
+
+Keng tarqalgan noto'g'ri tasavvur: "spread `Object.keys()` ishlatadi, shuning uchun symbol'lar copy bo'lmaydi". Aslida spread `Reflect.ownKeys()`'ga o'xshash — **string VA symbol key'larni ikkalasini ham** copy qiladi (faqat enumerable'larni). Lekin `JSON.stringify` symbol'larni **skip** qiladi. Bu asymmetry debugging paytida chalkashtiradi.
+
+```javascript
+const uid = Symbol("id");
+const secret = Symbol("secret");
+
+const obj = {
+  name: "Ali",
+  [uid]: 42,
+  [secret]: "top-secret",
+};
+
+// ✅ Object spread — symbol'lar copy bo'ladi!
+const copy = { ...obj };
+console.log(copy.name);      // "Ali"
+console.log(copy[uid]);      // 42 — copy bo'ldi!
+console.log(copy[secret]);   // "top-secret" — copy bo'ldi!
+
+// ❌ JSON.stringify — symbol'lar skip
+console.log(JSON.stringify(obj)); // '{"name":"Ali"}'  — uid va secret yo'q!
+
+// ❌ Object.keys — symbol'lar yo'q
+console.log(Object.keys(obj));             // ["name"] — faqat string key
+console.log(Object.getOwnPropertySymbols(obj)); // [Symbol(id), Symbol(secret)]
+console.log(Reflect.ownKeys(obj));          // ["name", Symbol(id), Symbol(secret)]
+
+// ─── Real implication: "sensitive" data spread ───
+class User {
+  constructor(name, password) {
+    this.name = name;
+    this[Symbol.for("password")] = password; // "yashirin" deb o'ylangan
+  }
+}
+
+const user = new User("Ali", "secret123");
+const clone = { ...user };
+console.log(clone[Symbol.for("password")]); // "secret123" — ⚠️ ko'rinadi!
+// Symbol key faqat "obfuscation" — haqiqiy privacy emas
+// True privacy uchun WeakMap yoki # private field ishlating
+
+// ✅ To'g'ri privacy pattern
+class UserSafe {
+  #password; // private field — spread'da ham skip bo'ladi
+
+  constructor(name, password) {
+    this.name = name;
+    this.#password = password;
+  }
+
+  checkPassword(input) {
+    return this.#password === input;
+  }
+}
+
+const safe = new UserSafe("Ali", "secret");
+const safeClone = { ...safe };
+console.log(safeClone); // { name: "Ali" } — #password yo'q!
+// safeClone.checkPassword — undefined (method ham copy bo'lmadi)
+```
+
+**Nima uchun:** ES2018 spec spread'ni `CopyDataProperties` ishlatish orqali aniqlagan, va bu abstract operation `OwnPropertyKeys` chaqiradi — u string va symbol'larni ikkalasini ham qaytaradi. Faqat non-enumerable property'lar skip bo'ladi. `Object.keys` esa faqat string keys qaytaradi (tarixiy sabab — symbol'lar ES6'da qo'shilgan). `JSON.stringify` JSON format'i uchun — JSON'da symbol bo'lishi mumkin emas.
+
+**Yechim:** "Yashirin" data uchun Symbol key ishlatmang — spread/Reflect.ownKeys bilan ochiladi. Private state kerak bo'lsa — ES2022 `#private` field'lari yoki WeakMap pattern. Agar faqat "serialization'dan yashirish" kerak bo'lsa — non-enumerable property'lar (`Object.defineProperty` `enumerable: false` bilan).
+
+### Gotcha 3: `JSON.parse` reviver `undefined` qaytarsa, property **o'chiriladi**
+
+`JSON.parse(text, reviver)` reviver funksiyasi har key-value uchun chaqiriladi. Agar reviver `undefined` qaytarsa — spec bo'yicha bu key natijadan **olib tashlanadi**. Bu ko'pincha kutilmagan "missing property" bug'iga olib keladi.
+
+```javascript
+const json = '{"name":"Ali","age":25,"password":"secret","active":true}';
+
+// Maqsad: "password" field'ni olib tashlash, boshqalarini saqlash
+const parsed = JSON.parse(json, (key, value) => {
+  if (key === "password") {
+    return undefined; // olib tashlash
+  }
+  return value; // boshqa qiymatlarni saqlash
+});
+
+console.log(parsed);
+// { name: "Ali", age: 25, active: true }
+// password field butunlay yo'q — spec bu key'ni o'chirdi
+
+// ❌ Common mistake — reviver "nothing" qaytarsa (implicit undefined):
+const parsedBad = JSON.parse(json, (key, value) => {
+  if (typeof value === "string") {
+    console.log("String:", value);
+    // return yo'q — implicit undefined
+  }
+  return value;
+});
+console.log(parsedBad);
+// { age: 25, active: true } — ❌ name, password yo'qoldi!
+// Sabab: string value'lar uchun return yo'q → undefined → key o'chirildi
+
+// ✅ To'g'ri pattern — doim value qaytarish
+const parsedGood = JSON.parse(json, (key, value) => {
+  if (typeof value === "string") {
+    console.log("String:", value);
+    return value; // ← explicit return
+  }
+  return value;
+});
+
+// ✅ Conditional transform — faqat kerakli joyda o'zgartirish
+const parsedTransform = JSON.parse(json, (key, value) => {
+  // ISO date string → Date object
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    return new Date(value);
+  }
+  // Boshqa hamma narsani saqlash — muhim!
+  return value;
+});
+
+// ─── Gotcha: Root reviver call ───
+// Reviver oxirida root uchun chaqiriladi: key === ""
+// Root'dan ham undefined qaytarsangiz — butun JSON.parse natijasi undefined!
+const rootTest = JSON.parse('{"a":1}', (key, value) => {
+  if (key === "") return undefined; // root
+  return value;
+});
+console.log(rootTest); // undefined — butun natija yo'qoldi!
+```
+
+**Nima uchun:** ECMAScript spec `JSON.parse` reviver'ni shunday belgilaydi: "If the returned value is `undefined`, the property is deleted from the result." Bu aslida **intentional feature** — filter qilish uchun. Lekin hujjatlashgan nuance, ko'p dasturchilar bilmaydi va "return forgot" bug'iga olib keladi.
+
+**Yechim:** Reviver yozayotganda **har tarmoqda** `return value` bo'lishiga ishonch hosil qiling. Filter pattern'da `return undefined` ni **intentional** ishlating, lekin accidental undefined'dan ehtiyot bo'ling. Arrow function bilan implicit return — bu erda xavfli (`(key, value) => value !== "password"` — boolean qaytaradi, property delete bo'lmaydi, lekin `false` qiymatga almashadi!).
+
+### Gotcha 4: `JSON.stringify` circular reference → `TypeError`, silent skip emas
+
+Object'da circular reference bo'lsa (`obj.self = obj`), `JSON.stringify` **xato tashlaydi** — silent skip yoki infinite loop emas. Bu `JSON.parse` error'dan farqli (parse circular qabul qilmaydi chunki JSON syntax'da aniqlab bo'lmaydi). Production'da bu keng uchraydi: React component fiber tree, DOM node'lar, event object'lari — barchasi circular.
+
+```javascript
+// Circular reference yaratish
+const parent = { name: "Parent" };
+const child = { name: "Child", parent };
+parent.child = child; // ← parent → child → parent
+
+// ❌ JSON.stringify — TypeError
+try {
+  JSON.stringify(parent);
+} catch (error) {
+  console.log(error.message);
+  // "Converting circular structure to JSON
+  //     --> starting at object with constructor 'Object'
+  //     |     property 'child' -> object with constructor 'Object'
+  //     --- property 'parent' closes the circle"
+}
+
+// DOM element — circular by design
+// JSON.stringify(document.body); // ❌ TypeError (parentNode, ownerDocument circular)
+
+// Event object — circular
+// document.addEventListener("click", (e) => {
+//   JSON.stringify(e); // ❌ TypeError — e.target.ownerDocument circular
+// });
+
+// ✅ Yechim 1: Custom replacer bilan seen set
+function stringifyCircular(obj) {
+  const seen = new WeakSet();
+  return JSON.stringify(obj, (key, value) => {
+    if (typeof value === "object" && value !== null) {
+      if (seen.has(value)) {
+        return "[Circular]"; // yoki undefined (skip)
+      }
+      seen.add(value);
+    }
+    return value;
+  });
+}
+
+const result = stringifyCircular(parent);
+console.log(result);
+// {"name":"Parent","child":{"name":"Child","parent":"[Circular]"}}
+
+// ✅ Yechim 2: structuredClone (ES2022) — circular qabul qiladi
+const cloned = structuredClone(parent);
+// structuredClone circular'ni to'g'ri handle qiladi
+// Lekin clone, serialization emas — JSON string kerak bo'lsa yaramaydi
+
+// ✅ Yechim 3: util.inspect (Node.js) — circular safe, lekin JSON emas
+const util = require("util");
+console.log(util.inspect(parent, { depth: null, showHidden: false }));
+// Parent: { name: 'Parent', child: { name: 'Child', parent: [Circular *1] } }
+
+// ✅ Yechim 4: Kutubxonalar — flatted, safe-json-stringify
+// import flatted from "flatted";
+// const str = flatted.stringify(parent); // circular-safe
+// const obj = flatted.parse(str);
+```
+
+**Nima uchun:** JSON format'i o'zi tree structure — DAG (Directed Acyclic Graph) emas. `{a: {b: {c: ...}}}` cheklangan bo'lishi kerak. Spec `JSON.stringify` algoritmini recursive ko'rinishda belgilaydi va circular detection bilan — xato tashlaydi. Bu "fail fast" printsipi: silent skip infinite loop va memory exhaustion'ga olib kelishi mumkin edi.
+
+**Yechim:** Production'da har `JSON.stringify` chaqirig'i try/catch'ga o'rash — ayniqsa external data bilan. Circular handling kerak bo'lsa — custom replacer bilan `WeakSet` visited tracking, yoki `flatted` kutubxonasi.
+
+### Gotcha 5: Optional chaining function call — `obj?.fn()` vs `obj.fn?.()` farq
+
+Optional chaining'ni funksiya bilan ishlatganda **ikki xil pattern** bor: `obj?.fn()` — **object**'ning null bo'lish ehtimolini handle qiladi; `obj.fn?.()` — **method**'ning yo'q bo'lish ehtimolini handle qiladi. Ularni aralashtirish keng xatolarga olib keladi.
+
+```javascript
+// Pattern 1: obj null bo'lishi mumkin, lekin method doim bor
+const user = getUserFromDatabase(); // null bo'lishi mumkin
+user?.updateLastSeen();
+// ✅ user null bo'lsa — short-circuit, hech narsa bo'lmaydi
+// user mavjud bo'lsa — user.updateLastSeen() chaqiriladi
+
+// Pattern 2: obj doim bor, lekin method optional
+const api = getApiInstance(); // doim bor
+api.beforeRequest?.(); // ✅ beforeRequest method yo'q bo'lsa — skip
+api.afterResponse?.(); // ✅ method yo'q bo'lsa — skip
+api.logRequest();       // doim bor, `?` kerak emas
+
+// ❌ Xato: ikki noaniqlikni aralashtirish
+// Agar api null bo'lsa, bu crash qiladi:
+api.beforeRequest?.(); // ❌ api.beforeRequest ichida api read — TypeError if api is null
+
+// ✅ To'g'ri: ikkala darajani ham handle qilish
+api?.beforeRequest?.();
+// ?. api null bo'lsa — short-circuit butun chain
+// ?. beforeRequest yo'q bo'lsa — ham short-circuit
+
+// ─── Common trap: parens va arrow function ───
+const arr = getArray(); // null bo'lishi mumkin
+
+// ❌ Noto'g'ri — arrow parentheses'ga tushadi
+// const item = arr?.map(x => x.name);
+// Bu aslida ishlaydi — ?. map dan oldin
+// arr null bo'lsa — natija undefined, map chaqirilmaydi
+
+// ❌ Xavfli — element access + method call
+const firstName = arr?.[0].name; // ❌ arr[0] undefined bo'lsa — TypeError
+// ?. arr ni tekshiradi, [0] ni emas
+
+// ✅ Har elementni ham tekshirish
+const firstName2 = arr?.[0]?.name; // ✅ ikkisi ham optional
+
+// ─── Real example: Event handler chain ───
+element.addEventListener("click", (e) => {
+  // 1. dataset bor-yo'qligini tekshirish
+  const data = e.target?.dataset;
+
+  // 2. Ma'lum bir data field
+  const action = e.target?.dataset?.action;
+
+  // 3. Handler chaqirish
+  handlers[action]?.(e.target); // ✅ handler yo'q bo'lsa — skip
+
+  // Alternative — ikkita tekshiruv bir joyda
+  handlers?.[action]?.(e.target);
+  // handlers object null bo'lsa ham, action yo'q bo'lsa ham — xavfsiz
+});
+```
+
+**Nima uchun:** `obj?.fn()` parser tomonidan shunday parse qilinadi: "`obj` ni evaluate qil, `null`/`undefined` bo'lsa undefined qaytar (short-circuit), aks holda `obj.fn` ni ol va chaqir". `obj.fn?.()` esa: "`obj.fn` ni ol (obj null bo'lsa crash!), `null`/`undefined` bo'lsa undefined, aks holda chaqir". Ikki ifoda semantikasi butunlay farqli — har biri o'ziga xos use case uchun.
+
+**Yechim:** Har darajadagi null ehtimolini alohida tekshirish kerak. Agar "hech narsa mavjud bo'lmasligi mumkin" degan vaziyat bo'lsa — har qadamda `?.` qo'shing: `a?.b?.c?.()`. Minimal `?.` — faqat kerakli joylarda — kod aniqligi uchun yaxshi, lekin xavf bo'lgan joylarda ularni o'tkazib yuborish bug manbai.
 
 ---
 
