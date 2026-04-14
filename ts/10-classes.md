@@ -2359,10 +2359,10 @@ class SuperAdmin extends Admin {
     name: string,
     email: string,
     permissions: string[],
-    public isGod: boolean
+    public isRoot: boolean
   ) {
     super(name, email, permissions);
-    console.log(`SuperAdmin constructor: isGod=${isGod}`);
+    console.log(`SuperAdmin constructor: isRoot=${isRoot}`);
   }
 }
 
