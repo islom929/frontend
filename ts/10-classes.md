@@ -2370,7 +2370,7 @@ class SuperAdmin extends Admin {
 // Output:
 // User constructor: Ali
 // Admin constructor: 1 permissions
-// SuperAdmin constructor: isGod=true
+// SuperAdmin constructor: isRoot=true
 
 // 6. instanceof chain
 class A {}
