@@ -194,7 +194,7 @@
 - Composition vs Inheritance — "has-a" vs "is-a", gorilla-banana muammosi
 - OOP vs Functional Programming — taqqoslash, qachon qaysi biri
 - Proxy bilan OOP — metaprogramming, validation, observable, access control
-- Common Mistakes — deep hierarchy, god object, noto'g'ri inheritance
+- Common Mistakes — deep hierarchy, ulkan object, noto'g'ri inheritance
 
 **Keyingi bo'limga ilova:** → `09-functions.md` — Functions first-class citizens, HOF, currying, memoization.
 

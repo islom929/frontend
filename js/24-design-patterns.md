@@ -2173,7 +2173,7 @@ formatters.protobuf = (data) => convertToProtobuf(data);
 
 ---
 
-### ❌ Xato 4: God Mediator — hamma narsani bitta joyga yig'ish
+### ❌ Xato 4: Ulkan Mediator — hamma narsani bitta joyga yig'ish
 
 ```javascript
 // ❌ Mediator juda ko'p mas'uliyat oladi

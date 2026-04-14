@@ -96,7 +96,7 @@ class Car {
 | Testing | Qiyin | Oson (DI) |
 
 ```typescript
-// ❌ God class — barcha base da
+// ❌ Ulkan class — barcha base da
 class BaseService {
   log(msg: string): void { }
   cache(key: string): void { }
