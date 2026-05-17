@@ -190,7 +190,9 @@ async function example() {       ┌──────────────�
 }
 ```
 
-Spec bo'yicha `await` operatori ichida **PromiseResolve** abstract operation chaqiriladi. Agar operand allaqachon Promise bo'lsa — uni to'g'ridan-to'g'ri ishlatadi (V8 7.2+ optimizatsiyasi). Agar oddiy qiymat bo'lsa — `Promise.resolve()` bilan wrap qiladi. Keyin `.then()` handler'i orqali funksiya davom ettiriladi — bu handler microtask queue'ga joylashadi.
+Spec bo'yicha `await` operatori ichida **PromiseResolve** abstract operation chaqiriladi. Agar operand allaqachon native Promise bo'lsa (`IsPromise(x) && x.constructor === %Promise%`) — spec qoidasi bo'yicha uni to'g'ridan-to'g'ri ishlatadi (qo'shimcha wrap qilmaydi). Agar oddiy qiymat yoki thenable bo'lsa — `Promise.resolve()` bilan wrap qiladi. Keyin `.then()` handler'i orqali funksiya davom ettiriladi — bu handler microtask queue'ga joylashadi.
+
+V8 7.2+ (Chrome 72+, Node.js 12+) ning haqiqiy optimizatsiyasi boshqa narsa — **ES2020 spec change**'i bilan `AsyncFunctionAwait`'ning **intermediary "throwaway" Promise**'ini olib tashlagan (3 microtick → 1 microtick). Bu quyida "V8 Optimization: Zero-Cost Async/Await" bo'limida batafsil.
 
 > **Eslatma:** Event loop mexanizmi haqida batafsil — [11-event-loop.md](11-event-loop.md), Promises haqida — [12-promises.md](12-promises.md)
 
@@ -1692,7 +1694,7 @@ async function main() {
 broken().catch(e => console.log("caught:", e.message));
 ```
 
-**Nima uchun:** Spec bo'yicha async funksiya chaqirilganda darhol Promise yaratiladi. Body ichida har qanday `throw` — shu Promise'ni reject qiladi, sync execution'ga tegmaydi. Bu async funksiyaning **asosiy kontrakti**: "returns a Promise" kafolati — throw bo'lgan bo'lsa ham, mic-mic yoki sync'da ham.
+**Nima uchun:** Spec bo'yicha async funksiya chaqirilganda darhol Promise yaratiladi. Body ichida har qanday `throw` — shu Promise'ni reject qiladi, sync execution'ga tegmaydi. Bu async funksiyaning **asosiy kontrakti**: "returns a Promise" kafolati — throw `await`'dan keyin (microtask'da) bo'lsa ham, funksiya tanasining boshida sync bajarilganda ham.
 
 **Yechim:** Async funksiyani har doim `await` yoki `.catch()` bilan chaqiring. Sync chaqiruv (`broken();` alohida) — unhandledrejection event'ini trigger qiladi (Node.js 15+ da process crash).
 

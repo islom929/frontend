@@ -732,7 +732,9 @@ function teardownFixed() {
 
 ### 4. Closures — Katta Data ni Ushlab Turish
 
-Spec darajasida closure o'zi yaratilgan `LexicalEnvironment`'ga reference saqlaydi — ya'ni tashqi scope'dagi **barcha** o'zgaruvchilar potentsial ushlab turilishi mumkin. V8 escape analysis bilan qaysi o'zgaruvchilar haqiqatan closure body'sida ishlatilishini aniqlaydi va kerak bo'lmaganlarni context slot'idan chiqarib tashlashga harakat qiladi, lekin bu optimizatsiya har doim ham ishlamaydi — `eval`, `with`, `arguments`, yoki xatto murakkab control flow uni bekor qilishi mumkin. Agar closure body'si katta o'zgaruvchini eslatib qolsa (optimizatsiya ishlamasa yoki haqiqatan kerak bo'lsa) — u data GC tozalay olmaydi:
+Spec darajasida closure o'zi yaratilgan `LexicalEnvironment`'ga reference saqlaydi — ya'ni tashqi scope'dagi **barcha** o'zgaruvchilar potentsial ushlab turilishi mumkin. V8 **scope analysis** (context allocation optimizatsiyasi) bilan qaysi o'zgaruvchilar haqiqatan inner funksiya(lar) tomonidan **captured** qilinganini aniqlaydi va faqat shularni Context object slot'iga joylashtiradi — qolganlari stack frame slot'ida qoladi va funksiya tugaganda tozalanadi. Lekin bu optimizatsiya har doim ham ishlamaydi — `eval`, `with`, `arguments`, yoki murakkab control flow uni bekor qilishi mumkin. Agar closure body'si katta o'zgaruvchini haqiqatan eslatib qolsa — u data GC tozalay olmaydi:
+
+> **Eslatma:** Bu **escape analysis**'dan farqli optimization. Escape analysis esa object'ning funksiyadan "qochib chiqish"ini tekshiradi (agar qochmasa — scalar replacement qilinadi, ya'ni object hech yaratilmaydi, property'lari register'larga bo'linadi). Ikki xil V8 optimization, turli bosqichlarda ishlaydi.
 
 ```javascript
 // ❌ Memory Leak — closure butun katta dataset ni ushlab turadi
@@ -1599,7 +1601,10 @@ btn = null;
 // Entry GC tozalashi KERAK edi, lekin:
 // - cache entry value hali ham btn ga reference qiladi
 // - value root emas, lekin WeakMap kalit'ni ushlab turadigan "reachability path" hosil qiladi
-// Aslida V8 bu pattern'ni aniqlay oladi va tozalaydi (ephemeron semantikasi),
+// ES spec'da WeakMap uchun ephemeron semantikasi belgilangan — har compliant engine
+// (V8, SpiderMonkey, JSC) bu qoidani bajarishi SHART: "value faqat kalit reachable bo'lsagina
+// tirik, kalit esa value reachable bo'lishi sababli tirik tutilmaydi". Shu tufayli
+// "value → kalit" self-reference pattern o'zi memory leak bermaydi.
 // LEKIN quyidagi versiya aniq leak beradi:
 
 const observers = [];
@@ -1620,7 +1625,7 @@ function forEachTracked(callback) {
 }
 ```
 
-**Nima uchun:** WeakMap aslida **ephemeron** semantikasini qo'llaydi (V8 da): entry faqat kalit reachable bo'lsa saqlanadi va faqat o'sha paytda value'ni ushlab turadi. Lekin agar value'ga **tashqi strong reference** bo'lsa (masalan `observers` array), value tirik qoladi va shu orqali kalit ham transitive reachable bo'ladi — GC tozalay olmaydi.
+**Nima uchun:** WeakMap **ephemeron** semantikasiga ega — bu ECMAScript spec qoidasi (V8-specific emas, barcha compliant engine'lar buni bajaradi): entry faqat kalit reachable bo'lsa saqlanadi va faqat o'sha paytda value'ni ushlab turadi. Lekin agar value'ga **tashqi strong reference** bo'lsa (masalan `observers` array), value tirik qoladi va shu orqali kalit ham transitive reachable bo'ladi — GC tozalay olmaydi.
 
 **Yechim:** WeakMap value'sida kalit'ga yoki boshqa shu kalit bilan bog'liq object'ga strong reference saqlamang. Agar metadata kalit bilan birga kerak bo'lsa — uni callback orqali passing qiling yoki alohida WeakRef ishlating.
 

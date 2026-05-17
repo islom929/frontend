@@ -135,8 +135,9 @@ Promise settle bo'lganda, tegishli reaction list'dagi barcha handler'lar **micro
 ```
 Promise Object (Internal):
 ┌──────────────────────────────────────────┐
-│  [[PromiseState]]:  "pending"            │
-│  [[PromiseResult]]: undefined            │
+│  [[PromiseState]]:      "pending"        │
+│  [[PromiseResult]]:     undefined        │
+│  [[PromiseIsHandled]]:  false            │
 │                                          │
 │  [[PromiseFulfillReactions]]: [          │
 │    { handler: thenCallback1 },           │
@@ -284,6 +285,13 @@ const rejected = Promise.reject(new Error("xato"));
 const p1 = Promise.resolve(42);
 const p2 = Promise.resolve(p1);
 console.log(p1 === p2); // true — bir xil object
+
+// DIQQAT: bu optimizatsiya faqat `p1.constructor === receiver` bo'lganda ishlaydi.
+// Subclass bo'lsa — yangi instance yaratiladi:
+class MyPromise extends Promise {}
+const mp = MyPromise.resolve(p1);
+console.log(mp === p1);           // false — wrap qilinadi
+console.log(mp instanceof MyPromise); // true
 ```
 
 </details>
@@ -973,7 +981,7 @@ new Promise(resolve => resolve(42)).then(v => console.log("C:", v));
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Production pattern'lar Promise'ning internal mechansim'lariga asoslanadi. **Retry pattern** — `catch` handler ichida yangi Promise qaytarish orqali chain'ni davom ettiradi: `.catch(err => { return new Promise(...) })` — bu yangi Promise'ning `[[PromiseFulfillReactions]]` ga keyingi `then` handler qo'shiladi, shu tariqa rekursiv chain hosil bo'ladi. Har bir retry yangi Promise object allocate qiladi — V8 da bu ~80 byte (internal slots + reaction lists). **Timeout pattern** `Promise.race()` ishlatadi — spec bo'yicha race ichki'da barcha Promise'larga `.then()` qo'shadi, birinchi settle bo'lgan Promise'ning qiymati yoki reason'i natija Promise'ga o'tadi. Muhim: `race` da yutqazgan Promise'lar cancel qilinmaydi — ular background'da davom etadi, faqat natijalari ignore qilinadi. **Concurrent limit** pattern'da `active` counter bilan Promise'lar boshqariladi — bu manual scheduling, engine'ning o'zi concurrency limit bermaydi. `AbortController.signal` — EventTarget subclass, `abort()` chaqirilganda `abort` event dispatch qiladi. `fetch` internal'da signal'ga listener qo'shadi va abort bo'lganda network request'ni cancel qilib `AbortError` bilan reject qiladi — bu haqiqiy OS-level socket cancel.
+Production pattern'lar Promise'ning internal mechansim'lariga asoslanadi. **Retry pattern** — `catch` handler ichida yangi Promise qaytarish orqali chain'ni davom ettiradi: `.catch(err => { return new Promise(...) })` — `.catch()` o'z `resultPromise`'ni qaytaradi, va handler'ning return qiymati (inner Promise) `PromiseResolveThenableJob` orqali `resultPromise` tomonidan **adopt** qilinadi. Keyingi `.then()` handler'lari aynan shu `resultPromise`'ning reaction list'iga qo'shiladi (inner Promise'niki emas) — shu tariqa rekursiv chain hosil bo'ladi. Har bir retry yangi Promise object allocate qiladi — V8 da bu ~80 byte (internal slots + reaction lists). **Timeout pattern** `Promise.race()` ishlatadi — spec bo'yicha race ichki'da barcha Promise'larga `.then()` qo'shadi, birinchi settle bo'lgan Promise'ning qiymati yoki reason'i natija Promise'ga o'tadi. Muhim: `race` da yutqazgan Promise'lar cancel qilinmaydi — ular background'da davom etadi, faqat natijalari ignore qilinadi. **Concurrent limit** pattern'da `active` counter bilan Promise'lar boshqariladi — bu manual scheduling, engine'ning o'zi concurrency limit bermaydi. `AbortController.signal` — EventTarget subclass, `abort()` chaqirilganda `abort` event dispatch qiladi. `fetch` internal'da signal'ga listener qo'shadi va abort bo'lganda network request'ni cancel qilib `AbortError` bilan reject qiladi — bu haqiqiy OS-level socket cancel.
 
 </details>
 

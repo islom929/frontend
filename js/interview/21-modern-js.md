@@ -9,7 +9,7 @@
 ### 1. Destructuring nima va qanday turlariga bo'linadi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Destructuring — object yoki array ichidagi qiymatlarni alohida o'zgaruvchilarga ajratib olish. 3 turi bor:
 
@@ -45,7 +45,7 @@ Object destructuring — `ToObject()` + property access. Array destructuring —
 ### 2. Spread va Rest operatorlarining farqi nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Ikkalasi ham `...` sintaksisi, lekin kontekstga qarab farq qiladi:
 
@@ -76,7 +76,7 @@ const { password, ...safeUser } = { name: "Ali", age: 25, password: "s" };
 ### 3. Tagged template nima va real-world da qayerda ishlatiladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Tagged template — template literal oldiga funksiya nomi qo'yish. Funksiya static string qismlarini va dynamic qiymatlarni alohida oladi:
 
@@ -106,7 +106,7 @@ Real-world ishlatilishi:
 ### 4. `?.` (optional chaining) va `??` (nullish coalescing) farqi nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `?.` — null/undefined bo'lishi mumkin bo'lgan qiymat property'siga **xavfsiz murojaat**. TypeError o'rniga `undefined` qaytaradi.
 
@@ -137,7 +137,7 @@ const theme = user?.settings?.theme ?? "light";
 ### 5. Default parameter qachon ishlaydi, qachon ishlamaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Default parameter faqat argument `undefined` bo'lganda ishlaydi:
 
@@ -164,8 +164,10 @@ function addToList(item, list = []) {
   return list;
 }
 addToList("a"); // ["a"] — yangi array
-addToList("b"); // ["b"] — yana yangi array! (Python da muammo bo'lardi)
+addToList("b"); // ["b"] — yana yangi array, oldingi chaqiruvdan mustaqil
 ```
+
+Bu xulq-atvor ECMAScript spec'da `FunctionDeclarationInstantiation` algoritmida belgilangan — default expression har funksiya chaqiruvida `Evaluation` orqali qayta bajariladi.
 
 
 </details>
@@ -173,7 +175,7 @@ addToList("b"); // ["b"] — yana yangi array! (Python da muammo bo'lardi)
 ### 6. `for...of` va `for...in` qachon ishlatiladi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | | `for...of` | `for...in` |
 |---|---|---|
@@ -207,7 +209,7 @@ for (const [key, value] of Object.entries(user)) {
 ### 7. `||=`, `&&=`, `??=` operator'larini tushuntiring [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Operator | Ma'nosi | Qachon assign qiladi |
 |----------|---------|---------------------|
@@ -237,7 +239,7 @@ val ??= expensiveComputation(); // chaqirilMAYDI — val null/undefined emas
 ### 8. JSON.stringify qaysi qiymatlarni skip qiladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 const data = {
@@ -273,7 +275,7 @@ console.log(JSON.stringify(data));
 ### 9. JSON.stringify ning replacer va space argumentlarini tushuntiring [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 const user = { name: "Ali", password: "secret", age: 25, role: "admin" };
@@ -302,7 +304,7 @@ JSON.stringify(user, null, "\t"); // tab indent
 ### 10. RegExp named groups va matchAll nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Named groups — match natijalariga nom berish (`groups` property):
 
@@ -338,7 +340,7 @@ for (const m of text.matchAll(regex)) {
 ### 11. Lookbehind va Lookahead nima? Misol bering [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Lookahead/lookbehind — pattern'ni match'ga **kiritmasdan** tekshirish:
 
@@ -364,9 +366,23 @@ strongPassword.test("Abc1!xyz"); // true
 strongPassword.test("abcdefgh"); // false — katta harf va raqam yo'q
 ```
 
-**Deep Dive:**
+**Edge Cases:**
+- **Zero-width assertion**: Lookbehind/lookahead match'ga uzunlik qo'shmaydi — pozitsiyani tekshiradi, lekin `lastIndex`'ni o'zgartirmaydi
+- **Nested groups**: Lookbehind ichida capture group yozilsa — uning index'i butun pattern ichida hisoblanadi
+- **Variable-length lookbehind**: ES2018+ engine'larda `(?<=ab|abc)` kabi turli uzunlikdagi lookbehind ishlaydi, lekin V8 implementation backward scanning algoritmidan foydalanadi — performance differensial bo'lishi mumkin
 
-Lookbehind ES2018 da qo'shildi (oldin faqat lookahead bor edi). Safari da lookbehind qo'llab-quvvatlash kech qo'shildi (v16.4+). Lookbehind'da variable-length pattern ishlaydi, lekin ba'zi engine'larda cheklovlar bor.
+**Follow-up savollar:**
+1. **Lookahead'ni capture group bilan birga ishlatish mumkinmi?** — Ha, lekin lookahead'ning o'zi `match`'ga kirmaydi, faqat ichidagi capture group natijasi `groups` da bo'ladi.
+2. **`(?:...)` non-capturing group lookahead/lookbehind bilan farqi nima?** — `(?:...)` match'ga kiradi (faqat capture qilmaydi), lookahead esa match'ga umuman kirmaydi (zero-width).
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Lookbehind ES2018 (`RegExpAssertion` productionidagi `(?<=Pattern)` va `(?<!Pattern)`) da qo'shildi (oldin faqat lookahead `(?=...)`/`(?!...)` bor edi). Safari'da lookbehind qo'llab-quvvatlash v16.4 dan boshlab to'liq mavjud. Lookbehind'da variable-length pattern ishlaydi (oldindan ma'lum maksimal uzunlik kerak emas) — V8 engine'da bu backward execution algoritmi orqali implement qilingan: regex match pozitsiyasidan orqaga qarab pattern'ni evaluate qiladi.
+
+Specdagi `IsCharacterClass` va `Atom :: ( ? <= Disjunction )` productions lookbehind'ning grammatical tuzilishini belgilaydi. Capture group lookbehind ichida ishlaydi va outer pattern'da `\1` orqali backreference qilinishi mumkin.
+
+</details>
 
 
 </details>
@@ -374,7 +390,7 @@ Lookbehind ES2018 da qo'shildi (oldin faqat lookahead bor edi). Safari da lookbe
 ### 12. `String.raw` nima va qachon ishlatiladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `String.raw` — built-in tagged template, escape sequence'larni **qayta ishlamaydi**:
 
@@ -404,7 +420,7 @@ new RegExp(pattern); // /\d+\.\d+/
 ### 13. Swap, filter, va clean object — destructuring bilan qanday qilinadi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 // 1. Swap — vaqtinchalik o'zgaruvchisiz
@@ -434,7 +450,7 @@ const { data: { users: [firstUser] } } = response;
 ### 14. ES6+ xususiyatlardan qaysilari eng ko'p ishlatiladi va nima uchun? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Xususiyat | Ishlatilish darajasi | Sabab |
 |-----------|---------------------|-------|
@@ -462,9 +478,28 @@ async function loadUserDashboard(userId) {
 }
 ```
 
-**Deep Dive:**
+**Edge Cases:**
+- **Destructuring + iterator protocol**: Array destructuring `Symbol.iterator` ishlatadi — Set, Map, String, generator hammasi ishlaydi
+- **Optional chaining + delete**: `delete obj?.prop` valid sintaksis, lekin obj null/undefined bo'lsa `true` qaytaradi (no-op)
+- **Spread vs `Object.assign`**: Spread `Object.prototype` ga emas, target object'ga property'larni `[[Set]]` orqali yozadi — getter/setter trigger qiladi (oldin to'g'ridan-to'g'ri `[[DefineOwnProperty]]` qilardi)
 
-TypeScript bilan birga eng kuchli kombinatsiyalar: destructuring + type inference, optional chaining + strict null checks, `??` + `strictNullChecks`. Framework'larda: React'da destructuring (props, state), Vue'da optional chaining (computed), Node.js'da spread (config merge).
+**Follow-up savollar:**
+1. **`Object.assign` vs spread farqi nima?** — Spread `[[Get]]` + `[[DefineOwnProperty]]` ishlatadi, `Object.assign` `[[Get]]` + `[[Set]]` ishlatadi. Setter mavjud bo'lganda farq sezilarli.
+2. **Top-level await modern JS ning qismimi?** — Ha, ES2022 da qabul qilindi, faqat ES Module'larda ishlaydi.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+TypeScript bilan birgalikda eng kuchli kombinatsiyalar:
+- **Destructuring + type inference**: TypeScript destructuring pattern'dan automatic type'larni infer qiladi (`const { name } = user` — name string)
+- **Optional chaining + `strictNullChecks`**: TS compile time'da `?.` natijasini `T | undefined` deb hisoblaydi
+- **`??` + `strictNullChecks`**: Default qiymat narrow qilinadi — `T | null | undefined` → `T`
+
+Framework'lardagi qo'llanish: React'da destructuring (props, state, hook return), Vue'da optional chaining (computed property, template), Node.js'da spread (config merge, middleware composition), Express middleware'larida rest parameters.
+
+V8 implementation: Spread expression `CopyDataProperties` abstract operation'iga compile qilinadi. Destructuring esa `DestructuringAssignmentTarget` rules orqali sequence of `GetValue` + `PutValue` operatsiyalariga aylantiriladi.
+
+</details>
 
 
 </details>
@@ -488,7 +523,7 @@ console.log(port);     // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 null     // timeout: null !== undefined → default ISHLAMAYDI
@@ -517,7 +552,7 @@ console.log(original.b.c); // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 1    // original.a o'zgarmadi — primitive to'g'ridan-to'g'ri copy bo'ldi
@@ -545,7 +580,7 @@ console.log(getConfig({ debug: false, timeout: 0, retries: 0 }));
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 { debug: false, timeout: 5000, retries: 0 }
@@ -572,7 +607,7 @@ for (const user in data) {
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **3 ta xato:**
 
@@ -614,7 +649,7 @@ console.log("b:", b);
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 yield: 0
@@ -649,7 +684,7 @@ console.log(obj?.arr?.[10]);    // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 0          // c = 0 — 0 null/undefined emas, saqlanadi
@@ -662,6 +697,256 @@ undefined  // arr[10] — index yo'q, undefined
 ```
 
 `0?.d` — 0 null/undefined emas, shuning uchun `?.` to'xtamaydi, `(0).d` → `undefined` (autoboxing — Number prototype'da `d` yo'q).
+
+
+</details>
+
+### 7. Numeric separator nima va qaerda ishlatish mumkin? [Junior+]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+Numeric separator (`_`) (ES2021) — katta sonlarni o'qish osonlashtiradigan vizual ajratgich. Runtime'da hech qanday ta'siri yo'q — lexer bosqichida olib tashlanadi. JIT compiler `1_000_000` va `1000000` uchun bir xil bytecode ishlab chiqaradi.
+
+```javascript
+// Barcha son turlarida ishlaydi:
+const million = 1_000_000;            // decimal
+const price = 99_999.99;              // float
+const permissions = 0b1010_0001_1000; // binary
+const color = 0xFF_AA_00;             // hex
+const huge = 9_007_199_254_740_993n;  // BigInt
+
+console.log(1_000_000 === 1000000); // true
+```
+
+**Cheklovlar (SyntaxError):**
+- `_1000` — identifier sifatida o'qiladi (boshida `_`)
+- `1000_` — oxirida bo'lishi mumkin emas
+- `1__000` — ketma-ket ikki `_` mumkin emas
+- `1._5` — decimal nuqta yonida bo'lishi mumkin emas
+
+Java 7+, Python 3.6+, Rust, Swift'da ham bor — JavaScript ES2021 da qabul qildi.
+
+
+</details>
+
+### 8. BigInt nima va Number bilan qanday farqli? [Middle]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+`BigInt` (ES2020) — `Number.MAX_SAFE_INTEGER` (2⁵³ - 1) dan katta integer sonlar bilan ishlash uchun. Literal sintaksis: oxirida `n` (`123n`) yoki `BigInt(123)`. Faqat butun sonlar — decimal yo'q.
+
+```javascript
+const big = 9007199254740993n;
+const big2 = BigInt("9007199254740993");
+console.log(big + 1n); // 9007199254740994n
+
+// Number.MAX_SAFE_INTEGER dan keyin Number aniqligini yo'qotadi:
+console.log(9007199254740992 + 1); // 9007199254740992 — ❌ aniq emas!
+console.log(9007199254740992n + 1n); // 9007199254740993n — ✅ aniq
+
+// ❌ BigInt va Number aralashtirib bo'lmaydi
+// 10n + 5; // TypeError: Cannot mix BigInt and other types
+
+// ✅ Explicit conversion kerak
+console.log(10n + BigInt(5)); // 15n
+console.log(Number(10n) + 5); // 15 — lekin precision yo'qoldi
+
+// Operatsiyalar:
+console.log(10n / 3n); // 3n — integer division (BigInt floor)
+console.log(10n ** 100n); // very large number, no overflow
+
+// JSON.stringify — TypeError!
+// JSON.stringify({ id: 1n }); // TypeError
+// Yechim:
+BigInt.prototype.toJSON = function() { return this.toString(); };
+JSON.stringify({ id: 1n }); // '{"id":"1"}'
+```
+
+**Qachon ishlatish:**
+- Crypto, hashing (UUID, signatures, key'lar) — 64-bit+ integers
+- Financial calculations (pul birliklarini cent/tiyin'da saqlash, BigInt bilan)
+- Timestamps with nanosecond precision (`process.hrtime.bigint()`)
+- ID'lar — agar database 64-bit integer ishlatsa (PostgreSQL `bigint`, MongoDB ObjectId)
+
+**Deep Dive:** V8 BigInt'ni heap'da arbitrary-precision integer sifatida saqlaydi (kichik BigInt'lar inline pointer tagging orqali smi-like optimizatsiyada). Number esa IEEE 754 double-precision float (52 bit mantissa + 11 bit exponent + 1 bit sign). BigInt operatsiyalari Number'dan sekinroq — har operatsiyada heap allocation va variable-length arithmetic algoritmi ishlaydi (Karatsuba multiplication katta sonlar uchun). Performance kritik joylarda Number ishlatish afzal, agar precision yetsa.
+
+
+</details>
+
+### 9. Output nima? Template literal escape va `String.raw` [Middle]
+
+
+```javascript
+const path = "C:\\Users\\Ali";
+
+console.log(path);
+console.log(`${path}`);
+console.log(`Line1\nLine2`);
+console.log(String.raw`Line1\nLine2`);
+console.log(String.raw`C:\Users\Ali`);
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+```
+C:\Users\Ali
+C:\Users\Ali
+Line1
+Line2
+Line1\nLine2
+C:\Users\Ali
+```
+
+- `"C:\\Users\\Ali"` — string literal'da `\\` → bitta `\` (escape)
+- `` `${path}` `` — template literal interpolation, path'ning aktual qiymati chiqadi
+- `` `Line1\nLine2` `` — template literal `\n` ni yangi qatorga aylantiradi (oddiy string kabi)
+- `String.raw\`Line1\nLine2\`` — `String.raw` built-in tag, escape sequence'larni qayta ishlamaydi: `\n` to'g'ridan-to'g'ri ikkita belgi (backslash + n)
+- `String.raw\`C:\Users\Ali\`` — Windows path uchun ideal: backslash escape qilinmaydi
+
+`String.raw` `strings.raw` array'idagi raw (escape qilinmagan) qiymatlardan foydalanadi. RegExp pattern yozish uchun ham qulay: `String.raw\`\d+\.\d+\`` — ikki marta escape qilish shart emas.
+
+
+</details>
+
+### 10. Object destructuring + rename + default bir vaqtda qanday yoziladi? [Middle]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+Object destructuring'da `original: newName = defaultValue` sintaksisi — bir vaqtda rename va default berish:
+
+```javascript
+const config = { port: undefined, debug: null };
+
+// rename + default
+const {
+  port: serverPort = 3000,       // port → serverPort, undefined bo'lsa 3000
+  debug: debugMode = false,       // debug → debugMode, null bo'lsa NULL qoladi!
+  host: serverHost = "localhost", // host yo'q → "localhost"
+} = config;
+
+console.log(serverPort);  // 3000 — undefined edi
+console.log(debugMode);   // null — null !== undefined, default ishlamadi
+console.log(serverHost);  // "localhost" — property yo'q
+
+// ─── Nested destructuring + rename + default ───
+const response = {
+  data: {
+    user: { name: "Ali", age: null }
+  }
+};
+
+const {
+  data: {
+    user: { name = "Mehmon", age: userAge = 0 } = {}
+  } = {}
+} = response;
+
+console.log(name);    // "Ali"
+console.log(userAge); // null — null !== undefined!
+
+// ✅ null uchun ham fallback berish — ?? bilan
+const ageWithFallback = userAge ?? 0;
+```
+
+**Edge case — null va default:** Destructuring default faqat `undefined` uchun ishlaydi. `null` uchun ham fallback kerak bo'lsa, destructuring'dan keyin `??` bilan:
+
+```javascript
+const { age: rawAge = 0 } = { age: null };
+const age = rawAge ?? 0; // 0 — ikkala holatda ham
+```
+
+
+</details>
+
+### 11. Output nima? `for...in` Array bilan [Middle+]
+
+
+```javascript
+Array.prototype.customMethod = function() {};
+const nums = [10, 20, 30];
+
+for (const key in nums) {
+  console.log(typeof key, key);
+}
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+```
+string 0
+string 1
+string 2
+string function customMethod
+```
+
+`for...in` quyidagi muammolarni keltiradi:
+
+1. **Index'lar string sifatida** — `"0"`, `"1"`, `"2"` (number emas)
+2. **Prototype chain'dagi enumerable property'lar** kirib qoladi — `customMethod` — `Array.prototype` ga qo'shilgan
+3. **Tartib kafolatlanmaydi** — integer-like key'lar oldin keladi, qolganlari insertion order'da
+
+Shu sababli array uchun **doim** `for`, `for...of`, `forEach`, `map`, `filter` ishlatish kerak. Eski lodash, MooTools kabi kutubxonalar `Array.prototype` ga method qo'shgan davrlarda bu juda ko'p bug manbai bo'lgan.
+
+```javascript
+// ✅ for...of — faqat qiymatlar, prototype yo'q
+for (const value of nums) {
+  console.log(value); // 10, 20, 30 — clean
+}
+```
+
+
+</details>
+
+### 12. ??= bilan memoization patterni qanday yoziladi? [Middle]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+`??=` operator memoization (lazy initialization) uchun ideal — agar qiymat null/undefined bo'lsa, kompyuter qilib assign qiladi, aks holda hech narsa qilmaydi:
+
+```javascript
+const cache = {};
+
+function fibonacci(n) {
+  return cache[n] ??= n <= 1 ? n : fibonacci(n - 1) + fibonacci(n - 2);
+  // cache[n] mavjud → uni qaytaradi (computation skip)
+  // cache[n] undefined → hisoblanadi, cache'ga yoziladi
+}
+
+console.log(fibonacci(50)); // 12586269025 — cache bilan tez
+
+// ─── Map bilan (??= to'g'ridan-to'g'ri ishlamaydi) ───
+const mapCache = new Map();
+function getCached(key, computeFn) {
+  if (!mapCache.has(key)) {
+    mapCache.set(key, computeFn());
+  }
+  return mapCache.get(key);
+}
+
+// ─── Eski usul vs zamonaviy ───
+// ❌ Eski — verbose
+function oldStyle(key) {
+  if (cache[key] === undefined) {
+    cache[key] = expensiveComputation(key);
+  }
+  return cache[key];
+}
+
+// ✅ Zamonaviy — bir qatorda
+function newStyle(key) {
+  return cache[key] ??= expensiveComputation(key);
+}
+```
+
+**Short-circuit qoidasi:** Agar `cache[key]` allaqachon mavjud bo'lsa — o'ng tomon (`expensiveComputation`) **chaqirilmaydi**. Bu `cache[key] = cache[key] || expensiveComputation()` dan ham yaxshiroq, chunki ikkinchi versiyada `0`/`""`/`false` cache qiymatlari ham fallback'ga olib keladi.
+
+**Production use case'lar:** API response caching, expensive computation memoization, lazy module loading, default configuration initialization.
 
 
 </details>

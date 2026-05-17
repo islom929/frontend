@@ -1,6 +1,6 @@
 # Bo'lim 9: Functions — First-Class Citizens
 
-> Function — JavaScript da first-class citizen. O'zgaruvchiga saqlash, argument sifatida berish, funksiyadan qaytarish mumkin. Functional programming ning asosi shu yerda.
+> Function — JavaScript'da first-class citizen. O'zgaruvchiga saqlash, argument sifatida berish, funksiyadan qaytarish mumkin. Functional programming'ning asosi shu yerda.
 
 ---
 
@@ -34,9 +34,9 @@
 
 ### Nazariya
 
-JavaScript da funksiya yaratishning **3 ta asosiy usuli** bor va ularning farqini tushunish professional dasturlashning asosiy talabi. Har bir usul o'ziga xos xususiyatlarga ega — hoisting xulq-atvori, `this` binding mexanizmi, `arguments` ob'ekti, va `new` bilan chaqirish imkoniyati. Bu farqlarni bilmaslik production da jiddiy va qiyin topiladigan xatolarga olib keladi.
+JavaScript'da funksiya yaratishning **3 ta asosiy usuli** bor va ularning farqini tushunish professional dasturlashning asosiy talabi. Har bir usul o'ziga xos xususiyatlarga ega — hoisting xulq-atvori, `this` binding mexanizmi, `arguments` ob'ekti, va `new` bilan chaqirish imkoniyati. Bu farqlarni bilmaslik production da jiddiy va qiyin topiladigan xatolarga olib keladi.
 
-Nima uchun uchta usul kerak? JavaScript tarixan faqat Function Declaration ga ega edi. Keyin Function Expression qo'shildi — bu funksiyani qiymat sifatida ishlatish imkonini berdi (first-class function). ES6 da Arrow Function kiritildi — u `this` binding muammosini hal qildi va qisqa callback yozish imkonini berdi. Zamonaviy kodda uchala usul ham faol ishlatiladi, lekin har biri o'z joyida.
+Nima uchun uchta usul kerak? JavaScript tarixan faqat Function Declaration'ga ega edi. Keyin Function Expression qo'shildi — bu funksiyani qiymat sifatida ishlatish imkonini berdi (first-class function). ES6'da Arrow Function kiritildi — u `this` binding muammosini hal qildi va qisqa callback yozish imkonini berdi. Zamonaviy kodda uchala usul ham faol ishlatiladi, lekin har biri o'z joyida.
 
 **1. Function Declaration** — klassik usul, `function` keyword bilan boshlanadi:
 
@@ -267,7 +267,7 @@ const createUser = (name, age) => ({ name, age, createdAt: Date.now() });
 
 ### Nazariya
 
-JavaScript da funksiyalar — **birinchi darajali fuqarolar (first-class citizens)**. Bu degani funksiyalar `number`, `string`, `object` kabi boshqa qiymatlar bilan **teng huquqli** — ularni o'zgaruvchiga saqlash, argument sifatida berish, funksiyadan qaytarish, massiv va ob'ektlarda saqlash mumkin.
+JavaScript'da funksiyalar — **birinchi darajali fuqarolar (first-class citizens)**. Bu degani funksiyalar `number`, `string`, `object` kabi boshqa qiymatlar bilan **teng huquqli** — ularni o'zgaruvchiga saqlash, argument sifatida berish, funksiyadan qaytarish, massiv va ob'ektlarda saqlash mumkin.
 
 Bu xususiyat nima uchun muhim? Ko'pgina dasturlash tillarida (masalan, eski Java versiyalarida) funksiyalar "ikkinchi darajali" edi — ularni o'zgaruvchiga saqlash yoki argument sifatida berish mumkin emas edi. JavaScript funksiyalarning first-class bo'lishi butun tilning **functional programming** qobiliyatlarining asosi — closure, callback, higher-order function, decorator, memoization — bularning barchasi aynan shu xususiyat tufayli mumkin.
 
@@ -363,7 +363,7 @@ function createFormatter(currency, locale = "uz-UZ") {
 const formatUZS = createFormatter("UZS");
 const formatUSD = createFormatter("USD", "en-US");
 
-formatUZS(1500000); // "1 500 000,00 UZS"
+formatUZS(1500000); // "1 500 000,00 UZS" (NBSP — ICU locale data)
 formatUSD(99.99);   // "$99.99"
 ```
 
@@ -398,7 +398,7 @@ function executeMiddlewares(req, middlewares) {
 
 **IIFE** (Immediately Invoked Function Expression) — bu funksiya yaratilishi bilan **darhol chaqiriladi**. U scope izolyatsiyasi, module pattern, va bir martalik initialization uchun ishlatiladi.
 
-IIFE JavaScript tarixida juda muhim rol o'ynagan. ES6 dan oldin `let`, `const` va modullar yo'q edi — faqat `var` va function scope bor edi. Shu sababli dasturchilar global scope'ni ifloslantirmaslik uchun IIFE ishlatishgan. jQuery, Lodash, va boshqa mashhur kutubxonalarning barchasi IIFE ichida o'ralgan edi. Zamonaviy kodda ES modules va block scope (`let`/`const`) IIFE ning aksariyat use case'larini almashtirgani bo'lsa-da, legacy kod bilan ishlashda va top-level await mavjud bo'lmagan muhitda async initialization uchun IIFE hali ham kerak.
+IIFE JavaScript tarixida juda muhim rol o'ynagan. ES6'dan oldin `let`, `const` va modullar yo'q edi — faqat `var` va function scope bor edi. Shu sababli dasturchilar global scope'ni ifloslantirmaslik uchun IIFE ishlatishgan. jQuery, Lodash, va boshqa mashhur kutubxonalarning barchasi IIFE ichida o'ralgan edi. Zamonaviy kodda ES modules va block scope (`let`/`const`) IIFE'ning aksariyat use case'larini almashtirgani bo'lsa-da, legacy kod bilan ishlashda va top-level await mavjud bo'lmagan muhitda async initialization uchun IIFE hali ham kerak.
 
 ```javascript
 // Klassik IIFE syntax
@@ -426,7 +426,7 @@ IIFE JavaScript tarixida juda muhim rol o'ynagan. ES6 dan oldin `let`, `const` v
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Engine IIFE ni qanday process qiladi:
+Engine IIFE'ni qanday process qiladi:
 
 ```
 Source Code:   (function() { ... })()
@@ -444,7 +444,7 @@ Source Code:   (function() { ... })()
 
 4. Funksiya tugagach:
    → Execution Context stack dan chiqadi
-   → Funksiya object ga HECH KIM reference qilmayapti
+   → Funksiya object'ga HECH KIM reference qilmayapti
    → Garbage Collector yo'qotadi
 
 ┌──────────────────────────────────┐
@@ -459,7 +459,7 @@ Source Code:   (function() { ... })()
 │  })();                           │
 │                                  │
 │  // IIFE tugadi — hech narsa     │
-│  // global scope da qolmadi      │
+│  // global scope'da qolmadi      │
 └──────────────────────────────────┘
 ```
 
@@ -552,7 +552,7 @@ console.log(config.apiUrl); // "http://localhost:3000"
 
 ### Hozir IIFE Kerakmi?
 
-ES6 modullar va block scope (`let`/`const`) kirgandan keyin, IIFE ning ko'p use case'lari **ortiqcha** bo'ldi:
+ES6 modullar va block scope (`let`/`const`) kirgandan keyin, IIFE'ning ko'p use case'lari **ortiqcha** bo'ldi:
 
 ```javascript
 // ❌ Eski usul — IIFE bilan scope izolyatsiya
@@ -600,7 +600,7 @@ export function getSecret() { return secret; }
 
 HOF nima uchun muhim? U kodni **abstraksiya** qilish imkonini beradi — "nima qilish" dan "qanday qilish" ni ajratadi. Masalan, `array.filter(predicate)` da filter "massivda yurib chiqish" logikasini o'z ichiga oladi, siz esa faqat "qaysi elementni olish" qoidasini berasiz. Bu separation of concerns prinsipi bo'lib, kodni o'qish va test qilishni osonlashtiradi.
 
-JavaScript da HOF lar hamma joyda: `map`, `filter`, `reduce`, `addEventListener`, `setTimeout`, `Promise.then`, Express middleware — bularning barchasi HOF. First-class functions tushunchasining **amaliy qo'llanishi** aynan shu yerda namoyon bo'ladi.
+JavaScript'da HOF'lar hamma joyda: `map`, `filter`, `reduce`, `addEventListener`, `setTimeout`, `Promise.then`, Express middleware — bularning barchasi HOF. First-class functions tushunchasining **amaliy qo'llanishi** aynan shu yerda namoyon bo'ladi.
 
 ```
 ┌───────────────────────────────────────────────────┐
@@ -730,7 +730,7 @@ function calculateShippingCost(weight, distance) {
 const loggedCalculate = withLogging(calculateShippingCost);
 loggedCalculate(2.5, 150);
 // [LOG] calculateShippingCost chaqirildi: [2.5, 150]
-// [LOG] calculateShippingCost tugadi: 0.02ms, natija: 12750
+// [LOG] calculateShippingCost tugadi: <duration>ms, natija: 12750
 ```
 
 **4. O'zimiz Array.prototype.map yozamiz:**
@@ -759,7 +759,7 @@ console.log(withVAT); // [112000, 280000, 560000]
 
 ### Nazariya
 
-**Callback** — boshqa funksiyaga argument sifatida beriladigan va ma'lum bir voqea yoki shart bajarilganda **chaqiriladigan** funksiya. "Meni keyin chaqir" (call me back) degani — nom aynan shu ma'nodan kelgan. Callback JavaScript ning asinxron dasturlash pattern'larining **tarixiy asosi** bo'lib, Promise va async/await paydo bo'lishidan oldin yagona asinxron mexanizm edi.
+**Callback** — boshqa funksiyaga argument sifatida beriladigan va ma'lum bir voqea yoki shart bajarilganda **chaqiriladigan** funksiya. "Meni keyin chaqir" (call me back) degani — nom aynan shu ma'nodan kelgan. Callback JavaScript'ning asinxron dasturlash pattern'larining **tarixiy asosi** bo'lib, Promise va async/await paydo bo'lishidan oldin yagona asinxron mexanizm edi.
 
 Callback ikki xil ishlatiladi: **sinxron callback** (darhol chaqiriladi — `map`, `filter`, `forEach`) va **asinxron callback** (keyinroq, biror voqea sodir bo'lganda chaqiriladi — `setTimeout`, `addEventListener`, `fs.readFile`). Bu ikki turni farqlash muhim — chunki ularning xatti-harakati tubdan farq qiladi.
 
@@ -913,7 +913,7 @@ readConfig("./config.json", function(error, config) {
 
 Nima uchun purelik muhim? Pure funksiyalar kodni **predictable** (oldindan aytib berish mumkin) qiladi, test yozish osonlashadi (faqat input/output tekshirish yetarli, mock kerak emas), parallel bajarish xavfsiz bo'ladi (shared state yo'q), va caching/memoization mumkin bo'ladi (bir xil input = bir xil output). React'ning butun rendering tizimi pure function konsepsiyasiga asoslangan — component pure bo'lishi kerak, side effect'lar esa `useEffect` ichida bo'lishi kerak.
 
-**Side Effect** — funksiyaning tashqi dunyoga ta'sir qilishi: global o'zgaruvchini o'zgartirish, console ga yozish, DOM ni o'zgartirish, network request, file tizimiga yozish, yoki `Math.random()`/`Date.now()` ishlatish. Side effect'lar zarur (ularsiz dastur foydali ish qila olmaydi), lekin ularni **nazorat qilish** va **izolyatsiya qilish** kerak.
+**Side Effect** — funksiyaning tashqi dunyoga ta'sir qilishi: global o'zgaruvchini o'zgartirish, console'ga yozish, DOM'ni o'zgartirish, network request, file tizimiga yozish, yoki `Math.random()`/`Date.now()` ishlatish. Side effect'lar zarur (ularsiz dastur foydali ish qila olmaydi), lekin ularni **nazorat qilish** va **izolyatsiya qilish** kerak.
 
 ```javascript
 // ✅ Pure — bir xil input, bir xil output, side effect yo'q
@@ -1132,7 +1132,7 @@ Qadam 1: curriedMultiply(2)
 
 Qadam 2: (qaytarilgan funksiya)(3)
   → b = 3
-  → a ni closure dan oladi: a = 2
+  → a'ni closure'dan oladi: a = 2
   → return 2 * 3 = 6
 ```
 
@@ -1586,11 +1586,11 @@ const memoFib = memoize(function fib(n) {
 });
 
 console.time("Birinchi");
-memoFib(40); // Computing... ~0.5ms (memoized recursive)
+memoFib(40); // Computing... (memoized recursive, har n uchun bir marta)
 console.timeEnd("Birinchi");
 
 console.time("Ikkinchi");
-memoFib(40); // Cache hit! ~0.01ms
+memoFib(40); // Cache hit! (O(1) lookup)
 console.timeEnd("Ikkinchi");
 ```
 
@@ -1628,12 +1628,12 @@ function memoizeWithLimit(fn, maxSize = 100) {
 const fetchUserProfile = memoizeWithLimit(async function(userId) {
   const response = await fetch(`/api/users/${userId}`);
   return response.json();
-}, 50); // Oxirgi 50 ta foydalanuvchi profili cache da
+}, 50); // Oxirgi 50 ta foydalanuvchi profili cache'da
 
 // Birinchi chaqiruv — network request
 await fetchUserProfile("user-123"); // fetch → /api/users/user-123
 
-// Ikkinchi chaqiruv — cache dan (network request yo'q)
+// Ikkinchi chaqiruv — cache'dan (network request yo'q)
 await fetchUserProfile("user-123"); // cache hit!
 ```
 
@@ -1657,7 +1657,7 @@ const calculateExpensiveReport = memoize(function(transactions, startDate, endDa
 // Birinchi chaqiruv — hisob-kitob bajariladi
 const report1 = calculateExpensiveReport(transactions, "2025-01-01", "2025-01-31");
 
-// Xuddi shu argumentlar bilan — cache dan
+// Xuddi shu argumentlar bilan — cache'dan
 const report2 = calculateExpensiveReport(transactions, "2025-01-01", "2025-01-31");
 // report1 === report2 — bir xil reference!
 ```
@@ -1911,7 +1911,7 @@ const debouncedSave = debounce(saveToServer, 1000);
 
 `arguments` — har bir **regular function** (declaration va expression) ichida mavjud bo'lgan **array-like** (massivga o'xshash) ob'ekt. U funksiyaga berilgan **barcha argumentlarni** indeks bo'yicha saqlaydi, parametrlar soni necha bo'lishidan qat'i nazar.
 
-`arguments` JavaScript'ning eng eski xususiyatlaridan biri bo'lib, ES1 dan beri mavjud. U funksiya nechta argument qabul qilishini oldindan bilmaslik muammosini hal qilgan. Lekin `arguments` ning **jiddiy kamchiliklari** bor: u haqiqiy massiv emas (Array.prototype method'lari yo'q), arrow function'da mavjud emas, va strict mode'da ba'zi kutilmagan xulq-atvor ko'rsatadi. Shu sababli ES6 da uning zamonaviy almashtiruvi — **rest parameters** (`...args`) kiritildi.
+`arguments` JavaScript'ning eng eski xususiyatlaridan biri bo'lib, ES1'dan beri mavjud. U funksiya nechta argument qabul qilishini oldindan bilmaslik muammosini hal qilgan. Lekin `arguments`'ning **jiddiy kamchiliklari** bor: u haqiqiy massiv emas (Array.prototype method'lari yo'q), arrow function'da mavjud emas, va strict mode'da ba'zi kutilmagan xulq-atvor ko'rsatadi. Shu sababli ES6'da uning zamonaviy almashtiruvi — **rest parameters** (`...args`) kiritildi.
 
 **Muhim:** `arguments` **haqiqiy massiv emas** — u `Array.prototype` ga ega emas. `map`, `filter`, `reduce` kabi method'lar to'g'ridan-to'g'ri ishlamaydi — avval `Array.from(arguments)` yoki `[...arguments]` bilan haqiqiy massivga aylantirish kerak.
 
@@ -1969,7 +1969,7 @@ test(1, 2);
 
 </details>
 
-### Arrow Function da arguments YO'Q
+### Arrow Function'da arguments YO'Q
 
 Bu — ko'p so'raladigan narsa. Arrow function o'zining `arguments` object'iga **ega emas**. Agar `arguments` ga murojaat qilsa, u **tashqi scope'dan** (closure orqali) olishga harakat qiladi:
 
@@ -1988,7 +1988,7 @@ outer(1, 2, 3);
 ```
 
 ```javascript
-// Global scope da arrow function:
+// Global scope'da arrow function:
 const showArgs = () => {
   console.log(arguments); // ReferenceError: arguments is not defined
   // Tashqi scope'da ham arguments yo'q!
@@ -2043,7 +2043,7 @@ const sum2 = (...numbers) => numbers.reduce((total, num) => total + num, 0);
 
 ### Nazariya
 
-**Rest parameters** (`...`) — ES6 da kiritilgan, `arguments` ob'ektining zamonaviy va kuchli almashtiruvi. `arguments` dan farqli o'laroq, rest parameters **haqiqiy Array** qaytaradi (barcha Array method'lari ishlaydi), **arrow function**'larda ishlaydi, va faqat **qolgan argumentlarni** oladi (nomlangan parametrlardan keyingilarini).
+**Rest parameters** (`...`) — ES6'da kiritilgan, `arguments` ob'ektining zamonaviy va kuchli almashtiruvi. `arguments`'dan farqli o'laroq, rest parameters **haqiqiy Array** qaytaradi (barcha Array method'lari ishlaydi), **arrow function**'larda ishlaydi, va faqat **qolgan argumentlarni** oladi (nomlangan parametrlardan keyingilarini).
 
 Nima uchun rest parameters kerak bo'ldi? `arguments` ob'ektining kamchiliklari (array-like, arrow function'da yo'q, strict mode muammolari) ko'p xatolarga sabab bo'lardi. Rest parameters bu muammolarning barchasini hal qildi va zamonaviy kodda `arguments` ishlatish uchun hech qanday sabab qolmadi. Bugungi kunda `arguments` faqat legacy kodda uchraydi.
 
@@ -2353,7 +2353,7 @@ transferMoney();                            // Error: "from" parametri majburiy!
 
 Har bir funksiya object bo'lgani uchun ([First-Class Functions](#first-class-functions) bo'limida tushuntirilganidek), unda **avtomatik xususiyatlar** mavjud. Bulardan ikkitasi debugging va meta-programming uchun juda foydali: `name` — funksiyaning nomi (string), va `length` — **kutilayotgan parametrlar soni** (rest parametrlarni hisoblamasdan).
 
-**`name` property** — funksiyaning **debug-friendly** nomi. Bu DevTools call stack'da, error stack trace'da, va `console.log` da funksiyani identifikatsiya qilish uchun ishlatiladi. Anonymous funksiyalar ham kontekstga qarab nom olishi mumkin — bu ES6 da kiritilgan **name inference** mexanizmi.
+**`name` property** — funksiyaning **debug-friendly** nomi. Bu DevTools call stack'da, error stack trace'da, va `console.log`'da funksiyani identifikatsiya qilish uchun ishlatiladi. Anonymous funksiyalar ham kontekstga qarab nom olishi mumkin — bu ES6'da kiritilgan **name inference** mexanizmi.
 
 **`length` property** — funksiyaning e'lon qilingan **majburiy parametrlari** soni. Bu rest parameters (`...args`) va default value bilan berilgan parametrlarni **hisoblamaydi**. `length` meta-programming da, masalan `curry` funksiyasida, kerakli argumentlar sonini aniqlash uchun ishlatiladi — yuqoridagi [Currying](#currying) bo'limidagi `curry` implementatsiyamiz aynan `fn.length` ga tayanadi.
 
@@ -2576,12 +2576,12 @@ isOdd(3);  // true  — isOdd(3) → isEven(2) → isOdd(1) → isEven(0) → tr
 
 **Stack frame mexanizmi**: Har recursive chaqiruv yangi **stack frame** yaratadi — return address, local variables, this binding, scope chain shu frame'da saqlanadi. Frame stack pointer'ni quyiga suradi, return qilganda orqaga ko'tariladi.
 
-**Stack size limitlari**:
-- **V8** (Chrome/Node.js): ~984 KB, ~10,000-15,000 frames
-- **SpiderMonkey** (Firefox): ~1 MB, ~50,000 frames
-- **JavaScriptCore** (Safari): ~1 MB
+**Stack size limitlari** (engine source-based defaults, OS va build flag'larga qarab o'zgaradi):
+- **V8** (Chrome/Node.js): default stack ~984 KB (`--stack-size` flag bilan o'zgaradi)
+- **SpiderMonkey** (Firefox): platform-specific (Windows/Linux/macOS farqli)
+- **JavaScriptCore** (Safari): platform-specific
 
-Frame limit aniq son emas — har frame hajmi local variable soniga bog'liq. V8'da `--stack-size=N` flag bilan oshirish mumkin, lekin bu temporary — algoritmni iterative'ga aylantirish yaxshiroq.
+Frame limit aniq son emas — har frame hajmi local variable soniga bog'liq. Aniq frame count engine va kod xususiyatlariga qarab o'zgaradi — algoritmni iterative'ga aylantirish stack overflow xavfini butunlay yo'q qiladi.
 
 **Recursion overhead**: Har call uchun parameter passing, frame allocation, EC creation, function prologue/epilogue. Bu overhead O(1) har call, lekin million'lab call'larda yig'iladi. V8 ba'zi recursive funksiyalarni inline qiladi (TurboFan), lekin chuqur recursion'da yordam bermaydi.
 
@@ -2613,12 +2613,12 @@ factorial(5); // 120
 **Fibonacci — naive vs memoized:**
 
 ```javascript
-// ❌ Naive — O(2^n) — juda sekin!
+// ❌ Naive — O(2^n) — eksponensial sekin
 function fibNaive(n) {
   if (n <= 1) return n;
   return fibNaive(n - 1) + fibNaive(n - 2);
 }
-// fibNaive(40) — bir necha sekund kutadi!
+// fibNaive(40) — sezilarli kechikish (eksponensial recursive call'lar)
 // Sabab: bir xil qiymatlar qayta-qayta hisoblanadi
 // fib(5) → fib(4) + fib(3)
 //          fib(3) + fib(2)   fib(2) + fib(1)  ← fib(3) 2 MARTA!
@@ -2808,7 +2808,7 @@ TCO siz (oddiy recursion):                TCO bilan:
 6 ta frame                                2 ta frame (main + 1)
 ```
 
-**Continuation-Passing Style (CPS)** — alternative approach. Natijani qaytarish o'rniga, uni callback (continuation) ga uzatish. Bu TCO ga qulayroq shakl, lekin o'qilishi qiyin:
+**Continuation-Passing Style (CPS)** — alternative approach. Natijani qaytarish o'rniga, uni callback (continuation)'ga uzatish. Bu TCO'ga qulayroq shakl, lekin o'qilishi qiyin:
 
 ```javascript
 // Oddiy
@@ -2898,7 +2898,7 @@ fibTail(10); // 55
 // → fibTail(1, 34, 55) → return 55
 ```
 
-**Trampoline — TCO ni qo'lda emulatsiya qilish:**
+**Trampoline — TCO'ni qo'lda emulatsiya qilish:**
 
 ```javascript
 // Trampoline helper — universal
@@ -3152,7 +3152,7 @@ console.log(boundToObj2()); // "Vali"
 
 ## Common Mistakes
 
-### ❌ Xato 1: Arrow function ni object method sifatida ishlatish
+### ❌ Xato 1: Arrow function'ni object method sifatida ishlatish
 
 ```javascript
 const user = {
@@ -3182,7 +3182,7 @@ console.log(user.greet()); // "Salom, Ali!"
 
 ---
 
-### ❌ Xato 2: arguments ni arrow function da ishlatish
+### ❌ Xato 2: arguments'ni arrow function'da ishlatish
 
 ```javascript
 const sum = () => {
@@ -3383,8 +3383,8 @@ const initialize = once(() => {
 });
 
 console.log(initialize()); // "Initialized!" → { ready: true }
-console.log(initialize()); // { ready: true } — log yo'q, cache dan
-console.log(initialize()); // { ready: true } — log yo'q, cache dan
+console.log(initialize()); // { ready: true } — log yo'q, cache'dan
+console.log(initialize()); // { ready: true } — log yo'q, cache'dan
 ```
 
 **Tushuntirish:** `called` flag va `result` o'zgaruvchisi closure orqali saqlanadi. Birinchi chaqiruvda `fn` bajariladi va natijasi saqlanadi. Keyingi chaqiruvlarda `called === true` bo'lgani uchun `fn` qayta chaqirilmaydi — saqlangan `result` qaytariladi. Bu pattern — database connection, SDK initialization kabi bir martalik operatsiyalar uchun keng ishlatiladi.
@@ -3603,7 +3603,7 @@ const fetchUser = memoize(
 );
 
 await fetchUser("u1"); // fetch
-await fetchUser("u1"); // cache dan (1 daqiqa ichida)
+await fetchUser("u1"); // cache'dan (1 daqiqa ichida)
 
 fetchUser.cache.clear(); // cache tozalash
 await fetchUser("u1"); // fetch (cache tozalandi)
@@ -3680,7 +3680,7 @@ console.log(expensiveCalc(10)); // "Computing for 10..." → natija
 console.log(expensiveCalc(10)); // Cache dan — log yo'q
 console.log(expensiveCalc(20)); // "Computing for 20..." → natija
 console.log(expensiveCalc(30)); // "Computing for 30..." → natija
-console.log(expensiveCalc(40)); // "Computing for 40..." — maxSize=3, "10" cache dan o'chdi
+console.log(expensiveCalc(40)); // "Computing for 40..." — maxSize=3, "10" cache'dan o'chdi
 
 console.log(expensiveCalc.cache.size()); // 3
 expensiveCalc.cache.clear();

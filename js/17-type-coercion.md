@@ -90,10 +90,10 @@ b = 20;
 console.log(a); // 10 — a o'zgarmadi, chunki primitive immutable
 
 // Reference — copy by reference:
-let obj1 = { x: 1 };
-let obj2 = obj1;    // obj2 ga heap'dagi ADDRESS berildi
-obj2.x = 99;
-console.log(obj1.x); // 99 — bitta object, chunki reference nusxalandi
+let user1 = { name: "Islom" };
+let user2 = user1;    // user2 ga heap'dagi ADDRESS berildi
+user2.name = "Ali";
+console.log(user1.name); // "Ali" — bitta object, chunki reference nusxalandi
 
 // === taqqoslash farqi:
 console.log(42 === 42);              // true  — primitive: qiymat teng
@@ -800,7 +800,7 @@ To'liq tricky cases jadvali:
 │ " \n\t" == 0     │ true     │ false    │ whitespace→0                 │
 │ [null] == ""     │ true     │ false    │ [null]→""                    │
 │ [undefined] == ""│ true     │ false    │ [undefined]→""               │
-└──────────────────┴──────────┴──────────┘──────────────────────────────┘
+└──────────────────┴──────────┴──────────┴──────────────────────────────┘
 ```
 
 Qoida — DOIM === ishlating:
@@ -1300,8 +1300,8 @@ structuredClone vs JSON hack farqi va cheklovlari:
 │ Circular references   │ ❌ Error         │ ✅ ishlaydi      │
 │ undefined values      │ ❌ o'chib ketadi  │ ✅ saqlanadi     │
 │ NaN, Infinity         │ ❌ null bo'ladi   │ ✅ saqlanadi     │
-│ Function              │ ❌               │ ❌ Error         │
-│ Symbol                │ ❌               │ ❌ Error         │
+│ Function              │ ❌ silent omit    │ ❌ DataCloneError │
+│ Symbol                │ ❌ silent omit    │ ❌ DataCloneError │
 │ Prototype chain       │ ❌ yo'qoladi      │ ❌ yo'qoladi     │
 └───────────────────────┴──────────────────┴──────────────────┘
 ```
@@ -1501,7 +1501,7 @@ console.log(Number.isFinite(42));        // true
 
 **`Number.isNaN()` vs global `isNaN()`** — eng muhim farq: global `isNaN()` avval argumentni `ToNumber()` orqali number'ga aylantiradi, keyin NaN mi tekshiradi. Shuning uchun `isNaN("hello") → true` (chunki `Number("hello") → NaN`). `Number.isNaN()` esa **hech qanday coercion qilmaydi** — faqat type `number` va qiymati `NaN` bo'lsagina `true` qaytaradi. Shu sababli `Number.isNaN("hello") → false` — bu to'g'ri javob, chunki `"hello"` NaN emas, u string.
 
-**`Number.isFinite()` vs global `isFinite()`** — xuddi shunday farq. Global `isFinite()` avval coercion qiladi: `isFinite("42") → true`. `Number.isFinite("42") → false` — string number emas.
+**`Number.isFinite()` vs global `isFinite()`** — bir xil tabiatdagi farq. Global `isFinite()` avval coercion qiladi: `isFinite("42") → true`. `Number.isFinite("42") → false` — string number emas.
 
 **`Number.isInteger()`** — qiymat integer ekanini tekshiradi. Float kabi ko'rinadigan lekin aslida integer bo'lgan sonlar ham `true`: `Number.isInteger(5.0) → true` (chunki `5.0 === 5`).
 
@@ -1627,7 +1627,7 @@ console.log(hex); // "#ff8000"
 
 **`Math.max()` / `Math.min()`** — argumentlar orasidagi eng katta/kichik qiymat. Array bilan ishlatish uchun spread kerak: `Math.max(...arr)`. Lekin juda katta array'larda (100K+ element) stack overflow berishi mumkin — bu holda `reduce` ishlatish kerak.
 
-**`Math.pow(base, exp)` vs `**` operator** — ikkalasi bir xil natija beradi. `**` operator ES2016 da qo'shilgan va o'qilishi osonroq. Farq: `**` right-associative (`2 ** 3 ** 2 = 2 ** 9 = 512`), `Math.pow` esa chaqirish tartibiga bog'liq.
+**`Math.pow(base, exp)` vs `**` operator** — Number argumentlar uchun bir xil natija beradi. `**` operator ES2016 da qo'shilgan va o'qilishi osonroq. Ikki farq: (1) `**` right-associative (`2 ** 3 ** 2 = 2 ** 9 = 512`), `Math.pow` chaqirish nesting'iga bog'liq; (2) `**` **BigInt**'ni qo'llab-quvvatlaydi (`2n ** 3n === 8n`), `Math.pow(2n, 3n)` esa **TypeError** beradi (Math.pow faqat Number qabul qiladi).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>

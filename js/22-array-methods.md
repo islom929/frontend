@@ -704,21 +704,30 @@ arr[-1]; // undefined — array'da "-1" property yo'q
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Sequential vs parallel — eng muhim farq**: `Array.fromAsync` har elementni **navbat bilan** (sequential) `await` qiladi. `Promise.all` esa **bir vaqtda** (parallel) ishlatadi:
+**Sequential await vs parallel execution — nozik farq**: `Array.fromAsync` elementlarni **navbat bilan** (sequential) `await` qiladi, lekin **effective wall-clock time** input turiga bog'liq:
 
 ```javascript
-// Sequential — total time: t1 + t2 + t3
+// Promise array (allaqachon boshlangan) — total time: max(t1, t2, t3)
+// Fetch'lar sync yaratiladi, request'lar PARALLEL boshlanadi darhol.
+// Array.fromAsync faqat natijalarni ketma-ket await qiladi — lekin ular
+// allaqachon parallel ishlab turgani uchun Promise.all bilan bir xil vaqt.
 await Array.fromAsync([fetch('/a'), fetch('/b'), fetch('/c')]);
 
-// Parallel — total time: max(t1, t2, t3)
+// Promise.all — bir xil parallel behavior
 await Promise.all([fetch('/a'), fetch('/b'), fetch('/c')]);
+
+// Async iterable/generator — total time: t1 + t2 + t3 (HAQIQIY sequential)
+// Generator keyingi elementni oldingisi await bo'lgandan keyingina yaratadi
+await Array.fromAsync(generateUsers()); // bu yerda sequential muhim
 ```
 
+**Muhim farq**: `Promise.all` bitta Promise reject bo'lsa — darhol butun natija reject (fail-fast). `Array.fromAsync` ham shu printsipda reject qiladi, lekin semantik jihatdan — u **iteration** bilan ishlaydi, generator error'larini tabiiy tutadi.
+
 **Qachon ishlatish**:
-- ✅ Async generator output yig'ish: `Array.fromAsync(generateUsers())`
-- ✅ Rate-limited API (parallel ban'ga olib keladi)
-- ✅ Memory-limited pagination
-- ❌ Mustaqil parallel requestlar — `Promise.all` tezroq
+- ✅ **Async generator** output yig'ish: `Array.fromAsync(generateUsers())` — haqiqiy sequential, `Promise.all` bilan bu ishlamaydi
+- ✅ **Async iterable API** (paginatsiya, stream) — `Promise.all` async iterable qabul qilmaydi
+- ✅ **Promise array** — `Promise.all` bilan farqsiz (ikkalasi ham parallel wall-clock), tanlov style masalasi
+- ❌ Sync iterable'dan darhol array — oddiy `Array.from` yetarli
 
 **Browser support**: Chrome 121+, Firefox 115+, Safari 16.4+, Node.js 22+.
 
@@ -741,7 +750,10 @@ const data = await Array.fromAsync([
   fetch("/api/user/1").then(r => r.json()),
   fetch("/api/user/2").then(r => r.json())
 ]);
-// [userData1, userData2] — Promise.all dan farqli: sequential (ketma-ket) bajaradi, parallel emas
+// [userData1, userData2] — Promise.all bilan bir xil wall-clock time:
+// fetch'lar sync yaratiladi, request'lar parallel boshlanadi.
+// Array.fromAsync natijalarni ketma-ket await qiladi, lekin requests
+// allaqachon parallel ishlagani uchun total time = max(fetch times)
 ```
 
 </details>
@@ -1267,7 +1279,7 @@ const sorted = original.toSorted((a, b) => a - b); // original saqlanadi
 **Savol:** `myMap` ni implement qiling.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 Array.prototype.myMap = function(callback, thisArg) {
@@ -1293,7 +1305,7 @@ Array.prototype.myMap = function(callback, thisArg) {
 **Savol:** `myReduce` ni implement qiling.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 Array.prototype.myReduce = function(callback, initialValue) {
@@ -1334,7 +1346,7 @@ Array.prototype.myReduce = function(callback, initialValue) {
 **Savol:** `myFlat(arr, depth)` ni implement qiling.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function myFlat(arr, depth = 1) {
@@ -1362,7 +1374,7 @@ myFlat([1, [2, [3, [4]]]], Infinity); // [1, 2, 3, 4]
 **Savol:** Quyidagi raw data'dan: (1) faol foydalanuvchilarni filter, (2) familiya bo'yicha sort, (3) guruhlash (role bo'yicha), (4) har bir guruhda faqat ism va email olish.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 const rawUsers = [

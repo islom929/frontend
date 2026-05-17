@@ -1188,7 +1188,7 @@ outer.addEventListener("mouseleave", () => {
 
 ### Gotcha 3: Anonymous `removeEventListener` ishlamaydi — reference equality
 
-`removeEventListener` callback'ni **reference equality** bilan topadi — xuddi shu funksiya object bo'lishi kerak. Arrow function yoki `.bind(this)` har chaqirilganda yangi funksiya yaratadi.
+`removeEventListener` callback'ni **reference equality** bilan topadi — aynan shu funksiya object bo'lishi kerak. Arrow function yoki `.bind(this)` har chaqirilganda yangi funksiya yaratadi.
 
 ```javascript
 // ❌ Arrow function — yangi funksiya har safar:

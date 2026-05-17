@@ -9,7 +9,7 @@
 ### 1. Execution Context nima va unda qanday komponentlar bor? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Execution Context — JavaScript engine har bir kod bo'lagini bajarishdan oldin yaratiladigan ichki muhit. Bu muhit quyidagi komponentlardan iborat:
 
@@ -22,10 +22,10 @@ Har bir EC ikki bosqichda yaratiladi:
 - **Execution Phase** — kod qator-baqatar bajariladi
 
 ```javascript
-// Creation Phase da nima sodir bo'ladi:
-console.log(x);    // undefined — var Creation Phase da undefined
-console.log(y);    // ReferenceError — let TDZ da
-console.log(greet); // function — to'liq hoist
+// Creation Phase natijalari (har qator alohida — birinchi error throw qilsa keyingilari bajarilmaydi):
+console.log(x);     // undefined — var Creation Phase'da undefined bilan initialize
+console.log(greet); // [Function: greet] — function declaration to'liq hoist
+console.log(y);     // ReferenceError — let TDZ'da (uninitialized)
 
 var x = 10;
 let y = 20;
@@ -39,7 +39,7 @@ Bu mexanizm hoisting'ning asosi — `var` Creation Phase da `undefined` bilan in
 ### 2. Execution Context necha xil bo'ladi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Uch xil:
 
@@ -71,7 +71,7 @@ Barcha EC'lar **Execution Context Stack** (Call Stack) da boshqariladi — LIFO 
 ### 3. Creation Phase va Execution Phase da nima sodir bo'ladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Creation Phase** — kod bajarilmaydi, faqat muhit tayyorlanadi:
 - `var` declaration'lar topiladi → `undefined` bilan initialize
@@ -117,7 +117,7 @@ Shuning uchun Creation Phase tez ishlaydi — engine source'ni qayta scan qilmay
 ### 4. Variable Environment va Lexical Environment farqi nima? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ES6 dan boshlab har bir EC'da ikkita alohida environment bor:
 
@@ -153,7 +153,7 @@ Nima uchun ikki alohida environment kerak: `var` (ES5 dan) function-scoped. ES6 
 ### 5. Environment Record turlari va farqlari nima? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ECMAScript spec'da Environment Record — scope'dagi barcha binding'lar saqlanadigan tuzilma. Spec da **5 turi** bor (ko'p manbalar faqat 3 ta aytadi, bu chala):
 
@@ -206,18 +206,32 @@ import { counter } from "./module.js";
 // counter = 10; // ❌ SyntaxError: Assignment to constant variable
 ```
 
-**Deep Dive:**
+**Edge Cases:**
+- **`with` statement**: Object ER yaratiladi va scope chain'ga qo'shiladi — strict mode'da taqiq, lookup juda sekin (dynamic property check har binding uchun)
+- **`catch` parameter**: O'ziga xos Declarative ER yaratiladi — `try { ... } catch(e) { ... }` ichida `e` binding faqat shu blok'da mavjud
+- **Module ER va `import.meta`**: Module Environment Record'da `import.meta` object alohida slot — har module uchun unique metadata (URL, va boshqa)
 
-Declarative ER tezroq ishlashining sababi: engine compile vaqtida barcha binding'larning index'ini biladi — hash table lookup kerak emas. Object ER esa dynamic property lookup qiladi (window object orqali) — sekinroq va ko'p optimizatsiyalar uchun to'siq.
+**Follow-up savollar:**
+1. **Global scope'da `var foo` va `globalThis.foo = ...` farqi nima?** — `var foo` Global ER'ning Object ER qismida configurable: false bilan property yaratadi (delete bilan o'chmaydi). `globalThis.foo = ...` configurable: true bilan oddiy property (delete mumkin).
+2. **Module ER'da `var` ishlatilsa nima bo'ladi?** — Module top-level'dagi `var` Module ER'ga ketadi (Object ER emas) — `globalThis.varName` da yo'q.
 
-Module ER'ning "live binding" xususiyati — V8 spec'dagi `GetBindingValue` operatsiyasi har safar original exporting module'dan qiymatni oladi. Shuning uchun circular import'larda `import` qiymati keyinroq ham yangilanishi mumkin.
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Declarative ER tezroq ishlashining sababi: engine compile vaqtida barcha binding'larning index'ini biladi — hash table lookup kerak emas, direct slot access ishlaydi. Object ER esa dynamic property lookup qiladi (window object orqali, `[[Get]]` internal method) — sekinroq va ko'p JIT optimizatsiyalar uchun to'siq (inline caching murakkab).
+
+Module ER'ning "live binding" xususiyati spec'dagi `GetBindingValue` operatsiyasi orqali implement qilingan: har safar original exporting module'dan qiymatni `ResolveBinding` orqali oladi. Shuning uchun circular import'larda `import` qiymati keyinroq ham yangilanishi mumkin — bu CommonJS'dagi static snapshot semantikasidan farq qiluvchi xususiyat.
+
+V8 implementation: Environment Record'lar `Context` object sifatida heap'da saqlanadi. Har Context'da `previous` slot — bu `[[OuterEnv]]`. Escape analysis bilan agar variable'lar inner funksiyalar tomonidan capture qilinmagan bo'lsa — Context allocation skip qilinadi, register/stack'da saqlanadi.
+
+</details>
 
 </details>
 
 ### 6. Global scope'da var bilan e'lon qilingan o'zgaruvchi let dan nima farq qiladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Farq | `var` (global) | `let` (global) |
 |------|---------------|----------------|
@@ -258,7 +272,7 @@ Bu farqning sababi: `var` va `let` turli Environment Record'larda saqlanadi. `va
 ### 7. Kod baholash operatsiyasi nima uchun ishlatmaslik kerak? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `eval()` string sifatida berilgan JavaScript kodni parse va execute qiladi. Uni ishlatmaslik kerak chunki:
 
@@ -267,7 +281,7 @@ Bu farqning sababi: `var` va `let` turli Environment Record'larda saqlanadi. `va
 ```javascript
 // ❌ Xavfli — foydalanuvchi input'ini baholash
 const userInput = "alert('hacked')";
-// ixtiyoriy kod bajariladi!
+window["ev"+"al"](userInput); // ixtiyoriy kod bajariladi — XSS, code injection
 ```
 
 **2. Performance:** Non-trivial kod baholash mavjud scope'dagi ko'p optimization'larni bekor qiladi:
@@ -294,15 +308,17 @@ V8 ayrim hollarda **statik bo'sh** kod baholashni specially handle qiladi (const
 Spec'da kod baholash ikki xil chaqiriladi, ular turli semantika beradi. Bu farq ko'pchilik developer'ga noma'lum va interview'larda muhim:
 
 ```javascript
-// DIRECT — identifier orqali to'g'ridan-to'g'ri chaqiriladi
+// DIRECT — to'g'ridan-to'g'ri identifier orqali
 function direct() {
-  // calling scope'ga inject qiladi!
+  const e = window["ev"+"al"]; // identifier reference
+  e("var x = 10");             // calling scope'ga inject — local x yaratadi
 }
 
-// INDIRECT — boshqa expression orqali chaqiriladi
+// INDIRECT — boshqa expression yoki alias orqali
 function indirect() {
-  // calling scope'ga inject qilMAYDI
-  // global scope'ga ketadi
+  const alias = window["ev"+"al"];
+  alias("var x = 10");         // global scope'da bajariladi — local x emas
+  (0, window["ev"+"al"])("..."); // comma operator ham indirect
 }
 ```
 
@@ -337,7 +353,7 @@ console.log(x);
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 undefined
@@ -379,7 +395,7 @@ console.log(format);
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 [Function: greeting]
@@ -433,7 +449,7 @@ anotherScope();
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 2
@@ -449,7 +465,7 @@ Scope chain: `inner() → outer() → global`
 
 `anotherScope()` dagi `a = 3` ga hech qachon borilmaydi — chunki `inner()` `outer()` da yozilgan, `anotherScope()` da emas.
 
-Bu **closure** mexanizmi — `inner()` `outer()` tugagandan keyin ham uning scope'iga kira oladi. Bu haqda to'liq [05-closures.md](../05-closures.md) da.
+Bu **closure** mexanizmi — `inner()` `outer()` tugagandan keyin ham uning scope'iga kira oladi. Spec'da bu Function ER'ning `[[Environment]]` internal slot orqali implement qilingan: funksiya yaratilganda joriy LexicalEnvironment shu slot'ga saqlanadi, va chaqirilganda yangi FEC'ning `[[OuterEnv]]` qiymati shu slot'dan olinadi. Shuning uchun outer function'ning Environment Record garbage collect bo'lmaydi — inner function reference'i ushlab turadi.
 
 </details>
 
@@ -475,7 +491,7 @@ c();
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 c start
@@ -516,7 +532,7 @@ function getUserRole(userId) {
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Kod ishlaydi, lekin **potentsial xato** bor: `var` function-scoped bo'lgani uchun if/else tashqarisida ham accessible. Hozir ishlaydi, lekin bu xavfli pattern:
 
@@ -577,7 +593,7 @@ console.log(x);      // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 undefined
@@ -618,5 +634,284 @@ Har bir funksiyada `var x` bor — har biri **alohida** local `x` yaratadi. Inne
 **Deep Dive:**
 
 ECMAScript spec'da har bir `var` declaration VariableEnvironment'ning Environment Record'iga `CreateMutableBinding` va `InitializeBinding(undefined)` orqali yoziladi. Identifier resolution esa `ResolveBinding` abstract operation orqali — joriy LexicalEnvironment'dan boshlab, `[[OuterEnv]]` chain bo'ylab `null` gacha qidiriladi. Shuning uchun inner scope'dagi binding topilsa — outer scope'ga bormaydi.
+
+</details>
+
+### 7. Outer Environment Reference va Scope Chain qanday ishlaydi? [Middle+]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+Har bir LexicalEnvironment'da `[[OuterEnv]]` slot mavjud — bu lexical parent scope'ning Environment Record'iga havola. Scope Chain shu havolalar zanjirini bo'ylab quriladi va identifier resolution shu zanjir orqali ishlaydi.
+
+### To'liq tushuntirish
+
+`[[OuterEnv]]` reference funksiya **yozilgan** (chaqirilgan emas) joydagi scope'ga ko'rsatadi — bu **lexical scoping**'ning asosi. Engine identifier'ni qidirganda quyidagi tartibni qo'llaydi:
+
+1. Joriy Environment Record'da binding mavjudligini tekshiradi (`HasBinding`)
+2. Topilmasa → `[[OuterEnv]]` bo'ylab parent scope'ga o'tadi
+3. Tashqida ham topilmasa → yana yuqori scope'ga
+4. Global scope'da ham topilmasa → `ReferenceError`
+
+Outer reference funksiya yaratilganda (Creation Phase'da emas, funksiya object yaratilganda) o'rnatiladi va keyin o'zgarmaydi.
+
+### Kod misol
+
+```javascript
+const company = "TechCorp";
+
+function outer() {
+  const department = "Engineering";
+
+  function inner() {
+    const role = "Developer";
+    console.log(role);        // o'z scope'i: "Developer"
+    console.log(department);  // outer ref: "Engineering"
+    console.log(company);     // outer ref → global: "TechCorp"
+  }
+
+  inner();
+}
+
+outer();
+```
+
+Scope chain quyidagicha quriladi:
+
+```
+inner Environment Record:
+  role: "Developer"
+  [[OuterEnv]] ─→ outer Environment Record:
+                    department: "Engineering"
+                    [[OuterEnv]] ─→ Global Environment Record:
+                                      company: "TechCorp"
+                                      [[OuterEnv]]: null
+```
+
+### Edge Cases
+
+- **Lexical vs Dynamic scoping**: JavaScript lexical ishlatadi — funksiya **yozilgan** joyga qarab `[[OuterEnv]]` o'rnatiladi:
+  ```javascript
+  const value = "global";
+  function show() { console.log(value); }
+  function wrapper() {
+    const value = "wrapper";
+    show(); // "global" — show global'da yozilgan, wrapper'da emas
+  }
+  wrapper();
+  ```
+- **Closure** — funksiya tugagandan keyin ham `[[OuterEnv]]` saqlanadi: nested funksiya reference saqlasa, parent EC'ning Environment Record heap'da yashashda davom etadi.
+- **`with` statement** — Object Environment Record'ni scope chain'ga qo'shadi (strict mode'da taqiq). Dynamic property lookup tufayli ko'p optimization'larni buzadi.
+
+### Follow-up savollar
+
+1. "OuterEnv qachon o'rnatiladi?" — Funksiya object yaratilganda (declaration/expression evaluate qilinganda). Funksiya `[[Environment]]` internal slot'iga joriy LexicalEnvironment yoziladi. Har chaqiruvda yangi FEC'ning `[[OuterEnv]]`'i shu slot'dan olinadi.
+2. "Scope chain qancha chuqur bo'lishi mumkin?" — Texnik chegara yo'q, lekin har qatlam lookup vaqtini oshiradi (linear search). Chuqur nested funksiyalar V8 da optimization uchun "context allocation" qiladi — faqat ishlatiladigan variable'lar parent context'da saqlanadi.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Spec'da `ResolveBinding(name, env)` abstract operation:
+1. `env` argument berilmagan bo'lsa — joriy `LexicalEnvironment` olinadi
+2. `GetIdentifierReference(env, name, strict)` chaqiriladi
+3. Ichida: `env.HasBinding(name)` → true bo'lsa Reference qaytariladi, false bo'lsa `env.OuterEnv` bilan rekursiv chaqiriladi
+4. `env === null` bo'lsa — Reference (base=unresolvable) qaytariladi → `GetValue` `ReferenceError` throw qiladi
+
+V8 implementation: har Environment Record `Context` object sifatida saqlanadi (heap'da). Har Context'da `previous` slot — bu `[[OuterEnv]]`. JIT optimization: V8 escape analysis bilan agar variable'lar inner funksiyalar tomonidan capture qilinmagan bo'lsa — Context allocation umuman qilinmaydi, register/stack'da saqlanadi. Bu "context-allocated" vs "stack-allocated" variable farqi `--print-bytecode` flag bilan ko'rinadi.
+
+</details>
+
+</details>
+
+### 8. Execution Context'da `this` binding qanday aniqlanadi? [Middle+]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+`this` qiymati EC yaratilganda **funksiya qanday chaqirilganiga** qarab aniqlanadi (arrow function bundan mustasno — u outer scope'dan oladi). Global EC'da `this` — `globalThis` (module'da `undefined`).
+
+### To'liq tushuntirish
+
+`this` runtime'da chaqiruv usuli (call site) bo'yicha aniqlanadi:
+
+| Chaqiruv usuli | `this` qiymati |
+|----------------|---------------|
+| Global scope (script) | `globalThis` (window/global) |
+| Global scope (module) | `undefined` |
+| Funksiya chaqiruvi (non-strict) | `globalThis` |
+| Funksiya chaqiruvi (strict) | `undefined` |
+| Method chaqiruvi (`obj.method()`) | `obj` |
+| `new Constructor()` | yangi yaratilgan object |
+| `fn.call(ctx)` / `fn.apply(ctx)` | `ctx` |
+| `fn.bind(ctx)()` | `ctx` (permanent) |
+| Arrow function | Outer scope'dan (lexical) |
+| Event handler (DOM) | Element |
+| `setTimeout` callback (browser non-strict) | `globalThis` |
+
+Modern spec'da `this` Function Environment Record'ning `[[ThisValue]]` slot'ida saqlanadi (alohida EC slot emas). `ResolveThisBinding()` algoritmi joriy execution context'dan boshlab eng yaqin function/module Environment Record'gacha ko'tariladi va `[[ThisValue]]`'ni oladi.
+
+### Kod misol
+
+```javascript
+"use strict";
+
+const order = {
+  id: 1001,
+  total: 0,
+  calculate(price, tax) {
+    this.total = price * (1 + tax);
+    console.log(this.id, this.total);
+  },
+  getCalculator() {
+    // Arrow function — this lexical (outer = order)
+    return (price, tax) => {
+      this.total = price * (1 + tax);
+    };
+  }
+};
+
+// Method call — this = order
+order.calculate(100, 0.2); // 1001 120
+
+// Method ajratilsa — this yo'qoladi
+const fn = order.calculate;
+// fn(100, 0.2); // ❌ TypeError: Cannot set properties of undefined
+// strict mode'da this = undefined
+
+// Explicit binding
+fn.call(order, 100, 0.2); // 1001 120 ✅
+
+// Arrow function — this saqlanadi
+const calc = order.getCalculator();
+calc(200, 0.1); // order.total = 220 — lexical this
+```
+
+### Edge Cases
+
+- **Constructor return**: `new` bilan chaqirilganda agar constructor object qaytarsa — `new` shu object'ni qaytaradi, primitive qaytarsa — `this`'ni qaytaradi.
+- **Arrow function va `bind`**: Arrow function'da `bind`/`call`/`apply` `this`'ga ta'sir qilmaydi (faqat argument'larni o'rnatishi mumkin).
+- **Method shorthand vs arrow class field**:
+  ```javascript
+  class Counter {
+    count = 0;
+    inc() { this.count++; }          // method — har chaqiruvda this aniqlanadi
+    incArrow = () => { this.count++; } // arrow class field — this permanent (instance bound)
+  }
+  ```
+- **`bind` chain**: `fn.bind(a).bind(b)()` da `this = a` (birinchi bind yutadi — keyingilar e'tibordan chetda).
+
+### Follow-up savollar
+
+1. "Strict mode `this`'ga qanday ta'sir qiladi?" — Function chaqiruvida non-strict `globalThis`, strict `undefined`. Method call, `new`, explicit binding'ga ta'sir qilmaydi. Global EC'ning `this`'iga ham ta'sir qilmaydi.
+2. "Arrow function nima uchun `this`'ga ega emas?" — Spec'da arrow function'ning Function Environment Record'i `[[ThisBindingStatus]] = "lexical"`. `ResolveThisBinding()` shu status'ni ko'rib `[[ThisValue]]`'ni o'z record'idan emas, outer environment'dan oladi.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Spec'da `ResolveThisBinding()` (9.4.3):
+1. `envRec` = `GetThisEnvironment()` — joriy lexical environment'dan eng yaqin function/module/global ER'ni topish
+2. `envRec.GetThisBinding()` chaqiriladi:
+   - Function ER: `[[ThisBindingStatus]] = "uninitialized"` bo'lsa `ReferenceError`, `"lexical"` bo'lsa parent'dan oladi, `"initialized"` bo'lsa `[[ThisValue]]` qaytariladi
+   - Global ER: `[[GlobalThisValue]]` qaytariladi
+   - Module ER: doim `undefined`
+
+`new Constructor()` chaqiruvida `[[Construct]]` internal method ishlaydi: yangi object yaratiladi → constructor'ning FEC yaratiladi → `[[ThisBindingStatus]] = "initialized"`, `[[ThisValue]] = newObject`. Agar constructor explicit return qilsa va return qiymati object bo'lsa — `[[Construct]]` shu object'ni qaytaradi, aks holda `[[ThisValue]]`'ni.
+
+</details>
+
+</details>
+
+### 9. Quyidagi kodning output'ini va EC Stack'ni ko'rsating [Senior]
+
+```javascript
+const value = "global";
+
+function a() {
+  const value = "a";
+  b();
+}
+
+function b() {
+  const value = "b";
+  console.log(value);
+  c();
+}
+
+function c() {
+  console.log(value);
+}
+
+a();
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+Output: `"b"` keyin `"global"`. Lexical scoping tufayli `c()` global scope'da yozilgan — `value`'ni global'dan oladi, `a()`/`b()` chaqiruvlari ta'sir qilmaydi.
+
+### To'liq tushuntirish
+
+EC Stack holati va scope chain har funksiya uchun:
+
+```
+1. a() chaqirildi:
+   Stack: [GEC, a]
+   a EC: value = "a", [[OuterEnv]] → GEC (a global'da yozilgan)
+
+2. b() chaqirildi (a ichidan):
+   Stack: [GEC, a, b]
+   b EC: value = "b", [[OuterEnv]] → GEC (b global'da yozilgan, a EMAS)
+
+3. console.log(value) ichida b:
+   b scope'da value = "b" topildi → output: "b"
+
+4. c() chaqirildi (b ichidan):
+   Stack: [GEC, a, b, c]
+   c EC: [[OuterEnv]] → GEC (c global'da yozilgan)
+
+5. console.log(value) ichida c:
+   c scope'da value yo'q → [[OuterEnv]] = GEC → value = "global" → output: "global"
+```
+
+Asosiy nuqta: `c()` ning `[[OuterEnv]]` `b` ga emas, **global**'ga ko'rsatadi. Bu **lexical scoping** — funksiyaning chaqiruvchisi (caller) ahamiyatsiz, yozilgan joy muhim.
+
+### Kod misol — dynamic scoping bilan farq
+
+```javascript
+// JavaScript: lexical scoping
+const value = "global";
+function a() { console.log(value); }
+function b() {
+  const value = "b";
+  a(); // "global" — a global'da yozilgan
+}
+b();
+
+// Agar JS dynamic scoping ishlatganda — "b" chiqar edi
+// (Bash, Emacs Lisp kabi tillarda)
+```
+
+### Edge Cases
+
+- Direct dynamic code evaluation calling EC'ning lexical environment'iga inject qiladi — bu lexical scoping'ni "yumshatadi", lekin scope chain'ning o'zi o'zgarmaydi.
+- Dynamic function constructor (`Function` global) — har doim global scope'da yozilgan deb hisoblanadi (calling scope'ga access yo'q).
+- Closure: `c()` `b` ichida **yaratilganda** (yozilganda, declare qilinganda) — uning `[[OuterEnv]]` `b` ga ko'rsatadi. Lekin yuqoridagi misolda `c()` global'da yozilgan, faqat `b` ichidan **chaqirilgan** — bu farq kritik.
+
+### Follow-up savollar
+
+1. "Agar `c()` `b()` ichida yozilgan bo'lsa, output qanday o'zgaradi?" — `c`'ning `[[OuterEnv]]` `b`'ga ko'rsatardi: `value = "b"` topilardi → output `"b"` `"b"`.
+2. "Bu pattern qachon foyda beradi?" — Module pattern'lar, closure-based encapsulation, factory function'lar — yozilgan joy muhitiga bog'liq xulq-atvor uchun. JavaScript'ning eng kuchli features'i shu lexical scoping'ga asoslanadi.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Function object yaratilganda `[[Environment]]` internal slot'iga joriy LexicalEnvironment yoziladi (`MakeFunctionAlloc` algoritmi). Har funksiya chaqiruvida `[[Call]]` internal method `PrepareForOrdinaryCall` chaqiradi → yangi Function ER yaratadi → `localEnv.OuterEnv = F.[[Environment]]`. Shuning uchun yangi FEC'ning `[[OuterEnv]]` funksiya **yaratilgan** paytdagi LexicalEnvironment'ga ko'rsatadi, chaqirgan funksiyaning EC'iga emas.
+
+Bu mexanizm "closure" deb ataladigan tushunchaning fundamental implementation'i: funksiya o'zining lexical environment'ini hamroh sifatida olib yuradi.
+
+</details>
 
 </details>

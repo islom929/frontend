@@ -47,7 +47,9 @@ const user = {
 user.greet(); // "Salom, men Ali" — this = user
 
 const greetFn = user.greet;
-greetFn(); // "Salom, men undefined" — this = window (yoki undefined strict mode da)
+greetFn();
+// Browser non-strict: "Salom, men " — this = window, window.name default "" (bo'sh string)
+// Strict mode / Node ES module: TypeError — this = undefined, undefined.name → throw
 ```
 
 **Bitta funksiya** — lekin **ikki xil** `this`. Nima uchun? Chunki `this` **call-site** ga bog'liq — funksiya qayerda **chaqirildi**, qayerda yozilganiga emas.
@@ -105,7 +107,9 @@ ali.greet();  // "Ali" — this = ali
 vali.greet(); // "Vali" — this = vali
 
 // Call-site 3: oddiy funksiya sifatida chaqirildi
-greet();      // undefined — this = window (non-strict) yoki undefined (strict)
+greet();
+// Non-strict (browser): this = window, window.name default "" — `undefined` emas
+// Strict mode: this = undefined → undefined.name → TypeError
 ```
 
 ---
@@ -510,9 +514,12 @@ V8 da strict mode funksiyalar uchun `this` coercion qadami butunlay skip qilinad
 console.log(this);           // window
 console.log(this === window); // true
 
-// Node.js da global scope (module)
+// Node.js CommonJS module top-level (`.cjs` yoki "type": "commonjs")
 console.log(this);           // {} (module.exports)
-console.log(this === module.exports); // true (Node.js module da)
+console.log(this === module.exports); // true — CJS module wrapper this'ini module.exports'ga bog'laydi
+
+// Node.js ES Module top-level (`.mjs` yoki "type": "module"):
+// console.log(this); // undefined — ES Module spec qoidasi (Module Environment Record)
 ```
 
 ### Nima Uchun Default Binding Xavfli?
@@ -1307,10 +1314,10 @@ export default test;
 
 Strict mode V8 ga bir nechta optimization imkonini beradi:
 
-1. `this` coercion yo'q — `null`/`undefined` ni `window` ga o'tkazish shart emas
-2. Primitive boxing yo'q — `42` ni `Number(42)` ga o'tkazish kerak emas
-3. `arguments` object optimization — strict mode da `arguments` parametrlar bilan decouple
-4. Hidden class stability — `this` doimiy ravishda object bo'lishi kafolatlangan emas
+1. **`this` coercion yo'q** — `null`/`undefined` ni `window` ga o'tkazish shart emas
+2. **Primitive boxing yo'q** — `42` ni `Number(42)` wrapper'ga o'tkazish kerak emas
+3. **`arguments` object optimization** — strict mode'da `arguments` parametrlar bilan decouple (sync emas)
+4. **Wrapper object'larsiz call site** — non-strict'da har primitive `this` uchun wrapper object yaratiladi va u o'z hidden class'i bilan keladi (qisqa muddatli allocation + GC pressure). Strict mode'da `this` aynan o'zi (primitive yoki undefined) uzatiladi — wrapper allocation yo'q, hidden class transition'larsiz call site barqarorroq
 
 ---
 

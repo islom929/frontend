@@ -9,7 +9,7 @@
 ### 1. `==` va `===` farqi nima? Qachon `==` ishlatish mumkin? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `===` (strict equality) — type va qiymatni tekshiradi, **hech qanday coercion yo'q**. Agar type'lar farqli bo'lsa — darhol `false`. `==` (abstract equality) — type'lar farqli bo'lsa, ECMAScript spec'dagi murakkab algoritm bo'yicha avval coercion qiladi, keyin taqqoslaydi.
 
@@ -39,16 +39,14 @@ if (value == null) {
 [] == false   // true — bo'sh array ham!
 ```
 
-**Deep Dive:**
-
-`==` algoritmi (ECMAScript 7.2.14 IsLooselyEqual): type teng → `===` kabi; null/undefined → `true`; Boolean bor → avval `Number` ga; String vs Number → String `Number` ga; Object bor → `ToPrimitive` chaqiriladi. Har bir qadam recursive — natijani bashorat qilish qiyin.
+`==` algoritmi (ECMAScript `IsLooselyEqual` abstract operation): type teng bo'lsa → `===` kabi; null vs undefined → `true`; Boolean operand bo'lsa → avval `ToNumber` ga; String vs Number → String'ni `ToNumber` ga; Object vs primitive → object'ga `ToPrimitive` chaqiriladi. Har qadam recursive — natijani bashorat qilish qiyin.
 
 </details>
 
 ### 2. typeof operatori haqida nima bilasiz? typeof null nima qaytaradi va nima uchun? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `typeof` qiymatning type'ini string sifatida qaytaradi. 8 ta mumkin natija: `"string"`, `"number"`, `"boolean"`, `"undefined"`, `"symbol"`, `"bigint"`, `"object"`, `"function"`.
 
@@ -69,7 +67,7 @@ To'g'ri null tekshirish: `value === null`. Array tekshirish: `Array.isArray(valu
 ### 3. Truthy va Falsy qiymatlar nima? Falsy qiymatlarni sanab bering [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 JavaScript da faqat **8 ta falsy** qiymat bor — qolgan **hamma narsa truthy**:
 
@@ -102,7 +100,7 @@ Boolean(new Boolean(false)) // true — wrapper object!
 ### 4. Type coercion nima? Explicit va implicit farqi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Type coercion — bir type'ni boshqasiga o'zgartirish.
 
@@ -130,7 +128,7 @@ ECMAScript spec da 4 ta Abstract Operation bor: `ToString`, `ToNumber`, `ToBoole
 ### 5. ToPrimitive qanday ishlaydi? Symbol.toPrimitive nima? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Object primitive emas. Engine object'ni primitive ga aylantirishi kerak bo'lganda ToPrimitive chaqiriladi. U **hint** parametri oladi:
 
@@ -138,7 +136,9 @@ Object primitive emas. Engine object'ni primitive ga aylantirishi kerak bo'lgand
 |------|---------|--------|
 | `"string"` | `String()`, template literal | `toString()` → `valueOf()` |
 | `"number"` | `Number()`, unary `+`, `-`, `<`, `>` | `valueOf()` → `toString()` |
-| `"default"` | `+`, `==` | `valueOf()` → `toString()` (Date `[Symbol.toPrimitive]` orqali `"default"` ni `"string"` kabi ishlatadi) |
+| `"default"` | binary `+`, `==` | `valueOf()` → `toString()` |
+
+> **Date — istisno:** `Date.prototype[Symbol.toPrimitive]` `"default"` hint'ni `"string"` kabi qabul qiladi. Shu sababli `date + ""` → string, lekin oddiy object'da `obj + ""` → `valueOf()` natijasi.
 
 `Symbol.toPrimitive` — eng yuqori prioritet. Agar mavjud bo'lsa, `valueOf`/`toString` e'tiborga olinmaydi:
 
@@ -165,7 +165,7 @@ Array uchun: `valueOf()` → o'zini qaytaradi (object!), keyin `toString()` → 
 ### 6. `null` va `undefined` farqi nima? ToNumber da qanday farq qiladi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `undefined` — o'zgaruvchi e'lon qilingan lekin qiymat berilmagan, yoki funksiya hech narsa return qilmagan holat. `null` — dasturchi tomonidan ataylab "bo'sh/hech narsa yo'q" qiymat berilgan holat.
 
@@ -199,7 +199,7 @@ Bu farq production da xatolarga olib keladi — `undefined` aralashgan arifmetik
 ### 7. Symbol nima? Nima uchun kerak? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Symbol — ES6 da qo'shilgan primitive type. Har bir Symbol **unique** — hatto bir xil tavsif bilan yaratilgan ikkitasi ham teng emas. Asosiy maqsad — **nom to'qnashuvini oldini olish**. Object property key sifatida ishlatilganda, Symbol key'lar `for...in`, `Object.keys()` da ko'rinmaydi.
 
@@ -231,7 +231,7 @@ Type coercion cheklovi: implicit string konversiya `TypeError` beradi (`"x" + sy
 ### 8. BigInt nima? Number dan farqi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 BigInt — ES2020 da qo'shilgan primitive, `Number.MAX_SAFE_INTEGER` (2^53 - 1) dan katta butun sonlar uchun. Number bu chegaradan oshganda aniqlik yo'qotadi:
 
@@ -257,7 +257,7 @@ Use case'lar: katta database ID'lari, kriptografik hisob-kitoblar, moliyaviy ani
 ### 9. Map va Object farqi nima? Qachon qaysi birini ishlatish kerak? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Xususiyat | Object | Map |
 |-----------|--------|-----|
@@ -291,7 +291,7 @@ map.has("toString"); // false — toza
 ### 10. WeakMap va Map farqi nima? Qachon WeakMap ishlatiladi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 WeakMap key'lari **weakly referenced** — boshqa joyda strong reference yo'q bo'lsa, GC key-value juftlikni o'chirishi mumkin. Shu sababli WeakMap iterate qilib bo'lmaydi (size, keys, values, forEach yo'q).
 
@@ -324,7 +324,7 @@ class User {
 ### 11. `structuredClone()` nima? `JSON.parse(JSON.stringify())` dan farqi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `structuredClone()` — ES2022 da qo'shilgan built-in deep copy. JSON hack'dan kuchli:
 
@@ -365,7 +365,7 @@ s.undef;                // undefined ✅
 ### 12. `Object.is()` nima? `===` dan farqi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `Object.is()` — ECMAScript spec'dagi **SameValue** algoritmini implement qiladi. `===` dan ikkita farqi bor:
 
@@ -401,7 +401,7 @@ React'da `Object.is` ishlatiladi — state o'zgarishini aniqlashda `-0` va `NaN`
 ### 13. Set nima? Array dan farqi? Duplikatlarni qanday olib tashlash mumkin? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Set — faqat unique qiymatlarni saqlaydigan data structure. Asosiy farq: dublikat qo'shilmaydi, `has()` O(1), `delete()` O(1).
 
@@ -429,7 +429,7 @@ new Set([...a].filter(x => !b.has(x)));      // {1,2}
 ### 14. NaN nima? Qanday tekshiriladi? Nima uchun NaN === NaN false? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `NaN` — "Not a Number", lekin `typeof NaN === "number"`. U noto'g'ri matematik operatsiya natijasida hosil bo'ladi (`0/0`, `parseInt("abc")`). IEEE 754 floating-point standarti bo'yicha NaN **hech narsaga teng emas, o'ziga ham**. Bu atayin — NaN noaniq qiymatni bildiradi, ikki noaniq qiymat teng bo'la olmaydi.
 
@@ -441,9 +441,10 @@ NaN == NaN          // false!
 Number.isNaN(NaN)   // true
 Number.isNaN("abc") // false — string, NaN emas
 
-// ⚠️ Eski isNaN() — coercion qiladi:
-isNaN("abc")        // true — "abc"→NaN→true (noto'g'ri!)
-isNaN(undefined)    // true — undefined→NaN→true
+// ⚠️ Eski isNaN() — avval Number() ga coercion qiladi:
+isNaN("abc")        // true  — "abc" → NaN → true (string aslida NaN emas!)
+isNaN(undefined)    // true  — undefined → NaN → true
+isNaN("42")         // false — "42" → 42 → false
 
 // NaN "yuqumli" — arifmetikda tarqaladi:
 NaN + 5    // NaN
@@ -458,7 +459,7 @@ Math.max(1, NaN, 3) // NaN
 ### 15. `||`, `&&`, `??` operatorlarining farqi nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Bu uchala operator ham boolean qaytarmaydi — **qiymatni o'zini** qaytaradi:
 
@@ -503,7 +504,7 @@ console.log(null == undefined); // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Natijalar:
 
@@ -543,7 +544,7 @@ console.log(+[]);                // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Natijalar:
 
@@ -565,7 +566,7 @@ Asosiy qoidalar: `+` operatorida bir tomon string bo'lsa — concatenation; `-`,
 ### 3. `instanceof` implement qiling [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `instanceof` prototype chain bo'ylab `Constructor.prototype` ni qidiradi:
 
@@ -625,7 +626,7 @@ processInput(null);   // lekin typeof null === "object" ga yetmaydi
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Muammolar:
 1. `!value` — `0` va `""` ham falsy, valid input yo'qoladi
@@ -654,7 +655,7 @@ processInput({a:1}); // "a" ✅
 ### 5. `deepEqual` implement qiling — ikki qiymatni chuqur taqqoslash [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function deepEqual(a, b) {
@@ -723,6 +724,22 @@ deepEqual({ a: 1 }, { a: 2 });                              // false
 
 **Edge case'lar:** Circular reference uchun `WeakMap` bilan "ko'rilgan" object'larni track qilish kerak. Symbol property'larni ham tekshirish uchun `Reflect.ownKeys()` ishlatiladi.
 
-**Deep Dive:** ECMAScript spec'da 4 ta equality algoritmi bor: `SameValue` (`Object.is`), `SameValueZero` (`Map`/`Set` key comparison, `includes`), `IsStrictlyEqual` (`===`), va `IsLooselyEqual` (`==`). Node.js `assert.deepStrictEqual` ichida `SameValue` ishlatadi — `NaN === NaN` true, `-0 !== +0`. `structuredClone` esa spec'dagi `StructuredSerializeInternal` algoritmini ishlatadi — bu deep equality emas, balki deep copy, lekin u ham circular reference'larni identity map orqali track qiladi.
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+ECMAScript spec'da 4 ta equality algoritmi mavjud:
+
+| Algoritm | API | NaN | -0 vs +0 |
+|----------|-----|-----|----------|
+| `SameValue` | `Object.is` | teng | farqli |
+| `SameValueZero` | `Map`/`Set` key, `Array.includes` | teng | teng |
+| `IsStrictlyEqual` | `===` | farqli | teng |
+| `IsLooselyEqual` | `==` | farqli | teng (coercion bilan) |
+
+Node.js `assert.deepStrictEqual` ichida `SameValue` ishlatadi — `NaN`'lar teng, `-0` va `+0` farqli. `structuredClone` esa spec'dagi `StructuredSerializeInternal` algoritmini ishlatadi — bu deep equality emas, balki deep copy, lekin u ham circular reference'larni identity map (memory) orqali track qiladi.
+
+Production'da deep equality kerak bo'lsa: `lodash.isEqual` (battle-tested), `fast-deep-equal` (performance critical), yoki Node.js `util.isDeepStrictEqual`.
+
+</details>
 
 </details>

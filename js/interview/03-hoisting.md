@@ -399,7 +399,7 @@ class MyClass {
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 ReferenceError: Cannot access 'MyClass' before initialization
@@ -419,5 +419,218 @@ const instance = new MyClass(); // ✅
 ```
 
 Bu function declaration bilan asosiy farq — function declaration to'liq hoist bo'ladi, class esa TDZ da.
+
+</details>
+
+### 8. Default parameter'larda TDZ qanday ishlaydi? [Middle+]
+
+```javascript
+function createConfig(timeout = retries * 1000, retries = 3) {
+  return { timeout, retries };
+}
+
+console.log(createConfig());
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+`ReferenceError: Cannot access 'retries' before initialization` — parameter'lar chapdan o'ngga initialize bo'ladi, har parameter o'z TDZ'siga ega.
+
+### To'liq tushuntirish
+
+Function parameter'lar **chapdan o'ngga** ketma-ket initialize qilinadi. Har bir parameter o'z TDZ zonasiga ega: undan **oldingi** parameter'lar mavjud va initialize qilingan, **keyingi** parameter'lar esa hali `uninitialized` (TDZ).
+
+`createConfig()` chaqirilganda:
+1. Engine `timeout` default'ini evaluate qiladi: `retries * 1000`
+2. `retries` hali initialize qilinmagan — keyingi parameter
+3. TDZ'dagi `retries` ga murojaat → `ReferenceError`
+
+### Kod misol
+
+```javascript
+// ❌ Noto'g'ri tartib — keyingi parameter'ga reference
+function bad(a = b, b = 1) {
+  return [a, b];
+}
+bad(); // ❌ ReferenceError: Cannot access 'b' before initialization
+
+// ✅ To'g'ri tartib — dependent parameter keyin
+function good(b = 1, a = b) {
+  return [a, b];
+}
+good(); // [1, 1] ✅
+good(10); // [10, 10] — b = 10, a = b = 10
+good(10, 20); // [20, 10]
+```
+
+### Edge Cases
+
+- Parameter scope va function body — alohida scope qatlamlari. Body'dagi `let`/`const` parameter default'da ko'rinmaydi:
+  ```javascript
+  function example(x = y) {
+    const y = 10; // body scope'da
+    return x;
+  }
+  example(); // ❌ ReferenceError: y is not defined
+  // (TDZ emas — y umuman parameter scope'da yo'q)
+  ```
+- Default parameter expression'da `this`, `arguments` ishlatish mumkin (parameter scope'dan accessible)
+- Default `undefined` argument'ni trigger qiladi: `bad(undefined, 5)` ham xato beradi — `undefined` default'ni faollashtiradi
+
+### Follow-up savollar
+
+1. "Default parameter `var` declaration bilan kolleziya bo'lsa?" — Parameter Creation Phase'da binding sifatida yaratiladi. Body'dagi `var x` mavjud binding'ni topadi va o'sha qiymatni saqlaydi (assignment yo'q bo'lsa).
+2. "Rest parameter TDZ'ga ega?" — Ha, `(a, ...rest)` da `rest` `a` ga reference qila olmaydi (oldingi parameter'lardan keyin keladi).
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Spec `10.2.11 FunctionDeclarationInstantiation`: agar funksiya non-simple parameter'larga ega (default/rest/destructuring), engine alohida **ParameterEnvironment** yaratadi. Har parameter `IteratorBindingInitialization` orqali chapdan o'ngga initialize qilinadi: `CreateMutableBinding` + agar argument berilgan bo'lsa `InitializeBinding`, aks holda default expression evaluate qilinadi va `InitializeBinding`. Keyingi parameter binding'lari hali `uninitialized` — TDZ holatida. `ResolveBinding` `uninitialized` binding'ga uchrasa `ReferenceError` throw qiladi.
+
+</details>
+
+</details>
+
+### 9. Block ichida function declaration — strict vs non-strict farqi [Senior]
+
+```javascript
+"use strict";
+
+if (true) {
+  function helper() { return "strict"; }
+  console.log(helper());
+}
+console.log(typeof helper);
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+Strict mode'da: `"strict"` keyin `"undefined"`. Non-strict mode'da: `"strict"` keyin `"function"` (Annex B web compatibility tufayli).
+
+### To'liq tushuntirish
+
+ES2015 dan boshlab block ichidagi function declaration spec'da aniq belgilangan, lekin xulq-atvor strict mode'ga bog'liq:
+
+- **Strict mode** (yoki ES Module): function declaration faqat **block-scoped** binding yaratadi (`let`-like). Block tashqarisida o'zgaruvchi mavjud emas — `typeof` `"undefined"` qaytaradi.
+- **Non-strict mode**: ECMAScript Annex B "Web Compatibility Semantics" (B.3.2) qoidalariga ko'ra ikki binding yaratiladi — block-scoped + function-scoped (eng oxirgi assignment qiymati bilan). Bu legacy code uchun saqlangan, 2015'dan barcha brauzerlar va Node'da bir xil ishlaydi.
+
+### Kod misol
+
+```javascript
+// Strict mode (yuqoridagi kod):
+"use strict";
+if (true) {
+  function helper() { return "strict"; }
+  console.log(helper()); // "strict" ✅
+}
+console.log(typeof helper); // "undefined" — block tashqarisida YO'Q
+
+// Non-strict mode (classic script, top-level):
+if (true) {
+  function helper() { return "non-strict"; }
+}
+helper(); // "non-strict" ✅ — function-scoped binding mavjud (Annex B)
+console.log(typeof helper); // "function"
+```
+
+### Edge Cases
+
+- ES Modules **doim strict** — module'da block function declaration faqat block-scoped
+- Dynamic code evaluation ichida strict mode'da bir xil qoida
+- Block function declaration hoisting: strict'da `let`-like (TDZ), non-strict'da function-scoped `var`-like binding `undefined` bilan boshlanadi, block bajarilganda funksiya qiymati assign bo'ladi
+
+### Follow-up savollar
+
+1. "Nima uchun block function declaration ishlatish noaniq?" — Strict/non-strict farqi va engine'lararo legacy farqlar. Aniq behavior uchun `const fn = function() {}` yoki arrow function tavsiya etiladi.
+2. "Loop ichida function declaration?" — Bir xil qoidaga amal qiladi: strict'da block-scoped, non-strict'da Annex B.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+ECMAScript Annex B "Additional ECMAScript Features for Web Browsers" — bu standart qism web compatibility uchun saqlangan legacy behavior'larni belgilaydi. B.3.2 "Block-Level Function Declarations Web Legacy Compatibility Semantics" non-strict mode'da block function declaration uchun ikkita binding yaratishni belgilaydi: block scope'da `let`-like binding (`InstantiateFunctionObject` natijasi) va function scope'da `var`-like binding. Block ichidagi har bir assignment function-scoped binding'ni ham yangilaydi. Strict mode'da Annex B qoidalari **qo'llanilmaydi** — faqat block-scoped binding qoladi.
+
+</details>
+
+</details>
+
+### 10. Parameter va var nomi to'qnashganda nima sodir bo'ladi? [Senior]
+
+```javascript
+function showValue(price) {
+  var price;
+  console.log(price);
+
+  var price = 999;
+  console.log(price);
+}
+
+showValue(100);
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+Output: `100` keyin `999`. Parameter va `var` bir xil scope'ga kiradi; assignment'siz `var price` mavjud binding'ni saqlaydi, lekin `var price = 999` assignment'i Execution Phase'da uni override qiladi.
+
+### To'liq tushuntirish
+
+Function parameter'lar va body'dagi `var` declaration'lar bir xil function-level scope'ga (VariableEnvironment) kiradi. Creation Phase'da:
+
+1. Parameter `price` binding sifatida yaratiladi va argument qiymati (`100`) bilan initialize qilinadi
+2. `var price` declaration qayta ishlanadi — binding allaqachon mavjud → mavjud qiymat saqlanadi (spec `VarDeclaredNames` qoidasi)
+
+Execution Phase'da:
+
+1. `console.log(price)` → `100` (parameter qiymati)
+2. `var price = 999` — declaration qismi no-op, lekin `= 999` assignment bajariladi → `price = 999`
+3. `console.log(price)` → `999`
+
+### Kod misol
+
+```javascript
+function example(userId) {
+  var userId; // ✅ assignment yo'q — parameter qiymati saqlanadi
+  console.log(userId); // → argument qiymati
+
+  var userId = "new"; // ❌ assignment override qiladi
+  console.log(userId); // → "new"
+}
+example(42);
+// Output:
+// 42
+// "new"
+```
+
+### Edge Cases
+
+- `let`/`const` parameter bilan kolleziya — SyntaxError: `function fn(x) { let x; }` parse-time xato
+- Strict mode'da bir nomli parameter'lar (`function fn(x, x)`) — SyntaxError
+- Default parameter va body var: `function fn(x = 10) { var x; }` — `x` parameter qiymatini saqlaydi (10)
+- Arrow function parameter'lari — bir xil qoidalarga bo'ysunadi
+
+### Follow-up savollar
+
+1. "Function parameter va Function declaration body'da bir xil nomda bo'lsa?" — Function declaration parameter binding'ni override qiladi (function declaration var'dan keyin Creation Phase'da qayta ishlanadi).
+2. "Bu pattern qachon foydali?" — Hech qachon. Modern kodda `let`/`const` ishlatib parameter va body nomlarini ajratish — clarity beradi va SyntaxError bilan kolleziyalarning oldini oladi.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Spec `FunctionDeclarationInstantiation` (10.2.11) qadamlari:
+
+1. `parameterNames` ro'yxati olinadi
+2. `varNames` (function body'dagi) ro'yxati olinadi
+3. Har parameter uchun `CreateMutableBinding` + `InitializeBinding(argument)` (yoki default)
+4. `var` declaration'lar: agar nom `parameterNames` da bo'lsa va binding allaqachon initialize qilingan — `CreateMutableBinding` skip qilinadi (`HasBinding` returns true)
+5. Function declaration'lar — `SetMutableBinding` orqali mavjud binding'ni override qiladi (parameter ham var ham)
+
+Shuning uchun: parameter + assignment'siz var = parameter qiymati saqlanadi. Parameter + function declaration = function override.
+
+</details>
 
 </details>

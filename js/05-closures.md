@@ -9,7 +9,7 @@
 - [Closure Nima](#closure-nima)
 - [Lexical Environment va Closure Aloqasi](#lexical-environment-va-closure-aloqasi)
 - [Closure Qanday Hosil Bo'ladi](#closure-qanday-hosil-boladi)
-- [V8 da Closure Implementation](#v8-da-closure-implementation)
+- [V8'da Closure Implementation](#v8da-closure-implementation)
 - [Use Cases](#use-cases)
   - [Data Privacy / Encapsulation](#data-privacy--encapsulation)
   - [Factory Functions](#factory-functions)
@@ -39,7 +39,15 @@ Closure ikki qismdan iborat:
 1. **Funksiya** — ichki funksiya (yoki istalgan funksiya)
 2. **Lexical Environment** — shu funksiya yaratilgan paytdagi scope'dagi barcha o'zgaruvchilar
 
-Closure hosil bo'lishining **zaruriy sharti** — funksiya tashqi scope'dagi kamida bitta o'zgaruvchiga murojaat qilishi. Agar funksiya faqat o'z local o'zgaruvchilarini ishlatsa — texnik jihatdan closure mavjud, lekin amaliy ta'siri yo'q (engine optimizatsiya qilib, keraksiz reference'larni olib tashlashi mumkin).
+**Spec darajasida:** ECMAScript bo'yicha **har qanday funksiya yaratilganda** `[[Environment]]` internal slot'iga joriy LexicalEnvironment saqlanadi — ya'ni texnik jihatdan har funksiya closure hosil qiladi. Tashqi scope'ni ishlatadimi, yo'qmi — farq yo'q, slot doim to'ldiriladi.
+
+**Amaliy darajada:** Closure tushunchasi odatda funksiya **tashqi scope'dagi kamida bitta o'zgaruvchini ishlatganda** gaplashish ma'noga ega. Sababi:
+
+- Funksiya faqat o'z local o'zgaruvchilarini ishlatsa, V8 **scope analysis** paytida tashqi scope'ni Context object'iga ko'chirmaydi (optimization — "no context allocation")
+- Natijada `[[Environment]]` slot spec'da bor, lekin heap'da hech qanday ushlab turilgan data yo'q — amaliy "closure ta'siri" sezilmaydi
+- Tashqi funksiya scope'i bemalol GC qilinadi
+
+Shuning uchun bu kursda "closure hosil bo'ldi" deganimizda **amaliy ta'siri bor** — ichki funksiya tashqi scope'dagi o'zgaruvchini ishlatib, tashqi scope'ni heap'da tirik saqlaydigan holatni nazarda tutamiz.
 
 Closure'ning amaliy ta'siri shundaki, funksiya **o'zi bilan birga** tashqi scope ma'lumotlarini olib yuradi. Bu ma'lumotlar boshqa hech kimga ko'rinmaydi — faqat shu funksiya (va uning "aka-uka" funksiyalari — bir xil tashqi scope'da yaratilganlar) murojaat qila oladi.
 
@@ -119,7 +127,7 @@ const inc = outer();
        [[OuterEnv]]: Global Environment
 
 2. increment funksiyasi YARATILADI:
-   increment.[[Environment]] = outer EC ning LexicalEnvironment
+   increment.[[Environment]] = outer EC'ning LexicalEnvironment
    // ✅ Bu reference — outer scope'ga "ip bog'landi"
 
 3. increment RETURN qilinadi → inc = increment
@@ -258,13 +266,13 @@ console.log(globalHandler()); // { debug: true, version: "2.0" }
 
 ---
 
-## V8 da Closure Implementation
+## V8'da Closure Implementation
 
 ### Nazariya
 
 V8 engine closure'larni qanday implement qiladi va optimizatsiya qiladi — bu bilim production'da performance-critical kod yozishda foydali.
 
-**Context Object**: V8 da closure hosil bo'lganda, tashqi scope'dagi **faqat closure tomonidan ishlatiladigan** o'zgaruvchilar maxsus **Context** object'iga ko'chiriladi. Bu object heap'da saqlanadi (stack'da emas). Closure ishlatiLMAYDIGAN o'zgaruvchilar Context'ga tushMAYDI — ular stack frame bilan birga yo'qoladi.
+**Context Object**: V8'da closure hosil bo'lganda, tashqi scope'dagi **faqat closure tomonidan ishlatiladigan** o'zgaruvchilar maxsus **Context** object'iga ko'chiriladi. Bu object heap'da saqlanadi (stack'da emas). Closure ishlatiLMAYDIGAN o'zgaruvchilar Context'ga tushMAYDI — ular stack frame bilan birga yo'qoladi.
 
 ```
 function outer() {
@@ -349,7 +357,7 @@ Encapsulation principleining maqsadi: object'ning ichki holatini (state) tashqi 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Closure-based encapsulation V8 da `Context` object'ida yashirin o'zgaruvchilar sifatida saqlanadi. Returned object'ning method'larining `[[Environment]]` slot'i factory function'ning EC'iga ishora qiladi — shu orqali private o'zgaruvchilarga kirish mumkin.
+Closure-based encapsulation V8'da `Context` object'ida yashirin o'zgaruvchilar sifatida saqlanadi. Returned object'ning method'larining `[[Environment]]` slot'i factory function'ning EC'iga ishora qiladi — shu orqali private o'zgaruvchilarga kirish mumkin.
 
 **Truly private** — private fields (`#`) dan eski usul, lekin xavfsizlik kafolatlari kuchli:
 - Reflection orqali kirish yo'q (`Object.getOwnPropertyNames` ko'rinmaydi)
@@ -755,7 +763,7 @@ Closure yordamida stateful iterator yaratish — har chaqiruvda keyingi qiymatni
 
 ES6 dan boshlab JavaScript'da **Iterator Protocol** standart bo'lgan — `next()` method'i `{value, done}` qaytaradi. Closure-based iterator bu protocol'ni qo'l bilan implement qilishning eng oson usuli (generator function'lar yo'q paytda yagona usul edi).
 
-Closure-based iterator vs Generator: closure'da state explicit (siz manage qilasiz), generator'da implicit (engine state machine yaratadi). Har ikkisi ham ishlaydi — tanlov kod o'qilish qulayligi va kontekst'ga bog'liq. Generator'lar state machine transformatsiyasi tufayli biroz qo'shimcha overhead'ga ega bo'lishi mumkin, lekin zamonaviy engine'lar (V8 2020+) ularni yaxshi optimizatsiya qiladi.
+Closure-based iterator vs Generator: closure'da state explicit (siz manage qilasiz), generator'da implicit (engine state machine yaratadi). Har ikkisi ham ishlaydi — tanlov kod o'qilish qulayligi va kontekst'ga bog'liq. Generator'lar state machine transformatsiyasi tufayli biroz qo'shimcha overhead'ga ega bo'lishi mumkin, lekin zamonaviy engine'lar (V8 7.2+/2018 dan beri "zero-cost async/await" va shunga o'xshash generator optimizatsiyalari) ularni yaxshi optimizatsiya qiladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1318,14 +1326,14 @@ Closure **copy** emas, **reference** saqlaydi. `getValue` va `setValue` bir xil 
 
 ```javascript
 function processLargeData() {
-  const hugeArray = fetchMillionRecords(); // 100MB data
+  const hugeArray = fetchMillionRecords(); // katta hajmli ma'lumotlar
 
   const summary = computeSummary(hugeArray);
 
   return function getSummary() {
     return summary;
     // getSummary faqat summary ishlatadi
-    // V8 ning Context optimization tufayli hugeArray Context'ga ko'chirilMAYDI
+    // V8'ning Context optimization tufayli hugeArray Context'ga ko'chirilMAYDI
     // (eval/debugger bo'lmasa) — GC tozalaydi
     // Lekin xavfsizlik uchun quyidagi ✅ usulni ishlatish tavsiya etiladi
   };

@@ -194,13 +194,13 @@ MyApp.utils.formatDate(new Date());
 
 ### Nazariya
 
-CommonJS — Node.js uchun yaratilgan modul tizimi. 2009-yildan beri Node.js da standart. U `require()` bilan modul yuklaydi va `module.exports` bilan eksport qiladi.
+CommonJS — Node.js uchun yaratilgan modul tizimi. 2009-yildan beri Node.js da standart. U `require()` bilan modul yuklaydi va `module.exports` bilan export qiladi.
 
 CommonJS ning asosiy xususiyatlari:
 1. **Synchronous loading** — `require()` sinxron bajariladi (faylni diskdan o'qiydi). Browser da ishlash uchun mos emas — network so'rov sinxron bo'lsa UI bloklanadi. Shu sababli Node.js uchun yaratilgan.
 2. **Cached** — har bir modul **bir marta** bajariladi. Keyingi `require()` larida cache'dan olinadi (`require.cache`).
 3. **Runtime** — `require()` istalgan joyda chaqirilishi mumkin — `if` ichida, funksiya ichida, loop ichida. Bu static analysis qilishni qiyinlashtiradi.
-4. **Copy of value** — primitive lar export qilinganda **qiymat nusxasi** beriladi (reference emas). Object lar esa reference sifatida beriladi.
+4. **Property-based export** — `module.exports = { count }` oddiy JavaScript property access semantikasida ishlaydi: primitive'lar import paytida **snapshot** (keyinchalik o'zgarsa — ko'rinmaydi), object'lar esa **shared reference** (mutation ko'rinadi). ESM'ning **getter-based live binding**'idan farqli — CJS'da live qiymat kerak bo'lsa getter'ni qo'lda yozish kerak (`get count() { return count; }`).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -241,7 +241,7 @@ module.exports = { x };
 Asosiy export/import:
 
 ```javascript
-// math.js — eksport
+// math.js — export
 function add(a, b) { return a + b; }
 function multiply(a, b) { return a * b; }
 const PI = 3.14159;
@@ -376,7 +376,7 @@ ES Module Loading Pipeline:
 **Live bindings** mexanizmi — CommonJS dan asosiy farq:
 
 ```javascript
-// CommonJS — VALUE COPY
+// CommonJS — oddiy property access (primitive → snapshot)
 // counter.cjs
 let count = 0;
 module.exports = { count, increment() { count++; } };
@@ -384,11 +384,14 @@ module.exports = { count, increment() { count++; } };
 // app.cjs
 const { count, increment } = require('./counter.cjs');
 increment();
-console.log(count); // 0 ← ESKIsini ko'ryapti! Copy olgan
+console.log(count); // 0 ← module.exports.count = 0 (primitive snapshot paytida export)
+                     //    Local count o'zgarsa ham, object.count property o'zgarmaydi
+                     //    CJS'da live qiymat kerak bo'lsa — GETTER qo'yish kerak:
+                     //    module.exports = { get count() { return count; }, increment }
 
 // ---
 
-// ES Modules — LIVE BINDING
+// ES Modules — LIVE BINDING (avtomatik getter)
 // counter.mjs
 export let count = 0;
 export function increment() { count++; }
@@ -396,7 +399,8 @@ export function increment() { count++; }
 // app.mjs
 import { count, increment } from './counter.mjs';
 increment();
-console.log(count); // 1 ← YANGI qiymat! Live binding
+console.log(count); // 1 ← YANGI qiymat! ESM spec export'larni getter-like live
+                     //    binding qilib bog'laydi — har access haqiqiy qiymatni beradi
 ```
 
 </details>
@@ -933,12 +937,12 @@ Zamonaviy bundler'lar:
 4. **Chunk splitting** — dynamic import boundary'lari alohida chunk'ga, vendor chunks
 5. **Output generation** — module wrapping (IIFE/UMD/ESM), minification, source maps, file hashing
 
-**Module resolution algorithm** — bundler `import './foo'` uchun:
+**Module resolution algorithm** — bundler `import './utils'` uchun:
 ```
-1. ./foo.js
-2. ./foo.json
-3. ./foo/index.js
-4. ./foo/package.json (main/module/exports field)
+1. ./utils.js
+2. ./utils.json
+3. ./utils/index.js
+4. ./utils/package.json (main/module/exports field)
 ```
 Bare specifier (`'react'`) uchun `node_modules` traversal — parent directory'ga chiqadi.
 
@@ -1026,7 +1030,7 @@ Tree shaking ishlashi va ishlamasligi:
 import { map } from 'lodash-es'; // faqat map yuklanadi, qolgani olib tashlanadi
 
 // ❌ Tree shaking ISHLAMAYDI — butun kutubxona
-import _ from 'lodash'; // BUTUN lodash bundle'ga tushadi (70KB+)
+import _ from 'lodash'; // BUTUN lodash bundle'ga tushadi — har versiya turli hajmda
 _.map([1,2,3], x => x*2);
 
 // ❌ Tree shaking ISHLAMAYDI — CommonJS
@@ -1087,7 +1091,7 @@ console.log("app end");
 **Nima uchun:** ECMAScript spec'da ESM 3 bosqichli loading'ga ega: **Parse → Link → Evaluate**. Parse bosqichida engine barcha `import` deklaratsiyalarini topadi (ular qaerda yozilganidan qat'i nazar) va dependency graph'ga qo'shadi. Evaluation bosqichida **dependency tartibida** modullar bajariladi — shuning uchun import qilingan modul side effect'lari har doim sizning kodi'ngizdan oldin ishlaydi.
 
 **Amaliy ta'sir:**
-- **Conditional import ishlamaydi** — `if (cond) import './foo.mjs'` SyntaxError. Static import runtime shart'larga bog'liq bo'la olmaydi. Shart kerak bo'lsa — `import()` (dynamic).
+- **Conditional import ishlamaydi** — `if (cond) import './analytics.mjs'` SyntaxError. Static import runtime shart'larga bog'liq bo'la olmaydi. Shart kerak bo'lsa — `import()` (dynamic).
 - **Side effect'ga tayangan kod xavfli** — agar sizning "birinchi qator" `console.log("start")` bo'lsa, aslida u birinchi emas. Imported modul log'lari oldin chiqadi.
 
 **Yechim:** Side effect'ni kutilgan joyga qo'yish kerak bo'lsa — **dynamic import** ishlating:
@@ -1145,7 +1149,7 @@ import * as lodash from 'lodash-es';
 lodash.map([1, 2, 3], x => x * 2); // Faqat map ishlatilmoqda, lekin butun lodash bundled
 
 // Bundler fikrlashi: "Lib['map']" yozish mumkin edi, shuning uchun HAMMA narsa kerak
-// Result: ~70KB bundle (~4KB map o'rniga)
+// Result: butun namespace bundle'da — faqat ishlatilgan funksiya o'rniga
 
 // ✅ Tree shaking ISHLAYDI — named imports
 import { map, filter } from 'lodash-es';
@@ -1217,7 +1221,7 @@ console.log(lib.VERSION);          // "1.0.0"
 
 ### Side-effect-only imports — `import './polyfill.mjs'` tree shaking'ga chidamli
 
-`import './foo.mjs'` (named/default import'siz) — "shu modulni ishga tushir, ma'lumot olma" ma'nosida. Bu pattern **polyfill'lar**, **global registration** (Web Components), **CSS injection** uchun ishlatiladi. Bundler uni **tree shake qila olmaydi**, chunki side effect kutilmoqda.
+`import './polyfill.mjs'` (named/default import'siz) — "shu modulni ishga tushir, ma'lumot olma" ma'nosida. Bu pattern **polyfill'lar**, **global registration** (Web Components), **CSS injection** uchun ishlatiladi. Bundler uni **tree shake qila olmaydi**, chunki side effect kutilmoqda.
 
 ```javascript
 // ✅ Polyfill import — tree shaking OLIB TASHLAMAYDI

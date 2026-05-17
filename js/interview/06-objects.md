@@ -9,7 +9,7 @@
 ### 1. Object yaratishning qanday usullari bor? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 JavaScript da object yaratishning to'rtta asosiy usuli:
 
@@ -44,7 +44,7 @@ const user4 = new UserClass("Alice");
 ### 2. Property descriptor nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Har bir object property'si meta-ma'lumotlarga ega — bu **property descriptor**. Uch xil flag bor:
 
@@ -79,7 +79,7 @@ delete obj.id;         // ❌ o'chirilmaydi
 ### 3. `Object.freeze`, `Object.seal`, `Object.preventExtensions` farqi nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | | Yangi property | O'zgartirish | O'chirish |
 |---|---|---|---|
@@ -114,7 +114,7 @@ function deepFreeze(obj) {
 ### 4. Shallow copy va deep copy farqi nima? Qanday usullar bor? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Shallow copy** — birinchi daraja copy, nested object'lar reference bo'lib qoladi:
 ```javascript
@@ -145,7 +145,7 @@ Zamonaviy kod'da `structuredClone` eng yaxshi tanlov — function copy kerak bo'
 ### 5. `for...in` vs `Object.keys()` vs `Reflect.ownKeys()` farqi nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Metod | Own | Inherited | Non-enumerable | Symbol |
 |-------|-----|-----------|---------------|--------|
@@ -172,7 +172,7 @@ Zamonaviy kod'da `for...in` o'rniga `Object.keys()` / `Object.entries()` ishlati
 ### 6. `Object.hasOwn()` nima va `hasOwnProperty` dan farqi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `Object.hasOwn()` (ES2022) — property object'ning **o'ziga** tegishli ekanini tekshiradi. `hasOwnProperty` ning xavfsiz versiyasi:
 
@@ -196,7 +196,7 @@ Zamonaviy kod'da doim `Object.hasOwn()` ishlatish kerak.
 ### 7. Getter va Setter nima? Qachon ishlatiladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Getter/Setter — property o'qilganda/yozilganda avtomatik chaqiriladigan funksiyalar. Tashqaridan oddiy property, ichida logika:
 
@@ -230,7 +230,7 @@ Use cases:
 ### 8. Optional chaining (`?.`) qanday ishlaydi va qachon ishlatiladi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Optional chaining — chuqur nested property'ga xavfsiz murojaat. Agar zanjirdagi biror qism `null` yoki `undefined` bo'lsa — `TypeError` o'rniga `undefined` qaytaradi:
 
@@ -266,9 +266,9 @@ Qachon ishlatMASLIK kerak: doim mavjud bo'lishi kerak bo'lgan property'lar uchun
 ### 9. V8 Hidden Class nima va performance'ga qanday ta'sir qiladi? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
-V8 har bir object uchun **Hidden Class** (ichki nomi "Map") yaratadi — bu object'ning "shakli" (shape). Bir xil tartibda bir xil property'lar qo'shilgan object'lar bitta Hidden Class'ni share qiladi.
+V8 har bir object uchun **Hidden Class** yaratadi (V8 source kodida `Map` deb nomlanadi — JavaScript `Map` data structure'dan boshqa tushuncha). Bu object'ning shape'i. Bir xil tartibda bir xil property'lar qo'shilgan object'lar bitta Hidden Class'ni share qiladi.
 
 Hidden Class'ning maqsadi — **inline caching**. Agar V8 bilsa ki ikkita object bir xil shape'da — birinchi object'da property access optimizatsiya qilinsa, ikkinchisida ham shu optimizatsiya ishlaydi.
 
@@ -304,7 +304,7 @@ V8 ichida Hidden Class `Map` deb ataladi (JavaScript `Map` data structure bilan 
 ### 10. `Object.groupBy()` nima va qanday ishlaydi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `Object.groupBy()` (ES2024) — array elementlarini callback natijasi bo'yicha guruhlaydi:
 
@@ -340,7 +340,7 @@ const byRole = users.reduce((groups, user) => {
 ### 11. `structuredClone` nima va JSON hack dan farqi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `structuredClone()` (ES2022) — browser'ning Structured Clone Algorithm'i asosida deep copy yaratadi:
 
@@ -393,7 +393,7 @@ console.log(b.y.z);  // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 1
@@ -428,7 +428,7 @@ console.log(JSON.stringify(obj));            // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 Object.keys(obj);                // ["a"]
@@ -449,7 +449,7 @@ JSON.stringify(obj);             // '{"a":1}'
 ### 3. `deepClone` funksiyasini implement qiling [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function deepClone(obj, seen = new WeakMap()) {
@@ -518,7 +518,7 @@ console.log(cloned !== original); // true (alohida object)
 ### 4. `deepEqual` funksiyasini implement qiling [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function deepEqual(a, b) {
@@ -580,6 +580,167 @@ ECMAScript spec'da **uchta alohida equality algoritmi** bor — ularni aralashti
 Primitive'lar uchun `===` **value equality** tekshiradi (not reference), object'lar uchun esa reference identity. Deep equality uchun spec'da alohida operation yo'q — bu userland implementatsiya. Node.js'ning `assert.deepStrictEqual` ichida `innerDeepEqual` funksiyasi `Object.keys`, `Object.getOwnPropertySymbols`, va `getPrototypeOf` kombinatsiyasini ishlatib recursive taqqoslash qiladi — va u SameValue semantikasini ishlatadi (NaN === NaN true).
 
 Shuning uchun custom `deepEqual` yozayotganda primitive taqqoslash uchun odatda `Object.is` (SameValue) ishlatiladi — `NaN` va `-0`/`+0` to'g'ri taqqoslanishi uchun.
+
+</details>
+
+### 5. Property enumeration order — output ayting [Middle+]
+
+**Savol:**
+
+```javascript
+const obj = {
+  "10": "ten",
+  "name": "Alice",
+  "1": "one",
+  [Symbol("id")]: 42,
+  "age": 25,
+  "2": "two"
+};
+
+console.log(Object.keys(obj));
+console.log(Reflect.ownKeys(obj));
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+```javascript
+Object.keys(obj);
+// ["1", "2", "10", "name", "age"]
+// ✅ Integer-like keys avval (1, 2, 10 — ascending numeric)
+// ✅ Keyin string keys insertion order ("name", "age")
+// ❌ Symbol keys YO'Q — Object.keys faqat string keys
+
+Reflect.ownKeys(obj);
+// ["1", "2", "10", "name", "age", Symbol(id)]
+// ✅ Integer-like → string keys (insertion) → Symbol keys (insertion)
+```
+
+**Qoida:** ECMAScript spec'da `[[OwnPropertyKeys]]` qat'iy tartibni kafolatlaydi:
+1. Integer index (`"0"`, `"1"`, `"42"`) — ascending numeric order
+2. String keys — insertion order
+3. Symbol keys — insertion order
+
+Integer-like deganda non-negative integer'ga to'liq mos keladigan string (`"10"` ha, `"10.5"` yo'q, `"010"` yo'q). Bu spec qoidasi Array index'lari bilan consistency uchun kiritilgan.
+
+**Deep Dive:**
+
+ES2015 dan oldin tartib spec'da kafolatlanmagan edi — engine'lar har xil ishlatardi. ES2015 da `[[OwnPropertyKeys]]` internal method standartlashtirildi, lekin **`for...in`** loop uchun tartib **ES2020** gacha to'liq belgilanmagan edi. Hozir har bir engine spec tartibga rioya qiladi. Aniq tartib kerak bo'lsa (insertion order har xil key turlari uchun ham saqlansin) — `Map` ishlatish kerak, chunki `Map` doim insertion order'ni saqlaydi.
+
+</details>
+
+### 6. `Object.freeze` bug fix — fix the code [Middle]
+
+**Savol:** Quyidagi `createConfig` funksiyasi config object'ini immutable qilishi kerak, lekin nested object o'zgartirilishi mumkin. Tuzating:
+
+```javascript
+function createConfig(data) {
+  return Object.freeze(data);
+}
+
+const config = createConfig({
+  db: { host: "localhost", port: 5432 },
+  api: { timeout: 5000 }
+});
+
+config.db.host = "hacked"; // ❌ Bu ishlamasligi kerak!
+console.log(config.db.host); // "hacked" — bug!
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+`Object.freeze` faqat **shallow** — birinchi daraja property'larni freeze qiladi, nested object'lar mutable bo'lib qoladi. Yechim — recursive deep freeze:
+
+```javascript
+function deepFreeze(obj) {
+  // Avval recursive — chunki freeze'dan keyin descriptor o'qish ba'zi case'da cheklanadi
+  for (const key of Reflect.ownKeys(obj)) {
+    const value = obj[key];
+    if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+      deepFreeze(value);
+    }
+  }
+  return Object.freeze(obj);
+}
+
+function createConfig(data) {
+  return deepFreeze(data);
+}
+
+const config = createConfig({
+  db: { host: "localhost", port: 5432 },
+  api: { timeout: 5000 }
+});
+
+config.db.host = "hacked";  // ❌ silent fail (strict: TypeError)
+console.log(config.db.host); // "localhost" ✅
+```
+
+**Edge case** — circular reference: `Object.isFrozen(value)` check infinite recursion'dan himoya qiladi (frozen object'lar qayta freeze qilinmaydi).
+
+**Deep Dive:**
+
+`Object.freeze` ECMAScript spec'da `SetIntegrityLevel(O, "frozen")` orqali implement qilingan: object'ning `[[IsExtensible]]` `false` ga o'tkaziladi, barcha own data property'lar uchun `writable: false` va `configurable: false` qo'shiladi, accessor property'lar uchun `configurable: false`. Bu **faqat own property'larga** ta'sir qiladi — `[[Get]]` orqali kelgan nested object'lar tegmaydi. JS'da real "deep immutable" struktura uchun `Immutable.js`, `immer` kabi kutubxonalardan foydalanish odatiy — ular structural sharing va persistent data structure'larni ham ta'minlaydi.
+
+</details>
+
+### 7. Symbol property iteration — output ayting [Senior]
+
+**Savol:**
+
+```javascript
+const id = Symbol("id");
+const name = Symbol("name");
+
+const user = {
+  age: 25,
+  email: "alice@mail.com",
+  [id]: 12345,
+  [name]: "Alice"
+};
+
+console.log(Object.keys(user));
+console.log(Object.getOwnPropertySymbols(user));
+console.log(JSON.stringify(user));
+
+for (const key in user) {
+  console.log(key);
+}
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+```javascript
+Object.keys(user);
+// ["age", "email"]
+// ✅ Faqat enumerable string keys, Symbol keys ko'rinmaydi
+
+Object.getOwnPropertySymbols(user);
+// [Symbol(id), Symbol(name)]
+// ✅ Faqat Symbol keys
+
+JSON.stringify(user);
+// '{"age":25,"email":"alice@mail.com"}'
+// ✅ Symbol keys serialization'da yo'qoladi
+
+for (const key in user) {
+  console.log(key); // "age", "email"
+}
+// ✅ for...in ham Symbol keys'ni skip qiladi
+```
+
+**Qoida:** Symbol-keyed property'lar oddiy enumeration API'laridan **yashirin**. Ularga kirish uchun maxsus API kerak:
+- `Object.getOwnPropertySymbols(obj)` — faqat Symbol keys
+- `Reflect.ownKeys(obj)` — string + Symbol keys birga
+- `obj[symbolKey]` — to'g'ridan-to'g'ri access
+
+**Use case:** Symbol keys metadata, internal state, library-internal property'lar uchun ideal — foydalanuvchi kodi accidentally serialize qilmaydi yoki `Object.keys` orqali ko'rmaydi. Lekin ehtiyot bo'lish kerak — bu ham xavfsizlik emas (Symbol keys hali ham `Reflect.ownKeys` orqali ko'rinadi).
+
+**Deep Dive:**
+
+`JSON.stringify` ECMAScript spec'da `SerializeJSONObject(value)` ichida `EnumerableOwnProperties(value, "key")` ni ishlatadi — bu `[[OwnPropertyKeys]]` qaytargan listdan **faqat string keys**'ni filter qiladi (Symbol keys explicit skip qilinadi spec qadam 5.a.iii: "If property is a String"). `for...in` esa `EnumerateObjectProperties` ni ishlatadi — bu ham Symbol keys'ni skip qiladi. Symbol semantikasi spec'da "non-enumerable across language" sifatida belgilangan — yagona Symbol-aware enumeration `Reflect.ownKeys` va `Object.getOwnPropertySymbols`.
 
 </details>
 

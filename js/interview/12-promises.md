@@ -9,7 +9,7 @@
 ### 1. Promise nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Promise — asinxron operatsiyaning kelajakdagi natijasini ifodalovchi **state machine**. U uchta holatdan birida bo'ladi:
 
@@ -34,7 +34,7 @@ Eng muhim xususiyat: Promise **faqat bir marta** settle bo'ladi — pending dan 
 ### 2. Promise constructor qanday ishlaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `new Promise(executor)` — executor funksiya **sinxron** chaqiriladi va `resolve`, `reject` argumentlar oladi.
 
@@ -62,7 +62,7 @@ Muhim nuqtalar:
 ### 3. `.then()`, `.catch()`, `.finally()` farqi nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Method | Qachon ishlaydi | Argument | Qaytaradi | Qiymatni o'zgartiradi? |
 |--------|----------------|----------|-----------|----------------------|
@@ -95,7 +95,7 @@ Promise.reject(new Error("xato"))
 ### 4. Promise.all() va Promise.allSettled() farqi nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | | `Promise.all()` | `Promise.allSettled()` |
 |---|---|---|
@@ -130,7 +130,7 @@ Promise.allSettled(promises).then(results => {
 ### 5. Promise.race() va Promise.any() farqi nima? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | | `Promise.race()` | `Promise.any()` |
 |---|---|---|
@@ -157,7 +157,7 @@ Promise.any(promises).then(val => console.log("any:", val));
 ### 6. Error propagation qanday ishlaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Promise chain'da xato `.catch()` topilguncha barcha `.then()`'larni **skip** qiladi:
 
@@ -184,7 +184,7 @@ Promise.resolve("start")
 ### 7. Promise.withResolvers() nima? (ES2024) [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `Promise.withResolvers()` — `{ promise, resolve, reject }` object qaytaradi. `resolve`/`reject` ni Promise'dan tashqarida ishlatish mumkin:
 
@@ -236,7 +236,7 @@ console.log("5");
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Output: **1, 2, 3, 5, 4**
 
@@ -253,7 +253,7 @@ Output: **1, 2, 3, 5, 4**
 ### 2. `Promise.all()` ni implement qiling [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function myPromiseAll(promises) {
@@ -286,7 +286,7 @@ Muhim detaillar:
 ### 3. `Promise.allSettled()` ni implement qiling [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function myPromiseAllSettled(promises) {
@@ -325,16 +325,61 @@ myPromiseAllSettled([
 // ]
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-Farqi `Promise.all` dan: bu yerda `reject` **chaqirilmaydi** — har doim `resolve`. `.catch()` ichida ham `results[i]` ga yozamiz. `finally` orqali hammasi tugaganini tekshiramiz.
+**Farqi `Promise.all` dan:** bu yerda `reject` **chaqirilmaydi** — har doim `resolve`. `.catch()` ichida ham `results[i]` ga yozamiz. `finally` orqali hammasi tugaganini tekshiramiz.
+
+**Spec algoritmi — `PerformPromiseAllSettled`:**
+
+ECMA-262 `27.2.4.2` da har element uchun `PromiseAllSettledResolveElement` va `PromiseAllSettledRejectElement` ikki ichki funksiya yaratiladi. Har biri shared `[[AlreadyCalled]]`, `[[Index]]`, `[[Values]]`, `[[Capability]]`, `[[RemainingElements]]` slot'lariga ega:
+
+```
+PromiseAllSettledResolveElement(value):
+  1. Set values[index] = { status: "fulfilled", value }.
+  2. remainingElements -= 1.
+  3. If remainingElements == 0 → resolve(values).
+
+PromiseAllSettledRejectElement(reason):
+  1. Set values[index] = { status: "rejected", reason }.
+  2. remainingElements -= 1.
+  3. If remainingElements == 0 → resolve(values).
+```
+
+E'tibor: ikkala funksiya ham **resolve** chaqiradi (reject hech qachon emas). Bu sabab `Promise.allSettled` hech qachon reject bo'lmaydi.
+
+**Boshlang'ich `remainingElements = 1`:**
+
+Spec'da counter `0` dan emas, `1` dan boshlanadi va har element uchun increment qilinadi. Iteration tugagandan keyin manual decrement (`remainingElements -= 1`). Sabab: agar iterable juda tez (sync), `0` ga tezroq yetib aborted bo'lib qolardi — pre-increment pattern bunga yo'l qo'ymaydi.
+
+**Memory consideration:**
+
+Million-element iterable uchun `values` array va resolve/reject closure'lar heap'da saqlanadi. Element settle bo'lguncha — barcha pending Promise'lar reference'lari closure ichida. Memory peak: O(n).
+
+**Test edge cases:**
+
+```javascript
+// Synchronous resolve — counter pre-increment muhim
+Promise.allSettled([Promise.resolve(1), Promise.resolve(2)])
+  .then(console.log);
+// [{status:"fulfilled",value:1}, {status:"fulfilled",value:2}]
+
+// Thenable bilan — har biri PromiseResolveThenableJob orqali
+const thenable = { then(res) { res("ok"); } };
+Promise.allSettled([thenable]).then(console.log);
+// [{status:"fulfilled",value:"ok"}]
+```
+
+**Spec referensiyasi:** ECMA-262 `27.2.4.2 Promise.allSettled`, `27.2.4.2.1 PerformPromiseAllSettled`.
+
+</details>
 
 </details>
 
 ### 4. `sleep` funksiyasini yozing [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function sleep(ms) {
@@ -366,7 +411,7 @@ new Promise(async (resolve, reject) => {
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Anti-pattern:** Promise constructor ichida `async` ishlatish.
 
@@ -405,7 +450,7 @@ Promise.resolve()
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Output: **A, C, D, E, B**
 
@@ -428,18 +473,61 @@ Queue: [then_B]
 then_B → "B"
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-`return Promise.resolve("B")` — `.then()` handler'dan thenable qaytarish. Spec (ECMA-262) bo'yicha `PromiseResolveThenableJob` yaratiladi — bu **2 ta qo'shimcha microtask tick** hosil qiladi (ThenableJob + resolveOuter). Shuning uchun `"B"` `"E"` dan ham keyin chiqadi.
+**`PromiseResolveThenableJob` mexanizmi:**
 
-> **⚠️ Runtime eslatma:** Yuqoridagi tartib **ECMA-262 spec'ga mos** (2 extra tick). Lekin ba'zi V8 versiyalari `.then()` return native Promise uchun **1 tick** optimizatsiya qo'llashi mumkin — bu holda natija `A, C, D, B, E` bo'ladi. Farqli `await` kontekstida V8 7.2+ (ES2020+) 1 tick spec darajasida standardlashtirilgan, lekin `.then()` return uchun spec hali 2 tick talab qiladi. **Interview'da:** "spec bo'yicha 2 tick, lekin runtime optimization tufayli farq bo'lishi mumkin" deb eslatish eng xavfsiz javob.
+`return Promise.resolve("B")` — `.then()` handler'dan thenable qaytarish. Spec (ECMA-262 `27.2.1.4`) bo'yicha:
+
+```
+Step 1: then_A callback ishlaydi → "A" chiqadi
+Step 2: Promise.resolve("B") qaytariladi (allaqachon fulfilled native Promise)
+Step 3: Outer Promise (then_A natija) resolve qilinishi kerak — lekin
+        resolution value Promise bo'lgani uchun spec ChainPromises
+        operation'ni chaqiradi
+Step 4: PromiseResolveThenableJob queue qilinadi — tick #1
+Step 5: ThenableJob ishlaydi: Promise.resolve("B").then(resolveOuter, rejectOuter)
+        → resolveOuter callback yana microtask queue'ga qo'shiladi — tick #2
+Step 6: resolveOuter("B") chaqiriladi → keyingi then_B handler queue'ga
+Step 7: then_B ishlaydi → "B" chiqadi
+```
+
+Jami **2 ta qo'shimcha tick** "A" va "B" orasida. Shu sabab "C", "D", "E" oraliqda joylashib oladi.
+
+**V8 optimization tarixi:**
+
+- **V8 7.2 dan oldin (Node 10):** `await` operatori ham 2 tick ishlatardi — `await` desugar'i `.then(...)` ga ekvivalent edi
+- **V8 7.2+ (Node 11+, ES2020 spec rasmiy):** `await native_promise` → 1 tick (PerformPromiseThen direct). Spec'da `PerformPromiseThen` optimizatsiyasi qo'shildi — native Promise uchun `PromiseResolveThenableJob` skip qilinadi
+- **`.then()` return Promise:** Hozirgi spec'da hali 2 tick — spec'da bu pattern uchun optimization yo'q
+
+**Test variant:**
+
+```javascript
+// Native await — 1 tick optimization
+async function test1() {
+  await Promise.resolve("B");
+  console.log("after"); // Faqat 1 tick keyin
+}
+
+// .then() return — 2 tick
+Promise.resolve()
+  .then(() => Promise.resolve("B"))
+  .then(val => console.log(val)); // 2 tick keyin
+```
+
+> **Runtime eslatma:** Yuqoridagi tartib ECMA-262 spec'ga mos (2 extra tick). Ba'zi muhitlarda (eski V8) farq bo'lishi mumkin. Interview'da: "spec bo'yicha 2 tick" — to'g'ri javob.
+
+**Spec referensiyasi:** ECMA-262 `27.2.1.4 PromiseResolveThenableJob`, `27.2.1.7 RejectPromise`, `27.2.2.1 PerformPromiseThen`.
+
+</details>
 
 </details>
 
 ### 7. Promise.race() ni implement qiling [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function myPromiseRace(promises) {
@@ -458,10 +546,294 @@ Promise faqat bir marta settle — birinchi `resolve` yoki `reject` ishlaydi, qo
 
 </details>
 
-### 8. Retry pattern yozing [Middle+]
+### 8. Thenable nima va u qanday xavf tug'diradi? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+Thenable — `.then` method'i bor har qanday object. Promise system uni Promise kabi qabul qiladi (duck typing). Agar oddiy class'da accidental `.then` method bo'lsa — `await` bilan ishlatilganda kutilmagan behavior beradi.
+
+### To'liq tushuntirish
+
+ECMAScript spec'da `PromiseResolveThenableJob` abstract operation thenable'larni Promise zanjiriga qo'shadi. Agar value `IsObject(value) && IsCallable(value.then)` — thenable hisoblanadi va `value.then(resolve, reject)` chaqiriladi. Bu standart Promise interoperability uchun mo'ljallangan (jQuery deferred, Bluebird), lekin har qanday `.then` method'iga ega object'ga ham qo'llaniladi.
+
+### Kod misol
+
+```javascript
+// Oddiy thenable — Promise emas, lekin Promise kabi ishlaydi:
+const customThenable = {
+  then(resolve, reject) {
+    setTimeout(() => resolve("from thenable"), 500);
+  }
+};
+
+Promise.resolve(customThenable).then(val => console.log(val));
+// "from thenable" (500ms keyin)
+
+const val = await customThenable; // "from thenable"
+
+console.log(customThenable instanceof Promise);             // false
+console.log(Promise.resolve(customThenable) instanceof Promise); // true
+
+// Xavfli scenario — accidental thenable:
+class QueryBuilder {
+  #conditions = [];
+
+  where(cond) {
+    this.#conditions.push(cond);
+    return this;
+  }
+
+  // ❌ "then" nomi xavfli — thenable deb qabul qilinadi
+  then(onFulfilled) {
+    onFulfilled(this.#conditions.join(" AND "));
+    return this;
+  }
+}
+
+const qb = new QueryBuilder();
+qb.where("age > 18").where("status = 'active'");
+
+const result = await qb;
+// result — string, QueryBuilder instance emas!
+// await thenable.then ni chaqiradi → resolve(string)
+```
+
+### Edge Cases
+
+- **`Promise.resolve(promise)`** — agar argument allaqachon native Promise bo'lsa, **uni qaytaradi** (yangi wrap qilmaydi). Lekin custom thenable bo'lsa — har doim yangi Promise yaratadi
+- **Throw thenable'da** — `thenable.then(resolve, reject)` chaqirilganda throw qilsa, outer Promise rejected bo'ladi
+- **Sync resolve** — thenable `then` ichida sync `resolve(value)` chaqirsa ham, outer Promise faqat keyingi microtick'da settle bo'ladi
+
+### Follow-up savollar
+
+1. **`.then` nomidan qachon qochish kerak?** — Promise-unrelated class'larda. Fluent interface uchun `build`, `execute`, `onComplete` kabi nomlar yaxshiroq.
+2. **Polyfill kutubxonalar nima uchun thenable ishlatadi?** — Cross-library interop uchun (Bluebird Promise + native Promise + jQuery deferred bir-birini tushunadi).
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+**Spec algoritmi — `PromiseResolveThenableJob`:**
+
+ECMA-262 spec'da `Promise Resolve Functions` operation thenable detection algoritmini quyidagicha amalga oshiradi:
+
+```
+1. Let resolution be resolutionValue.
+2. If resolution is not an Object → fulfill(promise, resolution). EXIT.
+3. Let then be Get(resolution, "then").
+4. If then throws → reject(promise, error). EXIT.
+5. If IsCallable(then) is false → fulfill(promise, resolution). EXIT.
+6. Let job be NewPromiseResolveThenableJob(promise, resolution, then).
+7. HostEnqueuePromiseJob(job, realm).
+```
+
+Bu sabab `Promise.resolve(thenable)` **sinxron natija bermaydi** — `then` chaqirig'i microtask job sifatida queue qilinadi. Sync `resolve(value)` chaqirilgan thenable ham keyingi tick'da settle bo'ladi.
+
+**`PromiseResolveThenableJob` ichki kodi:**
+
+```
+1. Let resolvingFunctions be CreateResolvingFunctions(promiseToResolve).
+2. Let thenCallResult be Call(then, thenable, [resolve, reject]).
+3. If thenCallResult is abrupt completion → reject(promise, error).
+4. Return undefined.
+```
+
+`Get(resolution, "then")` — har Promise resolve'da `then` property getter chaqiriladi. Bu bir nechta xavf manbai:
+
+```javascript
+// Getter side effect — har "thenable check"da chaqiriladi
+const trap = {
+  get then() {
+    console.log("Probe!");
+    throw new Error("evil");
+  }
+};
+
+Promise.resolve(trap).catch(err => console.log(err.message));
+// "Probe!" → "evil"
+
+// Defensive copy uchun frozen object:
+const safe = Object.freeze({ then: undefined, data: 42 });
+// then = undefined → IsCallable false → fulfill bilan object qaytariladi
+```
+
+**V8 implementation nuance:**
+
+V8 da `Promise.resolve` fast path optimization mavjud: agar argument `[[PromiseState]]` slot'iga ega va same realm da bo'lsa — direct return qilinadi (yangi job queue qilinmaydi). Lekin custom thenable yoki cross-realm Promise — har doim `PromiseResolveThenableJob` orqali o'tadi (2 microtask tick overhead).
+
+**Memory leak xavfi:**
+
+```javascript
+// Thenable hech qachon resolve/reject chaqirmasa — outer Promise pending qoladi
+const memoryLeak = {
+  then(resolve, reject) {
+    // Hech narsa qilmaydi — resolve/reject chaqirilmaydi
+  }
+};
+
+Promise.resolve(memoryLeak).then(/* hech qachon ishlamaydi */);
+// Promise abadiy pending, then handler heap'da saqlanadi
+```
+
+**Spec referensiyasi:** ECMA-262 `27.2.1.4 PromiseResolveThenableJob`, `27.2.4.7 Promise.resolve`.
+
+</details>
+
+</details>
+
+---
+
+### 9. `unhandledrejection` event va `Promise.race([])` edge case [Senior]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+**`unhandledrejection`** — Promise reject bo'lib `.catch()` qo'yilmaganda dispatch qilinadi (microtask tick'idan keyin). Node.js 15+ da default process crash. **`Promise.race([])`** — bo'sh array bilan **hech qachon settle bo'lmaydi** (abadiy pending) — bu memory leak va hanging await xavfi.
+
+### To'liq tushuntirish
+
+ECMAScript spec'da har Promise'da `[[PromiseIsHandled]]` internal slot bor. Promise reject bo'lganidan **bir microtask tick** ichida handler qo'shilmasa — `HostPromiseRejectionTracker` chaqiriladi va `unhandledrejection` event'i dispatch qilinadi. Keyinroq handler qo'shilsa — `rejectionhandled` event chiqadi.
+
+`Promise.race([])` ning behavior'i spec'dan kelib chiqadi: race semantikasi "birinchi settled Promise'ni qaytar", bo'sh iterable'da hech kim settle bo'lmaydi → outer Promise pending qoladi.
+
+### Kod misol
+
+```javascript
+// 1. unhandledrejection event
+window.addEventListener("unhandledrejection", (event) => {
+  console.error("Unhandled:", event.reason);
+  event.preventDefault();
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled:", reason);
+});
+
+Promise.reject(new Error("no catch"));
+// → unhandledrejection event dispatch
+
+// Kechiktirilgan catch — rejectionhandled event:
+const p = Promise.reject(new Error("delayed"));
+setTimeout(() => {
+  p.catch(err => console.log("Finally:", err.message));
+  // → rejectionhandled event
+}, 100);
+
+// 2. Promise.race([]) — abadiy pending
+Promise.race([]).then(
+  val => console.log("never:", val),
+  err => console.log("never:", err)
+);
+// Hech narsa chiqmaydi — Promise abadiy pending
+
+// Boshqa static method'lar:
+Promise.all([]).then(val => console.log(val));        // [] darhol
+Promise.allSettled([]).then(val => console.log(val)); // [] darhol
+Promise.any([]).catch(err => console.log(err.errors)); // AggregateError([])
+
+// 3. Xavfli scenario:
+async function firstResult(items) {
+  return Promise.race(items); // ❌ items bo'sh bo'lsa hanging
+}
+
+await firstResult([]); // Abadiy kutadi!
+
+// Yechim:
+async function firstResultSafe(items) {
+  if (items.length === 0) return null;
+  return Promise.race(items);
+}
+```
+
+### Edge Cases
+
+- **Node.js 15+ default** — `unhandledRejection` da `process.exit(1)`. Production'da `--unhandled-rejections=warn` flag bilan o'zgartirish mumkin (lekin tavsiya etilmaydi)
+- **Sentry/Datadog integration** — `unhandledrejection` listener critical production observability
+- **Async function ichida throw** — async function darhol rejected Promise qaytaradi → caller catch qilmasa unhandledrejection trigger qiladi
+
+### Follow-up savollar
+
+1. **Nima uchun spec `Promise.race([])` ni darhol settle qilmaydi?** — Race semantikasi "kim birinchi" — bo'sh array'da hech kim yo'q. Spec consistency uchun pending qoldiriladi.
+2. **`Promise.all([])` nima uchun darhol resolve bo'ladi?** — "Hammasi fulfilled" qoidasi: 0 ta element → 0 tasi fulfilled → true → `[]` qaytariladi.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+**Spec algoritmi — `HostPromiseRejectionTracker`:**
+
+ECMA-262 spec'da har Promise reject bo'lganda yoki handler qo'shilganda host environment'ga signal yuboriladi:
+
+```
+HostPromiseRejectionTracker(promise, operation):
+  - operation = "reject" → rejection registered (handler hali yo'q)
+  - operation = "handle" → handler keyinroq qo'shildi (rejectionhandled)
+```
+
+V8/Node.js implementation: reject bo'lgan Promise `[[PromiseIsHandled]]` slot'i `false` bilan internal "rejection tracker" microtask queue'siga qo'shiladi. Keyingi microtask tick'da agar slot hali `false` bo'lsa — `unhandledrejection` event dispatch qilinadi. Bu sabab `.catch` sync `.then` keyin qo'shilsa ham — event chiqmaydi (bir tick ichida handle bo'ldi).
+
+**Sync vs async catch attach:**
+
+```javascript
+// ✅ Sync attach — unhandledrejection chiqmaydi
+const p = Promise.reject(new Error("x"));
+p.catch(() => {}); // Bir tick ichida handler qo'shildi
+
+// ❌ Async attach — event birinchi chiqadi, keyin rejectionhandled
+const p2 = Promise.reject(new Error("y"));
+setTimeout(() => p2.catch(() => {}), 0);
+// Sequence: unhandledrejection (microtask) → rejectionhandled (timer)
+```
+
+**Node.js 15+ behavior va flags:**
+
+```
+--unhandled-rejections=throw    (default) — process exit code 1
+--unhandled-rejections=strict   — throw, ignore unhandledRejection listener
+--unhandled-rejections=warn     — warning chiqaradi, exit qilmaydi
+--unhandled-rejections=none     — sukut (avvalgi default)
+```
+
+Production tavsiya: `throw` (default) — failure tezda topiladi. Observability uchun listener orqali Sentry/Datadog'ga forward qilish:
+
+```javascript
+process.on("unhandledRejection", (reason, promise) => {
+  Sentry.captureException(reason);
+  // Default throw behavior'i saqlanadi (listener default'ni bekor qilmaydi)
+});
+```
+
+**`Promise.race([])` spec rationale:**
+
+`Promise.race` algoritmi:
+
+```
+1. Let promiseResolve be Get(C, "resolve").
+2. Let iteratorRecord be GetIterator(iterable).
+3. Repeat:
+   a. Let next = IteratorStep(iteratorRecord).
+   b. If next is false → return promise (NO RESOLUTION).
+   c. Let nextValue = IteratorValue(next).
+   d. promiseResolve.call(C, nextValue).then(resolve, reject).
+```
+
+Bo'sh iterable'da loop hech qachon `resolve`/`reject` ni chaqirmaydi → outer Promise pending qoladi. Bu `Promise.all([])` (resolve `[]` darhol) va `Promise.any([])` (reject `AggregateError([])` darhol) dan farqli. Sabab: `all`/`any` da "counter" pattern — 0 counter'da darhol settle; `race` da counter yo'q, faqat first-settles-wins.
+
+**Spec referensiyasi:** ECMA-262 `27.2.1.9 HostPromiseRejectionTracker`, `27.2.4.5 Promise.race`, HTML spec `unhandledrejection event`.
+
+</details>
+
+</details>
+
+---
+
+### 10. Retry pattern yozing [Middle+]
+
+<details>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function retry(fn, maxRetries = 3, delay = 1000) {

@@ -2,7 +2,6 @@
 
 ---
 
-
 ### QISM 1: JS ENGINE VA ASOSLAR (Bo'lim 1-3)
 
 ### `01-js-engine.md` — JavaScript Engine Ichidan
@@ -747,4 +746,3 @@
   - Record and Tuple — `#{ x: 1 }`, `#[1, 2]` — immutable primitives
   - JSON Modules — `import data from './data.json' with { type: 'json' }`
 - Har bir feature uchun: Nima muammoni hal qiladi, Syntax, Real-world misol, Browser/Node.js support holati
-

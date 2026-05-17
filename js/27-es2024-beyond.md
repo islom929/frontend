@@ -59,7 +59,7 @@ Browser vendor'lar (Chrome/V8, Firefox/SpiderMonkey, Safari/JavaScriptCore) odat
 
 ### Nazariya
 
-`Object.groupBy()` — iterable elementlarini callback natijasiga qarab guruhlaydi. Natija oddiy object — har bir key uchun mos elementlar array'i. `Map.groupBy()` xuddi shunday, lekin natija `Map` bo'ladi — key sifatida istalgan qiymat (object, number, symbol) ishlatiladi.
+`Object.groupBy()` — iterable elementlarini callback natijasiga qarab guruhlaydi. Natija oddiy object — har bir key uchun mos elementlar array'i. `Map.groupBy()` bir xil ishlaydi, lekin natija `Map` bo'ladi — key sifatida istalgan qiymat (object, number, symbol) ishlatiladi.
 
 Bu method'lar `Array.prototype.reduce()` bilan qo'lda guruhlash o'rniga qisqa, o'qilishi oson yechim beradi.
 
@@ -78,7 +78,7 @@ Object.groupBy(items, callback) algoritmi:
 5. Har bir key uchun elementlarni array ga to'playdi
 6. Natija object'ni qaytaradi
 
-Map.groupBy xuddi shunday, faqat Map qaytaradi
+Map.groupBy bir xil tarzda ishlaydi, faqat Map qaytaradi
 ```
 
 </details>
@@ -485,7 +485,7 @@ if (isAsync) {
 
 // Farq: wait vs waitAsync
 // Atomics.wait()      — BLOCKING (Worker'da ishlaydi, Main thread'da TypeError)
-// Atomics.waitAsync() — NON-BLOCKING (Main thread + Worker, Promise qaytaradi)
+// Atomics.waitAsync() — NON-BLOCKING (Main thread + Worker, {async, value} qaytaradi)
 ```
 
 </details>
@@ -858,8 +858,8 @@ async function getUser(id) {
   const file1 = stack.use(new FileHandle("/tmp/a.txt"));
   const file2 = stack.use(new FileHandle("/tmp/b.txt"));
 
-  file1.write("data1");
-  file2.write("data2");
+  file1.write("birinchi matn");
+  file2.write("ikkinchi matn");
 
   // Scope tugaganda — ikkalasi ham yopiladi (teskari tartibda)
 }
@@ -1029,7 +1029,9 @@ const timeRe = /(?<h>\d{1,2}):(?<m>\d{2})(?::(?<s>\d{2}))?|(?<h>\d{1,2})h(?<m>\d
 
 timeRe.exec("14:30").groups;    // { h: "14", m: "30", s: undefined }
 timeRe.exec("14:30:45").groups; // { h: "14", m: "30", s: "45" }
-timeRe.exec("14h30").groups;    // { h: "14", m: "30" }
+timeRe.exec("14h30").groups;    // { h: "14", m: "30", s: undefined }
+// Eslatma: named group'lar groups object'ida doim key sifatida mavjud,
+// matched bo'lmasa qiymat undefined
 ```
 
 </details>
@@ -1190,12 +1192,16 @@ console.log(union); // Set {1, 2, 3, 4, 5} — YANGI Set
 ```javascript
 // ❌ using scope tashqarisida resource'ga murojaat
 function process() {
+  let leaked;
   {
     using file = openFile("data.txt");
     file.write("test");
+    leaked = file; // ← reference'ni tashqariga chiqarish
   }
-  // Shu yerda file allaqachon DISPOSE bo'lgan!
-  // file.write("more"); // ❌ Resource closed
+  // Block scope tugadi → file[Symbol.dispose]() chaqirildi
+  // `file` identifier bu yerda mavjud emas (block-scoped, ReferenceError)
+  // Lekin `leaked` — DISPOSE bo'lgan resource'ga reference
+  leaked.write("more"); // ❌ Resource closed (dispose allaqachon chaqirilgan)
 }
 
 // ✅ using scope ichida barcha ishni tugatish

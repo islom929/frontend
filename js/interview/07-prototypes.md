@@ -9,7 +9,7 @@
 ### 1. `__proto__` va `prototype` farqi nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Bu ikki tushuncha butunlay farqli narsalar:
 
@@ -42,13 +42,13 @@ console.log(rex.prototype); // undefined
 ### 2. Prototype chain nima va qanday ishlaydi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Prototype chain — ob'ektlar bir-biriga `[[Prototype]]` orqali bog'langan zanjir. Object'da property topilmasa, engine bu zanjir bo'ylab **yuqoriga** qidiradi — `null` gacha.
 
 Lookup algoritmi:
 1. Object'ning **own property** larida qidiradi
-2. Topilmasa — `[[Prototype]]` (ota) da qidiradi
+2. Topilmasa — `[[Prototype]]` da qidiradi
 3. Topilmasa — otaning otasida, va hokazo
 4. `Object.prototype` → `null` ga yetilsa va topilmasa — `undefined`
 
@@ -74,7 +74,7 @@ V8 engine tezlashtirish uchun **inline cache** ishlatadi — birinchi lookup nat
 ### 3. `new` keyword ichida nima sodir bo'ladi? Step-by-step tushuntiring. [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `new Constructor(args)` chaqirilganda engine 4 ta qadam bajaradi:
 
@@ -108,16 +108,16 @@ Return override muhim edge case:
 
 ```javascript
 // Primitive qaytarsa — IGNORED:
-function Foo() { this.a = 1; return 42; }
-new Foo(); // { a: 1 } — 42 ignored
+function Product() { this.name = "Laptop"; return 42; }
+new Product(); // { name: "Laptop" } — 42 ignored
 
 // Object qaytarsa — this yo'qoladi:
-function Bar() { this.a = 1; return { b: 2 }; }
-new Bar(); // { b: 2 } — this.a yo'qoldi
+function Config() { this.debug = true; return { env: "production" }; }
+new Config(); // { env: "production" } — this.debug yo'qoldi
 
 // null — primitive sifatida ignored:
-function Baz() { this.a = 1; return null; }
-new Baz(); // { a: 1 }
+function Settings() { this.theme = "dark"; return null; }
+new Settings(); // { theme: "dark" }
 ```
 
 </details>
@@ -125,7 +125,7 @@ new Baz(); // { a: 1 }
 ### 4. `Object.create(null)` nima va nima uchun ishlatiladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `Object.create(null)` `[[Prototype]]` i `null` bo'lgan ob'ekt yaratadi. Bu ob'ektda `Object.prototype` dan meros olinadigan hech qanday method (`toString`, `hasOwnProperty`, `valueOf`, `constructor`) **mavjud emas**.
 
@@ -169,7 +169,7 @@ console.log(safeDict["__proto__"]); // "oddiy qiymat" ✅
 ### 5. `for...in`, `Object.keys`, `Object.getOwnPropertyNames` farqi nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function User(name) { this.name = name; }
@@ -205,7 +205,7 @@ console.log(Object.getOwnPropertyNames(ali));
 ### 6. Constructor inheritance qanday qilinadi? (ES5 usuli) [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Constructor function'lar bilan inheritance 3 ta muhim qadamdan iborat:
 
@@ -245,18 +245,23 @@ console.log(c instanceof Shape);  // true
 | `Object.create(Shape.prototype)` | Prototype chain ulash | `instanceof Shape` false, Shape method'lari yo'q |
 | `constructor = Circle` | constructor reference tiklash | `c.constructor === Circle` false |
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-`Object.create(Shape.prototype)` ishlatish sababi — `new Shape()` emas. `new Shape()` desak, Shape constructor side-effect'lari bo'lishi mumkin (API call, DOM manipulation, required parameter). `Object.create` faqat prototype chain'ni ulaydi, constructor'ni chaqirmaydi.
+`Object.create(Shape.prototype)` ishlatish sababi — `new Shape()` emas. `new Shape()` desak, Shape constructor side-effect'lari bo'lishi mumkin (API call, DOM manipulation, required parameter validation). `Object.create` faqat `[[Prototype]]` chain'ni ulaydi (`OrdinaryObjectCreate` orqali) — constructor body'ni chaqirmaydi.
+
+Spec darajasida (`Object.create(proto)`, ECMA-262 §20.1.2.3): yangi ordinary object yaratiladi va uning `[[Prototype]]` slot'iga `proto` o'rnatiladi. `new Shape()` esa `Construct(Shape, args)` chaqiradi — bu `[[Construct]]` internal method'ni ishga tushiradi, `OrdinaryCreateFromConstructor` bilan instance yaratadi va keyin Shape body'ni execute qiladi. Inheritance setup paytida body execution kerak emas, faqat chain.
+
+</details>
 
 </details>
 
 ### 7. Prototype-based inheritance va class-based inheritance farqi nima? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
-JavaScript **prototype-based** — ob'ektlar to'g'ridan-to'g'ri boshqa **ob'ekt**dan meros oladi. Java/C++ **class-based** — ob'ektlar **class** (blueprint) dan yaratiladi.
+JavaScript **prototype-based** — ob'ektlar to'g'ridan-to'g'ri boshqa **ob'ekt**dan meros oladi. Java/C++ **class-based** — ob'ektlar `class` blueprint'idan yaratiladi.
 
 | | Prototype-based (JS) | Class-based (Java/C++) |
 |-|---------------------|----------------------|
@@ -277,16 +282,21 @@ User.prototype.greet = function() { return this.name; };
 console.log(ali.greet()); // "Ali" — delegation orqali ishlaydi
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-ES6 `class` sintaksisi kirganidan keyin JavaScript'da ham class-based ko'rinishi bor, lekin bu **syntactic sugar** — ichida xuddi shu prototype mexanizm ishlaydi. `class User { greet() {} }` engine ichida `User.prototype.greet = function() {}` ga aylanadi. `extends` esa `Object.create` va `Object.setPrototypeOf` kombinatsiyasi.
+ES6 `class` sintaksisi kirganidan keyin JavaScript'da ham class-based ko'rinishi bor, lekin bu asosan **syntactic sugar** — ichida xuddi shu prototype mexanizm ishlaydi. `class User { greet() {} }` engine ichida `User.prototype.greet = function() {}` ga aylanadi (method'lar prototype'ga, static'lar constructor function'ga). `extends` esa `Object.setPrototypeOf(Child, Parent)` (static inheritance uchun) + `Child.prototype.[[Prototype]] = Parent.prototype` (instance method inheritance) kombinatsiyasi.
+
+Lekin class'da ba'zi xulq-atvor sugar emas — alohida semantika: constructor'ni `new` bilan chaqirish majburiy (`[[IsClassConstructor]]` slot tekshiriladi, oddiy call'da TypeError), class body'ning ichi har doim strict mode, class declaration'lar hoist bo'lmaydi (TDZ'da turadi), `super` syntax faqat class va object literal method'larda ishlaydi (`HomeObject` slot'iga bog'liq), va `#private` field'lar faqat class'da bor.
+
+</details>
 
 </details>
 
 ### 8. Prototype pollution nima va qanday himoya qilish? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Prototype pollution — zararli data orqali `Object.prototype` ni o'zgartirish hujumi:
 
@@ -336,16 +346,21 @@ const data = new Map();
 Object.freeze(Object.prototype);
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-Prototype pollution hujumi `[[Set]]` abstract operation orqali ishlaydi — `obj["__proto__"]["isAdmin"] = true` aslida `Object.getPrototypeOf(obj)` ga property qo'shadi, ya'ni `Object.prototype` ga. Spec bo'yicha `__proto__` maxsus accessor property (`Object.prototype.__proto__`) bo'lib, `[[Prototype]]` internal slot'ni o'zgartiradi. `Object.create(null)` bilan yaratilgan object'da bu accessor yo'q — shuning uchun `__proto__` oddiy data property sifatida yoziladi va xavfsiz.
+Prototype pollution hujumi recursive merge orqali `[[Set]]` abstract operation ketma-ketligini ekspluatatsiya qiladi. `merge({}, JSON.parse('{"__proto__": {"isAdmin": true}}'))` ichida loop iteratsiya `target["__proto__"]` ni read qiladi — bu `Object.prototype.__proto__` getter accessor orqali `Object.prototype` ni qaytaradi. Recursive call `merge(Object.prototype, { isAdmin: true })` ga aylanadi — keyingi iteratsiyada `Object.prototype["isAdmin"] = true` set qilinadi va global ta'sir bo'ladi.
+
+Spec bo'yicha `__proto__` Annex B.2.2.1 da `Object.prototype` da accessor property sifatida aniqlangan: get `[[GetPrototypeOf]]`, set `[[SetPrototypeOf]]` chaqiradi. `Object.create(null)` bilan yaratilgan object'da bu accessor inherit qilinmaydi — `__proto__` oddiy data property sifatida yoziladi (`[[DefineOwnProperty]]`). Node.js 22+ va modern browser'lar `JSON.parse` paytida `__proto__` key'ni `[[Prototype]]` slot'iga emas, oddiy data property sifatida set qiladi — lekin `merge` funksiyasidagi keyingi `[[Set]]` accessor'ga tushadi va pollution sodir bo'ladi. Himoya: `for...of Object.keys` ishlatish (own enumerable string keys), yoki `Object.create(null)` ni intermediate object sifatida ishlatish.
+
+</details>
 
 </details>
 
 ### 9. Mixin pattern prototype bilan qanday qilinadi? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 JavaScript single inheritance — bitta `[[Prototype]]` chain. Mixin — bir nechta source'dan method'larni prototype'ga ko'chirish usuli:
 
@@ -378,16 +393,35 @@ user.validate();  // true
 user.serialize(); // '{"name":"Ali","email":"ali@mail.com"}'
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-Mixin muammolari: naming collision (ikki mixin bir xil method nomi), fragile base class problem. Zamonaviy JavaScript'da **composition** ko'pincha mixin'dan yaxshiroq. Bu haqda ko'proq [08-classes.md](08-classes.md) da.
+Mixin muammolari: naming collision (ikki mixin bir xil method nomi bo'lsa keyingisi oldingisini override qiladi), fragile base class problem (mixin yangilanganda barcha consumer'lar sinishi mumkin), kuchsiz instanceof (mixin object instanceof bilan tekshirilmaydi — alohida brand check kerak). Zamonaviy JavaScript'da **composition** ko'pincha mixin'dan yaxshiroq — mustaqil object'lar method'larini delegatsiya bilan birlashtirish.
+
+```javascript
+// ✅ Composition — mixin o'rniga
+function createValidatedUser(name, email) {
+  const user = { name, email };
+  const validator = {
+    validate() { return !!user.email && user.email.includes("@"); }
+  };
+  const serializer = {
+    toJSON() { return JSON.stringify(user); }
+  };
+  return Object.assign({}, user, validator, serializer);
+}
+```
+
+`Object.assign(target, ...sources)` ichida `[[Set]]` semantics ishlatiladi — bu degani target prototype'da accessor (`set` defined) bo'lsa, mixin assignment unga tushadi va kutilmagan side effect bo'lishi mumkin. Spec-accurate "data-only" mixin uchun `Object.defineProperties` bilan barcha descriptor'larni ko'chirish kerak: `Object.defineProperties(User.prototype, Object.getOwnPropertyDescriptors(Mixin))` — bu enumerable, non-enumerable, getter/setter va Symbol key'larni ham to'g'ri ko'chiradi.
+
+</details>
 
 </details>
 
 ### 10. Prototype method va instance method farqi nima? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function User(name) {
@@ -444,7 +478,7 @@ console.log(rex instanceof Animal);
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 "Rex speaks"
@@ -494,7 +528,7 @@ console.log(b.x);
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 1
@@ -534,7 +568,7 @@ console.log(Object.hasOwn(child, "count"));
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 1
@@ -583,7 +617,7 @@ console.log(beta.members);
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `beta.members` → `["Ali"]` — bu bug!
 
@@ -614,7 +648,7 @@ console.log(beta.members); // [] ✅
 **Savol:** `myInstanceof(obj, Constructor)` funksiyasini yozing.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `instanceof` prototype chain bo'ylab `Constructor.prototype` ni qidiradi:
 
@@ -650,9 +684,10 @@ console.log(myInstanceof(42, Number));     // false (primitive)
 console.log(myInstanceof(null, Object));   // false
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-ECMAScript spec'da `instanceof` aslida `OrdinaryHasInstance` abstract operation'ni chaqiradi. Agar constructor'da `Symbol.hasInstance` static method aniqlangan bo'lsa — u birinchi chaqiriladi:
+ECMAScript spec'da `instanceof` operator (ECMA-262 §13.10.2) `InstanceofOperator(V, target)` abstract operation'ni chaqiradi. Bu birinchi `GetMethod(target, @@hasInstance)` orqali `Symbol.hasInstance` mavjudligini tekshiradi — agar bor bo'lsa, uni `target` ga `V` bilan chaqiradi va boolean qaytaradi. Aks holda `OrdinaryHasInstance(target, V)` chaqiriladi — bu prototype chain bo'ylab `target.prototype` ni qidiradi (bound function'lar uchun `[[BoundTargetFunction]]` recursive unwrap qilinadi).
 
 ```javascript
 class EvenNumber {
@@ -664,6 +699,10 @@ console.log(4 instanceof EvenNumber);  // true
 console.log(5 instanceof EvenNumber);  // false
 ```
 
+Bizning `myInstanceof` polyfill `Symbol.hasInstance` override'ni handle qilmaydi va arrow function'larda fail bo'ladi (arrow function'da `prototype` property yo'q — `target.prototype === undefined`). To'liq spec-accurate polyfill `Symbol.hasInstance` check'ni boshida qo'shishi va `prototype` property mavjudligini validate qilishi kerak.
+
+</details>
+
 </details>
 
 ### 6. `new` keyword polyfill yozing [Senior]
@@ -671,7 +710,7 @@ console.log(5 instanceof EvenNumber);  // false
 **Savol:** `myNew(Constructor, ...args)` funksiyasini yozing — `new` keyword'ning to'liq polyfill'i.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function myNew(Constructor, ...args) {
@@ -721,19 +760,31 @@ console.log(typeof fn); // "function" ✅
 console.log(fn());      // 42
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-Return logic'dagi noziklik: `typeof result === "function"` tekshiruvini qo'shdik, chunki function ham object hisoblanadi lekin `typeof function === "function"` (`"object"` emas). Standart `new` operator function qaytarilsa ham uni return qiladi.
+Return logic'dagi noziklik: `typeof result === "function"` tekshiruvini qo'shdik, chunki function ham object hisoblanadi (spec'da `Object` tipi callable bo'lishi mumkin), lekin `typeof function === "function"` (`"object"` emas). Standart `new` operator function qaytarilsa ham uni return qiladi — spec test `Type(result) is Object` (function ham Object type'iga kiradi).
+
+Real `new` spec algoritmi (`[[Construct]]`, ECMA-262 §10.2.2):
+
+1. `OrdinaryCreateFromConstructor(newTarget, "%Object.prototype%")` — `[[Prototype]]` `newTarget.prototype` ga teng ordinary object yaratiladi
+2. `PrepareForOrdinaryCall(F, newTarget)` — yangi calleeContext yaratiladi, `[[ThisValue]]` instance'ga bind qilinadi
+3. Function body bajariladi, result olinadi
+4. Agar result `Object` type bo'lsa — uni qaytaradi, aks holda yangi instance'ni
+
+`new.target` — calleeContext'ning `[[NewTarget]]` slot'idan o'qiladi (function chaqirilganda `[[Call]]` bilan oddiy chaqiruvda `undefined`, `[[Construct]]` bilan chaqirilganda constructor reference). Bu xulq-atvor `Reflect.construct(target, args, newTarget)` orqali kuzatiladi.
 
 **⚠️ Bu polyfill'ning cheklovlari:**
 - **`[[IsConstructor]]` internal slot tekshirilmagan** — real `new` operator Constructor'ning `[[IsConstructor]]` slot'ini tekshiradi. Quyidagilar **constructor emas** va `new` bilan chaqirilsa `TypeError` beradi, lekin bu polyfill ularni qabul qiladi:
   - Arrow function: `const f = () => {}` → `new f()` TypeError
-  - Method shorthand: `{ foo() {} }.foo` → `new obj.foo()` TypeError
+  - Method shorthand: `{ greet() {} }.greet` → `new obj.greet()` TypeError
   - Async function: `async function f() {}` → `new f()` TypeError
   - Generator: `function* f() {}` → `new f()` TypeError
 - **`new.target` yo'q** — constructor ichida `new.target` har doim `undefined` bo'ladi (real `new` da Constructor'ga teng)
 
 To'liqroq polyfill uchun `Reflect.construct(Constructor, args)` ishlatish mumkin — bu barcha yuqoridagi semantikani spec-accurate qoplaydi.
+
+</details>
 
 </details>
 
@@ -765,7 +816,7 @@ for (const key in obj) {
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 1
@@ -807,7 +858,7 @@ console.log(Object.hasOwn(child, "x"));
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 10
@@ -823,9 +874,14 @@ false
 // Object.hasOwn(child, "x") → false (child'da own property yaratilMADI)
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-Bu ECMAScript spec'dagi `[[Set]]` algoritmi (OrdinarySet, qadam 4.d): agar inherited property data descriptor bo'lsa va `writable: false` bo'lsa — assignment `false` qaytaradi. Agar `Object.defineProperty(child, "x", { value: 20 })` desak — bu **ishlaydi**, chunki `defineProperty` `[[Set]]` ni emas, `[[DefineOwnProperty]]` ni chaqiradi.
+Bu ECMAScript spec'dagi `OrdinarySet` algoritmi (ECMA-262 §10.1.9.2) bilan tushuntiriladi. `OrdinarySetWithOwnDescriptor(O, P, V, Receiver, ownDesc)` ichida agar `ownDesc` `undefined` bo'lsa (own property yo'q), parent ga delegatsiya qiladi. Parent'da property data descriptor va `[[Writable]]` `false` bo'lsa — algoritm `false` qaytaradi (yoki strict mode'da TypeError). Sabab: assignment semantikasi inherited read-only invariant'ni saqlash kerak — agar parent'da read-only bo'lsa, child shadow yarata olmaydi.
+
+Lekin `Object.defineProperty(child, "x", { value: 20 })` **ishlaydi**, chunki `defineProperty` `[[Set]]` ni emas, `[[DefineOwnProperty]]` ni chaqiradi (ECMA-262 §10.1.6). `[[DefineOwnProperty]]` parent'ning writable atributini tekshirmaydi — faqat o'z object'idagi mavjud property'ni va `[[Extensible]]` flag'ni hisobga oladi. Bu farq sintaktik shadowing va explicit descriptor definition orasidagi semantik chegarani belgilaydi.
+
+</details>
 
 </details>
 
@@ -857,7 +913,7 @@ console.log(cat.bark()); // Bu ishlamamasligi kerak edi!
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 3 ta xato:
 
@@ -922,7 +978,7 @@ console.log(laptop.getDiscount()); // 12000 (15%) ❌ — 5% bo'lishi kerak!
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Constructor ichida `this.getDiscount` instance property sifatida yaratilgan — bu prototype'dagi method'ni **shadow** qiladi. Narx o'zgarganda instance property o'chib ketmaydi — doim 15% qaytaradi.
 
@@ -945,6 +1001,180 @@ console.log(laptop.getDiscount()); // 75000 (15%) ✅
 laptop.price = 80000;
 console.log(laptop.getDiscount()); // 4000 (5%) ✅
 ```
+
+</details>
+
+### 11. `Object.getPrototypeOf` vs `__proto__` — qaysi biri afzal va nima uchun? [Middle]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+Ikkalasi ham object'ning `[[Prototype]]` internal slot'ini o'qiydi, lekin standart va xulq-atvor jihatdan farqli:
+
+| | `Object.getPrototypeOf(obj)` | `obj.__proto__` |
+|-|----------------------------|-----------------|
+| **Standart** | ECMAScript core | Annex B (legacy web compat) |
+| **`Object.create(null)`** | ✅ ishlaydi (`null` qaytaradi) | ❌ `undefined` — accessor yo'q |
+| **Override mumkin** | ❌ static method | ✅ ha (`Object.prototype.__proto__` accessor) |
+| **Performance** | Bir xil — ikkalasi `[[GetPrototypeOf]]` ni chaqiradi | Bir xil |
+| **Type system (TS)** | Aniq tip | `any` |
+
+```javascript
+const obj = { name: "Alice" };
+
+// ✅ Tavsiya — har doim ishlaydi:
+console.log(Object.getPrototypeOf(obj) === Object.prototype); // true
+
+// ⚠️ Legacy — Object.create(null)'da yo'q:
+console.log(obj.__proto__ === Object.prototype); // true
+
+const bare = Object.create(null);
+console.log(Object.getPrototypeOf(bare)); // null ✅
+console.log(bare.__proto__);              // undefined ❌
+```
+
+**Yana bir farq** — `__proto__` accessor `this` binding'ga sezgir:
+
+```javascript
+const desc = Object.getOwnPropertyDescriptor(Object.prototype, "__proto__");
+// desc.get / desc.set — accessor functions
+// Object.create(null) bilan yaratilgan object'da bu accessor inherit qilinmaydi
+```
+
+**Qoida:** Zamonaviy kodda doim `Object.getPrototypeOf()` va `Object.setPrototypeOf()` ishlating. `__proto__` faqat eski browser compatibility uchun.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+`__proto__` accessor `Object.prototype` da getter/setter sifatida aniqlangan (ECMA-262 Annex B.2.2.1). Annex B `normative-optional` bo'lim — non-browser implementation'lar uchun majburiy emas, lekin web compatibility tufayli har bir engine (V8, SpiderMonkey, JSC) implement qiladi. `Object.getPrototypeOf` esa core spec'da (§20.1.2.12) — har doim mavjud. Performance jihatidan ikkalasi ham V8'da `[[GetPrototypeOf]]` internal method'ni chaqiradi, IC bilan optimallashadi — sezilarli farq yo'q.
+
+Asosiy tanlov sabablari: **xavfsizlik** (`Object.create(null)` da `__proto__` ishlamaydi — lookup `undefined` qaytaradi va silent bug yaratishi mumkin), **portability** (Annex B'siz environment'larda yo'q bo'lishi mumkin), va **TypeScript** (`__proto__` ning tipi `any`, `Object.getPrototypeOf` esa `object | null` qaytaradi — type-safe).
+
+</details>
+
+</details>
+
+### 12. Object.prototype'da nima metodlar bor? `isPrototypeOf` qanday ishlaydi? [Middle]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+`Object.prototype` — barcha (default prototype chain'li) object'larning eng yuqori ajdodi. Unda quyidagi method'lar bor:
+
+- **`toString()`** — `"[object Object]"` qaytaradi (override mumkin)
+- **`valueOf()`** — object'ning primitive konvertatsiyasi
+- **`hasOwnProperty(key)`** — property own ekanligini tekshiradi
+- **`isPrototypeOf(obj)`** — `obj` ning prototype chain'ida `this` bormi
+- **`propertyIsEnumerable(key)`** — property enumerable own ekanligini
+- **`__proto__`** (Annex B) — `[[Prototype]]` accessor
+
+```javascript
+const animal = { eats: true };
+const dog = Object.create(animal);
+const puppy = Object.create(dog);
+
+// isPrototypeOf — instance method, this'dan boshlab chain bo'ylab qidiradi:
+console.log(animal.isPrototypeOf(puppy));  // true (animal → dog → puppy)
+console.log(dog.isPrototypeOf(puppy));     // true (bevosita parent)
+console.log(puppy.isPrototypeOf(animal));  // false — teskari emas
+
+// `instanceof` bilan farq — instanceof Constructor.prototype'ni qidiradi:
+console.log(animal.isPrototypeOf(puppy)); // animal object'ni qidiradi
+// instanceof bilan ekvivalenti yo'q (instanceof faqat Constructor function bilan)
+```
+
+**Algoritm** (`isPrototypeOf` ichida — spec OrdinaryHasInstance ga o'xshash):
+
+```javascript
+function isPrototypeOf(target) {
+  let proto = Object.getPrototypeOf(target);
+  while (proto !== null) {
+    if (proto === this) return true;
+    proto = Object.getPrototypeOf(proto);
+  }
+  return false;
+}
+```
+
+**`instanceof` bilan asosiy farq:**
+
+```javascript
+function Animal() {}
+const a = new Animal();
+
+// instanceof Constructor.prototype ni qidiradi:
+console.log(a instanceof Animal);  // true — Animal.prototype chain'da
+
+// isPrototypeOf — bevosita object'ni qidiradi:
+console.log(Animal.prototype.isPrototypeOf(a));  // true — bir xil natija
+console.log(Animal.isPrototypeOf(a));            // false! — Animal function, .prototype emas
+```
+
+**Use case:** `isPrototypeOf` constructor'siz prototype chain bilan ishlaganda foydali (`Object.create` pattern, polymorphic API'lar).
+
+</details>
+
+### 13. Quyidagi kodda nima sodir bo'ladi? [Senior]
+
+**Savol:**
+
+```javascript
+const parent = {
+  greet() { return `Salom, ${this.name}`; }
+};
+
+const child = Object.create(parent);
+child.name = "Alice";
+
+const greet = child.greet;
+console.log(greet());
+console.log(child.greet());
+console.log(child.greet.call({ name: "Bob" }));
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+```
+"Salom, undefined"  (yoki TypeError strict mode'da)
+"Salom, Alice"
+"Salom, Bob"
+```
+
+**Tushuntirish:**
+
+```javascript
+// 1. const greet = child.greet — method'ni "ajratib oldik"
+//    Bu prototype chain bo'ylab parent.greet'ni topadi, lekin
+//    method bilan birga this bog'lanmagan — faqat function reference
+//
+// 2. greet() — bog'lanmagan function call, this = undefined (strict) yoki globalThis
+//    globalThis.name undefined → "Salom, undefined"
+//    (Browser'da globalThis.name = "" bo'lishi mumkin → "Salom, ")
+//
+// 3. child.greet() — to'g'ri method call, this = child
+//    parent.greet topiladi (delegation), this = child, child.name = "Alice"
+//    Natija: "Salom, Alice"
+//
+// 4. child.greet.call({ name: "Bob" }) — explicit this binding
+//    this = { name: "Bob" }, natija: "Salom, Bob"
+```
+
+**Asosiy qoida:** Method "ajratib olinganda" `this` binding yo'qoladi. Bu prototype'dan kelgan method bilan ham ishlaydi — chunki delegation faqat lookup'ga ta'sir qiladi, `this` binding esa call-site bilan belgilanadi.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Bu xulq-atvor JavaScript'dagi `this` binding'ning dynamic ekanligidan kelib chiqadi. Spec bo'yicha `EvaluateCall(func, ref, arguments, tailPosition)` (ECMA-262 §13.3.6.2) ichida: agar `ref` Reference Record bo'lsa va base Object — `thisValue = GetThisValue(ref)` (base object), aks holda `thisValue = undefined`. `child.greet` member access expression Reference Record qaytaradi (`{ Base: child, ReferencedName: "greet" }`), shuning uchun `child.greet()` → `thisValue = child`. Lekin `const greet = child.greet` `GetValue` chaqiradi va Reference Record'ni function value'ga aylantiradi — `greet()` chaqiruvida hech qanday base yo'q, `thisValue = undefined`.
+
+Method shorthand (`greet() {}`) va `function` expression ikkalasi ham bu xulq-atvor'ga ega — `[[ThisMode]]` `"strict"` yoki `"global"`. Arrow function esa farq qiladi — `[[ThisMode]]` `"lexical"`, `OrdinaryCallBindThis` no-op qiladi, va `this` resolving outer Environment Record'ga delegatsiya qiladi. Shu sababli arrow function'ni `call`/`apply`/`bind` bilan o'zgartirib bo'lmaydi.
+
+Real-world muammoda yechim:
+- **Explicit bind:** `const greet = child.greet.bind(child);` — `BoundFunctionCreate` orqali yangi function object yaratiladi, `[[BoundThis]]` slot'iga `child` saqlanadi
+- **Arrow wrapper:** `const greet = () => child.greet();` — closure orqali `child` ushlab qoladi
+- **Class field arrow** (instance method): `class Foo { greet = () => {...} }` — har instance uchun bound copy (memory cost'i bor)
+
+</details>
 
 </details>
 

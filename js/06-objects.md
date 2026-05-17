@@ -1,6 +1,6 @@
 # Bo'lim 6: Objects Ichidan
 
-> Object — key-value juftliklardan iborat ma'lumot tuzilmasi. JavaScript da deyarli barcha murakkab qiymatlar (array, function, date, regex) object'ning maxsus ko'rinishlari. Object'larni chuqur tushunish — butun tilni tushunish.
+> Object — key-value juftliklardan iborat ma'lumot tuzilmasi. JavaScript'da deyarli barcha murakkab qiymatlar (array, function, date, regex) object'ning maxsus ko'rinishlari. Object'larni chuqur tushunish — butun tilni tushunish.
 
 ---
 
@@ -25,7 +25,7 @@
 
 ### Nazariya
 
-JavaScript da object yaratishning to'rtta asosiy usuli bor. Har birining o'z use case'i va xususiyatlari mavjud:
+JavaScript'da object yaratishning to'rtta asosiy usuli bor. Har birining o'z use case'i va xususiyatlari mavjud:
 
 **1. Object Literal** — eng ko'p ishlatiladigan va eng oddiy usul:
 
@@ -88,7 +88,7 @@ const user = new User("Alice", 25);
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-V8 da object yaratilganda engine **Hidden Class** yaratadi. (V8 source kodida bu internal strukturaga `Map` deb nom beriladi — lekin bu JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha, ular shunchaki bir xil so'zni ishlatadi.) Hidden Class object'ning "shakli" (shape) — qaysi property'lar bor va ular memory'da qanday joylashgan. Bir xil ketma-ketlikda bir xil property'lar qo'shilgan object'lar **bitta** Hidden Class'ni share qiladi — bu inline caching va optimizatsiya uchun muhim (batafsil [01-js-engine.md](01-js-engine.md) da).
+V8'da object yaratilganda engine **Hidden Class** yaratadi. (V8 source kodida bu internal strukturaga `Map` deb nom beriladi — lekin bu JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha, ular shunchaki bir xil so'zni ishlatadi.) Hidden Class object'ning "shakli" (shape) — qaysi property'lar bor va ular memory'da qanday joylashgan. Bir xil ketma-ketlikda bir xil property'lar qo'shilgan object'lar **bitta** Hidden Class'ni share qiladi — bu inline caching va optimizatsiya uchun muhim (batafsil [01-js-engine.md](01-js-engine.md) da).
 
 ```
 const a = { x: 1, y: 2 };
@@ -156,7 +156,7 @@ ECMAScript spec bo'yicha har bir property aslida **Property Descriptor Record** 
 3. Agar property `configurable: false` bo'lsa, faqat cheklangan o'zgarishlar ruxsat etiladi (`writable: true -> false` mumkin, lekin `false -> true` mumkin emas)
 4. Data va accessor descriptor aralashtirib bo'lmaydi — agar mavjud property data descriptor bo'lsa va accessor descriptor berilsa, engine avval eski descriptor ni to'liq o'chiradi
 
-V8 ichida property descriptor'lar **PropertyDetails** structurasida bit flaglar sifatida saqlanadi. `writable`, `enumerable`, `configurable` har biri bitta bit egallaydi. `Object.defineProperty` bilan yaratilgan property'larda spec bo'yicha default qiymatlar `false` (oddiy assign bilan yaratilganda esa `true`). Bu farq spec ning `CreateDataProperty` (assign/literal) vs `DefinePropertyOrThrow` (`Object.defineProperty`) abstract operation'lari orasidagi farqdan kelib chiqadi.
+V8 ichida property descriptor'lar **PropertyDetails** structurasida bit flaglar sifatida saqlanadi. `writable`, `enumerable`, `configurable` har biri bitta bit egallaydi. `Object.defineProperty` bilan yaratilgan property'larda spec bo'yicha default qiymatlar `false` (oddiy assign bilan yaratilganda esa `true`). Bu farq spec'ning `CreateDataProperty` (assign/literal) vs `DefinePropertyOrThrow` (`Object.defineProperty`) abstract operation'lari orasidagi farqdan kelib chiqadi.
 
 </details>
 
@@ -245,7 +245,7 @@ Property access (`obj.prop`) bo'lganda engine **[[Get]](prop, receiver)** intern
 
 Assign (`obj.prop = val`) bo'lganda **[[Set]](prop, value, receiver)** chaqiriladi va `OrdinarySet` ishlaydi — accessor bo'lsa `Call(setter, receiver, value)` bajariladi.
 
-V8 da accessor property'lar `AccessorPair` internal objectda saqlanadi. Bu objectda `getter` va `setter` funksiya pointer'lari bor. V8 inline cache (IC) accessor property'larni ham cache qiladi, lekin data property'larga nisbatan sekinroq — chunki har safar funksiya chaqiruvi (function call overhead) bo'ladi. Shu sababli performance-critical kodda getter/setter o'rniga oddiy property + explicit method chaqiruvi afzalroq bo'lishi mumkin.
+V8'da accessor property'lar `AccessorPair` internal objectda saqlanadi. Bu objectda `getter` va `setter` funksiya pointer'lari bor. V8 inline cache (IC) accessor property'larni ham cache qiladi, lekin data property'larga nisbatan sekinroq — chunki har safar funksiya chaqiruvi (function call overhead) bo'ladi. Shu sababli performance-critical kodda getter/setter o'rniga oddiy property + explicit method chaqiruvi afzalroq bo'lishi mumkin.
 
 </details>
 
@@ -312,7 +312,7 @@ console.log(t._celsius);   // 0 — setter: (32-32) * 5/9
 
 ### Nazariya
 
-JavaScript da object'ni "o'zgarmas" qilishning uchta darajasi bor — har biri oldigidan kuchliroq:
+JavaScript'da object'ni "o'zgarmas" qilishning uchta darajasi bor — har biri oldigidan kuchliroq:
 
 | Metod | Yangi property | O'zgartirish | O'chirish |
 |-------|---------------|-------------|-----------|
@@ -327,21 +327,41 @@ Muhim: **barcha uchta faqat SHALLOW** ishlaydi — ichki (nested) object'larga t
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spec da object immutability uchta **integrity level** orqali boshqariladi. Har biri object ning internal method'larini cheklaydi:
+ECMAScript spec'da object immutability uchta **integrity level** orqali boshqariladi. Har biri object'ning internal method'larini cheklaydi:
 
-**`Object.preventExtensions()`** — object ning **`[[IsExtensible]]`** internal slot ini `false` ga o'rnatadi. Bu `[[DefineOwnProperty]]` ni chaqirganda yangi property qo'shishni bloklaydi. `OrdinaryDefineOwnProperty` ichida `IsExtensible(O)` tekshiriladi — `false` bo'lsa va property mavjud bo'lmasa, `false` qaytadi (strict mode da TypeError).
+**`Object.preventExtensions()`** — object'ning **`[[IsExtensible]]`** internal slot'ini `false`'ga o'rnatadi. Bu `[[DefineOwnProperty]]`'ni chaqirganda yangi property qo'shishni bloklaydi. `OrdinaryDefineOwnProperty` ichida `IsExtensible(O)` tekshiriladi — `false` bo'lsa va property mavjud bo'lmasa, `false` qaytadi (strict mode'da TypeError).
 
-**`Object.seal()`** — spec da `SetIntegrityLevel(O, "sealed")` abstract operation chaqiriladi. Bu operation:
+**`Object.seal()`** — spec'da `SetIntegrityLevel(O, "sealed")` abstract operation chaqiriladi. Bu operation:
 1. `[[PreventExtensions]](O)` — yangi property bloklash
 2. Barcha own property'larning `[[Configurable]]` flagini `false` ga o'rnatish (`[[DefineOwnProperty]]` orqali)
 3. `configurable: false` bo'lganda property o'chirib bo'lmaydi va descriptor turi o'zgartirilmaydi
 
 **`Object.freeze()`** — `SetIntegrityLevel(O, "frozen")` chaqiriladi:
-1. `[[PreventExtensions]](O)` + barcha property'lar `configurable: false`
-2. Data property'lar uchun `writable: false` ham qo'shiladi
-3. Accessor property'lar (getter/setter) **freeze bo'lmaydi** — `[[Get]]/[[Set]]` funksiyalar o'zgartirilmaydi, lekin ular chaqirilishi davom etadi
+1. `[[PreventExtensions]](O)` + **barcha property'lar** (data va accessor) `configurable: false` ga o'tkaziladi — redefine va delete imkoni yo'q
+2. **Data property'lar** uchun qo'shimcha `writable: false` qo'shiladi — qiymat o'zgartirilmaydi
+3. **Accessor property'lar** uchun `writable` flag yo'q (u data descriptor atributi) — lekin `configurable: false` ular uchun ham qo'llaniladi. Ya'ni accessor'ni `Object.defineProperty` bilan qayta yozib bo'lmaydi, lekin `[[Get]]/[[Set]]` funksiyalar **o'z ichki logikasi bilan ishlashda davom etadi** (setter chaqirilishi mumkin). Agar setter data property'ni o'zgartirmoqchi bo'lsa — u data property `writable: false` bo'lgani uchun silent fail (yoki strict mode'da TypeError) bo'ladi
 
-V8 ichida freeze/seal operatsiyalari object ning Hidden Class (Map) ini almashtiradi — yangi Map yaratiladi, unda `frozen`/`sealed` flag `true` bo'ladi. Bu keyingi property access operatsiyalarida tez tekshirish imkonini beradi (IC fast path).
+```javascript
+const obj = {
+  _x: 1,
+  get x() { return this._x; },
+  set x(v) { this._x = v; }
+};
+Object.freeze(obj);
+
+const desc = Object.getOwnPropertyDescriptor(obj, 'x');
+console.log(desc.configurable); // false — accessor ham FROZEN
+
+// Accessor'ni qayta yozib bo'lmaydi:
+// Object.defineProperty(obj, 'x', { get() { return 999; } });
+// ❌ TypeError: Cannot redefine property: x
+
+// Setter hali chaqirilishi mumkin, lekin _x frozen → silent fail (non-strict):
+obj.x = 999;
+console.log(obj._x); // 1 — o'zgarmadi, chunki _x ham frozen (writable: false)
+```
+
+V8 ichida freeze/seal operatsiyalari object'ning Hidden Class'ini (Map'ini) almashtiradi — yangi Map yaratiladi, unda `frozen`/`sealed` flag `true` bo'ladi. Bu keyingi property access operatsiyalarida tez tekshirish imkonini beradi (IC fast path).
 
 </details>
 
@@ -406,7 +426,7 @@ console.log(config.db.host); // "localhost"
 
 ### Nazariya
 
-JavaScript da object'lar **reference** bo'yicha uzatiladi. `const b = a` deganda `b` yangi object emas — `a` bilan bir xil object'ga reference. Object'ni haqiqiy copy qilish uchun maxsus usullar kerak.
+JavaScript'da object'lar **reference** bo'yicha uzatiladi. `const b = a` deganda `b` yangi object emas — `a` bilan bir xil object'ga reference. Object'ni haqiqiy copy qilish uchun maxsus usullar kerak.
 
 **Shallow Copy** — faqat birinchi daraja copy bo'ladi. Ichki (nested) object'lar hali reference bo'lib qoladi:
 
@@ -426,7 +446,7 @@ console.log(original.address.city); // "LA" — original buzildi
 **Deep Copy** — barcha darajalar to'liq copy bo'ladi. Hech qanday reference qolmaydi:
 
 ```javascript
-// 1. structuredClone (ES2022) — eng yaxshi zamonaviy usul
+// 1. structuredClone — HTML Living Standard (Node 17+, browser'lar 2022) — eng yaxshi zamonaviy usul
 const deep1 = structuredClone(original);
 // ✅ Circular reference qo'llab-quvvatlaydi
 // ✅ Date, Map, Set, ArrayBuffer, RegExp copy qiladi
@@ -472,7 +492,7 @@ function deepClone(obj, seen = new WeakMap()) {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`structuredClone()` ichida HTML spec ning **StructuredSerializeInternal / StructuredDeserialize** algoritmi ishlaydi — bu `postMessage()` va IndexedDB da ham ishlatiladigan algoritm.
+`structuredClone()` ichida HTML spec'ning **StructuredSerializeInternal / StructuredDeserialize** algoritmi ishlaydi — bu `postMessage()` va IndexedDB'da ham ishlatiladigan algoritm.
 
 Circular reference handling: algoritm **`memory`** deb nomlangan internal `Map<original, clone>` saqlaydi. Har bir object clone qilinayotganda avval `memory` da tekshiriladi — agar oldin clone qilingan bo'lsa, shu clone qaytariladi. Bu circular reference va shared reference muammosini hal qiladi:
 
@@ -486,7 +506,7 @@ Natija: A' → B' → C' → A' (circular saqlanadi, yangi graph)
 
 Algoritm ichida har bir type uchun alohida serialization logic bor: `Date` uchun `[[DateValue]]` internal slot copy qilinadi, `RegExp` uchun `[[RegExpMatcher]]` + `[[OriginalSource]]` + `[[OriginalFlags]]`, `Map`/`Set` uchun entry'lar recursive clone qilinadi. `Function`, `Symbol`, `WeakMap`/`WeakRef` esa **non-serializable** — `DataCloneError` DOMException throw qilinadi.
 
-V8 da `structuredClone` native C++ da implement qilingan (`v8::ValueSerializer`/`v8::ValueDeserializer`), shuning uchun JS-level recursive clone'dan tezroq ishlashi kutiladi. `JSON.parse(JSON.stringify())` usuli esa faqat JSON-safe (non-circular, primitive qiymatlar, plain object/array) data uchun ishlaydi — V8 ning JSON parser'i juda optimallashtirilgan bo'lgani uchun bu yondashuv ham amaliyotda samarali. Aniq tezlik farqlari workload va object strukturasiga bog'liq — production kodda benchmark bilan tekshirish tavsiya etiladi.
+V8'da `structuredClone` native C++'da implement qilingan (`v8::ValueSerializer`/`v8::ValueDeserializer`), shuning uchun JS-level recursive clone'dan tezroq ishlashi kutiladi. `JSON.parse(JSON.stringify())` usuli esa faqat JSON-safe (non-circular, primitive qiymatlar, plain object/array) data uchun ishlaydi — V8'ning JSON parser'i juda optimallashtirilgan bo'lgani uchun bu yondashuv ham amaliyotda samarali. Aniq tezlik farqlari workload va object strukturasiga bog'liq — production kodda benchmark bilan tekshirish tavsiya etiladi.
 
 Copy usullarini taqqoslash:
 
@@ -525,9 +545,9 @@ Object property'larini sanab o'tishning bir nechta usuli bor — har biri turli 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spec da property enumeration uchun ikki asosiy internal method va bir nechta abstract operation mavjud:
+ECMAScript spec'da property enumeration uchun ikki asosiy internal method va bir nechta abstract operation mavjud:
 
-**`[[OwnPropertyKeys]]()`** — object ning barcha own property key'larini qaytaradi. Spec bo'yicha key'lar qat'iy tartibda qaytariladi:
+**`[[OwnPropertyKeys]]()`** — object'ning barcha own property key'larini qaytaradi. Spec bo'yicha key'lar qat'iy tartibda qaytariladi:
 1. Integer index property'lar — ascending numeric order (0, 1, 2, ...)
 2. String property'lar — yaratilish (insertion) tartibida
 3. Symbol property'lar — yaratilish tartibida
@@ -540,9 +560,9 @@ ECMAScript spec da property enumeration uchun ikki asosiy internal method va bir
 3. Faqat `enumerable: true` bo'lgan property'larni filtrlaydi
 4. `kind` parametriga qarab key, value, yoki [key, value] qaytaradi
 
-`for...in` loop uchun esa spec da `EnumerateObjectProperties(O)` abstract operation ishlatiladi — bu **prototype chain** bo'ylab ham yuradi. Engine `[[GetPrototypeOf]]()` orqali prototype chain ni traverse qiladi va har bir level dagi enumerable string key'larni yig'adi (Symbol key'lar skip qilinadi). Lekin spec tartibni kafolatlamaydi — V8 amalda `[[OwnPropertyKeys]]` tartibiga amal qiladi, lekin inherited property'lar tartibi implementation-defined.
+`for...in` loop uchun esa spec'da `EnumerateObjectProperties(O)` abstract operation ishlatiladi — bu **prototype chain** bo'ylab ham yuradi. Engine `[[GetPrototypeOf]]()` orqali prototype chain'ni traverse qiladi va har bir level'dagi enumerable string key'larni yig'adi (Symbol key'lar skip qilinadi). ES2020'dan boshlab spec tartibni kafolatlaydi: har object uchun `[[OwnPropertyKeys]]` natural order (integer index'lar avval, keyin insertion order string'lar), keyin prototype'ga ko'tarilib davom etadi. Faqat duplicated key'lar (shadow bo'lgan) ikkinchi marta yieldlanmaydi.
 
-V8 da `Object.keys()` kabi operatsiyalar uchun **enum cache** mavjud — agar object ning Hidden Class (Map) o'zgarmagan bo'lsa, oldingi enumeration natijasi cache dan qaytariladi.
+V8'da `Object.keys()` kabi operatsiyalar uchun **enum cache** mavjud — agar object'ning Hidden Class (Map) o'zgarmagan bo'lsa, oldingi enumeration natijasi cache'dan qaytariladi.
 
 </details>
 
@@ -601,7 +621,7 @@ const doubled = Object.fromEntries(
 
 ### Nazariya
 
-ES2022 va ES2024 da `Object` global obyektiga ikki muhim static method qo'shildi: `Object.hasOwn()` va `Object.groupBy()`. Ular eski API'larning kamchiliklarini hal qiladi va zamonaviy JavaScript da keng qo'llaniladi.
+ES2022 va ES2024'da `Object` global obyektiga ikki muhim static method qo'shildi: `Object.hasOwn()` va `Object.groupBy()`. Ular eski API'larning kamchiliklarini hal qiladi va zamonaviy JavaScript'da keng qo'llaniladi.
 
 **`Object.hasOwn(obj, key)`** — `hasOwnProperty` ning xavfsiz almashtiruvchisi. ESLint ham `no-prototype-builtins` qoidasi orqali instance method o'rniga shu static method'ni tavsiya qiladi.
 
@@ -726,7 +746,7 @@ console.log(obj.getEmail()); // "alice@mail.com"
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spec da computed property name **ComputedPropertyName** grammar production orqali parse qilinadi: `[ AssignmentExpression ]`. Object literal evaluate bo'lganda har bir property uchun **PropertyDefinitionEvaluation** abstract operation chaqiriladi.
+ECMAScript spec'da computed property name **ComputedPropertyName** grammar production orqali parse qilinadi: `[ AssignmentExpression ]`. Object literal evaluate bo'lganda har bir property uchun **PropertyDefinitionEvaluation** abstract operation chaqiriladi.
 
 Computed property uchun jarayon:
 1. `[ ]` ichidagi expression **runtime** da evaluate qilinadi (compile-time emas)
@@ -736,7 +756,7 @@ Computed property uchun jarayon:
 
 Bu degani computed property name sifatida ixtiyoriy expression ishlatish mumkin — `Symbol()`, funksiya chaqiruvi, ternary operator, hatto `await` expression ham. Lekin key har safar object literal evaluate bo'lganda **qayta hisoblanadi**.
 
-V8 da object literal ichidagi computed property'lar **boilerplate optimization** ni buzadi. Oddiy (non-computed) property'lar uchun V8 compile-time da `ObjectBoilerplateDescription` yaratadi va keyin `CloneObjectIC` orqali tez clone qiladi. Computed property bor bo'lsa bu optimization ishlamaydi — har safar property'lar runtime da bitta-bitta qo'shiladi, bu esa yangi Hidden Class transition'lar ketma-ketligiga olib keladi.
+V8'da object literal ichidagi computed property'lar **boilerplate optimization** ni buzadi. Oddiy (non-computed) property'lar uchun V8 compile-time da `ObjectBoilerplateDescription` yaratadi va keyin `CloneObjectIC` orqali tez clone qiladi. Computed property bor bo'lsa bu optimization ishlamaydi — har safar property'lar runtime da bitta-bitta qo'shiladi, bu esa yangi Hidden Class transition'lar ketma-ketligiga olib keladi.
 
 **Shorthand Property Names** — o'zgaruvchi nomi va property nomi bir xil bo'lsa:
 
@@ -999,7 +1019,7 @@ console.log(config.db.host); // "hacked"
 ```javascript
 function deepFreeze(obj) {
   Object.freeze(obj);
-  Object.getOwnPropertyNames(obj).forEach(prop => {
+  Reflect.ownKeys(obj).forEach(prop => {
     const val = obj[prop];
     if (val !== null && typeof val === "object" && !Object.isFrozen(val)) {
       deepFreeze(val);
@@ -1012,7 +1032,7 @@ const config = deepFreeze({ db: { host: "localhost" } });
 config.db.host = "hacked"; // ❌ o'zgarmaydi
 ```
 
-**Nima uchun:** `Object.freeze()` faqat shallow — birinchi daraja property'lar freeze bo'ladi. Nested object'larni ham freeze qilish uchun recursive yondashuv kerak.
+**Nima uchun:** `Object.freeze()` faqat shallow — birinchi daraja property'lar freeze bo'ladi. Nested object'larni ham freeze qilish uchun recursive yondashuv kerak. `Reflect.ownKeys` Symbol-keyed property'larni ham qamrab oladi (`Object.getOwnPropertyNames` skip qilardi).
 
 ---
 
@@ -1064,7 +1084,7 @@ const copy = structuredClone(safe);
 // ✅ set → Set saqlanadi
 ```
 
-**Nima uchun:** JSON faqat JSON-safe qiymatlarni qo'llab-quvvatlaydi. `undefined`, `Function`, `Symbol` yo'qoladi; `Infinity`, `NaN` → `null` ga aylanadi; `Date` → string ga aylanadi; `Map`, `Set`, `RegExp` → bo'sh object ga aylanadi. `structuredClone` esa HTML spec algoritmi bilan ishlaydi — u `undefined`, `Date`, `Map`, `Set`, `RegExp` va circular reference'larni yaxshi saqlaydi, lekin `Function`, `Symbol` va DOM node'larni rad etadi (`DataCloneError`).
+**Nima uchun:** JSON faqat JSON-safe qiymatlarni qo'llab-quvvatlaydi. `undefined`, `Function`, `Symbol` yo'qoladi; `Infinity`, `NaN` → `null`'ga aylanadi; `Date` → string'ga aylanadi; `Map`, `Set`, `RegExp` → bo'sh object'ga aylanadi. `structuredClone` esa HTML spec algoritmi bilan ishlaydi — u `undefined`, `Date`, `Map`, `Set`, `RegExp` va circular reference'larni yaxshi saqlaydi, lekin `Function`, `Symbol` va DOM node'larni rad etadi (`DataCloneError`).
 
 ---
 

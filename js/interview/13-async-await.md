@@ -9,7 +9,7 @@
 ### 1. `async/await` nima? Promise bilan farqi nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `async/await` — Promise ustiga qurilgan **syntactic sugar**. Asinxron kodni sinxron ko'rinishda yozish imkonini beradi, lekin ichida hamma narsa Promise va microtask'lar bilan ishlaydi.
 
@@ -22,7 +22,7 @@ function getUser(id) {
     .then(r => r.json());
 }
 
-// async/await — xuddi shu narsa, lekin o'qish oson
+// async/await — semantik jihatdan ekvivalent, lekin o'qish oson
 async function getUser(id) {
   const response = await fetch(`/api/users/${id}`);
   const user = await response.json();
@@ -44,7 +44,7 @@ Asosiy xususiyatlar:
 ### 2. Sequential vs Parallel — qachon qaysi biri? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Qoida oddiy: operatsiyalar bir-biriga **bog'liq** bo'lsa → sequential; **mustaqil** bo'lsa → parallel.
 
@@ -66,7 +66,7 @@ async function fast() {
     fetchComments(),  // 200ms ─┘
   ]);
   return { users, posts, comments };
-  // Jami: ~200ms (3x tezroq!)
+  // Jami: ~200ms — eng sekin so'rov vaqti bilan cheklangan
 }
 ```
 
@@ -88,7 +88,7 @@ async function getOrderDetails(orderId) {
 ### 3. `forEach` ichida `await` ishlaydimi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Yo'q.** `forEach` sinxron funksiya — async callback'ni **kutmaydi**. U callback'ning Promise'ini ignore qiladi.
 
@@ -125,7 +125,7 @@ Sababi: `forEach` ning source code'iga qarasak — u callback'ning return qiymat
 ### 4. `return await` kerakmi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `try/catch` bo'lmasa — **keraksiz**. `try/catch` ichida — **majburiy**.
 
@@ -158,7 +158,7 @@ Nima uchun? `return fetchUser(id)` — Promise shu holda caller'ga qaytadi, try/
 ### 5. Async function vs Promise — qachon qaysi birini ishlatish kerak? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Xususiyat | `async/await` | Promise chain |
 |-----------|--------------|---------------|
@@ -198,7 +198,7 @@ function getUserName(id) {
 ### 6. `Promise.all` vs `Promise.allSettled` — qachon qaysi biri? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Xususiyat | `Promise.all` | `Promise.allSettled` |
 |-----------|--------------|---------------------|
@@ -234,7 +234,7 @@ Qoida: muhim operatsiyalar (payment + inventory) → `Promise.all`; mustaqil, ix
 ### 7. Top-level await nima? Qayerda ishlaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ES2022 dan boshlab **ES Modules** ichida `await` ni `async` funksiya siz ham ishlatish mumkin:
 
@@ -261,7 +261,7 @@ Ehtiyot bo'lish kerak: top-level await modulni "async" qiladi — bu modulni imp
 ### 8. `AbortController` bilan request cancel qilish [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `AbortController` — asinxron operatsiyalarni bekor qilish uchun standart API. `fetch()` bilan integratsiyalashgan.
 
@@ -291,7 +291,7 @@ async function fetchWithTimeout(url, timeoutMs = 5000) {
 ### 9. Async constructor bo'ladimi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Yo'q.** Constructor `async` bo'la olmaydi — u sinxron bo'lishi va `this` qaytarishi kerak.
 
@@ -334,7 +334,7 @@ Nima uchun? Constructor ECMAScript spec bo'yicha **doim** yangi object (`this`) 
 ### 10. `for-await-of` nima? Qachon ishlatiladi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `for-await-of` — async iterable (async iterator) ustida iteratsiya qilish uchun maxsus tsikl. Har bir iteratsiyada Promise resolve bo'lishini kutadi.
 
@@ -374,7 +374,7 @@ Ishlatish holatlari:
 ### 11. `Promise.all` + `await` da bitta xato bo'lsa nima bo'ladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `Promise.all` — **fail-fast**: bitta reject bo'lsa, darhol reject bo'ladi. Qolgan muvaffaqiyatli natijalar **yo'qoladi**.
 
@@ -415,7 +415,7 @@ Muhim: `Promise.all` da reject bo'lganda — boshqa Promise'lar **to'xtatilmaydi
 ### 12. Async/Await under the hood qanday ishlaydi? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `async/await` — generator + Promise pattern'ning syntactic sugar'i. ES2017 dan oldin Babel buni generator'ga transpile qilardi.
 
@@ -455,7 +455,25 @@ Mapping:
 - resume → `generator.next(value)` (davom ettirish)
 - reject → `generator.throw(error)` (xato tashish)
 
-V8 7.2+ optimizatsiya: oldingi versiyalarda `await` har safar qo'shimcha Promise yaratib 3 ta microtick olardi. Hozir agar await qilingan qiymat allaqachon Promise bo'lsa — to'g'ridan-to'g'ri ishlatiladi va faqat 1 microtick oladi.
+**Edge Cases:**
+- **`await` non-Promise qiymat**: `await 42` → engine `PromiseResolve(42)` orqali Promise yaratadi va microtask queue'ga resume task qo'yadi — bir microtick kechikish doim mavjud
+- **`await` thenable**: Custom `then` method'i bo'lgan object ham await qilinadi — `Promise.resolve(thenable)` ichida unwrap qilinadi
+- **Engine resume**: Generator state machine bytecode'ga compile qilinadi — har `await` resume point'iga aylanadi, lokal o'zgaruvchilar `JSGeneratorObject`'ning context slot'larida saqlanadi
+
+**Follow-up savollar:**
+1. **`async function` Promise instance qaytaradimi?** — Ha, doim. Hatto `return undefined` ham `Promise.resolve(undefined)` qaytaradi. `Symbol.species` orqali subclass'larda override qilish mumkin.
+2. **`await` ichida exception qanday tashlanadi?** — Engine resume callback'ni `generator.throw(error)` orqali chaqiradi — bu try/catch ichidagi yoki tashqaridagi handler'gacha propagate bo'ladi.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+V8 7.2+ optimizatsiya (2018-yil sonida qabul qilingan): oldingi versiyalarda `await someValue` quyidagi qadamlarni bajarardi — `someValue`'ni Promise'ga wrap qilish, throwaway Promise yaratish, va resume callback'ni `then`'ga ulash. Bu 3 ta microtick olardi (har biri alohida microtask sifatida).
+
+Hozirgi optimizatsiyada: agar await qilingan qiymat allaqachon native Promise bo'lsa (`%PromisePrototype%` chain'da) — engine to'g'ridan-to'g'ri shu Promise'ga resume callback'ni ulaydi va faqat 1 microtick oladi. Bu optimizatsiya stack trace'ni ham yaxshilaydi (oraliq Promise'lar yo'q).
+
+Spec mexanizmi: `AwaitExpression` evaluation bosqichida `PromiseResolve(value)` chaqiriladi (Promise allaqachon Promise bo'lsa identity qaytaradi), keyin `PerformPromiseThen` orqali resume callback `[[AsyncContext]]` bilan attach qilinadi. Funksiya `JSAsyncFunctionResumeContext` bytecode'da to'xtaydi va microtask'da davom ettiriladi.
+
+</details>
 
 </details>
 
@@ -481,7 +499,7 @@ console.log("END");
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 START
@@ -521,7 +539,7 @@ async function loadAllUsers(ids) {
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Mantiqan xato yo'q — ishlaydi. Lekin **performance muammosi** bor: barcha so'rovlar ketma-ket bajariladi. 100 ta user × 200ms = 20 sekund. So'rovlar bir-biriga bog'liq emas — ularni parallel qilish kerak:
 
@@ -561,7 +579,7 @@ console.log("2");
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 1
@@ -587,7 +605,7 @@ Muhim nuqta: `await null` yoki `await 42` ham **bir microtick kechikish** yarata
 **Savol:** Asinxron funksiyani xato bo'lganda qayta ishlatadigan `retry(fn, maxRetries, baseDelay)` yozing. Har safar kutish vaqti 2x oshsin.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 async function retry(fn, maxRetries = 3, baseDelay = 1000) {
@@ -676,7 +694,7 @@ console.log("end");
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 start
@@ -698,18 +716,116 @@ Step-by-step:
 
 Muhim: `fetchUsers` va `fetchOrders` bir-biridan mustaqil, lekin ikkalasi ham birinchi `await` da to'xtaydi. Keyin microtask queue'da FIFO tartibda davom etadi — fetchUsers avval boshlanganligi uchun avval resume bo'ladi.
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-`await` expression ichki mexanizmi: `await Promise.resolve()` chaqirilganda engine async funksiyaning holatini (local variables, execution position) saqlaydi va microtask queue'ga **resume callback** qo'shadi. ECMAScript spec bo'yicha `await` — `PromiseResolve(promise).then(resumeCallback)` ga ekvivalent. Har bir `await` kamida **bitta microtask tick** sarflaydi. Ikkita mustaqil async funksiya parallel chaqirilganda ularning `await` dan keyingi qismlari microtask queue'da **FIFO** tartibda saqlanadi — qaysi funksiya avval `await` ga yetgan bo'lsa, uning resume callback'i avval queue'ga tushadi va avval bajariladi. Bu tartib **deterministik** — bir xil kod har doim bir xil output beradi.
+`await` expression ichki mexanizmi: `await Promise.resolve()` chaqirilganda engine async funksiyaning holatini (local variables, execution position, `[[AsyncContext]]` snapshot) saqlaydi va microtask queue'ga **resume callback** qo'shadi. ECMAScript spec bo'yicha `await value` — `PromiseResolve(value)` chaqiriladi → resume callback `PerformPromiseThen` orqali attach qilinadi → joriy async funksiya suspend bo'ladi.
+
+Har bir `await` kamida bitta microtask tick sarflaydi (V8 7.2+ optimizatsiya bilan — oldin 3 ta edi). Ikkita mustaqil async funksiya parallel chaqirilganda ularning `await` dan keyingi qismlari microtask queue'da FIFO tartibda saqlanadi — qaysi funksiya avval `await` ga yetgan bo'lsa, uning resume callback'i avval queue'ga tushadi va avval bajariladi.
+
+Bu tartib **deterministik** — bir xil kod har doim bir xil output beradi (concurrent ko'rinsa ham, real parallelism yo'q — single-threaded event loop). V8'da har microtask `MicrotaskQueue` ichida saqlanadi va call stack bo'shaganda batch'da bajariladi. Microtask ichida yana microtask qo'shilsa — shu batch oxirida bajariladi (macrotask'ga kutish kerak emas).
 
 </details>
 
-### 6. Concurrent limit implement qiling [Senior]
+</details>
+
+### 6. Async function ichidagi `throw` qanday ushlaydi? [Middle+]
+
+**Savol:** Quyidagi kodda nima xato? Tuzating.
+
+```javascript
+async function loadData(url) {
+  throw new Error("invalid url");
+  const response = await fetch(url);
+  return response.json();
+}
+
+try {
+  loadData("https://api.example.com");
+} catch (err) {
+  console.log("Caught:", err.message);
+}
+console.log("Done");
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+Sync `try/catch` ushlamaydi — async function ichidagi `throw` (hatto `await`'dan oldin ham) **rejected Promise** bo'lib qaytadi. `unhandledrejection` event trigger qilinadi. Yechim: chaqirgan joy `await` yoki `.catch()` ishlatishi kerak.
+
+### To'liq tushuntirish
+
+ECMAScript spec'da async function chaqirilganda darhol yangi Promise yaratiladi (`AsyncFunctionStart`). Body ichidagi har qanday `throw` — hatto birinchi qatorda ham — shu Promise'ni reject qiladi. Sync call stack'ga throw chiqmaydi. Bu async function'ning **asosiy kontrakti**: "doim Promise qaytaradi".
+
+Yuqoridagi kodda `loadData(...)` rejected Promise qaytaradi, lekin `try/catch` sync block — Promise'ni ko'rmaydi. Promise'da `.catch` handler qo'yilmagani uchun `unhandledrejection` dispatch qilinadi.
+
+### Kod misol
+
+```javascript
+async function loadData(url) {
+  throw new Error("invalid url");
+  // Sync ko'rinishida throw, lekin Promise.reject qaytadi
+}
+
+// ❌ Sync try/catch ushlamaydi:
+try {
+  loadData("https://api.example.com");
+} catch (err) {
+  console.log("never caught"); // chaqirilmaydi
+}
+console.log("Done");
+// Output:
+// Done
+// (keyin) unhandledrejection: invalid url
+
+// ✅ Yechim 1: await bilan
+async function main() {
+  try {
+    await loadData("https://api.example.com");
+  } catch (err) {
+    console.log("Caught:", err.message); // "Caught: invalid url"
+  }
+}
+main();
+
+// ✅ Yechim 2: .catch() bilan
+loadData("https://api.example.com")
+  .catch(err => console.log("Caught:", err.message));
+
+// ✅ Yechim 3: chaqirgan funksiya ham async va await ishlatadi
+async function handler() {
+  try {
+    const data = await loadData(url);
+    process(data);
+  } catch (err) {
+    console.log("Error:", err.message);
+  }
+}
+```
+
+### Edge Cases
+
+- **Sync throw + await keyin** — yuqoridagi misol kabi, throw `await`'dan oldin bo'lsa ham — Promise reject. Async function tanasi to'liq Promise context'da bajariladi
+- **`async () => { throw err }`** — arrow async function ham bir xil — Promise.reject qaytaradi
+- **Top-level await + throw** — ES Module top-level'da throw — module evaluation rejected bo'ladi, import qilgan modullar `unhandledrejection` oladi
+
+### Follow-up savollar
+
+1. **Sync function ichida throw async function chaqirsa-chi?** — Sync funksiya throw qilsa — call stack'ga chiqadi (oddiy sync error). Lekin async function'ni `await`'siz chaqirsa — Promise hammon yo'qoladi (fire-and-forget).
+2. **`Promise.reject(err)` vs async `throw err` farqi bormi?** — Yo'q, semantik bir xil. Lekin async function ichida `throw` ko'proq idiomatic — stack trace yaxshiroq.
+
+</details>
+
+---
+
+### 7. Concurrent limit implement qiling [Senior]
 
 **Savol:** `mapWithLimit(items, limit, fn)` — bir vaqtda max `limit` ta task parallel ishlashi kerak, natijalar tartibini saqlang.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 async function mapWithLimit(items, limit, fn) {
@@ -748,6 +864,26 @@ const results = await mapWithLimit(
 
 Ishlash prinsipi: `limit` ta worker funksiya parallel ishlaydi. Har bir worker navbatdan keyingi task'ni oladi (`currentIndex++`), bajaradi, va yana navbatga qaytadi. Worker tugashi uchun navbat bo'sh bo'lishi kerak. `results[index]` — natijalar original tartibda saqlanadi.
 
-**Deep Dive:** Bu yondashuv "worker pool" pattern deb ataladi. Production da `p-limit`, `p-map` (npm) kutubxonalari ishlatiladi. Ular error handling, cancellation, va timeout qo'llab-quvvatlaydi.
+**Edge Cases:**
+- **`fn` throw qilsa**: Joriy implementation'da exception worker'dan `Promise.all`'ga propagate bo'ladi — birinchi xato butun `mapWithLimit`'ni reject qiladi. Robust versiya `try/catch` bilan har task'ni o'rab natijani saqlashi kerak
+- **`limit > items.length`**: `Math.min(limit, items.length)` cheklaydi — keraksiz worker'lar yaratilmaydi
+- **`limit === 0`**: Hech qaysi worker boshlanmaydi — `Promise.all([])` darhol resolve bo'ladi, lekin items bajarilmaydi (bug-prone — validation kerak)
+
+**Follow-up savollar:**
+1. **Cancel mexanizmi qanday qo'shiladi?** — `AbortSignal` argument qabul qilib, worker loop'da `signal.aborted` tekshirish; signal abort bo'lsa loop break qilinadi.
+2. **`p-limit` vs `mapWithLimit` farqi nima?** — `p-limit` lazy queue ishlatadi (har task alohida wrap qilinadi), `mapWithLimit` worker pool — fixed worker'lar navbatdan task oladi. Worker pool batch processing uchun yaxshiroq.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Bu yondashuv "worker pool" yoki "fixed-size concurrency" pattern deb ataladi. Production'da `p-limit`, `p-map` (npm package'lari) ishlatiladi. Ular error handling (`Promise.allSettled` semantics), cancellation (`AbortSignal`), va timeout qo'llab-quvvatlaydi.
+
+JavaScript single-threaded event loop bo'lganligi sababli `currentIndex++` race condition'ga olib kelmaydi: V8 har worker'ning kodini atomic batch'da bajaradi (yield point — faqat `await`). Increment expression `await` bo'lmagani uchun preemption sodir bo'lmaydi.
+
+Performance considerations: katta `limit` qiymatlari (masalan, 1000+) server'ni overload qilishi mumkin (TCP connection limits, file descriptor exhaustion). Network operations uchun odatda 5-20 oralig'i optimal — RTT (round-trip time) va server capacity ga qarab.
+
+Memory: results array ham task'lar tugagunga qadar to'liq saqlanadi. Streaming pattern (async generator) bilan memory tejash mumkin agar barcha natijani saqlash shart bo'lmasa.
+
+</details>
 
 </details>
