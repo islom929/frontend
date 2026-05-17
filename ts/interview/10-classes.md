@@ -1,244 +1,864 @@
 # Interview: Classes TypeScript da
 
-> Access modifiers, parameter properties, abstract classes, implements, override, this type, TS private vs ES # private bo'yicha interview savollari.
+> Access modifiers, parameter properties, abstract classes, implements, override, this type, readonly, static members, generics, accessor, TS private vs ES `#` private bo'yicha interview savollari.
+
+---
+
+## Mundarija
+
+- [Nazariy savollar](#nazariy-savollar)
+- [Amaliy savollar (Coding Challenges)](#amaliy-savollar-coding-challenges)
 
 ---
 
 ## Nazariy savollar
 
-### 1. TypeScript class da `public`, `private`, `protected` farqi nima? Runtime da nima bo'ladi?
+### Savol 1: TypeScript class da `public`, `private`, `protected` farqi nima? Runtime da nima bo'ladi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
-Uchta access modifier — class member larining visibility darajasini belgilaydi:
+### Qisqa javob
+
+Uchta access modifier compile-time da member visibility ni cheklaydi. JS ga compile bo'lganda **butunlay o'chiriladi** — runtime da hech qanday tekshiruv qolmaydi.
+
+### To'liq tushuntirish
 
 | Modifier | Class ichida | Subclass da | Tashqarida |
 |----------|:----------:|:-----------:|:----------:|
-| `public` (default) | ✅ | ✅ | ✅ |
-| `protected` | ✅ | ✅ | ❌ |
-| `private` | ✅ | ❌ | ❌ |
+| `public` (default) | Ruxsat | Ruxsat | Ruxsat |
+| `protected` | Ruxsat | Ruxsat | Taqiq |
+| `private` | Ruxsat | Taqiq | Taqiq |
 
-**Muhim:** Bular faqat **compile-time** tekshiruvi. JS ga compile bo'lganda **butunlay o'chiriladi**:
+Access modifier lar TypeScript ning **type system** xususiyati. Compiler tekshiradi, lekin `tsc` `.js` faylga yozganda barcha modifier'lar o'chiriladi. Bu sabab — JavaScript spec'ida bunday modifier'lar yo'q, kompilyator emit qila olmaydi.
 
-```typescript
-class Secret {
-  private key: string = "abc123";
-}
-// Compiled JS: class Secret { constructor() { this.key = "abc123"; } }
+Haqiqiy runtime privacy uchun ECMAScript `#` private fields (Stage 4, ES2022) ishlatiladi. `#field` lexical scoping orqali implement qilingan — class declaration tashqarisidan parse-time'da reject bo'ladi.
 
-const s = new Secret();
-(s as any).key; // "abc123" — runtime da ochiq!
-```
-
-Haqiqiy runtime privacy uchun ES `#` private fields kerak:
+### Kod misol
 
 ```typescript
-class Secret {
-  #key: string = "abc123";
+class PaymentProcessor {
+  private apiKey: string = "sk_live_abc123";
+  protected merchantId: number = 42;
+  public name: string = "Stripe";
 }
-(new Secret() as any).#key; // SyntaxError — runtime da ham yopiq
+
+const processor = new PaymentProcessor();
+// (processor as any).apiKey — runtime'da hech qanday cheklov yo'q
+console.log((processor as any).apiKey); // → "sk_live_abc123" — ochiq!
+
+// ES `#` private — runtime hard privacy
+class SecurePaymentProcessor {
+  #apiKey: string = "sk_live_abc123";
+
+  charge(amount: number): void {
+    console.log(`Charging ${amount} with ${this.#apiKey}`); // ✅ class ichida
+  }
+}
+
+const secure = new SecurePaymentProcessor();
+// (secure as any).#apiKey — parse-time SyntaxError:
+// `#apiKey` declarator scope tashqarisida — `as any` cast bu lexical
+// cheklovni chetlab o'tolmaydi
 ```
+
+### Edge Cases
+
+- **Soft private bypass:** `(obj as any).private` har doim ishlaydi — TS modifier compile-time emit'dan keyin yo'q
+- **Subclass override:** subclass parent ning `private` member'ini override qila olmaydi — compile error, lekin JS'da hech qanday cheklov yo'q
+- **Cross-instance access:** TS `private` bir xil class'ning ikkinchi instance'iga kirishga ruxsat beradi (`this.other.privateField`), `#private` bera olmaydi (faqat declaring class lexical scope)
+- **JSON.stringify:** TS `private` enumerable — JSON'da chiqadi. `#private` har doim chiqmaydi
+- **DevTools:** TS `private` browser DevTools'da oddiy property sifatida ko'rinadi
+
+### Follow-up savollar
+
+1. "Production secret'ni saqlash kerak bo'lsa `private` yetarlimi?" — Yo'q. Server-side env variable yoki Vault kabi secret manager. `private` faqat IDE'da accidental misuse'ni oldini oladi
+2. "Library ishlab chiqayotgan bo'lsam qaysi birini ishlataman?" — `#private` — consumer JS'dan import qilishi mumkin, TS `private` JS'da yo'q
 
 </details>
 
-### 2. Parameter properties nima?
+---
+
+### Savol 2: Parameter properties nima? Modifier siz parameter qaysi farqi bor? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
-Constructor parametrida access modifier yoki `readonly` yozish orqali **avtomatik** class property yaratish shorthand:
+### Qisqa javob
+
+Constructor parametrida access modifier (`public`/`private`/`protected`) yoki `readonly` yozish — TypeScript shorthand. Class property avtomatik yaratiladi va assign bo'ladi.
+
+### To'liq tushuntirish
+
+Modifier **SHART** — `public`, `private`, `protected`, `readonly` biri. Aralash kombinatsiya ham mumkin (`public readonly`, `private readonly`). Modifier siz parameter oddiy constructor argument — class instance'da property bo'lmaydi.
+
+Compiled JS'da TypeScript constructor body'ga `this.x = x` qatorlarini avtomatik qo'shadi. Modifier emit'dan keyin yo'qoladi.
+
+### Kod misol
 
 ```typescript
-// Verbose
-class User {
-  name: string;
-  age: number;
-  constructor(name: string, age: number) {
-    this.name = name;
-    this.age = age;
+// Verbose syntax
+class OrderProcessor {
+  userId: number;
+  amount: number;
+  readonly currency: string;
+
+  constructor(userId: number, amount: number, currency: string) {
+    this.userId = userId;
+    this.amount = amount;
+    this.currency = currency;
   }
 }
 
 // Parameter properties — bir xil natija
-class User {
-  constructor(public name: string, public age: number) {}
-}
-```
-
-**Qoida:** Modifier **SHART** — `public`, `private`, `protected`, yoki `readonly` biri bo'lishi kerak. Modifier siz parameter oddiy constructor argument:
-
-```typescript
-class Example {
+class OrderProcessor2 {
   constructor(
-    public name: string,  // ✅ Property bo'ladi
-    age: number           // ❌ Property emas, faqat constructor da
+    public userId: number,
+    public amount: number,
+    public readonly currency: string,
   ) {}
 }
-new Example("Ali", 25).age; // ❌ Property 'age' does not exist
+
+const order = new OrderProcessor2(1, 100, "USD");
+console.log(order.userId);   // → 1
+console.log(order.currency); // → "USD"
+// order.currency = "EUR"; // ❌ readonly
+
+// Modifier siz parameter — property emas
+class InvoiceBuilder {
+  public total: number;
+  constructor(items: number[]) {
+    // `items` faqat constructor scope'ida — instance property emas
+    this.total = items.reduce((sum, x) => sum + x, 0);
+  }
+}
+const inv = new InvoiceBuilder([10, 20, 30]);
+console.log(inv.total); // → 60
+// console.log((inv as any).items); // → undefined
 ```
+
+### Edge Cases
+
+- **`useDefineForClassFields: true`** (TS 4.0+, default ES2022) — parameter property `[[Define]]` semantics bilan emit bo'ladi, oldindan declare qilingan field'ni shadow qilmaydi
+- **Inherit holatda:** parent ning parameter property'sini subclass `super()` orqali init qiladi — subclass'da qayta yozish kerak emas
+- **Mix qilish:** parameter property va oddiy parameter aralash bo'lishi mumkin: `constructor(public id: number, options: Options)` — `id` property, `options` lokal
+- **Decorator bilan:** parameter decorator parameter property'ga ham qo'llanadi (TS 5.0+ ECMAScript decorators bilan)
+
+### Follow-up savollar
+
+1. "`readonly` parameter property mutate bo'ladimi?" — Class ichida constructor'dan tashqari joyda yo'q. Constructor ichida ruxsat
+2. "Inheritance'da parent parameter property override bo'ladimi?" — Field reassignment shaklida `super()` chaqirilgandan keyin
 
 </details>
 
-### 3. Abstract class nima? Interface dan qanday farqi bor?
+---
+
+### Savol 3: Abstract class nima? Interface'dan qanday farqi bor? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
-Abstract class — `new` bilan to'g'ridan-to'g'ri instance yaratib bo'lmaydigan class. Ikki turdagi member bor:
+### Qisqa javob
 
-1. **Abstract members** — faqat signature, subclass MAJBURIY implement qiladi
-2. **Concrete members** — tayyor implementation, subclass meros oladi
+Abstract class — `new` bilan to'g'ridan-to'g'ri instantiate qilib bo'lmaydigan class. Abstract members (faqat signature, subclass implement qilishi shart) va concrete members (tayyor implementation) aralash bo'lishi mumkin. Interface — faqat type-level contract, runtime'da yo'q.
 
-```typescript
-abstract class Shape {
-  abstract area(): number;
-  describe(): string { return `Area: ${this.area()}`; }
-}
+### To'liq tushuntirish
 
-class Circle extends Shape {
-  constructor(private radius: number) { super(); }
-  area(): number { return Math.PI * this.radius ** 2; }
-}
-
-new Shape();   // ❌ abstract class dan instance yaratib bo'lmaydi
-new Circle(5); // ✅
-```
+Abstract class runtime'da real JS class sifatida mavjud — `instanceof` ishlaydi. Interface compile-time only — JS emit'da butunlay yo'q.
 
 | Xususiyat | Abstract Class | Interface |
 |-----------|:-----------:|:---------:|
-| Concrete method | ✅ | ❌ |
-| Constructor | ✅ | ❌ |
-| Access modifiers | ✅ | ❌ |
-| Runtime da mavjud | ✅ | ❌ (o'chiriladi) |
-| Multiple inherit | ❌ Faqat 1 | ✅ Bir nechta |
-| `instanceof` | ✅ | ❌ |
+| Concrete method | Ruxsat | Taqiq |
+| Constructor | Ruxsat | Taqiq |
+| Access modifiers | Ruxsat | Taqiq |
+| Runtime'da mavjud | Ha | Yo'q (o'chiriladi) |
+| Multiple inheritance | Faqat 1 | Bir nechta |
+| `instanceof` ishlaydi | Ha | Yo'q |
+| Declaration merging | Yo'q | Ha |
 
-**Qachon nima:** Interface — faqat contract. Abstract class — shared implementation + contract (template method pattern).
+**Qachon abstract class:** shared implementation kerak (Template Method pattern), instantiate qilinmasligi shart, `protected` member'lar bilan subclass'ga API berish. **Qachon interface:** faqat contract, multiple inheritance kerak, structural typing yetarli.
 
-</details>
-
-### 4. `implements` nima qiladi? Nima uchun type inference bo'lmaydi?
-
-<details>
-<summary>Javob</summary>
-
-`implements` — class ning ma'lum interface ga mos kelishini compile-time da tekshiradi. Lekin faqat **tekshiradi** — type bermaydi:
+### Kod misol
 
 ```typescript
-interface Logger {
-  log(message: string): void;
-}
+abstract class PaymentGateway {
+  constructor(protected readonly apiKey: string) {}
 
-class ConsoleLogger implements Logger {
-  log(message) { // ❌ message: any — inference yo'q!
-    console.log(message);
+  // Abstract — subclass implement qilishi SHART
+  abstract charge(amount: number, currency: string): Promise<string>;
+
+  // Concrete — shared logic
+  async chargeWithLog(amount: number, currency: string): Promise<string> {
+    console.log(`[${this.constructor.name}] charging ${amount} ${currency}`);
+    const txId = await this.charge(amount, currency);
+    console.log(`[${this.constructor.name}] tx: ${txId}`);
+    return txId;
   }
 }
+
+class StripeGateway extends PaymentGateway {
+  async charge(amount: number, currency: string): Promise<string> {
+    return `stripe_tx_${Date.now()}`;
+  }
+}
+
+// new PaymentGateway("..."); // ❌ Cannot create an instance of an abstract class
+const gateway = new StripeGateway("sk_test");
+await gateway.chargeWithLog(100, "USD");
+// → [StripeGateway] charging 100 USD
+// → [StripeGateway] tx: stripe_tx_...
+
+// Abstract construct signature (TS 4.2+)
+type GatewayCtor = abstract new (apiKey: string) => PaymentGateway;
+function registerGateway(Ctor: GatewayCtor): void { /* ... */ }
 ```
 
-Nima uchun inference yo'q?
-1. Explicit annotation — kodni o'qigan developer type ni darhol ko'radi
-2. Agar inference bo'lsa — xato interface da paydo bo'ladi (chalkash)
-3. `implements` — "tekshiruv" vositasi, "type injection" emas
+### Edge Cases
 
-Compiled JS da `implements` butunlay o'chiriladi. `instanceof` bilan interface tekshirib bo'lmaydi:
+- **Abstract construct signature** (TS 4.2+): `abstract new (...) => T` — abstract class'ni constructor parameter sifatida qabul qilish
+- **Abstract member visibility:** abstract member `public`/`protected` bo'lishi mumkin, `private` taqiq (subclass implement qila olmaydi)
+- **Abstract static:** TS 4.2+ ruxsat beradi, lekin foydali emas — instantiate qilinmasdan ishlatilishi mumkin
+- **Empty abstract class:** abstract member yo'q bo'lsa ham `new` taqiq — declaration intent muhim
 
-```typescript
-doc instanceof Printable; // ❌ 'Printable' only refers to a type
-```
+### Follow-up savollar
+
+1. "Abstract class va `protected constructor` farqi?" — `protected constructor` instantiate qilinishini cheklaydi, lekin tasodifan subclass'da `new` mumkin. Abstract — har qanday `new` taqiq
+2. "Interface ham `instanceof` orqali tekshirilsa-chi?" — Yo'q — interface JS'da yo'q. Type guard (`is`) yoki branded type kerak
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Abstract class emit'da har qanday boshqa class kabi yoziladi — `abstract` keyword tashlanadi. Yagona farq — TypeScript constructor call'ni compile-time'da bloklaydi. Runtime'da `Reflect.construct(AbstractClass, [])` muvaffaqiyatli ishlaydi (TS himoyasidan tashqarida).
+
+Spec referensi: TC39 class fields ECMA-262 §15.7 — abstract emit'da hech qanday native semantics yo'q. TypeScript implementation faylda `TSAbstractClass*` AST node bilan tracking qiladi.
 
 </details>
 
-### 5. `override` keyword nima? `noImplicitOverride` bilan qanday ishlaydi?
+</details>
+
+---
+
+### Savol 4: `implements` nima qiladi? Nima uchun type inference bo'lmaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
-`override` (TS 4.3+) — subclass da parent method ni qayta yozayotganingizni aniq belgilash. Ikki xil xatoni ushlaydi:
+### Qisqa javob
 
-**1. Typo:**
+`implements` — class ning interface contract'iga mosligini compile-time'da tekshiradi. Faqat tekshiruv — type bermaydi. Method signature'lari `any` bo'lib qoladi agar explicit annotate qilinmasa.
 
-```typescript
-class Animal { speak(): string { return "..."; } }
+### To'liq tushuntirish
 
-class Dog extends Animal {
-  override speck(): string { return "Woof"; }
-  // ❌ 'speck' is not declared in base class — typo!
-}
-```
+TypeScript dizayn qarori: `implements` "tekshiruv", "type injection" emas. Inference bo'lsa, xato message interface'da paydo bo'lar va developer chalkash bo'lar edi. Explicit type — kodni o'qigan developer interface'ga qarab signature'ni topish o'rniga method'da darhol ko'radi.
 
-**2. Parent method o'chirilganda** — barcha `override` lar xato beradi.
+Compiled JS'da `implements` butunlay o'chiriladi. `instanceof` bilan interface tekshirib bo'lmaydi — interface JS'da yo'q.
 
-`noImplicitOverride: true` bilan override qilish **MAJBURIY**:
+### Kod misol
 
 ```typescript
-class Dog extends Animal {
-  speak(): string { return "Woof"; }
-  // ❌ Must have 'override' modifier
-
-  override speak(): string { return "Woof"; } // ✅
+interface CacheStore {
+  get(key: string): string | null;
+  set(key: string, value: string, ttl: number): void;
 }
+
+// ❌ implements faqat tekshiradi, type bermaydi
+class RedisCacheBad implements CacheStore {
+  get(key) { // ❌ Parameter 'key' implicitly has 'any' type (strict mode)
+    return null;
+  }
+  set(key, value, ttl) { /* any, any, any */ }
+}
+
+// ✅ Explicit annotation
+class RedisCache implements CacheStore {
+  private store = new Map<string, { value: string; expiresAt: number }>();
+
+  get(key: string): string | null {
+    const entry = this.store.get(key);
+    if (!entry || entry.expiresAt < Date.now()) return null;
+    return entry.value;
+  }
+
+  set(key: string, value: string, ttl: number): void {
+    this.store.set(key, { value, expiresAt: Date.now() + ttl });
+  }
+}
+
+// implements emit'da yo'q
+// const cache = new RedisCache();
+// cache instanceof CacheStore; // ❌ 'CacheStore' only refers to a type, not a value
 ```
 
-Compiled JS da `override` o'chiriladi — faqat compile-time safety.
+### Edge Cases
+
+- **Multiple implements:** `class X implements A, B, C` — har bir interface contract'iga rioya qilish kerak
+- **`implements` va inheritance:** `class X extends Y implements Z` — Y'dan member meros oladi, Z contract'iga rioya qilishi shart
+- **Method signature mismatch:** parameter contravariant, return covariant — bivariant yondashuv `strictFunctionTypes` bilan strictroq
+- **Optional member:** interface'da `prop?: T` — class'da yozilmasa ham OK
+- **Index signature:** interface'da `[key: string]: T` — class'da har bir property `T` ga mos bo'lishi shart
+
+### Follow-up savollar
+
+1. "Class extends class + implements interface ishlaydimi?" — Ha. `class X extends Base implements I1, I2`. Inheritance bittada, interface ko'p
+2. "Interface'ni class sifatida ham implement qilish mumkinmi?" — TS interface'lar nominal emas, structural — har qanday matching shape OK
 
 </details>
 
-### 6. TS `private` vs ES `#` private — qachon qaysi birini ishlatish kerak?
+---
+
+### Savol 5: `override` keyword nima? `noImplicitOverride` qanday ishlaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
-Ikki farqli mexanizm — compile-time vs runtime privacy:
+### Qisqa javob
+
+`override` (TS 4.3+) — subclass'da parent method'ni qayta yozayotganligini explicit belgilash. Typo (`speack` o'rniga `speak`) va parent method olib tashlanganda barcha override'larni xato bilan ushlaydi.
+
+### To'liq tushuntirish
+
+`noImplicitOverride: true` (tsconfig) bilan parent method'ni qayta yozish'da `override` keyword MAJBURIY bo'ladi. Default `false`. Production codebase'larda har doim yoqilishi tavsiya — refactoring xatolarini compile-time'da ushlaydi.
+
+`override` JS emit'da yo'q — faqat compile-time safety.
+
+### Kod misol
+
+```typescript
+class PaymentGateway {
+  charge(amount: number): string {
+    return `charged ${amount}`;
+  }
+
+  refund(transactionId: string): boolean {
+    return true;
+  }
+}
+
+class StripeGateway extends PaymentGateway {
+  // ✅ To'g'ri override
+  override charge(amount: number): string {
+    return `stripe: charged ${amount}`;
+  }
+
+  // ❌ Typo — parent'da bunday method yo'q
+  override refnud(txId: string): boolean { // ❌ Error TS4117
+    return false;
+  }
+}
+
+// noImplicitOverride: true bilan
+class PaypalGateway extends PaymentGateway {
+  charge(amount: number): string { // ❌ Error: This member must have an 'override' modifier
+    return `paypal: charged ${amount}`;
+  }
+
+  override charge(amount: number): string { // ✅
+    return `paypal: charged ${amount}`;
+  }
+}
+
+// Parent method olib tashlanganda
+// PaymentGateway'dan `refund` o'chirilsa →
+// barcha subclass'lardagi `override refund` xato beradi (refactoring safety)
+```
+
+### Edge Cases
+
+- **Method va property override:** `override` har ikkalasi uchun ishlaydi
+- **Static method:** static method ham `override` qabul qiladi (TS 4.3+)
+- **Abstract member:** abstract'ni implement qilganda `override` shart emas, lekin yozish ruxsat
+- **Constructor:** constructor'da `override` mavjud emas — har subclass o'z constructor'iga ega
+- **Accessor (getter/setter):** override qo'llaniladi
+
+### Follow-up savollar
+
+1. "Parent va child da signature farqli bo'lsa?" — Compile error. Bivariant param/covariant return constraint
+2. "Multiple inheritance bo'lsa-chi?" — JS'da yo'q. Mixin pattern bilan oxirgi mixin'dagi method override hisoblanadi
+
+</details>
+
+---
+
+### Savol 6: TS `private` vs ES `#` private — qachon qaysi birini ishlatish kerak? [Middle+]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+TS `private` — compile-time soft privacy, JS emit'da o'chiriladi. ES `#` private — runtime hard privacy, lexical scoping orqali implement qilingan. Library yozayotganda yoki haqiqiy encapsulation kerak bo'lsa `#`. Aksariyat application kodlarida TS `private` yetarli.
+
+### To'liq tushuntirish
 
 | Xususiyat | TS `private` | ES `#` |
 |-----------|:-----------:|:------:|
-| Runtime privacy | ❌ | ✅ |
-| `as any` bypass | Mumkin | Mumkin emas |
-| Compiled (ES2022+) | Oddiy property | `#` private |
-| Compiled (ES2015) | Oddiy property | WeakMap |
-| JSON.stringify | Chiqadi | Chiqmaydi |
+| Runtime privacy | Yo'q | Ha |
+| `(obj as any).x` bypass | Mumkin | Mumkin emas |
+| Compiled (target ES2022+) | Oddiy property | Native `#` |
+| Compiled (target < ES2022) | Oddiy property | WeakMap shim |
+| `JSON.stringify` | Chiqadi | Chiqmaydi |
+| `Object.keys` | Chiqadi | Chiqmaydi |
+| Cross-instance access | Ruxsat | Ruxsat (same class) |
+| `in` operator | Default ko'rinadi | `#x in obj` syntax bilan |
+
+`target: ES2015` da `#` har bir field uchun WeakMap shim'ga compile bo'ladi — har access lookup qo'shimcha. `ES2022+` native `#` — V8 hidden class optimization saqlanadi.
+
+### Kod misol
 
 ```typescript
-class A { private x = 1; }
-(new A() as any).x; // 1 — runtime da ochiq
+// TS private — soft
+class TsPaymentProcessor {
+  private apiKey: string = "sk_live_test";
+  charge(): void { console.log(this.apiKey); }
+}
 
-class B { #x = 1; }
-(new B() as any).#x; // SyntaxError — haqiqiy private
+const tsProc = new TsPaymentProcessor();
+console.log((tsProc as any).apiKey); // → "sk_live_test" — ochiq
+console.log(JSON.stringify(tsProc));  // → {"apiKey":"sk_live_test"}
+
+// ES # private — hard
+class EsPaymentProcessor {
+  #apiKey: string = "sk_live_test";
+  charge(): void { console.log(this.#apiKey); }
+
+  static brandCheck(obj: unknown): boolean {
+    return #apiKey in (obj as object); // Stage 4 brand check
+  }
+}
+
+const esProc = new EsPaymentProcessor();
+console.log(JSON.stringify(esProc)); // → {} — bo'sh
+console.log(Object.keys(esProc));    // → [] — bo'sh
+// (esProc as any).#apiKey;          // ❌ Parse-time SyntaxError
+
+console.log(EsPaymentProcessor.brandCheck(esProc));      // → true
+console.log(EsPaymentProcessor.brandCheck({}));          // → false
 ```
 
-**Qachon nima:**
-- **TS `private`** — aksariyat hollarda yetarli, sodda
-- **ES `#`** — library yozayotganda (consumer JS dan foydalanishi mumkin), yoki haqiqiy encapsulation kerak bo'lganda
+### Edge Cases
 
-`target: ES2015` da `#` har bir field uchun WeakMap yaratadi — performance ta'siri bor. `ES2022+` da native `#` — overhead minimal.
+- **Mix qilish:** bitta class'da `private` va `#private` ikkalasi ishlatilishi mumkin, lekin chalkash
+- **WeakMap shim performance:** `target: ES2015` da `#` access har biri WeakMap lookup — hot loop'da sezilarli overhead
+- **Subclass `#name` conflict:** subclass parent'ning `#name` ga kira olmaydi (lexical scope cheklovi)
+- **Reflection cheklovi:** `Reflect.getOwnPropertyNames` `#` field'ni qaytarmaydi
+- **DevTools:** `#field` Chrome DevTools'da ko'rsatiladi (debugger uchun), lekin user code'dan kira olmaydi
+
+### Follow-up savollar
+
+1. "Performance critical kodda qaysi?" — `target: ES2022+` bo'lsa `#` overhead minimal. Eski target — TS `private` (oddiy property)
+2. "Class'imni serialize qilishni xohlayman, lekin secret saqlash kerak — qaysi?" — `#` — `JSON.stringify` avtomatik secret'ni qoldiradi
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+V8 implementation: `#field` har class declaration uchun unique `PrivateName` symbol yaratadi. Bu symbol class lexical scope'da yashirin saqlanadi. Access tekshiruvi V8'da `LoadProperty` bytecode'ning maxsus path'i — `[[PrivateBrand]]` slot check.
+
+TS `private` esa AST'da `TSPrivateKeyword` modifier — emit phase'da olib tashlanadi. `tsc --target es2022` `#` ni native sifatida emit qiladi, `--target es2015` Babel'ga o'xshash WeakMap shim:
+
+```javascript
+// target: es2015 da `#field` emit:
+var _ApiKey = new WeakMap();
+class EsPaymentProcessor {
+  constructor() { _ApiKey.set(this, "sk_live_test"); }
+  charge() { console.log(_ApiKey.get(this)); }
+}
+```
+
+Brand check (`#x in obj`) `[[HasPrivateName]]` internal slot orqali — `instanceof` o'rniga ishlatilishi mumkin (lekin secondary use case).
 
 </details>
 
-### 7. TS class yaratganingizda nechta type hosil bo'ladi?
+</details>
+
+---
+
+### Savol 7: TS class yaratganingizda nechta type hosil bo'ladi? Farqi qanaqa? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
-**Ikkita type** hosil bo'ladi:
+### Qisqa javob
 
-1. **Instance type** — `User` — `new User()` bilan yaratilgan object type
-2. **Constructor type** — `typeof User` — class ning o'zi (constructor function)
+Class declaration ikkita type hosil qiladi: **instance type** (`OrderEntity` — `new OrderEntity()` natijasi) va **constructor type** (`typeof OrderEntity` — class ning o'zi). Function parametrida class'ni qabul qilganda farq muhim.
+
+### To'liq tushuntirish
+
+Class declaration ham value (constructor function), ham type space'ga qo'shiladi. Type space'da:
+
+- `OrderEntity` — instance shape
+- `typeof OrderEntity` — constructor signature + static member'lar
+
+Generic factory function'larda class'ni argument sifatida qabul qilganda `typeof OrderEntity` (yoki `new (...) => OrderEntity`) kerak.
+
+### Kod misol
 
 ```typescript
-class User {
-  constructor(public name: string) {}
+class OrderEntity {
+  static tableName = "orders";
+  constructor(public id: number, public total: number) {}
+
+  toJSON(): object {
+    return { id: this.id, total: this.total };
+  }
 }
 
-const user: User = new User("Ali");         // Instance type
-const UserClass: typeof User = User;         // Constructor type
-const user2 = new UserClass("Vali");         // ✅
+// Instance type — OrderEntity
+const order: OrderEntity = new OrderEntity(1, 100);
+order.toJSON(); // ✅
 
-// Farq muhim — class ni argument sifatida berishda:
-function logClass(cls: User): void { }        // ❌ Instance kutadi
-function logClass(cls: typeof User): void { }  // ✅ Constructor kutadi
+// Constructor type — typeof User
+const EntityClass: typeof OrderEntity = OrderEntity;
+console.log(EntityClass.tableName);   // → "orders" (static access)
+const order2 = new EntityClass(2, 200); // ✅
+
+// Function parameter farqi
+function logInstance(entity: OrderEntity): void {
+  console.log(entity.id);
+}
+logInstance(new OrderEntity(1, 100)); // ✅ instance kutadi
+
+function registerEntity<T extends new (...args: any[]) => any>(Ctor: T): void {
+  // Constructor type — `new` qilish mumkin, static'ga kirish mumkin
+  console.log((Ctor as any).tableName);
+}
+registerEntity(OrderEntity); // ✅
+
+// Abstract construct signature (TS 4.2+)
+abstract class BaseRepo {
+  abstract save(): void;
+}
+type AbstractCtor = abstract new (...args: any[]) => BaseRepo;
+function registerRepo(Repo: AbstractCtor): void { /* ... */ }
 ```
+
+### Edge Cases
+
+- **`InstanceType<typeof Class>`** — constructor type'dan instance type olish
+- **`ConstructorParameters<typeof Class>`** — constructor parametrlar tuple'i
+- **Abstract class** — `new` qilib bo'lmaydi, lekin `typeof AbstractClass` constructor type — `abstract new` signature kerak
+- **Class expression:** `const X = class { ... }` — `X` ham value, ham type. `typeof X` constructor
+
+### Follow-up savollar
+
+1. "Factory'da `new Ctor()` xato bersa nima qilish kerak?" — Ctor signature'ga rioya qilish: `new (...args: any[]) => T`
+2. "`InstanceType` va `T extends new (...) => infer R` farqi?" — `InstanceType` built-in utility, ichida `infer` ishlatadi — bir xil natija
+
+</details>
+
+---
+
+### Savol 8: `readonly` class property nima qiladi? `const` bilan farqi? [Junior+]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+`readonly` — property faqat declaration yoki constructor ichida assign bo'ladi. Constructor'dan keyin reassignment compile error. Compile-time only — runtime'da `Object.defineProperty` semantics qo'llanmaydi.
+
+### To'liq tushuntirish
+
+`const` variable binding'ga, `readonly` object property'ga taalluqli. `const obj = { x: 1 }` — `obj` reassign qilib bo'lmaydi, lekin `obj.x = 2` mumkin. `readonly` esa property mutation'ni bloklaydi.
+
+`readonly` modifier'i:
+- Class field
+- Interface property
+- Type alias property
+- Tuple element (`readonly [number, string]`)
+- Array (`readonly T[]` yoki `ReadonlyArray<T>`)
+
+`readonly` shallow — nested object mutate qilinishi mumkin. Deep readonly uchun `DeepReadonly<T>` utility kerak.
+
+### Kod misol
+
+```typescript
+class UserProfile {
+  readonly id: number;
+  readonly createdAt: Date;
+  name: string;
+
+  constructor(id: number, name: string) {
+    this.id = id;
+    this.createdAt = new Date(); // ✅ constructor ichida ruxsat
+    this.name = name;
+  }
+
+  rename(newName: string): void {
+    this.name = newName;       // ✅ mutable
+    // this.id = 999;          // ❌ Cannot assign to 'id' (readonly)
+  }
+}
+
+const user = new UserProfile(1, "Ali");
+// user.id = 2;                 // ❌ Cannot assign to 'id'
+user.createdAt.setFullYear(2020); // ✅ shallow — Date mutate bo'ladi!
+
+// Deep readonly utility
+type DeepReadonly<T> = {
+  readonly [K in keyof T]: T[K] extends object ? DeepReadonly<T[K]> : T[K];
+};
+
+class ImmutableProfile {
+  readonly settings: DeepReadonly<{ theme: { color: string } }>;
+  constructor(settings: { theme: { color: string } }) {
+    this.settings = settings;
+  }
+}
+const prof = new ImmutableProfile({ theme: { color: "dark" } });
+// prof.settings.theme.color = "light"; // ❌ Cannot assign (deep readonly)
+```
+
+### Edge Cases
+
+- **`as const`** — literal type lock + readonly. `[1, 2, 3] as const` → `readonly [1, 2, 3]`
+- **Mutation via aliasing:** `function f(p: { x: number })` — `readonly` property'ni mutable parameter'ga bersa, mutation mumkin (TS strictreadonly emas)
+- **`readonly` static field:** `static readonly` — class darajasida constant, declaration vaqtida init
+- **Parameter property:** `constructor(public readonly id: number)` — shorthand
+- **Compile-time only:** runtime'da `obj.readonlyField = 1` ishlaydi (TS strip qilingan)
+
+### Follow-up savollar
+
+1. "Runtime'da haqiqiy immutability kerak bo'lsa?" — `Object.freeze` (shallow) yoki Immer/Immutable.js library
+2. "`readonly` array va `Array` farqi?" — `readonly T[]` `push`/`pop` taqiq, `T[]` mumkin
+
+</details>
+
+---
+
+### Savol 9: Static member nima? Static initialization block (TS 4.4+) qachon kerak? [Middle]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+Static member — class darajasiga biriktirilgan (instance'larga emas) property/method. `ClassName.staticMember` orqali kirilgan. Static initialization block (TS 4.4+, ES2022) — `static { ... }` ichida static field'larni init qilish uchun maxsus blok (asinxron emas, `this` static class'ga ishora qiladi).
+
+### To'liq tushuntirish
+
+Static member'lar shared state yoki utility method'lar uchun: `Math.PI`, `Array.isArray`. Constructor function ning property'lariga bog'lanadi (prototype'ga emas).
+
+Static initialization block:
+- Class declaration vaqtida bir marta ishlaydi
+- Murakkab static init logic uchun (try/catch, conditional, private static field'larga kirish)
+- `super` parent class'ga reference
+
+### Kod misol
+
+```typescript
+class HttpClient {
+  static baseUrl = "https://api.example.com";
+  static defaultHeaders: Record<string, string>;
+  static #instanceCounter = 0;
+
+  // Static initialization block — TS 4.4+ / ES2022
+  static {
+    try {
+      const env = process.env.API_BASE_URL;
+      HttpClient.defaultHeaders = {
+        "Content-Type": "application/json",
+        "X-Client-Version": HttpClient.#computeVersion(),
+      };
+      if (env) HttpClient.baseUrl = env;
+    } catch (e) {
+      HttpClient.defaultHeaders = { "Content-Type": "application/json" };
+    }
+  }
+
+  static #computeVersion(): string {
+    return `v1.0.${HttpClient.#instanceCounter}`;
+  }
+
+  static request(path: string): Promise<Response> {
+    return fetch(`${HttpClient.baseUrl}${path}`, {
+      headers: HttpClient.defaultHeaders,
+    });
+  }
+}
+
+console.log(HttpClient.baseUrl); // → "https://api.example.com" yoki env
+
+// Static method instance'siz chaqiriladi
+HttpClient.request("/users");
+```
+
+### Edge Cases
+
+- **`this` static method ichida:** static method ichida `this` — class ning o'zi (`typeof Class`), instance emas
+- **Static + inheritance:** subclass parent static member'ni meros oladi (`Child.parentStatic` ishlaydi)
+- **`static override`** (TS 4.3+): static method override qilinganda `override` keyword ishlatish mumkin
+- **Multiple static blocks:** bir class'da bir nechta static block — declaration tartibida ishlaydi
+- **`#private` static:** static private field — `static #counter`. Lexical scope cheklovi qo'llaniladi
+
+### Follow-up savollar
+
+1. "Static field generic bo'lishi mumkinmi?" — Yo'q. Static class darajasida, generic T instance darajasida — TS bunga ruxsat bermaydi
+2. "Singleton pattern'da static qanday ishlatiladi?" — `static instance: Class | null`, `static getInstance()`
+
+</details>
+
+---
+
+### Savol 10: `accessor` keyword (TS 4.9+) nima qiladi? Oddiy field bilan farqi? [Senior]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+`accessor` keyword (TS 4.9+, Stage 3 ECMAScript decorators uchun) — field'ni auto-accessor (getter/setter pair) sifatida e'lon qiladi. Decorator metadata'da getter/setter sifatida ko'rinishi kerak bo'lganda ishlatiladi.
+
+### To'liq tushuntirish
+
+Stage 3 ECMAScript decorators field'ga apply qilinganda decorator getter/setter pair olib, getter/setter pair qaytaradi. Oddiy field'ni decorate qilish mumkin emas — `accessor` keyword field'ni avtomatik getter/setter ga aylantiradi.
+
+Compile'da `accessor x` → private storage + getter + setter:
+
+```javascript
+// accessor x = 1; emit:
+#__x = 1;
+get x() { return this.#__x; }
+set x(v) { this.#__x = v; }
+```
+
+### Kod misol
+
+```typescript
+function logged<T, V>(
+  target: ClassAccessorDecoratorTarget<T, V>,
+  context: ClassAccessorDecoratorContext<T, V>,
+): ClassAccessorDecoratorResult<T, V> {
+  return {
+    get(this: T): V {
+      const v = target.get.call(this);
+      console.log(`Read ${String(context.name)}: ${String(v)}`);
+      return v;
+    },
+    set(this: T, value: V): void {
+      console.log(`Write ${String(context.name)}: ${String(value)}`);
+      target.set.call(this, value);
+    },
+  };
+}
+
+class UserAccount {
+  @logged accessor balance: number = 0;
+}
+
+const acc = new UserAccount();
+acc.balance = 100;
+// → Write balance: 100
+console.log(acc.balance);
+// → Read balance: 100
+// → 100
+```
+
+### Edge Cases
+
+- **`accessor` static:** `static accessor x = 1` — class darajasida auto-accessor
+- **Inheritance:** subclass `override accessor` bilan parent accessor'ni qayta yozadi
+- **`readonly accessor`** taqiq — getter/setter pair'ni half-readonly qilish mantiqsiz
+- **Compatibility:** legacy decorators (`experimentalDecorators: true`) bilan ishlamaydi — faqat Stage 3
+- **Performance:** har access getter/setter call — hot loop'da oddiy field'dan sekinroq
+
+### Follow-up savollar
+
+1. "Legacy decorators bilan `accessor` ishlaydimi?" — Yo'q. `experimentalDecorators: false` bo'lishi kerak
+2. "Reflect metadata bilan integratsiya?" — Stage 3 decorator context'da `metadata` slot mavjud (TS 5.2+)
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Stage 3 decorators (TC39 proposal) spec'i: `ClassAccessorDecoratorContext` da `access.get`, `access.set` reference bor — decorator field'ni getter/setter pair sifatida ko'radi. Emit:
+
+```javascript
+class UserAccount {
+  #balance_initializers = [];
+  #balance = (() => {
+    const result = logged({ get: this.#balance_get, set: this.#balance_set }, {...});
+    return result.init ? result.init.call(this, 0) : 0;
+  })();
+  get balance() { return this.#balance; }
+  set balance(v) { this.#balance = v; }
+}
+```
+
+`accessor` field decorator metadata uchun unified API — old-style getter/setter manual yozishni almashtiradi.
+
+</details>
+
+</details>
+
+---
+
+### Savol 11: Generic class qanday yoziladi? Constraint'lar bilan misol [Middle]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+Generic class — class declaration'ga type parameter'lar qo'shish. `class Repository<T> { ... }`. Type parameter constructor, method, property type'larida ishlatilishi mumkin. Constraint (`T extends BaseEntity`) — parameter'ga shape talab qiladi.
+
+### To'liq tushuntirish
+
+Type parameter class darajasida e'lon qilinganda — instance method'lar va property'lar uchun foydalanish mumkin. Static member'larda type parameter ishlatib bo'lmaydi — static class darajasida, T instance darajasida.
+
+Generic constraint'lar `extends` orqali — parameter'ga minimal shape majburiyati. Default type parameter (`T = string`) bo'sh argument'da fallback.
+
+### Kod misol
+
+```typescript
+interface Entity {
+  id: number;
+}
+
+class Repository<T extends Entity> {
+  private items: Map<number, T> = new Map();
+
+  save(entity: T): void {
+    this.items.set(entity.id, entity);
+  }
+
+  findById(id: number): T | undefined {
+    return this.items.get(id);
+  }
+
+  findAll(): T[] {
+    return Array.from(this.items.values());
+  }
+
+  // Method-level generic
+  filter<K extends keyof T>(key: K, value: T[K]): T[] {
+    return this.findAll().filter(item => item[key] === value);
+  }
+}
+
+interface UserEntity extends Entity {
+  name: string;
+  email: string;
+}
+
+const userRepo = new Repository<UserEntity>();
+userRepo.save({ id: 1, name: "Ali", email: "ali@example.com" });
+const found = userRepo.findById(1); // UserEntity | undefined
+const byName = userRepo.filter("name", "Ali"); // UserEntity[]
+
+// const bad = new Repository<{ name: string }>(); // ❌ id yo'q
+```
+
+### Edge Cases
+
+- **Default type parameter:** `class Box<T = unknown> { ... }` — argument'siz `Box` → `Box<unknown>`
+- **Multiple parameters:** `class Cache<K, V> { ... }` — har biri uchun constraint mumkin
+- **Type parameter va `this`:** method `T` qaytarganda `this.value as T` bilan narrow
+- **Static method generic:** static method o'z type parameter'iga ega bo'lishi mumkin, lekin class T'ga kira olmaydi
+- **Variance:** generic class member'lar variance'ni belgilaydi (covariant return, contravariant param)
+
+### Follow-up savollar
+
+1. "Generic class abstract bo'lishi mumkinmi?" — Ha. `abstract class Repo<T> { abstract save(x: T): void; }`
+2. "Constructor type'da generic'ni qanday saqlash mumkin?" — `typeof Class` generic argument'lariga ega bo'lmaydi — `new <T>(...) => Class<T>` shaklida ifoda
 
 </details>
 
@@ -246,61 +866,82 @@ function logClass(cls: typeof User): void { }  // ✅ Constructor kutadi
 
 ## Amaliy savollar (Coding Challenges)
 
-### 1. Constructor + field initialization order (Daraja: Middle)
+### Savol 12: Constructor + field initialization order [Middle]
 
-**Savol:** Output ni ayting va nima uchun ekanini tushuntiring:
+**Savol:** Output ni ayting va sababini tushuntiring:
 
 ```typescript
-class A {
+class Base {
   x: number = 1;
   constructor() {
-    console.log("A constructor, x =", this.x);
+    console.log("Base ctor, x =", this.x);
     this.init();
   }
   init(): void {
     this.x = 2;
-    console.log("A init, x =", this.x);
+    console.log("Base init, x =", this.x);
   }
 }
 
-class B extends A {
+class Derived extends Base {
   y: number = 10;
   override init(): void {
-    console.log("B init, y =", this.y);
+    console.log("Derived init, y =", this.y);
     this.x = 3;
   }
 }
 
-const b = new B();
-console.log("b.x =", b.x, "b.y =", b.y);
+const d = new Derived();
+console.log("d.x =", d.x, "d.y =", d.y);
 ```
 
 <details>
-<summary>Yechim</summary>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
 
 ```
-A constructor, x = 1
-B init, y = undefined
-b.x = 3 b.y = 10
+Base ctor, x = 1
+Derived init, y = undefined
+d.x = 3 d.y = 10
 ```
+
+Constructor'da virtual method chaqirish xavfli — subclass field'lari hali initialize bo'lmagan.
+
+### To'liq tushuntirish
 
 Execution order:
 
-1. `new B()` → B da constructor yo'q, auto `super()` chaqiradi
-2. A constructor: avval `this.x = 1` (field initializer) → `"A constructor, x = 1"`
-3. `this.init()` chaqiriladi — **lekin** `this` B instance → **B.init()** ishlaydi
-4. B.init da `this.y` → **undefined** — B ning field initializer lari hali ishlamagan!
+1. `new Derived()` — Derived'da explicit constructor yo'q, auto `super()` chaqiradi
+2. Base constructor: avval field initializer (`x = 1`) → `"Base ctor, x = 1"`
+3. `this.init()` chaqiriladi — **virtual dispatch**: `this` Derived instance, `Derived.init()` ishlaydi
+4. Derived.init: `this.y` → **undefined** — Derived'ning field initializer'lari hali ishlamagan (`super()` qaytmagan)
 5. `this.x = 3` assign bo'ladi
-6. A constructor tugadi → B ga qaytadi → B field initializer: `this.y = 10`
-7. Natija: `b.x = 3`, `b.y = 10`
+6. Base constructor tugadi → Derived field initializer'lar: `this.y = 10`
+7. Natija: `d.x = 3`, `d.y = 10`
 
-**Dars:** Constructor da virtual method chaqirish **xavfli** — subclass field lari hali tayyor bo'lmagan bo'lishi mumkin. ES2022 field initializer lar `super()` qaytgandan **keyin** ishlaydi.
+### Kod misol
+
+ES2022 (TS 4.6 `useDefineForClassFields: true` default) field initializer'lar `super()` qaytgandan **keyin** ishlaydi. Bu sabab subclass field'lari Base constructor ichida `undefined` ko'rinadi.
+
+### Edge Cases
+
+- **`useDefineForClassFields: false`** (TS 4.0 dan oldin default) — `[[Set]]` semantics, accessor'larni trigger qiladi
+- **Parameter property:** `constructor(public x: number)` — body'da explicit init kabi ishlaydi
+- **Abstract method call:** abstract class constructor'da abstract method chaqirish ham xavfli
+
+### Follow-up savollar
+
+1. "Bu xatti-harakatdan qanday qochish mumkin?" — Constructor'da template method chaqirmaslik. Factory pattern yoki `init()` method'ni constructor'dan tashqarida explicit chaqirish
+2. "Java/C# da ham bir xilmi?" — Ha — bu fundamental OOP gotcha "calling virtual methods from constructor"
 
 </details>
 
-### 2. Structural typing — class bilan (Daraja: Middle)
+---
 
-**Savol:** Bu kodda xato bormi? `Dog` `Animal` ni extend qilmagan:
+### Savol 13: Structural typing — class bilan [Middle]
+
+**Savol:** `Dog` `Animal` ni extend qilmagan. Bu kod ishlaydimi?
 
 ```typescript
 class Animal {
@@ -317,26 +958,60 @@ function printAnimal(animal: Animal): void {
 }
 
 const dog = new Dog("Rex");
-printAnimal(dog); // Ishlaydi mi?
+printAnimal(dog);
 ```
 
 <details>
-<summary>Yechim</summary>
+<summary><strong>Javob</strong></summary>
 
-**Xato yo'q** — ishlaydi. TypeScript **structural typing** — `Dog` ning `Animal` ni extend qilmasligi muhim emas. `printAnimal` `{ name: string }` shape kutadi — `Dog` da `name: string` bor → mos keladi.
+### Qisqa javob
+
+Xato yo'q — ishlaydi. TypeScript structural typing — class nominal emas, shape muhim. `Dog` `{ name: string }` shape'iga mos.
+
+### To'liq tushuntirish
+
+`printAnimal` `Animal` ni qabul qiladi, lekin TS strukturani solishtirgan: `Animal` shape — `{ name: string }`. `Dog` da `name: string` bor → mos keladi. Qo'shimcha `bark()` method strukturaviy typing'da muammo emas.
+
+Nominal typing (Java, C#) — `Dog extends Animal` yozilishi shart edi. TS — `Dog` va `Animal` mustaqil class'lar, lekin shape mos kelganda interchangeable.
+
+### Kod misol
 
 ```typescript
-printAnimal(dog);           // ✅ Dog shape mos
-printAnimal({ name: "Cat" }); // ✅ Oddiy object ham mos
+printAnimal(dog);                  // ✅ Dog shape mos
+printAnimal({ name: "Cat" });      // ✅ Oddiy object ham mos
+printAnimal({ name: "X", age: 3 });// ✅ Extra property ham OK
+
+// Private/protected member'lar nominal qiladi
+class SecureAnimal {
+  private secret: string = "x";
+  constructor(public name: string) {}
+}
+
+class OtherSecure {
+  private secret: string = "y";
+  constructor(public name: string) {}
+}
+
+function f(a: SecureAnimal): void {}
+// f(new OtherSecure("x")); // ❌ private member'lar bir xil declaration'dan emas
 ```
 
-`bark()` qo'shimcha method — structural typing da extra member lar muammo emas.
+### Edge Cases
 
-Nominal typing (Java, C#) da `Dog extends Animal` yozilishi shart edi. TS da class nom va inheritance emas, **shape** muhim. Nominal kerak bo'lsa — branded types ishlatiladi.
+- **Private member nominal effect:** `private` yoki `#private` bo'lsa — har class unique brand, faqat bir xil declaration'dan kelgan instance mos
+- **Branded type:** `type Brand<T, B> = T & { __brand: B }` — nominal simulation
+- **Class hierarchy:** structural typing'da `Animal | Dog` — bir xil shape bo'lsa subset qarash
+
+### Follow-up savollar
+
+1. "Nominal typing kerak bo'lsa?" — Branded type pattern: `type UserId = number & { __brand: "UserId" }`
+2. "`instanceof` ishlaydimi?" — Ha — instanceof prototype chain tekshiradi, structural emas
 
 </details>
 
-### 3. Abstract class + generics — xatoni toping (Daraja: Middle+)
+---
+
+### Savol 14: Abstract class + generics — xatoni toping [Middle+]
 
 **Savol:** Bu kodda ikki mantiqiy xato bor. Toping va tuzating:
 
@@ -356,17 +1031,20 @@ abstract class Cache<T> {
 ```
 
 <details>
-<summary>Yechim</summary>
+<summary><strong>Javob</strong></summary>
 
-**Xato 1:** `if (existing)` — falsy value muammosi. `0`, `""`, `false`, `null` cache da bo'lsa — falsy tufayli "miss" deb hisoblanadi:
+### Qisqa javob
 
-```typescript
-const cache = new MemoryCache<number>();
-cache.set("count", 0);
-cache.getOrSet("count", () => 99); // 99 qaytaradi — 0 falsy!
-```
+**Xato 1:** `if (existing)` falsy value muammosi — `0`, `""`, `false`, `null` cache'da bo'lsa "miss" deb hisoblanadi.
+**Xato 2:** `get` return type `T` — key topilmasa `undefined` qaytishi kerak, lekin `T` `undefined` ni qamramaydi.
 
-**Xato 2:** `get` return type `T` — lekin key mavjud bo'lmaganda `undefined` qaytishi kerak.
+### To'liq tushuntirish
+
+`abstract get(key: string): T` — implementation `T` qaytarishi shart, lekin Map'da key mavjud bo'lmasa `undefined` qaytadi. Return type `T | undefined` bo'lishi kerak.
+
+Falsy check `if (existing)` — cache'da `0` saqlangan bo'lsa, har chaqiriqda factory chaqiriladi (regression bug). To'g'ri yondashuv: `has(key)` method qo'shish.
+
+### Kod misol
 
 ```typescript
 // ✅ Tuzatilgan
@@ -389,15 +1067,30 @@ class MemoryCache<T> extends Cache<T> {
   set(key: string, value: T): void { this.store.set(key, value); }
   has(key: string): boolean { return this.store.has(key); }
 }
+
+const cache = new MemoryCache<number>();
+cache.set("count", 0);
+console.log(cache.getOrSet("count", () => 99)); // → 0 (xato yo'q!)
 ```
 
-`has()` qo'shish — falsy muammoni hal qiladi. `Map` — `Record` dan yaxshiroq (key mavjudligini aniq tekshiradi).
+### Edge Cases
+
+- **`!` non-null assertion:** `this.get(key)!` — `has` true bo'lsa, lekin keyin race condition'da o'chgan bo'lsa runtime undefined
+- **Async cache:** `async get(key): Promise<T | undefined>` — `getOrSet` ham async, race protection kerak
+- **Eviction policy:** LRU, TTL — `has` true qaytarishidan oldin TTL tekshirilishi kerak
+
+### Follow-up savollar
+
+1. "Concurrent `getOrSet` chaqiruvlar bo'lsa-chi?" — Promise saqlash: `Map<string, Promise<T>>` — duplicate factory'ni oldini olish
+2. "`null` ni cache'lash kerak bo'lsa?" — `T | null | undefined` aralash — `has` yagona to'g'ri yo'l
 
 </details>
 
-### 4. `this` type — fluent API (Daraja: Middle+)
+---
 
-**Savol:** `QueryBuilder` ning fluent chain'i buzilgan. Muammoni toping va tuzating:
+### Savol 15: `this` type — fluent API [Middle+]
+
+**Savol:** `QueryBuilder` chain'i buzilgan. Muammoni toping va tuzating:
 
 ```typescript
 class QueryBuilder {
@@ -423,22 +1116,31 @@ class UserQueryBuilder extends QueryBuilder {
   }
 }
 
-// Muammo: chain buziladi
 new UserQueryBuilder()
-  .select("*")     // → QueryBuilder (UserQueryBuilder emas!)
-  .activeOnly();   // ❌ Property 'activeOnly' does not exist on type 'QueryBuilder'
+  .select("*")     // → QueryBuilder
+  .activeOnly();   // ❌ does not exist on type 'QueryBuilder'
 ```
 
 <details>
-<summary>Yechim</summary>
+<summary><strong>Javob</strong></summary>
 
-**Muammo:** `select()` va `from()` return type `QueryBuilder` — subclass type yo'qoladi. Chain dan keyin `UserQueryBuilder` method lariga kirish mumkin emas.
+### Qisqa javob
+
+`select()` va `from()` return type `QueryBuilder` — subclass type yo'qoladi. Yechim: `this` polymorphic return type + `protected query` (subclass uchun access).
+
+### To'liq tushuntirish
+
+`this` return type — polymorphic. `QueryBuilder` da `QueryBuilder`, `UserQueryBuilder` da `UserQueryBuilder` ga resolve bo'ladi. Chain'da subclass method'lari accessible bo'lib qoladi.
+
+`private` → `protected` — subclass'ga `query` field'ga kirishga ruxsat berish.
+
+### Kod misol
 
 ```typescript
 class QueryBuilder {
-  protected query: string[] = []; // protected — subclass kirishiga ruxsat
+  protected query: string[] = [];
 
-  select(fields: string): this { // ← this type
+  select(fields: string): this {
     this.query.push(`SELECT ${fields}`);
     return this;
   }
@@ -458,53 +1160,68 @@ class UserQueryBuilder extends QueryBuilder {
   }
 }
 
-// ✅ Chain ishlaydi
-new UserQueryBuilder()
-  .select("*")     // → UserQueryBuilder (this)
-  .from("users")   // → UserQueryBuilder (this)
-  .activeOnly()    // → UserQueryBuilder ✅
-  .build();        // "SELECT * FROM users WHERE active = true"
+const sql = new UserQueryBuilder()
+  .select("*")     // this → UserQueryBuilder
+  .from("users")   // this → UserQueryBuilder
+  .activeOnly()    // ✅
+  .build();        // → "SELECT * FROM users WHERE active = true"
 ```
 
-**Tushuntirish:**
+### Edge Cases
 
-- `this` return type — `QueryBuilder` da `QueryBuilder`, `UserQueryBuilder` da `UserQueryBuilder` ga resolve bo'ladi
-- `private query` → `protected query` — subclass da ishlatish uchun
-- Polymorphic `this` — compile-time feature, Builder, Fluent API pattern larda muhim
+- **`this` type narrowing:** `this is SubType` type predicate orqali narrow qilish mumkin
+- **Method nashr qilish:** `this` polymorphic — subclass har doim o'z type'iga ega bo'lib qoladi
+- **`return this`** SHART — `this` type return qaytarmasa, runtime undefined, compile error
+
+### Follow-up savollar
+
+1. "`this` type qachon foydali emas?" — Subclass'da method explicit boshqa subclass type qaytarsa, polymorphic break
+2. "Builder pattern bilan farq?" — `this` chaining (mutable). Type-state builder — har chaqiriq yangi type qaytaradi (immutable type progression)
 
 </details>
 
-### 5. Singleton pattern (Daraja: Middle+)
+---
 
-**Savol:** `Database` singleton class yozing — faqat bitta instance bo'lishi mumkin. `private constructor`, `static getInstance()` ishlatilsin:
+### Savol 16: Singleton pattern [Middle+]
+
+**Savol:** `DatabaseConnection` singleton class yozing — faqat bitta instance bo'lishi mumkin. `private constructor`, `static getInstance()` ishlatilsin.
 
 ```typescript
-// Implement qiling:
-// const db1 = Database.getInstance("postgres://localhost/mydb");
-// const db2 = Database.getInstance();
+// const db1 = DatabaseConnection.getInstance("postgres://localhost/mydb");
+// const db2 = DatabaseConnection.getInstance();
 // db1 === db2 → true
-// new Database("...") → ❌ compile error
+// new DatabaseConnection("...") → ❌ compile error
 ```
 
 <details>
-<summary>Yechim</summary>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+`private constructor` — tashqaridan `new` ni compile-time'da bloklaydi. `static instance` — shared instance, `getInstance()` lazy initialization.
+
+### To'liq tushuntirish
+
+`private constructor` faqat compile-time himoya. Haqiqiy runtime privacy uchun `#private` static field + factory function ham kerak (chunki TS `private` JS'da o'chiriladi va `Reflect.construct` ishlaydi).
+
+### Kod misol
 
 ```typescript
-class Database {
-  private static instance: Database | null = null;
+class DatabaseConnection {
+  static #instance: DatabaseConnection | null = null;
 
   private constructor(
-    private readonly connectionString: string
+    private readonly connectionString: string,
   ) {}
 
-  static getInstance(connectionString?: string): Database {
-    if (!Database.instance) {
+  static getInstance(connectionString?: string): DatabaseConnection {
+    if (!DatabaseConnection.#instance) {
       if (!connectionString) {
         throw new Error("Connection string required for first init");
       }
-      Database.instance = new Database(connectionString);
+      DatabaseConnection.#instance = new DatabaseConnection(connectionString);
     }
-    return Database.instance;
+    return DatabaseConnection.#instance;
   }
 
   query(sql: string): void {
@@ -512,19 +1229,273 @@ class Database {
   }
 }
 
-const db1 = Database.getInstance("postgres://localhost/mydb");
-const db2 = Database.getInstance();
-console.log(db1 === db2); // true
+const db1 = DatabaseConnection.getInstance("postgres://localhost/mydb");
+const db2 = DatabaseConnection.getInstance();
+console.log(db1 === db2); // → true
 
-// new Database("..."); // ❌ Constructor is private
+db1.query("SELECT * FROM users");
+
+// new DatabaseConnection("..."); // ❌ Constructor of class 'DatabaseConnection' is private
 ```
 
-**Tushuntirish:**
+### Edge Cases
 
-- `private constructor` — tashqaridan `new` ni compile-time da to'xtatadi
-- `static instance` — bitta shared instance
-- `getInstance()` — lazy initialization, birinchi chaqiruvda yaratadi
-- TS `private` JS da o'chiriladi — runtime da `new` to'xtatish uchun qo'shimcha tekshiruv kerak bo'lishi mumkin
+- **Module-level singleton:** ES module — module bir marta evaluate qilinadi. `export const db = new DB()` ham singleton (alternativa)
+- **Testability:** singleton mock qilish qiyin — DI yoki `resetInstance()` method qo'shish
+- **Inheritance:** `private constructor` subclass'ni bloklaydi — `protected` qilish mumkin
+- **Thread safety:** Node.js single-threaded — race condition yo'q. Worker threads alohida memory
+
+### Follow-up savollar
+
+1. "Multiple parameter bilan getInstance() — keyingi chaqiruvlarda nima bo'ladi?" — Birinchi argument bilan init, keyingi argument'lar ignore. Strict yondashuv: idempotency tekshiruvi
+2. "Anti-pattern emasmi?" — Ko'p hollarda DI afzal. Singleton — connection pool, config, logger uchun mos
+
+</details>
+
+---
+
+### Savol 17: Class implements interface — index signature bilan bug [Senior]
+
+**Savol:** Quyidagi kod compile xato beradi. Sababini tushuntiring va tuzating:
+
+```typescript
+interface JsonSerializable {
+  [key: string]: string | number | boolean;
+}
+
+class UserRecord implements JsonSerializable {
+  name: string;
+  age: number;
+  isActive: boolean;
+  createdAt: Date;
+
+  constructor(name: string, age: number) {
+    this.name = name;
+    this.age = age;
+    this.isActive = true;
+    this.createdAt = new Date();
+  }
+}
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+`JsonSerializable` index signature `string | number | boolean` ga cheklaydi. `createdAt: Date` index signature'ga mos emas — compile error. Method va class'lar ham index signature talabidan istisno emas.
+
+### To'liq tushuntirish
+
+Interface'da index signature `[key: string]: T` bo'lsa — barcha property'lar `T` ga assignable bo'lishi shart. Class `implements` qilganda har bir property index signature'ga rioya qiladi.
+
+`Date` `string | number | boolean` ga assignable emas. Yechim:
+1. Index signature'ga `Date` qo'shish: `[key: string]: string | number | boolean | Date`
+2. `createdAt` ni `string` (ISO) qilib saqlash
+3. Index signature'ni olib tashlash, explicit property list ishlatish
+
+### Kod misol
+
+```typescript
+// ✅ Variant 1: Index signature'ni kengaytirish
+interface JsonSerializable {
+  [key: string]: string | number | boolean | Date;
+}
+
+class UserRecord implements JsonSerializable {
+  name: string;
+  age: number;
+  isActive: boolean;
+  createdAt: Date;
+  // Index signature qoladi: har property string|number|boolean|Date bo'lishi shart
+
+  constructor(name: string, age: number) {
+    this.name = name;
+    this.age = age;
+    this.isActive = true;
+    this.createdAt = new Date();
+  }
+}
+
+// ✅ Variant 2: ISO string saqlash
+interface JsonSerializable2 {
+  [key: string]: string | number | boolean;
+}
+
+class UserRecord2 implements JsonSerializable2 {
+  name: string;
+  age: number;
+  isActive: boolean;
+  createdAt: string; // ISO
+
+  constructor(name: string, age: number) {
+    this.name = name;
+    this.age = age;
+    this.isActive = true;
+    this.createdAt = new Date().toISOString();
+  }
+}
+```
+
+### Edge Cases
+
+- **Method va index signature:** method `(...args) => any` — `string | number | boolean` ga mos emas, xato
+- **Optional property:** `prop?: T` — index signature'ga `T | undefined` bo'lib mos kelishi shart
+- **Symbol key:** index signature `[key: string]` symbol property'larni qamramaydi
+- **`Record<string, T>` alternativa:** `class X implements Record<string, T>` ham aynan shu cheklov
+
+### Follow-up savollar
+
+1. "Index signature'ni keng `unknown` qilsa-chi?" — Type safety yo'qoladi — har property accept qilinadi
+2. "Class instance'ni `JSON.stringify` qilganda?" — Method'lar va `undefined` qiymatlar avtomatik ignore qilinadi, lekin compile-time muammosi qoladi
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Index signature TC39 spec emas — TypeScript type system feature. Implementation: `IndexInfo` AST'da har structural check'da `getApparentType().indexInfos` solishtiriladi. Index signature `string` va `number` (separately) yoki `symbol` bo'lishi mumkin (TS 4.4+).
+
+V8'da hidden class invariant: property'lar bir xil shape'da saqlanadi. Index signature TypeScript abstraction — runtime'da har property oddiy own property.
+
+</details>
+
+</details>
+
+---
+
+### Savol 18: `override` + `noImplicitOverride` — bug fix [Middle]
+
+**Savol:** Bu kod `noImplicitOverride: true` bilan ishlamaydi. Toping va tuzating:
+
+```typescript
+class BaseLogger {
+  log(message: string): void {
+    console.log(`[INFO] ${message}`);
+  }
+  error(message: string): void {
+    console.error(`[ERROR] ${message}`);
+  }
+}
+
+class JsonLogger extends BaseLogger {
+  log(message: string): void {
+    console.log(JSON.stringify({ level: "info", message }));
+  }
+  errror(message: string): void { // typo
+    console.error(JSON.stringify({ level: "error", message }));
+  }
+}
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+Ikkita muammo: `log()` `override` keyword'siz (`noImplicitOverride: true` bilan xato), va `errror()` typo — `override` qo'shilsa bu typo ushlanadi.
+
+### To'liq tushuntirish
+
+`noImplicitOverride: true` parent method'ni qayta yozayotgan har bir method'ga `override` keyword'ni MAJBURIY qiladi. `errror` — typo, lekin `override` siz oddiy yangi method sifatida qabul qilinadi. `override` qo'yilsa — TS parent'da `errror` topa olmaydi va xato beradi.
+
+### Kod misol
+
+```typescript
+class BaseLogger {
+  log(message: string): void {
+    console.log(`[INFO] ${message}`);
+  }
+  error(message: string): void {
+    console.error(`[ERROR] ${message}`);
+  }
+}
+
+class JsonLogger extends BaseLogger {
+  override log(message: string): void { // ✅ override qo'shildi
+    console.log(JSON.stringify({ level: "info", message }));
+  }
+
+  override error(message: string): void { // ✅ typo tuzatildi
+    console.error(JSON.stringify({ level: "error", message }));
+  }
+}
+
+const logger = new JsonLogger();
+logger.log("user created");
+// → {"level":"info","message":"user created"}
+```
+
+### Edge Cases
+
+- **Yangi method qo'shish:** subclass'da parent'da bo'lmagan method `override` siz yoziladi
+- **Refactoring safety:** parent'dan method olib tashlansa — barcha `override` xato beradi (intent: refactoring)
+- **Static method override:** TS 4.3+ static method ham `override` qabul qiladi
+
+### Follow-up savollar
+
+1. "Eski codebase'da `noImplicitOverride: true` yoqsam — qancha xato bo'ladi?" — Har subclass method uchun bir xato. `--fixOverrides` flag yo'q, codemod kerak
+2. "Abstract method implement qilishda `override` shartmi?" — Yo'q, lekin yozish ruxsat. TS dizayn qarori — abstract implement va override semantically farqli
+
+</details>
+
+---
+
+### Savol 19: Parameter property + readonly — output [Middle]
+
+**Savol:** Output ni ayting:
+
+```typescript
+class Account {
+  constructor(
+    public readonly id: number,
+    public balance: number,
+    private readonly _createdAt: Date = new Date(),
+  ) {}
+
+  deposit(amount: number): this {
+    this.balance += amount;
+    return this;
+  }
+}
+
+const acc = new Account(1, 100);
+acc.deposit(50).deposit(25);
+console.log(acc.balance);
+console.log((acc as any)._createdAt instanceof Date);
+console.log("id" in acc);
+console.log(Object.keys(acc).length);
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+```
+175
+true
+true
+3
+```
+
+### To'liq tushuntirish
+
+1. `acc.deposit(50)` → `balance = 150`, `this` qaytaradi. `.deposit(25)` → `balance = 175`
+2. `_createdAt` `private` — runtime'da oddiy property, `Date` instance
+3. `"id" in acc` → `true` — parameter property avtomatik property yaratadi
+4. `Object.keys` — barcha enumerable own property'lar: `id`, `balance`, `_createdAt`
+
+Parameter property TypeScript shorthand — JS emit'da constructor body'ga `this.x = x` qo'shadi. TS `private` runtime'da yo'q — property oddiy enumerable.
+
+### Edge Cases
+
+- **`readonly` runtime'da:** runtime'da reassignment ishlaydi (TS strip qilingan)
+- **Default value:** `_createdAt: Date = new Date()` — argument berilmagani uchun har instance uchun yangi `Date`
+- **Method `Object.keys`'da yo'q:** method'lar prototype'da, own property emas
+
+### Follow-up savollar
+
+1. "Methodlar ham `Object.keys`'da ko'rinishi uchun?" — `useDefineForClassFields: false` (eski emit), yoki arrow function field
+2. "`#private` qilsam `Object.keys`?" — `#` static private'lar `Object.keys`'da yo'q
 
 </details>
 
@@ -532,14 +1503,15 @@ console.log(db1 === db2); // true
 
 ## Xulosa
 
-- Access modifiers (`public`/`private`/`protected`) — faqat compile-time, JS da o'chiriladi
-- ES `#` private — haqiqiy runtime privacy, library yozayotganda afzal
-- Parameter properties — constructor da modifier bilan avtomatik property
-- Abstract class — shared implementation + contract. Interface — faqat contract
+- Access modifiers (`public`/`private`/`protected`) — compile-time only, JS'da o'chiriladi
+- ES `#` private — runtime hard privacy, lexical scope orqali brand check
+- Parameter properties — constructor'da modifier'lar bilan avtomatik property
+- `readonly` — compile-time mutation protection, shallow
+- Abstract class — instantiate qilib bo'lmaydi, shared implementation + contract
 - `implements` — tekshiruv, type injection emas. Inference bermaydi
-- `override` — typo va parent o'zgarganda xatoni ushlaydi
-- `this` return type — fluent API / builder pattern uchun muhim
-- Class = 2 ta type: instance type (`User`) va constructor type (`typeof User`)
-- Generic Repository — batafsil [interview/21 — Design Patterns](21-design-patterns.md) da
-
-[Asosiy bo'limga qaytish →](../10-classes.md)
+- `override` — typo va refactoring xatolarini ushlaydi (`noImplicitOverride`)
+- `this` polymorphic return type — fluent API / builder pattern uchun
+- Class = 2 ta type: instance type (`Class`) va constructor type (`typeof Class`)
+- Static initialization block (TS 4.4+, ES2022) — murakkab static init uchun
+- `accessor` keyword (TS 4.9+) — auto-accessor, Stage 3 decorators uchun
+- Generic class — type parameter constructor/method/property'da, static'da emas
