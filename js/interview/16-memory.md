@@ -9,14 +9,14 @@
 ### 1. Stack va Heap farqi nima? Qaysi ma'lumotlar qayerda saqlanadi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 JavaScript engine xotirani ikki hududda boshqaradi:
 
 | | Stack | Heap |
 |---|-------|------|
 | **Nima saqlanadi** | Primitives, pointers, call frames | Objects, Arrays, Functions |
-| **Hajm** | Kichik, fixed (~1MB) | Katta, dynamic (GB gacha) |
+| **Hajm** | Kichik, fixed (OS/engine konfiguratsiyasiga bog'liq, Node.js'da `--stack-size` flag bilan boshqariladi) | Katta, dynamic (`--max-old-space-size` bilan cheklanadi) |
 | **Tezlik** | Juda tez (LIFO — pointer siljitish) | Sekinroq (allokatsiya + GC kerak) |
 | **Boshqaruv** | Avtomatik (scope/funksiya tugasa tozalanadi) | Garbage Collector boshqaradi |
 | **Tartib** | LIFO (Last In, First Out) | Tartibsiz |
@@ -60,7 +60,7 @@ V8 da heap bir nechta bo'limga bo'lingan (2023+ V8 v11 layout):
 ### 2. Copy by value va copy by reference farqi nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Primitive turlari (number, string, boolean, undefined, null, symbol, bigint) **copy by value** — o'zgaruvchiga tayinlanganda qiymatning mustaqil nusxasi yaratiladi, birini o'zgartirish ikkinchisiga ta'sir qilmaydi.
 
@@ -93,7 +93,7 @@ Bu farq React/Redux da muhim: state'ni mutate qilsangiz reference bir xil qoladi
 ### 3. Garbage Collection qanday ishlaydi? Mark-and-Sweep nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 JavaScript avtomatik memory management ishlatadi — Garbage Collector keraksiz object'larni topib tozalaydi.
 
@@ -122,7 +122,7 @@ V8 **Generational GC** ishlatadi:
 ### 4. Memory leak nima? Eng keng tarqalgan turlari qaysilar? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Memory leak — dastur ishlayotganida xotira to'planib ketishi, lekin GC uni tozalay olmasligi. Sababi: object'ga biz unutgan/tashlab qo'ygan reference mavjud — GC uchun "kerakli".
 
@@ -158,7 +158,7 @@ class ComponentFixed {
 ### 5. WeakMap va Map farqi nima? Qachon WeakMap ishlatish kerak? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Xususiyat | `Map` | `WeakMap` |
 |-----------|-------|-----------|
@@ -191,7 +191,7 @@ WeakMap ishlatish kerak bo'lgan holatlar:
 ### 6. WeakRef nima? Qachon ishlatiladi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `WeakRef` (ES2021) — object'ga **kuchsiz reference** yaratadi. Oddiy (strong) reference GC ga "bu object kerak" deydi. WeakRef esa GC ga to'sqinlik qilmaydi — object'ga boshqa strong reference bo'lmasa, GC tozalashi mumkin.
 
@@ -219,7 +219,7 @@ Muhim: GC **qachon** ishlashi noaniq — `deref()` istalgan paytda `undefined` q
 ### 7. Chrome DevTools da memory leak qanday topiladi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Comparison Workflow** — eng samarali usul:
 
@@ -241,7 +241,7 @@ Muhim: GC **qachon** ishlashi noaniq — `deref()` istalgan paytda `undefined` q
 ### 8. V8 da Generational GC nima? Young va Old Generation farqi? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 V8 **Generational Hypothesis** ga asoslanadi: ko'pchilik object'lar qisqa muddatli. Shuning uchun heap ikki avlodga bo'lingan:
 
@@ -271,7 +271,7 @@ Bu kombinatsiya tufayli Major GC ham main thread ni minimal to'xtatadi — moder
 ### 9. `structuredClone` va `JSON.parse(JSON.stringify())` farqi nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Xususiyat | `JSON.parse(JSON.stringify())` | `structuredClone()` |
 |-----------|-------------------------------|---------------------|
@@ -302,7 +302,7 @@ Qoida: shallow copy → spread/`Object.assign` (eng tez). Deep copy → `structu
 ### 10. Object pooling nima? Qachon ishlatiladi? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Object pooling — ko'p object yaratish-yo'q qilish o'rniga, mavjud object'larni qayta ishlatish patterni. GC yukini kamaytiradi va performance oshiradi.
 
@@ -346,7 +346,7 @@ Qachon **kerak emas**: oddiy CRUD, kam object yaratish, bir martalik amallar —
 ### 11. FinalizationRegistry nima? Real-world use case ayting. [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `FinalizationRegistry` (ES2021) — object GC tomonidan tozalanganda callback chaqirish imkonini beradi. Bu tashqi resurslarni cleanup qilish uchun foydali.
 
@@ -401,7 +401,7 @@ Muhim: callback **QACHON** chaqirilishi kafolatlanmagan — GC o'z vaqtida tozal
 ### 12. `AbortController` event listener cleanup uchun qanday ishlatiladi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `addEventListener` ning `signal` optsiyasi orqali bir nechta listener'ni bir yo'la olib tashlash mumkin — `abort()` chaqirilganda barcha listener'lar avtomatik remove bo'ladi:
 
@@ -432,7 +432,7 @@ Bu pattern ayniqsa SPA component'larida foydali — `destroy()`/`unmount()` da b
 ### 13. React useEffect da memory leak qanday oldini olish mumkin? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 React `useEffect` da **cleanup function** qaytarish — component unmount bo'lganda yoki dependency o'zgarganda chaqiriladi:
 
@@ -487,7 +487,7 @@ Cleanup kerak bo'lgan holatlar: `addEventListener`, `setInterval`/`setTimeout`, 
 ### 14. V8 da xotirani monitoring qilish va profiling qanday qilinadi? (Node.js) [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Node.js da V8 xotira holati `process.memoryUsage()` orqali ko'riladi:
 
@@ -558,7 +558,7 @@ console.log(myNum);   // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 10
@@ -587,7 +587,7 @@ console.log(a.value);  // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 true
@@ -625,7 +625,7 @@ setInterval(() => counter.increment(), 100);
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **2 ta muammo:**
 1. **`history` array cheksiz o'sadi** — har 100ms da yangi object qo'shiladi, hech qachon tozalanmaydi
@@ -678,7 +678,7 @@ console.log(fn()); // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 1000000
@@ -721,7 +721,7 @@ console.log(weakMap.has(obj1)); // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 true
@@ -740,7 +740,7 @@ Muhim nuance: `obj1 = null` qilganda WeakMap dan entry **ham** yo'qoladi (GC toz
 **Savol:** `structuredClone` ishlatmasdan, circular reference'larni ham qo'llab-quvvatlaydigan `deepClone` yozing.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function deepClone(obj, seen = new WeakMap()) {
@@ -788,5 +788,262 @@ console.log(clone === obj);           // false — turli object
 ```
 
 **Deep Dive:** `WeakMap` circular reference'larni saqlash uchun ideal — allaqachon clone qilingan object'ni qayta uchratsak, WeakMap'dan olamiz. `Reflect.ownKeys` — Symbol property'larni ham o'z ichiga oladi (`Object.keys` faqat string key).
+
+</details>
+
+### 7. Quyidagi kodning output'ini ayting [Senior]
+
+**Savol:**
+
+```javascript
+const buffer = new ArrayBuffer(8);
+const view = new Uint8Array(buffer);
+view[0] = 42;
+
+const worker = new Worker("worker.js");
+worker.postMessage(buffer, [buffer]);
+
+console.log(view.length);
+console.log(buffer.byteLength);
+try {
+  view[0] = 99;
+} catch (err) {
+  console.log(err.constructor.name);
+}
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+```
+0
+0
+TypeError
+```
+
+`postMessage(data, transferList)` ikkinchi argumenti — **transfer list**. Buffer ownership Worker thread'ga o'tkaziladi (zero-copy). Original buffer **detached** holatga o'tadi — `byteLength = 0`, har qanday read/write `TypeError` beradi.
+
+**Detached holat:** Memory aslida allocated bo'ladi (Worker'da), lekin original realm'da undan foydalanib bo'lmaydi. Bu **race condition** oldini olish uchun — ikki thread bitta buffer'ga egalik qila olmaydi.
+
+```javascript
+// Tekshirish:
+buffer.byteLength === 0; // detached belgisi
+// Yoki:
+try { new Uint8Array(buffer, 0, 1); }
+catch (e) { /* TypeError: ArrayBuffer is detached */ }
+```
+
+**Yechim:** Agar buffer ikkala tomonda kerak bo'lsa — transfer qilmang (structured clone copy bo'ladi), yoki `SharedArrayBuffer` ishlating (atomic operations bilan).
+
+**Deep Dive:** Spec'da `ArrayBuffer`'ning `[[ArrayBufferData]]` slot'i `null` ga o'rnatiladi transfer'dan keyin. Har bir `TypedArray` view shu slot'ni tekshiradi — `null` bo'lsa `TypeError`. `SharedArrayBuffer` esa `postMessage` orqali kopiya emas, ikkala realm'da bir xil memory'ga reference saqlaydi — lekin `COOP/COEP` header'lari talab qilinadi (Spectre security mitigation).
+
+</details>
+
+### 8. `WeakMap` value'sida key'ga reference saqlash xavfli? [Senior]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+**Qisqa javob:** WeakMap value bevosita key'ga ishora qilishi o'zi memory leak bermaydi — spec'dagi **ephemeron** semantikasi himoyalaydi. **LEKIN** value'ga **tashqi strong reference** bo'lsa, leak yuzaga keladi.
+
+```javascript
+const cache = new WeakMap();
+
+// ✅ Xavfsiz — value key'ga ishora qiladi, lekin tashqi ref yo'q
+function safe(element) {
+  cache.set(element, {
+    element,        // self-ref — ephemeron tomonidan himoyalanadi
+    timestamp: Date.now()
+  });
+}
+
+// ❌ Leak — value'ga tashqi reference bor:
+const observers = [];
+function unsafe(element) {
+  const meta = { element, count: 0 };
+  cache.set(element, meta);
+  observers.push(meta); // tashqi strong ref!
+}
+let btn = document.querySelector('#btn');
+unsafe(btn);
+btn.remove();
+btn = null;
+// meta hali observers'da → meta.element ham hali tirik
+// element hech qachon GC bo'lmaydi → leak!
+```
+
+**Ephemeron semantikasi (spec):** WeakMap entry faqat **kalit reachable bo'lsa** saqlanadi. Value transitive reachability orqali kalitni tirik tutmaydi — bu non-ephemeral WeakMap (eski tushuncha) muammosini hal qilish uchun spec'da aniq belgilangan. V8, SpiderMonkey, JSC — barchasi shu qoidaga rioya qiladi.
+
+**Self-reference (`value.element === key`) xavfsiz** chunki:
+1. Key'ga tashqi reference bo'lmasa — entry GC bo'ladi (value ham yo'qoladi)
+2. Value'ning key'ga ishorasi — entry ichida, root path emas
+
+**Leak faqat tashqi strong ref bo'lganda yuzaga keladi:**
+- `observers.push(meta)` — `meta.element` orqali key tirik qoladi
+- `closure capture` — closure meta'ni eslatib qolsa
+- `setTimeout(() => meta.element)` — timer pending'da
+
+**Yechim:**
+- Value'da minimal data saqlash (key'ga ishora kerak bo'lsa — WeakRef ishlatish)
+- Tashqi observer/queue'larda WeakRef ishlatish
+- Periodik cleanup — eski reference'larni o'chirish
+
+**Deep Dive:** ECMAScript spec'da WeakMap garbage collection algoritmi quyidagicha: mark phase'da har WeakMap entry uchun "agar kalit qora (reachable) bo'lsa, value'ni ham mark qil" qoidasi qo'llaniladi. Lekin "value qora bo'lsa, kalitni mark qil" qoidasi YO'Q — bu ephemeron'ning farqlovchi xususiyati. Eski non-ephemeral hashtable'larda value tirik bo'lsa kalit ham tirik qolardi — bu memory leak'ning klassik manbai edi.
+
+</details>
+
+### 9. Closure katta data ushlab turish leak'ini qanday topish va tuzatish? [Middle+]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+**Belgilari:** Heap snapshot'da `(closure)` entry'lari katta retained size bilan, retainer chain'da yopilgan funksiya scope'i.
+
+```javascript
+// ❌ Leak — closure butun dataset ushlab turadi:
+function createFilter() {
+  const allUsers = fetchAllUsers(); // 50MB
+  const allProducts = fetchAllProducts(); // 30MB
+  const config = loadConfig();        // 1KB — faqat shu kerak
+
+  return function(userId) {
+    return config.filter(userId); // 80MB butunlay closure'da!
+  };
+}
+
+const filter = createFilter();
+// allUsers va allProducts hech qachon ishlatilmaydi, lekin GC tozalay olmaydi
+```
+
+**Yechim 1: Faqat kerakli ma'lumotni capture qilish**
+
+```javascript
+function createFilterFixed() {
+  const allUsers = fetchAllUsers();
+  const allProducts = fetchAllProducts();
+  const config = loadConfig(); // faqat shu kerak
+
+  // allUsers va allProducts shu scope'da qoladi, returned function reference qilmaydi
+  // V8 scope analysis bu o'zgaruvchilar inner function'da ishlatilmaganini aniqlaydi
+  return function(userId) {
+    return config.filter(userId);
+  };
+}
+```
+
+**Yechim 2: Block scope bilan ajratish**
+
+```javascript
+function createFilterScoped() {
+  let config;
+  {
+    const allUsers = fetchAllUsers();   // bu block'da
+    const allProducts = fetchAllProducts();
+    config = computeConfig(allUsers, allProducts);
+  } // allUsers, allProducts scope tugaydi — GC tozalashi mumkin
+
+  return function(userId) {
+    return config.filter(userId);
+  };
+}
+```
+
+**Yechim 3: Explicit null**
+
+```javascript
+function createFilterNullify() {
+  let allUsers = fetchAllUsers();
+  let allProducts = fetchAllProducts();
+  const config = computeConfig(allUsers, allProducts);
+  allUsers = null;     // hint to GC
+  allProducts = null;
+
+  return function(userId) {
+    return config.filter(userId);
+  };
+}
+```
+
+**DevTools workflow leak topish:**
+1. Heap Snapshot olish
+2. Constructor filter'ida `(closure)` qidirish
+3. Retained Size bo'yicha sort
+4. Yuqoridagi closure'larni bosib → Retainers panelda parent scope'ni ko'rish
+
+**Deep Dive:** V8 **scope analysis** (context allocation optimization) bilan qaysi o'zgaruvchilar haqiqatan ham captured ekanligini aniqlaydi va faqat shularni `Context` object slot'iga joylashtiradi. Lekin bu optimization har doim ham ishlamaydi: `eval`, `with`, `arguments`, yoki murakkab control flow uni bekor qilishi mumkin. Production'da `eval` ishlatmaslik — closure memory'ni optimal qilish uchun ham muhim.
+
+</details>
+
+### 10. `using` declaration va `Symbol.dispose` bilan memory management qanday yaxshilanadi? [Senior]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+ES2023+ `using` declaration va `Symbol.dispose` — **deterministic resource cleanup** uchun. `FinalizationRegistry`'dan farqli — cleanup **aniq paytda** bajariladi (scope tugaganda), GC ga bog'liq emas.
+
+```javascript
+// Resource class — Symbol.dispose implement qiladi
+class FileHandle {
+  constructor(path) {
+    this.fd = openFile(path);
+    this.path = path;
+  }
+
+  [Symbol.dispose]() {
+    closeFile(this.fd);
+    console.log(`Closed: ${this.path}`);
+  }
+
+  read() { return readFile(this.fd); }
+}
+
+// using declaration — scope tugaganda Symbol.dispose chaqiriladi
+{
+  using handle = new FileHandle('/data.txt');
+  const content = handle.read();
+  // ... ishlatish ...
+} // ← handle[Symbol.dispose]() AVTOMATIK chaqiriladi
+// Console: "Closed: /data.txt"
+
+// try/catch ham ishlaydi — finally semantikasi:
+function process() {
+  using handle = new FileHandle('/data.txt');
+  if (someError) throw new Error('oops');
+  // throw bo'lsa ham handle.dispose() chaqiriladi
+}
+```
+
+**Async resource'lar uchun — `await using`:**
+
+```javascript
+class DbConnection {
+  async [Symbol.asyncDispose]() {
+    await this.close();
+  }
+}
+
+async function processData() {
+  await using db = new DbConnection();
+  const result = await db.query('SELECT * FROM users');
+  return result;
+} // db[Symbol.asyncDispose]() awaited
+```
+
+**`FinalizationRegistry` bilan farqlar:**
+
+| Xususiyat | `FinalizationRegistry` | `using` + `Symbol.dispose` |
+|-----------|------------------------|-----------------------------|
+| Cleanup vaqti | Noaniq (GC qachon) | **Aniq** (scope tugaganda) |
+| Kafolat | Yo'q (callback chaqirilmasligi mumkin) | **Bor** (try/finally semantics) |
+| Async support | Yo'q | `Symbol.asyncDispose` |
+| Use case | Best-effort optimization | Resource lifecycle |
+
+**Use case'lar:**
+- File handles, network connections, database cursors
+- Transaction'lar (commit yoki rollback)
+- Lock'lar (mutex acquire/release)
+- WebGL/WebGPU context (GPU resource cleanup)
+
+**Deep Dive:** `using` spec'da `DisposableStack` va `AsyncDisposableStack` ham qo'shilgan — bir nechta resource'ni guruh bilan boshqarish uchun. Engine implementation: scope exit'da reverse order'da `[Symbol.dispose]()` chaqiriladi (eng oxirgi yaratilgan birinchi yopiladi — stack semantics). Bu RAII (Resource Acquisition Is Initialization) pattern'ning JavaScript versiyasi — C++/Rust'dagi destructor mexanizmiga semantik teng.
 
 </details>

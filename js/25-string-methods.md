@@ -588,18 +588,21 @@ encodeURIComponent(safe); // ✅ xatosiz
 ### String Concatenation
 
 ```javascript
-// ❌ Loop'da + bilan concatenation — har safar yangi string yaratiladi
+// ❌ Loop'da + bilan concatenation — katta cheklovlar uchun qochish tavsiya
 let result = "";
 for (let i = 0; i < 10000; i++) {
-  result += `element-${i},`; // har safar yangi string = O(n²)
+  result += `element-${i},`;
+  // Modern V8 ConsString bilan har `+=` O(1) allocation, amortized
+  // O(n + total-length) — lekin ko'p oraliq ConsString node'lar GC pressure
+  // va flatten ehtimoli ko'payadi (masalan, substring, regex match chaqirilsa)
 }
 
-// ✅ Array.join — bir marta string yaratiladi
+// ✅ Array.join — bitta yakuniy allocation, predictable memory
 const parts = [];
 for (let i = 0; i < 10000; i++) {
   parts.push(`element-${i}`);
 }
-const result2 = parts.join(","); // ✅ O(n)
+const result2 = parts.join(","); // ✅ bitta string allocation, kam GC overhead
 
 // ✅ Template literal — kichik holatlarda + dan yaxshi
 const name = "Ali";
@@ -727,9 +730,9 @@ const upperLabel = label.toUpperCase();        // "STRASSE" (7 char!)
 
 // ─── Turkish locale — "İ" muammosi ───
 const turkish = "İstanbul";
-console.log(turkish.length); // 9 (İ = 2 code units in UTF-16)
-console.log(turkish.toLowerCase());           // "i̇stanbul" (with combining dot above)
-console.log(turkish.toLowerCase().length);    // 9 — mismatch with simple "istanbul" length 8
+console.log(turkish.length); // 8 (İ = U+0130, BMP ichida — bitta code unit)
+console.log(turkish.toLowerCase());           // "i̇stanbul" — i + U+0307 (combining dot)
+console.log(turkish.toLowerCase().length);    // 9 ❌ — 8 → 9 expansion, "istanbul" (8) bilan mos emas
 
 // Locale-aware — correct Turkish behavior
 console.log("İ".toLocaleLowerCase("tr"));     // "i" (1 code point)
@@ -814,7 +817,7 @@ parseTokens("2+3*(4-1)");
 
 ### Gotcha 4: `trim()` zero-width belgilarni olib tashlamaydi
 
-`trim()` ECMAScript spec'da "WhiteSpace + LineTerminator" belgilarni oladi — bular Unicode kategoriya Zs (Space Separator) va maxsus whitespace'lar. Lekin **zero-width belgilar** (U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ, U+FEFF BOM ba'zi pozitsiyalarda) bular "space" emas deb hisoblanadi va trim qilinmaydi. Ular copy-paste orqali kelgan invisible data uchun common bug manbai.
+`trim()` ECMAScript spec'da "WhiteSpace + LineTerminator" belgilarni oladi — Unicode kategoriya Zs (Space Separator), maxsus whitespace (TAB, VT, FF) va U+FEFF (ZWNBSP/BOM, ES2018+ spec'da WhiteSpace). Lekin **zero-width category Cf (Format) belgilari** — U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ — "space" emas, trim qilinmaydi. Ular copy-paste orqali kelgan invisible data uchun common bug manbai.
 
 ```javascript
 // Oddiy whitespace — trim olib tashlaydi
@@ -828,9 +831,13 @@ const zwsp = "\u200Bhello\u200B";         // zero-width space
 console.log(zwsp.trim() === "hello");     // false ❌
 console.log(zwsp.trim().length);          // 7 (still has ZWSP)
 
-const bom = "\uFEFFhello";                // BOM (byte order mark)
-console.log(bom.trim() === "hello");      // false ❌ (ba'zi holatlarda)
-console.log(bom.trim().length);           // 6
+const bom = "\uFEFFhello";                // BOM (U+FEFF = ZWNBSP)
+console.log(bom.trim() === "hello");      // true ✅ (ES2018+ spec'da WhiteSpace)
+console.log(bom.trim().length);           // 5
+
+const zwj = "‍hello‍";          // zero-width joiner (U+200D)
+console.log(zwj.trim() === "hello");      // false ❌ (category Cf — WhiteSpace emas)
+console.log(zwj.trim().length);           // 7
 
 // ─── Real bug: copy-paste dan invisible data ───
 // User copy-paste'da o'zi bilmay ZWSP qo'shganda:
@@ -847,8 +854,9 @@ function deepTrim(str) {
 
 deepTrim("\u200Bhello\u200B"); // "hello" ✅
 
-// ✅ Yechim 2: Unicode category bilan (\p{C} — Control, format, private use)
+// ✅ Yechim 2: Unicode category `\p{Cf}` bilan (Format — ZWSP, ZWJ, BOM va boshqalar)
 function cleanTrim(str) {
+  // \p{Cf} — faqat Format belgilar (ZWSP, ZWJ, BOM va h.k.)
   return str.replace(/^[\s\p{Cf}]+|[\s\p{Cf}]+$/gu, "");
 }
 

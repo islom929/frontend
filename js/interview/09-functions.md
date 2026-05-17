@@ -1,8 +1,8 @@
 # Functions — First-Class Citizens — Interview Savollari
 
 > Function Declaration vs Expression vs Arrow, First-class functions, IIFE, HOF, Callbacks, Pure Functions, Currying, Partial Application, Composition, Memoization, Debounce, Throttle, arguments vs rest, default params, function name/length properties haqida interview savollari.
-> **Savollar soni:** 25
-> **Taqsimot:** Nazariy ~40% | Output ~30% | Coding ~20% | Tuzatish ~10%
+> **Savollar soni:** 29
+> **Taqsimot:** Nazariy ~45% | Output ~28% | Coding ~21% | Tuzatish ~7%
 
 ---
 
@@ -11,7 +11,7 @@
 ### 1. Function Declaration, Function Expression va Arrow Function — farqlari nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 JavaScript da funksiya yaratishning **3 ta asosiy usuli** bor. Ularning farqi hoisting, `this` binding, `arguments`, va `new` bilan chaqirish imkoniyatlarida namoyon bo'ladi.
 
@@ -38,13 +38,13 @@ const greet3 = (name) => `Salom, ${name}`;
 | `new` bilan | ✅ Constructor bo'la oladi | ✅ Constructor bo'la oladi | ❌ TypeError |
 | `prototype` | ✅ Bor | ✅ Bor | ❌ Yo'q |
 
-**Deep Dive:**
+**Qo'shimcha — arrow function va `this`:**
 
 Arrow function ichki `[[ThisMode]]: "lexical"` slotiga ega. Bu degani engine `this` ni resolve qilganda, arrow function ning o'zida `this` qidirmaydi — **tashqi scope** ga chiqadi. Shuning uchun `call`, `apply`, `bind` arrow function ning `this` ini o'zgartira olmaydi:
 
 ```javascript
 const arrow = () => console.log(this);
-arrow.call({ name: "Ali" }); // window/global — call e'tiborga olinmadi!
+arrow.call({ name: "Ali" }); // module top-level: undefined; script: globalThis — call e'tiborga olinmadi!
 ```
 
 </details>
@@ -52,7 +52,7 @@ arrow.call({ name: "Ali" }); // window/global — call e'tiborga olinmadi!
 ### 2. First-class function nima degani? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 JavaScript da funksiyalar — **birinchi darajali fuqaro (first-class citizen)**. Bu degani funksiyalar boshqa qiymatlar (`number`, `string`, `object`) kabi muomala qilinadi:
 
@@ -77,7 +77,7 @@ const obj = { run: () => console.log("running") };
 const pipeline = [Math.abs, Math.sqrt, Math.round];
 ```
 
-**Deep Dive:**
+**Spec — callable object:**
 
 ECMAScript spec bo'yicha funksiya — **callable object**. `[[Call]]` internal method mavjudligi uni chaqiriladigan qiladi. Funksiya object bo'lganligi uchun unga property ham qo'shish mumkin:
 
@@ -93,7 +93,7 @@ console.log(validate.length); // 1 (parametr soni)
 ### 3. IIFE nima? Nima uchun ishlatiladi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **IIFE** (Immediately Invoked Function Expression) — funksiya yaratilishi bilan darhol chaqiriladi. Scope izolyatsiyasi uchun ishlatiladi.
 
@@ -136,7 +136,7 @@ console.log(validate.length); // 1 (parametr soni)
 ### 4. Higher-Order Function (HOF) nima? Misol bering. [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 HOF — boshqa funksiyani **argument sifatida qabul qiladigan** yoki **funksiyani qaytaradigan** funksiya.
 
@@ -180,7 +180,7 @@ Built-in HOF lar: `map`, `filter`, `reduce`, `forEach`, `sort`, `setTimeout`, `a
 ### 5. Callback nima? Callback hell nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Callback — boshqa funksiyaga **argument sifatida beriladigan** funksiya. U HOF tomonidan kerak bo'lganda chaqiriladi.
 
@@ -224,7 +224,7 @@ async function getData(id) {
 ### 6. Pure Function nima? Side Effect nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Pure function **ikki shartni** bajaradi:
 1. **Deterministic** — bir xil input doim bir xil output beradi
@@ -274,7 +274,7 @@ function logResult(x) {
 ### 7. `arguments` vs Rest Parameters — farqi nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 // arguments — array-LIKE object (eski usul)
@@ -319,7 +319,7 @@ logMessage("error", "Server down", "DB timeout");
 ### 8. Default Parameters qanday ishlaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ES6 dan beri parametrlarga default qiymat berish mumkin. Default qiymat faqat argument `undefined` bo'lganda ishlatiladi (`null` emas!).
 
@@ -360,7 +360,7 @@ greet("Ali"); // "Salom, Ali!"
 ### 9. Currying nima? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Currying — ko'p argumentli funksiyani **birma-bir argument qabul qiluvchi** funksiyalar zanjiriga aylantirish: `f(a, b, c)` → `f(a)(b)(c)`.
 
@@ -392,7 +392,7 @@ curriedAdd(1)(2)(3); // 6
 ### 10. Partial Application nima? Currying dan farqi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Partial Application** — funksiyaning **ba'zi argumentlarini oldindan berish** va qolganlarini keyinroq kutuvchi yangi funksiya olish.
 
@@ -438,7 +438,7 @@ const c = () => "C";
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 - `a()` → `"A"` ✅ — Function Declaration to'liq hoist bo'ladi
 - `b()` → ❌ `TypeError: b is not a function` — `var b` hoist bo'ladi lekin `undefined` qiymati bilan, funksiya tayinlanmagan
 - `c()` ga yetib bormaydi — `b()` da xato bo'lganligi uchun dastur to'xtaydi. Agar alohida tekshirsak: ❌ `ReferenceError: Cannot access 'c' before initialization` — `const` TDZ da
@@ -462,7 +462,7 @@ showArgs(1, 2, 3);
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 - `arguments.length` → `3` — 3 ta argument berilgan
 - `arguments[2]` → `3` — uchinchi argument
 - `a` → `100` ✅ — **non-strict mode** va **simple parameter list** (default/rest/destructuring yo'q) bilan `arguments` va named parameter lar **bog'langan** (ParameterMap orqali). `arguments[0]` o'zgarganda `a` ham o'zgaradi.
@@ -515,7 +515,7 @@ console.log(funcs[2]()); // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Hammasi `3` qaytaradi.
 
@@ -544,7 +544,7 @@ for (var i = 0; i < 3; i++) {
 ### 4. Universal `curry` funksiyasini implement qiling. [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Universal `curry` implementation:**
 
@@ -577,7 +577,7 @@ double(5); // 10
 triple(5); // 15
 ```
 
-**Deep Dive:**
+**Tushuntirish:**
 
 `fn.length` — funksiya kutayotgan parametrlar soni (rest va default parametrlar hisobga olinmaydi). Curry har safar argumentlar yetarli ekanini tekshiradi. Yetmasa — closure orqali avvalgi argumentlarni saqlab yangi funksiya qaytaradi. Bu **lazy evaluation** printsipi.
 
@@ -586,7 +586,7 @@ triple(5); // 15
 ### 5. Function Composition nima? `pipe` va `compose` ni implement qiling. [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Function Composition — bir necha kichik funksiyalarni **birlashtirish** orqali yangi funksiya hosil qilish. `compose(f, g)(x)` = `f(g(x))`.
 
@@ -623,7 +623,10 @@ processText2("  SALOM DUNYO  "); // ["salom", "dunyo"]
 // Bajarilish: trim → toLower → split (chapdan o'ngga, tabiiy tartib)
 ```
 
-**Deep Dive — amaliy misol:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+**Amaliy misol — API response pipeline:**
 
 ```javascript
 // API dan kelgan data ni qayta ishlash pipeline
@@ -644,12 +647,20 @@ const processResponse = pipe(
 // processResponse('{"users": [...]}') → ["Ali (admin)", "Vali (user)"]
 ```
 
+**Spec va internal:**
+
+`pipe` va `compose` pattern ECMAScript spec'da maxsus qo'llab-quvvatlanmaydi — bu `Array.prototype.reduce`/`reduceRight` ustiga qurilgan userland abstraktsiya. Reduce har step natijasini accumulator'ga o'tkazadi, callback `(acc, fn) => fn(acc)` zanjirni quradi.
+
+**TC39 Pipeline operator (`|>`)** — Hack-style proposal Stage 2 da (faol harakat sust, lekin spec ochiq). Sintaksis: `value |> fn1(%) |> fn2(%)` — bu expression-based, `%` placeholder joriy value'ni bildiradi. Unary function emas, istalgan expression ishlaydi: `5 |> double(%) |> Math.sqrt(%)`.
+
+</details>
+
 </details>
 
 ### 6. `debounce` funksiyasini implement qiling. [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Debounce — funksiyani **oxirgi chaqiruvdan N ms o'tgandan keyin** bajaradi. Agar vaqt tugashidan oldin yana chaqirilsa — taymer qaytadan boshlanadi.
 
@@ -723,7 +734,7 @@ function debounce(fn, delay, { leading = false } = {}) {
 ### 7. `throttle` funksiyasini implement qiling. [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Throttle — funksiyani **har N ms da bir marta** bajaradi. Oraliqda qancha chaqirilishidan qat'i nazar, faqat bitta bajariladi.
 
@@ -797,7 +808,7 @@ function throttle(fn, limit) {
 ### 8. `memoize` funksiyasini implement qiling. [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Memoization — funksiya natijalarini **cache lash** orqali takroriy hisoblashlarni oldini olish. Pure function lar uchun ideal.
 
@@ -837,18 +848,19 @@ factorial(99);  // Cache da EMAS! Qayta hisoblaydi
 // → Recursive call'lar memoize wrapper'ni chetlab o'tadi
 // → Faqat top-level chaqiruvlar (factorial(100), factorial(99)) cache'ga tushadi
 
-// ✅ Barcha intermediate natijalarni cache'lash uchun:
-function factorial2(n) {
+// ✅ Barcha intermediate natijalarni cache'lash uchun — let-binding trick:
+let memoFactorial;
+memoFactorial = memoize(function (n) {
   if (n <= 1) return 1;
-  return n * factorial2(n - 1); // recursive call top-level nom orqali
-}
-const memoFactorial = memoize(factorial2);
-// Endi memoFactorial(100) → factorial2(100) → factorial2(99) → ...
-// Lekin bu ham cache intermediate'larni saqlamaydi — chunki factorial2 original
-// (memoized emas). To'g'ri yechim: factorial2 ichida memoFactorial(n-1) chaqirish.
+  return n * memoFactorial(n - 1); // ← memoized wrapper'ga murojaat
+});
+
+memoFactorial(100); // 100, 99, 98, ..., 1 hammasi cache'ga tushadi
+memoFactorial(99);  // Cache hit — darhol qaytaradi
+memoFactorial(50);  // Cache hit — chunki 100 hisoblanganda 50 ham saqlangan
 ```
 
-**Deep Dive — maxSize bilan memoize:**
+**Kengaytirilgan versiya — maxSize (LRU eviction):**
 
 ```javascript
 function memoize(fn, { maxSize = 100 } = {}) {
@@ -898,7 +910,7 @@ test(5, 0);          // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 - `test()` → `1 2 3` — hammasi default
 - `test(5)` → `5 10 11` — `a=5`, `b=5*2=10`, `c=10+1=11`
@@ -938,7 +950,7 @@ console.log(addToList2("b")); // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Javob 1 — `addToList`:** `["a"]` va `["b"]` — **bug yo'q, JS da to'g'ri ishlaydi**.
 
@@ -999,7 +1011,7 @@ console.log(x);        // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 - Birinchi `console.log(x)` → `undefined` — `var x` hoist bo'ldi, lekin qiymati hali tayinlanmagan
 - Ikkinchi `console.log(x)` → `20` — endi `x = 20` tayinlangan
@@ -1031,7 +1043,7 @@ new greet();              // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 - `obj.greet()` → `obj` ({greet: f, announce: f}) — implicit binding
 - `obj.announce()` → `window`/`global` (yoki `{}` module da) — arrow function `this` ni **tashqi scope dan oladi**, implicit binding ishlamaydi
@@ -1042,16 +1054,33 @@ new greet();              // ?
 
 Arrow function uchun **hech qanday** binding rule ishlamaydi — u doim tashqi lexical scope ning `this` ini ishlatadi.
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-Spec'da arrow function `[[ThisMode]]: "lexical"` ichki slotiga ega. `[[Construct]]` internal method'i yo'q — shuning uchun `new` bilan chaqirilsa `TypeError` tashlaydi. `[[Call]]` chaqirilganda `OrdinaryCallBindThis` qadami skip qilinadi — `this` resolve qilish uchun `GetThisEnvironment()` tashqi Environment Record'gacha yuradi. Shuningdek arrow function'da `arguments` object ham yaratilmaydi — `FunctionDeclarationInstantiation` da `[[ThisMode]]` tekshiriladi.
+**Spec'dagi internal slot'lar:**
+
+Arrow function `[[ThisMode]]: "lexical"` ichki slotiga ega. `[[Construct]]` internal method'i yo'q — shuning uchun `new` bilan chaqirilsa `TypeError: <name> is not a constructor` tashlaydi (`Construct` abstract operation `[[Construct]]` mavjudligini tekshiradi).
+
+**`this` resolution:**
+
+`[[Call]]` chaqirilganda `OrdinaryCallBindThis` qadami `[[ThisMode]] === "lexical"` bo'lsa skip qilinadi — funksiya scope'da yangi `this` binding yaratilmaydi. `this` ga murojaat `ResolveThisBinding` orqali `GetThisEnvironment()` tashqi Environment Record'gacha yuradi — birinchi `HasThisBinding()` `true` qaytarsa o'sha Environment'dan `[[ThisValue]]` olinadi.
+
+**`arguments` object:**
+
+Arrow function'da `arguments` object ham yaratilmaydi — `FunctionDeclarationInstantiation` da `[[ThisMode]] === "lexical"` bo'lsa `arguments` binding skip qilinadi. Shuning uchun arrow ichida `arguments` tashqi function'ning `arguments`'iga (yoki global scope'da `ReferenceError`'ga) ishora qiladi.
+
+**`call`/`apply`/`bind` arrow'da:**
+
+Method'lar arrow function'da chaqirilsa, birinchi argument (thisArg) ignore qilinadi — chunki `OrdinaryCallBindThis` skip qilinadi. Lekin `bind` partial application uchun ishlatilsa bo'ladi (qo'shimcha argumentlarni qotirish).
+
+</details>
 
 </details>
 
 ### 13. `pipe` funksiyasini yozing — har bir bosqichda log chiqarsin. [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function pipeWithLog(...fns) {
@@ -1098,9 +1127,42 @@ const getUserName = asyncPipe(fetchUser, extractName, toUpperCase);
 await getUserName(1); // "ALI"
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-`pipe` va `compose` pattern spec'da maxsus qo'llab-quvvatlanmaydi — bu `Array.prototype.reduce`/`reduceRight` ustiga qurilgan userland abstraktsiya. TC39'da Pipeline operator (`|>`) proposal Stage 2 da — bu `value |> fn1 |> fn2` sintaksisini til darajasida qo'shadi. Hack-style pipeline tanlandi: `value |> fn1(%) |> fn2(%)` — bu expression-based, faqat unary function emas, istalgan expression ishlaydi.
+**Sync vs async pipe internal:**
+
+Sync `pipe` `Array.prototype.reduce` ustiga qurilgan — har step natijasi accumulator'ga o'tkaziladi. Async variant `Promise.resolve(initial)` bilan boshlanadi va har step `.then(fn)` orqali qo'shiladi — har fn promise yoki value qaytarishi mumkin (`.then` ikkalasini ham handle qiladi).
+
+**Error handling async pipe'da:**
+
+```javascript
+function asyncPipe(...fns) {
+  return (value) => fns.reduce(
+    (promise, fn) => promise.then(fn).catch(err => {
+      console.error(`Pipeline failed at ${fn.name}:`, err);
+      throw err;
+    }),
+    Promise.resolve(value)
+  );
+}
+```
+
+**TC39 Pipeline operator (`|>`):**
+
+Hack-style proposal Stage 2 da. Sintaksis: `value |> fn1(%) |> fn2(%)` — `%` placeholder joriy value'ni bildiradi. Faqat unary function emas, istalgan expression ishlaydi:
+
+```javascript
+// Hozir (userland)
+const result = pipe(double, addTen, square)(3); // 256
+
+// Pipeline operator bilan
+const result = 3 |> double(%) |> addTen(%) |> square(%); // 256
+```
+
+Expression-based bo'lgani uchun `await`, ternary, method call ham ishlaydi: `data |> await fetch(%) |> (%).json()`.
+
+</details>
 
 </details>
 
@@ -1129,7 +1191,7 @@ pay(100000);         // chaqirilmadi ✅ — bu to'g'ri
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 // ✅ Tuzatilgan — return qo'shish kerak!
@@ -1182,11 +1244,11 @@ console.log(new B().x);  // ?
 console.log(new C().x);  // ?
 
 const D = () => { this.x = 1; };
-// console.log(new D().x);  // ?
+console.log(new D().x);  // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 - `new A().x` → `2` — constructor **object** qaytardi → shu object ishlatiladi, `this` tashlanadi
 - `new B().x` → `1` — constructor **primitive** (`42`) qaytardi → ignore, `this` qaytariladi
@@ -1195,9 +1257,42 @@ const D = () => { this.x = 1; };
 
 **Qoida:** `new` bilan chaqirilganda, agar constructor **non-null object** qaytarsa — o'sha object ishlatiladi. Aks holda `this` (yangi yaratilgan object) qaytariladi.
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-Spec'dagi `[[Construct]]` algoritmi (OrdinaryCreateFromConstructor qadam): birinchi `OrdinaryCreateFromConstructor` yangi object yaratadi, keyin constructor body `[[Call]]` orqali `this = newObject` bilan bajariladi. Return qiymati tekshiriladi — `Type(result) === Object` bo'lsa (ECMAScript spec'da `null` Type `Null`, `Object` emas) — `result` qaytariladi. Aks holda `newObject` qaytariladi. Shuning uchun `return null` `this` ni saqlab qoladi — `null` spec'da object emas.
+**`[[Construct]]` algoritmi spec'da:**
+
+`OrdinaryCreateFromConstructor` birinchi yangi object yaratadi (`thisArgument`), prototype'ni constructor'ning `prototype` property'sidan oladi. Keyin constructor body `[[Call]]` orqali `this = thisArgument` bilan bajariladi (`OrdinaryCallBindThis` `this` ni yangi object'ga binding qiladi).
+
+**Return qiymat tekshiruvi:**
+
+Spec'da aniq qadam — `Construct` operation'i:
+```
+If result.[[Type]] is normal and Type(result.[[Value]]) is Object:
+  Return result.[[Value]]
+If result.[[Type]] is normal:
+  Return thisArgument
+```
+
+`Type(null)` — spec'da `Null`, `Object` emas. Shuning uchun `return null` `this` ni saqlab qoladi. `Type(42)` — `Number`. `Type({})` — `Object`. `Type(function(){})` — `Object` (function spec'da object).
+
+**Edge case — return function:**
+
+```javascript
+function F() {
+  this.x = 1;
+  return function() { return "from return"; };
+}
+const f = new F();
+typeof f;  // "function"
+f();       // "from return" — function ham Object hisoblanadi
+```
+
+**Arrow function va `[[Construct]]`:**
+
+Arrow function spec'da `[[ConstructorKind]]` slot yo'q va `[[Construct]]` internal method o'rnatilmaydi. `Construct(F)` chaqirilganda spec birinchi `IsConstructor(F)` tekshiradi — `false` qaytsa `TypeError`. Class constructor'lari `[[ConstructorKind]] = "derived"` yoki `"base"` bo'ladi.
+
+</details>
 
 </details>
 
@@ -1229,7 +1324,7 @@ console.log(dec());  // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 - `inc()` → `1` ✅ — `increment` regular method (`this = obj`), ichidagi arrow function **lexical this** = `obj`. `obj.count` 0 dan 1 ga.
 - `inc()` → `2` ✅ — yana `obj.count++`, 1 dan 2 ga.
@@ -1237,12 +1332,170 @@ console.log(dec());  // ?
 
 **Tushuntirish:** `increment` da regular function + ichidagi arrow = **to'g'ri this zanjiri**. `decrement` da arrow function + ichidagi regular function = **ikkalasi ham this ni yo'qotadi**.
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-Bu xatti-harakat `[[ThisMode]]` internal slot bilan tushuntiriladi. `increment` regular function — `[[ThisMode]]: "global"` — shuning uchun `obj.increment()` da `OrdinaryCallBindThis` `this = obj` qiladi. Ichidagi arrow function esa `[[ThisMode]]: "lexical"` — `GetThisEnvironment()` orqali `increment` ning `this` ini (ya'ni `obj`) oladi. `decrement` arrow function bo'lgani uchun uning `this` i object literal scope'da — global. Ichidagi regular function `default binding` ishlatadi — yana global.
+**`[[ThisMode]]` internal slot:**
+
+Spec'da har function'ning `[[ThisMode]]` slot'i 3 qiymatdan birini oladi:
+- `"global"` — non-strict regular function (default — `this = undefined` bo'lsa global object'ga coerce qilinadi)
+- `"strict"` — strict mode regular function (`this = undefined` saqlanadi, coerce qilinmaydi)
+- `"lexical"` — arrow function (`this` resolve qilinmaydi, lexical scope'dan olinadi)
+
+**`increment` ish zanjiri:**
+
+1. `obj.increment()` — `obj` PropertyReference bo'lib `Call`'ga uzatiladi
+2. `OrdinaryCallBindThis` `[[ThisMode]] !== "lexical"` — `this = obj` binding qiladi function Environment Record'da
+3. Ichidagi arrow function chaqirilganda `[[ThisMode]] === "lexical"` — `OrdinaryCallBindThis` skip
+4. Arrow ichida `this` — `ResolveThisBinding()` orqali tashqi (`increment`) Environment'dan `obj` olinadi
+
+**`decrement` ish zanjiri:**
+
+1. `decrement` arrow function — definition vaqtida lexical scope (module/global) `this` ni ushlaydi
+2. Object literal'ning o'z `this` binding'i YO'Q — arrow tashqi scope'ga chiqadi
+3. Module'da `this = undefined`, script'da `this = globalThis`
+4. Ichidagi regular function `obj.decrement()()` — `()` chaqiruvi PropertyReference'siz, `this = undefined` (strict) yoki `globalThis` (non-strict)
+5. `globalThis.count` — `undefined` → `undefined - 1 = NaN`
+
+**Module vs script muhim:**
+
+ES modules avtomatik strict — top-level `this = undefined`. `<script>` tag'da yoki Node.js CommonJS'da `this = globalThis`. Shuning uchun bir xil kod muhitga qarab `NaN` yoki `TypeError: Cannot read property 'count' of undefined` berishi mumkin.
+
+</details>
+
+</details>
+
+### 17. Named Function Expression — ichki ism qayerda visible? [Middle+]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+Named function expression (`const f = function innerName() {...}`)'da `innerName` **faqat function body ichida** mavjud — recursive self-reference uchun safe pattern.
+
+```javascript
+const factorial = function fact(n) {
+  if (n <= 1) return 1;
+  return n * fact(n - 1); // ✅ ichki "fact" — recursive call
+};
+
+console.log(factorial(5));   // 120
+console.log(factorial.name); // "fact"
+
+// Tashqi scope'da "fact" YO'Q:
+// console.log(fact(5)); // ❌ ReferenceError
+
+// Pattern afzalligi — tashqi reference o'zgarsa ham ishlaydi:
+const fn = factorial;
+// factorial = null; // bekor qilsak ham
+// fn(5) → 120 ishlaydi, chunki ichki "fact" tashqi o'zgarmaydi
+
+// Anonymous expression — tashqi reference ga bog'liq:
+const broken = function(n) {
+  if (n <= 1) return 1;
+  return n * broken(n - 1); // ❌ tashqi "broken" ga bog'liq
+};
+```
+
+**Spec — function expression scope:**
+
+Spec'da Named Function Expression ichki nomni alohida **function expression scope** Environment Record'da bind qiladi — read-only binding, faqat function body ichida visible. Bu `FunctionExpression` runtime semantics'ida belgilangan. Use case'lar: recursive function expression, debugging-friendly stack trace (DevTools'da nom ko'rinadi), library'larda named pattern.
+
+</details>
+
+### 18. Default parameter scope — TDZ va parametr orasidagi murojaat [Middle+]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+Default parameter'lar o'z scope'iga ega — har parameter o'zidan **oldingi** parametrlarga murojaat qilishi mumkin, lekin **keyingi**larga TDZ tufayli kira olmaydi.
+
+```javascript
+// ✅ Oldingi parametrga murojaat — ishlaydi
+function createElement(tag, className = tag + "-element") {
+  return { tag, className };
+}
+createElement("div"); // { tag: "div", className: "div-element" }
+
+// ❌ Keyingi parametrga murojaat — TDZ
+function test(a = b, b = 1) {
+  return [a, b];
+}
+test();  // ❌ ReferenceError: Cannot access 'b' before initialization
+test(5); // [5, 1] ✅ — a berildi, b'ga murojaat yo'q
+
+// Murakkab zanjir
+function chain(a = 1, b = a * 2, c = a + b) {
+  return [a, b, c];
+}
+chain();    // [1, 2, 3]
+chain(5);   // [5, 10, 15]
+chain(5,3); // [5, 3, 8]
+
+// Required parameter trick
+function required(name) {
+  throw new Error(`"${name}" majburiy`);
+}
+function transfer(from = required("from"), amount = required("amount")) {
+  return { from, amount };
+}
+transfer("Ali", 100); // ✅
+// transfer("Ali"); // ❌ throw Error
+```
+
+**Spec — parameter scope va TDZ:**
+
+Spec'da har parameter alohida **declarative Environment Record** binding bo'ladi — TDZ qoidalari amal qiladi. Default expression `IteratorBindingInitialization` algorithm'ida lazy evaluate qilinadi (faqat argument `undefined` bo'lsa). Bu Python'dan farqli — Python default function definition vaqtida bir marta evaluate bo'ladi (mutable default tuzog'i), JavaScript har chaqiruvda qayta evaluate qiladi.
+
+</details>
+
+### 19. Function `length` vs `arguments.length` — farqi nima? [Middle]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+`function.length` — **e'lon qilingan** majburiy parametrlar soni (definition-time, default/rest dan oldingi). `arguments.length` — **chaqiruvda** berilgan argumentlar soni (call-time).
+
+```javascript
+function test(a, b, c) {
+  return { declared: test.length, passed: arguments.length };
+}
+test(1, 2);       // { declared: 3, passed: 2 }
+test(1, 2, 3, 4); // { declared: 3, passed: 4 }
+
+// length default/rest dan oldingi parametrlarni hisoblaydi
+function fn1(a, b, c) {}              // length: 3
+function fn2(a, b, ...rest) {}        // length: 2 — rest hisoblanmaydi
+function fn3(a, b = 1, c) {}          // length: 1 — b default, undan keyingi c ham hisoblanmaydi
+function fn4(a = 1, b, c) {}          // length: 0 — birinchi default, keyingilar ham
+function fn5(...args) {}              // length: 0
+
+// bind length'ga ta'sir qiladi:
+function add(a, b, c) { return a + b + c; }
+console.log(add.length);              // 3
+console.log(add.bind(null).length);   // 3
+console.log(add.bind(null, 1).length); // 2 — bir partial arg berildi
+console.log(add.bind(null, 1, 2).length); // 1
+```
+
+**Use case — curry'da:**
+
+```javascript
+function curry(fn) {
+  return function curried(...args) {
+    if (args.length >= fn.length) { // ← fn.length kerakli son
+      return fn.apply(this, args);
+    }
+    return (...more) => curried(...args, ...more);
+  };
+}
+```
+
+**Spec — `length` property:**
+
+Spec'da `length` property — `FunctionDeclarationInstantiation` vaqtida o'rnatiladi: `ExpectedArgumentCount` — non-rest, non-default parameter'lar soni. Birinchi default/rest position'dan keyin barchasi exclude. `arguments.length` esa `OrdinaryCallEvaluateBody` vaqtida actual passed argument count. `length` `writable: false, configurable: true` — `Object.defineProperty` orqali o'zgartirilishi mumkin (testing/mocking uchun).
 
 </details>
 
 ---
 
-*Savollar soni: 25 | Nazariy: 10 (~40%) | Output: 8 (~32%) | Coding: 5 (~20%) | Tuzatish: 2 (~8%)*
+*Savollar soni: 29 | Nazariy: 13 (~45%) | Output: 8 (~28%) | Coding: 6 (~21%) | Tuzatish: 2 (~7%)*

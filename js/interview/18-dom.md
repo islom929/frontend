@@ -9,7 +9,7 @@
 ### 1. DOM nima? HTML bilan farqi nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 DOM (Document Object Model) — brauzer HTML hujjatni parse qilib xotirada yaratadigan **daraxt strukturasi**. HTML — matn fayl (source code), DOM — tirik JavaScript object tree.
 
@@ -37,7 +37,7 @@ Rendering pipeline: `HTML → Parser → DOM Tree → CSSOM → Render Tree → 
 ### 2. `querySelector` va `getElementById` farqi nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Usul | Qaytaradi | Live? | Tezlik |
 |------|-----------|-------|--------|
@@ -67,7 +67,7 @@ console.log(static_.length); // 3 — o'zgarmadi (snapshot)
 ### 3. `textContent`, `innerHTML`, `innerText` farqi nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```html
 <div id="demo">
@@ -106,7 +106,7 @@ element.textContent = userInput;  // Xavfsiz — oddiy matn ✅
 ### 4. `closest()` va `matches()` nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 - `closest(selector)` — elementdan **yuqoriga** qarab eng yaqin mos ota elementni topadi (o'zini ham tekshiradi)
 - `matches(selector)` — element CSS selector'ga mos keladimi (boolean)
@@ -142,7 +142,7 @@ list.addEventListener("click", (e) => {
 ### 5. `data-*` attributes va `dataset` qanday ishlaydi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```html
 <div id="card" data-user-id="42" data-user-name="Ali" data-is-active="true">
@@ -185,7 +185,7 @@ Attribute — HTML dagi boshlang'ich qiymat. Property — DOM object dagi hozirg
 ### 6. `classList` API ni tushuntiring [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 const btn = document.querySelector("button");
@@ -208,7 +208,7 @@ btn.classList.replace("btn-primary", "btn-secondary");
 ### 7. Reflow va Repaint nima? Layout Thrashing qanday bo'ladi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 - **Reflow (Layout)** — element o'lchami/pozitsiyasi qayta hisoblanadi. Qimmat operatsiya.
 - **Repaint** — faqat ko'rinish (rang, shadow) qayta chiziladi. Arzonroq.
@@ -252,7 +252,7 @@ Brauzer style yozishlarni batch qiladi, lekin `offsetWidth`, `clientHeight`, `ge
 ### 8. DocumentFragment nima? Nima uchun kerak? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 DocumentFragment — DOM ning yengil virtual container'i. Unga element qo'shish reflow trigger qilmaydi.
 
@@ -291,7 +291,7 @@ Fragment DOM ga qo'shilganda "eritiladi" — faqat bolalari qo'shiladi, fragment
 ### 9. `requestAnimationFrame` nima? `setInterval` dan farqi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `requestAnimationFrame(callback)` — brauzerga keyingi repaint oldidan callback bajarishni aytadi. Animatsiyalar uchun optimal.
 
@@ -331,7 +331,7 @@ requestAnimationFrame(() => {
 ### 10. `cloneNode` qanday ishlaydi? Event listener'lar nusxalanadimi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 const original = document.querySelector(".template");
@@ -363,7 +363,7 @@ el.outerHTML = "<section>Yangi</section>";
 ### 11. Virtual DOM nima? DocumentFragment dan farqi? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Virtual DOM — haqiqiy DOM ning JavaScript object sifatidagi engil nusxasi. React, Vue kabi framework'lar ishlatadi.
 
@@ -398,16 +398,34 @@ O'zgarish 2 → Reflow      O'zgarish 2 ├→ Diff → 1 DOM update → 1 Reflo
 O'zgarish 3 → Reflow      O'zgarish 3 ┘
 ```
 
-**Deep Dive:**
+**Edge Cases:**
+- **Keyed list diffing**: React/Vue da `key` prop majburiy — diffing algoritmi key bo'yicha element'ni qayta ishlatadi (move qiladi, qayta create qilmaydi). Key'lar noto'g'ri ishlatilsa — performance keskin tushadi
+- **Fragment'lar (React/Vue)**: Multiple root element'lar — VDOM'da node sifatida saqlanadi, lekin DOM'da wrapper element yaratmaydi
+- **Compile-time vs runtime VDOM**: Svelte, Solid.js compile-time'da reactive update'larni generate qiladi — runtime VDOM diff yo'q, faqat targeted DOM updates
 
-Virtual DOM doim ham tezroq emas. Kichik o'zgarishlar uchun to'g'ridan-to'g'ri manipulation tezroq (VDOM diff/patch overhead). VDOM ning kuchi — developer experience (declarative UI) va katta UI'lar uchun optimizatsiya. Svelte compile-time da hal qiladi — runtime VDOM ishlatmaydi.
+**Follow-up savollar:**
+1. **Virtual DOM doim ham tezroq emas — nima uchun?** — Kichik o'zgarishlar uchun to'g'ridan-to'g'ri manipulation tezroq (VDOM diff/patch overhead bor). VDOM'ning afzalligi — declarative API va batch update'lar.
+2. **React Fiber Virtual DOM'dan farqi nima?** — Fiber — VDOM'ning kengaytirilgan implementation'i. Har VDOM node uchun Fiber node bor (parent/child/sibling pointer'lar bilan). Bu reconciliation jarayonini interruptible qiladi (priority-based scheduling).
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Virtual DOM doim ham tezroq emas: kichik o'zgarishlar uchun to'g'ridan-to'g'ri manipulation tezroq, chunki VDOM diff/patch overhead bor. VDOM'ning kuchi — developer experience (declarative UI) va katta UI tree'larda predictable performance.
+
+Diffing algoritmi (React reconciliation): O(n) heuristic algorithm (klassik tree diff O(n³) bo'lardi). Asosiy qoidalar — turli element type'lar butun subtree'ni qayta yaratish, bir xil type'da prop'larni yangilash, list'lar uchun key prop ishlatish.
+
+Svelte yondashuvi: compile-time'da reactive primitive'larni generate qiladi — `<div>{count}</div>` source code'i compile bosqichida `text_1.data = count` kabi targeted DOM update kodiga aylanadi. Runtime VDOM yo'q — bundle size kichik va initial render tez.
+
+Solid.js: Fine-grained reactivity (signals) — har reactive primitive o'zining update subscription'iga ega. VDOM tree'siz — proxy-based reactive system.
+
+</details>
 
 </details>
 
 ### 12. `insertAdjacentHTML` qanday ishlaydi? 4 ta pozitsiyani ayting [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 /*
@@ -445,7 +463,7 @@ el.insertAdjacentText("beforeend", "Xavfsiz matn");
 ### 13. `getComputedStyle` va `style` farqi nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 const box = document.querySelector(".box");
@@ -477,7 +495,7 @@ console.log(before.content);
 ### 14. Element yaratish va qo'shish usullarini solishtiring [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 const container = document.getElementById("container");
@@ -543,7 +561,7 @@ console.log(list.children.length);            // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Javoblar:**
 
@@ -573,7 +591,7 @@ for (let i = 0; i < items.length; i++) {
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Xato:** `getElementsByClassName` live HTMLCollection qaytaradi. `items[0]` o'chirilganda `items[1]` endi `items[0]` bo'ladi — index siljiydi. Faqat **yarmi** o'chiriladi.
 
@@ -612,7 +630,7 @@ list.innerHTML += '<li>Ikkinchi</li>';
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Javob:** Click handler **ISHLAMAYDI**.
 
@@ -652,7 +670,7 @@ showProfile({
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **3 ta XSS xavfi:**
 1. innerHTML bilan user input — script/img injection
@@ -686,7 +704,7 @@ function showProfileSafe(user) {
 ### 5. Coding: 10,000 elementni performance-optimal qo'shing [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 // === Usul 1: To'g'ridan-to'g'ri appendChild ===
@@ -732,16 +750,34 @@ list4.parentNode.replaceChild(clone, list4); // bitta reflow
 console.timeEnd("offscreen"); // tez (off-screen reflow yo'q, bitta replaceChild)
 ```
 
-**Deep Dive:**
+**Edge Cases:**
+- **`innerHTML` va event listener'lar**: `innerHTML` mavjud DOM tree'ni butunlay almashtiradi — eski element'larga qo'yilgan `addEventListener` listener'lar yo'qoladi (detached element'lar GC bo'ladi)
+- **Detached subtree'da reflow**: Element parent'i `document.body`'da bo'lmasa — reflow trigger qilinmaydi, hatto `offsetWidth` chaqirilsa ham (`null` qaytadi)
+- **Browser batching**: Zamonaviy browser'lar bir tick'da bir nechta DOM mutation'larni batch qiladi (style recalc va layout deferred bo'ladi) — lekin layout-reading property'lar (`offsetWidth`) forced reflow qiladi
 
-Usul 4 eng samarali: `cloneNode(false)` DOM'dan uzilgan element yaratadi — reflow/repaint trigger qilmaydi. `replaceChild` bitta atomic operatsiya. Virtual scrolling (faqat ko'rinadigan elementlarni render qilish) — 10,000+ element uchun eng to'g'ri yechim.
+**Follow-up savollar:**
+1. **Virtual scrolling qachon kerak?** — 1000+ visible element bo'lganda. Faqat ko'rinadigan element'larni render qilib, scroll bo'yicha pool'dan qayta ishlatadi (`react-window`, `vue-virtual-scroller`).
+2. **`requestIdleCallback` bilan chunk'lab render qilish mumkinmi?** — Ha, 10,000 element'ni 100 ta'dan chunk'lab `requestIdleCallback` callback'larda render qilish UI'ni bloklamaydi (lekin total vaqt uzunroq).
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+Usul 4 (off-screen element bilan cloneNode) eng samarali: `cloneNode(false)` document'dan ajralgan element yaratadi — shu element ichidagi mutation'lar reflow/repaint trigger qilmaydi (chunki rendering tree'da yo'q). `replaceChild` esa bitta atomic operatsiya: faqat bitta reflow trigger qiladi.
+
+Browser rendering pipeline'da kritik bosqichlar: `Style Recalculation` → `Layout` → `Paint` → `Composite`. Detached element'lar `Style Recalculation` ham trigger qilmaydi.
+
+Virtual scrolling (windowing) — 10,000+ element uchun production solution: faqat ko'rinadigan element'lar (viewport + buffer) render qilinadi. Scroll event'da pool'dan element'lar qayta ishlatiladi (recycling). Bu CPU va memory'ni ham tejaydi.
+
+`requestIdleCallback` bilan time-slicing: 10,000 element'ni 50ms vaqt budget bilan chunk'lab render qilish mumkin — UI thread bloklanmaydi (60fps saqlanadi). Bu pattern React Concurrent Mode'da ham ishlatiladi.
+
+</details>
 
 </details>
 
 ### 6. Coding: Todo list — DOM manipulation bilan [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function createTodoApp(containerId) {

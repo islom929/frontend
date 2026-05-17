@@ -2069,7 +2069,7 @@ function parseDataset(element) {
 
 ### Gotcha 4: `getBoundingClientRect()` read-only emas — u forced synchronous layout trigger qiladi
 
-Method nomi "get" deb boshlangani va Promise qaytarmagani uchun ko'pchilik uni arzon sinxron "getter" deb tasavvur qiladi. Aslida **har chaqiriq brauzerga pending DOM mutations'ni flush qilishga majbur qiladi** — chunki aniq pozitsiya/hajm olish uchun to'liq layout hisobi kerak.
+Method nomi "get" deb boshlangani va Promise qaytarmagani uchun ko'pchilik uni arzon sinxron "getter" deb hisoblaydi. Aslida **har chaqiriq brauzerga pending DOM mutations'ni flush qilishga majbur qiladi** — chunki aniq pozitsiya/hajm olish uchun to'liq layout hisobi kerak.
 
 ```javascript
 const items = document.querySelectorAll(".item");
@@ -2118,7 +2118,7 @@ items.forEach(item => {
 const el = document.querySelector(".item");
 el.classList.add("active");
 
-// ❌ "Agar true bo'lsa toggle qil" deb tasavvur qilish:
+// ❌ "Agar true bo'lsa toggle qil" deb noto'g'ri tushunish:
 const someCondition = true;
 el.classList.toggle("active", someCondition);
 // Kutilgan: toggle (active → inactive)

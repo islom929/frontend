@@ -9,11 +9,11 @@
 ### 1. JavaScript nima uchun single-threaded? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 JavaScript single-threaded dizaynining **ikki tarixiy sababi** bor:
 
-1. **Implementation simplicity (asosiy)** — Netscape 1995-da Brendan Eich'ga JavaScript'ni 10 kun ichida yozishni buyurgan. Multi-threaded runtime yaratish murakkab va ko'p vaqt talab qilardi — single-threaded eng oddiy va tezkor yechim edi.
+1. **Implementation simplicity (asosiy)** — Netscape 1995-da Brendan Eich JavaScript prototipini juda qisqa muddat ichida yaratishi kerak edi. Multi-threaded runtime yaratish ancha murakkab va ko'p vaqt talab qilardi — single-threaded eng oddiy va tezkor yechim edi.
 
 2. **DOM concurrency safety (post-hoc justification)** — keyinchalik muhim: agar ikkita thread bir vaqtda bitta DOM elementni o'zgartirmoqchi bo'lsa, **race condition** yuzaga keladi. Single-threaded model DOM API dizaynini ham ancha soddalashtirdi.
 
@@ -37,7 +37,7 @@ Lekin JavaScript o'zi single-threaded bo'lsa-da, runtime (browser/Node.js) **mul
 ### 2. Event Loop nima va qanday ishlaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Event Loop — Call Stack va Queue'lar o'rtasidagi aloqani boshqaradigan cheksiz loop. U quyidagi algoritmni takrorlaydi:
 
@@ -58,16 +58,14 @@ Promise.resolve().then(() => console.log("micro")); // → Microtask Queue
 
 Eng muhim nuqta — **asimmetriya**: microtask'lar **barchasi** bajariladi, macrotask'dan esa **bittasi** olinadi.
 
-**Deep Dive:**
-
-V8 engine Event Loop ni implement qilmaydi — u faqat JavaScript kodni compile va execute qiladi. Event Loop browser uchun HTML spec da, Node.js uchun libuv kutubxonasida implement qilingan.
+V8 engine Event Loop'ni implement qilmaydi — u faqat JavaScript kodni compile va execute qiladi. Event Loop browser uchun HTML Standard (WHATWG) "Event loops" bo'limida, Node.js uchun esa libuv kutubxonasida implement qilingan.
 
 </details>
 
 ### 3. Microtask va Macrotask farqi nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Xususiyat | Microtask | Macrotask |
 |-----------|-----------|-----------|
@@ -100,7 +98,7 @@ setTimeout(() => {
 ### 4. setTimeout(fn, 0) nima uchun darhol bajarmaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `setTimeout(fn, 0)` callback'ni **Macrotask Queue** ga qo'yadi. U faqat:
 1. Sync kod tugagandan keyin
@@ -117,16 +115,16 @@ console.log("Sync");
 ```
 
 Qo'shimcha nuqtalar:
-- HTML spec bo'yicha nested setTimeout 5+ marta chaqirilganda minimum delay **4ms** (clamping)
-- Background tab'larda minimum **1000ms** gacha throttle qilinishi mumkin
-- Amalda OS scheduler tufayli ~1-4ms delay bo'ladi
+- HTML Standard "Timers" bo'limi: nesting level 5+ bo'lganda minimum delay **4ms** (clamping)
+- Background tab'larda browser'lar `setTimeout` ni throttle qiladi (Chrome — taxminan 1 soniya, Firefox — implementation-defined)
+- Amalda OS scheduler resolution tufayli timer trigger 1-4ms kechikishi mumkin
 
 </details>
 
 ### 5. Promise constructor sync ishlashini tushuntiring [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `new Promise(executor)` dagi `executor` funksiya **synchronous** tarzda darhol chaqiriladi. Faqat `.then()`, `.catch()`, `.finally()` callback'lari async (microtask sifatida) ishlaydi.
 
@@ -151,7 +149,7 @@ console.log("4 — sync");
 ### 6. requestAnimationFrame Event Loop'da qayerda turadi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `requestAnimationFrame` (rAF) na microtask, na macrotask — u Event Loop'ning **rendering bosqichida** ishlaydi.
 
@@ -188,7 +186,7 @@ rAF animatsiya uchun ideal:
 ### 7. Starvation nima va qanday oldini olish mumkin? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Starvation** — microtask queue hech qachon bo'sh bo'lmaydigan holat. Har bir microtask yangi microtask qo'shsa, Event Loop macrotask'larga va rendering'ga **hech qachon** o'tmaydi — UI muzlab qoladi.
 
@@ -220,7 +218,7 @@ Oldini olish qoidalari:
 ### 8. Node.js Event Loop browser'nikidan qanday farq qiladi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Node.js Event Loop **6 ta faza (phase)** dan iborat (browser'da faqat macrotask → microtask → render):
 
@@ -235,7 +233,7 @@ Node.js Event Loop **6 ta faza (phase)** dan iborat (browser'da faqat macrotask 
 
 | Xususiyat | Browser | Node.js |
 |-----------|---------|---------|
-| Spec | HTML Spec | libuv (C) |
+| Spec | HTML Standard (WHATWG) | libuv (C library) |
 | Fazalar | 1 (macrotask→micro→render) | 6 ta faza |
 | rAF | ✅ | ❌ (DOM yo'q) |
 | setImmediate | ❌ | ✅ |
@@ -253,16 +251,14 @@ fs.readFile(__filename, () => {
 // Poll faza → Check faza (setImmediate) → Timers faza (setTimeout)
 ```
 
-**Deep Dive:**
-
-`process.nextTick` va `setImmediate` nomlari teskari qo'yilgan — tarixiy xato. `nextTick` darhol (har faza orasida) ishlaydi, `setImmediate` esa check fazada (keyinroq) ishlaydi. Top-level da `setTimeout(fn,0)` vs `setImmediate` tartibi **garanti emas** (OS timer resolution ga bog'liq).
+`process.nextTick` va `setImmediate` nomlari teskari qo'yilgan — bu tarixiy noqulaylik. `nextTick` darhol (har faza orasida) ishlaydi, `setImmediate` esa check fazada (keyinroq) ishlaydi. Top-level'da `setTimeout(fn,0)` vs `setImmediate` tartibi **garanti emas** — OS timer resolution'ga bog'liq.
 
 </details>
 
 ### 9. UI blocking muammosini qanday hal qilasiz? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 UI blocking — og'ir hisoblash main thread'ni to'xtatganda yuzaga keladi. Yechimlar:
 
@@ -310,14 +306,22 @@ function debounce(fn, delay) {
 input.addEventListener("input", debounce(filterList, 300));
 ```
 
-Real production'da ko'pincha uchala usul birgalikda ishlatiladi: debounce + Web Worker + batch rendering.
+**4. `scheduler.postTask` — yangi browser API (Chromium 94+):**
+
+```javascript
+// Yangi standart: task'larga priority berish
+scheduler.postTask(processItems, { priority: "user-blocking" }); // tezda
+scheduler.postTask(prefetch, { priority: "background" });          // bo'sh vaqtda
+```
+
+Real production'da ko'pincha bir nechta usul birgalikda ishlatiladi: debounce + Web Worker + batch rendering + (kelajakda) `scheduler.postTask` priority hint'lari.
 
 </details>
 
 ### 10. queueMicrotask() nima va qachon ishlatiladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `queueMicrotask(callback)` — microtask queue'ga to'g'ridan-to'g'ri callback qo'shish uchun API. `Promise.resolve().then(callback)` bilan deyarli bir xil, lekin Promise object yaratmaydi.
 
@@ -340,7 +344,7 @@ Qachon ishlatiladi:
 ### 11. process.nextTick() va queueMicrotask() farqi nima? (Node.js) [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Xususiyat | `process.nextTick()` | `queueMicrotask()` |
 |-----------|---------------------|---------------------|
@@ -362,16 +366,23 @@ Promise.resolve().then(() => console.log("Promise"));
 // Promise           ← microtask queue (FIFO)
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-Node.js hujjatlari o'zi `queueMicrotask` ni tavsiya qiladi — chunki u cross-platform (browser + Node.js) va `process.nextTick` ning starvation xavfi yuqoriroq. `process.nextTick` har bir Event Loop faza **orasida** ishlagani uchun, recursive chaqirilganda I/O callback'lar umuman bajarilmasligi mumkin.
+Node.js rasmiy hujjatlari `queueMicrotask`'ni tavsiya qiladi — sabablari ikkita: u cross-platform (browser + Node.js), va `process.nextTick`'ning starvation xavfi yuqoriroq.
+
+`process.nextTick` har bir Event Loop faza **orasida** ishlaydi. Recursive chaqirilganda — nextTick queue hech qachon bo'shamasa — `libuv` keyingi fazaga (timers, poll, check) **umuman o'tmaydi**. I/O callback'lar, timer callback'lari bloklanadi.
+
+`queueMicrotask` esa V8'ning standart MicrotaskQueue'siga callback qo'shadi. Bu queue ham starvation berishi mumkin (Node 11+ har JS callback'dan keyin drain qilinadi), lekin `nextTick`'dan kamroq xavfli, chunki Node.js'da `nextTick` queue alohida (eng yuqori) priority'ga ega.
+
+</details>
 
 </details>
 
 ### 12. requestIdleCallback nima va requestAnimationFrame dan farqi? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `requestIdleCallback` — browser **bo'sh vaqtida** (idle) callback bajaradigan API. `requestAnimationFrame` dan farqli o'laroq, u **past priority'li** ishlar uchun — analytics, prefetching, lazy initialization.
 
@@ -397,9 +408,16 @@ requestIdleCallback((deadline) => {
 }, { timeout: 3000 }); // 3 soniya ichida garanti
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-`requestIdleCallback` ga berilgan callback `IdleDeadline` object oladi. `deadline.timeRemaining()` frame tugashigacha qolgan vaqtni (ms) qaytaradi. Odatda bu 0-50ms oraliqda. Agar browser band bo'lsa va `timeout` berilgan bo'lsa — timeout o'tgandan keyin `timeRemaining()` 0 qaytaradi, lekin callback baribir chaqiriladi.
+`requestIdleCallback`'ga berilgan callback `IdleDeadline` object'ini argument sifatida oladi. `deadline.timeRemaining()` frame tugashigacha qolgan vaqtni millisekundlarda qaytaradi — spec bo'yicha maksimal 50ms. Browser bu deadline'ni harakatdagi frame budjeti asosida hisoblaydi.
+
+Agar browser band bo'lsa va `timeout` parametri berilgan bo'lsa — timeout o'tgandan keyin `timeRemaining()` 0 qaytaradi, lekin callback baribir chaqiriladi. `deadline.didTimeout` flag esa `true` bo'ladi — kod shu holatni tekshirib, ish miqdorini moslab olish mumkin.
+
+**Browser support:** Chrome 47+, Firefox 55+. Safari (WebKit) hozirgi vaqtda implement qilmagan — fallback sifatida `setTimeout(fn, 1)` yoki `MessageChannel` ishlatish kerak.
+
+</details>
 
 </details>
 
@@ -422,7 +440,7 @@ console.log("F");
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Output: **A, F, C, E, D, B**
 
@@ -460,7 +478,7 @@ Promise.resolve().then(() => console.log("6"));
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Output: **3, 1, 4, 2, 6, 5**
 
@@ -516,7 +534,7 @@ console.log("10");
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Output: **1, 6, 10, 7, 9, 2, 3, 4, 8, 5**
 
@@ -538,19 +556,104 @@ Macrotask: setTimeout_8 → "8"
 Macrotask: setTimeout_5 → "5"
 ```
 
-**Deep Dive:**
+<details>
+<summary><strong>Deep Dive</strong></summary>
 
-`return Promise.resolve()` bilan return qilish muhim — bu `.then(9)` ni faqat shu Promise resolve bo'lgandagina queue ga qo'shadi. Oddiy `return undefined` bo'lganida `.then(9)` darhol queue ga tushardi.
+`return Promise.resolve()` bilan return qilish muhim — bu `.then(9)`'ni faqat shu Promise resolve bo'lgandagina queue'ga qo'shadi. Oddiy `return undefined` bo'lganida `.then(9)` darhol microtask queue'ga tushardi.
 
-`return Promise.resolve()` esa qo'shimcha microtask tick kutadi — spec bo'yicha `PromiseResolveThenableJob` yaratiladi (thenable resolve qilish uchun). Bu **spec evolution** bor:
-- **Eski spec (ES2018 gacha):** 2 extra microtask tick (NewPromiseResolveThenableJob + PromiseReactionJob)
-- **ES2019+ (V8 7.2+):** 1 extra microtask tick — optimization: native `Promise` resolve qilinayotganda `PromiseResolve` shortcut qo'llaniladi
+`return Promise.resolve()` qo'shimcha microtask tick kutadi — spec bo'yicha `PromiseResolveThenableJob` yaratiladi (thenable resolve qilish uchun). Bu spec evolution:
 
-Bu farq **shu savol natijasiga ta'sir qilmaydi** (tartib bir xil), lekin boshqa murakkab interleaving'larda muhim bo'lishi mumkin — shuning uchun interview'da "spec version'ga qarab tick soni farq qilishi mumkin" deb eslatish yaxshi.
+- **Eski spec (ES2018 gacha):** 2 ta qo'shimcha microtask tick (`NewPromiseResolveThenableJob` + `PromiseReactionJob`)
+- **ES2019+ (V8 7.2+):** 1 ta qo'shimcha microtask tick — optimization: native `Promise` resolve qilinayotganda `PromiseResolve` shortcut qo'llaniladi
+
+Bu farq **shu savol natijasiga ta'sir qilmaydi** (tartib bir xil), lekin boshqa murakkab interleaving'larda muhim bo'lishi mumkin. Interview'da "spec version'ga qarab tick soni farq qilishi mumkin" deb eslatish bilim chuqurligini ko'rsatadi.
 
 </details>
 
-### 4. Quyidagi kodda nima xato va qanday tuzatasiz? [Middle+]
+</details>
+
+### 4. `MessageChannel` qanday ishlaydi va qachon ishlatiladi? [Senior]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+`MessageChannel` — ikkita port (`port1`, `port2`) yaratadigan Web API. Bir port'ga `postMessage` chaqirilsa, ikkinchi port'ning `onmessage` handler'i **macrotask** sifatida ishga tushadi. `setTimeout(fn, 0)`'ga muqobil — lekin **4ms nested clamping**'siz, true zero-delay scheduling beradi.
+
+### To'liq tushuntirish
+
+HTML spec'ning "minimum timer interval" qoidasi faqat `setTimeout`/`setInterval` task source'iga tegishli. `MessageChannel.postMessage` boshqa task source'da bo'lgani uchun clamping qo'llanilmaydi. Bu fact high-performance scheduling library'lar (masalan React Scheduler) tomonidan ishlatiladi.
+
+Muhim: `MessageChannel` callback'i ham **macrotask** — microtask'lar va rendering undan oldin ishlaydi. Microtask tezligida kerak bo'lsa `queueMicrotask` ishlatish kerak.
+
+### Kod misol
+
+```javascript
+function scheduleWithMessageChannel(fn) {
+  const channel = new MessageChannel();
+  channel.port1.onmessage = fn;
+  channel.port2.postMessage(null);
+}
+
+// setTimeout(0) — nested chain'da 4ms clamping
+function scheduleWithTimeout(fn) {
+  setTimeout(fn, 0);
+}
+
+console.time("setTimeout(0)");
+scheduleWithTimeout(() => console.timeEnd("setTimeout(0)"));
+// Nested 6+ darajada chaqirilganda: ~4ms
+
+console.time("MessageChannel");
+scheduleWithMessageChannel(() => console.timeEnd("MessageChannel"));
+// Clamping yo'q — minimum delay sezilarli darajada past
+
+// Real use case: batched DOM updates
+const channel = new MessageChannel();
+let pendingUpdates = [];
+
+channel.port1.onmessage = () => {
+  const updates = pendingUpdates;
+  pendingUpdates = [];
+  updates.forEach(applyUpdate);
+};
+
+function scheduleUpdate(update) {
+  if (pendingUpdates.length === 0) {
+    channel.port2.postMessage(null); // zero-delay schedule
+  }
+  pendingUpdates.push(update);
+}
+```
+
+### Edge Cases
+
+- **Cross-origin iframe'larda** — `MessageChannel` postMessage cross-context kommunikatsiya uchun mo'ljallangan, lekin scheduling pattern bitta context'da ham ishlaydi
+- **Port transferring** — port `Transferable` interfeysni implement qiladi, `postMessage`'ning ikkinchi argumenti orqali boshqa context'ga uzatish mumkin
+- **Garbage Collection** — port'larga reference saqlanmasa, channel GC qilinadi va callback'lar ishlamaydi
+
+### Follow-up savollar
+
+1. **MessageChannel macrotask'mi yoki microtask'mi?** — Macrotask. Rendering va microtask'lar undan oldin ishlaydi.
+2. **React Scheduler nima uchun MessageChannel ishlatadi?** — Concurrent mode'da time-slicing uchun; `setTimeout` 4ms clamping va background tab throttle'iga uchraydi.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+`MessageChannel` HTML Standard'da "Message channels" bo'limida belgilangan. Har port `MessagePort` interfeysini implement qiladi va `Transferable` — `postMessage`'ning ikkinchi argumenti orqali boshqa context'ga (Worker, iframe) o'tkazilishi mumkin.
+
+`postMessage(null)` callback `port.onmessage`'ga **"posted message" task source** orqali yetkaziladi. HTML spec timer clamping qoidasini faqat **"timer task source"**'ga (setTimeout/setInterval) qo'llaydi — bu boshqa task source bo'lgani uchun 4ms cheklovi yo'q.
+
+React 18+ `Scheduler` paketi shu mexanizmni ishlatadi: `scheduler/src/forks/SchedulerDOM.js`'da `MessageChannel` orqali yield qilinadi (time-slicing). `MessageChannel` mavjud bo'lmagan environment'larda (eski Node.js, JSDOM ba'zi versiyalari) fallback sifatida `setTimeout(fn, 0)` ishlatiladi.
+
+</details>
+
+</details>
+
+---
+
+### 5. Quyidagi kodda nima xato va qanday tuzatasiz? [Middle+]
 
 **Savol:**
 
@@ -568,7 +671,7 @@ loadBtn.addEventListener("click", () => {
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Muammo:** 50,000 ta DOM element yaratish va qo'shish — hammasi **sync** va **bitta frame** ichida. Bu UI ni bir necha soniya muzlatadi.
 
@@ -611,5 +714,92 @@ loadBtn.addEventListener("click", async () => {
   renderBatch();
 });
 ```
+
+</details>
+
+---
+
+### 6. Node.js da quyidagi kodning output'ini ayting [Senior]
+
+**Savol:**
+
+```javascript
+const fs = require("fs");
+
+console.log("1");
+
+setImmediate(() => console.log("2"));
+process.nextTick(() => console.log("3"));
+Promise.resolve().then(() => console.log("4"));
+
+fs.readFile(__filename, () => {
+  console.log("5");
+  setImmediate(() => console.log("6"));
+  process.nextTick(() => console.log("7"));
+  Promise.resolve().then(() => console.log("8"));
+});
+
+setTimeout(() => console.log("9"), 0);
+
+console.log("10");
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+
+Output: **1, 10, 3, 4, 9, 2, 5, 7, 8, 6**
+
+`process.nextTick` har faza orasida birinchi, microtask ikkinchi. `setImmediate` check fazada, `setTimeout(0)` timers fazada. I/O callback (poll fazada) ichida `setImmediate` doim `setTimeout(0)` dan oldin.
+
+### To'liq tushuntirish
+
+```
+SYNC: "1", "10"
+
+Sync tugagandan keyin event loop boshlanadi.
+Har faza orasida: nextTick queue → microtask queue:
+  "3" — process.nextTick
+  "4" — Promise.then
+
+Timers fazasi:
+  "9" — setTimeout(0)
+  (top-level setImmediate va setTimeout tartibi OS timer resolution'ga bog'liq —
+   bu yerda setTimeout oldin keladi deb hisoblaymiz)
+
+Check fazasi:
+  "2" — top-level setImmediate
+
+Poll fazasi (I/O):
+  "5" — fs.readFile callback
+  Faza ichida sinxron tugagach, nextTick + microtask:
+  "7" — process.nextTick
+  "8" — Promise.then
+
+Check fazasi (poll'dan keyin):
+  "6" — fs.readFile ichida ro'yxatga olingan setImmediate
+```
+
+### Edge Cases
+
+- **Top-level setTimeout(0) vs setImmediate** — tartib **garanti emas**, OS timer resolution'ga bog'liq. Test environment'da har ikki natija ham mumkin
+- **I/O callback ichida** — `setImmediate` **DOIM** `setTimeout(0)` dan oldin (poll → check tartibi)
+- **`process.nextTick` recursion** — I/O callback'larni umuman bloklab qo'yishi mumkin (starvation)
+
+### Follow-up savollar
+
+1. **Nima uchun top-level'da setTimeout vs setImmediate tartibi noaniq?** — `setTimeout(fn, 0)` aslida ~1ms (Node implementation). Agar event loop boshlanganda 1ms o'tgan bo'lsa — timer ready, oldin keladi. O'tmagan bo'lsa — setImmediate avval.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+`libuv` har fazani ketma-ket bajaradi: timers → pending → idle/prepare → poll → check → close. Har faza tugagach, **`uv_run` ichida** `process_nextTick_queue()` va microtask queue chaqiriladi.
+
+`process.nextTick` Node.js'ning `_tickInfo` internal struktura orqali boshqariladi — bu **C++ darajadagi queue**, V8 microtask queue'sidan alohida. `_tickInfo.length > 0` bo'lganda V8 har JS callback'dan keyin nextTick'larni drain qiladi.
+
+Microtask queue esa V8'ning standart `MicrotaskQueue` — Node.js V8 embedder API orqali `EnqueueMicrotask`/`PerformCheckpoint` chaqiradi. Node.js v11+ dan boshlab microtask checkpoint har JS callback'dan keyin amalga oshiriladi (oldin faza oxirida edi — bu xatti-harakat o'zgarishi).
+
+</details>
 
 </details>

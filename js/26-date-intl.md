@@ -1288,7 +1288,7 @@ const end = Temporal.PlainDate.from("2024-03-13");
 // ⚠️ PlainDate.until() default largestUnit = "day"
 // (PlainDate da vaqt komponentlari yo'q → days level'da balance qiladi)
 const duration = start.until(end);
-// P72D — 72 kun (oy/kunga ajratilmaydi!)
+// P72D — 72 kun (default largestUnit = "day", oy va kunga ajratilmaydi)
 
 duration.days;          // 72
 duration.total("day");  // 72 — days-only duration uchun ishlaydi
@@ -1332,7 +1332,7 @@ const zonedDT = instant.toZonedDateTimeISO("Asia/Tashkent");
 
 ### Nazariya
 
-`Intl.DurationFormat` — vaqt oralig'larini (`Temporal.Duration` yoki oddiy object) locale-aware formatda ko'rsatish uchun. ECMA-402 2025 da qabul qilingan yangi API. 2026-yil holatida Chrome 129+, Firefox 134+, Node.js 22+ da mavjud.
+`Intl.DurationFormat` — vaqt oralig'larini (`Temporal.Duration` yoki oddiy object) locale-aware formatda ko'rsatish uchun. TC39'da 2023-yil oxirida Stage 4 ga yetgan, ECMA-402 2024 edition'iga kiritilgan. 2026-yil holatida Chrome 129+, Firefox 134+, Node.js 22+ da mavjud.
 
 Bu API Temporal.Duration bilan juda mos: `start.until(end)` dan olingan duration'ni to'g'ridan-to'g'ri formatlash mumkin.
 
@@ -1563,7 +1563,7 @@ revived.createdAt.getTime(); // 1710345600000 ✅
 
 **Nima uchun:** JSON format'ida "date" tipi yo'q — faqat string, number, boolean, null, array, object. ECMAScript spec `toJSON()` bilan **stringify** ni standardlashtirgan, lekin **parse** da tipni tiklash hech qachon standartlashtirilmagan (qaysi string Date ekanligini aniqlash noaniq muammo).
 
-**Yechim:** Backend'dan kelgan JSON'da Date maydonlari bo'lsa, reviver funksiya ishlating yoki manual ravishda `new Date(obj.field)` chaqiring. Temporal API'da ham xuddi shunday holat.
+**Yechim:** Backend'dan kelgan JSON'da Date maydonlari bo'lsa, reviver funksiya ishlating yoki manual ravishda `new Date(obj.field)` chaqiring. Temporal API'da ham shu holat takrorlanadi.
 
 ---
 
@@ -1582,10 +1582,12 @@ const seg = new Intl.Segmenter("en", { granularity: "grapheme" });
 
 // Character counter ilova misoli
 const text = "Hello 👋🏽 world";
+// "Hello " = 6 CU, "👋" = 2 CU, "🏽" = 2 CU, " world" = 6 CU → jami 16 CU
+// 👋🏽 = 2 code point (base + skin tone modifier), grapheme darajasida 1
 
-text.length;                // 13 (code units)
-[...text].length;           // 12 (code points — 👋🏽 = 2 CP)
-[...seg.segment(text)].length; // 11 ✅ (graphemes — 👋🏽 = 1)
+text.length;                // 16 (UTF-16 code units)
+[...text].length;           // 14 (code points — 👋🏽 = 2 CP: base + modifier)
+[...seg.segment(text)].length; // 13 ✅ (graphemes — 👋🏽 = 1)
 ```
 
 **Nima uchun:** Unicode'da bir "inson belgisi" bir nechta code point'dan iborat bo'lishi mumkin — skin tone modifier (`\u{1F3FD}`), ZWJ sequence, combining accents (`é` = `e` + `\u0301`). Spec operatsiyalar turli abstraksiya darajasida ishlaydi.

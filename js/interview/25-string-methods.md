@@ -193,13 +193,17 @@ Agar normalize qilmasangiz — "caf\u00E9" ni qidirganda bir xil ko'rinishdagi "
 <summary>Javob</summary>
 
 ```javascript
-// ❌ Loop'da + concatenation — har safar yangi string = O(n²)
+// ❌ Loop'da + concatenation — katta cheklovlarda qochish tavsiya
 let result = "";
 for (let i = 0; i < 10000; i++) {
   result += `item-${i},`;
+  // Modern V8 ConsString bilan har `+=` O(1) allocation (amortized O(n+L)),
+  // klassik "O(n²)" reasoning eski allocation model uchun to'g'ri.
+  // Asosiy qochish sababi — ko'p intermediate ConsString node'lar → GC pressure +
+  // flatten ehtimoli (masalan, substring/regex chaqirilsa). N katta bo'lsa seziladi.
 }
 
-// ✅ Array.join — bir marta string yaratiladi = O(n)
+// ✅ Array.join — bitta yakuniy allocation, predictable memory layout
 const parts = [];
 for (let i = 0; i < 10000; i++) {
   parts.push(`item-${i}`);

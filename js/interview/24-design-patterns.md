@@ -583,7 +583,7 @@ const result = await app.execute({});
 - **Onion model** — birinchi middleware oxirida ham kod bajariladi (`await next()` dan keyin)
 - `async/await` — har bir middleware async bo'lishi mumkin
 
-**Deep Dive:** Koa.js bu pattern'ni `koa-compose` moduli bilan implement qiladi — `compose(middlewares)` funksiyasi recursive `dispatch(i)` yaratadi, har bir middleware `next = () => dispatch(i+1)` oladi. Express esa har middleware uchun `Layer` object yaratadi va `handle_request` method'ida error argument'ini tekshirib error middleware'ni ajratadi. Bu pattern'ning asosi GoF "Chain of Responsibility" — lekin `await next()` dan keyin kodning ishlashi (onion model) klassik CoR da yo'q, bu Koa innovatsiyasi.
+**Deep Dive:** Koa.js bu pattern'ni `koa-compose` moduli bilan implement qiladi — `compose(middlewares)` funksiyasi recursive `dispatch(i)` yaratadi, har bir middleware `next = () => dispatch(i+1)` oladi. Express esa har middleware uchun `Layer` object yaratadi va `handle_request` method'ida error argument'ini tekshirib error middleware'ni ajratadi. Memory perspective: har `next()` chaqiruvida yangi `Promise` yaratiladi (async middleware uchun) — N ta middleware = N ta microtask queue entry. Hot path uchun bu sezilarli emas, lekin har request uchun ko'p middleware qo'shganda profile qilish kerak.
 
 </details>
 

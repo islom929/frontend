@@ -2,7 +2,6 @@
 
 ---
 
-
 ### QISM 1: JS ENGINE VA ASOSLAR (Bo'lim 1-3)
 
 ### `01-js-engine.md` — JavaScript Engine Ichidan
@@ -194,7 +193,7 @@
 - Composition vs Inheritance — "has-a" vs "is-a", gorilla-banana muammosi
 - OOP vs Functional Programming — taqqoslash, qachon qaysi biri
 - Proxy bilan OOP — metaprogramming, validation, observable, access control
-- Common Mistakes — deep hierarchy, god object, noto'g'ri inheritance
+- Common Mistakes — deep hierarchy, ulkan object, noto'g'ri inheritance
 
 **Keyingi bo'limga ilova:** → `09-functions.md` — Functions first-class citizens, HOF, currying, memoization.
 
@@ -747,4 +746,3 @@
   - Record and Tuple — `#{ x: 1 }`, `#[1, 2]` — immutable primitives
   - JSON Modules — `import data from './data.json' with { type: 'json' }`
 - Har bir feature uchun: Nima muammoni hal qiladi, Syntax, Real-world misol, Browser/Node.js support holati
-

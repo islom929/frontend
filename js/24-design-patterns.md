@@ -55,7 +55,7 @@ Factory pattern — object yaratish logikasini bitta joyga markazlashtiradi. Cli
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Factory funksiya har safar chaqirilganda yangi object literal yaratadi. V8 bu object'larni **Hidden Class** (V8 source kodida `Map` deb nomlanadi — JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha) orqali optimize qiladi — agar factory doim bir xil property tartibida object qaytarsa, barcha natijalar bir xil hidden class'ga ega bo'ladi va property access monomorphic IC (inline cache) bilan tezlashadi. Lekin `switch` ichida har xil shape'dagi object'lar qaytarilsa (masalan, admin'da `canManageUsers` bor, viewer'da yo'q), har bir tur alohida hidden class oladi — bu megamorphic access'ga olib keladi.
+Factory funksiya har safar chaqirilganda yangi object literal yaratadi. V8 bu object'larni **Hidden Class** (V8 source kodida `Map` deb nomlanadi — JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha) orqali optimize qiladi — agar factory doim bir xil property tartibida object qaytarsa, barcha natijalar bir xil hidden class'ga ega bo'ladi va property access monomorphic IC (inline cache) bilan tezlashadi. Lekin `switch` ichida har xil shape'dagi object'lar qaytarilsa (masalan, bir case'da `canManageUsers` field bor, boshqasida yo'q), har bir tur alohida hidden class oladi — factory'ni chaqiruvchi call site ko'p shape bilan to'qnashadi va megamorphic access'ga olib keladi.
 
 Class-based factory'da `new` operator constructor'ni chaqirganda V8 oldindan hidden class tayyor qiladi. Har bir subclass (`EmailNotification`, `SMSNotification`) o'zining prototype chain'iga ega — factory client koddan bu prototype tafsilotlarini yashiradi. Factory funksiya closure bo'lsa, ichki class reference'lar closure'ning `[[Environment]]` record'ida saqlanadi — bu GC tomonidan factory reference mavjud ekan tozalanmaydi.
 
@@ -293,7 +293,7 @@ Builder pattern — murakkab object'ni **qadam-baqadam** (step-by-step) yaratish
 
 Method chaining'ning asosi — har bir method `return this` qiladi. `this` reference shu object'ga ishora qiladi, yangi object yaratilmaydi. V8 bu chained call'larni optimize qiladi: `from()`, `select()`, `where()` ketma-ket chaqirilganda, har safar bir xil receiver (`this`) bo'lgani uchun inline cache (IC) monomorphic holatda qoladi va method lookup tez ishlaydi.
 
-Private field'lar (`#table`, `#fields`) V8 ichida class instance'ning internal slot'larida saqlanadi. Bu property'lar hidden class'da ko'rinmaydi — ular alohida `PrivateName` identifier orqali access qilinadi. Shuning uchun builder'ning ichki holati tashqaridan `Object.keys()` yoki `for...in` bilan ko'rinmaydi.
+Private field'lar (`#table`, `#fields`) V8 ichida class instance'ning hidden class'ida `PrivateName` (unique symbol-like key) orqali saqlanadi — ya'ni ular hidden class'ning bir qismi, lekin oddiy string key'li property emas. Bu `PrivateName` identifier'ga tashqaridan access yo'q, shuning uchun builder'ning ichki holati `Object.keys()`, `for...in`, `JSON.stringify()` kabi enumeration'larda ko'rinmaydi — bu encapsulation lexical (class body) + runtime (PrivateName unique key) darajada ta'minlanadi.
 
 `build()` chaqirilganda yangi string concatenation bo'ladi. V8 string concatenation'ni `ConsString` (rope structure) bilan lazy bajaradi — haqiqiy birlashma faqat string o'qilganda sodir bo'ladi. Builder pattern'da intermediate object'lar (builder o'zi) `build()` dan keyin reference bo'lmasa GC tomonidan tozalanadi.
 
@@ -413,7 +413,7 @@ IIFE `(function() { ... })()` bajarilganda engine yangi **Execution Context** ya
 
 IIFE tugagandan keyin uning Execution Context stack'dan chiqadi, lekin Environment Record GC tomonidan tozalanmaydi — chunki qaytarilgan object'ning funksiyalari `[[Environment]]` internal slot orqali unga reference saqlaydi. Bu closure'ning memory implication'i — private variable'lar module reference mavjud ekan hayotda qoladi.
 
-ES Module'da engine boshqacha ishlaydi — module body'si `Module Environment Record`'da bajariladi. Bu record'dagi `export` qilinmagan binding'lar (`let count`) module tashqarisidan spec bo'yicha accessible emas. `import { increment }` qilganda — bu reference copy emas, **live binding** — eksport qiluvchi module'dagi o'zgaruvchiga to'g'ridan-to'g'ri bog'langan.
+ES Module'da engine boshqacha ishlaydi — module body'si `Module Environment Record`'da bajariladi. Bu record'dagi `export` qilinmagan binding'lar (`let count`) module tashqarisidan spec bo'yicha accessible emas. `import { increment }` qilganda — bu reference copy emas, **live binding** — export qiluvchi module'dagi o'zgaruvchiga to'g'ridan-to'g'ri bog'langan.
 
 </details>
 
@@ -498,7 +498,7 @@ Funksiya decorator pattern'da `withLogging(fn)` yangi funksiya qaytaradi — bu 
 
 `fn.apply(this, args)` chaqiruvi muhim — bu `this` binding'ni to'g'ri uzatadi. `apply` ichida engine `[[Call]]` internal method'ni `this` va `args` bilan chaqiradi. Agar `this` uzatilmasa, decorator wrapped funksiyaning context'ini yo'qotadi. Spread operator (`...args`) rest parameter orqali arguments'ni Array ga yig'adi — bu Arguments object yaratishdan ko'ra V8 da samaraliroq.
 
-Class-level decorator (TC39 Stage 3) prototype chain'ni extend qiladi yoki property descriptor'larni o'zgartiradi. `Object.defineProperty` orqali method'ning `value`, `writable`, `configurable` attribute'lari qayta yoziladi. V8 bu o'zgarishni hidden class transition sifatida qayd qiladi.
+Joriy TC39 **Stage 3 decorator proposal**'da decorator funksiyasi `(value, context)` argument'lar oladi va yangi qiymat qaytaradi (yoki `undefined` — o'zgartirmaslik). Method decorator'da `value` — asl funksiya, qaytgan funksiya bilan almashtiriladi. Class decorator'da `value` — asl class, qaytgan class bilan almashtiriladi. Ya'ni Stage 3 decorator'lar **function composition** orqali ishlaydi — `Object.defineProperty` bilan property descriptor'ni o'zgartirish yondashuvi bu eski Stage 2 ("legacy") proposal (TypeScript `experimentalDecorators` va Babel legacy mode shu pattern'ni ishlatadi).
 
 </details>
 
@@ -1084,11 +1084,11 @@ Strategy — bir xil vazifani bajarishning **bir nechta usuli** (algoritm, strat
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-JavaScript'da strategy'lar odatda object literal yoki funksiya sifatida ifodalanadi. `strategies` object'dagi har bir property (`creditCard`, `paypal`) o'z hidden class'iga ega object'ga ishora qiladi. `strategies[strategyName]` — bu computed property access, V8 buni megamorphic IC sifatida qayd qiladi (chunki key runtime'da o'zgaradi).
+JavaScript'da strategy'lar odatda object literal yoki funksiya sifatida ifodalanadi. `strategies` object'dagi har bir property (`creditCard`, `paypal`) o'z hidden class'iga ega object'ga ishora qiladi. `strategies[strategyName]` — bu computed (keyed) property access: `strategies` object shape'i constant bo'lsa ham, dinamik key bo'yicha lookup generic `KeyedLoadIC` orqali ketadi va turli key'lar ko'payganda IC polymorphic/megamorphic holatga o'tishi mumkin.
 
 `this.#strategy = strategy` — bu reference almashish, copy emas. Eski strategy object'ga boshqa reference bo'lmasa GC tozalaydi. Strategy funksiya sifatida berilganda (`#strategy = fn`), context object closure capture qilmaydi — faqat funksiya reference saqlanadi. Bu memory-efficient: har bir strategy almashtiruvda yangi allocation yo'q.
 
-Strategy pattern `if/else` dan farqi engine level'da ham bor: `if/else` branch'lari uchun V8 branch prediction ishlatadi va ko'p branch'larda prediction miss ko'payadi. Object property lookup esa IC (inline cache) orqali optimize qilinadi. Lekin amalda bu farq micro-optimization — pattern'ning asosiy qiymati code maintainability'da.
+Strategy pattern `if/else` dan farqi engine level'da ham bor: uzun `if/else` yoki `switch` zanjiri har case'da compare operation qiladi (CPU darajasida branch prediction bilan) — ko'p branch'larda jump target'lar turlicha bo'ladi. Object property lookup esa IC (inline cache) orqali optimize qilinadi. Lekin amalda bu farq micro-optimization — pattern'ning asosiy qiymati code maintainability'da.
 
 </details>
 
@@ -1610,7 +1610,7 @@ Iterator — collection elementlariga **ketma-ket kirish** uchun standart interf
 
 `Symbol.iterator` — well-known Symbol. Engine `for...of` chaqirilganda object'dan `[Symbol.iterator]()` method'ni qidiradi. Bu method iterator object qaytaradi — `{ next() }` interface bilan. Har bir `next()` chaqiruvida `{ value, done }` object yaratiladi. V8 bu kichik object'larni **allocation elimination** orqali optimize qiladi — agar `value` va `done` faqat loop ichida ishlatilsa, object heap'da yaratilmaydi, register'larda saqlanadi.
 
-Generator funksiya (`*[Symbol.iterator]()`) ichki **state machine** sifatida compile qilinadi. Har bir `yield` nuqtasi alohida state. V8 generator'ni suspend/resume qilganda, generator'ning execution context'i (local variable'lar, stack frame) **generator object** ichida saqlanadi — bu oddiy funksiyadan farqli ravishda context GC tomonidan tozalanmaydi, generator complete bo'lguncha.
+Generator funksiya (`*[Symbol.iterator]()`) V8'da maxsus bytecode opcodes (`SuspendGenerator` va `ResumeGenerator`) bilan compile qilinadi — switch-case state machine emas (bu Babel transpile pattern'i, native V8 mexanizmi emas). Generator suspend'ga uchraganda (`yield` nuqtasida) engine register'dagi qiymatlarni va bytecode pointer'ni **generator object**'ning internal slot'lariga saqlaydi. `next()` chaqirilganda `ResumeGenerator` opcode saqlangan state'ni tiklab, bytecode'dan davom ettiradi. Bu context (local variable'lar, saved registers) oddiy funksiyadan farqli ravishda GC tomonidan tozalanmaydi — generator complete bo'lguncha yoki GC uchun unreachable bo'lguncha saqlanadi.
 
 `yield*` delegation'da ichki iterable'ning iterator'i yaratiladi va har bir `next()` chaqiruvida ichki iterator'ga forward qilinadi. Tree traversal'da rekursiv `yield*` har bir node uchun yangi generator object yaratadi — chuqur tree'larda bu sezilarli memory overhead. `for...of` loop tugaganda yoki `break` qilinganda engine `return()` method'ni chaqiradi (agar mavjud bo'lsa) — bu generator'ni tozalash imkonini beradi.
 
@@ -1817,7 +1817,7 @@ app.use(auth);      // 2-chi — log'dan keyin auth
 
 **Nima uchun:** Function composition math: `f(g(x))` — `g` avval, keyin `f`. Lekin decorator pattern'da `f = withLogging(g)` — `f` **yangi funksiya**, uning body'sida `g` chaqiriladi. Chaqirish paytida: `f()` → logging IN → `g()` execute → logging OUT. Ya'ni outer wrapper birinchi va oxirgi kodda, inner o'rtada — "onion" model.
 
-**Yechim:** Decorator composition'da har doim **outer → middle → inner → middle → outer** sekvensini tasavvur qiling. Test yozayotganda har layer'ning effektini alohida tekshiring. Timing/benchmark decorator'lari eng **tashqi** yoki eng **ichki** bo'lishi kerakligini ongli tanlang (tashqi = butun chain'ni o'lchaydi, ichki = faqat original fn'ni).
+**Yechim:** Decorator composition'da har doim **outer → middle → inner → middle → outer** sekvensini hisobga oling. Test yozayotganda har layer'ning effektini alohida tekshiring. Timing/benchmark decorator'lari eng **tashqi** yoki eng **ichki** bo'lishi kerakligini ongli tanlang (tashqi = butun chain'ni o'lchaydi, ichki = faqat original fn'ni).
 
 ### Gotcha 3: Command pattern unbounded history — memory leak
 
@@ -1889,7 +1889,7 @@ class SnapshotEditor {
 }
 ```
 
-**Nima uchun:** JavaScript GC mark-and-sweep — array ichidagi reference'lar "reachable" deb hisoblanadi, GC tozalay olmaydi. Command pattern'ning "temporal undo" ning asosiy idiomasi — har amalning teskarisini saqlash. Lekin tarix **cheksiz** bo'lsa, RAM xuddi stack trace'ning saqlanishi kabi ortadi. Production editor'lar (VS Code, Figma) snapshot + differential history bilan ishlaydi.
+**Nima uchun:** JavaScript GC mark-and-sweep — array ichidagi reference'lar "reachable" deb hisoblanadi, GC tozalay olmaydi. Command pattern'ning "temporal undo" ning asosiy idiomasi — har amalning teskarisini saqlash. Lekin tarix **cheksiz** bo'lsa, har bir saqlangan command RAM'ni linear ravishda oshiradi. Production editor'lar (VS Code, Figma) snapshot + differential history bilan ishlaydi.
 
 **Yechim:** Har doim `maxHistorySize` limit qo'ying (50-500 oralig'ida odatda yetarli). Og'ir command'lar uchun snapshot pattern — har N amalda baseline saqlab, oraliq command'larni tozalash. Memory profiling bilan command size'ni nazorat qiling.
 
@@ -2009,7 +2009,7 @@ class PaidState {
 
 const order = new Order();
 
-// ❌ Legitimate flow
+// ✅ Legitimate flow
 order.pay();
 order.ship(); // OK — pay → ship
 
@@ -2173,7 +2173,7 @@ formatters.protobuf = (data) => convertToProtobuf(data);
 
 ---
 
-### ❌ Xato 4: God Mediator — hamma narsani bitta joyga yig'ish
+### ❌ Xato 4: Ulkan Mediator — hamma narsani bitta joyga yig'ish
 
 ```javascript
 // ❌ Mediator juda ko'p mas'uliyat oladi

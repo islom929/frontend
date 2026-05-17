@@ -9,7 +9,7 @@
 ### 1. Scope nima va JavaScript da qanday scope turlari mavjud? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Scope — o'zgaruvchilar va funksiyalarning kodning qaysi qismida **accessible** (kirish mumkin) ekanligini belgilaydigan qoidalar to'plami. JavaScript da uchta asosiy scope turi bor:
 
@@ -53,7 +53,7 @@ console.log(globalThis.b); // undefined — let globalThis property EMAS
 ### 2. Lexical scope nima va dynamic scope dan farqi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Lexical scope (static scope) — scope funksiya **yozilgan** (define qilingan) joyga qarab aniqlanadi, **chaqirilgan** joyga qarab emas. JavaScript lexical scoping ishlatadi.
 
@@ -94,7 +94,7 @@ Texnik jihatdan lexical scope funksiya yaratilganda `[[Environment]]` internal s
 ### 3. Scope chain nima va qanday ishlaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Scope chain — o'zgaruvchi qidirilganda engine bosib o'tadigan **scope'lar ketma-ketligi**. Qidiruv doim joriy (ichki) scope'dan boshlanadi va `[[OuterEnv]]` reference bo'ylab tashqariga (yuqoriga) qarab davom etadi — global scope'gacha.
 
@@ -140,7 +140,7 @@ Muhim qoidalar:
 ### 4. `globalThis` nima va nima uchun kerak? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `globalThis` — ES2020 da kiritilgan, **cross-environment global object** ga murojaat qilish uchun standart yo'l. Turli JavaScript environment'larda global object turli nomlarga ega:
 
@@ -180,7 +180,7 @@ console.log(globalThis.newLet); // undefined
 ### 5. `var` ning block scope tanimasligini tushuntiring va bu qanday muammolarga olib keladi? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `var` keyword faqat **function scope** ni tan oladi — `if`, `for`, `while`, `{}` kabi block konstruktsiyalar `var` uchun scope chegarasi hisoblanmaydi. `var` bilan block ichida e'lon qilingan o'zgaruvchi tashqi function scope'ga "chiqadi".
 
@@ -217,7 +217,7 @@ Yechim: `let`/`const` ishlatish. Zamonaviy JavaScript'da `var` ishlatish uchun h
 ### 6. Strict mode nima va u scope'ga qanday ta'sir ko'rsatadi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Strict mode — `"use strict"` directive bilan yoqiladigan JavaScript'ning qat'iyroq rejimi. ES5 da kiritilgan. Scope va o'zgaruvchilarga tegishli asosiy ta'sirlari:
 
@@ -271,7 +271,7 @@ ES6 **modullar** va **class** tanasi avtomatik strict mode'da ishlaydi — alohi
 ### 7. `let`, `const`, `var` ning scope farqlarini jadvali bilan tushuntiring [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Xususiyat | `var` | `let` | `const` |
 |---|---|---|---|
@@ -304,7 +304,7 @@ Zamonaviy JavaScript'da qoida: **default `const`**, faqat qiymat o'zgarishi kera
 ### 8. Scope chain va call stack farqi nima? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Bu ikki tushuncha ko'p aralashtiriladi, lekin ular **butunlay farqli** mexanizmlar:
 
@@ -357,7 +357,7 @@ Closure bu ikki mexanizm orasidagi ko'prik. Funksiya call stack'dan chiqqandan k
 ### 9. Module scope nima va global scope dan farqi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ES Modules (`import`/`export`) da har bir fayl o'zining **module scope**'iga ega. Module scope'dagi o'zgaruvchilar boshqa modullardan **ko'rinmaydi** — faqat `export` qilinganlar accessible.
 
@@ -399,7 +399,7 @@ console.log(globalThis.y);   // undefined — var ham globalThis'ga tushmaydi
 ### 10. `with` statement nima uchun taqiqlangan va u scope chain'ga qanday ta'sir ko'rsatadi? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `with` statement object'ning property'larini scope chain'ga qo'shadi — object property'lariga to'g'ridan-to'g'ri nom bilan murojaat qilish imkonini beradi:
 
@@ -466,7 +466,7 @@ test();
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 10, 20
@@ -504,7 +504,7 @@ console.log(x); // C
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 A: 1
@@ -542,7 +542,7 @@ console.log(outer()); // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 ReferenceError: Cannot access 'count' before initialization
@@ -588,7 +588,7 @@ for (let j = 0; j < 3; j++) {
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 var: 3
@@ -641,7 +641,7 @@ handlers[2](); // ?
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Muammo: barcha handler'lar bir xil natija beradi:
 
@@ -710,7 +710,7 @@ outer();
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 A: undefined
@@ -734,7 +734,7 @@ Bu savolda **hoisting + shadowing + TDZ** uchala tushuncha birgalikda tekshirila
 **Savol:** `createPrivateCounter()` funksiyasini yozing. U `increment()`, `decrement()`, `getCount()`, `reset()` method'lariga ega object qaytarsin. `count` tashqaridan o'zgartirilishi mumkin bo'lmasin.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function createPrivateCounter(initialValue = 0) {
@@ -777,6 +777,12 @@ Bu pattern **scope-based encapsulation** deyiladi — function scope + closure y
 
 Scope chain: `increment()` → `createPrivateCounter()` scope (count bu yerda) → global. `count` `createPrivateCounter()` scope'da turadi — faqat shu scope'dan return qilingan method'lar uni ko'radi va o'zgartiradi.
 
+**Deep Dive:**
+
+Engine ichida har bir return qilingan method `[[Environment]]` internal slot orqali `createPrivateCounter`'ning Environment Record'iga reference saqlaydi (closure). V8 **scope analysis** parse-time'da `count` o'zgaruvchisining captured ekanini aniqlaydi va uni stack frame o'rniga **Context object slot**'iga joylashtiradi — shu sababli funksiya tugaganidan keyin ham `count` heap'da tirik qoladi. Returned object'ning har method'i (`increment`, `decrement`, ...) bir xil `Context`'ga reference tutadi — shuning uchun barchasi bir xil `count` binding'iga ta'sir qiladi.
+
+Memory implikatsiyasi: har `createPrivateCounter()` chaqiruvi yangi Context yaratadi — agar 1000 ta counter yaratilsa, 1000 ta alohida `count` binding heap'da bo'ladi. Object reachable bo'lmagandan keyin GC barcha closure'larni va Context'ni tozalaydi. `#private` class field bilan farqi: class field'lar instance'ga to'g'ridan-to'g'ri yashirin slot bo'lib joylashadi (Context overhead'siz), shu sababli pure performance jihatidan `#private` yengilroq — lekin functional API uchun closure pattern declarativ.
+
 </details>
 
 ### 8. Quyidagi kodning output'i nima? [Middle+]
@@ -806,7 +812,7 @@ first();
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 A: 1, 2
@@ -824,5 +830,129 @@ Tahlil:
 Diqqat: C — `second()` `if` block ichida define qilingan, shuning uchun uning scope chain `if block → first → global`. Block scope'dagi shadow o'zgaruvchilarni ko'radi.
 
 > **Muhim eslatma (strict/module mode assumption):** Block ichida `function` declaration ES6+ strict mode va modul'larda **block-scoped** ishlaydi — yuqoridagi javob shunga tayanadi. Classic script non-strict mode'da esa **Annex B "Legacy Function Declarations in Blocks"** semantikasi qo'llaniladi — `second` containing function scope'ga ham hoist bo'ladi (web compat uchun), bu esa subtle bug'larga olib keladi. Shuning uchun block ichida `function` declaration o'rniga `const second = () => {...}` (arrow/function expression) yozish tavsiya qilinadi.
+
+</details>
+
+### 9. Variable lookup (Resolve Binding) algoritmi qanday ishlaydi? [Senior]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+Variable lookup — engine'ning identifier qiymatini topish jarayoni. ECMAScript spec'da bu `ResolveBinding` → `GetIdentifierReference` abstract operation'lari orqali amalga oshiriladi.
+
+Algoritm qadam-baqadam:
+
+1. Joriy Execution Context'ning LexicalEnvironment olinadi
+2. `env.HasBinding(name)` tekshiriladi
+3. Binding mavjud bo'lsa → Reference Record qaytariladi (kerakli scope ko'rsatilgan)
+4. Yo'q bo'lsa → `env.[[OuterEnv]]` ga o'tiladi
+5. Jarayon takrorlanadi
+6. `[[OuterEnv]]` null bo'lsa (eng tashqi scope ham tekshirilgan) → unresolvable Reference
+
+```javascript
+const globalVar = "G";
+
+function outer() {
+  const outerVar = "O";
+
+  function inner() {
+    console.log(outerVar);
+    // Lookup zanjiri:
+    // 1. inner Environment Record — yo'q
+    // 2. outer Environment Record — topildi ✅ ("O")
+  }
+
+  inner();
+}
+
+outer();
+```
+
+Read vs Write farqlari:
+
+- **Read** (`console.log(x)`) — topilmasa darhol `ReferenceError`
+- **Write** (`x = 10`) — non-strict mode'da topilmasa engine `globalThis`'ga property qo'shadi (implicit global). Strict mode'da `ReferenceError`
+
+```javascript
+function leaky() {
+  // "use strict" yo'q
+  leaked = "Oops!";
+  // Engine scope chain bo'ylab qidiradi — hech joyda yo'q
+  // Non-strict: globalThis.leaked = "Oops!" yaratiladi
+  // Strict: ReferenceError throw qiladi
+}
+```
+
+**Deep Dive:**
+
+V8 parse-time da har bir identifier uchun **scope depth** va **slot index** ni aniqlaydi. Bu **scope analysis** bosqichi — har bir o'zgaruvchining `STACK_ALLOCATED`, `CONTEXT_ALLOCATED`, yoki `MODULE_ALLOCATED` ekanligi belgilanadi. Runtime'da scope chain bo'ylab `HasBinding` qidirilmaydi — to'g'ridan-to'g'ri kerakli Context object'dagi slot index orqali murojaat qilinadi. Bu **scope caching** deyiladi va variable lookup'ni O(1)'ga keltiradi (oddiy O(scope depth) o'rniga).
+
+`eval`, `with`, dinamik `Function` constructor scope analysis'ni buzadi — chunki bu konstruktsiyalar runtime'da yangi binding'lar qo'shishi mumkin. Shu hollarda V8 fallback sifatida runtime scope chain traversal qiladi — bu performance jarima.
+
+</details>
+
+### 10. Labeled statement nima va qaysi hollarda foydali? [Middle+]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+Label — identifier + colon (`:`) konstruktsiyasi bo'lib, loop yoki block'ga **nom berish** imkonini beradi. Asosiy foyda — nested loop'larda `break` va `continue` ni tashqi loop'ga yo'naltirish.
+
+Standart `break` faqat **eng ichki** loop'ni to'xtatadi. Labeled `break` esa **istalgan tashqi loop**'ni to'xtatishi mumkin.
+
+```javascript
+const matrix = [
+  [1, 2, 3],
+  [4, 5, 6],
+  [7, 8, 9]
+];
+
+// Maqsad: matrix ichidan 5 ni topish va ikkala loop'ni to'xtatish
+
+// Label SIZ — flag o'zgaruvchi kerak (chiroyli emas):
+let found = false;
+for (let i = 0; i < matrix.length; i++) {
+  for (let j = 0; j < matrix[i].length; j++) {
+    if (matrix[i][j] === 5) {
+      found = true;
+      break;
+    }
+  }
+  if (found) break; // qo'shimcha tekshiruv
+}
+
+// Label BILAN — toza yechim:
+search: for (let i = 0; i < matrix.length; i++) {
+  for (let j = 0; j < matrix[i].length; j++) {
+    if (matrix[i][j] === 5) {
+      console.log(`Topildi: [${i}][${j}]`);
+      break search; // ikkala loop ham to'xtaydi
+    }
+  }
+}
+```
+
+Label ishlaydigan operatsiyalar:
+
+1. **`break label`** — labeled loop yoki block'dan to'liq chiqish
+2. **`continue label`** — labeled loop'ning keyingi iteratsiyasiga o'tish (faqat loop, block emas)
+3. **Block label** — `label: { ... break label; }` — early exit funksiyasiz
+
+```javascript
+// Block label — validation pattern uchun
+function processData(data) {
+  let result = null;
+
+  validation: {
+    if (!data) { console.log("No data"); break validation; }
+    if (!data.type) { console.log("No type"); break validation; }
+    result = `${data.type}: processed`;
+  }
+
+  return result;
+}
+```
+
+Label'lar kam ishlatiladi — kod o'qish qiyinligi tufayli. Ko'p hollarda alohida funksiya + `return` afzal. Lekin murakkab matrix qidiruv yoki ko'p qatlamli ma'lumot ishlovida label syntactic toza yechim beradi.
 
 </details>

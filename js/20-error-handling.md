@@ -2130,7 +2130,7 @@ await new Promise((resolve, reject) => {
 **Savol:** `safeJsonParse(str, fallback)` funksiyasi yarating. JSON parse muvaffaqiyatli bo'lsa natijani, xato bo'lsa `fallback` ni qaytarsin. Faqat `SyntaxError` ni ushlang — boshqa xatolarni qayta throw qiling.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function safeJsonParse(str, fallback = null) {
@@ -2167,7 +2167,7 @@ console.log(safeJsonParse('"hello"'));           // "hello" (valid JSON string)
 - `DatabaseError` — statusCode: 500, `isOperational: false`
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 class AppError extends Error {
@@ -2239,7 +2239,7 @@ console.log(handleError(new DatabaseError("Connection lost")));
 **Savol:** `retry(fn, options)` funksiyasi yarating: `maxRetries` (default: 3), `delay` (default: 1000ms), `backoff` koeffitsienti (default: 2), `onRetry(attempt, error, waitTime)` callback.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 async function retry(fn, options = {}) {
@@ -2304,7 +2304,7 @@ console.log(result); // "Muvaffaqiyat!" — 3-chi urinishda
 **Savol:** `ErrorBoundary` class yarating: `wrap(fn)` — funksiyani wrap qilib xatolarni ushlaydi (sync va async), `onError(callback)` — xato handler, `getErrors()` — barcha xatolar ro'yxati.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 class ErrorBoundary {

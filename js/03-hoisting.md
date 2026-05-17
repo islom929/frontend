@@ -1,6 +1,6 @@
 # Bo'lim 3: Hoisting — Ichki Mexanizm
 
-> Hoisting — JavaScript engine'ning Creation Phase da o'zgaruvchi va funksiya declaration'larni scope'ning boshiga registratsiya qilish mexanizmi. Kod fizik ravishda "ko'tarilmaydi" — engine shunchaki declaration'larni kod bajarilishidan oldin qayta ishlaydi.
+> Hoisting — JavaScript engine'ning Creation Phase'da o'zgaruvchi va funksiya declaration'larni scope'ning boshiga registratsiya qilish mexanizmi. Kod fizik ravishda "ko'tarilmaydi" — engine shunchaki declaration'larni kod bajarilishidan oldin qayta ishlaydi.
 
 ---
 
@@ -29,7 +29,7 @@
 
 Hoisting — JavaScript'da o'zgaruvchi va funksiya declaration'larning kod bajarilishidan **oldin** scope'da mavjud bo'lishi hodisasi. Ko'pchilik buni "declaration'lar fayl tepasiga ko'tariladi" deb tushuntiradi, lekin bu texnik jihatdan noto'g'ri. Kod hech qayerga ko'chirilmaydi — engine shunchaki **Creation Phase** da declaration'larni qayta ishlaydi.
 
-Hoisting terminining o'zi noto'g'ri tushunchaga olib keladi — aslida sodir bo'layotgan narsa Creation Phase dagi **early binding** (erta bog'lash). Engine source code'ni parse qilganida barcha declaration'larni topadi va ularni execution context'ning environment record'iga yozadi. Shu sababli kod bajarilishida (Execution Phase) bu declaration'lar allaqachon mavjud.
+Hoisting terminining o'zi noto'g'ri tushunchaga olib keladi — aslida sodir bo'layotgan narsa Creation Phase'dagi **early binding** (erta bog'lash). Engine source code'ni parse qilganida barcha declaration'larni topadi va ularni execution context'ning environment record'iga yozadi. Shu sababli kod bajarilishida (Execution Phase) bu declaration'lar allaqachon mavjud.
 
 Qanday narsalar hoist bo'ladi:
 - `var` declaration'lar → `undefined` bilan initialize
@@ -47,7 +47,7 @@ ECMAScript spec'da "hoisting" atamasi yo'q. Bu — developer tomonidan yaratilga
 Source code → Parser → AST → Compilation → Execution
 
 Compilation phase:
-  1. Engine AST ni traverse qiladi
+  1. Engine AST'ni traverse qiladi
   2. Har bir declaration uchun Environment Record'ga binding qo'shadi
   3. var/function declaration → binding initialized
   4. let/const/class → binding uninitialized (TDZ)
@@ -82,7 +82,7 @@ V8 bytecode (simplified):
   Star x                  ; x = 10
 ```
 
-Ko'rinib turibdiki, `Star x` (undefined assignment) `console.log` dan oldin keladi — bu Creation Phase ning natijasi. V8 declaration'ni "hoist" qilmaydi, balki `undefined` initialization'ni boshida joylashtiradi.
+Ko'rinib turibdiki, `Star x` (undefined assignment) `console.log`'dan oldin keladi — bu Creation Phase'ning natijasi. V8 declaration'ni "hoist" qilmaydi, balki `undefined` initialization'ni boshida joylashtiradi.
 
 </details>
 
@@ -93,13 +93,13 @@ Ko'rinib turibdiki, `Star x` (undefined assignment) `console.log` dan oldin kela
 // Hoisting tufayli bu kod ishlaydi:
 console.log(message); // undefined — xato emas!
 var message = "Hello";
-// ✅ var Creation Phase da undefined bilan initialize — shuning uchun o'qish mumkin
+// ✅ var Creation Phase'da undefined bilan initialize — shuning uchun o'qish mumkin
 
 greet(); // "Hi!" — xato emas!
 function greet() {
   console.log("Hi!");
 }
-// ✅ function declaration Creation Phase da to'liq hoist — chaqirish mumkin
+// ✅ function declaration Creation Phase'da to'liq hoist — chaqirish mumkin
 ```
 
 </details>
@@ -110,19 +110,19 @@ function greet() {
 
 ### Nazariya
 
-"Hoisting" atamasi oddiylashtirish — aslida bu [02-execution-context.md](02-execution-context.md) da o'rganilgan **Creation Phase** ning natijasi. Kod tepaga ko'chirilmaydi — engine Creation Phase da environment record'ga binding'larni yozadi.
+"Hoisting" atamasi oddiylashtirish — aslida bu [02-execution-context.md](02-execution-context.md)'da o'rganilgan **Creation Phase**'ning natijasi. Kod tepaga ko'chirilmaydi — engine Creation Phase'da environment record'ga binding'larni yozadi.
 
 Jarayon qadam-baqadam:
 
 1. Engine source code'ni **parse** qiladi va AST hosil qiladi
 2. Execution context yaratiladi — **Creation Phase** boshlanadi
-3. Engine AST ni scan qilib barcha **declaration**'larni topadi:
+3. Engine AST'ni scan qilib barcha **declaration**'larni topadi:
    - `var` topilsa → VariableEnvironment'ga yoziladi, `undefined` bilan initialize
    - `function declaration` topilsa → VariableEnvironment'ga yoziladi, to'liq funksiya bilan initialize
    - `let`/`const` topilsa → LexicalEnvironment'ga yoziladi, lekin **initialize qilinMAYDI**
 4. **Execution Phase** boshlanadi — kod qator-baqatar bajariladi
-5. `var x = 10` ga yetganda → `x` allaqachon mavjud (undefined), endi `10` assign bo'ladi
-6. `let y = 20` ga yetganda → `y` allaqachon mavjud (lekin TDZ da), endi `20` assign bo'ladi va TDZ tugaydi
+5. `var x = 10`'ga yetganda → `x` allaqachon mavjud (undefined), endi `10` assign bo'ladi
+6. `let y = 20`'ga yetganda → `y` allaqachon mavjud (lekin TDZ'da), endi `20` assign bo'ladi va TDZ tugaydi
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -180,7 +180,7 @@ test();
 
 ### Nazariya
 
-`var` bilan e'lon qilingan o'zgaruvchilar Creation Phase da **`undefined`** qiymati bilan initialize qilinadi. Bu degani `var` o'zgaruvchini e'lon qilishdan oldin o'qish mumkin — lekin qiymati `undefined` bo'ladi (haqiqiy qiymat emas).
+`var` bilan e'lon qilingan o'zgaruvchilar Creation Phase'da **`undefined`** qiymati bilan initialize qilinadi. Bu degani `var` o'zgaruvchini e'lon qilishdan oldin o'qish mumkin — lekin qiymati `undefined` bo'ladi (haqiqiy qiymat emas).
 
 `var` hoisting'ning xususiyatlari:
 - `var` **function-scoped** — faqat funksiya chegarasida qoladi
@@ -198,7 +198,7 @@ var name = "Ali";   // assignment faqat shu qatorda bajariladi
 console.log(name);  // "Ali"
 
 // Engine buni shunday ko'radi:
-// var name;           ← Creation Phase da (undefined bilan)
+// var name;           ← Creation Phase'da (undefined bilan)
 // console.log(name);  ← Execution: undefined
 // name = "Ali";       ← Execution: assignment
 // console.log(name);  ← Execution: "Ali"
@@ -211,7 +211,7 @@ function example() {
 
   if (false) {
     var x = 10; // ❌ Bu kod HECH QACHON bajarilmaydi
-    // Lekin var declaration Creation Phase da hoist bo'ladi!
+    // Lekin var declaration Creation Phase'da hoist bo'ladi!
   }
 
   console.log(x); // undefined — assignment bajarilmagan
@@ -219,7 +219,7 @@ function example() {
 
 example();
 // ✅ if (false) ichidagi var ham hoist bo'ladi
-// Chunki hoist Creation Phase da — runtime shart (if) tekshirilmaydi
+// Chunki hoist Creation Phase'da — runtime shart (if) tekshirilmaydi
 ```
 
 ```javascript
@@ -241,11 +241,11 @@ console.log(count); // 2
 
 ### Nazariya
 
-`let` va `const` ham **hoist bo'ladi** — lekin `var` dan farqli ravishda ular Creation Phase da **initialize qilinMAYDI**. Ular `<uninitialized>` holatda qoladi — bu **Temporal Dead Zone (TDZ)** deb ataladi.
+`let` va `const` ham **hoist bo'ladi** — lekin `var`'dan farqli ravishda ular Creation Phase'da **initialize qilinMAYDI**. Ular `<uninitialized>` holatda qoladi — bu **Temporal Dead Zone (TDZ)** deb ataladi.
 
 TDZ — bu scope boshlanganidan `let`/`const` declaration'ga yetguncha bo'lgan oraliq. Bu oraliqda o'zgaruvchini o'qishga yoki yozishga urinish `ReferenceError` beradi.
 
-`let` va `const` nima uchun TDZ da: bu dizayn qaror — dasturchilarni o'zgaruvchini e'lon qilishdan oldin ishlatishdan himoya qilish. `var` dagi `undefined` muammosi ko'p bug'larga sabab bo'lgan — `let`/`const` TDZ orqali buni oldini oladi.
+`let` va `const` nima uchun TDZ'da: bu dizayn qaror — dasturchilarni o'zgaruvchini e'lon qilishdan oldin ishlatishdan himoya qilish. `var`'dagi `undefined` muammosi ko'p bug'larga sabab bo'lgan — `let`/`const` TDZ orqali buni oldini oladi.
 
 `let` va `const` farqi:
 - `let` — TDZ tugagandan keyin qayta qiymat berish mumkin
@@ -255,13 +255,13 @@ TDZ — bu scope boshlanganidan `let`/`const` declaration'ga yetguncha bo'lgan o
 <summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
-// let — hoist bo'ladi, lekin TDZ da
+// let — hoist bo'ladi, lekin TDZ'da
 console.log(age); // ❌ ReferenceError: Cannot access 'age' before initialization
 let age = 25;
 // let age scope boshida hoist bo'lgan, lekin initialize qilinmagan
 // console.log gacha TDZ — o'qish taqiq
 
-// const ham TDZ da — let bilan bir xil mexanizm
+// const ham TDZ'da — let bilan bir xil mexanizm
 console.log(PI); // ❌ ReferenceError
 const PI = 3.14;
 ```
@@ -337,7 +337,7 @@ console.log(typeof undeclaredVar); // "undefined" — e'lon qilinmagan → xato 
 console.log(typeof tdzVar);       // ❌ ReferenceError!
 let tdzVar = 10;
 // typeof odatda xato bermaydi (e'lon qilinmagan o'zgaruvchi uchun)
-// Lekin TDZ dagi o'zgaruvchi uchun — ReferenceError beradi
+// Lekin TDZ'dagi o'zgaruvchi uchun — ReferenceError beradi
 // Bu let hoist bo'lishining yana bir isboti
 ```
 
@@ -354,7 +354,7 @@ function increment() {
   count++; // ❌ ReferenceError!
   let count = 1;
   // ✅ Sabab: local let count hoist bo'ldi
-  // count++ bajarilganda local count TDZ da
+  // count++ bajarilganda local count TDZ'da
   // Global count ga bormaydi — local count shadowing qiladi
 }
 
@@ -373,7 +373,7 @@ function example(a = b, b = 1) {
 }
 
 example();  // ❌ ReferenceError: Cannot access 'b' before initialization
-// a = b bajarilganda b hali TDZ da — parameter'lar chapdan o'ngga initialize bo'ladi
+// a = b bajarilganda b hali TDZ'da — parameter'lar chapdan o'ngga initialize bo'ladi
 
 // ✅ Tuzatish — tartibni o'zgartirish:
 function exampleFixed(b = 1, a = b) {
@@ -391,7 +391,7 @@ exampleFixed(); // [1, 1] ✅
 
 ### Nazariya
 
-Function declaration'lar Creation Phase da **to'liq funksiya** bilan initialize qilinadi. Bu `var` (undefined) va `let`/`const` (uninitialized) dan farq qiladi — function declaration darhol chaqirishga tayyor.
+Function declaration'lar Creation Phase'da **to'liq funksiya** bilan initialize qilinadi. Bu `var` (undefined) va `let`/`const` (uninitialized)'dan farq qiladi — function declaration darhol chaqirishga tayyor.
 
 Bu nima uchun shunday: JavaScript'ning dastlabki dizaynida funksiyalarni faylning istalgan joyida e'lon qilib, istalgan joyida chaqirish imkoniyati kerak edi. Shu sababli function declaration'lar to'liq hoist bo'ladi.
 
@@ -410,7 +410,7 @@ console.log(sum(2, 3)); // 5 — e'lon qilishdan oldin chaqirish mumkin
 function sum(a, b) {
   return a + b;
 }
-// Creation Phase da: sum → function sum(a, b) { return a + b; }
+// Creation Phase'da: sum → function sum(a, b) { return a + b; }
 ```
 
 ```javascript
@@ -420,7 +420,7 @@ console.log(multiply(2, 3)); // TypeError: multiply is not a function
 var multiply = function(a, b) {
   return a * b;
 };
-// Creation Phase da: multiply → undefined (var hoist)
+// Creation Phase'da: multiply → undefined (var hoist)
 // Execution da: multiply(2, 3) → undefined(2, 3) → TypeError!
 // multiply MAVJUD (undefined), lekin function emas
 ```
@@ -430,7 +430,7 @@ var multiply = function(a, b) {
 console.log(divide(10, 2)); // TypeError: divide is not a function
 
 var divide = (a, b) => a / b;
-// Creation Phase da: divide → undefined (var hoist)
+// Creation Phase'da: divide → undefined (var hoist)
 ```
 
 ```javascript
@@ -440,7 +440,7 @@ console.log(greet("Ali")); // ReferenceError: Cannot access 'greet'
 const greet = function(name) {
   return "Hello, " + name;
 };
-// Creation Phase da: greet → <uninitialized> (const — TDZ)
+// Creation Phase'da: greet → <uninitialized> (const — TDZ)
 ```
 
 </details>
@@ -581,14 +581,14 @@ count++;
 
 ### Nazariya
 
-Agar bir xil nomda `function declaration` va `var` e'lon qilinsa — **function declaration yuqori priority**ga ega. Creation Phase da function declaration'lar birinchi qayta ishlanadi, keyin var declaration'lar qayta ishlanadi.
+Agar bir xil nomda `function declaration` va `var` e'lon qilinsa — **function declaration yuqori priority**ga ega. Creation Phase'da function declaration'lar birinchi qayta ishlanadi, keyin var declaration'lar qayta ishlanadi.
 
 Qoidalar:
 
 1. Function declaration'lar birinchi qayta ishlanadi — binding yaratiladi va to'liq function object'i bilan initialize qilinadi
 2. Keyin var declaration'lar qayta ishlanadi
 3. Agar var nomi allaqachon mavjud bo'lsa (function declaration bilan) — **mavjud qiymat saqlanadi**, var uni `undefined` bilan override qilmaydi. Bu ECMAScript spec qoidasi: var `VarDeclaredNames` iteratsiyasida mavjud binding'ni qayta yaratmasligi ko'rsatilgan
-4. Lekin Execution Phase da kod bajarilganda, `var x = qiymat` qatoridagi **assignment** qismi ishga tushadi va mavjud qiymatni almashtiradi (function bo'lsa ham)
+4. Lekin Execution Phase'da kod bajarilganda, `var x = qiymat` qatoridagi **assignment** qismi ishga tushadi va mavjud qiymatni almashtiradi (function bo'lsa ham)
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -622,7 +622,7 @@ EXECUTION PHASE:
   console.log(handler)   → function handler() {...}  (Creation Phase natijasi)
   handler = "string"     → assignment bajariladi (`var handler = "string"`
                            qatoridagi `= "string"` qismi) — handler endi "string"
-  function handler() {}  → Execution Phase da declaration no-op (allaqachon Creation'da)
+  function handler() {}  → Execution Phase'da declaration no-op (allaqachon Creation'da)
   console.log(handler)   → "string"
 ```
 
@@ -653,7 +653,7 @@ console.log(greet()); // "Second"
 function greet() { return "First"; }
 function greet() { return "Second"; }
 // ✅ Ikkinchi function declaration birinchini override qiladi
-// Ikkalasi ham Creation Phase da qayta ishlanadi — oxirgisi saqlanadi
+// Ikkalasi ham Creation Phase'da qayta ishlanadi — oxirgisi saqlanadi
 ```
 
 </details>
@@ -682,7 +682,7 @@ class User {
     this.name = name;
   }
 }
-// class hoist bo'ladi, lekin TDZ da — function declaration kabi emas!
+// class hoist bo'ladi, lekin TDZ'da — function declaration kabi emas!
 ```
 
 ```javascript
@@ -737,16 +737,16 @@ let tdzVar = 10;
 
 ### Block ichida `function declaration` — strict/non-strict farqi (Annex B)
 
-Non-strict mode'da block ichidagi function declaration'lar brauzerlarda legacy xulq-atvorga ega (Annex B spec). Bu function declaration function-scope'ga hoist bo'lishga intiladi, lekin bu xulq-atvor predictable emas. Strict mode'da esa function declaration to'g'ri block-scoped bo'ladi.
+Non-strict mode'da block ichidagi function declaration ECMAScript Annex B "Web Compatibility Semantics" qoidalariga ko'ra **ikki binding** yaratadi (2015'dan beri barcha web brauzerlar uchun majburiy): block-scoped binding (block ichida `let`-like) va function-scoped binding (block tashqarisida — eng oxirgi assignment qiymati). Strict mode'da esa faqat block-scoped binding qoladi — Annex B qoidalari qo'llanilmaydi.
 
 ```javascript
-// Non-strict mode — brauzerga bog'liq, predictable emas
+// Non-strict mode — Annex B web compatibility (brauzerlar bir xil ishlaydi)
 if (true) {
   function legacyFn() { return 1; }
 }
-legacyFn(); // Ba'zi engine'larda ishlaydi, ba'zilarida ReferenceError
+legacyFn(); // 1 (function-scoped binding ham yaratiladi)
 
-// Strict mode — aniq block-scoped
+// Strict mode — faqat block-scoped, block tashqarisida YO'Q
 "use strict";
 if (true) {
   function strictFn() { return 2; }
@@ -755,7 +755,7 @@ if (true) {
 // console.log(strictFn()); // ❌ ReferenceError — block'dan tashqarida yo'q
 ```
 
-**Yechim:** Block ichida funksiya kerak bo'lsa — `const fn = function() {}` yoki arrow function ishlating. Bu cross-engine predictable va ES Modules (default strict) bilan mos.
+**Yechim:** Block ichida funksiya kerak bo'lsa — `const fn = function() {}` yoki arrow function ishlating. Bu eng aniq behavior va ES Modules (default strict) bilan mos. Annex B B.3.2 — 2015'dan barcha brauzerlar va zamonaviy Node uchun majburiy; eski legacy engine'larda farq bo'lishi mumkin.
 
 ---
 
@@ -776,15 +776,23 @@ function good(b = 1, a = b) {
 }
 good(); // [1, 1] ✅
 
-// Parameter va function body orasida ham TDZ ishlaydi
+// Parameter scope va function body — ALOHIDA scope qatlamlari
 function withBody(x = y) {
-  const y = 10; // const y function body'da — parameter'dan tashqarida
+  const y = 10; // const y — function body scope'da, parameter scope'da EMAS
   return x;
 }
-withBody(); // ❌ ReferenceError — parameter'da y TDZ'da (body TDZ'ni tugatmaydi)
+withBody(); // ❌ ReferenceError: y is not defined
+// Spec (10.2.11 FunctionDeclarationInstantiation): non-simple parameter'lar bo'lsa
+// ParameterEnvironment YARATILADI (faqat parameter binding'lari bilan) — default'lar
+// shu yerda evaluate qilinadi. Function body esa ParameterEnvironment'ning CHILD scope'i —
+// u keyingi qadamda yaratiladi. Shuning uchun `x = y` evaluate bo'lganda:
+//   - ParameterEnvironment'da faqat x bor, y YO'Q (binding ham yo'q)
+//   - Outer scope (global) — y yo'q
+//   - → "y is not defined" (undeclared)
+// Bu "Cannot access 'y' before initialization" (TDZ) EMAS — TDZ uchun binding mavjud bo'lishi kerak
 ```
 
-**Yechim:** Parameter'lar bir-biriga bog'liq bo'lsa, dependent parameter'ni keyin qo'ying. Funksiya body'dagi o'zgaruvchilar parameter TDZ'ni tugatmaydi — parameter va body alohida scope qatlamlari.
+**Yechim:** Parameter'lar bir-biriga bog'liq bo'lsa, dependent parameter'ni keyin qo'ying. Parameter default'da body'dagi `let`/`const` o'zgaruvchilariga murojaat qilish **mumkin emas** — ular parameter scope'da ko'rinmaydi (body parameter'ning child scope'i). `ReferenceError: y is not defined` oladi, TDZ xatosi emas.
 
 ---
 
@@ -887,7 +895,7 @@ function test() {
 ### ✅ To'g'ri tushunish:
 
 ```javascript
-// ✅ let HOIST BO'LADI, lekin TDZ da — shuning uchun ReferenceError
+// ✅ let HOIST BO'LADI, lekin TDZ'da — shuning uchun ReferenceError
 // Engine local let x ni BILADI (hoist) — shuning uchun global x ga bormaydi
 // Lekin local x hali initialize qilinMAGAN (TDZ) — shuning uchun xato
 
@@ -899,7 +907,7 @@ function test() {
 }
 ```
 
-**Nima uchun:** `let`/`const` hoist bo'ladi (engine scope boshida ularni biladi), lekin `undefined` bilan emas, `uninitialized` bilan. Bu TDZ ni yaratadi — declaration qatoriga yetguncha murojaat taqiq.
+**Nima uchun:** `let`/`const` hoist bo'ladi (engine scope boshida ularni biladi), lekin `undefined` bilan emas, `uninitialized` bilan. Bu TDZ'ni yaratadi — declaration qatoriga yetguncha murojaat taqiq.
 
 ---
 
@@ -913,7 +921,7 @@ var calculate = function(a, b) {
   return a + b;
 };
 // TypeError: calculate is not a function
-// Creation Phase da: calculate → undefined (var hoist)
+// Creation Phase'da: calculate → undefined (var hoist)
 // undefined(10, 20) → TypeError
 ```
 
@@ -974,7 +982,7 @@ function createConfig(timeout = retries * 1000, retries = 3) {
 }
 
 createConfig(); // ❌ ReferenceError: Cannot access 'retries' before initialization
-// timeout = retries * 1000 bajarilganda retries hali TDZ da
+// timeout = retries * 1000 bajarilganda retries hali TDZ'da
 ```
 
 ### ✅ To'g'ri usul:
@@ -1019,8 +1027,8 @@ ReferenceError: Cannot access 'b' before initialization
 
 Kod 2-qatorda ReferenceError tufayli to'xtaydi — 3-qator bajarilmaydi.
 
-- `var a` → Creation Phase da `undefined` bilan initialize → o'qish mumkin
-- `let b` → Creation Phase da `uninitialized` (TDZ) → o'qish `ReferenceError`
+- `var a` → Creation Phase'da `undefined` bilan initialize → o'qish mumkin
+- `let b` → Creation Phase'da `uninitialized` (TDZ) → o'qish `ReferenceError`
 - `const c` → shu qatorga yetmaydi (oldingi xato tufayli)
 </details>
 
@@ -1075,14 +1083,14 @@ ReferenceError: Cannot access 'x' before initialization
 
 `let x = x + 1;` bajarilganda:
 - `=` ning o'ng tomoni avval evaluate qilinadi: `x + 1`
-- Bu paytda `x` hali initialize qilinmagan (TDZ da)
+- Bu paytda `x` hali initialize qilinmagan (TDZ'da)
 - `x` ni o'qishga urinish → `ReferenceError`
 
 `var` bilan bo'lganida:
 ```javascript
 var x = x + 1;
 console.log(x); // NaN
-// var x Creation Phase da undefined
+// var x Creation Phase'da undefined
 // x + 1 = undefined + 1 = NaN
 ```
 </details>
@@ -1177,14 +1185,14 @@ Execution Phase:
 
 Bu bo'limda Hoisting mexanizmini chuqur o'rgandik:
 
-- **Hoisting** — Creation Phase da declaration'larning scope'da registratsiya qilinishi. Kod fizik ko'chirilmaydi
+- **Hoisting** — Creation Phase'da declaration'larning scope'da registratsiya qilinishi. Kod fizik ko'chirilmaydi
 - **var** → `undefined` bilan initialize (o'qish mumkin, lekin qiymati undefined)
-- **let/const** → `uninitialized` (TDZ da — o'qish ReferenceError)
+- **let/const** → `uninitialized` (TDZ'da — o'qish ReferenceError)
 - **function declaration** → to'liq funksiya bilan initialize (chaqirishga tayyor)
 - **function expression** → faqat o'zgaruvchi hoist (var → undefined, let/const → TDZ)
 - **TDZ** — scope boshidan declaration qatoriga qadar zona, murojaat taqiq
 - **Priority** — function declaration > var (bir xil nomda bo'lsa function yutadi)
-- **class** → let/const kabi TDZ da (function declaration'dan farqli)
+- **class** → let/const kabi TDZ'da (function declaration'dan farqli)
 - **Zamonaviy yondashuv** — `const` default, `let` kerak bo'lganda, `var` ishlatmang
 
 Hoisting mexanizmini tushunish scope chain'ni tushunish uchun asos — keyingi bo'limda scope chain va lexical scoping'ni chuqur o'rganamiz.

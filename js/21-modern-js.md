@@ -844,7 +844,7 @@ Sabab: `(a+)+` har 'a' uchun turli guruh kombinatsiyalarini sinab ko'radi, 24 'a
 **Yechimlar**: manual pattern rewrite, input length limit, `re2` kutubxonasi (DFA-based, exponential blowup yo'q).
 
 **Lookahead/Lookbehind** — **zero-width assertion**'lar, match'da o'rin egallamaydi:
-- `/foo(?=bar)/` — "foo" topilsa va keyingi belgilar "bar" bo'lsa
+- `/\d+(?=px)/` — son topilsa va keyingi belgilar "px" bo'lsa
 - `/(?<=\$)\d+/` — raqam, oldida `$` bo'lishi shart
 
 Lookbehind ES2018 da qo'shilgan (Python, Java, .NET'da avvaldan bor edi).
@@ -909,7 +909,7 @@ console.log(reformatted); // "15/03/2024"
 "100px 200em 300px".match(/\d+(?=px)/g); // ["100", "300"] — faqat px oldidagi sonlar
 "100px 200em 300px".match(/\d+(?!px)/g); // ["10", "200", "30"] — px OLMAGANLAR
 // "10" — \d+ "100" dan "10" ga backtrack qildi, "10" keyin "0" keladi, "px" emas → mos
-// "30" — xuddi shunaqa, "300" dan "30" ga backtrack
+// "30" — bir xil tarzda, "300" dan "30" ga backtrack
 
 // Lookbehind — (?<=...) positive, (?<!...) negative
 // "Bu pattern OLDIN kelgan bo'lishi kerak"
@@ -1595,7 +1595,7 @@ Modern JavaScript sintaksisi bo'yicha 5 ta nozik, production'da tez-tez uchrab, 
 
 ### Gotcha 1: `{ ...null }` → `{}` lekin `const { x } = null` → TypeError
 
-Spread operator `null`/`undefined` bilan **xato bermaydi** — bo'sh object qaytaradi. Lekin destructuring xuddi shu qiymatlar bilan **TypeError** beradi. Bu asymmetry kutilmagan.
+Spread operator `null`/`undefined` bilan **xato bermaydi** — bo'sh object qaytaradi. Lekin destructuring esa shu qiymatlar bilan **TypeError** beradi. Bu asymmetry kutilmagan.
 
 ```javascript
 // ✅ Spread — null/undefined bilan xavfsiz
@@ -1645,7 +1645,7 @@ function processUserSafe(input) {
 
 ### Gotcha 2: Object spread **symbol key'larni ham copy qiladi** — JSON.stringify esa yo'q
 
-Keng tarqalgan noto'g'ri tasavvur: "spread `Object.keys()` ishlatadi, shuning uchun symbol'lar copy bo'lmaydi". Aslida spread `Reflect.ownKeys()`'ga o'xshash — **string VA symbol key'larni ikkalasini ham** copy qiladi (faqat enumerable'larni). Lekin `JSON.stringify` symbol'larni **skip** qiladi. Bu asymmetry debugging paytida chalkashtiradi.
+Keng tarqalgan noto'g'ri taxmin: "spread `Object.keys()` ishlatadi, shuning uchun symbol'lar copy bo'lmaydi". Aslida spread `Reflect.ownKeys()` bilan o'xshash semantikaga ega — **string VA symbol key'larni ikkalasini ham** copy qiladi (faqat enumerable'larni). Lekin `JSON.stringify` symbol'larni **skip** qiladi. Bu asymmetry debugging paytida chalkashtiradi.
 
 ```javascript
 const uid = Symbol("id");
@@ -2009,7 +2009,7 @@ console.log(apiUser?.name?.toUpperCase()); // ✅ apiUser null bo'lishi mumkin
 **Savol:** `deepMerge(target, source)` funksiyasi yarating — nested object'larni ham recursive merge qilsin. Array'lar va primitive'lar — source'dagi qiymat bilan almashtirsin.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function deepMerge(target, source) {
@@ -2065,7 +2065,7 @@ const merged = deepMerge(defaults, userConfig);
 **Savol:** `render(template, data)` — `{{key}}` pattern'larni data obyektidagi qiymatlar bilan almashtirsin. Nested key'lar ham ishlashi kerak: `{{user.name}}`.
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function render(template, data) {
@@ -2102,7 +2102,7 @@ console.log(render("{{a.b.c}} va {{missing}}", { a: { b: { c: "topildi" } } }));
 **Savol:** `sql` tagged template yarating: parametrlarni `$1, $2, ...` bilan almashtirsin va `{ query, params }` qaytarsin (SQL injection prevention).
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function sql(strings, ...values) {
@@ -2157,7 +2157,7 @@ console.log(result2);
 **Savol:** `safeGet(obj, path, defaultValue)` — nested property'ni dot notation bilan olish (`"a.b.c"`). `safeSet(obj, path, value)` — nested property'ni set qilish (intermediate object'larni yaratib).
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 function safeGet(obj, path, defaultValue = undefined) {

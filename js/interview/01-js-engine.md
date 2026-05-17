@@ -277,7 +277,7 @@ Call Stack — funksiya chaqiruvlarini boshqaradigan LIFO (Last In, First Out) t
 
 JavaScript **single-threaded** — uning faqat **bitta** call stack'i bor. Bir vaqtda faqat bitta funksiya bajariladi. Bu dizayn tanlovi tarixiy: Netscape 1995-da JavaScript'ni Brendan Eich'ga 10 kun ichida yozishni buyurgan — implementation simplicity birinchi asosiy sabab edi. DOM concurrency xavfi (ikkita thread bir vaqtda DOM element'ni o'zgartirsa race condition) — keyinchalik qo'shilgan muhim justification: single-threaded model DOM API dizaynini ham ancha soddalashtirdi.
 
-Lekin single-threaded degani "sekin" degani emas — Web APIs, callback queue va event loop orqali asinxron operatsiyalar bajariladi (bu haqda [11-event-loop.md](../11-event-loop.md) da).
+Lekin single-threaded degani "sekin" degani emas — Web APIs (DOM, fetch, timer), callback queue va event loop orqali asinxron operatsiyalar Call Stack'dan tashqarida bajariladi va natijasi queue orqali stack bo'sh bo'lganda qaytariladi.
 
 ```javascript
 function multiply(a, b) { return a * b; }
@@ -645,5 +645,184 @@ function createPointBad2(x, y, z) {
 function createPoint2D(x, y) { return { x, y }; }         // doim {x, y}
 function createPoint3D(x, y, z) { return { x, y, z }; }   // doim {x, y, z}
 ```
+
+</details>
+
+### 5. Quyidagi kodda Hidden Class va Inline Cache holatini ko'rsating [Senior]
+
+```javascript
+function getName(entity) {
+  return entity.name;
+}
+
+const user = { name: "Ali", age: 25 };
+const admin = { name: "Vali", age: 30 };
+const product = { name: "Phone", price: 999 };
+const tag = { id: 1, name: "label" };
+const order = { total: 100, name: "Order #1" };
+const invoice = { name: "INV-001", paid: false, items: [] };
+
+for (let i = 0; i < 10000; i++) {
+  getName(user);
+  getName(admin);
+  getName(product);
+  getName(tag);
+  getName(order);
+  getName(invoice);
+}
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+`getName` ichidagi `entity.name` IC `monomorphic` → `polymorphic` → `megamorphic` evolyutsiyasini bosib o'tadi va 6 ta turli shape kelganidan keyin generic property lookup'ga tushadi (5+ shape = megamorphic). Bu performance'ni sezilarli pasaytiradi.
+
+### To'liq tushuntirish
+
+V8 har property access joyida (`entity.name`) feedback slot saqlaydi. Quyidagi qadamlarda IC holati o'zgaradi:
+
+1. **`getName(user)`** — `Shape A {name, age}` ko'rildi → IC monomorphic: `[Shape A → offset 0]`
+2. **`getName(admin)`** — Shape A (bir xil tartibda, bir xil property'lar) → IC hit
+3. **`getName(product)`** — `Shape B {name, price}` — yangi shape → IC polymorphic: `[A, B]`
+4. **`getName(tag)`** — `Shape C {id, name}` (boshqa tartib!) → IC polymorphic: `[A, B, C]`
+5. **`getName(order)`** — `Shape D {total, name}` → IC polymorphic: `[A, B, C, D]`
+6. **`getName(invoice)`** — `Shape E {name, paid, items}` → IC megamorphic (5-chi shape qo'shildi) → cache o'chiriladi, har safar generic property lookup
+
+Megamorphic holatda V8 hash-table-based dynamic property lookup qiladi — bu monomorphic'ga nisbatan sezilarli sekinroq, lekin baribir ishlaydi.
+
+### Kod misol — IC holatini tezlatish
+
+```javascript
+// ❌ Megamorphic — turli shape'lar
+function getNameBad(entity) {
+  return entity.name;
+}
+
+// ✅ Monomorphic — har shape uchun alohida funksiya
+function getUserName(user) { return user.name; }
+function getProductName(product) { return product.name; }
+function getOrderName(order) { return order.name; }
+
+// Yoki barcha entity'larni bir xil shape'ga keltirish:
+function normalize({ name }) {
+  return { name }; // doim {name} shape
+}
+```
+
+### Edge Cases
+
+- IC har **call site** uchun alohida — bir xil funksiya turli joylardan chaqirilsa, har joy o'zining IC'siga ega.
+- Property qo'shilish tartibi muhim: `{name, age}` va `{age, name}` — turli shape'lar.
+- `Object.create(null)` — `[[Prototype]]` yo'q, lekin baribir hidden class mavjud.
+- `delete entity.name` — object dictionary mode'ga o'tadi, IC o'chiriladi.
+
+### Follow-up savollar
+
+1. "IC ni monomorphic holatda saqlash uchun nima qilish kerak?" — Bir xil tartibda property qo'shish, factory function/constructor/class ishlatish, `delete` ishlatmaslik, runtime property qo'shmaslik.
+2. "TurboFan IC'dan qanday foydalanadi?" — Monomorphic feedback bilan TurboFan inline cache offset'ini machine code'ga "hardcode" qiladi (guard tekshiruvi bilan). Megamorphic IC bo'lsa — generic lookup machine code'ga emit qilinadi (sekinroq).
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+V8 IC implementation: har feedback slot `FeedbackVector` array element sifatida saqlanadi. Property load IC turlari:
+- **Uninitialized** — birinchi marta hali chaqirilmagan
+- **Premonomorphic** — bir marta chaqirilgan, hali optimize qilinmagan
+- **Monomorphic** — bitta shape, fast path
+- **Polymorphic** — 2-4 shape, IC dispatch chain
+- **Megamorphic** — 5+ shape, generic hash-based lookup
+- **MegaDOM** — DOM property uchun maxsus megamorphic variant
+
+V8 source kodida bu `--trace-ic` flag bilan kuzatilishi mumkin. ICE (IC Event) log'larida har transition ko'rinadi.
+
+</details>
+
+</details>
+
+### 6. Quyidagi kod Garbage Collector uchun qanday muammo yaratadi? [Senior]
+
+```javascript
+const handlers = [];
+
+function attachHandler(element) {
+  const largeData = new Array(100000).fill({ data: "payload" });
+
+  element.addEventListener("click", function() {
+    console.log("clicked");
+  });
+
+  handlers.push(element);
+}
+
+for (let i = 0; i < 1000; i++) {
+  const button = document.createElement("button");
+  attachHandler(button);
+}
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+### Qisqa javob
+`largeData` event listener closure tomonidan capture qilinadi (gar `console.log` ishlatmasa ham — V8'da context allocation ko'pincha barcha local'larni saqlaydi) va `handlers` array element'larga reference saqlagani uchun element'lar GC qilinmaydi → memory leak.
+
+### To'liq tushuntirish
+
+JavaScript GC mark-and-sweep algoritmi ishlatadi: GC root'lardan (global, call stack, active closures) erishish mumkin bo'lgan barcha object'larni "live" deb belgilaydi. Erishilmagan object'lar tozalanadi.
+
+Bu kodda muammolar:
+
+1. **`largeData` closure capture**: Event listener funksiyasi `attachHandler` scope'iga `[[Environment]]` orqali ulangan. V8 odatda escape analysis qilib ishlatilmagan variable'larni context'ga qo'shmaydi, lekin closure ichida ishlatilgan har qanday outer variable saqlanadi. Bu yerda listener `console.log` ni chaqirsa ham, V8 implementation darajasida ba'zan keraksiz variable'lar context'ga tushishi mumkin.
+
+2. **`handlers` array**: Global array element'larga reference saqlaydi → element'lar DOM'dan olib tashlansa ham, `handlers` ularni ushlab turadi → DOM node'lar va ularning subtree'lari GC qilinmaydi.
+
+3. **DOM detached node leak**: Element'lar DOM'dan olib tashlangach ham, JavaScript reference saqlasa — "detached DOM tree" leak yuzaga keladi (Chrome DevTools Memory profiler'da ko'rinadi).
+
+### Kod misol — tuzatish
+
+```javascript
+const handlers = new WeakSet(); // ✅ WeakSet — element'ga weak reference
+
+function attachHandler(element) {
+  // ✅ largeData closure tashqarisida bo'lsin — keraksiz capture yo'q
+  function onClick() {
+    console.log("clicked");
+  }
+
+  element.addEventListener("click", onClick);
+  handlers.add(element);
+
+  // ✅ Cleanup pattern — element'ni olib tashlashdan oldin
+  return () => {
+    element.removeEventListener("click", onClick);
+    // handlers.delete(element) — WeakSet'da yo'q, GC o'zi tozalaydi
+  };
+}
+```
+
+### Edge Cases
+
+- **`WeakRef` va `FinalizationRegistry`** (ES2021) — explicit weak reference va cleanup callback'lar uchun.
+- **Closure scope analysis**: V8 escape analysis bilan ishlatilmagan variable'larni context'dan chiqarib tashlaydi, lekin bu optimization aniq bo'lmasligi mumkin — production kodda har closure'ni keraksiz outer variable'larsiz yozish kerak.
+- **Event listener memory leak**: React/Vue kabi framework'lar bu pattern'ni avtomatik boshqaradi (component unmount'da listener'larni olib tashlaydi). Vanilla JS'da manual cleanup kerak.
+- **Detached DOM**: `node.remove()` chaqirish yetarli emas — JavaScript reference'lar ham olib tashlanishi kerak.
+
+### Follow-up savollar
+
+1. "GC qachon ishga tushadi?" — V8'da: heap allocation pressure (allocation rate), idle time, explicit `--expose-gc` bilan manual trigger. Production'da GC pause minimal bo'lishi uchun Orinoco (concurrent + incremental + parallel) ishlatadi.
+2. "Memory leak'ni qanday topish kerak?" — Chrome DevTools Memory tab: Heap Snapshot (snapshot solishtirish), Allocation Timeline, Allocation Sampling. Node.js'da: `--inspect` + Chrome DevTools, `heapdump` paketi.
+
+<details>
+<summary><strong>Deep Dive</strong></summary>
+
+V8 GC arxitekturasi (Orinoco):
+- **Young Generation (Scavenger)**: bump pointer allocation, semi-space copying GC (Cheney's algorithm). Tez, lekin pause beradi.
+- **Old Generation (Mark-Compact)**: mark-and-sweep + compaction. Incremental marking (small steps), concurrent marking (background thread), parallel sweeping (multiple threads).
+- **Generational hypothesis**: ko'p object'lar qisqa muddatli. Young space tez GC qilinadi, Old space kamroq.
+- **Write barriers**: old-to-young reference'larni track qiladi (remembered set).
+
+Closure capture mechanism: V8 har function uchun "ScopeInfo" yaratadi — qaysi variable'lar context'da, qaysilari register/stack'da bo'lishini aniqlaydi. Closure tomonidan capture qilingan variable context allocation'ga majburlanadi (heap'da). Bu allocation funksiya scope tugaganda ham yashashda davom etadi.
+
+</details>
 
 </details>

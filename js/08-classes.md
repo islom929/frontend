@@ -37,7 +37,7 @@ Lekin `class` faqat "go'zal yozuv" emas — u bir nechta muhim farqlarga ega:
 1. `class` ichidagi barcha method'lar **non-enumerable** (`enumerable: false`) — constructor function'da esa default `true`
 2. `class` ichidagi barcha kod avtomatik **strict mode** da ishlaydi
 3. `class` ni `new` siz chaqirib bo'lmaydi — `TypeError` beradi
-4. `class` **function declaration kabi to'liq hoist emas** — u `let`/`const` kabi TDZ da turadi (binding scope boshida yaratiladi, lekin initialization evaluation vaqtiga kechiktiriladi). Function declaration esa to'liq hoist bo'ladi — e'londan oldin chaqirish mumkin.
+4. `class` **function declaration kabi to'liq hoist emas** — u `let`/`const` kabi TDZ'da turadi (binding scope boshida yaratiladi, lekin initialization evaluation vaqtiga kechiktiriladi). Function declaration esa to'liq hoist bo'ladi — e'londan oldin chaqirish mumkin.
 5. `class` method'larida `[[Construct]]` internal slot yo'q — ya'ni method'larni `new` bilan chaqirib bo'lmaydi
 
 <details>
@@ -146,7 +146,7 @@ Class body parse qilinganida engine **ClassDefinitionEvaluation** algorithm'ini 
 4. Static method'lar constructor function'ning o'ziga own property sifatida qo'shiladi
 5. Class field'lar (public va private) alohida **ClassFieldDefinition** record'lari sifatida saqlanadi — ular `new` chaqirilganida constructor oxirida evaluate bo'ladi
 
-V8 da class yaratilganida engine `JSFunction` object yaratadi va unga `SharedFunctionInfo` bog'laydi. Prototype object `JSObject` sifatida allocate qilinadi va **Hidden Class** orqali shape tracking ishlaydi. (V8 source kodida Hidden Class `Map` deb nomlanadi — lekin bu JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha.) Constructor'dagi `this.prop = value` assignment'lar V8 ning inline cache (IC) mexanizmi orqali optimallashtiriladi — har bir property qo'shilganida yangi Hidden Class transition yaratiladi.
+V8'da class yaratilganida engine `JSFunction` object yaratadi va unga `SharedFunctionInfo` bog'laydi. Prototype object `JSObject` sifatida allocate qilinadi va **Hidden Class** orqali shape tracking ishlaydi. (V8 source kodida Hidden Class `Map` deb nomlanadi — lekin bu JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha.) Constructor'dagi `this.prop = value` assignment'lar V8'ning inline cache (IC) mexanizmi orqali optimallashtiriladi — har bir property qo'shilganida yangi Hidden Class transition yaratiladi.
 
 Private field va method'lar uchun alohida `ClassScope` yaratiladi — bu scope tashqi koddan accessible emas. `#field` lar `PrivateName` record sifatida class evaluation vaqtida ro'yxatga olinadi.
 
@@ -224,10 +224,10 @@ Class'ni ikki usulda yaratish mumkin — declaration va expression. Farqi functi
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spec da class declaration va class expression ikkalasi ham **ClassDefinitionEvaluation** orqali evaluate bo'ladi. Farq faqat binding mexanizmida:
+ECMAScript spec'da class declaration va class expression ikkalasi ham **ClassDefinitionEvaluation** orqali evaluate bo'ladi. Farq faqat binding mexanizmida:
 
-- **Class Declaration** — `BindingIdentifier` joriy scope ning **lexical environment** ga `let`-semantika bilan qo'shiladi. Ya'ni hoisting bo'ladi (identifier scope boshida ro'yxatga olinadi), lekin initialization evaluation vaqtigacha kechiktiriladi — bu **TDZ (Temporal Dead Zone)** hosil qiladi.
-- **Class Expression** — `BindingIdentifier` (agar berilgan bo'lsa) faqat class body ichidagi alohida **class scope** da mavjud bo'ladi. Tashqi scope ga qo'shilmaydi. Named class expression da ichki nom recursive reference uchun foydali — `const` semantikasi bilan bind qilinadi (o'zgartirib bo'lmaydi).
+- **Class Declaration** — `BindingIdentifier` joriy scope'ning **lexical environment**'iga `let`-semantika bilan qo'shiladi. Ya'ni hoisting bo'ladi (identifier scope boshida ro'yxatga olinadi), lekin initialization evaluation vaqtigacha kechiktiriladi — bu **TDZ (Temporal Dead Zone)** hosil qiladi.
+- **Class Expression** — `BindingIdentifier` (agar berilgan bo'lsa) faqat class body ichidagi alohida **class scope**'da mavjud bo'ladi. Tashqi scope'ga qo'shilmaydi. Named class expression'da ichki nom recursive reference uchun foydali — `const` semantikasi bilan bind qilinadi (o'zgartirib bo'lmaydi).
 
 V8 parser class declaration ni uchratganida `VariableProxy` yaratadi va uni `MUST_USE_EXECUTION_CONTEXT` bilan belgilaydi. Class expression da esa anonymous class uchun V8 `SharedFunctionInfo` ning `inferred_name` field'iga o'zgaruvchi nomini yozadi — shuning uchun `const Foo = class {}` da `Foo.name === "Foo"` bo'ladi. Bu **name inference** mexanizmi `AssignmentExpression` evaluation vaqtida ishlaydi.
 
@@ -306,13 +306,13 @@ Bu farq nima uchun bor? Class'da `extends` bilan inheritance bo'lishi mumkin —
 
 ECMAScript spec bo'yicha class declaration `let` bilan bir xil **lexical binding** mexanizmidan foydalanadi. Compilation phase da engine quyidagilarni bajaradi:
 
-1. **CreateMutableBinding** — identifier scope ga qo'shiladi, lekin **uninitialized** holatda
+1. **CreateMutableBinding** — identifier scope'ga qo'shiladi, lekin **uninitialized** holatda
 2. Shu nuqtadan to `class` declaration evaluate bo'lguncha — TDZ faol. Bu oraliqda identifier ga har qanday murojaat `ReferenceError` beradi
 3. **ClassDefinitionEvaluation** tugagandan so'ng — **InitializeBinding** chaqiriladi va class function reference bind bo'ladi
 
-V8 da TDZ implement qilish uchun `TheHole` degan maxsus sentinel value ishlatiladi. Binding yaratilganda uning qiymati `TheHole` ga set bo'ladi. Har bir variable access da V8 `TheHole` check qiladi — agar topsa `ReferenceError` throw qiladi. Bu check production code da JIT compiler tomonidan optimize qilinishi mumkin — agar V8 statik analiz orqali isbotlay olsa ki binding doim initialized bo'ladi, TDZ check ni olib tashlaydi.
+V8'da TDZ implement qilish uchun `TheHole` degan maxsus sentinel value ishlatiladi. Binding yaratilganda uning qiymati `TheHole` ga set bo'ladi. Har bir variable access da V8 `TheHole` check qiladi — agar topsa `ReferenceError` throw qiladi. Bu check production code da JIT compiler tomonidan optimize qilinishi mumkin — agar V8 statik analiz orqali isbotlay olsa ki binding doim initialized bo'ladi, TDZ check ni olib tashlaydi.
 
-`typeof` operatori ham TDZ da `ReferenceError` beradi — bu e'lon qilinMAGAN variable dan farq (`typeof undeclared === "undefined"`). Sababi: spec bo'yicha `typeof` avval **GetValue** chaqiradi, GetValue esa uninitialized binding uchun xato beradi. E'lon qilinmagan identifier uchun esa `typeof` maxsus yo'l bilan unresolvable reference ni handle qiladi.
+`typeof` operatori ham TDZ'da `ReferenceError` beradi — bu e'lon qilinMAGAN variable'dan farq (`typeof undeclared === "undefined"`). Sababi: spec bo'yicha `typeof` avval **GetValue** chaqiradi, GetValue esa uninitialized binding uchun xato beradi. E'lon qilinmagan identifier uchun esa `typeof` maxsus yo'l bilan unresolvable reference'ni handle qiladi.
 
 </details>
 
@@ -320,7 +320,7 @@ V8 da TDZ implement qilish uchun `TheHole` degan maxsus sentinel value ishlatila
 <summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
-// ❌ Class — TDZ da, e'londan oldin ishlatib bo'lmaydi:
+// ❌ Class — TDZ'da, e'londan oldin ishlatib bo'lmaydi:
 const user = new User("Ali"); // ❌ ReferenceError: Cannot access 'User' before initialization
 
 class User {
@@ -334,7 +334,7 @@ function UserFn(name) { this.name = name; }
 ```
 
 ```javascript
-// typeof ham TDZ da xato beradi:
+// typeof ham TDZ'da xato beradi:
 console.log(typeof User); // ❌ ReferenceError (TDZ)
 
 class User {}
@@ -346,7 +346,7 @@ console.log(typeof createUser); // "function"
 
 // E'lon qilinMAGAN o'zgaruvchi uchun typeof xato bermaydi:
 console.log(typeof Nonexistent); // "undefined" — xato emas
-// Farq: e'lon qilinmagan → "undefined", TDZ da → ReferenceError
+// Farq: e'lon qilinmagan → "undefined", TDZ'da → ReferenceError
 ```
 
 </details>
@@ -508,7 +508,7 @@ ES2022 dan beri JavaScript'da **haqiqiy private** field va method'lar mavjud —
 
 Private field'lar nima uchun kerak? Encapsulation — ichki implementation detallarini yashirish. Bu refactoring ni osonlashtiradi (ichki field nomini o'zgartirsangiz, tashqi kod buzilmaydi) va xavfsizlikni oshiradi (tashqi kod ichki holatni o'zgartira olmaydi).
 
-`#` field'lar `_convention` (underscore prefix) dan qanday farq qiladi? `_name` — bu faqat **convention** (kelishuv), hech qanday himoya yo'q — tashqi kod `obj._name` ga bemalol kiradi. `#name` — bu **til enforsementi**, tashqi kodda `obj.#name` deb yozish **SyntaxError**.
+`#` field'lar `_convention` (underscore prefix) dan qanday farq qiladi? `_name` — bu faqat **convention** (kelishuv), hech qanday himoya yo'q — tashqi kod `obj._name` ga bemalol kiradi. `#name` — bu **til darajasidagi enforcement**, tashqi kodda `obj.#name` deb yozish **SyntaxError**.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -636,16 +636,16 @@ Public class field'lar — constructor'siz instance property e'lon qilish imkoni
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Public class field'lar spec da **Define semantics** ishlatadi — **Set semantics** emas. Bu muhim farq:
+Public class field'lar spec'da **Define semantics** ishlatadi — **Set semantics** emas. Bu muhim farq:
 
-- **Define** (`Object.defineProperty`) — property ni to'g'ridan-to'g'ri object ga qo'shadi, prototype chain dagi setter'larni **chaqirmaydi**
+- **Define** (`Object.defineProperty`) — property'ni to'g'ridan-to'g'ri object'ga qo'shadi, prototype chain'dagi setter'larni **chaqirmaydi**
 - **Set** (`obj.prop = value`) — prototype chain bo'ylab setter qidiradi va topsa chaqiradi
 
-Bu degani: agar parent class da `set name(v) { ... }` bo'lsa ham, child class dagi `name = "default"` field shu setter ni **bypass** qiladi va to'g'ridan-to'g'ri own property yaratadi. Bu TC39 tomonidan ataylab tanlangan — field'lar predictable bo'lishi uchun.
+Bu degani: agar parent class'da `set name(v) { ... }` bo'lsa ham, child class'dagi `name = "default"` field shu setter'ni **bypass** qiladi va to'g'ridan-to'g'ri own property yaratadi. Bu TC39 tomonidan ataylab tanlangan — field'lar predictable bo'lishi uchun.
 
-Engine ichida class field'lar **ClassFieldDefinition** record sifatida class evaluation vaqtida yig'iladi. Har bir field `[[Name]]` (property key) va `[[Initializer]]` (thunk function) dan iborat. `new` bilan constructor chaqirilganida, constructor body bajarilgandan **keyin** field initializer'lar tartib bo'yicha evaluate bo'ladi. Initializer ichida `this` yangi yaratilgan instance ga ishora qiladi.
+Engine ichida class field'lar **ClassFieldDefinition** record sifatida class evaluation vaqtida yig'iladi. Har bir field `[[Name]]` (property key) va `[[Initializer]]` (thunk function)'dan iborat. `new` bilan constructor chaqirilganida, constructor body bajarilgandan **keyin** field initializer'lar tartib bo'yicha evaluate bo'ladi. Initializer ichida `this` yangi yaratilgan instance'ga ishora qiladi.
 
-V8 da class field'lar object ning **Hidden Class** transition chain'iga oldindan qo'shiladi. V8 class literal ni parse qilganida barcha field'larning nomlarini biladi va `InitialMap` ni yaratadi (V8 source'dagi "Map" — Hidden Class'ning ichki nomi, JS `Map` data structure emas) — bu instance creation ni tezlashtiradi chunki property'lar uchun shape transition'lar oldindan hisoblangan bo'ladi. Arrow function field'lar uchun har instance da yangi `JSFunction` allocate qilinadi — bu prototype method'ga nisbatan ko'proq memory ishlatadi.
+V8'da class field'lar object'ning **Hidden Class** transition chain'iga oldindan qo'shiladi. V8 class literal'ni parse qilganida barcha field'larning nomlarini biladi va `InitialMap`'ni yaratadi (V8 source'dagi "Map" — Hidden Class'ning ichki nomi, JS `Map` data structure emas) — bu instance creation'ni tezlashtiradi chunki property'lar uchun shape transition'lar oldindan hisoblangan bo'ladi. Arrow function field'lar uchun har instance'da yangi `JSFunction` allocate qilinadi — bu prototype method'ga nisbatan ko'proq memory ishlatadi.
 
 </details>
 
@@ -690,7 +690,7 @@ Class field'da arrow function aniqlash — `this` ni avtomatik bind qiladi. Bu e
 class Timer {
   count = 0;
 
-  // Arrow function field — this doim Timer instance ga bog'liq:
+  // Arrow function field — this doim Timer instance'ga bog'liq:
   increment = () => {
     this.count++;
     console.log(this.count);
@@ -827,11 +827,11 @@ ES2022 da qo'shilgan `static { }` bloki — class yaratilganda (instance emas!) 
 
 Spec da static block **ClassStaticBlockDefinition** record sifatida ifodalanadi. Bu record `[[BodyFunction]]` field'iga ega — anonymous function bo'lib, class evaluation vaqtida call qilinadi. `this` qiymati class constructor'ning o'ziga set bo'ladi.
 
-Static block'lar class body dagi boshqa static element'lar bilan **textual order** da evaluate bo'ladi. Ya'ni agar static field, keyin static block, keyin yana static field bo'lsa — aynan shu tartibda bajariladi. Bu ordering kafolati spec da aniq belgilangan va engine'lar uni to'g'ri implement qilishi shart.
+Static block'lar class body'dagi boshqa static element'lar bilan **textual order**'da evaluate bo'ladi. Ya'ni agar static field, keyin static block, keyin yana static field bo'lsa — aynan shu tartibda bajariladi. Bu ordering kafolati spec'da aniq belgilangan va engine'lar uni to'g'ri implement qilishi shart.
 
 Static block ichida `this` class constructor'ga teng bo'lgani uchun, private static field'larga ham murojaat qilish mumkin — `this.#privateField`. Bu static block'ning asosiy use case'laridan biri: private static member'larga class tashqarisidan kirish imkoni beruvchi "friend" pattern. Masalan, static block ichida tashqi variable'ga private field accessor'ni assign qilish mumkin.
 
-V8 da static block parse vaqtida maxsus `ClassStaticBlock` AST node sifatida saqlanadi. Bytecode generation da u oddiy function call ga aylanadi. Static block ichidagi error (exception) class creation ni to'xtatadi — class object yaratilmay qoladi va binding uninitialized holatda qoladi.
+V8'da static block parse vaqtida maxsus `ClassStaticBlock` AST node sifatida saqlanadi. Bytecode generation da u oddiy function call ga aylanadi. Static block ichidagi error (exception) class creation ni to'xtatadi — class object yaratilmay qoladi va binding uninitialized holatda qoladi.
 
 </details>
 
@@ -902,7 +902,7 @@ Getter/setter nima uchun kerak? Validation (qiymat o'rnatishda tekshirish), comp
 
 Class ichidagi `get` va `set` keyword'lar spec bo'yicha `Object.defineProperty` ning **accessor descriptor** formatiga compile bo'ladi. `get propName()` method uchun property descriptor `{ get: function, set: undefined, enumerable: false, configurable: true }` bo'ladi. Agar `get` va `set` ikkalasi ham aniqlangan bo'lsa — bitta property descriptor da birlashtiriladi.
 
-Engine ichida accessor property oddiy data property dan farqli tarzda saqlanadi. V8 da Hidden Class property descriptor turini kuzatib boradi — accessor property `kAccessor` turi bilan belgilanadi. `obj.prop` o'qilganida V8 property lookup qilib, descriptor turini tekshiradi: agar `kAccessor` bo'lsa — `[[Get]]` function ni chaqiradi; agar `kData` bo'lsa — qiymatni to'g'ridan-to'g'ri qaytaradi.
+Engine ichida accessor property oddiy data property'dan farqli tarzda saqlanadi. V8'da Hidden Class property descriptor turini kuzatib boradi — accessor property `kAccessor` turi bilan belgilanadi. `obj.prop` o'qilganida V8 property lookup qilib, descriptor turini tekshiradi: agar `kAccessor` bo'lsa — `[[Get]]` function'ni chaqiradi; agar `kData` bo'lsa — qiymatni to'g'ridan-to'g'ri qaytaradi.
 
 Class body dagi getter/setter `prototype` object'ga qo'shiladi — ya'ni barcha instance'lar bitta getter/setter function'ni share qiladi. Bu `Object.getOwnPropertyDescriptor(ClassName.prototype, 'propName')` orqali tekshirish mumkin. Constructor ichidagi `this.prop = value` assignment accessor'ni trigger qiladi — chunki bu `Set` semantics, prototype chain dagi setter ni topadi va chaqiradi.
 
@@ -973,11 +973,11 @@ console.log(temp.celsius);    // 0
 3. Prototype chain bo'ylab yuqoriga yuradi: har bir `[[Prototype]]` ni `Constructor.prototype` bilan **reference equality** (`===`) orqali taqqoslaydi
 4. Agar topilsa — `true`, chain oxiriga (`null`) yetsa — `false`
 
-Bu linear search — prototype chain uzun bo'lsa, `instanceof` sekinlashadi. Lekin amalda chain kamdan-kam 3-4 dan oshadi. V8 da `instanceof` uchun **InstanceOf** bytecode instruction bor va IC (inline cache) orqali optimize qilinadi — ma'lum constructor uchun natija cache'lanadi.
+Bu linear search — prototype chain uzun bo'lsa, `instanceof` sekinlashadi. Lekin amalda chain kamdan-kam 3-4'dan oshadi. V8'da `instanceof` uchun **InstanceOf** bytecode instruction bor va IC (inline cache) orqali optimize qilinadi — ma'lum constructor uchun natija cache'lanadi.
 
-`Symbol.hasInstance` — well-known symbol bo'lib, `instanceof` behavior ni to'liq override qilish imkonini beradi. `Function.prototype[Symbol.hasInstance]` da default implementation `OrdinaryHasInstance` ni chaqiradi. Class da `static [Symbol.hasInstance](instance)` method aniqlansa — prototype chain walk o'rniga custom logic ishlaydi. Bu duck typing pattern uchun ishlatiladi.
+`Symbol.hasInstance` — well-known symbol bo'lib, `instanceof` behavior'ni to'liq override qilish imkonini beradi. `Function.prototype[Symbol.hasInstance]`'da default implementation `OrdinaryHasInstance`'ni chaqiradi. Class'da `static [Symbol.hasInstance](instance)` method aniqlansa — prototype chain walk o'rniga custom logic ishlaydi. Bu duck typing pattern uchun ishlatiladi.
 
-`Object.setPrototypeOf` yoki `__proto__` orqali prototype chain o'zgartirilsa — `instanceof` natijasi ham o'zgaradi, chunki u runtime da chain ni walk qiladi, cache'lanmaydi (IC invalidation bo'ladi).
+`Object.setPrototypeOf` yoki `__proto__` orqali prototype chain o'zgartirilsa — `instanceof` natijasi ham o'zgaradi, chunki u runtime'da chain'ni walk qiladi, cache'lanmaydi (IC invalidation bo'ladi).
 
 </details>
 
@@ -1035,7 +1035,7 @@ Engine darajasida class va constructor function o'rtasida bir nechta spec-level 
 3. **Strict mode** — class body doim strict mode da parse qilinadi. Bu `FunctionBody` ning `[[Strict]]` field'ida `true` sifatida belgilanadi. Constructor function'da esa `"use strict"` direktivasi yozilmasa sloppy mode bo'ladi.
 4. **Method definition** — class ichidagi method'lar `PropertyDefinitionEvaluation` orqali `enumerable: false` bilan define qilinadi. `Constructor.prototype.method = function(){}` esa default `enumerable: true` beradi.
 
-Babel/TypeScript class'ni ES5 ga transpile qilganida bu farqlarni emulyatsiya qiladi: `_classCallCheck` funksiyasi `[[IsClassConstructor]]` ni, `_createClass` funksiyasi `Object.defineProperty` bilan non-enumerable method'larni, va `"use strict"` directive strict mode ni ta'minlaydi. Lekin native class V8 da to'g'ridan-to'g'ri `ClassLiteral` AST node sifatida optimallashtirilgan — transpiled versiyaga nisbatan kamroq overhead beradi.
+Babel/TypeScript class'ni ES5'ga transpile qilganida bu farqlarni emulyatsiya qiladi: `_classCallCheck` funksiyasi `[[IsClassConstructor]]`'ni, `_createClass` funksiyasi `Object.defineProperty` bilan non-enumerable method'larni, va `"use strict"` directive strict mode'ni ta'minlaydi. Lekin native class V8'da to'g'ridan-to'g'ri `ClassLiteral` AST node sifatida optimallashtirilgan — transpiled versiyaga nisbatan kamroq overhead beradi.
 
 </details>
 
@@ -1089,7 +1089,7 @@ new PersonFn.prototype.greet(); // ✅ ishlaydi (xato, lekin ruxsat beriladi)
 
 ### Transpile — Class Engine Ichida
 
-Babel yoki TypeScript class'ni ES5 ga transpile qilganda quyidagiga o'xshash natija beradi:
+Babel yoki TypeScript class'ni ES5'ga transpile qilganda quyidagiga o'xshash natija beradi:
 
 ```javascript
 // ES6 class:
@@ -1139,7 +1139,7 @@ Mixin pattern `extends` clause da dynamic expression bo'lishi mumkinligiga asosl
 instance → MixinA.prototype → MixinB.prototype → MixinC.prototype → Object.prototype → null
 ```
 
-Har bir mixin chaqiruvi `ClassDefinitionEvaluation` ni trigger qiladi va yangi `JSFunction` + `prototype` object pair yaratiladi. V8 nuqtai nazaridan bu prototype chain uzayishi demak — property lookup har bir chain element'ini tekshiradi. Lekin V8 ning inline cache (IC) mexanizmi tez-tez murojaat qilinadigan property'lar uchun lookup natijasini cache'laydi.
+Har bir mixin chaqiruvi `ClassDefinitionEvaluation`'ni trigger qiladi va yangi `JSFunction` + `prototype` object pair yaratiladi. V8 nuqtai nazaridan bu prototype chain uzayishi demak — property lookup har bir chain element'ini tekshiradi. Lekin V8'ning inline cache (IC) mexanizmi tez-tez murojaat qilinadigan property'lar uchun lookup natijasini cache'laydi.
 
 `Object.assign(Target.prototype, mixin)` alternativi ham ishlatiladi — bu prototype chain uzaytirmaydi, lekin `super` ishlamaydi va `instanceof` check ham mixin uchun `false` qaytaradi. Subclass factory pattern esa to'liq prototype chain quradi, `super` ishlaydi va `instanceof` to'g'ri natija beradi.
 
@@ -1183,9 +1183,11 @@ const Validatable = (Base) => class extends Base {
 };
 
 // Mixin'larni qo'llash — chaining:
-// Object ni base sifatida berish kerak — chunki har bir mixin factory
-// argumentga "Base" class'ni kutadi va uni extend qiladi. Object barcha
-// class'larning default parent'i, shuning uchun zanjir boshi sifatida ishlatiladi.
+// Object'ni base sifatida berish — chunki har bir mixin factory argumentga
+// extend qilinadigan class kutadi. `Object` har qanday class uchun valid
+// constructor (static inheritance uchun `Child.[[Prototype]] = Object`
+// bog'lanishini hosil qiladi). Custom base kerak bo'lmasa, `Object` zanjir
+// boshi sifatida ishlatiladi.
 class User extends Serializable(Timestamped(Validatable(Object))) {
   constructor(name, email) {
     super();  // Serializable → Timestamped → Validatable → Object zanjiri bo'ylab
@@ -1225,15 +1227,15 @@ Gang of Four (GoF) design patterns kitobidagi mashhur qoida: **"Favor compositio
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Inheritance va composition V8 ning object representation'iga turlicha ta'sir qiladi:
+Inheritance va composition V8'ning object representation'iga turlicha ta'sir qiladi:
 
 **Inheritance** da barcha instance'lar bir xil prototype chain'ga ega — V8 bu uchun bitta Hidden Class transition tree yaratadi. Bu monomorphic IC uchun ideal — property access tez bo'ladi. Lekin chuqur inheritance chain (ya'ni prototype chain uzun bo'lgan holatda) IC cache miss paytida property lookup'ni sekinlashtirishi mumkin — chunki har bir prototype level ketma-ket tekshiriladi. Aniq ta'sir cache holatiga (monomorphic/polymorphic/megamorphic) va kod pattern'iga bog'liq.
 
-**Composition** da (`Object.assign` yoki spread bilan) barcha method'lar instance'ning **own property** lari bo'ladi. Bu V8 da boshqa `Map` shape yaratadi — har instance'da ko'proq property bo'lgani uchun `Map` kattaroq bo'ladi. Lekin lookup tez — chunki prototype chain yurish shart emas, faqat own property tekshiriladi.
+**Composition**'da (`Object.assign` yoki spread bilan) barcha method'lar instance'ning **own property**'lari bo'ladi. Bu V8'da boshqa `Map` shape yaratadi — har instance'da ko'proq property bo'lgani uchun `Map` kattaroq bo'ladi. Lekin lookup tez — chunki prototype chain yurish shart emas, faqat own property tekshiriladi.
 
 Memory nuqtai nazaridan: inheritance da method'lar prototype'da bitta nusxada saqlanadi — 1000 ta instance uchun 1 ta function object. Composition da (`Object.assign` bilan factory pattern) har instance uchun method reference own property sifatida saqlanadi — 1000 ta instance uchun 1000 ta property entry (lekin function object'ning o'zi share bo'lishi mumkin, faqat property descriptor qo'shimcha memory oladi).
 
-V8 ning object shape tracking tizimi inheritance pattern uchun yaxshiroq optimallashtirilgan — chunki barcha instance'lar bir xil `Map` ni share qiladi. Composition da har xil capability kombinatsiyalari turli `Map` lar hosil qiladi — bu **megamorphic** holat yaratib, IC performance ni tushirishi mumkin.
+V8'ning object shape tracking tizimi inheritance pattern uchun yaxshiroq optimallashtirilgan — chunki barcha instance'lar bir xil `Map` ni share qiladi. Composition da har xil capability kombinatsiyalari turli `Map` lar hosil qiladi — bu **megamorphic** holat yaratib, IC performance ni tushirishi mumkin.
 
 </details>
 
@@ -1255,7 +1257,7 @@ V8 ning object shape tracking tizimi inheritance pattern uchun yaxshiroq optimal
 // ❌ Inheritance orqali — rigid, tight coupling:
 class FlyingSwimmingDuck extends FlyingAnimal {
   // Agar SwimmingAnimal dan ham meros olish kerak bo'lsa?
-  // JavaScript da multiple inheritance yo'q!
+  // JavaScript'da multiple inheritance yo'q!
 }
 
 // Inheritance bilan "Diamond Problem" yuzaga keladi:
@@ -1267,7 +1269,7 @@ class FlyingSwimmingDuck extends FlyingAnimal {
 //       Duck ???  ← qaysi Animal.eat() ni oladi?
 //
 // JavaScript buni tuzatolmaydi — faqat BITTA extends mumkin.
-// Yechim: Composition!
+// Yechim: composition pattern.
 ```
 
 ### 1. Object Composition (Functional Pattern)
@@ -2218,7 +2220,7 @@ console.log(user.serialize());  // '{"name":"Ali","email":"ali@mail.com"}'
 
 1. **Class = syntactic sugar** — ichida constructor function + prototype ishlaydi. Lekin strict mode, non-enumerable method'lar, `new` majburiyligi kabi muhim farqlar bor.
 
-2. **Class hoisting** — TDZ da turadi (`let`/`const` kabi). Function declaration'dan farqli ravishda e'londan oldin ishlatib bo'lmaydi.
+2. **Class hoisting** — TDZ'da turadi (`let`/`const` kabi). Function declaration'dan farqli ravishda e'londan oldin ishlatib bo'lmaydi.
 
 3. **`extends` va `super`** — inheritance chain quradi. `super()` derived class constructor'da `this` ishlatishdan oldin chaqirilishi SHART. `super.method()` parent method'ni chaqiradi.
 

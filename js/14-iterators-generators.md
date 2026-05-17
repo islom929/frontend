@@ -669,7 +669,7 @@ State 0 ─────────► State 1 ─────────► St
    done:false}        done:false}        done:true}
 ```
 
-V8 ichida generator function Babel transpile qilgandek switch-case state machine'ga aylanadi:
+V8 aslida generator funksiyani **bytecode darajasida** boshqaradi — `SuspendGenerator` va `ResumeGenerator` opcode'lar bilan register-based coroutine mexanizmi orqali. Quyidagi switch-case representation — bu **Babel/regenerator runtime** transpilation pattern'i (pedagogik jihatdan V8'ning native mexanizmiga semantik jihatdan teng, lekin implementation boshqacha):
 
 ```javascript
 // Biz yozamiz:
@@ -679,7 +679,7 @@ function* myGen() {
   return a + b;
 }
 
-// V8 soddalashtirilgan internal representation:
+// Babel/regenerator transpile natijasi (V8 native emas, lekin semantik teng):
 function myGen_desugared() {
   let _state = 0;
   let _a, _b, _sentValue;
@@ -1679,7 +1679,7 @@ Generator'ning pause/resume xususiyati state machine implement qilish uchun idea
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Generator spec bo'yicha uchta internal state'ga ega: **`"suspendedStart"`** (yaratilgan, hali `next()` chaqirilmagan), **`"suspendedYield"`** (`yield` da to'xtagan), **`"executing"`** (`next()` bilan ishlayotgan), **`"completed"`** (`return` yoki funksiya tugagan). State machine pattern'da generator o'zining `[[GeneratorState]]` dan tashqari, dasturchi belgilagan business state'larni ham boshqaradi (QIZIL/SARIQ/YASHIL). `while (true)` + `yield` kombinatsiyasi circular state machine yaratadi — generator hech qachon `"completed"` state'ga o'tmaydi. `next(value)` bilan two-way communication — argument oldingi `yield` expression'ning qiymati bo'lib qaytadi. V8 da generator function compile vaqtida state machine'ga aylantiriladi: har bir `yield` alohida switch-case label bo'ladi, `next()` chaqiruvi `[[GeneratorResumeIndex]]` bo'yicha to'g'ri label'ga jump qiladi. Async generator (`async function*`) qo'shimcha murakkablik qo'shadi — har bir `yield` va `await` alohida suspension point, engine ikkalasini internal state'da track qiladi.
+Generator spec bo'yicha to'rtta internal state'ga ega (`[[GeneratorState]]` slot qiymati): **`"suspendedStart"`** (yaratilgan, hali `next()` chaqirilmagan), **`"suspendedYield"`** (`yield` da to'xtagan), **`"executing"`** (`next()` bilan ishlayotgan), **`"completed"`** (`return` yoki funksiya tugagan). State machine pattern'da generator o'zining `[[GeneratorState]]` dan tashqari, dasturchi belgilagan business state'larni ham boshqaradi (QIZIL/SARIQ/YASHIL). `while (true)` + `yield` kombinatsiyasi circular state machine yaratadi — generator hech qachon `"completed"` state'ga o'tmaydi. `next(value)` bilan two-way communication — argument oldingi `yield` expression'ning qiymati bo'lib qaytadi. V8 da generator function compile vaqtida state machine'ga aylantiriladi: har bir `yield` alohida switch-case label bo'ladi, `next()` chaqiruvi `[[GeneratorResumeIndex]]` bo'yicha to'g'ri label'ga jump qiladi. Async generator (`async function*`) qo'shimcha murakkablik qo'shadi — har bir `yield` va `await` alohida suspension point, engine ikkalasini internal state'da track qiladi.
 
 ```javascript
 function* trafficLight() {

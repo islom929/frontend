@@ -1,6 +1,6 @@
 # Bo'lim 1: JavaScript Engine Ichidan
 
-> JavaScript Engine — JavaScript source code ni qabul qilib, uni machine code ga aylantiruvchi va bajaruvchi dasturiy ta'minot komponenti. Engine parsing, compilation, optimization va execution bosqichlarini o'z ichiga oladi.
+> JavaScript Engine — JavaScript source code'ni qabul qilib, uni machine code'ga aylantiruvchi va bajaruvchi dasturiy ta'minot komponenti. Engine parsing, compilation, optimization va execution bosqichlarini o'z ichiga oladi.
 
 ---
 
@@ -29,17 +29,17 @@
 
 ### Nazariya
 
-JavaScript Engine — bu JavaScript source code ni o'qib, tahlil qilib (parse), compile qilib va bajaradigan (execute) dastur. Brauzerlar va Node.js kabi runtime'lar o'z ichida JavaScript Engine'ni saqlaydi. Engine JavaScript kodini CPU tushunadigan machine code (yoki bytecode) ga aylantiradi va uni bajaradi.
+JavaScript Engine — bu JavaScript source code'ni o'qib, parse qilib, compile qilib va execute qiladigan dastur. Brauzerlar va Node.js kabi runtime'lar o'z ichida JavaScript Engine'ni saqlaydi. Engine JavaScript kodini CPU tushunadigan machine code'ga (yoki bytecode'ga) aylantiradi va uni bajaradi.
 
-JavaScript dasturlash tili sifatida o'zi hech narsa bajarmaydi — u faqat matn (source code). Engine shu matnni oladi, uning ma'nosini tushunadi (parsing), uni optimallashtiradi va CPU uchun tushunarli ko'rsatmalarga aylantiradi. Shu jarayon tufayli `console.log("hello")` degan matn aslida ekranga yozuv chiqaradi.
+JavaScript dasturlash tili sifatida o'zi hech narsa bajarmaydi — source code matn shaklidagi fayl, CPU uni to'g'ridan-to'g'ri tushunmaydi. Engine shu matnni oladi, uning ma'nosini parsing orqali tushunadi, optimallashtiradi va CPU uchun tushunarli ko'rsatmalarga aylantiradi. Shu jarayon tufayli `console.log("hello")` degan matn aslida ekranga yozuv chiqaradi.
 
 Engine'ning asosiy vazifalari:
 
-1. **Parsing** — source code ni tokenlar va AST (Abstract Syntax Tree) ga aylantirish
-2. **Compilation** — AST ni bytecode yoki machine code ga aylantirish
-3. **Execution** — hosil bo'lgan kodni CPU da bajarish
-4. **Optimization** — ko'p chaqiriladigan (hot) kodni yanada tezroq machine code ga qayta compile qilish
-5. **Garbage Collection** — ishlatilmayotgan memory ni avtomatik tozalash
+1. **Parsing** — source code'ni tokenlar va AST (Abstract Syntax Tree)'ga aylantirish
+2. **Compilation** — AST'ni bytecode yoki machine code'ga aylantirish
+3. **Execution** — hosil bo'lgan kodni CPU'da bajarish
+4. **Optimization** — ko'p chaqiriladigan (hot) kodni yanada tezroq machine code'ga qayta compile qilish
+5. **Garbage Collection** — ishlatilmayotgan memory'ni avtomatik tozalash
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -97,9 +97,9 @@ V8 — Google tomonidan C++ da yozilgan engine. Chrome brauzer, Node.js, Deno, E
 
 SpiderMonkey — Mozilla tomonidan C/C++ da yozilgan engine, Firefox brauzerda ishlatiladi. Bu JavaScript uchun yaratilgan birinchi engine (1995, Brendan Eich). Source code avval parser tomonidan AST'ga aylantiriladi, keyin bytecode emitter AST'dan bytecode hosil qiladi. Hosil qilingan bytecode quyidagi tier'lar orqali ishlanadi:
 
-- **Baseline Interpreter** — bytecode interpreter (2019 yildan qo'shilgan). Bytecode'ni assembly templates orqali tez interpret qiladi. Eski C++ interpreter'ga nisbatan sezilarli darajada tezroq
-- **Baseline Compiler** — non-optimizing baseline JIT compiler. Bytecode'dan tezda machine code hosil qiladi, lekin chuqur optimization qo'llamaydi
-- **Warp** — optimizing JIT compiler (2020 yildan IonMonkey'ning o'rnini bosgan). Type feedback va profiling data asosida yuqori darajada optimized machine code ishlab chiqaradi
+- **Baseline Interpreter** — bytecode interpreter (Firefox 70, 2019 yildan qo'shilgan). Bytecode'ni `computed goto` (threaded dispatch) va Baseline JIT'dan qayta ishlatiladigan assembly stub'lar yordamida interpret qiladi. Inline Cache va profiling data Baseline JIT bilan birgalikda ishlatiladi — bu eski C++ interpreter'ga nisbatan sezilarli tezroq
+- **Baseline Compiler (Baseline JIT)** — non-optimizing baseline JIT compiler. Bytecode'dan tezda machine code hosil qiladi, lekin chuqur optimization qo'llamaydi
+- **Warp (WarpMonkey)** — optimizing JIT compiler (Firefox 83, 2020 yildan IonMonkey'ning o'rnini bosgan). CacheIR-based type feedback asosida yuqori darajada optimized machine code ishlab chiqaradi
 
 **JavaScriptCore / JSC (Apple)**
 
@@ -108,7 +108,7 @@ JavaScriptCore — Apple tomonidan yaratilgan engine, Safari brauzer va WebKit f
 - **LLInt (Low-Level Interpreter)** — bytecode interpreter, eng past tier. Tez startup uchun
 - **Baseline JIT** — birinchi compiler tier'i, baseline machine code hosil qiladi
 - **DFG (Data Flow Graph) JIT** — mid-tier optimizing compiler. Type prediction va boshqa optimization'lar
-- **FTL (Faster Than Light) JIT** — yuqori darajadagi optimizing compiler. LLVM/B3 backend'idan foydalanadi (eski nomi Nitro JSC'ning optimizing tier'laridan birining nomi edi)
+- **FTL (Faster Than Light) JIT** — yuqori darajadagi optimizing compiler. Dastlab LLVM backend'idan foydalangan (2014), 2016'dan beri Apple'ning o'z B3 (Bare Bones Backend) compiler infrastructure'iga o'tgan — LLVM'ning katta compile overhead'ini yengillatish maqsadida
 
 **Taqqoslash jadvali:**
 
@@ -119,7 +119,7 @@ JavaScriptCore — Apple tomonidan yaratilgan engine, Safari brauzer va WebKit f
 | Baseline Compiler | Sparkplug | Baseline Compiler | Baseline JIT |
 | Mid-tier | Maglev | yo'q (Baseline'dan to'g'ridan-to'g'ri Warp'ga) | DFG JIT |
 | Top-tier Optimizer | TurboFan | Warp | FTL JIT |
-| GC | Orinoco (Generational + Concurrent) | Generational GC | Riptide (Concurrent) |
+| GC | Orinoco (Generational + Concurrent + Incremental) | Generational + Incremental + Concurrent | Riptide (Concurrent + Incremental) |
 | Ishlatiladi | Chrome, Node.js, Deno, Edge | Firefox | Safari, iOS brauzerlar |
 
 Bu kursda asosiy e'tibor **V8**'ga qaratiladi — chunki u eng keng tarqalgan (Chrome + Node.js), ochiq kodli, va pipeline'i juda yaxshi hujjatlashtirilgan. Boshqa engine'lar bir xil ECMAScript spec'ga amal qilgani uchun, V8'ning mexanizmlarini chuqur tushunib olgach, ularning ishlash printsiplarini ham anglash qiyin bo'lmaydi.
@@ -181,7 +181,7 @@ JavaScript source code CPU da bajarilishi uchun bir necha bosqichdan o'tadi. Bu 
 1. **Source Code** — developer yozgan `.js` fayl matni (odatda UTF-8 encoded)
 2. **Tokenizing / Lexing** — matnni tokenlar (eng kichik ma'noli birliklar) ga parchalash
 3. **Parsing** — tokenlardan AST (Abstract Syntax Tree) quriladi
-4. **Bytecode Generation** — AST dan interpreter uchun bytecode hosil qilinadi
+4. **Bytecode Generation** — AST'dan interpreter uchun bytecode hosil qilinadi
 5. **Interpretation** — bytecode interpreter tomonidan qator-baqator bajariladi
 6. **Profiling** — interpreter qaysi funksiyalar ko'p chaqirilayotganini kuzatadi
 7. **Optimization** — "hot" funksiyalar optimizing compiler ga beriladi
@@ -277,7 +277,7 @@ Tokenizer (yoki Scanner, Lexer) source code string'ini **token**lar ketma-ketlig
 | Operator | `+`, `-`, `*`, `===`, `=>`, `??` |
 | Template | `` ` ``, `${`, `` ` `` |
 
-Tokenizer whitespace va commentlarni odatda skip qiladi (ular AST ga kirmaydi), lekin ularni alohida saqlashi ham mumkin (formatting tool'lar uchun).
+Tokenizer whitespace va commentlarni odatda skip qiladi (ular AST'ga kirmaydi), lekin ularni alohida saqlashi ham mumkin (formatting tool'lar uchun).
 
 **Parsing (Syntactic Analysis)**
 
@@ -285,7 +285,7 @@ Parser tokenlar ketma-ketligini oladi va ulardan **AST** (Abstract Syntax Tree) 
 
 ```javascript
 // SyntaxError parsing bosqichida aniqlanadi — kod hali bajarilmagan
-// Bu xato engine source code ni parse qilayotganda chiqadi
+// Bu xato engine source code'ni parse qilayotganda chiqadi
 const x = ; // SyntaxError: Unexpected token ';'
 ```
 
@@ -346,7 +346,7 @@ let 123abc = 5;   // SyntaxError: Unexpected number
 function() {}     // SyntaxError: Function statements require a function name
 // function declaration da nom majburiy
 
-// ✅ To'g'ri — parser tokenlarni muvaffaqiyatli AST ga aylantiradi
+// ✅ To'g'ri — parser tokenlarni muvaffaqiyatli AST'ga aylantiradi
 const multiply = function(a, b) { return a * b; };
 // function expression da nom ixtiyoriy
 ```
@@ -359,17 +359,17 @@ const multiply = function(a, b) { return a * b; };
 
 ### Nazariya
 
-AST (Abstract Syntax Tree) — source code ning tree (daraxt) shaklidagi abstrakt tasviri. Parser tokenlardan AST ni quriladi. "Abstract" deyilishining sababi — AST da source code'ning barcha detallari emas, faqat semantik (ma'noviy) struktura saqlanadi. Qavslar, nuqtali vergullar, bo'shliqlar — bular AST da yo'q, chunki ular faqat syntax uchun kerak, ma'no uchun emas.
+AST (Abstract Syntax Tree) — source code'ning tree shaklidagi abstrakt tasviri. Parser tokenlardan AST'ni quradi. "Abstract" deyilishining sababi — AST'da source code'ning barcha detallari emas, faqat semantik struktura saqlanadi. Qavslar, nuqtali vergullar, bo'shliqlar — bular AST'da yo'q, chunki ular faqat syntax uchun kerak, ma'no uchun emas.
 
-AST — bu tree data structure bo'lib, har bir node (tugun) kodning bitta semantik birligini ifodalaydi. Masalan: `VariableDeclaration`, `FunctionDeclaration`, `BinaryExpression`, `CallExpression`, `ReturnStatement`.
+AST — bu tree data structure bo'lib, har bir node kodning bitta semantik birligini ifodalaydi. Masalan: `VariableDeclaration`, `FunctionDeclaration`, `BinaryExpression`, `CallExpression`, `ReturnStatement`.
 
 AST nima uchun kerak:
 
-- **Compiler/Interpreter** — AST dan bytecode yoki machine code hosil qiladi
-- **Static Analysis** — ESLint kabi tool'lar AST ni tahlil qilib xatolarni topadi
-- **Code Transformation** — Babel kabi transpiler'lar AST ni o'zgartiradi (yangi syntax → eski syntax)
+- **Compiler/Interpreter** — AST'dan bytecode yoki machine code hosil qiladi
+- **Static Analysis** — ESLint kabi tool'lar AST'ni tahlil qilib xatolarni topadi
+- **Code Transformation** — Babel kabi transpiler'lar AST'ni o'zgartiradi (yangi syntax → eski syntax)
 - **Minification** — Terser AST yordamida kodni qisqartiradi
-- **Formatting** — Prettier AST dan kodni qayta format qiladi
+- **Formatting** — Prettier AST'dan kodni qayta format qiladi
 - **Type Checking** — TypeScript compiler AST ustida type analysis qiladi
 
 <details>
@@ -419,7 +419,7 @@ Har bir AST node — bu JavaScript object:
 }
 ```
 
-AST ni real vaqtda ko'rish uchun [astexplorer.net](https://astexplorer.net) — bu tool'da JavaScript kodni yozib, uning AST sini vizual ko'rish mumkin.
+AST'ni real vaqtda ko'rish uchun [astexplorer.net](https://astexplorer.net) — bu tool'da JavaScript kodni yozib, uning AST'sini vizual ko'rish mumkin.
 
 </details>
 
@@ -443,7 +443,7 @@ module.exports = function() {
           callee.object.name === 'console' &&
           callee.property.name === 'log'
         ) {
-          // ✅ console.log() topildi — AST dan olib tashlaymiz
+          // ✅ console.log() topildi — AST'dan olib tashlaymiz
           path.remove();
         }
       }
@@ -488,7 +488,7 @@ Dasturlash tillarini bajarish uchun ikkita asosiy yondashuv mavjud: **interpreta
 
 **Interpreter:**
 
-- Source code ni (yoki bytecode ni) **qator-baqator** o'qib bajaradi
+- Source code'ni (yoki bytecode'ni) **qator-baqator** o'qib bajaradi
 - Oldindan compile qilish shart emas — darhol bajarishni boshlaydi
 - Har safar bir xil kodni qayta o'qib bajaradi — takroriy chaqiruvlarda sekin
 - Afzalligi: **startup tez** — darhol bajarishni boshlaydi, compile kutish kerak emas
@@ -496,7 +496,7 @@ Dasturlash tillarini bajarish uchun ikkita asosiy yondashuv mavjud: **interpreta
 
 **Compiler:**
 
-- Butun source code ni **oldindan** machine code ga aylantiradi
+- Butun source code'ni **oldindan** machine code'ga aylantiradi
 - Compile vaqtida optimization qilish imkoniyati bor
 - Compile qilingan machine code to'g'ridan-to'g'ri CPU da ishlaydi — juda tez
 - Afzalligi: **runtime tez** — optimized machine code CPU da native ishlaydi
@@ -523,7 +523,7 @@ JavaScript bu dilemmani **JIT (Just-In-Time) compilation** bilan hal qiladi: kod
 - **2008** — Google V8 engine chiqdi va JavaScript uchun JIT compilation qo'llashni boshladi. Bu JavaScript'ni bir necha marta tezlashtirdi va Node.js kabi server-side JavaScript'ning paydo bo'lishiga imkon yaratdi
 - **Hozir** — barcha zamonaviy engine'lar **multi-tier JIT compilation** ishlatadi: interpreter + bir nechta darajadagi compiler'lar
 
-**Nima uchun faqat compiler yetarli emas:** JavaScript **dynamic typed** til. Compiler oldindan biror o'zgaruvchining tipini bilmaydi — u `number`, `string`, object yoki boshqa narsa bo'lishi mumkin. Bu runtime'da aniqlanadi. Shuning uchun to'liq ahead-of-time compilation qiyin — compiler konservativ kod hosil qilishga majbur, optimization imkoniyati cheklangan.
+**Nima uchun faqat compiler yetarli emas:** JavaScript **dynamically typed** til. Compiler oldindan biror o'zgaruvchining tipini bilmaydi — u `number`, `string`, object yoki boshqa narsa bo'lishi mumkin. Bu runtime'da aniqlanadi. Shuning uchun to'liq ahead-of-time compilation qiyin — compiler konservativ kod hosil qilishga majbur, optimization imkoniyati cheklangan.
 
 **Nima uchun faqat interpreter yetarli emas:** zamonaviy web ilovalar murakkab — React, Angular, Vue kabi framework'lar minglab funksiyalarni chaqiradi. Faqat interpret qilish juda sekin bo'ladi. Server-side esa katta workload'larni boshqarishi kerak (Node.js).
 
@@ -537,7 +537,7 @@ JavaScript bu dilemmani **JIT (Just-In-Time) compilation** bilan hal qiladi: kod
 
 ### Nazariya
 
-JIT (Just-In-Time) Compilation — kodni runtime da, kerak bo'lgan paytda compile qilish usuli. AOT (Ahead-Of-Time) compilation'dan farqi — JIT da butun kod oldindan compile qilinmaydi, balki faqat bajarilayotgan qism kerak bo'lganda compile qilinadi.
+JIT (Just-In-Time) Compilation — kodni runtime'da, kerak bo'lgan paytda compile qilish usuli. AOT (Ahead-Of-Time) compilation'dan farqi — JIT'da butun kod oldindan compile qilinmaydi, balki faqat bajarilayotgan qism kerak bo'lganda compile qilinadi.
 
 JIT compilation'ning asosiy g'oyasi: **avval interpret qil, keyin ko'p chaqiriladigan kodni compile qil**.
 
@@ -579,7 +579,7 @@ TurboFan — V8'ning eng yuqori tier compiler'i. Assumption'lar asosida quyidagi
 | **Dead Code Elimination** | Hech qachon bajarilmaydigan kodni olib tashlaydi |
 | **Constant Folding** | `3 + 5` ni compile vaqtida `8` ga almashtiradi |
 | **Loop Invariant Code Motion** | Loop ichidagi o'zgarmas kodni loop tashqarisiga chiqaradi |
-| **Escape Analysis** | Object funksiyadan tashqariga chiqmasa — heap emas, stack'da ajratiladi |
+| **Escape Analysis + Scalar Replacement** | Object faqat funksiya ichida qolsa (escape qilmasa) — V8 uni butunlay allocate qilmaydi, property'larini alohida register/stack slot qiymatlariga aylantiradi |
 | **Register Allocation** | O'zgaruvchilarni CPU register'lariga optimal joylashtiradi |
 
 Har bir optimization assumption'ga tayanadi: masalan inlining "bu call doim shu funksiya chaqiradi" deb faraz qiladi. Agar assumption buzilsa — `Optimization va Deoptimization` bo'limidagi deopt jarayoni ishga tushadi.
@@ -646,7 +646,7 @@ Asosiy assumption'lar:
 - **Shape Assumption** — "bu object doim bir xil property'larga ega" → fast property access
 - **Call Target Assumption** — "bu joyda doim bir xil funksiya chaqiriladi" → inline qilish
 
-**Deoptimization (Deopt)** — agar runtime da assumption noto'g'ri chiqsa, engine optimized machine code ni tashlab, bytecode'ga qaytadi. Bu "bail out" deb ham ataladi.
+**Deoptimization (Deopt)** — agar runtime'da assumption noto'g'ri chiqsa, engine optimized machine code'ni tashlab, bytecode'ga qaytadi. Bu "bail out" deb ham ataladi.
 
 Deoptimization qimmat operatsiya — optimized code uchun sarflangan compile vaqti behuda ketadi. Lekin bu xavfsizlik mexanizmi — noto'g'ri natija berishdan ko'ra, sekin lekin to'g'ri ishlash muhimroq.
 
@@ -657,19 +657,23 @@ Deoptimization jarayoni qadam-baqadam:
 
 1. Optimized machine code bajarilayotganda "guard" (tekshiruv) turib qoladi
 2. Guard shart noto'g'ri — masalan, kutilgan number o'rniga string keldi
-3. Engine joriy execution state'ni to'xtatadi
-4. Optimized frame'dan bytecode frame'ga "reconstruct" qiladi (on-stack replacement)
+3. Engine joriy execution state'ni to'xtatadi (eager deopt — darhol, yoki lazy deopt — keyingi safer point'da)
+4. Optimized frame'ni bytecode frame'ga **deopt translation table** orqali qayta tiklaydi (CPU register/stack qiymatlari bytecode register'lariga map qilinadi)
 5. Ignition bytecode'dan davom ettiradi
 6. Keyinchalik bu funksiya yana hot bo'lsa — yangi profiling data bilan qayta optimize qilinishi mumkin
+
+> **Eslatma:** Bu jarayonni "OSR (On-Stack Replacement)" bilan adashtirmaslik kerak. V8 terminologiyasida OSR aksincha yo'nalish — bytecode'da bajarilayotgan funksiyani **stack ustida** optimized machine code'ga almashtirish (masalan uzoq loop bajarilayotgan paytda). Deopt esa optimized → bytecode yo'nalishi, "deoptimization" yoki "bail out" deb ataladi.
 
 Eng ko'p uchraydigan deoptimization sabablari:
 
 | Sabab | Misol | Buziladigan optimization |
 |-------|-------|-------------|
-| Type change | number o'rniga string keldi | Type specialization buziladi |
-| Hidden class change (Map transition) | Object'ga yangi property qo'shish, o'chirish, yoki shape o'zgarishi | Inline cache invalidation, property access deopt |
-| Out-of-bounds access | Array'dan tashqari index'ga murojaat | Bounds check elimination deopt |
-| Prototype chain change | Prototype'ga property qo'shish/o'chirish | Prototype check deopt |
+| Type change (monomorphic → polymorphic) | TurboFan "doim number" deb assume qilgan joyda string keldi | Type specialization bail out, bytecode'ga qaytish |
+| Kutilmagan hidden class | Optimize qilingan funksiya cache'lagan shape'larga mos kelmaydigan object oldi | Inline cache map check fails, deopt |
+| Out-of-bounds access | Array'dan tashqari index'ga murojaat | Bounds check elimination assumption buziladi |
+| Prototype chain mutation | Assume qilingan prototype'ga property qo'shish/o'chirish | Prototype validity cell invalidation |
+
+> **Muhim farq:** Odatiy hidden class transition (object'ga property ketma-ket qo'shish yo'li bilan) deopt EMAS — bu oddiy mexanizm. Deopt faqat **optimize qilingan kod kutgan shape'dan tashqarida** yangi/kutilmagan shape kelgandagina sodir bo'ladi. Monomorphic → polymorphic (2-4 shape) ham deopt emas — IC sekinroq ishlaydi, xolos. Haqiqiy deopt TurboFan guard'lari fail bo'lganda triggered bo'ladi.
 
 </details>
 
@@ -747,17 +751,17 @@ for (let i = 0; i < 10000; i++) {
 
 ### Nazariya
 
-JavaScript — dynamic typed til. Object'ga istalgan vaqtda property qo'shish yoki o'chirish mumkin. Bu moslashuvchanlik bilan birga performance muammosi ham keltirib chiqaradi: engine property'ni topish uchun har safar hash table lookup qilishi kerak, bu esa sekin.
+JavaScript — dynamically typed til. Object'ga istalgan vaqtda property qo'shish yoki o'chirish mumkin. Bu moslashuvchanlik bilan birga performance muammosi ham keltirib chiqaradi: engine property'ni topish uchun har safar hash table lookup qilishi kerak, bu esa sekin.
 
 V8 bu muammoni **Hidden Classes** va **Inline Caching** mexanizmlari bilan hal qiladi. Eslatma: V8 source kodida hidden class'lar `Map` deb nomlanadi, lekin bu JavaScript'dagi `Map` data structure'dan mutlaqo boshqa tushuncha — faqat ichki termin bir xil.
 
 **Hidden Class (Map):**
 Har bir object yaratilganda V8 unga hidden class (Map) biriktiradi. Hidden class — object'ning "shape" ini (qaysi property'lar bor, ular xotirada qayerda joylashgan) tavsiflaydigan ichki struktura. Bir xil tartibda bir xil property'larga ega object'lar **bir xil** hidden class'ni share qiladi.
 
-Hidden class nima uchun kerak: agar V8 object'ning shape'ini bilsa, property'ning xotiradagi aniq offset'ini ham biladi. Shunda property lookup hash table orqali emas, to'g'ridan-to'g'ri offset orqali — C/C++ struct kabi tez ishlaydi.
+Hidden class nima uchun kerak: agar V8 object'ning shape'ini bilsa, property'ning xotiradagi aniq offset'ini ham biladi. Shunda property lookup hash table orqali emas, to'g'ridan-to'g'ri offset orqali — C/C++ struct'dagi field access bilan teng tezlikda, bitta memory load instruction'da bajariladi.
 
 **Inline Caching (IC):**
-Inline cache — property access operatsiyasi uchun "yorliq" (shortcut). Birinchi marta `obj.x` bajarilganda engine property'ni topadi va uning hidden class + offset'ini cache'laydi. Keyingi safar xuddi shu shape'dagi object kelsa — cache'dan to'g'ridan-to'g'ri offset bilan oladi, qidiruv kerak emas.
+Inline cache — property access operatsiyasi uchun shortcut. Birinchi marta `obj.x` bajarilganda engine property'ni topadi va uning hidden class + offset'ini cache'laydi. Keyingi safar xuddi shu shape'dagi object kelsa — cache'dan to'g'ridan-to'g'ri offset bilan oladi, qidiruv kerak emas.
 
 IC holatlari:
 - **Monomorphic** — faqat bitta shape uchraydigan joy. Eng tez — single cache entry
@@ -965,7 +969,7 @@ Qadam 7: printSquare tugadi — stack'dan chiqdi
 
 **Stack Overflow:**
 
-Call Stack'ning hajmi cheklangan (brauzer va engine'ga qarab odatda 10,000–25,000 frame atrofida). Agar stack bu limitdan oshsa — **Stack Overflow** xatosi yuz beradi. Bu ko'pincha cheksiz rekursiyada sodir bo'ladi.
+Call Stack'ning hajmi byte'larda cheklangan — odatda bir necha megabayt (V8 thread stack OS-dependent, default ~1 MB usable hudud, Node.js'da `--stack-size` flag bilan o'zgartiriladi). Frame soni har frame'ning hajmiga bog'liq: kichik funksiyalar uchun o'n minglab frame sig'adi, og'ir local variable'larga ega funksiyalar uchun mingdan kam. Agar stack bu limitdan oshsa — **Stack Overflow** xatosi yuz beradi. Bu ko'pincha cheksiz rekursiyada sodir bo'ladi.
 
 </details>
 
@@ -1056,7 +1060,8 @@ V8 engine'da heap bir necha bo'limlarga (space) ajratilgan:
 │  │  │  (From/To)    │ │ (From/To)    │    │   │
 │  │  └──────────────┘ └──────────────┘    │   │
 │  │  Yangi yaratilgan object'lar shu yerda │   │
-│  │  Hajmi: 1-8 MB (kichik, tez GC)       │   │
+│  │  Default ~16 MB (semi-space x 2),     │   │
+│  │  --max-semi-space-size bilan sozlanadi│   │
 │  └────────────────────────────────────────┘   │
 │                                                │
 │  ┌────────────────────────────────────────┐   │
@@ -1068,7 +1073,8 @@ V8 engine'da heap bir necha bo'limlarga (space) ajratilgan:
 │                                                │
 │  ┌────────────────────────────────────────┐   │
 │  │  Large Object Space                    │   │
-│  │  Katta object'lar (>256KB)             │   │
+│  │  Katta object'lar (kMaxRegularHeap-    │   │
+│  │  ObjectSize dan oshganlar — yuzlab KB) │   │
 │  │  GC da ko'chirilMAYDI                  │   │
 │  └────────────────────────────────────────┘   │
 │                                                │
@@ -1082,7 +1088,7 @@ V8 engine'da heap bir necha bo'limlarga (space) ajratilgan:
 
 > **Eslatma:** Yuqoridagi heap struktura V8'ning umumiy modeli — aniq tafsilotlar (space soni va nomlari, allocation strategiyalari) versiyalar bo'yicha o'zgarib turadi. Asosiy g'oya barqaror: **generational hypothesis** asosida ko'p vaqt yashaydigan va kam vaqt yashaydigan object'lar alohida boshqariladi.
 
-Yangi object yaratilganda V8 ning **allocator**'i New Space'dagi bo'sh joyga joylashtiriladi (bump pointer allocation — juda tez). **Garbage Collector** esa ishlatilmagan xotirani **bo'shatish** (deallocation) bilan shug'ullanadi — xotira yetishmaganda GC trigger bo'ladi. Agar object uzoq yashasa (bir necha GC cycle'dan omon qolsa) — Old Space'ga ko'chiriladi. Bu **generational hypothesis** ga asoslanadi: ko'p object'lar qisqa muddatli, tez yaratiladi va tez unutiladi. Shuning uchun kichik New Space'da tez-tez GC qilish samarali — ko'p "axlat" shu yerda to'planadi.
+Yangi object yaratilganda V8'ning **allocator**'i New Space'dagi bo'sh joyga joylashtiriladi (bump pointer allocation — juda tez). **Garbage Collector** esa ishlatilmagan xotirani deallocate qilish bilan shug'ullanadi — xotira yetishmaganda GC trigger bo'ladi. Agar object uzoq yashasa (bir necha GC cycle'dan omon qolsa) — Old Space'ga ko'chiriladi. Bu **generational hypothesis**'ga asoslanadi: ko'p object'lar qisqa muddatli, tez yaratiladi va tez unutiladi. Shuning uchun kichik New Space'da tez-tez GC qilish samarali — ko'p garbage shu yerda to'planadi.
 
 Memory haqida to'liq ma'lumot — garbage collection algoritmlari (Mark-and-Sweep, Generational, Incremental), memory leak pattern'lari, WeakRef va FinalizationRegistry, structuredClone() va boshqalar — [16-memory.md](16-memory.md) da chuqur yoritiladi.
 
@@ -1139,7 +1145,7 @@ Stack va Heap — xotiraning ikki turli hududi. Ular turli maqsadlarda ishlatila
 | **Tezlik** | Juda tez — faqat pointer harakatlanadi | Sekinroq — bo'sh joy qidirish kerak |
 | **Hajmi** | Cheklangan (odatda 1-8 MB) | Katta (yuzlab MB, GB gacha) |
 | **Boshqaruv** | Avtomatik — funksiya chiqqanda tozalanadi | Garbage Collector boshqaradi |
-| **Xotirani bo'shatish** | Function tugaganda frame avtomatik olib tashlanadi | GC o'zi tozalaydi (mark-and-sweep) |
+| **Xotirani bo'shatish** | Function tugaganda frame avtomatik olib tashlanadi | GC o'zi tozalaydi (V8'da scavenger + mark-compact) |
 | **Lifetime** | Function scope bilan cheklangan | Reference bor ekan — yashaydi |
 
 Stack tez ishlashining sababi — u faqat **stack pointer** ni yuqoriga yoki pastga siljitadi. Yangi frame qo'shish = pointer ni ko'tarish. Frame olib tashlash = pointer ni tushirish. Heap esa bo'sh joy qidirishi, fragmentation bilan kurashishi kerak.
@@ -1155,7 +1161,7 @@ CPU darajasida stack va heap allocation:
 
 **Heap allocation**: V8 da bump pointer allocation — New Space ichida "bump pointer" joriy bo'sh joyni ko'rsatadi. Yangi object uchun pointer siljiydi. Lekin heap cheklanganda — GC ishga tushadi, ko'chirish (compaction) kerak, fragmentation bilan kurashish kerak. Bu O(1) amortized, lekin GC pause'lar predictable emas.
 
-**Escape analysis** — V8 optimizatsiyasi: agar object faqat funksiya ichida ishlatilsa va tashqariga chiqmasa ("escape qilmaydi"), V8 uni butunlay yo'q qilishi mumkin. Bu **scalar replacement** deb ataladi: object o'rniga uning property'lari alohida register/stack qiymatlari sifatida saqlanadi, heap allocation umuman bajarilmaydi. Bu GC pressure'ni kamaytiradi. Escape analysis faqat TurboFan darajasida ishlaydi va oddiy, predictable object'lar uchun samarali.
+**Escape analysis** — V8 optimizatsiyasi: agar object faqat funksiya ichida ishlatilsa va tashqariga chiqmasa ("escape qilmaydi"), V8 uni umuman allocate qilmaslikka qaror qilishi mumkin. Bu **scalar replacement** deb ataladi: object o'rniga uning property'lari alohida register/stack qiymatlari sifatida saqlanadi, heap allocation umuman bajarilmaydi. Bu GC pressure'ni kamaytiradi. Escape analysis faqat TurboFan darajasida ishlaydi va oddiy, predictable object'lar uchun samarali.
 
 </details>
 
@@ -1393,7 +1399,7 @@ doubleNumber(5);     // ✅ doim number — monomorphic
 doubleString("ab");  // ✅ doim string — monomorphic
 ```
 
-**Nima uchun:** V8 JIT compiler profiling data asosida tip-specific machine code hosil qiladi. Turli tip'lar kelsa — assumption buziladi va deoptimization sodir bo'ladi.
+**Nima uchun:** V8 JIT compiler profiling data asosida tip-specific machine code hosil qiladi. Funksiyaga 2-4 xil tip berilsa — inline cache **polymorphic** ga o'tadi (monomorphic'dan sekinroq, lekin hali optimize qilingan). 5+ tip → **megamorphic** (cache ishlamaydi, generic lookup). Haqiqiy deoptimization faqat TurboFan optimize qilgan funksiya'ga kutilmagan tip kelganda sodir bo'ladi — optimized machine code tashlanadi, bytecode'ga qaytiladi.
 
 ---
 
@@ -1690,9 +1696,15 @@ for (let i = 0; i < 50; i++) {
    (fibonacci(20) qiymati 6765, lekin chaqiruvlar soni ~21,891 ta)
    Bu katta call stack ishlaydi, lekin stack overflow bo'lmaydi
    chunki tree recursion depth faqat 20.
+
+   Eslatma 2: bu yerda 5 ta bosqich illustrative model — V8 har funksiya
+   uchun barcha tier'larga ko'tarmaydi. Promotion thresholds (call count,
+   bytecode size, feedback stability) kombinatsiyasiga bog'liq.
+   Outer loop 50 iteratsiya bo'lsa, fibonacci ichki rekursiv ~21,891 marta
+   chaqirilgani uchun u Maglev/TurboFan'gacha ko'tariladi.
 ```
 
-**Tushuntirish:** V8 tiered compilation qo'llaydi — har bir bosqich oldingisidan tezroq lekin compile vaqti uzonroq. fibonacci juda ko'p chaqirilgani uchun eng yuqori bosqich (TurboFan) gacha yetadi.
+**Tushuntirish:** V8 tiered compilation qo'llaydi — har bir bosqich oldingisidan tezroq lekin compile vaqti uzunroq. fibonacci juda ko'p chaqirilgani uchun eng yuqori bosqich (TurboFan) gacha yetishi mumkin.
 </details>
 
 ---
@@ -1701,14 +1713,14 @@ for (let i = 0; i < 50; i++) {
 
 Bu bo'limda JavaScript Engine'ning ichki ishlash mexanizmini o'rgandik:
 
-- **JavaScript Engine** — source code ni machine code ga aylantirib bajaradigan dastur (V8, SpiderMonkey, JSC)
-- **Pipeline** — Source Code → Tokenizer → Parser → AST → Bytecode → Machine Code — bu bosqichlar orqali kod CPU gacha yetadi
-- **JIT Compilation** — avval interpret qil, keyin hot code ni compile qil — startup tezligi va runtime performance'ni muvozanatlaydi
+- **JavaScript Engine** — source code'ni machine code'ga aylantirib bajaradigan dastur (V8, SpiderMonkey, JSC)
+- **Pipeline** — Source Code → Tokenizer → Parser → AST → Bytecode → Machine Code — bu bosqichlar orqali kod CPU'gacha yetadi
+- **JIT Compilation** — avval interpret qil, keyin hot code'ni compile qil — startup tezligi va runtime performance'ni muvozanatlaydi
 - **Hidden Classes va Inline Caching** — V8 object'larning shape'ini kuzatib, property access ni C/C++ darajasida tez qiladi
 - **Call Stack** — funksiya chaqiruvlarini LIFO tartibida boshqaradi, single-threaded execution'ni ta'minlaydi
 - **Memory Heap** — reference type'lar saqlanadigan dinamik xotira, Garbage Collector tomonidan boshqariladi
 
-Engine'ning ishlash prinsiplarindan kelib chiqadigan amaliy qoidalar: doim bir xil shape'da object yarating, bir xil tip'dagi argument'larni bering, `delete` operator'dan saqlaning, rekursiyada base case'ni unutmang.
+Engine'ning ishlash prinsiplaridan kelib chiqadigan amaliy qoidalar: doim bir xil shape'da object yarating, bir xil tip'dagi argument'larni bering, `delete` operator'dan saqlaning, rekursiyada base case'ni unutmang.
 
 ---
 

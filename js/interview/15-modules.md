@@ -434,3 +434,186 @@ console.log(mod.getCount()); // ?
 `mod.count` — export paytidagi qiymat (0) **copy** bo'lgan, hech qachon o'zgarmaydi. `mod.getCount()` — closure orqali ichki `count` ga murojaat qiladi, shuning uchun haqiqiy qiymat (2) qaytaradi. Bu CommonJS dagi value copy muammosi.
 
 </details>
+
+### 2. Bu kodda nima xato? [Middle]
+
+**Savol:**
+
+```javascript
+// utils.mjs
+console.log("utils loaded");
+export function format(x) { return String(x); }
+
+// app.mjs
+console.log("app start");
+import './utils.mjs';
+console.log("app end");
+```
+
+Output nima va nima uchun?
+
+<details>
+<summary>Javob</summary>
+
+```
+utils loaded
+app start
+app end
+```
+
+ESM `import` deklaratsiyalari **hoisted** — kod yozilishidan qat'i nazar, engine ularni modul tepasiga ko'taradi. Parse → Link → Evaluate bosqichlarida import qilingan modullar **dependency tartibida** evaluate qilinadi. Shuning uchun `utils.mjs` top-level kodi `app.mjs` ning birinchi `console.log` dan **oldin** ishlaydi.
+
+**Amaliy ta'sir:**
+- Side effect'larga tayanish xavfli — "birinchi qator" `console.log` aslida birinchi emas
+- Conditional `if (cond) import './x'` SyntaxError beradi (static import top-level)
+- Shart bilan side effect kerak bo'lsa — `await import('./utils.mjs')` (dynamic) ishlatish
+
+**Deep Dive:** Spec'da ESM 3 bosqichli loading bor — Parse (import/export deklaratsiyalarni topish), Link (binding'lar ulanadi, qiymat hali yo'q), Evaluate (top-level code dependency tartibida ishlaydi). `import` deklaratsiyasini funksiya yoki `if` ichiga joylash SyntaxError beradi — chunki linker compile-time'da dependency graph qurishi kerak.
+
+</details>
+
+### 3. Dynamic import xato bilan qanday ishlash kerak? [Middle+]
+
+<details>
+<summary>Javob</summary>
+
+`import()` Promise qaytaradi — modul topilmasa yoki yuklashda xato bo'lsa rejected bo'ladi. `try/catch` (async/await) yoki `.catch()` bilan ushlash kerak. Fallback va retry pattern'lari production'da muhim.
+
+```javascript
+// ✅ try/catch bilan
+async function loadAnalytics() {
+  try {
+    const module = await import('./analytics.mjs');
+    return module.default;
+  } catch (err) {
+    console.error('Analytics yuklanmadi:', err);
+    return { track: () => {} }; // no-op fallback
+  }
+}
+
+// ✅ Retry pattern — network xato uchun
+async function loadWithRetry(path, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await import(path);
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+}
+
+// ✅ Browser'da CSP/MIME xatolari
+try {
+  const m = await import('https://cdn.example.com/lib.mjs');
+} catch (err) {
+  if (err instanceof TypeError) {
+    // MIME type xato, CORS, yoki specifier resolution
+  }
+}
+```
+
+**Xato turlari:**
+- `TypeError` — MIME type noto'g'ri, CORS, yoki specifier resolution xatosi
+- `SyntaxError` — modul kodi parse bo'lmadi
+- `NetworkError` (browser) — fetch failed
+- `MODULE_NOT_FOUND` (Node.js) — fayl topilmadi
+
+**Deep Dive:** Dynamic import internal'da `HostImportModuleDynamically` spec abstract operation'ni chaqiradi — bu host (browser/Node.js) tomonidan implement qilinadi. Promise reject bo'lganda — module record cache'ga **xato holatda** saqlanadi, keyingi import shu xatoni qaytaradi. Cache bust qilish uchun query string ishlatish kerak: `import('./mod.mjs?v=' + Date.now())`.
+
+</details>
+
+### 4. Top-level await ESM'da qanday ishlaydi? Performance ta'siri qanday? [Senior]
+
+<details>
+<summary>Javob</summary>
+
+Top-level await (TLA) — ES2022'da kiritilgan. ESM top-level kodida `await` ishlatish mumkin — funksiya ichida bo'lishi shart emas. Modul evaluation paytida `await` resolve bo'lguncha **dependent modul'lar kutadi**.
+
+```javascript
+// config.mjs
+const response = await fetch('/api/config');
+export const config = await response.json();
+
+// app.mjs
+import { config } from './config.mjs';
+// app.mjs config.mjs evaluate tugaguncha kutadi
+console.log(config.apiUrl); // config tayyor
+```
+
+**Spec mexanizmi:** TLA bo'lgan modul `[[AsyncEvaluation]]` flag bilan belgilanadi. Module graph evaluate bo'lganda — async modul'lar Promise chain qoldiradi. Importer modul async modul evaluate tugaguncha kutadi (parent async-blocked).
+
+**Performance afzalliklari:**
+- **Sequential dependency'lar** uchun cleaner — `await import()` chain yo'q
+- **Module-level resource init** — DB connection, config fetch oldindan tayyor
+- **Conditional default exports** — environment bo'yicha turli export
+
+**Performance kamchiliklari:**
+- **Module graph delay** — TLA modul barcha dependent'larini bloklaydi
+- **Waterfall loading** — agar TLA modullari ketma-ket bog'lansa, parallel ishlamaydi
+- **Bundler complexity** — Webpack/Rollup TLA'ni alohida processing qiladi (async wrapper)
+
+```javascript
+// ❌ Anti-pattern — TLA waterfall:
+// a.mjs:
+export const a = await fetch('/a').then(r => r.json());
+// b.mjs:
+import { a } from './a.mjs';
+export const b = await fetch('/b').then(r => r.json());
+// b a tugagunicha kutadi — sequential!
+
+// ✅ Promise.all bilan parallel:
+// data.mjs:
+const [a, b] = await Promise.all([
+  fetch('/a').then(r => r.json()),
+  fetch('/b').then(r => r.json()),
+]);
+export { a, b };
+```
+
+CJS'da nima uchun ishlamaydi: `require()` sinxron — chaqiruvchi thread'ni bloklaydi. `await` sinxron kontekstda semantik jihatdan ma'nosiz.
+
+**Deep Dive:** Spec'da TLA `AsyncBlock` evaluation mexanizmi orqali implement qilingan. Modul `[[CycleRoot]]` va `[[AsyncEvaluation]]` slot'lari bilan kelishiladi. Bundler'lar (Webpack 5+, Rollup, Vite) TLA modullarni `__webpack_async__` yoki o'xshash wrapper bilan o'raydi — chunki bundled output sinxron IIFE bo'lishi mumkin emas. Bu bundle size'ga 1-2 KB qo'shadi.
+
+</details>
+
+### 5. ESM dan CommonJS modulni import qilganda qanday muammolar yuzaga keladi? [Middle+]
+
+<details>
+<summary>Javob</summary>
+
+CJS modulni ESM'dan import qilish mumkin, lekin **named import** ko'p hollarda ishlamaydi. Sababi: CJS `module.exports` runtime'da aniqlanadi, ESM esa static analysis kutadi.
+
+```javascript
+// lodash CJS modul
+// ✅ Default import — module.exports butun qiymati
+import lodash from 'lodash';
+lodash.map([1,2,3], x => x*2);
+
+// ❌ Named import — ko'p CJS modullarda ishlamaydi
+import { map } from 'lodash';
+// SyntaxError: The requested module does not provide an export named 'map'
+
+// ✅ Workaround 1: destructuring default'dan
+import lodash from 'lodash';
+const { map, filter } = lodash;
+
+// ✅ Workaround 2: createRequire
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { map } = require('lodash');
+
+// ✅ Workaround 3: Dynamic import
+const lodash = await import('lodash');
+const { map } = lodash.default; // CJS module.exports → default
+```
+
+**Nima uchun named import ko'pincha ishlamaydi:**
+
+CJS modul `module.exports = { map, filter }` qiladi — bu runtime'da tahlil qilinadi. ESM esa **compile-time** da export'larni bilishi kerak. Node.js CJS modulni "best-effort" parse qiladi — agar oddiy literal export bo'lsa, named import ishlashi mumkin (Node.js 14+ static analysis). Lekin dynamic export'lar (`exports[name] = ...`) topilmaydi.
+
+**Modern Node.js (22.12+):** `require(esm)` ham qo'llab-quvvatlanadi — CJS modul'dan ESM modulni `require()` orqali olish (synchronous, faqat sync ESM uchun — TLA bo'lsa ishlamaydi).
+
+**Deep Dive:** Node.js ESM loader CJS modulni o'qiyotganda `cjs-module-lexer` package'idan foydalanadi — bu static analysis bilan `module.exports.X = ...` va `exports.X = ...` pattern'larini topadi. Murakkab pattern'lar (`Object.assign(module.exports, ...)`, ternary, function-based) topilmaydi. Bu sababli kutubxonalar `package.json.exports` bilan dual package (CJS + ESM build) yaratadilar.
+
+</details>

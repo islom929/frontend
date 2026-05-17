@@ -37,7 +37,7 @@ Meta-programming — dastur o'zining tuzilishi yoki xatti-harakatini runtime da 
 
 3. **Intercession** — dasturning fundamental operatsiyalarini **ushlash va qayta belgilash**. Proxy aynan shu darajada ishlaydi — object ustidagi har qanday operatsiyani intercept qilish imkonini beradi.
 
-Proxy intercession uchun yaratilgan. ECMAScript spetsifikatsiyasi har bir object uchun 13 ta **essential internal method** belgilaydi: `[[Get]]`, `[[Set]]`, `[[HasProperty]]`, `[[Delete]]`, `[[Call]]`, `[[Construct]]` va boshqalar. Oddiy object'larda bu metodlar standart xatti-harakatga ega. Proxy esa bu internal method'larning har birini **custom logic** bilan almashtirishga imkon beradi.
+Proxy intercession uchun yaratilgan. ECMAScript spetsifikatsiyasi ordinary object uchun 11 ta **essential internal method** belgilaydi (`[[Get]]`, `[[Set]]`, `[[HasProperty]]`, `[[Delete]]`, `[[OwnPropertyKeys]]`, `[[GetOwnProperty]]`, `[[DefineOwnProperty]]`, `[[GetPrototypeOf]]`, `[[SetPrototypeOf]]`, `[[IsExtensible]]`, `[[PreventExtensions]]`), callable object'larga qo'shimcha `[[Call]]` va `[[Construct]]` — jami 13 ta. Oddiy object'larda bu metodlar standart xatti-harakatga ega. Proxy esa bu internal method'larning har birini **custom logic** bilan almashtirishga imkon beradi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -228,7 +228,7 @@ user.email = "ali@example.com"; // ✅
 4. Agar `get` trap bor — `get(target, "prop", receiver)` chaqiriladi
 5. Agar `get` trap yo'q — `Reflect.get(target, "prop", receiver)` chaqiriladi (standart xatti-harakat)
 
-`set` trap uchun ham xuddi shunday — lekin `set` trap'dan qaytgan qiymat tekshiriladi. `false` yoki falsy qiymat qaytsa va strict mode bo'lsa — `TypeError` tashlaydi.
+`set` trap uchun ham shu tartib — lekin `set` trap'dan qaytgan qiymat tekshiriladi. `false` yoki falsy qiymat qaytsa va strict mode bo'lsa — `TypeError` tashlaydi.
 
 ```
 get trap flow:
@@ -450,7 +450,7 @@ console.log(db1 === db2); // true — bitta instance
 
 `apply` trap faqat `target` callable bo'lganda ishlaydi. ECMAScript spec bo'yicha object'ning `[[Call]]` internal method'i bo'lishi kerak — bu faqat funksiyalarda bor. Oddiy object'ni proxy qilib `apply` trap qo'ysangiz — `proxy()` chaqirganda `TypeError: proxy is not a function` xatosi chiqadi, chunki target'da `[[Call]]` yo'q.
 
-`construct` trap ham xuddi shunday — faqat `target` da `[[Construct]]` internal method bor bo'lsa ishlaydi. Arrow function'larda `[[Construct]]` yo'q — shuning uchun ularni `new` bilan chaqirib bo'lmaydi, proxy qilsangiz ham.
+`construct` trap ham shu qoidaga bo'ysunadi — faqat `target` da `[[Construct]]` internal method bor bo'lsa ishlaydi. Arrow function'larda `[[Construct]]` yo'q — shuning uchun ularni `new` bilan chaqirib bo'lmaydi, proxy qilsangiz ham.
 
 </details>
 
@@ -577,7 +577,7 @@ Reflect.deleteProperty(obj, "role"); // true
 
 // === Reflect.ownKeys(target) ===
 // Object.keys + non-enumerable + Symbol key'lar — hammasi
-Reflect.ownKeys(obj); // ["name", "age", "id"]
+Reflect.ownKeys(obj); // ["name", "age"]  (bu nuqtada "id" hali define qilinmagan)
 
 // === Reflect.defineProperty(target, propertyKey, attributes) ===
 // Object.defineProperty dan farqi: throw o'rniga false qaytaradi
@@ -591,7 +591,7 @@ console.log(success); // true
 
 // Qayta define — writable:false va configurable:false bo'lgani uchun
 const fail = Reflect.defineProperty(obj, "id", { value: 2 });
-console.log(fail); // false — xato TASHLMASDAN muvaffaqiyatsizlik bildirdi
+console.log(fail); // false — xato TASHLAMASDAN muvaffaqiyatsizlik bildirdi
 
 // === Reflect.getOwnPropertyDescriptor(target, propertyKey) ===
 Reflect.getOwnPropertyDescriptor(obj, "id");
@@ -613,7 +613,7 @@ console.log(user instanceof User); // true
 Reflect.getPrototypeOf(user); // User.prototype
 
 // === Reflect.setPrototypeOf(target, proto) ===
-Reflect.setPrototypeOf(user, null); // true — prototype o'chirildi
+Reflect.setPrototypeOf(user, null); // true — [[Prototype]] null ga o'rnatildi
 
 // === Reflect.isExtensible(target) ===
 Reflect.isExtensible(obj); // true
@@ -628,13 +628,13 @@ Reflect.isExtensible(obj); // false — endi yangi property qo'shib bo'lmaydi
 
 Reflect va Object metod'larining asosiy farqi — xatolarga munosabat:
 
-| Operatsiya | Object | Reflect |
+| Operatsiya | Object / Operator | Reflect |
 |-----------|--------|---------|
-| Non-configurable property'ni qayta define | `TypeError` tashlaydi | `false` qaytaradi |
+| Non-configurable property'ni qayta define | `Object.defineProperty` → `TypeError` | `Reflect.defineProperty` → `false` |
 | Non-object'da ishlash | `TypeError` tashlaydi | `TypeError` tashlaydi |
-| `preventExtensions` qilingan object'ga property qo'shish | `TypeError` tashlaydi | `false` qaytaradi |
-| `defineProperty` muvaffaqiyatli | Object qaytaradi | `true` qaytaradi |
-| `deleteProperty` non-configurable | `TypeError` (strict) | `false` qaytaradi |
+| `preventExtensions` qilingan object'ga property qo'shish | `Object.defineProperty` → `TypeError` | `Reflect.defineProperty` → `false` |
+| `defineProperty` muvaffaqiyatli | `Object.defineProperty` → object qaytaradi | `Reflect.defineProperty` → `true` |
+| Non-configurable property'ni o'chirish | `delete` operator → `TypeError` (strict) | `Reflect.deleteProperty` → `false` |
 
 Reflect metod'lari **boolean** qaytargani uchun `if` bilan tekshirish oson:
 
@@ -1197,7 +1197,7 @@ Oddiy Proxy bitta object'ni wrap qiladi, lekin shu object ichida **boshqa object
 - **Security sandboxing** — untrusted JavaScript'ni izolyatsiya qilish (masalan, plugin, user script, iframe o'rnini bosuvchi)
 - **Revocable permissions** — bitta revoke butun grafga ta'sir qiladi, recursive
 - **Read-only enforcement** — "frozen" membrane: barcha nested object'lar ham read-only
-- **SES (Secure ECMAScript)** va **Realms API** proposal'larida membrane foydalaniladi
+- **SES (Secure ECMAScript)** va **ShadowRealm API** (ilgari Realms API nomi bilan tanilgan) proposal'larida membrane foydalaniladi
 - **Caja** (Google), **Figma** plugin sandbox, **MetaMask Snaps** — real dunyo misollar
 
 <details>
@@ -1654,30 +1654,40 @@ logger.error("oops"); // [error] oops ✅
 
 // ⚠️ Lekin Promise bilan ishlatishga urinish:
 async function run() {
-  const result = await logger; // ⚠️ await logger.then chaqiradi!
-  // Proxy get('then') → function(resolve, reject) qaytaradi
-  // Promise machinery bu function'ni chaqiradi: then(resolve, reject)
-  // Logger esa "[then]" log qiladi va undefined qaytaradi
-  // → await natijasi undefined
-  console.log("Result:", result); // undefined
+  const result = await logger; // ⚠️ await logger.then ni thenable sifatida adopt qiladi
+  // Proxy get('then') → (...args) => console.log(...) (arrow function)
+  // IsCallable(then) = true → logger THENABLE hisoblanadi
+  // Promise machinery chaqiradi: then.call(logger, resolve, reject)
+  // Arrow function "[then]" log qiladi, LEKIN resolve/reject ni CHAQIRMAYDI
+  // → Promise mangu PENDING qoladi → await hech qachon unblock bo'lmaydi
+  console.log("Result:", result); // ❌ bu satr hech qachon ishlamaydi — hang
 }
 run();
 
-// ─── Ko'proq xavfli holat — infinite loop ───
+// ─── Ko'proq xavfli holat — infinite microtask loop ───
+// MUHIM: thenable check trickier.then ning O'ZI funksiya bo'lishini talab qiladi.
+// Agar .then OBJECT qaytarsa — IsCallable false → thenable emas → oddiy resolve.
+// Haqiqiy infinite loop uchun .then funksiya qaytarishi kerak:
 const trickier = new Proxy({}, {
   get(target, prop) {
-    // Har property uchun yangi thenable qaytaradi
-    return {
-      then(resolve) {
-        resolve(trickier); // ← yana proxy'ni resolve qiladi!
-      }
-    };
+    if (prop === "then") {
+      // funksiya qaytaradi — logger thenable hisoblanadi
+      return function(resolve) {
+        resolve(trickier); // ← yana proxy'ni resolve qiladi
+      };
+    }
+    return undefined;
   }
 });
 
-// await trickier — trickier.then(resolve) chaqiradi
-// resolve(trickier) — yana Promise trickier.then'ni chaqiradi
-// Infinite recursion yoki hang
+// await trickier:
+// 1. trickier.then → function → IsCallable(true) → thenable
+// 2. PromiseResolveThenableJob: then.call(trickier, resolve, reject)
+// 3. resolve(trickier) — Promise trickier'ni qabul qilmoqchi
+// 4. trickier hali ham thenable — yangi PromiseResolveThenableJob
+// 5. Cycle detection: SameValue(resolution, promise) — bu yerda resolution=trickier,
+//    promise=yangi Promise — ular bir xil emas → cycle aniqlanmaydi
+// → Microtask queue cheksiz to'ladi, promise hech qachon settle bo'lmaydi
 
 // ✅ Yechim 1: then property'ni explicit handle qilish
 const safeLogger = new Proxy({}, {
@@ -1813,7 +1823,7 @@ withCache2.result;
 // - "Faqat cache miss'da log" → log INNER
 ```
 
-**Nima uchun:** JavaScript engine proxy operatsiyasini xuddi oddiy property access kabi evaluate qiladi — tashqi object'dan ichki object'ga. `outer.prop` → `outer` ning `[[Get]]` chaqiriladi → bu `outer.handler.get(inner, prop, outer)` — inner proxy target sifatida beriladi. Handler ichidagi `Reflect.get(inner, prop)` → `inner.handler.get(target, prop, inner)`. Ya'ni chain outer-to-inner execution order'ida.
+**Nima uchun:** JavaScript engine proxy operatsiyasini oddiy property access bilan bir xil mexanizm orqali evaluate qiladi — tashqi object'dan ichki object'ga. `outer.prop` → `outer` ning `[[Get]]` chaqiriladi → bu `outer.handler.get(inner, prop, outer)` — inner proxy target sifatida beriladi. Handler ichidagi `Reflect.get(inner, prop)` → `inner.handler.get(target, prop, inner)`. Ya'ni chain outer-to-inner execution order'ida.
 
 **Yechim:** Middleware chain'larni tuzayotganda execution order'ni **aniq hujjatlashtiring**. Trap ichida `Reflect.*` orqali "next" middleware'ga forward qilish — Express-style middleware pattern'iga o'xshash. Debugging uchun har middleware o'z label'iga ega bo'lishi kerak (console.log prefix). Test case'lar order-sensitive bo'lganda yaxshi test'lar yozing.
 
@@ -2283,7 +2293,7 @@ revoke();
 | **Invariants** | Proxy trap'lar ECMAScript invariant'lariga rioya qilishi shart. Non-configurable property uchun target qiymatidan boshqa qaytarib bo'lmaydi |
 | **Revocable** | `Proxy.revocable()` — vaqtinchalik access. `revoke()` dan keyin barcha operatsiyalar `TypeError` |
 | **Use Cases** | Validation, Logging, Caching, Negative indexing, Reactivity (Vue 3), Data binding, Access control |
-| **Performance** | Proxy oddiy object'dan 3-10x sekin. Hot path'larda ishlatmaslik. Lazy proxy qilish |
+| **Performance** | Proxy per-access overhead (trap body + engine roundtrip) — V8 versiyasi va pattern'ga bog'liq. Hot path'larda ishlatmaslik. Lazy proxy qilish |
 
 > **Keyingi bo'lim:** [24-design-patterns.md](24-design-patterns.md) — JavaScript design patterns: Factory, Singleton, Builder, Module, Decorator, Observer, Pub/Sub, Strategy, Command, Mediator, Chain of Responsibility. Har bir pattern muammo-yechim-real misol bilan.
 

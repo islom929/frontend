@@ -44,9 +44,9 @@ Lekin single-threaded degani sekin degani emas. JavaScript o'zi single-threaded 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spec da **"job"** tushunchasi bor — lekin Event Loop o'zi **spec dan tashqarida**. Event Loop browser uchun HTML spec da ta'riflangan, Node.js uchun esa libuv kutubxonasida implement qilingan.
+ECMAScript spec'da **Job** abstraction (`HostEnqueuePromiseJob` abstract operation) bor — bu Promise callback'larini "kelajakda bajarish uchun" enqueue qiladigan mexanizm. Lekin Event Loop o'zi ECMAScript spec'da aniqlanmagan — **host (embedder) tomonidan ta'minlanadi**: browser uchun **HTML Living Standard**'da aniqlangan, Node.js uchun esa **libuv** kutubxonasida implement qilingan.
 
-V8 engine o'zi Event Loop ni implement qilmaydi. V8 faqat JavaScript kodni compile va execute qiladi. Event Loop **runtime environment** (browser yoki Node.js) tomonidan ta'minlanadi.
+V8 engine Event Loop'ni **o'zi boshqarmaydi** — `v8::Platform` interface orqali embedder (Chrome, Node.js, Deno va h.k.) dan **task runner**'ni qabul qiladi. V8 o'zi **JavaScript kodni compile va execute** qiladi, **Garbage Collection**'ni boshqaradi, va Promise job'larini microtask queue'ga enqueue qiladi — lekin qachon va qaysi tartibda bu job'lar ishlashini **embedder'ning Event Loop implementation'i** qaror qiladi.
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -132,13 +132,19 @@ console.log("Fetch yuborildi, boshqa ishlar davom etadi");
 
 ### Nazariya
 
-JavaScript o'zi single-threaded bo'lsa-da, u **yolg'iz ishlamaydi**. Browser yoki Node.js uni o'rab turgan muhitni ta'minlaydi — bu muhit **Runtime Environment** deyiladi. Runtime Environment beshta asosiy komponentdan tashkil topgan:
+JavaScript o'zi single-threaded bo'lsa-da, u **yolg'iz ishlamaydi**. Butun sistema ikki qatlamdan tashkil topadi: **JavaScript Engine** (V8) va **Runtime Environment** (browser yoki Node.js).
+
+**JavaScript Engine (V8) ta'minlaydi:**
 
 1. **Call Stack** — hozir bajarilayotgan funksiyalar (LIFO)
-2. **Web APIs** — browser bergan asinxron API'lar (setTimeout, fetch, DOM Events)
-3. **Macrotask Queue** (Task Queue) — tayyor callback'lar navbati (FIFO)
-4. **Microtask Queue** — yuqori prioritetli callback'lar navbati (Promise.then)
-5. **Event Loop** — bularning barchasini boshqaradigan koordinator
+2. **Memory Heap** — object'lar saqlanadigan joy
+
+**Runtime Environment (browser/Node.js) ta'minlaydi:**
+
+3. **Web APIs / C++ APIs** — asinxron API'lar (setTimeout, fetch, DOM Events yoki fs, net, http)
+4. **Macrotask Queue** (Task Queue) — tayyor callback'lar navbati (FIFO)
+5. **Microtask Queue** — yuqori prioritetli callback'lar navbati (Promise.then, queueMicrotask)
+6. **Event Loop** — bularning barchasini boshqaradigan koordinator
 
 Ko'p dasturchilar "JavaScript asinxron til" deb o'ylaydi — aslida JavaScript **sinxron** til, lekin runtime environment asinxron imkoniyatlarni beradi.
 
@@ -354,8 +360,8 @@ HTML Living Standard (spec) bo'yicha Event Loop quyidagicha ishlaydi:
 - Microtask Queue **butunlay bo'sh** bo'lguncha davom etamiz
 
 **Qadam 3: Rendering**
-- Browser ~16.6ms da bir marta render qiladi (60fps)
-- Har bir Event Loop iteration'da render bo'lavermaydi — browser o'zi qaror qiladi
+- Browser monitor refresh rate'iga moslab render qiladi (60Hz → ~16.6ms, 120Hz → ~8.3ms)
+- Har bir Event Loop iteration'da render bo'lavermaydi — HTML spec'ning "update the rendering" qadami **agar kerak bo'lsa** chaqiriladi
 - `requestAnimationFrame` callback'lari shu bosqichda ishlaydi
 
 **Qadam 4: Qaytadan boshdan**
@@ -625,7 +631,7 @@ const intervalId = setInterval(() => {
 
 ### Nazariya
 
-Microtask — macrotask'dan **kichikroq** va **yuqoriroq priority**ga ega task turi. Event Loop har bir macrotask'dan keyin Microtask Queue ni **TO'LIQ BO'SHATADI** — bu microtask'larning eng muhim xususiyati.
+Microtask — macrotask'dan **yuqoriroq priority**ga ega task turi. "Kichikroq" degani yo'q (hajm bo'yicha microtask og'ir hisoblash ham bo'lishi mumkin) — farq **priority** va **checkpoint semantikasi**da: Event Loop har bir macrotask'dan keyin Microtask Queue ni **TO'LIQ BO'SHATADI** (bittadan emas, barchasini).
 
 Microtask turlari:
 - `Promise.then()` / `.catch()` / `.finally()` callback'lari
@@ -638,7 +644,7 @@ Microtask checkpoint algoritmining jiddiy oqibati — agar har bir microtask yan
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spec da microtask'lar **"PromiseJobs"** deb ataladi. HTML spec'da esa **"microtask queue"** deb ataladi.
+ECMAScript spec'da microtask'lar abstract **`Job`** tushunchasi bilan modellangan — `HostEnqueuePromiseJob` abstract operation orqali queue qilinadi. ("PromiseJobs" — bu ES2018 gacha ishlatilgan eski termin.) HTML spec'da esa aynan shu job'lar uchun **"microtask queue"** nomi ishlatiladi.
 
 Microtask checkpoint algoritmi:
 
@@ -739,7 +745,7 @@ targetNode.appendChild(document.createElement("div"));
 │ Promise.then/catch   │ setTimeout               │
 │ queueMicrotask       │ setInterval              │
 │ MutationObserver     │ setImmediate (Node)      │
-│ process.nextTick*    │ I/O callbacks            │
+│                      │ I/O callbacks            │
 │                      │ UI rendering events      │
 │                      │ MessageChannel           │
 ├──────────────────────┼──────────────────────────┤
@@ -752,9 +758,9 @@ targetNode.appendChild(document.createElement("div"));
 ├──────────────────────┼──────────────────────────┤
 │ Starvation xavfi bor │ Starvation xavfi yo'q    │
 └──────────────────────┴──────────────────────────┘
-
-* process.nextTick() Node.js da microtask queue dan HAM oldinroq ishlaydi
 ```
+
+> **Eslatma:** Node.js'ning `process.nextTick()` **microtask emas** — u **alohida queue**'da turadi (Node.js'ning ichki `nextTickQueue`) va **microtask queue'dan HAM oldinroq** bo'shatiladi. Har faza orasida tartib: `nextTickQueue → microtask queue`.
 
 ---
 
@@ -972,7 +978,7 @@ scheduleUpdate(footerEl, "Yangi footer");
 
 ### Nazariya
 
-`requestAnimationFrame(callback)` (qisqacha **rAF**) — na microtask, na macrotask. U Event Loop'ning **rendering bosqichida** ishlaydi — browser har gal ekranga chizishdan (paint) oldin rAF callback'larini chaqiradi. Bu uni animatsiyalar uchun ideal qiladi chunki u browser'ning render sikli bilan sinxronlashtirilgan (odatda 60fps = har 16.6ms).
+`requestAnimationFrame(callback)` (qisqacha **rAF**) — na microtask, na macrotask. U Event Loop'ning **rendering bosqichida** ishlaydi — browser har gal ekranga chizishdan (paint) oldin rAF callback'larini chaqiradi. Bu uni animatsiyalar uchun ideal qiladi chunki u browser'ning render sikli bilan sinxronlashtirilgan — interval monitor refresh rate'ga bog'liq (60Hz monitor → ~16.6ms).
 
 `setTimeout` emas, `rAF` ishlatish kerak bo'lgan sabablar:
 - `setTimeout` macrotask bo'lib, u render sikli bilan sinxronlashtirilmagan — natijada animatsiyalar "jitter" qilishi mumkin
@@ -1004,10 +1010,10 @@ scheduleUpdate(footerEl, "Yangi footer");
 <summary><strong>Under the Hood</strong></summary>
 
 **rAF xususiyatlari:**
-- Har frame'da **bir marta** chaqiriladi (~60fps = ~16.6ms)
+- Har frame'da **bir marta** chaqiriladi — interval monitor refresh rate'ga bog'liq (60Hz → ~16.6ms, 120Hz → ~8.3ms)
 - Agar tab background'da bo'lsa — **to'xtaydi** (battery/CPU tejash)
-- Animation uchun **eng yaxshi** usul (vsync bilan sinxronlashgan)
-- `setTimeout(fn, 16)` dan aniqroq — chunki browser ning render sikliga ulangan
+- Animation uchun **eng yaxshi** usul — browser render pipeline'i bilan sinxronlashgan
+- `setTimeout(fn, 16)` dan aniqroq — chunki browser ning render sikliga ulangan, timer drift va nested clamping ta'siri yo'q
 
 </details>
 
@@ -1124,15 +1130,16 @@ Bu API past priority'li ishlar uchun mo'ljallangan — analytics yuborish, prefe
 <summary><strong>Under the Hood</strong></summary>
 
 ```
-Frame budget (16.6ms @ 60fps):
+Frame budget (60Hz monitor → ~16.6ms per frame):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 │ Macrotask │ Microtasks │ rAF │ Style│Layout│Paint│ IDLE │
-│   2ms     │   1ms      │ 1ms │ 2ms  │ 3ms  │ 2ms │~5.6ms│
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                                                      ↑
                                             requestIdleCallback
                                             shu oraliqda ishlaydi
 ```
+
+> Bloklar nisbatlari illustrativ — har frame'da actual taqsimot kontentga (DOM hajmi, CSS murakkabligi, JS yuki) bog'liq. Refresh rate ham monitor'ga qarab farq qiladi (60Hz, 120Hz, 144Hz).
 
 </details>
 
@@ -1269,7 +1276,7 @@ Bu farqlarni bilish muhim chunki `setImmediate` vs `setTimeout(fn, 0)` ning farq
 | Priority | Eng yuqori (microtask'dan ham oldin) | Macrotask (check phase) |
 | Queue | nextTick Queue (alohida) | Check Queue |
 | Starvation xavfi | **HA** — recursive nextTick loop'ni to'xtatmaydi | Yo'q |
-| Nomlash | Aslida "immediate" ishlaydigan shu | Aslida "next tick" da ishlaydigan shu |
+| Ismining chalkashligi | "next tick" deyilsa ham **darhol** (faza orasida) ishlaydi | "immediate" deyilsa ham **keyingi fazada** (check) ishlaydi |
 
 > `process.nextTick` va `setImmediate` nomlari teskari qo'yilgan. `nextTick` darhol ishlaydi, `setImmediate` esa keyingi fazada. Bu Node.js ning tarixiy xatosi — o'zgartirishning iloji yo'q (backward compatibility).
 
@@ -2054,13 +2061,17 @@ setTimeout(tick, 1000);
 
 ---
 
-### Background tab throttling — `setTimeout` 1000ms'gacha clamped
+### Timer clamping va background tab throttling — ikki alohida mexanizm
 
-Modern browser'lar foydalanuvchi tab'ni background'ga o'tkazganda `setTimeout`/`setInterval`'ni **sezilarli darajada** sekinlashtiradi — battery va CPU tejash uchun. Bu bir nechta darajada bo'ladi:
+Timer'larga ikkita **alohida** cheklov qo'llaniladi — ularni chalkashtirmaslik kerak:
 
-- **Chrome/Edge:** Background tab'da deeply nested setTimeout → minimum **1000ms** clamping
-- **Firefox:** Background tab'da minimum ~1000ms (yoki 10000ms agar tab "throttled")
-- **Safari:** Agressiv throttling, tab deactivate bo'lsa butun Event Loop sekinlashadi
+**1. Nested clamping (active tab, HTML spec)** — `setTimeout`/`setInterval` chain'i 5 martadan ko'p nested bo'lsa, minimum delay **4ms**'gacha clamp qilinadi. Bu tab **active** bo'lganda ham ishlaydi, browser'dan qat'iy nazar — HTML Living Standard'da aniqlangan qoida.
+
+**2. Background tab throttling (browser-specific)** — foydalanuvchi tab'ni background'ga o'tkazganda `setTimeout`/`setInterval`'ni **sezilarli darajada** sekinlashtiriladi (battery va CPU tejash uchun):
+
+- **Chrome/Edge (intensive throttling):** Tab background'da 5 daqiqadan ko'p bo'lsa — timer'lar **1 daqiqaga ~1 timer** budget'iga tushadi. Ba'zi cross-origin iframe timer'lari 1000ms'ga clamp qilinadi
+- **Firefox:** Background tab'da minimum ~1000ms (ba'zi holatlarda tab "throttled" bo'lsa 10000ms+)
+- **Safari:** Agressiv throttling — tab deactivate bo'lganda butun Event Loop sekinlashadi
 
 ```javascript
 // Foreground tab (active):
@@ -2257,7 +2268,7 @@ console.log("oldin");
 setTimeout(() => console.log("setTimeout"), 0);
 console.log("keyin");
 
-// Ko'pchilik kutadi: oldin, setTimeout, keyin
+// Intuitiv kutilgan tartib: oldin, setTimeout, keyin
 // Aslida: oldin, keyin, setTimeout  ← ENG OXIRDA!
 ```
 
@@ -2293,7 +2304,7 @@ new Promise((resolve) => {
 
 console.log("C");
 
-// Ko'pchilik kutadi: A, C, B
+// Intuitiv kutilgan tartib: A, C, B
 // Aslida: A, B, C
 ```
 
@@ -2326,7 +2337,7 @@ console.log("C");
 setTimeout(() => console.log("timeout"), 0);
 Promise.resolve().then(() => console.log("promise"));
 
-// Ko'pchilik kutadi: timeout, promise
+// Intuitiv kutilgan tartib: timeout, promise
 // Aslida: promise, timeout
 ```
 
@@ -2396,7 +2407,7 @@ async function example() {
 example();
 console.log("C");
 
-// Ko'pchilik kutadi: A, B, C
+// Intuitiv kutilgan tartib: A, B, C
 // Aslida: A, C, B
 ```
 

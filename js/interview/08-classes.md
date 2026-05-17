@@ -9,9 +9,9 @@
 ### 1. Class nima va prototype bilan qanday bog'liq? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
-ES6 `class` — prototypal inheritance ustiga qurilgan **syntactic sugar**. Engine ichida class xuddi constructor function + prototype mexanizmi sifatida ishlaydi:
+ES6 `class` — prototypal inheritance ustiga qurilgan **syntactic sugar**. Engine ichida class — constructor function + prototype mexanizmi sifatida implement qilingan:
 
 ```javascript
 class User {
@@ -37,7 +37,7 @@ Lekin `class` faqat "yozuv qulayligi" emas — muhim farqlari bor: barcha method
 ### 2. Class va constructor function o'rtasidagi farqlar nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | Xususiyat | Constructor Function | Class |
 |-----------|---------------------|-------|
@@ -75,7 +75,7 @@ for (const key in new PersonCls("Ali")) console.log(key); // "name" — greet yo
 ### 3. `extends` va `super` qanday ishlaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `extends` — child class parent'dan meros olishini bildiradi. Engine ichida ikki prototype chain quradi:
 
@@ -116,7 +116,7 @@ console.log(Dog.kingdom()); // "Animalia" — static meros
 ### 4. Private fields (`#`) va underscore convention (`_`) farqi nima? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `_` prefix — bu faqat **convention** (kelishuv), hech qanday himoya yo'q. `#` prefix — bu **til darajasidagi enforcement**, tashqi kodda kirish **SyntaxError** beradi.
 
@@ -151,7 +151,7 @@ console.log(b.getName()); // "Ali" — faqat public method orqali
 ### 5. Static method nima va qachon ishlatiladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `static` method class'ning o'zida saqlanadi, instance'larda emas. Instance yaratmasdan chaqiriladi.
 
@@ -206,7 +206,7 @@ Bu pattern — **polymorphic factory** — parent'da yozilgan factory method chi
 ### 6. Class field'lar (public va arrow function) qanday ishlaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Public class field'lar — har instance'da **own property** sifatida yaratiladi (prototype'da emas):
 
@@ -253,7 +253,7 @@ console.log(t1.increment === t2.increment); // false — 2 ta alohida fn!
 ### 7. Getter va setter class'da qanday ishlaydi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `get`/`set` — computed property yaratadi. Tashqaridan oddiy property kabi ko'rinadi, ichida funksiya ishlaydi:
 
@@ -302,7 +302,7 @@ console.log(desc.enumerable); // false — class method
 ### 8. Static initialization block nima? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ES2022 da qo'shilgan `static { }` — class yaratilganda bir marta ishlaydi. Murakkab static initialization uchun:
 
@@ -328,12 +328,39 @@ console.log(Config.apiUrl); // "http://localhost:3000"
 
 Nima uchun kerak? Static field'da try/catch ishlatib bo'lmaydi, bir nechta o'zaro bog'liq field'larni initialize qilish qiyin. `static { }` bloki to'liq JavaScript kodi yozish imkonini beradi.
 
+Static block ichida `this` — class'ning o'zi. Private static field'larga ham kira oladi:
+
+```javascript
+class Database {
+  static #connectionString;
+  static #pool;
+
+  static {
+    // this === Database
+    this.#connectionString = process.env.DB_URL ?? "localhost:5432";
+    try {
+      this.#pool = createPool(this.#connectionString);
+    } catch (err) {
+      this.#pool = null; // graceful fallback
+      console.error("Pool init failed:", err.message);
+    }
+  }
+
+  static query(sql) {
+    if (!Database.#pool) throw new Error("Pool unavailable");
+    return Database.#pool.query(sql);
+  }
+}
+```
+
+Class bir nechta static blokka ega bo'lishi mumkin — ular yozilgan tartibda ishlaydi, static field declaration'lar bilan aralashtirilgan holda. Har static block alohida `var` scope yaratadi — bir blokda e'lon qilingan `let`/`const` boshqasida ko'rinmaydi.
+
 </details>
 
 ### 9. Mixin pattern class'larda qanday qilinadi? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 JavaScript single inheritance — bitta `extends`. Mixin — **subclass factory** pattern orqali ko'p capability qo'shish:
 
@@ -377,7 +404,7 @@ Mixin pattern spec'da maxsus qo'llab-quvvatlanmaydi — bu oddiy `extends` expre
 ### 10. Composition vs inheritance — qachon qaysi biri? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Inheritance** — "is-a" munosabat. `Dog extends Animal` — "Dog **bu** Animal".
 **Composition** — "has-a" munosabat. `Car` da `Engine` **bor**.
@@ -445,7 +472,7 @@ JavaScript spec'da faqat single prototype chain (`[[Prototype]]`) qo'llab-quvvat
 ### 11. `#private in obj` tekshiruvi nima? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ES2022 da `#field in obj` sintaksisi — **brand check**. Object'da ma'lum class'ning private field'i borligini tekshiradi:
 
@@ -481,7 +508,7 @@ Bu `instanceof` dan kuchli — `instanceof` prototype chain tekshiradi (o'zgarti
 ### 12. Class'da `new.target` nima? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `new.target` — constructor ichida qaysi class `new` bilan chaqirilganini ko'rsatadi. Abstract class (instance yaratish taqiqlangan) yaratish uchun ishlatiladi:
 
@@ -562,7 +589,7 @@ console.log(b.name);
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 "Hello from B"
@@ -609,7 +636,7 @@ console.log(JSON.stringify(c));
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 3
@@ -654,7 +681,7 @@ console.log(Child.getX === Parent.getX);
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 1
@@ -704,7 +731,7 @@ console.log(Object.keys(b));
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 2
@@ -746,7 +773,7 @@ const rex = new Dog("Rex", "Labrador");
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `ReferenceError: Must call super constructor in derived class before accessing 'this'`
 
@@ -786,7 +813,7 @@ log("test");
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `TypeError: Cannot read properties of undefined (reading 'prefix')` — `this` yo'qoldi.
 
@@ -811,7 +838,182 @@ const log = logger.log.bind(logger);
 const log = (msg) => logger.log(msg);
 ```
 
-Bu class method'larning ko'p uchraydigan muammosi — callback sifatida berilganda `this` binding yo'qoladi. Ko'proq [10-this-keyword.md](10-this-keyword.md) da.
+Bu class method'larning ko'p uchraydigan muammosi — callback sifatida berilganda `this` binding yo'qoladi. Sabab: `this` chaqirilish kontekstiga bog'liq (dynamic binding) — method reference olganda receiver yo'qoladi, strict mode'da (class body avtomatik strict) `this = undefined`. Yechimlar: arrow function field (lexical `this`), `.bind()` (yangi function), yoki wrapper closure.
+
+</details>
+
+### 7. Quyidagi kodning output'ini ayting [Senior]
+
+**Savol:**
+
+```javascript
+class Counter {
+  static #instances = 0;
+  #id;
+
+  constructor() {
+    this.#id = ++Counter.#instances;
+  }
+
+  static get total() { return Counter.#instances; }
+  get id() { return this.#id; }
+}
+
+const a = new Counter();
+const b = new Counter();
+const c = new Counter();
+
+console.log(a.id, b.id, c.id);
+console.log(Counter.total);
+
+class SubCounter extends Counter {}
+const d = new SubCounter();
+console.log(d.id);
+console.log(SubCounter.total);
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+```
+1 2 3
+3
+4
+4
+```
+
+```javascript
+// 1. Counter.#instances private static — bitta nusxa Counter class'da
+// 2. Har new Counter() → ++Counter.#instances → 1, 2, 3
+// 3. Counter.total → 3
+
+// 4. new SubCounter() — Counter constructor chaqiriladi (default super())
+//    Counter constructor ichida Counter.#instances ga kirish — ishlaydi
+//    chunki SubCounter Counter'dan extend qilgan, lekin private static field
+//    Counter class scope'da. d.#id = 4
+// 5. SubCounter.total → static getter Counter'dan meros olingan
+//    (Child.[[Prototype]] = Parent). this = SubCounter, lekin
+//    Counter.#instances reference Counter ga, shu sababli 4
+```
+
+**Muhim nuqta:** Private static field'lar **e'lon qilingan class'da** saqlanadi — subclass'da alohida nusxa yo'q. `SubCounter.total` chaqirilganda getter Counter'dan meros bo'lib, body ichida hali ham `Counter.#instances` qiymatini o'qiydi (4). Bu — singleton-like counter pattern uchun foydali, lekin subclass'larda kutilmagan xatti-harakat bo'lishi mumkin.
+
+**Deep Dive:**
+
+Spec bo'yicha private static field'lar `[[PrivateBrand]]` mechanism orqali class constructor'ga bind qilinadi. `Counter.#instances` access faqat Counter class body ichida valid bo'ladi — lekin SubCounter constructor super() orqali Counter constructor'ni delegate qilganida, brand check Counter (uning [[PrivateBrand]]) ga bog'liq bo'lib, instance ham parent constructor invocation orqali brand'ni qabul qiladi. Static private field'larning subclass tomonidan access'i `TypeError: Cannot read private member from an object whose class did not declare it` xatosi keltirib chiqarishi mumkin agar `SubCounter.#instances` to'g'ridan-to'g'ri yozilsa.
+
+</details>
+
+### 8. Bu kodda nima xato? [Middle+]
+
+**Savol:**
+
+```javascript
+class Container {
+  items = [];
+
+  add(item) {
+    this.items.push(item);
+    return this;
+  }
+}
+
+class Stack extends Container {
+  pop() {
+    return this.items.pop();
+  }
+}
+
+const s = new Stack();
+const pushItem = s.add;
+pushItem(1);
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+`TypeError: Cannot read properties of undefined (reading 'items')` — method reference olganda `this` binding yo'qoldi.
+
+```javascript
+// Sabab: const pushItem = s.add;
+// pushItem(1) chaqirilganda this = undefined (strict mode, class body)
+// this.items.push(item) → undefined.items → TypeError
+
+// ✅ Yechim 1: bind
+const pushItem = s.add.bind(s);
+pushItem(1); // ✅
+
+// ✅ Yechim 2: arrow wrapper
+const pushItem2 = (item) => s.add(item);
+
+// ✅ Yechim 3: arrow function field (memory cost bilan)
+class Stack2 extends Container {
+  add = (item) => {
+    this.items.push(item);
+    return this;
+  };
+}
+```
+
+**Tushuntirish:** Class body har doim strict mode'da. Method reference oligandan keyin `this` implicit'ga aniqlanmaydi. Yo'qotilgan `this` — class method'lar bilan ishlaganda eng ko'p uchraydigan bug. Builder pattern (chaining bilan) ham shu muammoga uchraydi — method reference'lar zanjirdan chiqsa, `this` yo'qoladi.
+
+**Deep Dive:**
+
+V8 nuqtai nazaridan, method reference `s.add` aslida bitta function object'ga reference olishdir — receiver (`this`) binding chaqirish vaqtida (call site) aniqlanadi, function object'da saqlanmaydi. Spec bo'yicha `pushItem(1)` `[[Call]]` internal method'ni `thisArgument = undefined` bilan chaqiradi. Strict mode'da `undefined` `this` ga avtomatik bog'lanadi (sloppy mode'da `globalThis` bo'lardi). Arrow function field esa lexical `this` ga ega — har instance uchun yangi closure yaratiladi, receiver class field initialization vaqtida fix qilinadi.
+
+</details>
+
+### 9. Class expression va declaration o'rtasidagi farqlar nima? [Middle]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+Class'ni ikki usulda yaratish mumkin — declaration va expression. Hoisting bo'yicha **ikkalasi ham TDZ** da turadi, lekin binding mexanizmida farq bor.
+
+```javascript
+// Class Declaration — joriy scope'ga let-semantika bilan qo'shiladi:
+class Animal {
+  constructor(name) { this.name = name; }
+}
+// Animal — declaration scope ichida accessible
+
+// Class Expression — named:
+const Cat = class FelineClass {
+  constructor(name) { this.name = name; }
+  whoAmI() { return FelineClass.name; } // ichki nom — recursive uchun
+};
+
+console.log(Cat.name);        // "FelineClass" — ichki nom
+console.log(new Cat("Tom").whoAmI()); // "FelineClass"
+// console.log(FelineClass);  // ❌ ReferenceError — tashqarida yo'q
+
+// Class Expression — unnamed (name inference):
+const Dog = class {
+  constructor(name) { this.name = name; }
+};
+console.log(Dog.name); // "Dog" — variable nomidan inferred
+
+// Factory pattern bilan dynamic class:
+function createTimestamped(Base) {
+  return class extends Base {
+    timestamp = Date.now();
+  };
+}
+
+const TimestampedUser = createTimestamped(class { constructor(n) { this.name = n; } });
+```
+
+| Xususiyat | Class Declaration | Class Expression |
+|-----------|------------------|------------------|
+| **Joylash** | Statement | Expression — kerakli joyda |
+| **Binding** | Scope'ga let-semantika | Variable yoki anonymous |
+| **Ichki nom** | Yo'q | Optional (`class Name {}`) |
+| **Hoisting** | TDZ (let kabi) | Variable hoisting qoidalari |
+| **Use case** | Top-level class'lar | Factory, mixin, dynamic class |
+
+**Deep Dive:**
+
+Spec bo'yicha ikkalasi ham `ClassDefinitionEvaluation` orqali evaluate bo'ladi — natija bir xil constructor function object. Farq faqat `BindingIdentifier` saqlash mexanizmida. Named class expression'da ichki nom alohida `class scope`'da `const`-semantikasi bilan bind qilinadi — `FelineClass = something` yozsa `TypeError` (const assignment). Unnamed expression'da V8 `SharedFunctionInfo.inferred_name` field'iga variable nomini yozadi — bu **NamedEvaluation** spec qoidasiga binoan ishlaydi, lekin faqat `const`/`let`/`var` declarator yoki property assignment kontekstida.
 
 </details>
 

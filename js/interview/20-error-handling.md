@@ -9,7 +9,7 @@
 ### 1. JavaScript dagi asosiy Error turlari qaysilar va farqlari nima? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 JavaScript da barcha xatolar `Error` base class'idan meros oladi. Har bir tur muayyan xato kategoriyasini bildiradi:
 
@@ -47,7 +47,7 @@ try {
 ### 2. Nima uchun Error throw qilish kerak, string emas? [Junior+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 // ❌ String throw — stack trace yo'q
@@ -79,7 +79,7 @@ try {
 ### 3. Custom Error class qanday yaratiladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `extends Error` bilan meros olish, `super(message)` chaqirish, `this.name` ni o'rnatish:
 
@@ -126,7 +126,7 @@ ValidationError instance → ValidationError.prototype → Error.prototype → O
 ### 4. Error.cause nima va qanday ishlatiladi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `Error.cause` (ES2022) — xatoning asl sababini saqlash. Ikkinchi argument sifatida `{ cause }` options obyekti beriladi:
 
@@ -158,7 +158,7 @@ Bu nima uchun kerak: ko'p qatlamli dasturlarda past darajadagi texnik xato (ENOE
 ### 5. unhandledrejection eventi nima va qanday ishlatiladi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 `unhandledrejection` — Promise reject bo'lib, hech qayerda `.catch()` yoki `try/catch` bilan ushlanmaganda browser/Node.js tomonidan trigger qilinadigan event. Bu xatolarni global darajada ushlashning oxirgi himoya qatlami.
 
@@ -197,7 +197,7 @@ Event loop'da microtask queue'dagi barcha microtask'lar tugagandan keyin, agar b
 ### 6. Re-throwing pattern nima? Qachon ishlatiladi? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Re-throwing — catch blokda faqat boshqara oladigan xatolarni ushlash, qolganlarini qayta `throw` qilish. Bu eng muhim error handling pattern'laridan biri.
 
@@ -225,7 +225,7 @@ function processInput(data) {
 ### 7. Result pattern nima? throw dan qanday farq qiladi? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Result pattern — `try/catch` va `throw` o'rniga natija obyekti qaytarish: `{ ok: true, data }` yoki `{ ok: false, error }`. Go tilida standart, JavaScript da kutilgan xatolar uchun ishlatiladi.
 
@@ -266,7 +266,7 @@ Performance: zamonaviy engine'larda try/catch overhead minimal (V8 TurboFan opti
 ### 8. Operational vs Programmer errors farqi nima? [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **Operational errors** — dastur to'g'ri yozilgan, lekin tashqi omillar sababli xato: network timeout, fayl topilmadi, user input noto'g'ri, rate limit, disk to'ldi. Bular **kutilgan** va **boshqarish mumkin** — retry, fallback, foydalanuvchiga xabar.
 
@@ -308,7 +308,7 @@ Node.js da `uncaughtException` dan keyin `process.exit(1)` tavsiya qilinadi — 
 ### 9. Circuit Breaker pattern'ini tushuntiring va implement qiling [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Circuit Breaker — tashqi servisga ko'p marta muvaffaqiyatsiz so'rov yuborilgandan keyin yangi so'rovlarni **vaqtincha to'xtatish** pattern'i. Servisni haddan tashqari yuklashni va cascading failure'ni oldini oladi.
 
@@ -382,7 +382,7 @@ Real production da qo'shimcha narsalar kerak: health check endpoint, sliding win
 ### 10. Graceful degradation pattern'ini tushuntiring [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 Graceful degradation — asosiy data manba ishlamasa bir necha bosqichda fallback'larga o'tish. Foydalanuvchi har doim natija oladi — to'liq yoki qisman.
 
@@ -431,7 +431,7 @@ Pattern'ning 3 ta prinsipi: (1) Har bir bosqich o'z try/catch'ida — bitta bosq
 ### 11. window.onerror vs addEventListener("error") farqi nima? [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | | `window.onerror` | `addEventListener("error")` |
 |---|---|---|
@@ -468,7 +468,7 @@ Resurs xatolari (img, script) bubble qilmaydi — shuning uchun **capture phase*
 ### 12. Promise.allSettled vs Promise.all — error handling farqi? [Middle]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 | | `Promise.all` | `Promise.allSettled` |
 |---|---|---|
@@ -508,7 +508,7 @@ const failed = results.filter(r => r.status === "rejected").map(r => r.reason);
 ### 13. Error handling best practices ro'yxatini ayting [Senior]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 1. **Doim `Error` throw qiling** — string, number emas. Stack trace uchun.
 
@@ -582,7 +582,7 @@ console.log(test());
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 A
@@ -615,7 +615,7 @@ console.log(tricky());
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 catch: xato!
@@ -659,7 +659,7 @@ test();
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 A
@@ -707,7 +707,7 @@ console.log("Done");
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 **3 ta xato bor:**
 
@@ -772,7 +772,7 @@ console.log("done");
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 a start
@@ -790,7 +790,7 @@ done
 ### 6. retry funksiyasini exponential backoff bilan implement qiling [Middle+]
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```javascript
 async function retry(fn, { maxRetries = 3, delay = 1000, backoff = 2 } = {}) {
@@ -847,7 +847,7 @@ Promise.resolve(1)
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```
 A: 1
@@ -858,6 +858,244 @@ D: 42
 `"A: 1"` — birinchi then, val = 1. throw sodir bo'ladi. `"B"` — **o'tkaziladi**, chunki xato bo'ldi — eng yaqin `.catch()`'ga boradi. `"C: xato"` — catch xatoni ushladi va `42` qaytardi. `"D: 42"` — catch'dan keyin zanjir davom etadi, catch'ning return qiymati keyingi then'ga o'tadi.
 
 **MUHIM**: `.catch()` xatoni **recovery** qiladi — catch'dan keyin zanjir normal davom etadi. Agar catch ichida yana throw qilsangiz — keyingi catch ga o'tadi.
+
+
+</details>
+
+### 8. Output nima? `return await` vs `return` try/catch ichida [Senior]
+
+
+```javascript
+async function fetchUser() {
+  throw new Error("network");
+}
+
+async function getUserNoAwait() {
+  try {
+    return fetchUser();
+  } catch (error) {
+    return "caught-no-await";
+  }
+}
+
+async function getUserWithAwait() {
+  try {
+    return await fetchUser();
+  } catch (error) {
+    return "caught-with-await";
+  }
+}
+
+getUserNoAwait().then(r => console.log("A:", r), e => console.log("A reject:", e.message));
+getUserWithAwait().then(r => console.log("B:", r));
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+```
+A reject: network
+B: caught-with-await
+```
+
+`return fetchUser()` — rejected Promise to'g'ridan-to'g'ri caller'ga qaytadi. Funksiya ichidagi `try/catch` faqat **joriy execution context**'dagi sync throw'ni ushlaydi — qaytarilgan Promise allaqachon funksiyadan tashqarida bo'ladi. `return await fetchUser()` — `await` rejected promise'ni sync throw'ga aylantiradi, throw hali funksiya ichida sodir bo'ladi va catch ushlaydi.
+
+**Qoida:** try/catch ichidan Promise qaytarayotgan bo'lsangiz — **doim `return await`** ishlating. Kichik performance cost (qo'shimcha microtask) bor, lekin aniq error handling muhim. ESLint'da `@typescript-eslint/return-await: "in-try-catch"` rule shu pattern'ni tekshiradi.
+
+
+</details>
+
+### 9. AggregateError nima va qachon throw bo'ladi? [Middle+]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+`AggregateError` (ES2021) — bir nechta xatoni bitta obyektda jamlash uchun mo'ljallangan Error subclass'i. `errors` property'sida xatolar array'ini saqlaydi. Asosan `Promise.any()` tomonidan throw qilinadi — agar barcha promise'lar reject bo'lsa.
+
+```javascript
+// Promise.any — kamida bittasi resolve bo'lishi kutiladi
+try {
+  const result = await Promise.any([
+    Promise.reject(new TypeError("type xato")),
+    Promise.reject(new RangeError("range xato")),
+    Promise.reject(new Error("oddiy xato"))
+  ]);
+} catch (error) {
+  console.log(error instanceof AggregateError); // true
+  console.log(error.errors.length); // 3
+  console.log(error.errors[0] instanceof TypeError); // true
+  console.log(error.message); // "All promises were rejected"
+}
+
+// Manual yaratish — bir nechta validation xatolarini birga qaytarish
+function validateForm(data) {
+  const errors = [];
+  if (!data.email) errors.push(new ValidationError("Email kerak", "email"));
+  if (!data.password) errors.push(new ValidationError("Parol kerak", "password"));
+  if (errors.length > 0) {
+    throw new AggregateError(errors, "Forma validatsiyadan o'tmadi");
+  }
+}
+```
+
+**Farqi `Promise.all()` dan:** `Promise.all` birinchi rejection'da darhol reject qiladi va xatoni `error` sifatida beradi (bitta). `Promise.any` **barcha** rejection'larni jamlab `AggregateError` qaytaradi — har birining sababi `errors` array'da.
+
+**Deep Dive:** `AggregateError` constructor signature: `new AggregateError(errors, message?, options?)`. `options.cause` ES2022 dan keyin qo'llanadi — `Error` constructor bilan bir xil. `errors` argument iterable bo'lishi kerak (array, Set, generator). Promise.any spec algoritmi (Promise Combinators) bir-bir resolve/reject'ni kuzatadi, oxirgisi reject bo'lganda yangi AggregateError yaratib reject qiladi.
+
+
+</details>
+
+### 10. Error.stack qanday capture qilinadi va Error.captureStackTrace nima qiladi? [Senior]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+`Error.stack` — ECMAScript spec'da rasman yo'q (non-standard), lekin V8, SpiderMonkey, JavaScriptCore — barcha zamonaviy engine'lar qo'llaydi. `new Error()` paytida engine joriy call stack'ning snapshot'ini saqlaydi va `.stack` property orqali string sifatida ochib beradi.
+
+```javascript
+function a() { return b(); }
+function b() { return c(); }
+function c() { return new Error("test"); }
+
+const err = a();
+console.log(err.stack);
+// Error: test
+//     at c (file.js:3:24)
+//     at b (file.js:2:24)
+//     at a (file.js:1:24)
+//     at <anonymous> ...
+```
+
+**V8 lazy stack trace** — performance optimizatsiyasi: `new Error()` paytida stack darhol format qilinmaydi, faqat internal pointer saqlanadi. `.stack` property birinchi marta o'qilganda string'ga aylantiriladi va cache qilinadi. Agar error catch qilinib stack hech qachon o'qilmasa — formatting overhead butunlay yo'q.
+
+`Error.captureStackTrace(target, constructorOpt)` — **V8-only** API. `constructorOpt` argument'iga berilgan funksiya va undan keyingi frame'lar stack'dan **olib tashlanadi**. Custom error class'lar va assert utility'lar uchun foydali — foydalanuvchi stack'da utility frame'larini ko'rmaydi:
+
+```javascript
+class AppError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "AppError";
+    // Stack trace'dan AppError constructor'ni olib tashlash
+    Error.captureStackTrace?.(this, AppError);
+  }
+}
+
+function assert(condition, message) {
+  if (!condition) {
+    const error = new Error(message);
+    // assert frame'ni stack'dan olib tashlash
+    Error.captureStackTrace?.(error, assert);
+    throw error;
+  }
+}
+```
+
+`Error.stackTraceLimit` (V8) — default 10 frame. `Infinity` qilib o'zgartirish mumkin, lekin performance ta'siri bor. Firefox/Safari'da bu property yo'q.
+
+**Deep Dive:** Stack format engine'ga bog'liq: V8 — `    at functionName (file:line:col)`, Firefox — `functionName@file:line:col`. Sentry/LogRocket'lar har engine uchun alohida parser ishlatadi. Source maps (`.map` fayl) production'da minified kod stack trace'ni original kodga map qiladi — DevTools avtomatik bog'laydi, lekin production'da source map'ni publik qilmaslik kerak (kod ochiladi).
+
+
+</details>
+
+### 11. Error obyektini JSON.stringify qilganda nima uchun bo'sh obyekt? [Middle+]
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+`Error.prototype.message`, `name`, `stack` — barchasi **non-enumerable** property'lar. `JSON.stringify` faqat enumerable own property'larni serialize qiladi (`EnumerableOwnPropertyNames` abstract operation) — shuning uchun Error obyekti uchun natija `"{}"` bo'ladi:
+
+```javascript
+const error = new Error("Yuklash xatosi");
+console.log(JSON.stringify(error)); // "{}" — bo'sh!
+
+// Sabab: built-in property'lar non-enumerable
+console.log(Object.keys(error)); // [] — bo'sh
+console.log(Object.getOwnPropertyDescriptor(Error.prototype, "message"));
+// { writable: true, enumerable: false, configurable: true }
+
+// ✅ Yechim 1: Custom serializer
+function serializeError(error) {
+  if (!error) return null;
+  const result = {
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+  };
+  // Custom enumerable property'lar (statusCode, code, ...)
+  for (const key of Object.keys(error)) {
+    result[key] = error[key];
+  }
+  // ES2022 cause chain — recursive
+  if (error.cause !== undefined) {
+    result.cause = serializeError(error.cause);
+  }
+  return result;
+}
+
+console.log(JSON.stringify(serializeError(error), null, 2));
+// {
+//   "name": "Error",
+//   "message": "Yuklash xatosi",
+//   "stack": "Error: Yuklash xatosi\n    at ..."
+// }
+
+// ✅ Yechim 2: JSON.stringify replacer
+JSON.stringify(error, ["name", "message", "stack", "cause"]);
+// '{"name":"Error","message":"Yuklash xatosi","stack":"..."}'
+```
+
+**Production muhim:** Logger, monitoring servislar (Sentry, Datadog) Error obyektni tanib avtomatik to'g'ri serialize qiladi. Lekin o'z logging kodingizda Error'ni to'g'ridan-to'g'ri `JSON.stringify` ga bermang — custom serializer orqali o'tkazing. Aks holda log'larda bo'sh obyekt'lar paydo bo'ladi va incident debug qiyinlashadi.
+
+
+</details>
+
+### 12. Bu kodda nima xato? finally va resource leak [Middle]
+
+```javascript
+async function processFile(path) {
+  const connection = await openConnection();
+  const data = await connection.read(path);
+  connection.close();
+  return JSON.parse(data);
+}
+```
+
+<details>
+<summary><strong>Javob</strong></summary>
+
+**Xato:** Agar `connection.read()` yoki `JSON.parse()` throw qilsa — `connection.close()` **chaqirilmaydi**. Bu **resource leak** — connection pool exhaust bo'lishi va serverni crash qilishi mumkin.
+
+```javascript
+// ✅ Tuzatilgan: try/finally bilan cleanup garantiyalanadi
+async function processFile(path) {
+  const connection = await openConnection();
+  try {
+    const data = await connection.read(path);
+    return JSON.parse(data);
+  } finally {
+    connection.close(); // ✅ DOIM ishlaydi — xato bo'lsa ham
+  }
+}
+```
+
+`finally` blok **doim** ishlaydi: try muvaffaqiyatli tugasa ham, throw bo'lsa ham, `return` ishlasa ham. Cleanup (file close, connection release, timer clear, mutex release) uchun ideal — `catch` shart emas (xato propagate bo'lib davom etadi).
+
+**Boshqa pattern'lar:**
+- **using statement** (ES2024+ Stage 3, hozircha barcha runtime'larda yo'q): `using connection = openConnection();` — block tugaganda avtomatik `[Symbol.dispose]()` chaqiriladi.
+- **Wrapper pattern**: `withConnection(async (conn) => {...})` — connection ochish/yopish wrapper ichida.
+
+**Anti-pattern — finally ichida throw qilish:** Agar `connection.close()` o'zi throw qilsa — bu xato `try` ichidagi original xatoni **override** qiladi. Production-ready kod:
+
+```javascript
+try {
+  // ...
+} finally {
+  try { connection.close(); } catch (closeError) {
+    console.error("Close failed:", closeError);
+    // Original xatoni saqlash — close xatosini faqat log qilish
+  }
+}
+```
 
 
 </details>

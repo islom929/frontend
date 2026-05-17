@@ -91,7 +91,7 @@ gen.next(); // "Oxir" chiqadi  → { value: 3, done: true }
 gen.next(); //                 → { value: undefined, done: true }
 ```
 
-**Deep Dive:** Engine ichida generator state machine sifatida ishlaydi. Har bir `yield` — bitta state. `next()` joriy state'dan keyingisiga o'tadi. V8 da bu switch-case ga transpile bo'ladi.
+**Deep Dive:** Pedagogik modelda generator "state machine" sifatida tavsiflanadi — har bir `yield` bitta state'ga mos keladi. Amalda V8 generator'ni maxsus bytecode opcodes (`SuspendGenerator` va `ResumeGenerator`) bilan compile qiladi — switch-case transpile emas (bu Babel/legacy TypeScript ES5 target pattern'i). Generator suspend bo'lganda register'dagi qiymatlar va bytecode pointer generator object'ning internal slot'larida saqlanadi, `next()` esa `ResumeGenerator` opcode orqali saqlangan holatdan davom ettiradi.
 
 </details>
 
@@ -546,5 +546,121 @@ console.log([...take(fibonacci(), 10)]);
 ```
 
 Generator'ning kuchi — cheksiz ketma-ketlik memory sarflamaydi. Faqat joriy holatni saqlaydi (`a`, `b`). `take` bilan kerakli miqdorni olish — xavfsiz.
+
+</details>
+
+### 5. Quyidagi kodning output'ini ayting [Senior]
+
+**Savol:**
+
+```javascript
+function* gen() {
+  try {
+    yield 1;
+    yield 2;
+    yield 3;
+  } finally {
+    console.log("cleanup");
+  }
+}
+
+const [a, b] = gen();
+console.log(a, b);
+```
+
+<details>
+<summary>Javob</summary>
+
+```
+cleanup
+1 2
+```
+
+Array destructuring `[a, b]` faqat 2 ta element oladi, lekin iterator'da yana qiymatlar qoldi. Spec'da `IteratorClose()` chaqiriladi — bu generator'ning `return()` method'ini trigger qiladi, va `try/finally` ichidagi `finally` bloki ishlaydi. Shuning uchun `cleanup` `1 2` dan **oldin** chiqadi (engine destructuring evaluation paytida iterator'ni yopadi).
+
+**Deep Dive:** Spec'da `ArrayBindingPattern` evaluation algoritmi `IteratorClose(iteratorRecord, completion)` ni iterator qolgan elementlari bo'lgan holatda chaqiradi. Bu resurs leak'ning oldini olish uchun — database cursor, file handle, network stream singari generator-based resource'larda `finally` bloki cleanup uchun ishonchli ishlaydi. Bu xususiyat `for...of + break` da ham bir xil ishlaydi (`break` IteratorClose ni trigger qiladi). Lekin `[...gen()]` spread esa iterator'ni oxirigacha consume qiladi — `finally` baribir ishlaydi, lekin natural flow orqali (early termination emas).
+
+</details>
+
+### 6. Async iterator nima va sync iterator'dan farqi nimada? [Senior]
+
+<details>
+<summary>Javob</summary>
+
+**Async iterator** — `Symbol.asyncIterator` orqali aniqlanadi (sync'dagi `Symbol.iterator` emas). `next()` method'i `Promise<{ value, done }>` qaytaradi — oddiy iterator esa darhol `{ value, done }`.
+
+```javascript
+const asyncIterable = {
+  [Symbol.asyncIterator]() {
+    let i = 0;
+    return {
+      next() {
+        return new Promise(resolve => {
+          setTimeout(() => {
+            resolve(i < 3 ? { value: i++, done: false } : { value: undefined, done: true });
+          }, 100);
+        });
+      }
+    };
+  }
+};
+
+for await (const val of asyncIterable) {
+  console.log(val); // 0, 1, 2 (har biri 100ms kechikish bilan)
+}
+```
+
+**Asosiy farqlar:**
+
+| Xususiyat | Sync Iterator | Async Iterator |
+|-----------|---------------|----------------|
+| Symbol | `Symbol.iterator` | `Symbol.asyncIterator` |
+| `next()` qaytaradi | `{ value, done }` | `Promise<{ value, done }>` |
+| Consumer | `for...of`, spread, destructuring | `for await...of` |
+| `await` body ichida | Ishlaydi (async funksiyada) | Ishlaydi |
+| Use case | Sync data (Array, Map, Set) | Stream, paginated API, events |
+
+**`for await...of` sync iterable bilan ham ishlaydi** — agar `Symbol.asyncIterator` topilmasa, engine `Symbol.iterator` ni ishlatadi va har value'ni `Promise.resolve()` ga o'raydi. Sequential — bitta iteratsiya tugamaguncha keyingisi boshlanmaydi (parallel emas).
+
+**Deep Dive:** Async iterator spec'da `[[AsyncGeneratorQueue]]` internal slot bilan kelishiladi — pending `next()` chaqiruvlari navbatda turadi. Bir vaqtda birdan ortiq `next()` chaqirilsa, ular sequential bajariladi (parallelism emas). Bu generator state machine konsistensiyasini saqlash uchun — `yield` pozitsiyasi va local variable'lar bir vaqtda turli context'larda bo'la olmaydi.
+
+</details>
+
+### 7. WeakMap iterable emas. Nima uchun? [Senior]
+
+<details>
+<summary>Javob</summary>
+
+WeakMap (va WeakSet) `Symbol.iterator` implement qilmaydi — `for...of`, `[...weakMap]`, `weakMap.entries()` ishlamaydi. Sababi: WeakMap key'lari **weak reference** bilan saqlanadi, GC istalgan paytda entry'ni olib tashlashi mumkin. Iterate paytida natija **noaniq** bo'lardi — qaysi entry qaysi paytda tirik ekanligi GC'ga bog'liq.
+
+```javascript
+const wm = new WeakMap();
+let key = { id: 1 };
+wm.set(key, "data");
+
+// ❌ Hammasi TypeError yoki undefined:
+// for (const [k, v] of wm) {} // TypeError: wm is not iterable
+// console.log(wm.size);        // undefined
+// wm.keys();                   // undefined
+// [...wm];                     // TypeError
+```
+
+**Spec qarori:** Iterable bo'lmagan API determinist bo'ladi — bir xil snapshot'da bir xil natija. WeakMap'ni iterable qilish degani — GC ishlashi va iterate natijasi orasida race condition bo'lishi mumkin edi. ECMAScript'da non-deterministic API'lar minimal bo'lishi tamoyili — shuning uchun iterate API qo'shilmagan.
+
+**Yechim — agar iteratsiya kerak bo'lsa:** Map ishlatish (strong reference), yoki WeakMap value'sida alohida iterable struktura saqlash.
+
+```javascript
+// Agar key'lar ham kerak bo'lsa — Map + manual cleanup:
+const keys = new Set();
+const map = new Map();
+
+function trackKey(key, data) {
+  keys.add(key);
+  map.set(key, data);
+  // Cleanup logic'ni qo'lda yozish kerak
+}
+```
+
+**Deep Dive:** WeakMap spec'da `[[WeakMapData]]` internal slot — `{ Key, Value }` record'lar ro'yxati saqlanadi. GC observable bo'lmasligi uchun bu slot tashqaridan ko'rinmaydi (`Object.keys`, `Reflect.ownKeys` ham ishlatib bo'lmaydi). ES2023+ da `Symbol()` (non-registered symbol) ham key bo'la oladi — chunki shu Symbol'ga reference yo'qolsa, GC entry'ni tozalashi mumkin (registered `Symbol.for('x')` esa global registry'da saqlanadi va tozalanmaydi).
 
 </details>
