@@ -68,7 +68,7 @@ TypeScript array tipi **homogeneous** emas — union type bilan aralash array ya
 
 TypeScript'da `T[]` va `Array<T>` ikkalasi ham **bir xil `Array<T>` interface**'iga resolve qilinadi — `lib.es5.d.ts`'da e'lon qilingan. `T[]` — sintaktik shakarlik (syntactic sugar), compiler uni darhol `Array<T>`'ga aylantiradi.
 
-Checker'da array tipi `TypeFlags.Object` bilan belgilanadi (interface'dan keladi) va `ObjectFlags.Reference` + `ObjectFlags.InstantiatedTypeParameters` flag'lari bilan generic instansiyatsiya sifatida ko'riladi. `T` element type'i generic type argument sifatida saqlanadi.
+Checker'da array tipi `TypeFlags.Object` bilan belgilanadi (interface'dan keladi) va `ObjectFlags.Reference` flag bilan generic instansiyatsiya sifatida ko'riladi (`Array<T>` generic interface'ning reference'i). `T` element type'i `typeArguments` array'ida saqlanadi — bu `TypeReference` strukturasining standart maydoni.
 
 **Inference asoslari:**
 
@@ -87,7 +87,7 @@ xs.push(1);  // endi: number[]
 xs.push("a"); // endi: (string | number)[]
 ```
 
-Evolving array — TS kompileri bo'sh array'ga har `push`'dan keyin tipni kengaytirib boradi. Bu `noImplicitAny` strict mode'da ham ishlaydi, lekin murakkab kodda kutilmagandek xulqqa olib kelishi mumkin. Shuning uchun bo'sh array'larga **annotation** tavsiya etiladi.
+Evolving array — TS kompileri bo'sh array'ga har `push`'dan keyin tipni kengaytirib boradi. Mexanizm `noImplicitAny: true` rejimida ham ishlaydi (initial `any[]` xato bermaydi, chunki evolving), lekin agar evolving tugamasa va variable narrowing'siz keng scope'da ishlatilsa, kompilator `TS7034` xatosini chiqarishi mumkin (`Variable 'xs' implicitly has type 'any[]' in some locations where its type cannot be determined`). Shuning uchun bo'sh array'larga **annotation** tavsiya etiladi — evolving inference'ga tayanmaslik.
 
 **Array method'lari va return type'lar:**
 
@@ -402,7 +402,7 @@ let triplet: [string, number, boolean] = ["a", 1, true];
 type TripletLength = typeof triplet.length; // type: 3
 ```
 
-Nima uchun: tuple type'ning `length` property'si checker tomonidan literal number type sifatida qaytariladi. Oddiy array'da esa `length: number` (keng tip). Bu farq `ArrayType.typeArguments` va `TupleType.fixedLength` ni ajratish asosida.
+Nima uchun: tuple type'ning `length` property'si checker tomonidan literal number type sifatida qaytariladi. Oddiy array'da esa `length: number` (keng tip). Bu farq `TupleType` strukturasidagi `minLength` va `fixedLength` (hisoblanadigan) maydonlari hamda `elementFlags: ElementFlags[]` array'i orqali aniqlanadi — har element uchun flag (`Required`, `Optional`, `Rest`, `Variadic`) saqlanadi.
 
 **Tuple va push muammosi:**
 
@@ -475,6 +475,9 @@ const [count, setCount] = useState(0);
 // count: number, setCount: (next: number) => void
 
 // 2. Response tuple — [error, data] pattern (Go-style)
+interface User { id: number; name: string }
+declare const api: { getUser: (id: number) => Promise<User> };
+
 async function fetchUser(id: number): Promise<[Error | null, User | null]> {
   try {
     const user = await api.getUser(id);
@@ -485,8 +488,8 @@ async function fetchUser(id: number): Promise<[Error | null, User | null]> {
 }
 
 const [error, user] = await fetchUser(1);
-if (error) { /* handle error */ }
-else { /* use user */ }
+if (error !== null) { /* handle error */ }
+else { /* use user — bu yerda user: User | null, qo'shimcha narrow kerak */ }
 
 // 3. Coordinate/vector — math operatsiyalar
 type Vec2 = [number, number];
@@ -800,9 +803,11 @@ Variadic tuple — real-world patterns:
 
 ```typescript
 // concat — tuple'larni birlashtirish
-function concat<T extends unknown[], U extends unknown[]>(
-  a: [...T],
-  b: [...U]
+// Diqqat: parametrlar `readonly [...T]` — `as const` tuple'lar readonly,
+// mutable `[...T]` ga assign bo'lmaydi
+function concat<T extends readonly unknown[], U extends readonly unknown[]>(
+  a: readonly [...T],
+  b: readonly [...U]
 ): [...T, ...U] {
   return [...a, ...b];
 }
@@ -1085,8 +1090,10 @@ const ROLES = ["admin", "editor", "viewer"] as const;
 type Role = typeof ROLES[number];
 // type Role = "admin" | "editor" | "viewer"
 
+interface AccountUser { id: number; roles: Role[] }
+
 // Runtime array + compile-time type — DRY
-function checkRole(user: User, role: Role): boolean {
+function hasRole(user: AccountUser, role: Role): boolean {
   return user.roles.includes(role);
 }
 
@@ -1373,15 +1380,16 @@ Shu sababli enum declaration merging va namespace merging bilan ishlashi mumkin 
 
 **Numeric enum tip semantikasi:**
 
-Numeric enum `number` subtype sifatida traktovka qilinadi — bu TypeScript'ning ataylab qilingan **"intentional unsoundness"** xususiyati. Har qanday `number` `Direction`'ga assign bo'la oladi:
+TS 5.0'gacha **har qanday** `number` numeric enum'ga assign bo'lardi — "intentional unsoundness" deb atalgan. **TS 5.0'dan boshlab** pure literal numeric enum'lar **union enum**'ga aylangan, ya'ni har bir member alohida literal tip:
 
 ```typescript
 enum Direction { Up, Down, Left, Right }
-let d: Direction = 42; // ⚠️ Ruxsat etilgan — xato yo'q
-// 42 enum'da yo'q, lekin TS compile-time'da to'xtatmaydi
+let d: Direction = 42;
+// TS 5.0+: ❌ Type '42' is not assignable to type 'Direction'
+// TS < 5.0:  ⚠️ ruxsat etilardi (eski xulq)
 ```
 
-Bu TypeScript'ning **bit flags** pattern'ini qo'llab-quvvatlashi uchun ataylab qilingan:
+Lekin **bit flags** pattern'i hali ham ishlaydi — chunki bitwise operatsiyalar enum literal member'lari ustida hisoblanganda natija enum'ning union'iga kiradi:
 
 ```typescript
 enum Permission {
@@ -1391,10 +1399,10 @@ enum Permission {
 }
 
 const rw: Permission = Permission.Read | Permission.Write;
-// rw = 3 (011) — enum'da yo'q, lekin valid bit flag
+// rw = 3 (011) — bitwise operatsiya member'lar ustida → enum'ga assign etiladi
 ```
 
-Agar TS numeric enum'ni qat'iy cheklasa, bitwise operatsiyalar natijalari enum'ga assign bo'lmaydi va bit flags pattern'i ishlamas edi.
+Eski "har qanday `number` qabul qilinadi" xulqi faqat enum **computed member**'ga ega bo'lganda saqlanadi (masalan, `Up = Math.random()`), chunki bunday enum union'ga aylantirib bo'lmaydi.
 
 **String enum tip semantikasi:**
 
@@ -1624,7 +1632,7 @@ console.log(Direction.Right);  // → compile: console.log(3)
 - **Performance** — runtime object lookup yo'q (inline value)
 - **Zero cost abstraction** — compile-time nom, runtime hech narsa
 
-**Cheklovlari — juda muhim:**
+**Cheklovlari (kritik):**
 
 1. **`isolatedModules: true`** bilan — **boshqa fayldan** `const enum` import qilish cheklangan. Sababi: esbuild, SWC, Babel kabi single-file transpiler'lar har faylni alohida compile qiladi — ular boshqa fayllarni o'qish imkoniga ega emas va inline qila olmaydi. TypeScript bu holatda `TS2748` xato beradi: *"Cannot access ambient const enums when the '--isolatedModules' flag is provided."*
 
@@ -1680,7 +1688,7 @@ Bu holda bundle size afzalligi yo'qoladi, lekin runtime'da enum object mavjud bo
 
 Modern JavaScript bundler'lar (esbuild, SWC, Babel) har faylni alohida (isolated) compile qilishadi — ular boshqa fayllarni o'qimaydi. `const enum` import qilinganda, bundler qiymatlarni topish uchun source faylni o'qishi kerak bo'lardi — lekin u bunday qilolmaydi. Shuning uchun TS `isolatedModules: true` bilan const enum cross-file import'ni bloklaydi.
 
-TS 5.8'dagi `erasableSyntaxOnly` — Node.js 22.6+'da `--experimental-strip-types` bilan TypeScript fayllarini to'g'ridan-to'g'ri ishga tushirish uchun. Node.js faqat type annotation'larni o'chiradi (type erasure), lekin enum inline qilish kabi transformation qila olmaydi. Shuning uchun `const enum` bu flag bilan ishlamaydi.
+TS 5.8'dagi `erasableSyntaxOnly` — Node.js native TypeScript support bilan ishlash uchun. Node.js 22.6+'da `--experimental-strip-types` flag bilan, Node.js 23.6+'da esa default yoqilgan (`--no-experimental-strip-types` bilan o'chiriladi). Bu rejimda Node.js faqat type annotation'larni o'chiradi (type erasure) — enum kabi runtime kod hosil qiluvchi konstruksiyalarni transform qila olmaydi. Shuning uchun `const enum` bu flag bilan ishlamaydi.
 
 </details>
 
@@ -1804,7 +1812,7 @@ Solishtirish: oddiy enum vs const enum:
 
 ```javascript
 // OLDINGI (oddiy enum):
-// ~200+ bayt — IIFE + object + reverse mapping
+// IIFE + object + forward + reverse mapping
 var Direction;
 (function (Direction) {
   Direction[Direction["Up"] = 0] = "Up";
@@ -1814,11 +1822,11 @@ var Direction;
 let dir = Direction.Up;
 
 // KEYINGI (const enum):
-// ~20 bayt — faqat qiymat
+// faqat literal qiymat (wrapper yo'q)
 let dir = 0 /* Direction.Up */;
 ```
 
-Bundle size farqi enum hajmiga bog'liq — lekin const enum doimo kichikroq (object overhead yo'q).
+Bundle size farqi enum member soniga proporsional — har member uchun oddiy enum'da wrapper + forward + reverse property assignment'lar saqlanadi, const enum'da esa hech narsa qolmaydi (faqat ishlatish nuqtalarida literal qiymat).
 
 </details>
 
@@ -1828,7 +1836,7 @@ Bundle size farqi enum hajmiga bog'liq — lekin const enum doimo kichikroq (obj
 
 ### Nazariya
 
-TypeScript oddiy enum (const emas) JavaScript'ga **IIFE (Immediately Invoked Function Expression)** sifatida compile bo'ladi. Bu enum'ning runtime representatsiyasini tushunish uchun kalit tushuncha.
+TypeScript oddiy enum (const emas) JavaScript'ga **IIFE (Immediately Invoked Function Expression)** sifatida compile bo'ladi. Bu enum'ning runtime representatsiyasini va `reverse mapping` mexanizmini tushunish uchun asosiy nuqta.
 
 ### Numeric Enum — IIFE va Reverse Mapping
 
@@ -2089,29 +2097,28 @@ for (const key in LogLevel) {
 }
 ```
 
-Declaration merging misoli:
+Declaration merging misoli (**bir xil scope** ichida — bir fayl yoki bir global namespace):
 
 ```typescript
-// File 1: types.ts
+// Bir faylda — yoki ikkala fayl ham ambient (.d.ts) global declaration'lar
 enum Color {
   Red = "#FF0000",
   Green = "#00FF00",
 }
 
-// File 2: same-or-other.ts (same module/project)
 enum Color {
   Blue = "#0000FF",
   Yellow = "#FFFF00",
 }
 
-// Merge natijasi
+// Merge natijasi (bir scope'da):
 Color.Red;     // "#FF0000"
 Color.Green;   // "#00FF00"
 Color.Blue;    // "#0000FF"
 Color.Yellow;  // "#FFFF00"
 ```
 
-Declaration merging faqat **same module/same file** ichida ishlatiladi, chunki TS modullar orasida avtomatik merge qilmaydi.
+Declaration merging faqat **bir xil scope** ichida ishlaydi: bitta fayl ichida, yoki ambient (`declare`) global namespace'da. Modul fayllar (har biri `import`/`export` bilan) o'zaro avtomatik merge qilinmaydi — har modul alohida scope hisoblanadi. Modul fayllar orasida merge kerak bo'lsa, `declare module "..."` (module augmentation) yoki `declare global` ishlatiladi.
 
 </details>
 
@@ -2181,22 +2188,36 @@ var Direction;
 
 Enum'lar bir nechta xavfli holatga ega — bular TypeScript'ning enum dizayni bo'yicha eng ko'p tanqid qilinadigan jihatlari. Bu pitfall'larni bilib, ehtiyot bo'lish yoki **alternativa** ishlatish tavsiya etiladi.
 
-### Pitfall 1: Numeric enum'ga har qanday son
+### Pitfall 1: Numeric enum'ning eski soundness muammosi
 
 ```typescript
+// TS < 5.0
 enum Direction { Up, Down, Left, Right }
-
-let dir: Direction = Direction.Up; // ✅ 0
-dir = 99;  // ⚠️ Hech qanday xato — TS ruxsat beradi
-// 99 Direction'da yo'q, lekin compiler to'xtatmaydi
-
-// String enum — bu muammo yo'q
-enum Color { Red = "RED", Green = "GREEN" }
-let c: Color = Color.Red;
-// c = "RANDOM"; // ❌ String literal enum'ga assign bo'lmaydi
+let dir: Direction = 99; // ⚠️ ruxsat etilardi — xato yo'q
 ```
 
-Sabab: TypeScript numeric enum'ni **bit flags** uchun mo'ljallagan, shuning uchun har qanday `number` ruxsat etiladi. Bit flags pattern'ida bitwise OR natijasi enum'da yo'q bo'lgan son bo'lishi mumkin — va bu normal.
+TS 5.0'gacha har qanday `number` numeric enum'ga assign bo'lardi — bu eski "intentional unsoundness" xulq edi. **TS 5.0'dan boshlab** pure literal numeric enum union enum sifatida ishlaydi va bunday assignment xato beradi:
+
+```typescript
+// TS 5.0+
+enum Direction { Up, Down, Left, Right }
+let dir: Direction = 99;
+// ❌ Type '99' is not assignable to type 'Direction'
+```
+
+Eski xulq faqat **computed member**'li enum'da saqlanadi (chunki bunday enum union'ga aylantirib bo'lmaydi):
+
+```typescript
+enum Mixed { A = 1, B = Math.floor(Math.random() * 10) }
+let m: Mixed = 999; // ⚠️ Hali ham ruxsat etilgan
+```
+
+Bit flags pattern'i hali ham ishlaydi — chunki member'lar ustidagi bitwise operatsiya enum union'iga kiradi:
+
+```typescript
+enum Perm { Read = 1, Write = 2 }
+const rw: Perm = Perm.Read | Perm.Write; // ✅ 3 — union'ga kiradi
+```
 
 ### Pitfall 2: Reverse mapping chalkashligi
 
@@ -2266,8 +2287,11 @@ import { Status } from "./types";
 ```
 
 ```typescript
-enum Direction { Up, Down } // ❌ Error: enum kod hosil qiladi, erasable emas
-const enum Speed { Fast = 100 } // ❌ Ham xato
+enum Direction { Up, Down }
+// ❌ TS1294: This syntax is not allowed when 'erasableSyntaxOnly' is enabled.
+
+const enum Speed { Fast = 100 }
+// ❌ TS1294: const enum ham bloklanadi
 ```
 
 **Sabab:** Node.js 22.6+ `--experimental-strip-types` bilan TypeScript fayllarini to'g'ridan-to'g'ri ishga tushirishi uchun faqat **type erasure** (annotation'larni o'chirish) qila oladi. Enum esa haqiqiy JavaScript runtime kod (IIFE) hosil qilishi kerak — bu erasure emas, transformation.
@@ -2279,24 +2303,21 @@ const enum Speed { Fast = 100 } // ❌ Ham xato
 
 Enum pitfall'larning sababi compiler'ning enum type representation'da:
 
-**Numeric enum soundness:**
+**Numeric enum soundness — eski va yangi xulq:**
 
-Numeric enum `number` bilan bi-directional assignability'ga ega — `number → EnumType` va `EnumType → number` ikkalasi ham ishlaydi. Bu TypeScript jamoasining **ataylab qilingan** qarori: bit flags pattern'i uchun zarur.
+TS 5.0'gacha numeric enum `number` bilan **bi-directional** assignability'ga ega edi: `number → EnumType` va `EnumType → number` ikkalasi ham ishlardi. TS 5.0 ("All enums Are Union enums") pure literal numeric enum'larni union enum'ga aylantirdi — endi `number → EnumType` cheklanadi, faqat enum member'lari va ular ustidagi bitwise kombinatsiyalar ruxsat etiladi:
 
 ```typescript
 enum Perm { Read = 1, Write = 2, Execute = 4 }
 
-// Bitwise OR natijasi enum'da yo'q bo'lgan son
-const combined = Perm.Read | Perm.Write; // 3
-// 3 enum'da yo'q, lekin valid "bit combination"
+const combined = Perm.Read | Perm.Write; // 3 — member'lar ustidagi bitwise
+let p: Perm = combined; // ✅ TS 5.0+: union'ga kiradi
 
-// Agar numeric enum strict bo'lsa:
-// combined: number (enum'dan tushib qolgan)
-// Assign qilish: let p: Perm = combined; // xato
-
-// Lekin bu yomon — bit flags ishlamaydi
-// Shuning uchun TS numeric enum'ni keng qo'yadi
+let p2: Perm = 99; // ❌ TS 5.0+: '99' is not assignable to type 'Perm'
+                    // ⚠️ TS < 5.0: ruxsat etilardi
 ```
+
+Computed (literal bo'lmagan) member'li enum'larda eski xulq saqlanadi — chunki bunday enum union sifatida modellashtirib bo'lmaydi.
 
 String enum esa nominal identity'ga ega (unique symbol kabi) — string literal'ni string enum'ga to'g'ridan-to'g'ri assign qilib bo'lmaydi:
 
@@ -2336,7 +2357,7 @@ Pitfall'larni amaliy ko'rish:
 ```typescript
 enum Direction { Up, Down, Left, Right }
 
-// Pitfall 1: har qanday son
+// Pitfall 1: TS < 5.0 da har qanday son qabul qilinardi
 function move(dir: Direction) {
   switch (dir) {
     case Direction.Up: return "up";
@@ -2344,10 +2365,12 @@ function move(dir: Direction) {
     case Direction.Left: return "left";
     case Direction.Right: return "right";
   }
-  return "unknown"; // 99 kelganda
+  return "unknown";
 }
 
-move(99); // ⚠️ TS ruxsat beradi — "unknown" qaytaradi
+move(99);
+// TS 5.0+: ❌ Argument of type '99' is not assignable to parameter of type 'Direction'
+// TS < 5.0: ⚠️ ruxsat etilardi — "unknown" qaytarardi
 
 // Pitfall 2: reverse mapping
 console.log(Direction[99]); // undefined
@@ -2411,15 +2434,16 @@ Object.values(Direction); // [0, 1, 2, 3] — toza
 <summary><strong>Compiled Output</strong></summary>
 
 ```typescript
-// TS source — pitfall misoli
+// TS source
 enum Direction { Up, Down, Left, Right }
-let dir: Direction = 99; // TS ruxsat beradi
-console.log(Direction[99]); // undefined
+// TS 5.0+: let dir: Direction = 99;  // ❌ compile xato
+// TS < 5.0: ruxsat etilardi
+console.log(Direction[99]); // undefined — TS hech bir versiyada xato bermaydi
 console.log(Object.keys(Direction));
 ```
 
 ```javascript
-// Compiled JS
+// Compiled JS — barcha versiyalarda bir xil
 var Direction;
 (function (Direction) {
   Direction[Direction["Up"] = 0] = "Up";
@@ -2427,10 +2451,10 @@ var Direction;
   Direction[Direction["Left"] = 2] = "Left";
   Direction[Direction["Right"] = 3] = "Right";
 })(Direction || (Direction = {}));
-let dir = 99; // TS tomonidan tekshirilmagan
-console.log(Direction[99]); // undefined — runtime'da silent xato
+console.log(Direction[99]); // undefined — runtime'da silent
 console.log(Object.keys(Direction));
 // Output: ["0", "1", "2", "3", "Up", "Down", "Left", "Right"]
+// Reverse mapping muammosi versiyaga bog'liq emas — runtime fakt
 ```
 
 </details>
@@ -3035,13 +3059,16 @@ type DeepReadonly<T> = {
 ### 🕳 Gotcha 4: Bo'sh array `const` va `never[]`
 
 ```typescript
-// Bo'sh array const — contextual bo'lmasa muammo
-const empty = []; // type: any[] (strict'da ham evolving)
-empty.push(1); // type: number[] (evolved)
+// Bo'sh array — evolving any[] pattern
+let empty = []; // initially: any[] (evolving)
+empty.push(1); // evolved: number[]
+// strict mode'da: agar oldingi qatordan keyin foydalanish (read) bo'lsa,
+// TS7034 "Variable 'empty' implicitly has type 'any[]' in some locations" xato bo'lishi mumkin
+// Aniq annotation har doim xavfsizroq
 
-// Lekin function return'ida:
+// Function return'ida — return type any[] sifatida inference
 function getList() {
-  return []; // return type: any[]
+  return []; // return type: any[] (bo'sh element)
 }
 
 // Generic function da — `never[]` bo'lishi mumkin
@@ -3050,7 +3077,9 @@ function firstOrDefault<T>(arr: T[]): T | undefined {
 }
 
 const result = firstOrDefault([]); // result: undefined
-// T inferred as unknown (TS 4.7+) or never (TS older)
+// T inferred as `unknown` (TS 4.7+) yoki `never` (TS oldingi versiyalari).
+// `unknown` xavfsizroq: `result` ham `unknown | undefined` bo'ladi va
+// type-check'siz ishlatilmaydi.
 
 // Aniq annotation yozish tavsiya:
 const empty2: number[] = [];
@@ -3117,32 +3146,34 @@ setPoint2(coords3); // ✅
 
 ---
 
-### ❌ Xato 2: Numeric enum'ga ixtiyoriy son
+### ❌ Xato 2: Numeric enum'ga ixtiyoriy son (TS < 5.0)
 
 ```typescript
 enum Direction { Up, Down, Left, Right }
 
-// ❌ Xavfli — 99 Direction'da yo'q
-let dir: Direction = 99; // TS hech narsa demaydi!
-
-function handleDirection(dir: Direction) {
-  switch (dir) {
-    case Direction.Up: /* ... */ break;
-    case Direction.Down: /* ... */ break;
-    case Direction.Left: /* ... */ break;
-    case Direction.Right: /* ... */ break;
-    // dir = 99 bo'lsa — hech qanday case'ga tushmaydi
-  }
-}
-
-handleDirection(99); // ⚠️ Silent xato
-
-// ✅ String enum yoki union type
-type Direction2 = "UP" | "DOWN" | "LEFT" | "RIGHT";
-let dir2: Direction2 = "RANDOM"; // ❌ Xato beradi
+let dir: Direction = 99;
+// TS 5.0+:  ❌ Type '99' is not assignable to type 'Direction'
+// TS < 5.0: ⚠️ ruxsat etilardi — silent xato
 ```
 
-**Nima uchun:** Numeric enum bit flags pattern'ini qo'llab-quvvatlash uchun har qanday `number`'ni qabul qiladi. Bu ataylab qilingan "intentional unsoundness". Agar bit flags kerak bo'lmasa — string enum yoki union type ishlating.
+TS 5.0 ("All enums Are Union enums") pure literal numeric enum'larni union enum'ga aylantirdi — endi 99 kabi enum'da yo'q son qabul qilinmaydi.
+
+**Lekin** quyidagi holatlarda eski xulq saqlanadi:
+- Computed (literal bo'lmagan) member'li enum: `enum E { A = Math.random() }`
+- TS 5.0'gacha kompilyatsiya qilingan kod
+
+```typescript
+// Computed member — eski xulq
+declare function compute(): number;
+enum Mixed { A = 1, B = compute() }
+let m: Mixed = 999; // ⚠️ Ruxsat etilgan
+
+// Aniq dizaynli alternativa
+type Direction2 = "UP" | "DOWN" | "LEFT" | "RIGHT";
+let dir2: Direction2 = "RANDOM"; // ❌ Aniq xato
+```
+
+**Tavsiya:** TS 5.0+ da pure literal enum xavfsiz, lekin `as const` object yoki union type ko'pincha hali ham qulay (kichikroq runtime, JSON-friendly).
 
 ---
 
@@ -3379,7 +3410,7 @@ function handleRequest(method: HttpMethod) { /* ... */ }
 
 ## Xulosa
 
-Bu bo'limda TypeScript'ning struktura tiplari bilan tanishdik:
+Bu bo'lim TypeScript'ning struktura tiplarini yoritdi:
 
 - **Array Types** — `T[]` va `Array<T>` bir xil, convention bo'yicha `T[]` ko'proq ishlatiladi. Bo'sh array'ga annotation tavsiya.
 - **Readonly Arrays** — `readonly T[]`, `ReadonlyArray<T>`, `Readonly<T[]>` — hammasi bir xil. Mutating method'lar taqiqlanadi. Faqat compile-time himoya. Funksiya parametrlari uchun best practice.

@@ -1,6 +1,6 @@
 # Bo'lim 25: Type Compatibility va Variance
 
-> Type compatibility — TypeScript type system ning **asosiy mexanizmi**. Structural typing, covariance, contravariance, bivariance, invariance — generic type lar qanday bir-biriga mos kelishini tushunish. `in`/`out` variance modifiers bilan explicit control. Bu interview larda eng ko'p so'raladigan va eng kam tushunilgan mavzulardan biri.
+> Type compatibility — TypeScript type system'ning asosiy mexanizmi: bir type'ning ikkinchisiga assignable bo'lishini aniqlash. Structural typing, covariance, contravariance, bivariance, invariance — generic type'lar bir-biriga qanday mos kelishini belgilaydi. `in`/`out` variance modifier'lar (TS 4.7+) bilan explicit control. Variance — interview va kompleks type design'da kritik mavzu.
 
 ---
 
@@ -25,9 +25,9 @@
 
 ### Nazariya
 
-TypeScript **structural typing** ishlatadi — type ning **nomi** emas, **shakli** (shape) muhim. Agar A type ning barcha property lari B type da bor bo'lsa — A B ga **assignable**.
+TypeScript **structural typing** (duck typing) ishlatadi — type'ning **nomi** emas, **shakli** (shape — property'lar to'plami va type'lari) muhim. Agar A type'ning barcha required property'lari B type'da mos type bilan bor bo'lsa — A ni B ga **assignable** deb hisoblanadi.
 
-Bu **nominal typing** (Java, C#) dan farqli — u yerda type nomi mos kelishi kerak.
+Bu **nominal typing** (Java, C#, Rust) dan farqli — u yerda ikki class bir xil shape'ga ega bo'lsa ham, agar nomi yoki inheritance'da bog'liqlik bo'lmasa — assignable emas. Structural — kompozitsiya va refactoring uchun yengil, duck-typed JavaScript bilan moslashuvchan.
 
 ```typescript
 interface Point { x: number; y: number; }
@@ -37,17 +37,39 @@ const p: Point = { x: 1, y: 2 };
 const c: Coordinate = p; // ✅ — shakli bir xil, nomi farq qilmaydi
 ```
 
-**Excess property checking** — faqat **fresh object literal** da ishlaydi (typo catcher):
+**Excess property checking** — fresh object literal'da qo'shimcha property bor bo'lsa, compiler error beradi. Bu typo'larni ushlash uchun mexanizm:
 
 ```typescript
 interface User { name: string; age: number; }
 
 const user: User = { name: "Ali", age: 25, email: "a@b.com" };
-// ❌ — excess property "email" (literal da)
-
-const obj = { name: "Ali", age: 25, email: "a@b.com" };
-const user2: User = obj; // ✅ — variable orqali bypass
+// ❌ — Object literal may only specify known properties, and 'email' does not exist
 ```
+
+**Nima uchun faqat literal'da:** literal — programmer'ning intention'ini bevosita ifodalaydi (typo bo'lishi mumkin). Variable orqali assign — value boshqa kontekstda ishlatilgan bo'lishi mumkin, qo'shimcha property'lar normal:
+
+```typescript
+const obj = { name: "Ali", age: 25, email: "a@b.com" };
+const user2: User = obj; // ✅ — variable orqali bypass (structural mos)
+```
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+TypeScript checker'da structural compatibility `isTypeAssignableTo(source, target)` funksiyasi orqali aniqlanadi. Algoritm:
+
+1. **Identity check** — agar source va target bir xil type bo'lsa, true.
+2. **Property-by-property** — target'dagi har required property uchun:
+   - Source'da shu nom bilan property bormi?
+   - Source property type'i target property type'iga assignable mi (recursive call)?
+3. **Optional property** — agar target'da optional, source'da yo'q bo'lsa, OK.
+4. **Excess property check** — agar source fresh literal bo'lsa, source'dagi har property target'da mavjudligini tekshirish.
+
+**Performance:** checker recursive compatibility'ni cache qiladi (`relationCache`). Bir xil juftlik (`A`, `B`) ikkinchi marta tekshirilmaydi — bu millionlab type comparison'larni tezlashtiradi.
+
+**Variance — kontekstga qarab:** property type comparison covariant (readonly position), contravariant (function parameter), yoki invariant (mutable position) bo'lishi mumkin. Bu boshqa section'da batafsil.
+
+</details>
 
 ---
 
@@ -99,14 +121,16 @@ const numFn: VoidFn = () => 42; // ✅ — return value IGNORE qilinadi
 
 ### Nazariya
 
-**Covariant** — subtype → supertype yo'nalishida moslik. Agar `Dog extends Animal`, unda:
+**Covariance** — generic type'ning parametri subtype → supertype yo'nalishida o'zgarganda, generic type ham xuddi shu yo'nalishda assignable bo'lishi. Agar `Dog <: Animal` (Dog Animal'ning subtype'i), unda:
 
-- `Dog[]` → `Animal[]` ✅ (array covariant)
+- `Dog[]` → `Animal[]` ✅ (array covariant — TS pragmatic ruxsat)
 - `() => Dog` → `() => Animal` ✅ (return type covariant)
 - `Promise<Dog>` → `Promise<Animal>` ✅
-- `readonly Dog[]` → `readonly Animal[]` ✅
+- `readonly Dog[]` → `readonly Animal[]` ✅ (xavfsiz)
 
-Covariance **o'qish** uchun xavfsiz — agar Dog qaytarilsa, uni Animal sifatida o'qish mumkin.
+**Nima uchun "covariant"** so'zi: type parameter'ning variance'i base type bilan **bir xil yo'nalishda** ("co-" = together). Agar `T` covariant bo'lsa, `Box<T>` ning subtyping `T` ning subtyping'iga ergashadi.
+
+**Xavfsizlik:** covariance faqat **output (read) pozitsiyada** xavfsiz. Agar `T` type'i faqat qaytariladigan bo'lsa (`() => T`, `readonly T[]`), unda subtype qaytarilsa, uni supertype sifatida ishlatish to'g'ri (Liskov substitution).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -124,11 +148,34 @@ const getAnimal: Producer<Animal> = getDog; // ✅ Dog <: Animal
 const dogs: Dog[] = [new Dog("Rex", "Lab")];
 const animals: readonly Animal[] = dogs; // ✅ readonly covariant xavfsiz
 
-// ⚠️ Mutable array — covariant lekin XAVFLI
+// ⚠️ Mutable array — covariant lekin XAVFLI (unsound)
 const mutableAnimals: Animal[] = dogs; // ✅ TS ruxsat beradi
-mutableAnimals.push(new Animal("Cat")); // ❌ Runtime: dogs array da Animal!
-// Bu TS ning bilgan cheklovi — strictness vs ergonomics trade-off
+mutableAnimals.push(new Animal("Cat"));
+// Runtime: dogs array'da Animal (Dog emas)
+// Lekin TS dogs[1] ni Dog deb hisoblaydi — type system buzilgan
+// Bu TS ning bilgan unsoundness'i — array covariance ergonomics uchun saqlangan
 ```
+
+</details>
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+TypeScript checker'da variance type parameter'ning **ishlatilish pozitsiyasi**ga qarab aniqlanadi:
+
+- **Output pozitsiya** (return type, getter, readonly property) → covariant
+- **Input pozitsiya** (function parameter, setter) → contravariant
+- **Ikkalasi** (mutable property, method bilan get+set) → invariant
+
+Algoritm `getVarianceOfTypeParameter` funksiyasida:
+1. Type parameter'ni `marker` type bilan almashtirish (var A).
+2. Type parameter'ni `marker`'ning supertype'i bilan almashtirish (var B).
+3. `A` va `B` orasidagi assignability'ni har yo'nalishda tekshirish.
+4. Natija: covariant (`A → B` ✅), contravariant (`B → A` ✅), bivariant (ikkalasi ✅), invariant (hech biri ✅).
+
+**Variance caching:** `getVarianceOfTypeParameter` natijasi har generic type uchun cache qilinadi (`variances` field). Cross-file inference'da yana hisoblanmaydi.
+
+**Array covariance unsoundness:** `T[]` ham `push`, `pop` (input pozitsiya) ham `[i]` access (output pozitsiya) bor — texnik jihatdan invariant bo'lishi kerak. TS pragmatic sabablar uchun covariant qilgan (`readonly T[]` esa to'g'ri covariant).
 
 </details>
 
@@ -138,13 +185,17 @@ mutableAnimals.push(new Animal("Cat")); // ❌ Runtime: dogs array da Animal!
 
 ### Nazariya
 
-**Contravariant** — supertype → subtype yo'nalishida moslik. Function **parameter** lari contravariant (`strictFunctionTypes: true` bilan):
+**Contravariance** — generic type'ning parametri subtype → supertype yo'nalishida o'zgarganda, generic type **teskari** yo'nalishda assignable bo'lishi. Function parameter pozitsiyasi contravariant (`strictFunctionTypes: true` bilan).
 
-Agar `Dog extends Animal`, unda:
-- `(animal: Animal) => void` → `(dog: Dog) => void` ✅ (contravariant)
-- `(dog: Dog) => void` → `(animal: Animal) => void` ❌
+Agar `Dog <: Animal`, unda:
+- `(animal: Animal) => void` assignable to `(dog: Dog) => void` ✅
+- `(dog: Dog) => void` assignable to `(animal: Animal) => void` ❌
 
-Nima uchun? Agar `Dog` handler kutilsa va `Animal` handler berilsa — bu xavfsiz (Animal har qanday Animal ni handle qiladi, shu jumladan Dog). Lekin teskari — xavfli (Dog handler faqat Dog biladi, boshqa Animal ni handle qilolmaydi).
+**Nima uchun** "contra-" = qarama-qarshi: type parameter'ning variance'i base type'ga **teskari yo'nalishda** ergashadi.
+
+**Liskov substitution intuition:** Agar function `Dog` handler joyga ishlatilsa, lekin u `Animal` ham handle qila olsa — bu yetarli (Animal har qanday Animal'ni biladi, shu jumladan Dog'ni). Teskari — xavfli: `Dog` handler `Animal`'ni handle qila olmaydi (boshqa subtype'larni — masalan `Cat` — bilmaydi).
+
+**`strictFunctionTypes: true` ahamiyati:** bu flag'siz function parameter'lar bivariant (ikki yo'nalishda mos) — bu unsound. Strict mode bilan parameter'lar contravariant bo'ladi (method shorthand'dan tashqari — backward compat).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -167,26 +218,31 @@ const handler: Consumer<Dog> = feedAnimal; // ✅ contravariant
 
 ### Nazariya
 
-**Bivariant** — ikki yo'nalishda mos (xavfli!). Method shorthand syntax da `strictFunctionTypes` bilan ham bivariant qoladi:
+**Bivariance** — type parameter ikki yo'nalishda ham (sub → super va super → sub) assignable. Bu **unsound** — runtime xato'larga olib keladi, lekin ergonomic. TS'da faqat method shorthand syntax'da `strictFunctionTypes` bilan ham bivariant qoladi:
 
 ```typescript
-interface Box {
-  // Method shorthand — BIVARIANT (xavfli)
-  compare(other: Box): number;
-
-  // Function property — CONTRAVARIANT (xavfsiz)
-  compare: (other: Box) => number;
-}
+interface BoxMethod { compare(other: Box): number; }     // BIVARIANT (method shorthand)
+interface BoxProp   { compare: (other: Box) => number; } // CONTRAVARIANT (function property)
 ```
 
-**Invariant** — hech qanday yo'nalishda mos emas. Mutable data (read + write) invariant bo'lishi kerak.
+**Sabab — backward compatibility:** `Array.prototype.push`, DOM event handler'lar (`addEventListener("click", (e: MouseEvent) => {})`) — method shorthand bilan yozilgan, ko'p library'lar bivariance'ga bog'liq. `strictFunctionTypes` qo'shilganda contravariance method shorthand'ga qo'llanmadi (mavjud kodni buzmaslik uchun).
 
-**TS 4.7+ variance modifiers:**
+**Invariance** — hech qanday yo'nalishda mos emas (faqat aniq teng bo'lsa). Mutable container'lar (get + set ikkalasini ham qila oladi) invariant bo'lishi kerak — bu xavfsizlik talabi:
 
 ```typescript
-interface Producer<out T> { get(): T; }          // Covariant
-interface Consumer<in T> { accept(value: T): void; } // Contravariant
-interface MutableBox<in out T> { get(): T; set(value: T): void; } // Invariant
+interface Box<T> { get(): T; set(v: T): void; }
+// Box<Dog> va Box<Animal> — bir-biriga assignable EMAS:
+// - get() Dog qaytarishi kerak, Animal yetmaydi (covariance kerak)
+// - set(Animal) qabul qilishi kerak, Dog yetmaydi (contravariance kerak)
+// Ikki talab qarama-qarshi → invariant
+```
+
+**TS 4.7+ variance modifiers** — niyatni explicit ifodalash:
+
+```typescript
+interface Producer<out T> { get(): T; }                    // Covariant
+interface Consumer<in T> { accept(value: T): void; }       // Contravariant
+interface MutableBox<in out T> { get(): T; set(v: T): void; } // Invariant
 ```
 
 ---
@@ -286,26 +342,38 @@ const t4: F1 = f7;  // ✅ number <: number|string (param contravariant)
 
 ### Nazariya
 
-**Class** — structural, lekin `private`/`protected` member bor bo'lsa nominal behavior:
+**Class** — structural compatibility'da boshqa type'lar bilan teng, lekin `private` yoki `protected` member bor bo'lsa **nominal behavior** ga o'tadi:
 
 ```typescript
 class A { private x = 1; }
 class B { private x = 1; }
-// const a: A = new B(); // ❌ — private member lar turli class larda nominal!
+// const a: A = new B(); // ❌ — private member har class'da unique identity
 ```
 
-**Enum** — numeric enum lar number ga mos, lekin turli enum lar bir-biriga mos EMAS:
+**Sabab:** `private`/`protected` — encapsulation kafolati. Agar ikki turli class'ning private property'lari structural mos kelsa, encapsulation buziladi (bir class boshqasining ichki holatiga kira oladi). Compiler har private member'ga class identity'sini bog'laydi.
+
+**Inheritance bilan saqlanadi:** `class B extends A` — B'da A'ning private member'lari xuddi shu identity bilan inherit qilinadi, shuning uchun `A` va `B` mos keladi.
+
+**Numeric enum** — enum'lar number'lar bo'yicha mos, lekin turli enum'lar bir-biriga mos emas (nominal):
 
 ```typescript
 enum Color { Red, Green }
 enum Fruit { Apple, Banana }
 
 let c: Color = Color.Red;
-// c = Fruit.Apple; // ❌ — turli enum lar mos emas
-c = 0; // ✅ — number → numeric enum
+// c = Fruit.Apple; // ❌ — turli enum'lar mos emas
+c = 0; // ✅ — number → numeric enum (TS 5.0 dan ogohlantirish)
 ```
 
-String enum lar **hech qanday** boshqa type ga mos emas (nominal behavior).
+**String enum** — to'liq nominal: hatto bir xil string value bilan ham, boshqa enum yoki string literal mos kelmaydi:
+
+```typescript
+enum Direction { Up = "UP", Down = "DOWN" }
+let d: Direction = Direction.Up;
+// d = "UP"; // ❌ — string literal != enum member
+```
+
+**Sabab:** string enum identity'si — xuddi class private member'i kabi nominal. Bu refactoring'da xavfsizlik beradi (enum nomini o'zgartirsa, raw string ishlatilgan joylar topiladi).
 
 ---
 
@@ -336,17 +404,25 @@ interface SafeHandler {
 // strictFunctionTypes bu holda HAM bivariant qoldiriladi
 ```
 
-### 3. `void` return — kutilmagan behavior
+### 3. `void` return — substitutability rule
+
+`void` return type — "caller return value'ni ishlatmaydi" degan kontrakt. Compiler bu signature'ga har qanday qaytaruvchi function'ni assignable qiladi (return value'ni o'qib bo'lmaydi):
 
 ```typescript
 type VoidFn = () => void;
-const fn: VoidFn = () => 42; // ✅ — return value IGNORE qilinadi
+const fn: VoidFn = () => 42; // ✅ — return value caller'da void
 const result = fn();
-// result: void — 42 ni ishlatib bo'lmaydi
+// result: void — TypeScript result'ni ishlatishni taqiqlaydi
 
-// Lekin forEach callback da:
-[1, 2].forEach(() => true); // ✅ — void callback, return ignore
+// Amaliy foyda — forEach callback:
+[1, 2].forEach((v): boolean => v > 0);
+// forEach signature: (value, index, array) => void
+// Callback boolean qaytaradi, lekin void signature'ga mos — forEach ignore qiladi
 ```
+
+**Sabab:** ko'p JavaScript API'lar callback'lar uchun `void` return ishlatadi (`forEach`, `addEventListener`), lekin developer'lar tasodifan qaytaruvchi function beradi (`(x) => x++`). Bu xato emas — caller qiymatni ishlatmaydi.
+
+**Diqqat:** `Promise<void>` o'xshash ishlaydi: `() => Promise<number>` assignable to `() => Promise<void>`. Bu unhandled promise rejection'ga olib kelishi mumkin (caller `.then` chain'ini kutmasa).
 
 ### 4. Excess property check bypass — variable orqali
 
@@ -364,14 +440,16 @@ const c: Config = obj; // ✅ — excess property ruxsat
 ### 5. `in`/`out` modifier qo'yilmagan interface — implicit variance
 
 ```typescript
-// in/out yo'q — TS o'zi aniqlaydi (slow, ba'zan noto'g'ri)
+// in/out yo'q — TS variance'ni tip ichidan aniqlaydi
 interface Box<T> { value: T; }
-// TS buni covariant deb aniqlaydi (value faqat read ko'rinadi)
+// `value: T` faqat read pozitsiyada ko'rinsa, TS uni covariant deb hisoblaydi
 
-// Explicit — tezroq va aniqroq
-interface Box<in out T> { value: T; }
-// Invariant — mutable data uchun TO'G'RI
+// Explicit — kompilatorga aniqroq sigal beradi (kuchli loyihalarda performance)
+interface MutableBox<in out T> { value: T; }
+// Invariant — mutable data uchun aniq belgilash
 ```
+
+`in`/`out` annotation'lari to'g'ri ishlatilganda variance tekshiruvini tezlashtiradi va niyatni aniq qiladi. Implicit inference odatda to'g'ri ishlaydi, lekin annotation niyatni hujjatlashtiradi va kompilator complex tip'larda ham ishlay oladi.
 
 ---
 
@@ -498,8 +576,17 @@ type F3 = () => string;
 type F4 = (a: number) => "hello";
 type F5 = (a: number | string) => string;
 
+declare const f1: F1;
+declare const f2: F2;
+declare const f3: F3;
+declare const f4: F4;
+declare const f5: F5;
+
 // Qaysilari ishlaydi?
-const t1: F2 = f1; const t2: F1 = f3; const t3: F1 = f4; const t4: F1 = f5;
+const t1: F2 = f1;
+const t2: F1 = f3;
+const t3: F1 = f4;
+const t4: F1 = f5;
 ```
 
 <details>

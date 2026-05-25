@@ -16,6 +16,7 @@
 - [`typeRoots` va `types`](#typeroots-va-types)
 - [Ambient Declarations](#ambient-declarations)
 - [Triple-Slash Directives](#triple-slash-directives)
+- [Module Augmentation](#module-augmentation)
 - [Declaration File Testing](#declaration-file-testing)
 - [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
@@ -60,13 +61,17 @@ node_modules:
 
 ### Nazariya
 
+`.ts` fayllar **runtime kod va type information** ikkalasini ham o'z ichiga oladi — kompilator JS emit qilganda implementation saqlanadi, type'lar olib tashlanadi. `.d.ts` fayllar esa **faqat type-level** konstruksiyalardan iborat: ulardan JS hech qachon generate qilinmaydi, ular faqat type-checker'ga signal beradi. Aslida butun `.d.ts` fayl **ambient kontekst**ga ega — ichidagi har bir declaration implicit ravishda `declare` modifier'ga ega deb hisoblanadi.
+
 | Xususiyat | `.ts` | `.d.ts` |
 |-----------|-------|---------|
 | Implementation (function body) | ✅ Bor | ❌ Yo'q |
 | Type annotations | ✅ | ✅ |
 | JS ga compile bo'ladi | ✅ | ❌ (allaqachon type faqat) |
-| `declare` keyword kerak | ❌ (ixtiyoriy) | ✅ (ko'p hollarda) |
+| `declare` keyword kerak | ❌ (ixtiyoriy) | ❌ (implicit ambient) |
 | Runtime da mavjud | ✅ (compile natijasi) | ❌ |
+| Top-level expression | ✅ | ❌ (faqat declaration) |
+| Type inference | ✅ | ❌ (explicit type kerak) |
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -92,7 +97,9 @@ export interface DateOptions {
   timezone: string;
 }
 // Function body yo'q — faqat signature
-// Interface — zaten faqat type, declare kerak emas
+// Interface — type-level konstruksiya, declare kerak emas
+// `.d.ts` da `declare` implicit (butun fayl ambient kontekst), lekin
+// uslub uchun function/var/class oldida explicit yoziladi.
 ```
 
 Kompilator `.d.ts` faylni o'qiganda faqat type information oladi va symbol table ga qo'shadi. `.ts` fayldan farqli, `.d.ts` da kompilator **type inference qilmaydi** — barcha type lar explicit yozilgan bo'lishi kerak. JS emit bosqichi butunlay skip bo'ladi.
@@ -108,6 +115,21 @@ Kompilator `.d.ts` faylni o'qiganda faqat type information oladi va symbol table
 `declare` keyword — kompilatorga "bu narsa **boshqa joyda** mavjud, men faqat type ini aytayapman" degan signal. `declare` bilan yozilgan code JS ga **emit qilinmaydi** — faqat type-checking uchun.
 
 Kompilator `declare` li declaration larni type-check qiladi (parametr type lari, return type lari tekshiriladi), lekin **implementation mavjudligini talab qilmaydi**. Oddiy function da body bo'lmasa error, lekin `declare function` da body talab qilinmaydi.
+
+`declare` ishlatilishi mumkin bo'lgan declaration turlari: `var` / `let` / `const`, `function`, `class`, `enum`, `namespace`, `module`, `global`. Type alias (`type`) va `interface` da `declare` **kerak emas** — ular zaten faqat type-level konstruksiyalar va runtime'da mavjud emas.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Kompilator parser bosqichida `declare` modifier'ni ko'rgach, AST node'ga `NodeFlags.Ambient` flag o'rnatadi. Type-checker bu node'ni standart node bilan bir xil tahlil qiladi (signature matching, type compatibility), lekin emit bosqichida `transformDeclarations.ts` (declaration emit) va `transformTypeScript.ts` (JS emit) ambient node'larni **butunlay tashlab ketadi**.
+
+Natijada `declare const x: number` source code'dan **na `.js` ga**, **na `.d.ts` ga** alohida `declare` keyword bilan yozilmaydi (`.d.ts` content'i `declare` o'rniga implicit ambient — chunki butun `.d.ts` fayl ambient kontekst). Lekin `.ts` faylda yozilgan `declare const` `.d.ts` emit'da `declare const` saqlanadi (top-level statement bo'lsa).
+
+`declare global { ... }` blok faqat **module** kontekstida (fayl `import` yoki `export` ga ega) ishlaydi. Script kontekstida (no import/export) `declare global` syntactic xato — chunki butun fayl zaten global. Shu sababli ko'p misol'larda `export {};` qo'shiladi — fayl module'ga aylantirish uchun.
+
+Internal'da `declare module "name" { ... }` bilan ambient module yaratilgach, type resolution algoritmi (`tryFindAmbientModule` `resolver.ts`'da) bu nomni `node_modules` resolution'dan oldin tekshiradi. Wildcard pattern (`"*.svg"`) maxsus `PatternAmbientModule` strukturasiga saqlanadi — resolver string match orqali tanlaydi.
+
+</details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -140,12 +162,16 @@ declare class EventEmitter {
 }
 ```
 
-**`declare module`:**
+**`declare module`** (ambient module — type'lari yo'q JS kutubxona uchun):
 
 ```typescript
-declare module "lodash" {
-  export function chunk<T>(array: T[], size: number): T[][];
-  export function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T;
+// types/legacy-sdk.d.ts — `@types/legacy-sdk` yo'q, qo'lda yozish kerak
+declare module "legacy-sdk" {
+  export interface ClientConfig { apiKey: string; timeout?: number; }
+  export class Client {
+    constructor(config: ClientConfig);
+    request<T>(endpoint: string): Promise<T>;
+  }
 }
 
 declare module "*.svg" {
@@ -154,12 +180,13 @@ declare module "*.svg" {
 }
 ```
 
-**`declare namespace`:**
+**`declare namespace`** (UMD library yoki global namespace API uchun):
 
 ```typescript
-declare namespace Express {
-  interface Request { body: any; params: Record<string, string>; }
-  interface Response { json(data: any): void; status(code: number): Response; }
+declare namespace GoogleAnalytics {
+  interface TrackingConfig { trackingId: string; debug?: boolean; }
+  function init(config: TrackingConfig): void;
+  function trackEvent(category: string, action: string): void;
 }
 ```
 
@@ -274,7 +301,9 @@ export declare class Formatter {
 }
 ```
 
-`"types"` conditional export — `exports` ichida **birinchi** bo'lishi kerak.
+`"types"` conditional export — `exports` ichida **birinchi** bo'lishi kerak (kompilator first-match resolution ishlatadi: agar `"import"` yoki `"require"` oldinda bo'lsa, `.d.ts` topilmaydi).
+
+Top-level `"types"` field — `exports` field'ni qo'llab-quvvatlamaydigan eski tool'lar uchun fallback. `moduleResolution: "node16"` yoki `"bundler"` da `exports` ustun keladi.
 
 </details>
 
@@ -308,7 +337,7 @@ declare module "analytics-lib" {
     batchSize?: number;
   }
 
-  export interface Event {
+  export interface AnalyticsEvent {
     name: string;
     properties?: Record<string, string | number | boolean>;
     timestamp?: Date;
@@ -316,7 +345,7 @@ declare module "analytics-lib" {
 
   export class Analytics {
     constructor(config: AnalyticsConfig);
-    track(event: Event): void;
+    track(event: AnalyticsEvent): void;
     identify(userId: string, traits?: Record<string, unknown>): void;
     flush(): Promise<void>;
   }
@@ -369,6 +398,17 @@ declare namespace google.maps {
 | Parallelization | ❌ | ✅ |
 | esbuild/SWC bilan | ❌ | ✅ |
 | Explicit types | Ixtiyoriy | Majburiy (exported) |
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Standart `declaration: true` da declaration emit cross-file type inference'ga tayanadi. Masalan `function getUser() { return fetchUser(); }` deklaratsiyasi yaratilganda kompilator `fetchUser` return type'ini izlaydi, kerak bo'lsa boshqa fayldagi import zanjirini kuzatadi. Bu type graph'ning to'liq qurilishini talab qiladi — har bir fayl boshqalardan **bog'liq** bo'ladi va parallel ishlash imkonsiz.
+
+`isolatedDeclarations: true` qoidasi kompilatorga "har bir export'ning type'ini fayldagi ma'lumotdan **yagona o'qish bilan** aniqlash mumkin bo'lsin" deb majburlaydi. Inferred return type, inferred property type, va boshqa cross-file inference talab qiladigan pattern'lar uchun explicit annotation talab qilinadi. Kompilator yetishmagan annotation'ni `error TS9007` va boshqa `9xxx` seriyadagi diagnostika orqali bildiradi.
+
+Bu cheklov tashqi tool'larga (esbuild, SWC, Bun) declaration emit'ni `tsc`'siz, fayl-fayl, parallel oqimda amalga oshirish imkonini beradi. Faqat syntactic information yetarli — semantic resolver kerak emas. Natija: monorepo'da yuzlab paketning declaration'larini `tsc` ishlatishdan tezroq generate qilish mumkin. TypeScript jamoasi bu xususiyatni 5.5 da kiritgan (2024-iyun).
+
+</details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -492,6 +532,21 @@ Bu qachon kerak:
 
 **Muhim:** `types` array **faqat automatic inclusion** ga ta'sir qiladi. Kodda explicit `import` yoki `/// <reference types="..." />` bo'lsa — `types` filter ni bypass qiladi.
 
+**`typesVersions` field** (TS 3.1+) — bir paket ichida turli TypeScript versiyalari uchun turli declaration fayllar berishga imkon beradi:
+
+```json
+{
+  "name": "my-lib",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    ">=4.5": { "*": ["./dist/ts4.5/*"] },
+    ">=3.9": { "*": ["./dist/ts3.9/*"] }
+  }
+}
+```
+
+Kompilator semver match qiladi: TS 5.0 ishlatuvchi consumer `>=4.5` matchni topadi va `./dist/ts4.5/*` papkadagi declaration'larni oladi. Bu yangi syntax (`satisfies`, `const` type params) ishlatadigan paket uchun eski TS versiyalariga downgrade-compatible declaration berish uchun foydali.
+
 ---
 
 ## Ambient Declarations
@@ -508,27 +563,29 @@ Ambient declaration lar **declaration merging** orqali ishlaydi — bir xil noml
 **UMD Library:**
 
 ```typescript
-// types/moment.d.ts
-export as namespace moment; // global sifatida ham mavjud
+// types/date-lib.d.ts
+export as namespace dateLib; // global sifatida `dateLib` nomi bilan mavjud
 
-export interface Moment {
+export interface DateValue {
   format(template: string): string;
-  add(amount: number, unit: string): Moment;
+  add(amount: number, unit: string): DateValue;
   isValid(): boolean;
 }
 
-export function moment(date?: string | Date): Moment;
-export default moment;
+export function create(input?: string | Date): DateValue;
 ```
 
 ```typescript
-// Module sifatida:
-import moment from "moment";
-const date = moment().format("YYYY-MM-DD");
+// 1) Module sifatida (bundler / Node.js):
+import { create } from "date-lib";
+const today = create().format("YYYY-MM-DD");
 
-// Script da global sifatida (agar UMD build load qilingan bo'lsa):
-const date = moment().format("YYYY-MM-DD");
+// 2) Script da global sifatida (UMD build <script> tag bilan load qilingan):
+//    import statement YO'Q — `dateLib` global scope'da mavjud
+const todayGlobal = dateLib.create().format("YYYY-MM-DD");
 ```
+
+`export as namespace dateLib` qo'shimcha `UMDModuleDeclaration` yaratadi — bu kompilatorga: "agar consumer module sifatida import qilmasa, `dateLib` global nomi orqali ham bu paketga murojaat qila oladi" degan signal.
 
 **Global Library:**
 
@@ -556,22 +613,119 @@ Triple-slash directive — fayl boshida `/// <reference ... />` formatida yozila
 
 ```typescript
 /// <reference types="node" />
-// @types/node ni include qiladi
+// @types/node paket'ini include qiladi
 
 /// <reference types="jest" />
-// @types/jest ni include qiladi
+// @types/jest paket'ini include qiladi
 
 /// <reference path="./global-types.d.ts" />
-// Bu fayl dagi type larni include qiladi
+// Bu fayldagi type'larni include qiladi (relative path)
 
 /// <reference lib="es2020" />
-// Built-in lib ni include qiladi
+// Built-in lib'ni include qiladi (tsconfig "lib" array'ga ekvivalent)
+
+/// <reference no-default-lib="true"/>
+// `lib.d.ts` ni butunlay o'chiradi (faqat o'z type lar yozish uchun)
+
+/// <reference types="node" resolution-mode="import" />
+// TS 4.7+: paket type'lari ESM resolution rejimida o'qiladi
 ```
 
 **Qachon kerak:**
-- `.d.ts` fayllarida — `import` ishlatish mumkin bo'lmagan joyda
-- Global type dependency — fayl global scope dagi type larga bog'liq bo'lganda
-- `lib` override — aniq fayl uchun lib ni o'zgartirish kerak bo'lganda
+- `.d.ts` fayllarida — top-level `import` global scope'ni module'ga aylantirib qo'yadigan hollarda
+- Global type dependency — fayl global scope'dagi type'larga bog'liq bo'lganda (`@types/node` `Buffer` global)
+- `lib` override — aniq fayl uchun lib'ni o'zgartirish kerak bo'lganda
+- `resolution-mode` (TS 4.7+) — paket ESM va CJS uchun turli `.d.ts` chiqarsa, qaysi rejimda o'qish kerakligini aytish
+
+</details>
+
+---
+
+## Module Augmentation
+
+### Nazariya
+
+Module augmentation — **mavjud module'ning** type declaration'larini **kengaytirish** mexanizmi. Bu yondashuv `@types/*` paketni `fork` qilmasdan, kutubxonaning Request, Window yoki boshqa public interface'lariga maydon qo'shish imkonini beradi.
+
+Ikkita asosiy holat: **third-party module augmentation** (`declare module "express"`) va **global augmentation** (`declare global { interface Window { ... } }`).
+
+Augmentation ishlashi uchun ikki shart bajarilishi kerak:
+
+1. **Fayl module bo'lishi** — `import` yoki `export` statement bo'lsa. Aks holda `declare module "..."` mavjud module'ni augment qilmaydi — **yangi ambient module yaratadi** va asl declaration'ni override qiladi.
+2. **`interface` orqali merging** — augment qilingan declaration `interface` yoki `namespace` bo'lishi kerak. `type` alias merging'ni qo'llab-quvvatlamaydi.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Declaration merging algoritmi (`mergeSymbol` `checker.ts`'da) bir xil nomli `InterfaceDeclaration` symbol'larni topadi va ularning member'larini **yagona symbol table** ga birlashtiradi. Bir xil property turli type bilan ikki interface'da bo'lsa — `Subsequent property declarations must have the same type` xatosi.
+
+Module augmentation uchun maxsus rule: `declare module "x"` blok'i fayl **ExternalModule** kontekstida bo'lganda kompilator uni **augmenting module declaration** sifatida belgilab, asl `"x"` module symbol'iga merge qiladi. Aks holda (fayl script bo'lsa) — yangi `AmbientModuleDeclaration` yaratiladi.
+
+Global augmentation (`declare global { ... }`) faqat module faylda ruxsat etiladi. Kompilator `declare global` blok'ini script context'ga ko'tarib, ichidagi interface/var/function'larni global scope'ga qo'shadi. Bu mexanizm orqali `@types/jest` `describe`, `it`, `expect` global'larni qo'shadi.
+
+</details>
+
+<details>
+<summary><strong>Kod Misollari</strong></summary>
+
+**Express `Request` ga `user` field qo'shish:**
+
+```typescript
+// types/express.d.ts
+import "express"; // ← fayl module'ga aylantirish uchun
+
+declare module "express" {
+  interface Request {
+    user?: { id: string; role: "admin" | "member" };
+  }
+}
+```
+
+```typescript
+// app.ts — augmentation avtomatik ishlaydi
+import express, { Request, Response } from "express";
+
+const app = express();
+app.get("/profile", (req: Request, res: Response) => {
+  const userId = req.user?.id; // ✅ typed!
+  res.json({ userId });
+});
+```
+
+**Global augmentation — `Window` ga custom property:**
+
+```typescript
+// types/window.d.ts
+export {}; // module qilish uchun
+
+declare global {
+  interface Window {
+    __APP_VERSION__: string;
+    analytics: { track(event: string): void };
+  }
+}
+```
+
+```typescript
+window.__APP_VERSION__ = "1.0.0"; // ✅
+window.analytics.track("page_view"); // ✅
+```
+
+**Generic library augmentation** (`fastify` plugin uchun):
+
+```typescript
+import "fastify";
+
+declare module "fastify" {
+  interface FastifyRequest {
+    requestId: string;
+    startTime: number;
+  }
+  interface FastifyInstance {
+    db: { query<T>(sql: string): Promise<T[]> };
+  }
+}
+```
 
 </details>
 
@@ -633,15 +787,16 @@ npx @arethetypeswrong/cli ./my-package-1.0.0.tgz
 declare module "express" {
   interface Request { userId: string; }
 }
-// Bu AMBIENT MODULE DECLARATION — yangi module yaratadi
-// Express ning mavjud Request ga QO'SHMAYDI — uni OVERRIDE qiladi!
+// Fayl script kontekstida — bu mustaqil ambient module e'loni
+// (mavjud Express modulidagi Request'ga MERGE bo'lmaydi).
 
-// FILE: types.d.ts (module — import bor)
+// FILE: types.d.ts (module — import yoki export bor)
 import "express";
 declare module "express" {
   interface Request { userId: string; }
 }
-// Bu MODULE AUGMENTATION — mavjud module ni kengaytiradi ✅
+// Fayl module kontekstida — bu MODULE AUGMENTATION,
+// mavjud Express Request interface'iga qo'shiladi ✅
 ```
 
 ### 2. `private` member lar `.d.ts` da type siz ko'rinadi
@@ -752,16 +907,23 @@ export async function getUsers(): Promise<User[]> {
 { "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.mjs" } } }
 ```
 
-### ❌ Xato 5: Module augmentation da `import` ni unutish
+### ❌ Xato 5: `type` alias bilan module augmentation qilish
 
 ```typescript
-// ❌ — import yo'q → ambient declaration (override!)
-declare module "express" { interface Request { userId: string; } }
-
-// ✅ — import bor → augmentation (kengaytirish)
 import "express";
-declare module "express" { interface Request { userId: string; } }
+
+// ❌ — `type` alias merging'ni qo'llab-quvvatlamaydi
+declare module "express" {
+  type Request = { user: { id: string } }; // ← Error: Duplicate identifier
+}
+
+// ✅ — `interface` orqali augmentation
+declare module "express" {
+  interface Request { user: { id: string }; }
+}
 ```
+
+**Nima uchun:** Declaration merging algoritmi faqat `interface` va `namespace`'ni birlashtiradi. `type` alias bir martagina e'lon qilinadi va qayta e'lon `Duplicate identifier` xatosi keltirib chiqaradi.
 
 ---
 
@@ -858,7 +1020,7 @@ declare module "typed-emitter" {
 ```typescript
 export const DEFAULT_CONFIG = { host: "localhost", port: 3000, debug: false };
 export function createServer(config = DEFAULT_CONFIG) { return { config, start() {} }; }
-export const handler = (req: any) => ({ status: 200, body: req.url });
+export const handler = (req: { url: string }) => ({ status: 200, body: req.url });
 ```
 
 <details>
@@ -867,20 +1029,21 @@ export const handler = (req: any) => ({ status: 200, body: req.url });
 ```typescript
 export interface ServerConfig { host: string; port: number; debug: boolean; }
 export interface Server { config: ServerConfig; start(): void; }
+export interface HandlerRequest { url: string; }
 export interface HandlerResult { status: number; body: string; }
 
 export const DEFAULT_CONFIG: ServerConfig = { host: "localhost", port: 3000, debug: false };
 export function createServer(config: ServerConfig = DEFAULT_CONFIG): Server {
   return { config, start() {} };
 }
-export const handler: (req: any) => HandlerResult = (req) => ({ status: 200, body: req.url });
+export const handler: (req: HandlerRequest) => HandlerResult = (req) => ({ status: 200, body: req.url });
 ```
 
 </details>
 
 ---
 
-### Mashq 5: `skipLibCheck` Diagnostika (Oson)
+### Mashq 5: Global Type Conflict Hal Qilish (Oson)
 
 **Savol:** Loyihangizda `@types/jest` va `@types/mocha` ikkalasi ham install. Ikkalasi `describe` va `it` global function larni turli type lar bilan declare qiladi → conflict. Qanday hal qilasiz?
 
@@ -918,19 +1081,21 @@ Bu bo'limda TypeScript declaration file system i o'rganildi:
 
 **Yaratish usullari:**
 - **Avtomatik** — `declaration: true`. `declarationMap` — IDE source navigation. `emitDeclarationOnly` — bundler bilan.
-- **`isolatedDeclarations` (TS 5.5+)** — fayl-bo'yicha, explicit types majburiy. Monorepo performance.
+- **`isolatedDeclarations` (TS 5.5+)** — fayl-bo'yicha mustaqil emit, explicit types majburiy. Parallelization (esbuild/SWC/Bun) bilan monorepo build tezligi.
 - **Qo'lda** — JS kutubxona, global script, non-standard module lar uchun.
 
 **Ecosystem:**
 - **DefinitelyTyped** — `@types/*` package lar
 - **`typeRoots`** va **`types`** — qaysi type definition lar include qilinishini boshqarish
 - **`exports` da `"types"` birinchi** bo'lishi kerak
+- **`typesVersions`** — bir paket ichida turli TS versiyalari uchun turli declaration'lar
 
 **Declaration turlari:**
 - **Ambient module** — `declare module "name"`
 - **Wildcard module** — `declare module "*.css"`
 - **Global** — `declare global { ... }`
 - **UMD** — `export as namespace`
+- **Module augmentation** — mavjud module/global'ga property qo'shish (interface merging, `import` shart)
 
 **Testing:** `tsd`, `@arethetypeswrong/cli`, `dtslint`
 

@@ -576,13 +576,13 @@ const AnotherClass = class MyInternalName {
 Class expression va class declaration JavaScript engine'da bir xil prototype-based object yaratadi. Farq faqat binding'da:
 
 ```
-Class Declaration: class Foo {}
-  → Foo nomi scope'da accessible (TDZ bilan)
-  → Foo.name === "Foo"
+Class Declaration: class User {}
+  → User nomi scope'da accessible (TDZ bilan)
+  → User.name === "User"
 
-Class Expression: const Bar = class {}
-  → Bar nomi scope'da accessible (const sifatida)
-  → Bar.name === "Bar" (variable nomidan inferred)
+Class Expression: const Product = class {}
+  → Product nomi scope'da accessible (const sifatida)
+  → Product.name === "Product" (variable nomidan inferred)
 
 Named Class Expression: const Logger = class InternalLogger {}
   → Logger scope'da accessible
@@ -593,13 +593,13 @@ Named Class Expression: const Logger = class InternalLogger {}
 **`Class.name` inference:** JavaScript'da class nomi variable name'dan inferred — lekin faqat variable declaration contextida. Function argument sifatida berilgan class nomi bo'sh:
 
 ```typescript
-const Foo = class {};
-Foo.name; // "Foo"
+const UserModel = class {};
+UserModel.name; // "UserModel"
 
-function register(cls: any) {
+function register(cls: new (...args: any[]) => unknown) {
   return cls.name;
 }
-register(class {}); // "" — bo'sh
+register(class {}); // "" — bo'sh, variable declaration emas
 ```
 
 **Type parameter va class expression:** Class expression generic ham bo'lishi mumkin:
@@ -785,7 +785,7 @@ class Product implements Serializable, Comparable<Product>, Printable {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Method signature compatibility:** Class bir nechta interface'ni implement qilganda, kompilator har method'ni barcha interface'larga teksharadi. Bir xil method turli interface'larda farqli return type bilan bo'lsa, class return type'i ikkala interface'ga mos kelishi kerak:
+**Method signature compatibility:** Class bir nechta interface'ni implement qilganda, kompilator har method'ni barcha interface'larga tekshiradi. Bir xil method turli interface'larda farqli return type bilan bo'lsa, class return type'i ikkala interface'ga mos kelishi kerak:
 
 ```typescript
 interface A { get(): string | number; }
@@ -1937,7 +1937,10 @@ interface SortStrategy<T> {
   readonly name: string;
 }
 
-class BubbleSort<T> implements SortStrategy<T> {
+// Comparable T uchun strategy (number | string | bigint)
+type Comparable = number | string | bigint;
+
+class BubbleSort<T extends Comparable> implements SortStrategy<T> {
   name = "BubbleSort";
   sort(data: T[]): T[] {
     const arr = [...data];
@@ -1952,7 +1955,7 @@ class BubbleSort<T> implements SortStrategy<T> {
   }
 }
 
-class QuickSort<T> implements SortStrategy<T> {
+class QuickSort<T extends Comparable> implements SortStrategy<T> {
   name = "QuickSort";
   sort(data: T[]): T[] {
     const arr = [...data];
@@ -2094,7 +2097,7 @@ const admin: AdminUser = {
   role: "admin",
   permissions: ["read", "write"],
 };
-// ❗ admin instanceof User === false — object literal, new User() emas
+// admin instanceof User === false — object literal, new User() emas
 ```
 
 <details>
@@ -2123,14 +2126,14 @@ type C = A & B;
 **Class type + property intersection:** Class type'ni intersection bilan kengaytirish mumkin, lekin natija **class instance emas**:
 
 ```typescript
-class User { constructor(public name: string) {} }
-type ExtendedUser = User & { role: string };
+class Account { constructor(public id: string) {} }
+type AccountWithRole = Account & { role: string };
 
-const u: ExtendedUser = { name: "Ali", role: "admin" };
-u instanceof User; // false — oddiy object
+const acc: AccountWithRole = { id: "u1", role: "admin" };
+acc instanceof Account; // false — oddiy object literal
 ```
 
-`instanceof` saqlanishi uchun `Object.assign(new User(), extras)` pattern kerak — lekin bu method binding muammolar keltiradi (quyida).
+`instanceof` saqlanishi uchun `Object.assign(new Account("u1"), extras)` pattern kerak — lekin bu method binding muammolar keltiradi (quyida).
 
 **`Object.assign` va class method'lar — nozik holat:** Class method'lar **prototype'da** yashaydi, instance'da emas. `Object.assign({}, instance)` faqat own property'larni ko'chiradi — prototype method'lar ko'chmaydi:
 
@@ -2148,8 +2151,8 @@ const copy = Object.assign({}, instance);
 
 1. **Object.assign bilan `new` instance saqlash** — prototype chain saqlanadi:
    ```typescript
-   const extended = Object.assign(new User("Ali"), { role: "admin" });
-   extended instanceof User; // true
+   const extended = Object.assign(new Account("u1"), { role: "admin" });
+   extended instanceof Account; // true
    ```
 
 2. **Method'larni manual bind qilish:**
@@ -2165,7 +2168,7 @@ const copy = Object.assign({}, instance);
    });
    ```
 
-Proxy eng elegant, lekin har method chaqiruq'da bind cost bor.
+Proxy eng elegant, lekin har method chaqiruvda bind cost bor.
 
 </details>
 
@@ -2277,7 +2280,7 @@ type WithTimestamp<T> = T & TimestampMixin;
 function addTimestamp<T extends BaseClass>(instance: T): WithTimestamp<T> {
   const timestamped = instance as WithTimestamp<T>;
   timestamped.createdAt = new Date();
-  timestamped.touch = function() {
+  timestamped.touch = function (this: TimestampMixin) {
     this.createdAt = new Date();
   };
   return timestamped;
@@ -2387,20 +2390,29 @@ const routes = [
 // readonly array
 ```
 
-**Class static property'lar:** `satisfies` class static property'larga qo'llanganda, literal type'lar autocomplete va type narrowing uchun juda foydali:
+**Class static property'lar:** `satisfies` class static property'larga qo'llanganda, autocomplete va type narrowing uchun foydali. Literal type'larni saqlash uchun `as const satisfies` kombinatsiyasi kerak — yolg'iz `satisfies` property type'larini target type'ga widen qiladi:
 
 ```typescript
 class Status {
-  static readonly VALUES = {
+  // satisfies yolg'iz — literal preserve qilmaydi
+  static readonly VALUES_WIDE = {
     pending: 1,
     active: 2,
     closed: 3,
   } satisfies Record<string, number>;
-  // Status.VALUES.pending: 1 (literal, number emas)
+  // Status.VALUES_WIDE.pending: number (target type'ga widen)
+
+  // as const satisfies — literal saqlanadi
+  static readonly VALUES = {
+    pending: 1,
+    active: 2,
+    closed: 3,
+  } as const satisfies Record<string, number>;
+  // Status.VALUES.pending: 1 (literal saqlangan)
 }
 ```
 
-Bu pattern enum'ga alternative — runtime'da oddiy object, compile-time'da literal type'lar.
+Bu pattern enum'ga alternative — runtime'da oddiy object, compile-time'da literal type'lar (`as const` bilan).
 
 **Excess property check:** `satisfies` fresh object literal'larda excess property'ni tekshiradi (type annotation kabi). Agar target type'da yo'q property qo'shilsa — compile error:
 
@@ -2485,13 +2497,14 @@ class TaskManager {
     active: { label: "Active", color: "#007bff", priority: 2 },
     completed: { label: "Completed", color: "#28a745", priority: 3 },
     failed: { label: "Failed", color: "#dc3545", priority: 4 },
-  } satisfies Record<string, StatusInfo>;
+  } as const satisfies Record<string, StatusInfo>;
 
   static getStatus(key: keyof typeof TaskManager.STATUS): StatusInfo {
     return TaskManager.STATUS[key];
   }
 }
 
+// as const tufayli literal saqlanadi:
 // TaskManager.STATUS.pending.color: "#ffc107" (literal)
 type PendingColor = (typeof TaskManager.STATUS)["pending"]["color"];
 // "#ffc107"

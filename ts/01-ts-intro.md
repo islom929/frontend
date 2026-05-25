@@ -75,7 +75,7 @@ TypeScript JavaScript ustiga qo'shadigan narsalarni ikki asosiy kategoriyaga bo'
 └─────────────────────────────────────────────────────────┘
 ```
 
-Birinchi kategoriya — type system — `tsc` emitter tomonidan to'liq o'chiriladi. Ikkinchi kategoriya — TS-specific runtime construct'lar — JavaScript kodga aylantiriladi. TS 5.8 `erasableSyntaxOnly` flag ikkinchi kategoriyani taqiqlaydi (Node.js native TS support uchun).
+Birinchi kategoriya — type system — `tsc` emitter tomonidan to'liq o'chiriladi. Ikkinchi kategoriya — TS-specific runtime construct'lar — JavaScript kodga aylantiriladi. TS 5.8 (mart 2025) `erasableSyntaxOnly` flag ikkinchi kategoriyani taqiqlaydi — Node.js 22.6+ `--experimental-strip-types` va Node.js 23.6+ default type stripping bilan integratsiya uchun.
 
 </details>
 
@@ -303,7 +303,7 @@ TypeScript Compiler (`tsc`) — TypeScript source code ni JavaScript ga aylantir
 1. **Type Checking** — barcha type annotation va ifodalarni tekshirish, xatolarni aniqlash
 2. **Emit** — type annotation larni olib tashlab, JavaScript output hosil qilish
 
-Bu ikki vazifa mustaqil — `noEmit: true` bilan faqat type check qilish mumkin (masalan, CI da). Teskarisi ham mumkin: faqat emit (type check qilmasdan) — bu esbuild, SWC, Babel va `ts.transpileModule()` API orqali amalga oshiriladi. Bu tool'lar `tsc` dan **sezilarli tez** ishlaydi, chunki ular faqat syntax parsing va type annotation o'chirish bilan shug'ullanadi — to'liq type check qilmaydi.
+Bu ikki vazifa mustaqil — `noEmit: true` bilan faqat type check qilish mumkin (masalan, CI da). Teskarisi ham mumkin: faqat emit (type check qilmasdan) — bu esbuild, SWC, Babel, `ts.transpileModule()` API orqali, yoki TS 5.6+ da `tsc --noCheck` flag bilan amalga oshiriladi. Bu tool'lar `tsc` ning to'liq tekshiruvidan tezroq ishlaydi, chunki ular faqat syntax parsing va type annotation o'chirish bilan shug'ullanadi — to'liq type check qilmaydi.
 
 Amaliy loyihalarda odatda ikki xil vosita ishlatiladi: **esbuild/SWC** production build uchun (tez), **tsc** yoki IDE type service type checking uchun.
 
@@ -836,7 +836,7 @@ Turli loyiha turlari uchun qo'shimcha sozlamalar:
 | `noImplicitAny` | Tip aniqlanmasa `any` deb taxmin qilmaslik — aniq tip yozish kerak |
 | `noImplicitThis` | `this` type'i noma'lum bo'lsa xato berish |
 | `alwaysStrict` | Har bir faylga `"use strict"` qo'shish (ESM modullarda tushiriladi — ES modullar allaqachon strict rejimda) |
-| `useUnknownInCatchVariables` | `catch(e)` da `e` ning type'i `unknown` (TS 4.0 da kiritilgan, TS 4.4 da `strict` ostiga qo'shilgan) |
+| `useUnknownInCatchVariables` | `catch(e)` da `e` ning type'i `unknown` (TS 4.4 da kiritilgan va o'sha versiyada `strict` ostiga qo'shilgan; oldin `e` har doim `any` edi) |
 
 `strict: true` yozib, individual flag'larni alohida o'chirish ham mumkin:
 
@@ -951,7 +951,7 @@ Playground Architecture:
 │                     ▼                               │
 │  ┌───────────────────────────────────────────────┐  │
 │  │  TypeScript Compiler (typescript.js)          │  │
-│  │  - Bundle hajmi ~10 MB (compressed)           │  │
+│  │  - Brauzer bundle (npm `typescript` package)  │  │
 │  │  - Web Worker ichida ishlaydi                 │  │
 │  │  - ts.createLanguageService() API orqali      │  │
 │  │  - In-memory virtual file system              │  │
@@ -1020,7 +1020,7 @@ TypeScript 2012-yildan beri faol rivojlanib kelmoqda. Quyida major versiyalar va
 | **1.0** | 2014 | Birinchi stable release — generics, classes, modules |
 | **1.4** | 2015 | Union types (`string \| number`), `let`/`const` |
 | **1.5** | 2015 | ES6 modules (`import`/`export`), destructuring, spread |
-| **1.6** | 2016 | `.tsx` fayl kengaytmasi, intersection types (`&`), user-defined type guards |
+| **1.6** | 2015 | `.tsx` fayl kengaytmasi, intersection types (`&`), user-defined type guards, abstract classes |
 | **2.0** | 2016 | **`strictNullChecks`**, `never` type, tagged (discriminated) unions, `readonly` |
 | **2.1** | 2016 | `keyof`, mapped types, `Partial<T>`, `Readonly<T>` |
 | **2.3** | 2017 | **`strict: true`** meta-flag, async iteration |
@@ -1038,7 +1038,9 @@ TypeScript 2012-yildan beri faol rivojlanib kelmoqda. Quyida major versiyalar va
 | **5.2** | 2023 | `using` declarations (Explicit Resource Management) |
 | **5.4** | 2024 | `NoInfer<T>` utility type, preserved narrowing in closures |
 | **5.5** | 2024 | `isolatedDeclarations`, inferred type predicates |
-| **5.8** | 2025 | `erasableSyntaxOnly` — Node.js native TS support bilan integratsiya |
+| **5.6** | 2024 | `--noCheck` flag (emit without type check), iterator helpers, strict builtin iterator checks |
+| **5.7** | 2024 | `--rewriteRelativeImportExtensions`, never-initialized variable checks |
+| **5.8** | 2025 | `erasableSyntaxOnly` — Node.js native TS support bilan integratsiya, `--module node18`/`node20` |
 
 **Muhim milestone'lar:**
 
@@ -1052,7 +1054,7 @@ TypeScript 2012-yildan beri faol rivojlanib kelmoqda. Quyida major versiyalar va
 
 **TS 5.0 — TC39 Decorators** (2023): Standart decorator'lar (Stage 3) qo'llab-quvvatlandi. Avvalgi `experimentalDecorators` legacy bo'lib qoldi (Angular, NestJS hozircha legacy'ni ishlatadi).
 
-**TS 5.8 — `erasableSyntaxOnly`** (2025): Node.js 22.6+ `--experimental-strip-types` flag bilan TypeScript fayllarini to'g'ridan-to'g'ri bajara boshlagani sababli, faqat type erasure orqali o'chadigan syntax'ni majburlaydigan bu flag kiritildi. `enum`, `namespace`, constructor parameter properties, `experimentalDecorators` — bular runtime kod hosil qiladi, shuning uchun native TS support'da ishlamaydi. `erasableSyntaxOnly: true` ularni compile-time'da taqiqlaydi. Node.js 23.6'dan boshlab `--experimental-strip-types` default yoqilgan.
+**TS 5.8 — `erasableSyntaxOnly`** (2025): Node.js 22.6+ `--experimental-strip-types` flag bilan TypeScript fayllarini to'g'ridan-to'g'ri bajara boshlagani sababli, faqat type erasure orqali o'chadigan syntax'ni majburlaydigan bu flag kiritildi. `enum`, `namespace`, constructor parameter properties, legacy `experimentalDecorators` — bular runtime kod hosil qiladi, shuning uchun native TS support'da ishlamaydi. `erasableSyntaxOnly: true` ularni compile-time'da taqiqlaydi. Node.js 23.6'da (yanvar 2025) type stripping flag'siz, default holatda ishlaydigan bo'ldi.
 
 > **Batafsil:** TS 5.x yangiliklari, `satisfies`, `const` type parameters, `using` declarations, Decorators va boshqa zamonaviy xususiyatlar [26-ts-5x-features.md](26-ts-5x-features.md) da batafsil yoritiladi.
 
@@ -1093,12 +1095,12 @@ function check(value: unknown) {
 
 // Yangilangan
 { "compilerOptions": { "strict": true } }
-// ❌ Birdan 500+ ta type error paydo bo'ladi
+// ❌ Katta loyihada ko'p sonli type error paydo bo'ladi
 ```
 
-**Sabab:** `strict: false` bilan TypeScript barcha o'zgaruvchi va parameter'lar `any` deb qaraydi (`noImplicitAny: false`), `null`/`undefined` har tipga assign bo'ladi (`strictNullChecks: false`), va hokazo. `strict: true` yoqilganda bu "noxushlik"lar barchasi bir zumda aniqlanadi.
+**Sabab:** `strict: false` bilan TypeScript explicit type yozilmagan parameter va o'zgaruvchilarni implicit `any` deb qabul qiladi (`noImplicitAny: false`), `null`/`undefined` har tipga assign bo'ladi (`strictNullChecks: false`), va hokazo. `strict: true` yoqilganda bu yashirin "noxushlik"lar bir zumda aniqlanadi.
 
-**Yechim:** Bosqichma-bosqich migration. Avval faqat `strictNullChecks: true` yoqish, keyin `noImplicitAny: true`, va hokazo. Har flag alohida fix qilinadi. Yoki yangi fayllar uchun `// @ts-strict-ignore` / `// @ts-check` bilan mixed mode.
+**Yechim:** Bosqichma-bosqich migration. Avval faqat `strictNullChecks: true` yoqish, keyin `noImplicitAny: true`, va hokazo. Har flag alohida fix qilinadi. Eski fayllarni vaqtincha tashlab ketish uchun fayl tepasiga `// @ts-nocheck` qo'yish mumkin (TS faylda type check'ni o'chiradi), keyin asta-sekin olib tashlanadi.
 
 ---
 

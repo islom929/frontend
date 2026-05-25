@@ -1150,7 +1150,7 @@ class LoggerAdapter implements ModernLogger {
 
 ### Edge Cases
 
-- **Facade god object:** facade juda ko'p method bo'lsa — bir nechta facade ga ajratish kerak (har subsystem area uchun)
+- **Facade monolith object:** facade juda ko'p method bo'lsa — bir nechta facade ga ajratish kerak (har subsystem area uchun)
 - **Hidden subsystem evolution:** facade orqali ishlovchi client subsystem o'zgarishini sezmaydi — backward compatibility yaxshilanadi
 - **Performance:** facade additional layer — har chaqiruv bir method call extra. Mostly negligible
 - **Testing:** facade test qilganda 4 ta subsystem ni mock qilish kerak. Integration test bilan birgalikda

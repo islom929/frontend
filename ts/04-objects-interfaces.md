@@ -237,17 +237,17 @@ Interface property uchun:
   - Access: property bor yoki yo'q — "in" operator bilan tekshirish mumkin
 ```
 
-Lekin **object literal'ga assign qilganda** checker optional property'ni `string | undefined`'ga kengaytiradi (qiymatni ham `undefined` qabul qilishi uchun). Bu `exactOptionalPropertyTypes`'ning default xulqi:
+Lekin **default xulq** (`exactOptionalPropertyTypes: false`) — checker optional property'ni `string | undefined`'ga kengaytiradi va `email: undefined`'ni qabul qiladi:
 
 ```typescript
 interface User { email?: string; }
 
 let a: User = {};                    // ✅ property yo'q
-let b: User = { email: undefined };  // ✅ property bor, qiymati undefined (default)
+let b: User = { email: undefined };  // ✅ default xulq — undefined qabul qilinadi
 let c: User = { email: "test" };     // ✅ property bor, qiymati string
 ```
 
-**`exactOptionalPropertyTypes: true` bilan:**
+**`exactOptionalPropertyTypes: true` yoqilsa**, optional `T?` va `T | undefined` ajratiladi:
 
 ```typescript
 let b: User = { email: undefined };  // ❌ Type 'undefined' is not assignable to type 'string'
@@ -418,7 +418,7 @@ point = { x: 30, y: 40 }; // ✅ binding qayta assign (let)
 // readonly faqat individual property'ni himoyalaydi
 ```
 
-**Juda muhim: `readonly` — shallow (yuzaki)**. Faqat birinchi daraja property'ni himoyalaydi, nested object'larni emas:
+**`readonly` — shallow (yuzaki)**. Faqat birinchi daraja property'ni himoyalaydi, nested object'larni emas:
 
 ```typescript
 interface Config {
@@ -438,7 +438,7 @@ config.settings.theme = "light";     // ⚠️ KUTILMAGAN: ichki property o'zgar
 // ichki property'lar mutable qoladi
 ```
 
-Bu behavior ko'pincha **kutilmagandek** bo'ladi — "readonly" so'zi deep immutability'ni anglatadi deb o'ylaymiz. Lekin TypeScript'ning `readonly` xuddi JavaScript'ning `Object.freeze()` kabi — shallow.
+Bu behavior ko'pincha **kutilmagandek** bo'ladi — "readonly" so'zi deep immutability'ni anglatadi deb o'ylaymiz. Lekin TypeScript'ning `readonly`, JavaScript'ning `Object.freeze()` singari, shallow himoya beradi — faqat birinchi daraja property reference'ni qotiradi.
 
 **Deep readonly** kerak bo'lsa — `Readonly<T>` utility yetarli emas (u ham shallow). Custom `DeepReadonly<T>` type yozish kerak (`16-custom-utility-types.md` da).
 
@@ -675,7 +675,7 @@ prices.melon = 250;           // ✅ dot notation ham ishlaydi
 // prices["pear"] = "expensive"; // ❌ string value emas, number kerak
 ```
 
-Index signature'ning kalit tipi faqat `string`, `number`, yoki `symbol` bo'lishi mumkin — bular JavaScript'ning valid property key tiplari.
+Index signature'ning kalit tipi `string`, `number`, `symbol` (bular JavaScript'ning valid property key tiplari) yoki **template literal type** (TS 4.4+) bo'lishi mumkin:
 
 ```typescript
 // String key
@@ -684,8 +684,11 @@ interface Dictionary { [key: string]: string; }
 // Number key — array-like object
 interface NumberMap { [index: number]: string; }
 
-// Symbol key
+// Symbol key (TS 4.4+)
 interface SymbolMap { [key: symbol]: string; }
+
+// Template literal pattern (TS 4.4+)
+interface DataAttrs { [key: `data-${string}`]: string }
 ```
 
 **Muhim:** Index signature va aniq (explicit) property'lar **birga** ishlatilganda, aniq property'ning tipi index signature'ga **mos kelishi** kerak. Sabab: runtime'da har qanday property access index signature orqali o'tadi.
@@ -815,7 +818,7 @@ const items: NumberMap = {
 
 items[0]; // "first"
 items[1]; // "second"
-// items["foo"]; // ❌ number index — string key emas
+// items["label"]; // ❌ number index — string key emas
 ```
 
 `noUncheckedIndexedAccess` xavfsizlik:
@@ -950,21 +953,24 @@ interface FruitMap {
 | Optional key'lar | ❌ | ✅ `Partial<Record<K, V>>` |
 | Readonly | ✅ `readonly [key]` | ✅ `Readonly<Record<K, V>>` |
 
-**Method qo'shish — gotcha:** `Record<K, V>` oddiy mapped type — method yozib bo'lmaydi. Interface va intersection kerak:
+**Method qo'shish — gotcha:** `Record<K, V>` oddiy mapped type — qo'shimcha property/method yozib bo'lmaydi. Bunga harakat qilish odatda muvaffaqiyatsiz:
 
 ```typescript
-// ❌ Record ichida method — mumkin emas
+// ❌ Record ichida qo'shimcha — mumkin emas (oddiy mapped type)
 type WithSize = Record<string, number>; // faqat key-value
 
-// ✅ Intersection bilan
+// ⚠️ Intersection bilan — texnik mumkin, lekin runtime'da chalkash
 type WithSize2 = Record<string, number> & { size(): number };
-// Lekin runtime'da `size` ham string key sifatida qaraladi — chalkash
+// size — method tipi `() => number`, lekin Record'ning string index'i `number` kutadi
+// Bu intersection compile-time'da `never` yoki konflikt yaratadi
 
-// ✅ Interface bilan yaxshiroq
+// ✅ Interface — index signature value tipini kengroq qilish kerak
 interface WithSize3 {
-  [key: string]: number;
-  size: number; // method emas, size property (index signature tipiga mos)
+  [key: string]: number | (() => number); // value tipi method'ni ham qamrab oladi
+  size(): number; // ✅ () => number index signature value'siga mos
 }
+// MUHIM: interface'da index signature value tipidan tashqari property/method
+// bo'lishi mumkin emas — har ikkalasi ham `number | () => number` ga mos kelishi shart
 ```
 
 <details>
@@ -1251,12 +1257,13 @@ Property lookup `O(1)` hash map orqali — tez. Interface type relations `isRela
 **Method shorthand vs property function:**
 
 ```typescript
+// Variance'ni ko'rsatish uchun interface'lar KENGROQ tip (Animal) kutadi
 interface A {
-  handler(x: Dog): void;       // method shorthand
+  handler(x: Animal): void;       // method shorthand
 }
 
 interface B {
-  handler: (x: Dog) => void;   // property function
+  handler: (x: Animal) => void;   // property function
 }
 ```
 
@@ -1265,18 +1272,18 @@ interface B {
 - **Property function (B.handler):** parameter contravariance tekshiriladi — **contravariant** (zamonaviy strict)
 
 ```typescript
-type AnimalHandler = (x: Animal) => void;
 type DogHandler = (x: Dog) => void;
 
 const dogHandler: DogHandler = (dog) => dog.bark();
+// dogHandler faqat Dog'ni qabul qiladi — kengroq Animal uchun noxavfsiz
 
 let a: A = { handler: dogHandler };
-// ❓ A.handler — bivariant bo'lsa: OK, contravariant bo'lsa: xato
-// strictFunctionTypes: method shorthand bivariant qoladi → OK
+// ✅ strictFunctionTypes bilan ham OK — method shorthand BIVARIANT
+// (texnik jihatdan unsound, lekin backward-compat uchun saqlangan)
 
 let b: B = { handler: dogHandler };
-// ❌ B.handler contravariant bo'lganda: Animal → Dog kengroq
-// Type 'DogHandler' is not assignable to type 'AnimalHandler'
+// ❌ Type '(x: Dog) => void' is not assignable to type '(x: Animal) => void'
+// Property function CONTRAVARIANT: Animal param kutilgan, Dog param berilgan
 ```
 
 Nima uchun method shorthand bivariance saqlandi: `Array<Dog>.sort((a, b) => ...)` kabi method'lar `Array<Animal>`'ga assign bo'lishi uchun. Bu JavaScript'ning inheritance pattern'i uchun muhim, lekin texnik jihatdan unsound.
@@ -1595,12 +1602,12 @@ type BaseType = {
   name: string;
 };
 
-// Interface type alias'dan extend qilishi mumkin — intersection kabi
-interface Extended extends BaseType {
+// Interface type alias'dan extend qilishi mumkin — intersection bilan ekvivalent
+interface ExtendedUser extends BaseType {
   email: string;
 }
 
-const e: Extended = {
+const extendedUser: ExtendedUser = {
   id: 1,
   name: "Ali",
   email: "ali@mail.com",
@@ -3250,22 +3257,20 @@ const p2: Point = data; // ✅ Hech qanday xato!
 ### 🕳 Gotcha 3: Interface merging va ambient modules
 
 ```typescript
-// Birinchi fayl
+// Bir xil scope ichida (bitta fayl, yoki ambient declarations)
 interface User { name: string; }
 
-// Ikkinchi fayl — xato silent bo'lishi mumkin
 interface User {
   age: number;
-  // Siz ikkinchi fayldan User ni faqat "age" bilan ishlatmoqchisiz
-  // Lekin TS merged interface'ni ishlatadi: { name, age }
+  // Siz faqat "age" bilan ishlatmoqchisiz, lekin TS merged interface'ni ko'radi: { name, age }
 }
 
 const user: User = { age: 25 };
 // ❌ Property 'name' is missing
-// Sabab: boshqa faylda name property e'lon qilingan
+// Sabab: yuqorida e'lon qilingan name property
 ```
 
-**Sabab:** Interface merging **avtomatik** va **global** (same module scope). Katta kodbazalarda bu silent bug'larga olib kelishi mumkin — siz bir joyda `interface User` deb e'lon qilsangiz, boshqa joyda merging sodir bo'lsa, birga ishlatilgan barcha property'lar paydo bo'ladi. Library augmentation uchun foydali, lekin `*.d.ts` fayllarda tasodifiy merging bo'lishi mumkin.
+**Sabab:** Interface merging **avtomatik** ishlaydi **bir xil scope** ichida — bitta fayl yoki ambient (`*.d.ts`) global declaration'larda. Modul fayllar (har biri `import`/`export` bilan) o'zaro merge qilinmaydi, lekin `declare global { interface User { ... } }` yoki `declare module "..."` bilan boshqa modullar tip'lariga qo'shilish mumkin. Library augmentation uchun bu foydali, lekin `*.d.ts` fayllarda tasodifiy merging katta kodbazalarda silent bug'larga olib keladi.
 
 ---
 
@@ -3274,10 +3279,10 @@ const user: User = { age: 25 };
 ```typescript
 // tsconfig.json: "noUncheckedIndexedAccess": false (default)
 
-interface Map { [key: string]: string; }
+interface StringDictionary { [key: string]: string; }
 
-const m: Map = { hello: "world" };
-const value = m["nonexistent"]; // type: string — LEKIN runtime: undefined!
+const dictionary: StringDictionary = { hello: "world" };
+const value = dictionary["nonexistent"]; // type: string — LEKIN runtime: undefined!
 
 value.toUpperCase(); // ❌ Runtime: TypeError: Cannot read properties of undefined
 // TS xato bermadi — silent crash
@@ -3489,8 +3494,8 @@ interface Config { host: string; port: number; }
 const a: Config = { host: "localhost", port: 3000, debug: true };
 
 // B
-const temp = { host: "localhost", port: 3000, debug: true };
-const b: Config = temp;
+const rawConfig = { host: "localhost", port: 3000, debug: true };
+const b: Config = rawConfig;
 
 // C
 function startServer(config: Config) {}
@@ -3512,8 +3517,8 @@ const a: Config = { host: "localhost", port: 3000, debug: true };
 // debug Config'da yo'q → xato
 
 // B — ✅ XATO YO'Q
-const temp = { host: "localhost", port: 3000, debug: true };
-const b: Config = temp;
+const rawConfig = { host: "localhost", port: 3000, debug: true };
+const b: Config = rawConfig;
 // Variable orqali — fresh emas, excess check yo'q
 // Structural: host ✅, port ✅ — yetarli
 // debug runtime'da qoladi — TS tekshirmagan

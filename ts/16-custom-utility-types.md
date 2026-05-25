@@ -112,7 +112,7 @@ Union type larga distributive ishlaydi: `DeepPartial<A | B>` = `DeepPartial<A> |
 type SimpleDeepPartial<T> = {
   [K in keyof T]?: T[K] extends object ? SimpleDeepPartial<T[K]> : T[K];
 };
-// ⚠️ Muammo: Date, Map, Set, Array ham object ga extends qiladi
+// Muammo: Date, Map, Set, Array ham object ga extends qiladi
 ```
 
 **To'liq versiya** — built-in class larni alohida handle qiladi:
@@ -181,11 +181,21 @@ Bu type immutable data structures yaratishda muhim — state management da (Redu
 ```typescript
 type DeepReadonly<T> = T extends BuiltIn
   ? T
-  : T extends Array<infer U>
-    ? ReadonlyArray<DeepReadonly<U>>
-    : T extends object
-      ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
-      : T;
+  : T extends Map<infer K, infer V>
+    ? ReadonlyMap<DeepReadonly<K>, DeepReadonly<V>>
+    : T extends ReadonlyMap<infer K, infer V>
+      ? ReadonlyMap<DeepReadonly<K>, DeepReadonly<V>>
+      : T extends Set<infer U>
+        ? ReadonlySet<DeepReadonly<U>>
+        : T extends ReadonlySet<infer U>
+          ? ReadonlySet<DeepReadonly<U>>
+          : T extends Array<infer U>
+            ? ReadonlyArray<DeepReadonly<U>>
+            : T extends ReadonlyArray<infer U>
+              ? ReadonlyArray<DeepReadonly<U>>
+              : T extends object
+                ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+                : T;
 ```
 
 Ishlatish — state management da:
@@ -247,11 +257,15 @@ API validation dan keyin to'liq data bor ekanligini type system da ifodalash uch
 ```typescript
 type DeepRequired<T> = T extends BuiltIn
   ? T
-  : T extends Array<infer U>
-    ? Array<DeepRequired<U>>
-    : T extends object
-      ? { [K in keyof T]-?: DeepRequired<T[K]> }
-      : T;
+  : T extends Map<infer K, infer V>
+    ? Map<DeepRequired<K>, DeepRequired<V>>
+    : T extends Set<infer U>
+      ? Set<DeepRequired<U>>
+      : T extends Array<infer U>
+        ? Array<DeepRequired<U>>
+        : T extends object
+          ? { [K in keyof T]-?: DeepRequired<T[K]> }
+          : T;
 ```
 
 Ishlatish — validation dan keyin:
@@ -307,11 +321,15 @@ type Mutable<T> = {
 // Deep versiya
 type DeepMutable<T> = T extends BuiltIn
   ? T
-  : T extends ReadonlyArray<infer U>
-    ? Array<DeepMutable<U>>
-    : T extends object
-      ? { -readonly [K in keyof T]: DeepMutable<T[K]> }
-      : T;
+  : T extends ReadonlyMap<infer K, infer V>
+    ? Map<DeepMutable<K>, DeepMutable<V>>
+    : T extends ReadonlySet<infer U>
+      ? Set<DeepMutable<U>>
+      : T extends ReadonlyArray<infer U>
+        ? Array<DeepMutable<U>>
+        : T extends object
+          ? { -readonly [K in keyof T]: DeepMutable<T[K]> }
+          : T;
 ```
 
 Ishlatish — `as const` object ni mutable qilish:
@@ -330,7 +348,7 @@ type WritableConfig = DeepMutable<typeof frozenConfig>;
 //   options: { debug: true; verbose: false };
 // }
 
-// ⚠️ Literal type lar (true, "localhost", 3000) saqlanadi
+// Diqqat: Literal type lar (true, "localhost", 3000) saqlanadi
 // Mutable faqat readonly ni olib tashlaydi, literal type larni kengaytirmaydi
 const mutableConfig: Mutable<typeof frozenConfig> = { ...frozenConfig };
 mutableConfig.host = "0.0.0.0"; // ❌ — literal type "localhost" saqlanadi
@@ -358,11 +376,15 @@ type Maybe<T> = T | null | undefined;
 // Deep versiya — nested null/undefined ni tozalash
 type NonNullableDeep<T> = T extends BuiltIn
   ? NonNullable<T>
-  : T extends Array<infer U>
-    ? Array<NonNullableDeep<U>>
-    : T extends object
-      ? { [K in keyof T]: NonNullableDeep<NonNullable<T[K]>> }
-      : NonNullable<T>;
+  : T extends Map<infer K, infer V>
+    ? Map<NonNullableDeep<K>, NonNullableDeep<V>>
+    : T extends Set<infer U>
+      ? Set<NonNullableDeep<U>>
+      : T extends Array<infer U>
+        ? Array<NonNullableDeep<U>>
+        : T extends object
+          ? { [K in keyof T]: NonNullableDeep<NonNullable<T[K]>> }
+          : NonNullable<T>;
 ```
 
 API response dan null larni tozalash:
@@ -489,9 +511,15 @@ type Flat = Prettify<Combined>;
 // Deep versiya:
 type DeepPrettify<T> = T extends BuiltIn
   ? T
-  : T extends object
-    ? { [K in keyof T]: DeepPrettify<T[K]> } & {}
-    : T;
+  : T extends Map<infer K, infer V>
+    ? Map<DeepPrettify<K>, DeepPrettify<V>>
+    : T extends Set<infer U>
+      ? Set<DeepPrettify<U>>
+      : T extends Array<infer U>
+        ? Array<DeepPrettify<U>>
+        : T extends object
+          ? { [K in keyof T]: DeepPrettify<T[K]> } & {}
+          : T;
 ```
 
 </details>
@@ -790,7 +818,7 @@ type Subtract<A extends number, B extends number> = BuildTuple<A> extends [
 type Diff = Subtract<7, 3>; // 4
 ```
 
-⚠️ Type-level arithmetic faqat kichik sonlar uchun ishlaydi (tail-call bo'lmasa taxminan 50, tail-call bilan taxminan 1000).
+**Diqqat:** Type-level arithmetic faqat kichik sonlar uchun ishlaydi — kompilator ichki instantiation depth/count limit'lari bor. Tail-call recursion (TS 4.5+) chuqurroq rekursiyani imkon beradi, lekin bu hali ham general-purpose hisob-kitob uchun mos emas.
 
 **Type-Level State Machine:**
 
@@ -900,8 +928,8 @@ type PartialDate = SimpleDeep<Date>;
 // Date ning getTime, toJSON, valueOf kabi method lari ham optional!
 // Bu mantiqiy emas — Date ni butunlay qoldirish kerak
 
-// ✅ To'g'ri — BuiltIn check:
-type DeepPartial<T> = T extends BuiltIn ? T : /* ... recursive ... */;
+// ✅ To'g'ri — BuiltIn check (to'liq versiya `DeepPartial<T>` bo'limida):
+type DeepPartial<T> = T extends BuiltIn ? T : /* Map/Set/Array/object recursive */;
 ```
 
 ### 2. Branded type arifmetikada brand yo'qoladi
@@ -959,7 +987,7 @@ type A = { x: string } & { y: { z: number } & { w: boolean } };
 
 type Pretty = Prettify<A>;
 // { x: string; y: { z: number } & { w: boolean } }
-// ❗ y ICHIDAGI intersection hali flat emas!
+// Diqqat: y ICHIDAGI intersection hali flat emas!
 
 // ✅ DeepPrettify kerak:
 type DeepPretty = DeepPrettify<A>;
@@ -1032,7 +1060,7 @@ type GoodReverse<T extends any[], Acc extends any[] = []> = T extends [infer H, 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 // Faqat top-level! Nested intersection lar flat bo'lmaydi
 
-// ✅ Deep versiya kerak:
+// ✅ Deep versiya kerak (yuqorida to'liq versiya — Map/Set/Array handle bilan):
 type DeepPrettify<T> = T extends BuiltIn
   ? T
   : T extends object
@@ -1123,24 +1151,33 @@ type Result = DeepPick<User, "profile.address.city" | "name">;
 <summary>Javob</summary>
 
 ```typescript
-type DeepPick<T, P extends string> = (
-  P extends `${infer First}.${infer Rest}`
-    ? First extends keyof T
-      ? { [K in First]: DeepPick<T[First], Rest> }
-      : never
-    : P extends keyof T
-      ? { [K in P]: T[P] }
-      : never
-) extends infer O
+// UnionToIntersection — union member larni intersection ga aylantirish
+type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (
+  x: infer I,
+) => void
+  ? I
+  : never;
+
+// DeepPickOne — bitta path uchun nested object yasash (distributive)
+type DeepPickOne<T, P extends string> = P extends `${infer First}.${infer Rest}`
+  ? First extends keyof T
+    ? { [K in First]: DeepPickOne<T[First], Rest> }
+    : never
+  : P extends keyof T
+    ? { [K in P]: T[P] }
+    : never;
+
+// DeepPick — barcha path lar uchun intersection (merged)
+type DeepPick<T, P extends string> = UnionToIntersection<DeepPickOne<T, P>> extends infer O
   ? { [K in keyof O]: O[K] }
   : never;
 ```
 
 **Tushuntirish:**
-1. Dotted path ni `First.Rest` ga ajratish
-2. `First` bo'yicha object yaratish, value sifatida recursive `DeepPick`
-3. Nuqta yo'q — oddiy property ni olish
-4. Union path lar uchun distributive conditional type ishlaydi
+1. `DeepPickOne` — bitta path uchun nested object yaratadi. `P` union bo'lsa, distributive conditional union qaytaradi: `{ name: ... } | { profile: ... }`
+2. `UnionToIntersection` — union member larni `&` orqali birlashtiradi: `{ name: ... } & { profile: ... }`
+3. Yakuniy mapped type `{ [K in keyof O]: O[K] }` — intersection'ni flat object ga aylantirib hover'da o'qish qulay bo'lishi uchun (`Prettify` pattern)
+4. Distributive conditional o'zi yetarli emas — union'ni mergelash uchun `UnionToIntersection` zarur
 
 </details>
 

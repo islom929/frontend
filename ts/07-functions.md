@@ -73,7 +73,7 @@ greet(42) tekshiruvi:
   42 extends string? → ❌ xato
 ```
 
-Kompilator har bir funksiya deklaratsiyasi uchun **`Signature`** object yaratadi — unda parametr type'lari, return type, `this` type, minimum required parametr soni, va maksimal parametr soni saqlanadi. Funksiya chaqiruvini tekshirishda kompilator `getResolvedSignature()` funksiyasi orqali mos keluvchi signature'ni topadi va argument'larni unga moslashtiradi.
+Kompilator har bir funksiya deklaratsiyasi uchun **`Signature`** object yaratadi — unda parametr type'lari, return type, `this` type, minimum required parametr soni, va maksimal parametr soni saqlanadi. Funksiya chaqiruvini tekshirishda kompilator mos keluvchi signature'ni call expression bo'yicha hal qiladi va argument'larni unga moslashtiradi.
 
 **Parametr type annotation qo'yilmagan holat:** Agar parametr type'siz yozilsa, TypeScript odatda `any` beradi. Lekin `noImplicitAny` flag'i yoqilgan bo'lsa (yoki `strict: true`), kompilator xato beradi — har parametr uchun aniq type yoki contextual type (masalan, callback'da) kerak. Contextual type — funksiya tashqi contextdan type'ni "oladi", masalan `array.map((x) => x * 2)`'da `x` array element type'iga inferrans bo'ladi.
 
@@ -975,7 +975,7 @@ Overload'ni faqat return type parametrga qarab **o'zgarganda** ishlatish kerak �
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Overload resolution TypeScript'ning `checker.ts`'dagi `chooseOverload()` va `getResolvedSignature()` funksiyalari orqali amalga oshiriladi. Algoritm:
+Overload resolution kompilator ichida quyidagi algoritm bo'yicha amalga oshiriladi:
 
 ```
 Overload Resolution Algorithm:
@@ -1806,7 +1806,7 @@ Type assignability:
   number → void:     ❌ (hech qanday type void'ga assign bo'lmaydi, callback'dan tashqari)
 ```
 
-**`void`'ning maxsus callback xatti-harakati:** `isTypeAssignableTo` funksiyasida maxsus case sifatida handle qilinadi. Agar target type `void` va expression "contextual type" (callback, method arg) da ishlatilsa, kompilator return type'ni tekshirmaydi. Agar funksiya deklaratsiyasi bo'lsa (standalone function yoki method body'si), return type tekshiriladi va `void` uchun return qiymat taqiqlanadi.
+**`void`'ning maxsus callback xatti-harakati:** kompilator assignability tekshiruvida buni maxsus case sifatida handle qiladi. Agar target type `void` va expression "contextual type" (callback, method arg) da ishlatilsa, return type tekshirilmaydi. Agar funksiya deklaratsiyasi bo'lsa (standalone function yoki method body'si), return type tekshiriladi va `void` uchun return qiymat taqiqlanadi.
 
 **Nima uchun bu asimmetriya?** JavaScript'da `Array.prototype.forEach`, `Array.prototype.map`, event handler'lar kabi ko'p API'lar callback'dan void kutadi. Lekin developer'lar ko'pincha return qiymatli expression yozadilar:
 
@@ -2191,7 +2191,7 @@ function firstElement(arr) { return arr[0]; }
 // <T> va T[] type annotation'lar to'liq o'chirildi
 ```
 
-TypeScript kompilatori generic funksiya chaqiruvini ko'rganda **type inference** jarayonini ishga tushiradi. Bu jarayon `checker.ts`'dagi `inferTypeArguments()` funksiyasida amalga oshiriladi. Kompilator argument'ning actual type'ini parametr type'idagi type variable bilan **unification** qiladi:
+TypeScript kompilatori generic funksiya chaqiruvini ko'rganda **type inference** jarayonini ishga tushiradi. Kompilator argument'ning actual type'ini parametr type'idagi type variable bilan **unification** qiladi:
 
 ```
 firstElement(["a", "b"]) chaqiruvida:
@@ -2615,7 +2615,7 @@ Chuqur variance — [25-type-compatibility.md](25-type-compatibility.md)'da.
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Function assignability — TypeScript type system'ning eng murakkab qismlaridan biri. Bu tekshiruvlar `checker.ts`'dagi `isSignatureAssignableTo()` va `compareSignaturesRelated()` funksiyalarida amalga oshiriladi.
+Function assignability — TypeScript type system'ning eng murakkab qismlaridan biri. Tekshiruv quyidagi qoidalar asosida ishlaydi:
 
 ```
 Function Type Assignability Algorithm:
@@ -2646,17 +2646,21 @@ Target signature:  (tA: TA, tB: TB) => TR
 Bu farq nested function type'larda muhim:
 
 ```typescript
-// Outer funksiya: callback'ni parametr sifatida qabul qiladi
-// Callback'ning parametri — double negation → covariant (tabi yo'nalish)
+// Outer: callback'ni parametr sifatida qabul qiladi
 type Outer = (callback: (arg: Animal) => void) => void;
 
-// Bu teng:
-type Equivalent = (callback: (arg: Dog) => void) => void;
-// Outer → Equivalent assign bo'ladimi? Parametr contravariant, ichki parametr esa
-// double contravariant = covariant. Lekin actual TS qoidasi murakkabroq.
+// Inner: callback parametri torroq (Dog)
+type Inner = (callback: (arg: Dog) => void) => void;
+
+// strictFunctionTypes: true bilan (double contravariance = covariance):
+// Inner ⊆ Outer — Inner Outer ga assign bo'la oladi
+//   Sabab: Outer caller Animal-handler beradi, inner uni Dog-handler joyiga ishlatadi
+//   Animal-handler Dog'ni handle qila oladi (Dog ⊆ Animal) — XAVFSIZ
+// Teskari (Outer → Inner) ishlamaydi:
+//   Inner caller Dog-handler beradi, outer Animal kutadi → Cat handle qilolmaydi — XAVFLI
 ```
 
-Murakkab misollar uchun intuitiv qoida: **har "kirish-chiqish" (`→`) yo'nalishini o'zgartiradi**. Bir `→` — contravariant (input), ikki `→` — covariant qayta.
+Murakkab misollar uchun intuitiv qoida: **har "kirish-chiqish" (`→`) yo'nalishini o'zgartiradi**. Bir `→` — contravariant (input), ikki `→` — covariant qayta. Bu munosabat **assignability** qoidasi, "tenglik" emas. Inner (torroq callback param) — Outer (kengroq callback param) subtype'i.
 
 **Parameter count soni tekshiruvi:** Kompilator target funksiyaning `minArgumentCount`'ini source funksiyaning parameter count bilan solishtiradi. Source'da kamroq parameter bo'lishi mumkin — ortiqcha parametr'lar ignore bo'ladi (JS xatti-harakatiga mos).
 
@@ -2692,7 +2696,7 @@ const animals: Animal[] = dogs;  // ✅ array covariant (strictly unsafe but all
 animals.push(new Cat()); // runtime'da dogs'ga Cat qo'shildi!
 ```
 
-Bu "holesome" — runtime'da xavfli, lekin TypeScript backward compatibility uchun qo'llab-quvvatlaydi. Agar bu xavf bo'lsa, `readonly Dog[]` ishlatish kerak.
+Bu — **type system unsoundness** (TypeScript spec'da "hole" deb yuritiladi): runtime'da xavfli, lekin TypeScript backward compatibility uchun qo'llab-quvvatlaydi. Agar bu xavf bo'lsa, `readonly Dog[]` ishlatish kerak — covariant lekin xavfsiz (mutation taqiqlanadi).
 
 </details>
 
@@ -2748,15 +2752,15 @@ interface Container<T> {
   remove: (item: T) => void; // function property
 }
 
-const dogContainer: Container<Circle> = {
+const circleContainer: Container<Circle> = {
   add(item) { console.log(item.radius); },
   remove: (item) => console.log(item.radius),
 };
 
 // Bu ishlaydi method shorthand bivariance tufayli:
-const shapeContainer: Container<Shape> = dogContainer;
+const shapeContainer: Container<Shape> = circleContainer;
 // ❌ Aslida xavfli — shapeContainer.add(new Shape())
-//    dogContainer.add'ga ulanadi, Circle kutilgan lekin Shape keladi
+//    circleContainer.add'ga ulanadi, Circle kutilgan lekin Shape keladi
 // Lekin method shorthand backward compat uchun ruxsat beradi
 
 // 6. Array covariance (unsafe)

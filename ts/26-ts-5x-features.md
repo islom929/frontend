@@ -44,7 +44,23 @@ const r = routes([{ path: "/" }, { path: "/about" }]);
 
 **`verbatimModuleSyntax`** — `import type` majburiy, predictable emit. Batafsil [Bo'lim 17](17-modules.md#verbatimmodulesyntax).
 
-**All enums are union enums** — enum member lar union type sifatida ishlaydi.
+**All enums are union enums** — TS 5.0 dan oldin `enum`'lar ikki xil edi: literal enum (har member literal type) va computed enum (har member `number`/`string` umumiy type). TS 5.0 da har enum **union type** sifatida ko'riladi:
+
+```typescript
+enum Status {
+  Active = "active",
+  Banned = computeStatus(), // computed
+}
+
+function check(s: Status) {
+  if (s === Status.Active) {
+    // TS 5.0+: s narrowed to Status.Active
+    // TS 4.x: s: Status (umumiy)
+  }
+}
+```
+
+Bu narrowing va exhaustiveness check'larni yaxshilaydi.
 
 ---
 
@@ -55,31 +71,53 @@ const r = routes([{ path: "/" }, { path: "/about" }]);
 **Implicit undefined return** — `undefined` qaytaradigan funksiyalarda explicit `return undefined` yozish kerak emas:
 
 ```typescript
-// TS 5.0 da:
-function setName(name: string): undefined {
-  this.name = name;
-  return undefined; // Kerak edi
+// TS 5.0 da — return undefined MAJBURIY edi
+function getUserById(id: number): User | undefined {
+  const user = users.find(u => u.id === id);
+  if (!user) return undefined; // explicit return kerak edi
+  return user;
 }
 
-// TS 5.1 da:
-function setName(name: string): undefined {
-  this.name = name;
+// TS 5.1 da — return undefined keraksiz
+function getUserById(id: number): User | undefined {
+  const user = users.find(u => u.id === id);
+  if (!user) return; // ✅ implicit undefined
+  return user;
+}
+
+// Faqat `: undefined` return type'i bilan ham:
+function logAction(msg: string): undefined {
+  console.log(msg);
   // return undefined — KERAK EMAS
 }
 ```
 
-**Unrelated getter/setter types** — getter va setter turli type lar qaytarishi mumkin:
+**Unrelated getter/setter types** — getter return type'i va setter parameter type'i bir-biriga assignable bo'lishi shart emas (TS 5.1'gacha kerak edi). Bu API design'da foydali: setter cheklangan input qabul qiladi, getter normalized output beradi:
 
 ```typescript
-class Container {
-  #value: unknown;
+class Temperature {
+  #celsius: number = 0;
 
-  get value(): unknown { return this.#value; }
+  // Setter qabul qiladi: Celsius yoki Fahrenheit string
+  set value(input: number | `${number}F`) {
+    if (typeof input === "string") {
+      const fahrenheit = parseFloat(input);
+      this.#celsius = (fahrenheit - 32) * 5 / 9;
+    } else {
+      this.#celsius = input;
+    }
+  }
 
-  set value(val: string | number | boolean) {
-    this.#value = val;
+  // Getter doim Celsius number qaytaradi
+  get value(): number {
+    return this.#celsius;
   }
 }
+
+const t = new Temperature();
+t.value = "100F"; // ✅ string input
+t.value = 25;     // ✅ number input
+const c: number = t.value; // ✅ number output
 ```
 
 ---
@@ -107,22 +145,32 @@ async function fetchData() {
 }
 ```
 
-**`Symbol.dispose` va `Symbol.asyncDispose`** — resource class larga implement qilinadi:
+**`Symbol.dispose` va `Symbol.asyncDispose`** — resource class'larga `Disposable` yoki `AsyncDisposable` interface implement qilinadi:
 
 ```typescript
+import * as fs from "node:fs";
+
 class FileHandle implements Disposable {
-  constructor(private fd: number) {}
+  private fd: number;
 
-  read() { return "file content"; }
+  constructor(path: string) {
+    this.fd = fs.openSync(path, "r");
+  }
 
-  [Symbol.dispose]() {
-    closeFile(this.fd);
-    console.log("File closed");
+  read(): string {
+    const buffer = Buffer.alloc(1024);
+    const bytesRead = fs.readSync(this.fd, buffer);
+    return buffer.toString("utf8", 0, bytesRead);
+  }
+
+  [Symbol.dispose](): void {
+    fs.closeSync(this.fd);
+    console.log("File handle closed");
   }
 }
 
 function openFile(path: string): FileHandle {
-  return new FileHandle(42);
+  return new FileHandle(path);
 }
 ```
 
@@ -141,20 +189,24 @@ import config from "./config.json" with { type: "json" };
 // Runtime ga bu JSON ekanini aytadi
 ```
 
-**`switch(true)` narrowing** — `switch(true)` da condition bilan type narrowing:
+**`switch(true)` narrowing** — `switch(true)` pattern'da har `case` expression discriminant sifatida type narrowing'ga sabab bo'ladi:
 
 ```typescript
 function classify(x: string | number | boolean) {
   switch (true) {
     case typeof x === "string":
-      return x.toUpperCase(); // x: string ✅
+      return x.toUpperCase(); // x: string
     case typeof x === "number":
-      return x.toFixed(2); // x: number ✅
+      return x.toFixed(2);    // x: number
     default:
-      return String(x); // x: boolean
+      return String(x);       // x: boolean
   }
 }
 ```
+
+**TS 5.3'gacha** `switch(true)` ishlatish mumkin edi, lekin narrowing ishlamasdi (har `case`'da `x: string | number | boolean`). 5.3'da checker `case` expression'larni type guard sifatida tan oladi.
+
+**`if/else if` muqobil:** xuddi shu narrowing `if/else if` zanjirida ham ishlaydi. `switch(true)` — pattern matching ko'rinishidagi muqobil sintaksis.
 
 ---
 
@@ -208,18 +260,21 @@ const grouped = Object.groupBy(users, u => u.role);
 
 **`isolatedDeclarations`** — fayl-bo'yicha declaration emit. Batafsil [Bo'lim 18](18-declaration-files.md#isolateddeclarations-ts-55).
 
-**Inferred type predicates** — `filter` callback da avtomatik type narrowing:
+**Inferred type predicates** — `filter` callback'da avtomatik type narrowing. TS 5.5 da compiler callback body'ni analiz qiladi va agar narrowing pattern aniqlansa, type predicate sifatida infer qiladi:
 
 ```typescript
-const values = [1, null, 2, undefined, 3];
+// TS 5.4 va undan oldin — explicit predicate kerak:
+const values1: (number | null | undefined)[] = [1, null, 2, undefined, 3];
+const nums1 = values1.filter((v): v is number => v != null);
+// nums1: number[]
 
-// TS 5.4 da:
-const nums = values.filter((v): v is number => v != null);
-
-// TS 5.5 da — avtomatik infer:
-const nums = values.filter(v => v != null);
-// nums: number[] — TS avtomatik type predicate infer qildi!
+// TS 5.5+ — avtomatik infer:
+const values2: (number | null | undefined)[] = [1, null, 2, undefined, 3];
+const nums2 = values2.filter(v => v != null);
+// nums2: number[] — TS avtomatik type predicate infer qildi
 ```
+
+**Mexanizm:** checker callback'ning return expression'ini control flow analysis bilan tekshiradi. Agar `return` true bo'lganda parameter'ning type'i narrowed bo'lsa, predicate sifatida inference qiladi. Bu faqat oddiy expression'lar (`!= null`, `typeof x === "string"`) uchun ishonchli ishlaydi.
 
 ---
 
@@ -227,22 +282,39 @@ const nums = values.filter(v => v != null);
 
 ### Nazariya
 
-**Always-truthy/nullish checks** — doim truthy yoki doim nullish bo'lgan expression lar uchun ogohlantirish:
+**Always-truthy/nullish checks** — TS 5.6 doim truthy yoki doim nullish bo'lgan expression'lar uchun xato beradi (bug guard):
 
 ```typescript
-function process(x: string) {
-  if (x) { /* ... */ }
-  // TS 5.6: Warning — x doim truthy (string, bo'sh emas)
-
-  if (/regex/) { /* ... */ }
-  // TS 5.6: Warning — regex doim truthy!
+// ❌ TS 5.6 — Regex literal doim truthy (object)
+function isValid(input: string) {
+  if (/^[a-z]+$/) { // ❌ "This kind of expression is always truthy"
+    return true;
+  }
+  return false;
+  // Programmer ehtimol input.match(/^[a-z]+$/) yozmoqchi edi
 }
+
+// ❌ Function reference doim truthy
+function callIfDefined(callback?: () => void) {
+  if (callback) callback();         // ✅ optional check OK
+  if (callIfDefined) { /* ... */ }  // ❌ function reference doim truthy
+}
+
+// ❌ Class instance doim truthy
+class Logger { log(msg: string) {} }
+const logger = new Logger();
+if (logger) { /* ... */ } // ❌ instance doim truthy
 ```
 
-**Iterator helpers** — `Iterator.prototype` method lari:
+**Diqqat:** check faqat **aniq truthy** expression'lar uchun (literal regex, function, class instance, har doim object qaytaruvchi expression). `string`, `number` kabi type'lar uchun emas — chunki ular falsy value'larga ega bo'lishi mumkin (`""`, `0`).
+
+**Iterator helpers** — ECMAScript Iterator Helpers proposal (Stage 4, ES2025) uchun TS type'lar. `Iterator.prototype.filter`, `map`, `take`, `toArray` lazy iteration imkonini beradi (infinite generator'lar bilan ham ishlaydi):
 
 ```typescript
-function* numbers() { let i = 0; while (true) yield i++; }
+function* numbers() {
+  let i = 0;
+  while (true) yield i++;
+}
 
 const first10Even = numbers()
   .filter(n => n % 2 === 0)
@@ -251,21 +323,35 @@ const first10Even = numbers()
 // [0, 2, 4, 6, 8, 10, 12, 14, 16, 18]
 ```
 
+**Runtime support:** Node.js 22+, Chrome 122+, Firefox 131+. Eski environment'lar uchun polyfill (`core-js/proposals/iterator-helpers`). TS 5.6'da faqat type'lar qo'shilgan — runtime allohida.
+
 ---
 
 ## TypeScript 5.7
 
 ### Nazariya
 
-**Path rewriting** — `moduleResolution: "node16"` da import specifier larni `.ts` → `.js` ga avtomatik rewrite:
+**Path rewriting** — `rewriteRelativeImportExtensions: true` flag bilan compiler `.ts`/`.tsx`/`.mts`/`.cts` extension'lardan `.js`/`.jsx`/`.mjs`/`.cjs` ga avtomatik rewrite qiladi. Bu Node.js ESM (extension majburiy) va `--allowImportingTsExtensions` bilan birgalikda ishlaydi:
 
-```typescript
-// tsconfig: "rewriteRelativeImportExtensions": true
-import { utils } from "./utils.ts";
-// Compiled JS: import { utils } from "./utils.js";
+```jsonc
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
+  }
+}
 ```
 
-**`es2024` target** — `Symbol.dispose`, `Object.groupBy`, `Promise.withResolvers` type lari.
+```typescript
+// Source: src/app.ts
+import { utils } from "./utils.ts";
+// Emit: dist/app.js
+// import { utils } from "./utils.js";
+```
+
+**Cheklov:** faqat **relative** import'larga ishlaydi (`./`, `../`). Package import'lar (`node_modules`) o'zgartirilmaydi.
+
+**`es2024` target** — `Object.groupBy`, `Map.groupBy`, `Promise.withResolvers`, `ArrayBuffer.prototype.resize` type'lari. `Symbol.dispose`/`Symbol.asyncDispose` esa alohida `esnext.disposable` lib'da (TS 5.2'da qo'shilgan) — `lib: ["es2024", "esnext.disposable"]` bilan yoqiladi.
 
 ---
 
@@ -312,15 +398,32 @@ class A { name: string; constructor(name: string) { this.name = name; } } // ✅
 
 ## Edge Cases va Gotchas
 
-### 1. `const` type parameter — har joyda `readonly` bo'ladi
+### 1. `const` type parameter — inference `as const` ga teng
+
+`<const T>` modifier'i type parameter inference'iga `as const` semantikasini qo'shadi: object literal'lar `readonly`, string literal'lar narrow type, array'lar tuple bo'ladi.
 
 ```typescript
 function getConfig<const T>(config: T) { return config; }
 const cfg = getConfig({ host: "localhost", port: 3000 });
 // cfg: { readonly host: "localhost"; readonly port: 3000 }
-// ⚠️ cfg.host = "other"; // ❌ — readonly!
-// const keyword siz — { host: string; port: number } (mutable)
+// cfg.host = "other"; // ❌ readonly
 ```
+
+```typescript
+// const SIZ — wide inference:
+function noConst<T>(routes: T) { return routes; }
+const r1 = noConst([{ path: "/" }]);
+// r1: { path: string }[]
+
+// const BILAN — literal/tuple inference:
+function withConst<const T>(routes: T) { return routes; }
+const r2 = withConst([{ path: "/" }]);
+// r2: readonly [{ readonly path: "/" }]
+```
+
+**Qachon kerak:** routing config, state machine, schema definition — call site'da `as const` yozmasdan literal inference.
+
+**Qachon kerak emas:** numeric/general computation — `<const T extends number>` da `T = 42` infer bo'ladi va arithmetic foydasiz (`a + b` baribir `number`).
 
 ### 2. `using` — faqat `Symbol.dispose` implement qilingan object lar bilan
 
@@ -347,16 +450,29 @@ type Status = (typeof Status)[keyof typeof Status];
 ### 4. Inferred type predicates — ba'zan kutilmagan natija
 
 ```typescript
-const items = [1, "hello", null, true];
-const strings = items.filter(x => typeof x === "string");
-// TS 5.5: strings: string[] — ✅ to'g'ri infer
+const items: (number | string | null | boolean)[] = [1, "hello", null, true];
 
-// Lekin murakkab callback larda infer ISHLAMASLIGI mumkin
-const complex = items.filter(x => {
+// ✅ Oddiy callback — to'g'ri infer
+const strings = items.filter(x => typeof x === "string");
+// strings: string[]
+
+// ⚠️ Murakkab control flow — infer ishlamasligi mumkin
+const filtered = items.filter(x => {
   if (typeof x === "string") return true;
+  if (typeof x === "number" && x > 0) return true;
   return false;
 });
-// Ba'zan (string | number | boolean | null)[] qaytarishi mumkin
+// filtered: (number | string | null | boolean)[] — narrow EMAS
+// Sabab: checker bir nechta return path'larni unified predicate'ga reduce qila olmaydi
+```
+
+**Yechim:** Murakkab logic uchun explicit type predicate:
+
+```typescript
+const filtered = items.filter((x): x is string | number =>
+  typeof x === "string" || (typeof x === "number" && x > 0)
+);
+// filtered: (string | number)[]
 ```
 
 ### 5. `NoInfer` — faqat inference bloklaydi, type check YO'Q

@@ -104,7 +104,7 @@ TypeScript kompilatori conditional type'ni quyidagi tartibda qayta ishlaydi:
    └── False → FalseType evaluate
 ```
 
-**Deferred conditional types — narrowing gotcha:** Generic funksiya ichida `T` hali noma'lum, shuning uchun conditional type resolve bo'lmaydi. Bu — TypeScript'ning fundamental cheklovi.
+**Deferred conditional types — narrowing gotcha:** Generic funksiya ichida `T` hali noma'lum, shuning uchun conditional type resolve bo'lmaydi. Bu TypeScript type system'ning fundamental cheklovi.
 
 ```typescript
 function processValue<T>(value: T): T extends string ? string[] : T {
@@ -297,17 +297,17 @@ type Z = ParseBool<"true">; // true
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-TypeScript kompilatori `infer` ni pattern matching algoritmi bilan qayta ishlaydi:
+TypeScript kompilatori `infer`'ni pattern matching algoritmi bilan qayta ishlaydi:
 
 ```
 Input: T extends Pattern<infer U> ? TrueType : FalseType
 
-1. T ni Pattern'ga structural moslashtirish
+1. T'ni Pattern'ga structural moslashtirish
 2. infer U joylashgan pozitsiyada qaysi type bo'lsa — U'ga candidate sifatida yozish
 3. Agar bir nechta candidate bo'lsa:
    - Covariant pozitsiya → candidates union = U
    - Contravariant pozitsiya → candidates intersection = U
-4. U ni true branch'da ishlatish
+4. U'ni true branch'da ishlatish
 ```
 
 **Co-variant vs contra-variant infer — sabab:**
@@ -357,7 +357,7 @@ T extends Pattern<infer U extends Constraint>
    └── ❌ → false branch'ga o'tish
 ```
 
-Bu `infer U` + `U extends Constraint ? ...` ga qaraganda yaxshiroq:
+Bu `infer U` + `U extends Constraint ? ...`'ga qaraganda yaxshiroq:
 
 - Nested conditional kam
 - Kompilator optimizatsiya qila oladi
@@ -372,7 +372,7 @@ declare function overloaded(x: number): number;
 type R = ReturnType<typeof overloaded>; // number (oxirgi overload)
 ```
 
-**Sabab:** TypeScript type system overload list'idagi **eng oxirgi** (eng keng) signature'ni implementation signature sifatida ishlatadi. Bu deterministik tanlov — lekin ko'p developer buni bilmaydi va tushunmaydi. Bu TS'ning ma'lum cheklovi.
+**Sabab:** TypeScript type system overload list'idagi **eng oxirgi** signature'ni implementation signature sifatida ishlatadi. Bu deterministik tanlov, lekin ko'p developer buni bilmaydi. Bu TypeScript'ning hujjatlangan cheklovi (microsoft/TypeScript#26113).
 
 **Runtime'da iz yo'q:** `infer` sof compile-time feature. Compiled JavaScript'da hech qanday iz qolmaydi.
 
@@ -559,7 +559,7 @@ type B = Check<boolean>;
 // boolean distributive qilinadi:
 // = Check<true> | Check<false>
 // = "yes" | "no"
-// ❗ Bu "yes" emas — chunki false ham tekshiriladi
+// Diqqat: "yes" emas — chunki false ham tekshiriladi
 ```
 
 **Naked type parameter visual contrast:**
@@ -591,7 +591,7 @@ type ToArray<T> = T extends any ? T[] : never;
 
 type A = ToArray<string | number>;
 // = string[] | number[] (distributive!)
-// ❗ (string | number)[] emas
+// Diqqat: (string | number)[] emas
 
 // 2. Exclude implementation
 type MyExclude<T, U> = T extends U ? never : T;
@@ -652,7 +652,7 @@ type UnionToIntersection<U> =
 // Ishlashi:
 // 1. U distributive: (A extends any ? (x: A) => void : never) | (B extends any ? ...)
 // 2. = ((x: A) => void) | ((x: B) => void)
-// 3. Butun union (x: infer I) => void ga moslashtiradi
+// 3. Butun union (x: infer I) => void'ga moslashtiradi
 // 4. I contravariant pozitsiyada → intersection: A & B
 
 type UI = UnionToIntersection<{ a: 1 } | { b: 2 }>;
@@ -729,7 +729,7 @@ Dist<string | number>
 type FnDist<T> = ((x: T) => void) extends ((x: string) => void) ? "yes" : "no";
 
 type A = FnDist<string>;        // "yes" (string extends string)
-type B = FnDist<string | number>; // "yes" ❗ (kutilmagan!)
+type B = FnDist<string | number>; // "yes" (kutilmagan!)
 // Sabab: (x: string | number) => void extends (x: string) => void
 // Parameter contravariant: keng accepted (string | number) tor expected (string)'ga assign bo'ladi
 // Aslida: (x: string) => void argument hatto string | number'ga assign bo'ladi
@@ -763,7 +763,7 @@ Bu trick generic function type'larni solishtirish orqali type equality'ni aniqla
 ```typescript
 type IsUnion<T, C = T> =
   T extends T  // Distributive trigger — T har member'ga split
-    ? [C] extends [T]  // Non-distributive: butun C ni current member T bilan taqqoslash
+    ? [C] extends [T]  // Non-distributive: butun C'ni current member T bilan taqqoslash
       ? false  // Agar C current member'ga assignable bo'lsa → bitta element
       : true   // Aks holda → ko'p element (union)
     : never;
@@ -1119,7 +1119,7 @@ Kompilator overload resolution va conditional type evaluation'ni **butunlay farq
 
 **Overload resolution:** Kompilator barcha overload signature'larni yuqoridan pastga tekshiradi. Birinchi mos keladigan overload tanlanadi. Union argument berilganda kompilator **bitta** overload tanlashga harakat qiladi — lekin union hech bir aniq overload'ga to'liq mos kelmaydi, shuning uchun xato bo'lishi mumkin.
 
-**Conditional type evaluation:** Conditional type `T extends U ? X : Y` ni evaluate qiladi. Agar `T` naked parameter + union bo'lsa — distributive behavior yoqiladi va har member alohida evaluate bo'ladi:
+**Conditional type evaluation:** Conditional type `T extends U ? X : Y`'ni evaluate qiladi. Agar `T` naked parameter + union bo'lsa — distributive behavior yoqiladi va har member alohida evaluate bo'ladi:
 
 ```
 Overload resolution:          Conditional type distribution:
@@ -1144,7 +1144,7 @@ type R = ReturnType<typeof overloaded>; // number (oxirgi)
 // Kutilgan: string | number — lekin noto'g'ri
 ```
 
-**Sabab:** TypeScript type system'da funksiya `typeof` orqali type olinganda, signature'larning oxirgisi (implementation signature'ga eng yaqini) tanlanadi. Bu eski design qarori — backward compatibility tufayli o'zgarmaydi.
+**Sabab:** TypeScript type system'da funksiya `typeof` orqali type olinganda, signature'larning oxirgisi (implementation signature'ga eng yaqini) tanlanadi. Bu eski design tanlov — backward compatibility tufayli o'zgarmaydi.
 
 **Yechim** — `infer` bilan barcha overload'larni olish (chekli):
 
@@ -1639,7 +1639,7 @@ function process<T extends string | number>(
   if (typeof value === "string") {
     return value.split(""); // ❌ Error
     // TS: T extends string ? string[] : number
-    // Kompilator T'ni bilmaydi, string[] ni T extends ... ga assign qila olmaydi
+    // Kompilator T'ni bilmaydi, string[]'ni T extends ...'ga assign qila olmaydi
   }
   return value * 2; // ❌ Error (same reason)
 }
@@ -1664,7 +1664,7 @@ type B = Check<boolean>;
 // boolean distributive qilinadi:
 // = Check<true> | Check<false>
 // = "yes" | "no"
-// ❗ Bu "yes" emas
+// Diqqat: "yes" emas
 ```
 
 **Sabab:** `boolean` — aslida union `true | false`. Distributive conditional'da har member alohida evaluate bo'ladi. Bu ko'p developer'ni chalkashtiradi — `boolean` monolithic type emas.
@@ -1689,7 +1689,7 @@ Non-distributive qilish uchun function wrap `((x: T) => void) extends ((x: U) =>
 type FnDist<T> = ((x: T) => void) extends ((x: string) => void) ? "yes" : "no";
 
 type A = FnDist<string>;         // "yes"
-type B = FnDist<string | number>; // "yes" ❗ (kutilmagan!)
+type B = FnDist<string | number>; // "yes" (kutilmagan!)
 // Sabab contravariance: (x: string | number) => void extends (x: string) => void
 // Keng parameter type tor parameter type'ga assign bo'ladi (contravariant)
 ```
@@ -1785,15 +1785,18 @@ type C = Flatten<boolean>;          // boolean
 ### ❌ Xato 3: Katta union + complex conditional — performance
 
 ```typescript
-// ❌ 100+ member union + complex conditional
-type BigUnion = /* 100+ literal types */;
+// ❌ Katta union + complex conditional
+type BigUnion =
+  | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j"
+  | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t";
+// Real loyihalarda bu 100+ literal bo'lishi mumkin
 
 type ComplexResult<T> =
   T extends string ? { value: T; upper: Uppercase<T>; lower: Lowercase<T> } :
   never;
 
 type Result = ComplexResult<BigUnion>;
-// Har member uchun alohida evaluation → juda sekin
+// Har member uchun alohida evaluation — katta union'da sekin
 ```
 
 **✅ To'g'ri usul:**
@@ -2141,7 +2144,7 @@ type C = never extends string ? "yes" : "no";
 
 type IsNever<T> = T extends never ? true : false;
 type D = IsNever<never>;
-// never ❗ — empty union distribute → nothing → never
+// never — empty union distribute → nothing → never (true emas!)
 
 type Check<T> = T extends string ? true : false;
 type E = Check<any>;
@@ -2151,9 +2154,9 @@ type F = Check<never>;
 // never — empty union distribute
 
 type G = Check<boolean>;
-// boolean distributive: Check<true> | Check<false> = false | false = false
-// Wait: true extends string? false. false extends string? false.
-// = false ❗ (boolean = true | false, ikkalasi string emas)
+// boolean distributive: Check<true> | Check<false>
+// true extends string? false. false extends string? false.
+// = false (boolean = true | false, ikkalasi ham string emas)
 
 type Dist<T> = T extends string ? T[] : never;
 type H = Dist<"a" | "b" | 1>;

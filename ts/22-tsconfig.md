@@ -31,7 +31,9 @@
 
 ### Nazariya
 
-`tsconfig.json` — TypeScript proyektining root direktoriyasida joylashgan konfiguratsiya fayli. `tsc` shu faylni o'qib ishlaydi.
+`tsconfig.json` — TypeScript proyektining root direktoriyasida joylashgan konfiguratsiya fayli. `tsc` shu faylni o'qib, kompilator sozlamalari, qaysi fayllar compile qilinishi, qaysi target ga emit qilish, va qanday module system ishlatilishini aniqlaydi.
+
+**NIMA UCHUN kerak:** TypeScript turli muhitlarda (browser, Node.js, Deno, bundler) turlicha compile bo'lishi kerak. Har proyekt o'z `target`, `module`, `lib` qiymatlariga muhtoj. `tsconfig.json` bularni deklarativ tarzda saqlaydi va `tsc` jarayoni reproducible bo'ladi.
 
 ```json
 {
@@ -51,7 +53,45 @@
 - **`extends`** — boshqa tsconfig dan meros olish
 - **`references`** — project references (monorepo)
 
-`tsc --init` — standart tsconfig yaratadi. `tsc --showConfig` — effective config ni ko'rsatadi (extends resolved).
+`tsc --init` — standart tsconfig yaratadi. `tsc --showConfig` — effective config ni ko'rsatadi (`extends` resolved, default'lar o'rnatilgan).
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Config resolution algoritmi:**
+
+1. `tsc` joriy directory'dan boshlab yuqoriga `tsconfig.json` qidiradi (yoki `--project` flag bilan aniq path)
+2. `extends` zanjirini topib chiqadi (recursive merge) — base config'lar bottom-up qo'llanadi
+3. `compilerOptions` extends bo'yicha override qilinadi (oxirgi g'olib)
+4. `include`/`exclude`/`files` — extends bo'lsa **override** qiladi (merge emas)
+5. Default qiymatlar to'ldiriladi (`module` default `target` ga bog'liq, `moduleResolution` default `module` ga bog'liq)
+6. `files` ro'yxati + `include` glob'lar resolve qilinadi, `exclude` filter qiladi
+7. Import graph quriladi — `import` orqali ulangan har bir fayl compile setiga qo'shiladi (`exclude` bunga ta'sir qilmaydi)
+
+```
+tsconfig.json o'qildi
+        ↓
+extends zanjir resolve (recursive)
+        ↓
+compilerOptions merge (override)
+        ↓
+default'lar to'ldirildi
+        ↓
+files + include - exclude → root fayllar
+        ↓
+import graph traverse → barcha kerakli fayllar
+        ↓
+type-check + emit
+```
+
+**Default behavior nuance'lari:**
+
+- `module` default: `target === "ES3" | "ES5"` → `"CommonJS"`, aks holda `"ES6"`
+- `moduleResolution` default: `module === "CommonJS"` → `"Node10"`, `module === "Node16"/"NodeNext"` → mos kelgan
+- `target` default: `"ES5"` (TS 5.0 dan oldin), keyin `"ES2016"` (TS 5.0+) — versiya'dan-versiyaga o'zgarib turadi
+- `strict: false` — har strict family flag alohida-alohida default `false`
+
+</details>
 
 ---
 
@@ -59,18 +99,46 @@
 
 ### Nazariya
 
-`strict: true` — **barcha strict flag larni** birdan yoqadi. Bu meta-flag — 8 ta individual flag ning shortcut i. **Har doim yoqing** — yangi loyihalarda standard.
+`strict: true` — **strict family** flag larini birdan yoqadigan meta-flag. **NIMA UCHUN:** strict bo'lmagan TypeScript JavaScript ustida soft type layer beradi (implicit `any`, `null` ignore qilinadi) — kompilator xatolarni o'tkazib yuboradi. Strict mode bu yumshoq xatti-harakatlarni o'chiradi, type safety ni full enforce qiladi.
+
+**QANDAY ISHLAYDI:** `strict: true` deklarativ — kompilator har strict family flag ni `true` deb default qiladi. Individual flag ni `false` qilib override qilish mumkin (`"strict": true, "strictNullChecks": false`). Yangi TS versiyada strict family ga yangi flag qo'shilsa, `strict: true` avtomatik yangi flag ni ham yoqadi (breaking change risk — releases'da diqqat).
 
 | Flag | Nima qiladi |
 |------|-------------|
-| `noImplicitAny` | Type annotation yo'q bo'lsa `any` deb taxmin qilmaydi — xato beradi |
-| `strictNullChecks` | `null`/`undefined` — alohida type (har joyda assignable emas) |
-| `strictFunctionTypes` | Function parameter larda **contravariance** enforce (method syntax bundan mustasno) |
-| `strictBindCallApply` | `bind`, `call`, `apply` parametrlarini type-check qiladi |
-| `strictPropertyInitialization` | Class property lar constructor da initialize bo'lishi kerak |
-| `noImplicitThis` | `this` type aniq bo'lmasa — xato |
-| `alwaysStrict` | Har JS faylga `"use strict"` qo'shadi |
-| `useUnknownInCatchVariables` (TS 4.4+) | `catch(e)` da `e: unknown` (TS 4.0+ `any` edi) |
+| `noImplicitAny` | Type annotation yo'q bo'lsa kompilator implicit `any` deb taxmin qilmaydi — xato beradi |
+| `strictNullChecks` | `null` va `undefined` har type ga avtomatik assignable emas — alohida member sifatida narrowing kerak |
+| `strictFunctionTypes` | Function parameter larida **contravariance** enforce (parameter pozitsiyasi). `method` syntax bundan mustasno (bivariance bilan qoladi — backward-compat) |
+| `strictBindCallApply` | `Function.prototype.bind`/`call`/`apply` parametrlarini target function'ga moslashtirib type-check qiladi |
+| `strictPropertyInitialization` | Class instance property lar `constructor` ichida (yoki declaration'da) initialize bo'lishi kerak — aks holda `undefined` bo'lib qoladi |
+| `noImplicitThis` | Function ichida `this` aniqlanmasa (implicit `any`) — xato |
+| `alwaysStrict` | Har emit qilingan JS modulga `"use strict"` directive qo'shadi (ES2015+ modullar avtomatik strict, lekin script fayllar emas) |
+| `useUnknownInCatchVariables` (TS 4.4+) | `try { } catch (e)` da `e` type'i `unknown` (avval `any` edi — narrowing majburiy emas edi) |
+| `strictBuiltinIteratorReturn` (TS 5.6+) | Built-in iterator (`Map.entries()`, `Set.values()`) `return()` natijasi `IteratorResult<T, undefined>` — avval `any` edi |
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`strictNullChecks` mexanizmi:** Kompilator har type ni `T` yoki `T | null | undefined` deb ajratadi. Ilgari `null` har type'ning member edi (bottom type sifatida) — `let s: string = null` o'tar edi. Strict mode'da `null` va `undefined` alohida unit type'lar. Type checker control flow analysis orqali narrowing qiladi (`if (x !== null) { /* x: T */ }`).
+
+**`strictFunctionTypes` va variance:** TS function type assignability'ni tekshirganda parameter pozitsiyasini contravariant qiladi (return pozitsiyasi covariant). `(x: Animal) => void` ni `(x: Dog) => void` ga assign qilib bo'lmaydi — chunki birinchi function har Animal'ni qabul qiladi, ikkinchisi faqat Dog'ni. **Method syntax** (`f(x: T): U` shape) bivariant qoldirilgan (backward-compat) — bu maxsus bypass.
+
+**`strictPropertyInitialization` mexanizmi:** Kompilator class constructor body'sini Definite Assignment Analysis bilan tekshiradi — har declared property constructor tugaganda bir vaqtning o'zida assigned bo'lishi shart. Bypass: `name!: string` (definite assignment assertion) yoki `name: string | undefined`.
+
+**`useUnknownInCatchVariables` motivatsiyasi:** Promise rejection yoki `throw` har qanday qiymatni tashlashi mumkin (`throw 42`, `throw "string"`, `throw {}`) — `Error` instance bo'lishi kafolatlanmagan. `unknown` narrowing'ni majbur qiladi: `if (e instanceof Error) { ... }`.
+
+```typescript
+// strictFunctionTypes — variance misol
+type AnimalHandler = (a: Animal) => void;
+type DogHandler = (d: Dog) => void;
+declare let ah: AnimalHandler;
+declare let dh: DogHandler;
+ah = dh; // ❌ contravariant: Dog handler Animal'ni qabul qila olmaydi
+dh = ah; // ✅ covariant subtype
+```
+
+**Performance ta'siri:** Strict family flag'lar type-check vaqtini oshiradi (qo'shimcha control flow analysis), lekin emit vaqtiga ta'sir qilmaydi. Yangi proyektlarda strict mode bilan boshlash — keyin keling deb qolib qolmaslik uchun (legacy strict-off code'ni keyinroq migrate qilish qiyin).
+
+</details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -115,25 +183,54 @@ let mouseHandler: Handler = (e) => console.log(e.clientX);
 
 ### Nazariya
 
-**`target`** — JS output ning qaysi ECMAScript versiyada bo'lishini belgilaydi. `"ES2022"` deganda — optional chaining, nullish coalescing, class fields — barchasi native qoladi. `"ES5"` deganda — barchasi polyfill/downlevel compile bo'ladi.
+**`target`** — kompilator generate qiladigan JavaScript'ning ECMAScript versiyasini belgilaydi. `"ES2022"` deganda optional chaining (`?.`), nullish coalescing (`??`), class fields, private fields (`#x`), top-level await — barchasi native syntax sifatida qoladi. `"ES5"` deganda kompilator downlevel transformation qiladi: `class` → ES5 prototype-based function, `let/const` → `var` + IIFE scope, `async/await` → generator + helper. Faqat **syntax** transform qilinadi — runtime API'lar (`Promise`, `Map`) polyfill emas, faqat type sifatida qaytariladi.
 
-**`lib`** — qaysi **built-in type declaration** lar mavjud. `target` ga qarab default lib tanlandi, lekin alohida sozlash mumkin.
+**`lib`** — qaysi built-in type declaration'lar (`lib.*.d.ts` fayllar) compile contextida mavjud bo'lishini belgilaydi. Bu `Promise`, `Map`, `Symbol.asyncIterator`, `document`, `HTMLElement` kabi type'larni o'z ichiga oladi. `lib` belgilanmasa, kompilator `target` ga mos kelgan default lib'larni yuklaydi.
 
-**Muhim farq:** `target` = output syntax, `lib` = available types. `target: "ES5"` bo'lsa-da, `lib: ["ES2020", "DOM"]` qo'yib `Promise`, `Map`, `Set` type larini ishlatish mumkin (polyfill bilan).
+**Asosiy farq:**
+
+| Aspect | `target` | `lib` |
+|--------|----------|-------|
+| Nimaga ta'sir | Emit qilingan JS syntax | Type-check'da mavjud type'lar |
+| Runtime | Transformation | Hech qanday emit yo'q |
+| Misol | `target: "ES5"` → `class` ni function qiladi | `lib: ["ES2020"]` → `Promise<T>` type'i mavjud |
+
+**Practical kombinatsiya:** `target: "ES5"` bo'lsa-da, `lib: ["ES2020", "DOM"]` qo'yib `Promise`, `Map`, `Set` type'larini ishlatish mumkin — lekin runtime'da polyfill (`core-js`) alohida qo'shish kerak.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`lib.*.d.ts` fayllar:** TypeScript distribution'da `lib.es5.d.ts`, `lib.es2015.core.d.ts`, `lib.es2015.iterable.d.ts`, `lib.dom.d.ts`, va boshqalar bor (TS package'ning `lib/` folder'ida). Har `lib` qiymati ushbu fayllarni `node_modules/typescript/lib/` dan o'qishni triggerlaydi.
+
+**Downlevel iteration mexanizmi (`downlevelIteration`):** ES5 target'da `for...of` faqat array uchun ishlaydi (length+index). String, Set, Map, custom iterator'lar uchun ishlamaydi. `downlevelIteration: true` qo'yilsa, kompilator `for...of`'ni `__values` helper bilan o'raydi — `Symbol.iterator` protocol'ni runtime'da ishlatadi. Bu emit hajmini oshiradi (har faylga helper'lar inline) — `importHelpers: true` + `tslib` package bilan helper'larni umumiy runtime'dan import qilib bundle size kichraytiriladi.
+
+```typescript
+// TS source
+for (const c of "hello") console.log(c);
+
+// target: ES5 + downlevelIteration: false → ❌ runtime xato (string ga length+index ishlatadi)
+// target: ES5 + downlevelIteration: true → __values helper bilan to'g'ri emit
+```
+
+**Lib evolution:** Har TS release lib fayllarini yangilaydi (yangi browser API, yangi ES feature). TS 5.0 da `lib.es2023.d.ts` qo'shildi (`Array.prototype.findLast`, `Array.prototype.toSorted`). Lib version'ni TS version bilan bog'lash kerak — eski TS bilan yangi `lib` ishlatib bo'lmaydi.
+
+**`target` va emit helper'lar:** ES5 target ko'p helper function generate qiladi (`__extends`, `__assign`, `__awaiter`, `__generator`). `importHelpers: true` + `tslib` package ularni bitta runtime'dan import qilib bundle size'ni kamaytiradi (har faylga duplicate emas).
+
+</details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
 ```json
-// Node.js 20
+// Node.js 20 (ES2023 syntax + types)
 { "target": "ES2022", "lib": ["ES2022"] }
 
-// Browser app (IE11 support kerak emas)
+// Browser app (modern, IE11 yo'q)
 { "target": "ES2020", "lib": ["ES2020", "DOM", "DOM.Iterable"] }
 
-// Browser app (eski browser)
-{ "target": "ES5", "lib": ["ES2020", "DOM"] }
-// ⚠️ Promise, Map polyfill kerak (core-js)
+// Browser app (eski browser — IE11 support)
+{ "target": "ES5", "lib": ["ES2020", "DOM"], "downlevelIteration": true }
+// Promise, Map, Set polyfill kerak (core-js / runtime)
 ```
 
 </details>
@@ -144,20 +241,68 @@ let mouseHandler: Handler = (e) => console.log(e.clientX);
 
 ### Nazariya
 
-Module-related option lar [Bo'lim 17](17-modules.md) da batafsil. Qisqacha:
+Module-related option'lar TypeScript'ning import/export ni qanday compile qilishini va modul fayllarni qanday topishini boshqaradi.
+
+**`module`** — emit qilingan JS qanday module format ishlatadi. `"CommonJS"` → `require`/`module.exports`. `"ESNext"`/`"ES2022"` → native `import`/`export` (bundler hal qiladi). `"Node16"`/`"NodeNext"` → fayl extension va `package.json` `"type"` field'ga qarab CJS yoki ESM emit (Node.js native ESM uchun). `"Preserve"` (TS 5.4+) → ESM import syntax'ni o'zgartirmasdan saqlaydi (bundler oxirgi transformation qiladi).
+
+**`moduleResolution`** — kompilator import path'ni qanday resolve qiladi (qaysi faylni topadi). `"Node10"` (eski "Node") — klassik Node algoritmi (`node_modules` qidirish + `package.json` `"main"`). `"Node16"`/`"NodeNext"` — modern Node ESM rules (`exports` field, conditional exports, `.js`/`.mjs`/`.cjs` extension). `"Bundler"` (TS 5.0+) — bundler-friendly (extension yo'q, `exports` field qo'llaniladi, lekin Node ESM constraint'lariga qattiq emas).
 
 | Option | Qiymat | Muhit |
 |--------|--------|-------|
-| `module` | `"Node16"` | Node.js ESM |
-| `module` | `"ESNext"` / `"Preserve"` | Bundler (Vite, Webpack) |
-| `module` | `"CommonJS"` | Node.js legacy |
-| `moduleResolution` | `"Node16"` | Node.js |
-| `moduleResolution` | `"Bundler"` | Vite/Webpack |
-| `verbatimModuleSyntax` | `true` | Yangi loyihalar |
-| `isolatedModules` | `true` | esbuild/SWC/Vite |
-| `moduleDetection` | `"force"` | Barcha fayllar module |
+| `module` | `"Node16"` / `"NodeNext"` | Node.js native ESM |
+| `module` | `"ESNext"` / `"Preserve"` (TS 5.4+) | Bundler (Vite, Webpack, esbuild) |
+| `module` | `"CommonJS"` | Node.js legacy (CJS-only) |
+| `moduleResolution` | `"Node16"` / `"NodeNext"` | Node.js (ESM + CJS dual) |
+| `moduleResolution` | `"Bundler"` (TS 5.0+) | Vite/Webpack/Next.js |
+| `verbatimModuleSyntax` | `true` (TS 5.0+) | Yangi loyihalar (type import explicit) |
+| `isolatedModules` | `true` | esbuild/SWC/Vite (single-file transpilation) |
+| `moduleDetection` | `"force"` | Har fayl module sifatida talqin (top-level scope global emas) |
 
-**Qoida:** `module` va `moduleResolution` — **juftlikda** sozlang.
+**Qoida:** `module` va `moduleResolution` **juftlikda** sozlanishi shart — nomos kombinatsiya runtime xatolarga olib keladi (masalan `module: "ESNext"` + `moduleResolution: "Node10"` → `exports` field ishlamaydi).
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`verbatimModuleSyntax` mexanizmi (TS 5.0+):** Avval `import { Foo } from "./mod"` da `Foo` faqat type sifatida ishlatilsa, emit'da import elide qilinardi (compile-time da olib tashlash). Bu `isolatedModules` bilan ishlamasdi — single-file transpiler (esbuild) `Foo` type ekanini bilolmaydi. `verbatimModuleSyntax: true` → `import type { Foo }` explicit yozish kerak. Type import elide qilinadi, value import qoldiriladi. Natija: emit predictable, esbuild/SWC bilan to'liq compatible.
+
+```typescript
+// ✅ verbatimModuleSyntax: true
+import type { User } from "./types";  // elide qilinadi (emit'da yo'q)
+import { fetchUser } from "./api";    // emit'da qoladi
+
+// ❌ — type import explicit emas
+import { User, fetchUser } from "./mixed";
+// Error: 'User' is a type and must be imported using a type-only import
+```
+
+**`isolatedModules` constraint'lari:** Single-file transpiler'lar (esbuild, SWC, swc-loader) har faylni alohida-alohida compile qiladi — boshqa fayllar context'i mavjud emas. Bu ba'zi TS feature'larni buzadi:
+- `export const enum` → cross-file inline qilolmaydi → ban
+- `import x = y.z` (namespace) → ban
+- Type-only re-export → ambiguous (type yoki value?) → `export type` aniq talab
+- `declaration merge` → ban (cross-file)
+
+**`moduleDetection`** — fayl module yoki script ekanini aniqlash:
+- `"auto"` (default) → `import`/`export` bo'lsa module
+- `"force"` → har `.ts`/`.tsx` faylni module deb belgilaydi (top-level `var` global scope'ga chiqmaydi)
+- `"legacy"` → eski TS xatti-harakati (deprecated)
+
+`moduleDetection: "force"` — modern proyektlar uchun tavsiya (har fayl izolyatsiyalangan scope).
+
+```
+Source fayl
+    ↓
+moduleDetection check (module yoki script?)
+    ↓
+module bo'lsa → ESM/CJS bo'yicha emit
+    ↓
+moduleResolution → import path resolve
+    ↓
+verbatimModuleSyntax → type vs value import ajratish
+```
+
+**`Preserve` qiymati (TS 5.4+):** `module: "Preserve"` — TS source ESM syntax'ni emit'da o'zgartirmasdan saqlaydi. Bundler (Vite/Rollup) keyin o'z transformation qiladi. Bu `moduleResolution: "Bundler"` bilan ideal juftlik — TS faqat type-check, transformation bundler'da.
+
+</details>
 
 ---
 
@@ -165,25 +310,68 @@ Module-related option lar [Bo'lim 17](17-modules.md) da batafsil. Qisqacha:
 
 ### Nazariya
 
+Bu option'lar source/output directory tuzilishini va import path alias'larini boshqaradi.
+
 | Option | Nima qiladi |
 |--------|-------------|
-| `outDir` | Compiled JS fayllar qayerga yoziladi |
-| `rootDir` | Source fayllar root papkasi |
-| `baseUrl` | Import resolve uchun base directory |
-| `paths` | Import alias lar (`@/*` → `src/*`) |
-| `rootDirs` | Virtual directory — bir nechta papkani bitta dek ko'rsatish |
+| `outDir` | Emit qilingan `.js` (va `.d.ts`) fayllar qayerga yoziladi |
+| `rootDir` | Source fayllar root papkasi — `outDir` ichidagi directory structure'ni belgilaydi |
+| `baseUrl` | Import resolve uchun base directory (TS 5.0 dan oldin `paths` uchun majburiy edi) |
+| `paths` | Import alias mapping'lari (`@/*` → `src/*`) — faqat type-check |
+| `rootDirs` | Bir nechta papkani bitta virtual directory dek ko'rsatadi (kamdan-kam kerak) |
 
-**Muhim:** `paths` faqat type-checking uchun — JS output da import **o'zgarmaydi**. Bundler (Vite) yoki runtime tool (tsconfig-paths) alohida konfiguratsiya kerak.
+**Muhim nuance — `paths` runtime'da ishlamaydi:** Kompilator import path'ni `paths` orqali resolve qiladi (faylni topadi), lekin **emit qilingan JS'da import path o'zgarmaydi** — kompilator path rewriting qilmaydi. Runtime tomonda alohida tool kerak:
+- **Bundler (Vite/Webpack)** — `vite.config.ts` da `resolve.alias` yoki `webpack.config.js` da `resolve.alias` parallel sozlanadi
+- **Node.js runtime** — `tsconfig-paths` package (development), yoki `tsc-alias`/`tsup` (build vaqtida path rewriting)
+
+**`rootDir` mexanizmi:** `rootDir: "src"`, `outDir: "dist"`, fayl `src/utils/log.ts` → emit `dist/utils/log.js`. `rootDir` belgilanmasa, kompilator avtomatik **eng past umumiy directory**'ni hisoblaydi — bu kutilmagan output strukturasiga olib kelishi mumkin (`src/a.ts` va `tests/b.ts` ikkalasi compile bo'lsa, common root proyekt root'i).
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`paths` resolution algoritmi:**
+
+1. Import statement uchraydi: `import { log } from "@/utils/log"`
+2. Kompilator `paths` ro'yxatini tekshiradi: `"@/*": ["src/*"]`
+3. `"@/utils/log"` patternga mos keladi: `@/*` → `*` qismi `utils/log`
+4. Substitution: `src/utils/log`
+5. Resolve `src/utils/log.ts` ni topadi → import bog'lanadi
+6. Emit'da import path **o'zgarmaydi** — `import { log } from "@/utils/log"` qoladi
+7. Runtime tool (bundler/tsconfig-paths) path'ni real fayl yo'liga rewrite qiladi
+
+**`paths` array — multiple fallback:**
+
+```json
+{
+  "paths": {
+    "lodash": ["./vendor/lodash", "node_modules/lodash"]
+  }
+}
+```
+
+Birinchi mavjud yo'l tanlanadi (vendor'da bo'lsa vendor'dan, aks holda node_modules'dan). Monorepo'da lokal package'ni tezroq resolve qilish uchun ishlatiladi.
+
+**`rootDirs` — virtual merge:**
+
+```json
+{ "rootDirs": ["src/generated", "src/manual"] }
+```
+
+`src/manual/api.ts` ichida `import { Schema } from "./schema"` yozilsa, kompilator `src/manual/schema.ts` va `src/generated/schema.ts` ikkalasini ham qidiradi. Bu code generation pipeline'larda foydali (manual+generated fayllar bir scope dek ko'rinadi).
+
+**`baseUrl` evolyutsiyasi:** TS 5.0 dan oldin `paths` `baseUrl` ga muhtoj edi (path'lar `baseUrl` ga nisbatan). TS 5.0+ da `paths` `tsconfig.json` joylashgan directory ga nisbatan resolve qilinadi — `baseUrl` ixtiyoriy.
+
+</details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
 ```json
+// tsconfig.json
 {
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
       "@components/*": ["src/components/*"],
@@ -191,6 +379,25 @@ Module-related option lar [Bo'lim 17](17-modules.md) da batafsil. Qisqacha:
     }
   }
 }
+```
+
+```typescript
+// src/pages/home.ts
+import { Button } from "@components/Button";  // resolve: src/components/Button.ts
+import { formatDate } from "@utils/date";     // resolve: src/utils/date.ts
+```
+
+```typescript
+// vite.config.ts — bundler tomonida parallel alias
+import path from "node:path";
+export default {
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+      "@components": path.resolve(__dirname, "src/components"),
+    },
+  },
+};
 ```
 
 </details>
@@ -201,16 +408,70 @@ Module-related option lar [Bo'lim 17](17-modules.md) da batafsil. Qisqacha:
 
 ### Nazariya
 
+Declaration option'lari TypeScript'ning `.d.ts` (type declaration) va source map fayllarini generate qilishini boshqaradi. Library publish qilganda yoki monorepo'da type'ni boshqa package'lar bilan ulashganda kritik.
+
 | Option | Nima qiladi |
 |--------|-------------|
-| `declaration` | `.d.ts` fayllar generate qilish |
-| `declarationDir` | `.d.ts` fayllar qayerga yoziladi |
-| `declarationMap` | `.d.ts.map` — IDE da source ga navigate |
-| `emitDeclarationOnly` | Faqat `.d.ts`, `.js` emas (bundler JS yaratganda) |
-| `isolatedDeclarations` (TS 5.5+) | Fayl-bo'yicha declaration, explicit types majburiy |
-| `sourceMap` | `.js.map` fayllar — debugger da TS source ko'rinadi |
-| `inlineSourceMap` | Source map ni JS fayl ichiga inline qo'shadi |
-| `stripInternal` | `@internal` JSDoc li declaration larni `.d.ts` dan olib tashlaydi |
+| `declaration` | Har emit qilingan `.js` uchun yondoshida `.d.ts` (type-only) generate qiladi |
+| `declarationDir` | `.d.ts` fayllar yoziladigan alohida directory (default `outDir`) |
+| `declarationMap` | `.d.ts.map` — IDE'da `.d.ts` symbol'idan TS source'iga navigate |
+| `emitDeclarationOnly` | Faqat `.d.ts` emit qiladi, `.js` emas (bundler JS yaratganda foydali) |
+| `isolatedDeclarations` (TS 5.5+) | Har fayl declaration'ni mustaqil generate qila olishi shart — explicit return type'lar majburiy |
+| `sourceMap` | `.js.map` fayllar generate — debugger TS source'da breakpoint qo'yishi mumkin |
+| `inlineSourceMap` | Source map'ni alohida fayl o'rniga `.js` ichiga base64 inline qo'shadi |
+| `inlineSources` | Source map ichiga original TS source matnini inline (debug stack'da ko'rinadi) |
+| `stripInternal` | JSDoc `@internal` tag'li deklaratsiyalarni `.d.ts` dan olib tashlaydi |
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`isolatedDeclarations` motivatsiyasi (TS 5.5+):** Klassik `declaration: true` mode'da kompilator type inference orqali `.d.ts` ni yarata oladi (return type'ni aytmasangiz ham, kompilator function body'dan infer qiladi). Bu **butun proyektni** type-check qilishni talab qiladi — har function'ning ichiga kirish kerak.
+
+`isolatedDeclarations: true` qo'shilsa, kompilator har faylni mustaqil declaration emit qilolishi shart. Buning uchun har exported function/class explicit return type yozishi kerak:
+
+```typescript
+// ❌ isolatedDeclarations xato
+export function getUser(id: number) {
+  return { id, name: "Ali" };
+}
+// Error: Function must have an explicit return type annotation
+//        with --isolatedDeclarations.
+
+// ✅
+export function getUser(id: number): { id: number; name: string } {
+  return { id, name: "Ali" };
+}
+```
+
+**Foyda:** Build tool (esbuild, swc-dts-generator) declaration'ni TS kompilator'siz, faqat parse + AST manipulation orqali generate qilishi mumkin → sezilarli tezroq library build (TS team `isolatedDeclarations` ni TS 5.5 announcement'da maxsus shu motivatsiya bilan kiritgan).
+
+**Source map mexanizmi:** `.js.map` Source Map V3 format'ida (JSON):
+- `version` — format versiyasi
+- `sources` — original fayllar ro'yxati
+- `mappings` — base64 VLQ-encoded mapping'lar (har JS pozitsiyadan TS pozitsiyaga)
+- `sourcesContent` (inline mode) — original source matni
+
+```
+src/user.ts:10  →  dist/user.js:8 (compiled)
+                 ↓ .js.map
+                 debugger pauses at src/user.ts:10
+```
+
+**`declarationMap` mexanizmi:** `.d.ts.map` — declaration fayl'dagi symbol'larni TS source pozitsiyasiga bog'laydi. IDE (VS Code) "Go to Definition" `.d.ts` ga emas, TS source ga olib boradi. Library consumer uchun foydali (node_modules ichidagi `.d.ts` o'rniga real source).
+
+**`stripInternal` use case:** Library author public va internal API'larini bir proyektda saqlashi mumkin. `@internal` JSDoc bilan belgilangan declaration'lar `.d.ts` dan tushiriladi:
+
+```typescript
+/** Public API */
+export function create(name: string): User { /* ... */ }
+
+/** @internal — testing uchun, public emas */
+export function _resetCache(): void { /* ... */ }
+
+// .d.ts: faqat create() qoladi, _resetCache() yo'q
+```
+
+</details>
 
 Batafsil [Bo'lim 18: Declaration Files](18-declaration-files.md).
 
@@ -220,18 +481,77 @@ Batafsil [Bo'lim 18: Declaration Files](18-declaration-files.md).
 
 ### Nazariya
 
-`strict` dan tashqari qo'shimcha tekshiruvlar:
+`strict` dan tashqari qo'shimcha type-check flag'lari — production-grade qattiqlikni oshiradi. `strict: true` bu flag'larni **avtomatik yoqmaydi** — har biri alohida konfiguratsiya kerak.
 
 | Option | Nima qiladi | Tavsiya |
 |--------|-------------|---------|
-| `noUncheckedIndexedAccess` | Index access natijasi `T \| undefined` | ✅ Production da doim |
-| `exactOptionalPropertyTypes` | `?` — "yo'q bo'lishi mumkin", `undefined` EMAS | ✅ Yangi loyihalarda |
-| `noImplicitOverride` | `override` keyword majburiy (TS 4.3+) | ✅ |
-| `noPropertyAccessFromIndexSignature` | Index signature da faqat `obj["key"]`, `obj.key` emas | Ixtiyoriy |
-| `noUnusedLocals` | Ishlatilmagan local variable → error | ✅ CI da |
-| `noUnusedParameters` | Ishlatilmagan parametr → error | ✅ CI da |
-| `noImplicitReturns` | Barcha code path da return bo'lishi kerak | ✅ |
-| `noFallthroughCasesInSwitch` | switch da break/return bo'lmasa error | ✅ |
+| `noUncheckedIndexedAccess` | Index access (`arr[i]`, `obj[key]`) natijasi `T \| undefined` | Production'da doim |
+| `exactOptionalPropertyTypes` | `prop?: T` — "yo'q bo'lishi mumkin", `T \| undefined` EMAS | Yangi loyihalarda |
+| `noImplicitOverride` | Subclass'da parent method override qilganda `override` keyword majburiy (TS 4.3+) | Tavsiya |
+| `noPropertyAccessFromIndexSignature` | Index signature'dagi property uchun faqat `obj["key"]`, dot syntax `obj.key` ban | Ixtiyoriy |
+| `noUnusedLocals` | Ishlatilmagan local variable → error | CI da |
+| `noUnusedParameters` | Ishlatilmagan function parameter → error (`_` prefix bilan skip) | CI da |
+| `noImplicitReturns` | Function'ning barcha code path'lari `return` qaytarishi shart | Tavsiya |
+| `noFallthroughCasesInSwitch` | `switch` case'da `break`/`return`/`throw` yo'q bo'lsa fallthrough → error | Tavsiya |
+| `allowUnreachableCode` | `false` — unreachable code (return'dan keyin) → warning | Tavsiya |
+| `allowUnusedLabels` | `false` — ishlatilmagan label → warning | Tavsiya |
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`noUncheckedIndexedAccess` mexanizmi:** TypeScript array va record'larda index access type'ini element type'iga teng deb default qiladi (`number[]` → `arr[0]: number`). Realistic da `arr[100]` mavjud bo'lmasligi mumkin. Bu flag index access'ni `T | undefined` qiladi — narrowing majburiy.
+
+```typescript
+// noUncheckedIndexedAccess: false (default)
+const arr = [1, 2, 3];
+const x = arr[100];      // x: number — yolg'on (haqiqatda undefined)
+x.toFixed();             // ❌ runtime crash
+
+// noUncheckedIndexedAccess: true
+const x = arr[100];      // x: number | undefined
+x.toFixed();             // ❌ compile error — narrowing kerak
+if (x !== undefined) x.toFixed(); // ✅
+```
+
+**`exactOptionalPropertyTypes` farqi:** Klassik mode'da `port?: number` `number | undefined` ga teng:
+```typescript
+interface Config { port?: number; }
+const c: Config = { port: undefined }; // ✅ standart mode'da o'tadi
+```
+
+Strict mode'da `?` "property yo'q bo'lishi mumkin" degani — `undefined` qiymat **boshqa**. `port?: number` qabul qiladi: yo'q bo'lish, yoki `number` qiymat. `undefined` ban.
+
+```typescript
+const c1: Config = {};                          // ✅ yo'q
+const c2: Config = { port: 3000 };              // ✅ qiymat
+const c3: Config = { port: undefined };         // ❌ exactOptionalPropertyTypes
+```
+
+**`noImplicitOverride` motivatsiyasi:** Subclass'da parent method'ni override qilganda `override` keyword yozish majburiy. Agar parent method nomi keyinroq o'zgartirilsa, subclass'dagi "override" implicit yangi method bo'lib qoladi (bug):
+
+```typescript
+class Base { greet() { return "Hi"; } }
+class Child extends Base {
+  override greet() { return "Hello"; }  // ✅ explicit
+}
+// Keyin Base'da greet → sayHello deb nomlangan bo'lsa:
+// Child.greet override qilmaydi (Base'da bunday method yo'q) → kompilator xato beradi
+```
+
+**`noFallthroughCasesInSwitch` semantics:** `case` bo'shliqsiz boshqa `case`'ga "tushish" (fallthrough) JavaScript'da legal. Aksariyat hollarda bug:
+
+```typescript
+switch (x) {
+  case "a": doA();  // ❌ break yo'q — "b" ga ham tushadi
+  case "b": doB(); break;
+}
+```
+
+Lekin explicit fallthrough kerak bo'lsa (kamdan-kam), bo'sh body bilan ruxsat: `case "a": case "b": doAB(); break;`.
+
+**Performance ta'sir:** Bu flag'lar control flow analysis'ni chuqurlashtiradi — yirik proyektda type-check vaqtini biroz oshirishi mumkin. Lekin bug catch rate bu qo'shimcha vaqtni qoplaydi (xato production'ga chiqmasdan ushlanadi).
+
+</details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -265,15 +585,69 @@ class Child extends Base {
 
 ### Nazariya
 
+Emit option'lari kompilator generate qiladigan JavaScript output'ning shaklini va xulq-atvorini boshqaradi.
+
 | Option | Nima qiladi |
 |--------|-------------|
-| `noEmit` | JS hech narsa emit qilmaydi (faqat type-check) — bundler JS yaratganda |
-| `removeComments` | JS output dan comment larni olib tashlaydi |
-| `downlevelIteration` | `for...of`, spread, destructuring ni eski target uchun to'g'ri emit |
-| `importHelpers` | `tslib` package dan helper import (`__awaiter`, `__spread`) |
-| `useDefineForClassFields` | Class fields ni `Object.defineProperty` bilan emit (ES2022 semantics) |
+| `noEmit` | JS emit qilmaydi (faqat type-check) — bundler JS yaratganda |
+| `removeComments` | JS output'dan comment'larni olib tashlaydi |
+| `downlevelIteration` | `for...of`, spread, destructuring'ni eski `target` uchun protocol-correct emit qiladi |
+| `importHelpers` | TS helper'larni (`__awaiter`, `__spread`, `__extends`) `tslib` package'dan import qiladi (har faylga inline emas) |
+| `useDefineForClassFields` | Class field'larni `Object.defineProperty` bilan emit (ES2022 native semantics) |
+| `preserveConstEnums` | `const enum` declaration'larni emit'da qoldiradi (inline o'rniga) |
+| `newLine` | Emit qilingan fayl'da `crlf` yoki `lf` line ending |
 
-`noEmit: true` — **Vite/Next.js loyihalarda standart**. Bundler JS yaratadi, tsc faqat type-check qiladi.
+`noEmit: true` — Vite/Next.js/esbuild proyektlarida standart. Bundler JS yaratadi, `tsc` faqat type-check (`tsc --noEmit`).
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`useDefineForClassFields` semantics farqi:** Class field'lar ECMAScript spec va eski TS xatti-harakati o'rtasida farqi:
+
+```typescript
+// Source
+class Animal { name = "cat"; }
+class Dog extends Animal {
+  name = "rex";       // child field
+  speak() { console.log(this.name); }
+}
+```
+
+- **`useDefineForClassFields: false`** (eski default): `name = "rex"` constructor ichida `this.name = "rex"` deb emit. Parent class'ning getter/setter'larini trigger qiladi.
+- **`useDefineForClassFields: true`** (ES2022 native): `Object.defineProperty(this, "name", { value: "rex", writable: true, ... })` deb emit. Parent setter'lar **trigger bo'lmaydi**. ECMAScript spec'iga to'liq mos.
+
+TS 4.3+ `target: "ES2022"` bilan default `true`. Eski Angular/Vue decorator pattern'lar yangi semantics'da buzilishi mumkin.
+
+**`importHelpers` mexanizmi:** Kompilator emit'da TS-specific runtime helper'lar generate qiladi (`__extends`, `__awaiter`, `__generator`, `__spread`). Har fayl uchun alohida inline — duplicate. `importHelpers: true` qo'yilsa, helper'lar `tslib` package'dan import qilinadi:
+
+```javascript
+// importHelpers: false (default)
+var __extends = (this && this.__extends) || (function () { ... })();
+// Har bir fayl tepasida shu helper
+
+// importHelpers: true
+import { __extends } from "tslib";
+// Faqat import — runtime tslib'dan
+```
+
+Library publish qilganda `tslib` ni `peerDependency` yoki `dependency` deb qo'shish kerak.
+
+**`noEmit` use case:** Modern bundler'lar (esbuild, swc, Vite) TypeScript'ni `tsc` ga nisbatan sezilarli tezroq compile qiladi (chunki ular type-check qilmaydi — faqat strip type annotations). Type safety uchun `tsc --noEmit` separate jarayonda type-check qiladi (CI'da yoki dev watch mode'da).
+
+```
+              ┌──────────────┐
+   .ts        │   esbuild    │   .js (tez emit)
+   ───────────┤              ├────────────►
+              └──────────────┘
+                     │
+                     │ parallel
+                     ▼
+              ┌──────────────┐
+              │  tsc --noEmit│   Type errors (lekin emit yo'q)
+              └──────────────┘
+```
+
+</details>
 
 ---
 
@@ -281,22 +655,79 @@ class Child extends Base {
 
 ### Nazariya
 
+Interop option'lari ESM/CommonJS module system'lari va boshqa fayl turlari (JSON, JS) bilan ishlashni yengillashtiradi.
+
 | Option | Nima qiladi |
 |--------|-------------|
-| `esModuleInterop` | CJS module dan default import mumkin (`import fs from "fs"`) |
-| `allowSyntheticDefaultImports` | Type-check da default import ruxsat (emit o'zgarmaydi) |
-| `forceConsistentCasingInFileNames` | Fayl nomi case sensitive (macOS da muhim) |
-| `allowJs` | `.js` fayllarni TS project ga qo'shish |
-| `checkJs` | `.js` fayllarni type-check qilish (JSDoc asosida) |
-| `resolveJsonModule` | `.json` fayllarni import qilish |
+| `esModuleInterop` | CJS module'dan default import sintaksi ruxsat (`import fs from "fs"`) + namespace helper'lar |
+| `allowSyntheticDefaultImports` | Default export'i yo'q module'dan default import type-check'da ruxsat (emit o'zgarmaydi) |
+| `forceConsistentCasingInFileNames` | Fayl nomi case sensitive — macOS/Windows case-insensitive FS'da muhim |
+| `allowJs` | `.js` fayllarni TS proyektga qo'shadi (mixed JS+TS proyekt) |
+| `checkJs` | `.js` fayllarni type-check qiladi (JSDoc annotation'lar asosida) |
+| `resolveJsonModule` | `.json` fayllarni `import` qilish ruxsat (type'i avtomatik infer) |
+| `allowArbitraryExtensions` (TS 5.0+) | `*.css`, `*.svg` kabi non-JS fayllarni import qilish uchun declaration topish |
 
-`esModuleInterop: true` — **har doim yoqing**. Bu CJS/ESM interop muammolarini hal qiladi.
+`esModuleInterop: true` — modern proyektlarda standart. CJS/ESM interop muammolarini hal qiladi.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`esModuleInterop` mexanizmi:** CommonJS `module.exports = X` bilan ESM'ning `export default X` boshqacha shape'ga ega:
+- CJS: `module.exports = { foo: 1 }` → `require("./mod")` qaytaradi `{ foo: 1 }`
+- ESM: `export default { foo: 1 }` → import qilganda `{ default: { foo: 1 } }`
+
+`esModuleInterop: false` bilan TS strict ESM:
+```typescript
+import fs from "fs";  // ❌ — fs'da default export yo'q (CJS module)
+import * as fs from "fs"; // ✅
+```
+
+`esModuleInterop: true` bilan kompilator `__importDefault` helper qo'shadi:
+```javascript
+// Emit
+const fs_1 = __importDefault(require("fs"));
+// __importDefault: agar mod.__esModule bo'lsa qaytar, aks holda { default: mod } qaytar
+fs_1.default.readFile(...);
+```
+
+Bu `import fs from "fs"` syntax'ni CJS module bilan ham ishlatishga imkon beradi.
+
+**`allowSyntheticDefaultImports` farqi:** `esModuleInterop` `true` qilsa, bu flag avtomatik `true` bo'ladi. Lekin alohida yoqish mumkin — type-check da ruxsat berib, emit'ni o'zgartirmaslik uchun (bundler interop hal qilganda).
+
+**`resolveJsonModule` mexanizmi:** `.json` fayl import qilinsa, kompilator JSON content'ni parse qilib type infer qiladi:
+
+```typescript
+// config.json: { "name": "MyApp", "version": "1.0.0" }
+import config from "./config.json";
+// config: { name: string; version: string }
+config.name; // ✅ type-safe
+```
+
+Emit'da `require("./config.json")` qoladi (bundler/Node JSON'ni handle qiladi). Bu `module: "Node16"` da ESM context'da murakkabroq (`import x from "./x.json" assert { type: "json" }` syntax — TS 5.3+).
+
+**`forceConsistentCasingInFileNames` motivatsiyasi:** macOS HFS+/APFS va Windows NTFS case-insensitive (`User.ts` va `user.ts` bir fayl). Linux ext4/btrfs case-sensitive. Bu cross-platform bug manbasi — Mac'da ishlovchi proyekt CI Linux'da buziladi:
+
+```typescript
+// File: src/User.ts
+import { User } from "./user";   // Mac/Win: ✅, Linux CI: ❌ ("./user" topilmaydi)
+```
+
+`forceConsistentCasingInFileNames: true` qo'shilsa, kompilator har import'ni FS'dagi aniq case bilan tekshiradi.
+
+**`allowJs` + `checkJs` migration strategy:** JS proyektni TS'ga aylantirishda incremental approach:
+1. `allowJs: true` — JS fayllarni proyektga qo'shish (type-check yo'q, lekin import graph'da)
+2. `checkJs: true` — JSDoc annotation'lar asosida type-check
+3. Bir-bir faylni `.js` → `.ts` ga ko'chirish
+
+</details>
 
 ---
 
 ## include, exclude, files
 
 ### Nazariya
+
+Bu uch option compile setiga qaysi fayllar kirishini boshqaradi. Ular **input bilan emas, root fayllar** bilan ishlaydi — root fayllardan import graph traversal orqali boshqa fayllar avtomatik qo'shiladi.
 
 ```json
 {
@@ -306,11 +737,57 @@ class Child extends Base {
 }
 ```
 
-- **`include`** — glob pattern. Default: `**/*` (barcha `.ts`/`.tsx`).
-- **`exclude`** — `include` dan chiqarish. Default: `["node_modules", "bower_components"]`.
-- **`files`** — aniq fayllar. Glob **ishlamaydi**.
+- **`include`** — glob pattern array. Default `**/*` (barcha `.ts`/`.tsx`/`.d.ts`)
+- **`exclude`** — `include` natijasidan chiqarish (filter). Default `["node_modules", "bower_components", "jspm_packages", outDir]`
+- **`files`** — aniq fayllar ro'yxati. Glob **ishlamaydi** — har fayl absolute/relative path
 
-**Muhim:** `exclude` faqat `include` ga ta'sir qiladi. Agar excluded fayl boshqa fayl tomonidan `import` qilinsa — **baribir compile bo'ladi**.
+**Glob pattern qoidalari (`include`/`exclude`):**
+
+| Pattern | Mos keladi |
+|---------|-----------|
+| `*` | Bir directory bo'lagi, har character (slash'siz) |
+| `?` | Bir character |
+| `**/` | Recursive — nol yoki ko'p directory |
+
+**KRITIK nuance — `exclude` import qilingan faylni to'xtatmaydi:**
+
+`exclude` faqat `include`/`files` orqali topilgan **root fayllar** ro'yxatini filtr qiladi. Lekin TS compile graph import'lar orqali kengayadi. Agar `include` da topilgan fayl `exclude` qilingan faylni `import` qilsa — bu fayl **baribir compile bo'ladi**.
+
+```json
+{ "include": ["src/**/*"], "exclude": ["src/internal/**"] }
+```
+
+```typescript
+// src/app.ts  (root sifatida include qilingan)
+import { x } from "./internal/util";
+// src/internal/util.ts — exclude'da, lekin import orqali kelgan → COMPILE
+```
+
+**`files` va `include` o'zaro:** Ikkalasi ham root fayllarni belgilaydi. `files` aniq, `include` glob — birga ishlatish mumkin. `files: []` (bo'sh) — `references` bilan project references mode'da metadata-only tsconfig uchun (root tsconfig).
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Compile graph algoritmi:**
+
+```
+1. Root fayllar ro'yxati = files ∪ (include - exclude)
+2. Har root fayl uchun:
+   - Parse → AST
+   - Import statement'larni topib resolve
+   - Topilgan fayllarni queue ga qo'shish
+3. Queue empty bo'lguncha takrorlash
+4. Yakuniy set = barcha kirgan fayllar (root + transitive)
+5. Har biri uchun type-check + (emit yoqilsa) emit
+```
+
+**Performance ta'sir:** `include` glob'lar kengayganda (`**/*` butun proyektda) FS skan vaqti oshadi. Yirik monorepo'da `include: ["src/**/*"]` aniq aytish (faqat src) tezroq. `exclude` da `node_modules` har doim ban — eslatma uchun (kompilator default'da chiqarib tashlaydi).
+
+**`tsc --listFiles`** — qaysi fayllar compile setida ekanini chiqaradi. Debug uchun foydali (kutilmagan fayl kelganini ko'rsatadi).
+
+**`tsc --traceResolution`** — har import resolve qadamlarini chiqaradi (qaysi yo'l, qaysi `package.json` o'qildi, nima topildi/topilmadi).
+
+</details>
 
 ---
 
@@ -318,7 +795,13 @@ class Child extends Base {
 
 ### Nazariya
 
-`extends` — boshqa tsconfig dan meros olish. Monorepo da umumiy sozlamalarni base config ga chiqarish uchun.
+`extends` — boshqa `tsconfig.json` dan kompilator sozlamalarini meros olish. Monorepo va shared config'lar uchun asosiy mexanizm.
+
+**Merge qoidalari:**
+- `compilerOptions` — **shallow merge** (child option base option'ni override qiladi)
+- `include`, `exclude`, `files` — child **butunlay override** qiladi (merge emas)
+- `references` — child override qiladi
+- `extends` — recursive (extends ichidagi config ham extends qila oladi)
 
 ```json
 // tsconfig.base.json
@@ -343,7 +826,7 @@ class Child extends Base {
 }
 ```
 
-TS 5.0+ da **array extends** — bir nechta config dan meros:
+**TS 5.0+ — array extends** (bir nechta config dan meros, tartib muhim — keyingisi g'olib):
 
 ```json
 {
@@ -351,7 +834,52 @@ TS 5.0+ da **array extends** — bir nechta config dan meros:
 }
 ```
 
-**npm package lar:** `@tsconfig/node20`, `@tsconfig/strictest`, `@tsconfig/recommended` — tayyor preset lar.
+**Tayyor preset npm package'lar** (`@tsconfig/*` namespace):
+- `@tsconfig/strictest` — eng qattiq strict + checking flags
+- `@tsconfig/node20`, `@tsconfig/node18`, `@tsconfig/node16` — Node version'lar
+- `@tsconfig/vite-react`, `@tsconfig/next` — framework-specific
+- `@tsconfig/recommended` — sensible default'lar
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Resolution algoritmi:**
+
+```
+tsconfig.json o'qildi
+        ↓
+extends bormi?
+   ↓ ha
+extends path resolve:
+   - "./relative.json" → relative path
+   - "@scope/preset" → node_modules
+   - "/absolute.json" → absolute path
+        ↓
+target config'ni recursive load (uning extends'i ham resolve)
+        ↓
+Bottom-up merge:
+   - Eng chuqur base avval
+   - Yuqoriga ko'tarilib har layer override
+   - Top tsconfig oxirgi g'olib
+        ↓
+Default'lar to'ldirildi
+        ↓
+Compile boshlanadi
+```
+
+**`extends` array semantics (TS 5.0+):**
+
+```json
+{ "extends": ["base-a.json", "base-b.json"] }
+```
+
+Tartib: `base-a` → `base-b` → joriy config. Conflict bo'lsa, **keyingisi g'olib**. `base-b` `base-a` ni override qiladi, joriy config `base-b` ni override qiladi.
+
+**Inheritance limitations:** `compilerOptions.paths` butunlay override qiladi (merge emas). Agar base'da `paths` bor va child'da yana qo'shmoqchi bo'lsangiz — `extends` orqali emas, qo'lda copy qilish kerak. Bu monorepo'da path alias'larni shared qilishni qiyinlashtiradi.
+
+**`tsc --showConfig`** — resolved final config'ni chiqaradi (extends'lar merge qilingan, default'lar to'ldirilgan). Debug uchun majburiy tool — extends chain qanday ishlayotganini ko'rsatadi.
+
+</details>
 
 ---
 
@@ -359,23 +887,35 @@ TS 5.0+ da **array extends** — bir nechta config dan meros:
 
 ### Nazariya
 
-Project references — monorepo da **bir nechta TS project** ni bog'lash. `composite: true` + `references` bilan har project alohida compile bo'ladi, lekin bir-biriga type-safe reference qiladi.
+Project references — yirik proyektni mustaqil compile bo'ladigan **kichik unit'larga** bo'lish mexanizmi. Har project alohida `tsconfig.json` ga ega, lekin bir-biriga type-safe `references` orqali bog'lanadi.
+
+**Asosiy foydalari:**
+1. **Incremental build** — faqat o'zgargan project'lar qayta compile bo'ladi (build cache `.tsbuildinfo` orqali)
+2. **Parallel compilation** — mustaqil project'lar parallel kompile (build tool darajasida)
+3. **Encapsulation** — har project o'z `compilerOptions`, `include`, `exclude` ga ega
+4. **Type-safe boundaries** — circular dependency'lar build vaqtida ushlanadi
+
+**`composite: true` ta'siri** (referenced project'da majburiy):
+- `declaration: true` avtomatik (`.d.ts` generate kerak — boshqa project'lar uchun)
+- `rootDir` default → `tsconfig.json` joylashgan papka (eng past umumiy yo'l emas)
+- `incremental: true` avtomatik (`.tsbuildinfo` generate)
+- Har source fayl `include`/`files` orqali aniq belgilangan bo'lishi shart (`import`'lar avto-resolve mavjud emas — boshqa fayllar root sifatida)
 
 ```json
-// packages/core/tsconfig.json
+// packages/core/tsconfig.json — referenced project
 {
   "compilerOptions": { "composite": true, "outDir": "dist", "rootDir": "src" },
   "include": ["src"]
 }
 
-// packages/server/tsconfig.json
+// packages/server/tsconfig.json — referrer
 {
   "compilerOptions": { "outDir": "dist", "rootDir": "src" },
   "references": [{ "path": "../core" }],
   "include": ["src"]
 }
 
-// Root tsconfig.json
+// Root tsconfig.json — solution-level
 {
   "files": [],
   "references": [
@@ -385,7 +925,60 @@ Project references — monorepo da **bir nechta TS project** ni bog'lash. `compo
 }
 ```
 
-`tsc --build` (yoki `tsc -b`) — dependency tartibida compile qiladi. `incremental: true` bilan faqat o'zgargan project lar qayta compile bo'ladi.
+**Build commands:**
+- `tsc --build` (yoki `tsc -b`) — dependency graph quradi, topological order'da compile
+- `tsc -b --clean` — `.tsbuildinfo` va emit fayllarni tozalaydi
+- `tsc -b --force` — incremental cache'ni ignore qilib to'liq qayta build
+- `tsc -b --watch` — fayl o'zgarishlarini kuzatib incremental rebuild
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**`.tsbuildinfo` format:**
+
+Project'ni birinchi marta build qilganda kompilator `.tsbuildinfo` fayl yaratadi (JSON):
+- Source fayllar fingerprint (modification time + content hash)
+- Output fayllar map
+- Dependency graph snapshot
+- Compile metadata
+
+Keyingi build'larda kompilator har fayl fingerprint'ni tekshiradi:
+- O'zgarmagan → skip
+- O'zgargan → qayta compile + downstream'larni invalidate
+
+```
+Build 1: barcha fayllar compile (cold)
+   ↓ .tsbuildinfo yozildi
+
+Build 2: faqat user.ts o'zgargan
+   ↓
+   Kompilator user.ts hash'ni solishtir → o'zgargan
+   user.ts qayta compile
+   user.ts ga bog'liq fayllar (downstream) topild
+   Faqat ular qayta compile (boshqalar skip)
+```
+
+**Topological build order:**
+
+```
+References graph:
+   server → core → utils
+
+tsc -b build order:
+1. utils (no dependencies)
+2. core (depends on utils, utils tugagach)
+3. server (depends on core, core tugagach)
+```
+
+Circular reference (`a → b → a`) bo'lsa, kompilator error beradi build vaqtida.
+
+**Referenced project'lar uchun emit constraint'lari:** Referenced project `composite: true` → `.d.ts` emit qiladi. Referrer project import qilganda real `.ts` source'ga emas, emitted `.d.ts` ga qaraydi. Bu encapsulation beradi: referenced internal'lar leak bo'lmaydi (`stripInternal` bilan kuchaytiriladi).
+
+**`disableSourceOfProjectReferenceRedirect`:** Default'da TS editor (VS Code) "Go to Definition" referenced project'ning real source'iga olib boradi (yaxshi DX). Bu flag'ni `true` qilsa, faqat `.d.ts` ga olib boradi (production emit bilan to'liq mos). Kamdan-kam ishlatiladi.
+
+**Performance trade-off:** Project references o'rnatish overhead beradi (config'lar ko'p). Foyda yirik monorepo'da (50+ package). Kichik proyektda single `tsconfig.json` afzal.
+
+</details>
 
 ---
 
@@ -393,7 +986,19 @@ Project references — monorepo da **bir nechta TS project** ni bog'lash. `compo
 
 ### Nazariya
 
-`typescript-eslint` — TypeScript uchun ESLint plugin. **Type-aware linting** — TypeScript ning type ma'lumotidan foydalanib, `no-floating-promises`, `no-unsafe-assignment` kabi qoidalarni enforce qiladi.
+`typescript-eslint` — TypeScript uchun ESLint plugin va parser. Klassik ESLint AST orqali ishlaydi (faqat syntax), `typescript-eslint` esa **type information** ham ishlatadi — TS compiler API orqali real type'larni o'qib qoidalar enforce qiladi.
+
+**Type-aware vs Syntax-only:**
+
+| Rule turi | Misol | Talab |
+|----------|-------|-------|
+| Syntax-only | `prefer-const`, `no-var` | Faqat AST |
+| Type-aware | `no-floating-promises`, `no-unsafe-assignment`, `no-misused-promises` | TS Program (type info) |
+
+Type-aware rule'lar yoqilsa, `parserOptions.projectService: true` (yoki eski `project: "./tsconfig.json"`) kerak. Bu lint vaqtini sezilarli oshiradi (TS Program quriladi), lekin kuchli rule'lar beradi:
+- **`no-floating-promises`** — handle qilinmagan Promise (await/`.then`/`.catch` yo'q) → error
+- **`no-misused-promises`** — `if (asyncFn())` yoki `void` callback'da Promise ishlatish → error
+- **`no-unsafe-assignment`** — `any` qiymatni typed variable'ga assignment → error
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -526,14 +1131,15 @@ class Child extends Base { x = 2; }
 // Bu accessor override va inheritance da farq qiladi
 ```
 
-### 4. `composite: true` — `declaration: true` va `rootDir` majburiy
+### 4. `composite: true` — `declaration` avtomatik, `rootDir` inferred
 
 ```json
-// ❌ — composite siz declaration emit yo'q
 { "compilerOptions": { "composite": true } }
-// composite avtomatik declaration: true talab qiladi
-// Agar rootDir belgilanmagan bo'lsa — tsconfig.json papkasi rootDir bo'ladi
+// composite: true → declaration: true avtomatik yoqiladi (explicit yozish shart emas)
+// rootDir berilmasa → tsconfig.json papkasi (yoki include'dan eng past umumiy yo'l) inferred
 ```
+
+`composite` boshqa qiymatlarga ham ta'sir qiladi: `incremental: true` (avtomatik), `noEmitOnError` qattiqroq xulq, `tsBuildInfoFile` yo'lining default joyi.
 
 ### 5. `verbatimModuleSyntax` CJS da import syntax ni cheklaydi
 
@@ -589,15 +1195,25 @@ export const enum Color { Red, Green } // TS OK, esbuild CRASH!
 // FIX: isolatedModules: true
 ```
 
-### ❌ Xato 5: `target` va `lib` ni aralashtirish
+### ❌ Xato 5: `paths` alias bundler/runtime sozlamasiz
 
 ```json
-// ❌ — target ES5 lekin lib default (ES5) — Promise type yo'q
-{ "target": "ES5" }
+// ❌ — tsconfig'da paths, lekin runtime'da resolve qilolmaydi
+{ "compilerOptions": { "paths": { "@/*": ["src/*"] } } }
+```
 
-// ✅ — lib alohida belgilash
-{ "target": "ES5", "lib": ["ES2015", "DOM"] }
-// Syntax ES5, lekin Promise, Map type lari mavjud (polyfill bilan)
+```typescript
+// src/app.ts — tsc type-check ✅, lekin Node.js da:
+import { x } from "@/utils";
+// Runtime: Error: Cannot find module '@/utils'
+```
+
+```typescript
+// ✅ — bundler tomonida parallel alias
+// vite.config.ts
+export default { resolve: { alias: { "@": "/src" } } };
+
+// Yoki Node.js'da tsc-alias / tsconfig-paths bilan path rewrite
 ```
 
 ---
