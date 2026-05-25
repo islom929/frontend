@@ -33,7 +33,7 @@
 **Muammo — sibling'lar mustaqil state:**
 
 ```tsx
-// ❌ Ikki Counter mustaqil state — sinxronizatsiya yo'q
+// ❌ Ikki Counter mustaqil state — sync yo'q
 function App() {
   return (
     <>
@@ -145,7 +145,7 @@ function InputField() {
 }
 ```
 
-**Pravillo:** State'ni **eng pastdagi joyda** saqlash — agar yuqoriga lift qilish shart bo'lmasa.
+**Qoida:** State'ni **eng pastdagi joyda** saqlash — agar yuqoriga lift qilish shart bo'lmasa.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -408,13 +408,13 @@ function ResetButton({ onReset }: { onReset: () => void }) {
 
 ### Nazariya
 
-**Single source of truth** — bir piece of state **bitta joyda** saqlanishi kerak. Duplicate state — sinxronizatsiya muammosi va inevitable inconsistency manbai.
+**Single source of truth** — bir piece of state **bitta joyda** saqlanishi kerak. Duplicate state — sync muammosi va inevitable inconsistency manbai.
 
 **Anti-pattern — duplicated state:**
 
 ```tsx
-// ❌ Ikki source — sinxronizatsiya kerak
-function BadComponent({ user }: { user: User }) {
+// ❌ Ikki source — sync kerak
+function UserNameInputDuplicated({ user }: { user: User }) {
   const [name, setName] = useState(user.name);
   // Endi ikki source: user.name (props) va name (state)
   
@@ -432,7 +432,7 @@ function BadComponent({ user }: { user: User }) {
 
 ```tsx
 // ✅ Bir source — props (parent owns)
-function GoodComponent({ user, onUserUpdate }: { user: User; onUserUpdate: (u: User) => void }) {
+function UserNameInput({ user, onUserUpdate }: { user: User; onUserUpdate: (u: User) => void }) {
   return (
     <input
       value={user.name}
@@ -507,11 +507,11 @@ function ExpensiveDerivation({ items }: { items: Item[] }) {
 
 1. **Initial value bilan reset:** `key` prop trick afzal (cross-ref [`08-list-rendering.md`](08-list-rendering.md))
 2. **Server'dan kelgan data uchun fetched state:** Lekin bu props emas, `useEffect` ichida fetch
-3. **External system bilan sinxronizatsiya:** `useSyncExternalStore` (cross-ref [`22-concurrent-hooks.md`](22-concurrent-hooks.md))
+3. **External system bilan sync:** `useSyncExternalStore` (cross-ref [`22-concurrent-hooks.md`](22-concurrent-hooks.md))
 
 ```tsx
 // ❌ Anti-pattern — props sync to state
-function BadCard({ user }: { user: User }) {
+function UserCardEffectSync({ user }: { user: User }) {
   const [name, setName] = useState(user.name);
   
   useEffect(() => {
@@ -544,13 +544,13 @@ Parent updates state
 Child re-renders
 ```
 
-State ikki joyda bo'lsa — bu cycle buziladi: ikki state independently update qilinadi, sinxronizatsiya kerak (effect'lar bilan, manual logic).
+State ikki joyda bo'lsa — bu cycle buziladi: ikki state independently update qilinadi, sync kerak (effect'lar bilan, manual logic).
 
 **Effect-based sync — cycle danger:**
 
 ```tsx
 // ❌ Cycle xavfli pattern
-function BadComponent({ value }: { value: number }) {
+function MirroredCounterCycle({ value }: { value: number }) {
   const [localValue, setLocalValue] = useState(value);
   
   useEffect(() => {
@@ -2187,19 +2187,19 @@ Yoki nullable handling:
 
 ```tsx
 // ❌ defaultValue keyingi render'larda ignore
-function Bad({ initial }: { initial: string }) {
+function StaleDefaultInput({ initial }: { initial: string }) {
   return <input defaultValue={initial} />;
   // initial o'zgarsa, input value o'zgarmaydi
 }
 
 // ✅ key trick — yangi mount, fresh defaultValue
-function Good({ initial }: { initial: string }) {
+function ResettableDefaultInput({ initial }: { initial: string }) {
   return <input key={initial} defaultValue={initial} />;
   // initial o'zgarsa — input unmount/mount, fresh
 }
 
 // ✅✅ Controlled — eng oddiy
-function Better({ initial }: { initial: string }) {
+function ControlledInput({ initial }: { initial: string }) {
   const [value, setValue] = useState(initial);
   
   return (
@@ -3940,7 +3940,7 @@ const [value, setValue] = useState<string | undefined>(undefined);
 ### Gotcha 2: `defaultValue` Keyingi Render'larda Ignore
 
 ```tsx
-function Bad({ initial }: { initial: string }) {
+function StaleDefaultInput({ initial }: { initial: string }) {
   return <input defaultValue={initial} />;
   // initial o'zgarsa, input o'zgarmaydi
 }
@@ -4014,17 +4014,17 @@ Form ichidagi `<button>` default `type="submit"`. Cancel/non-submit button'larda
 
 ```tsx
 // ❌ Anti-pattern
-function BadCard({ user }: { user: User }) {
+function UserCardEffectSync({ user }: { user: User }) {
   const [name, setName] = useState(user.name);
   
   useEffect(() => {
     setName(user.name);
   }, [user.name]);
-  // user.name o'zgarganda state sync — sinxronizatsiya cycle danger
+  // user.name o'zgarganda state sync — sync cycle danger
 }
 
 // ✅ Yechim 1: derive
-function GoodCard({ user }: { user: User }) {
+function UserCard({ user }: { user: User }) {
   return <h3>{user.name}</h3>;
 }
 

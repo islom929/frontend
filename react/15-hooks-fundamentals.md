@@ -410,7 +410,7 @@ function Counter() {
 }
 
 // ❌ XATO — conditional
-function BadCounter({ enabled }: { enabled: boolean }) {
+function ConditionalCounterBroken({ enabled }: { enabled: boolean }) {
   if (enabled) {
     const [count, setCount] = useState(0);  // ❌ Conditional
   }
@@ -419,14 +419,14 @@ function BadCounter({ enabled }: { enabled: boolean }) {
 }
 
 // ❌ XATO — loop
-function BadList({ items }: { items: Item[] }) {
+function ItemLoopBroken({ items }: { items: Item[] }) {
   for (const item of items) {
     const [open, setOpen] = useState(false);  // ❌ Loop
   }
 }
 
 // ❌ XATO — early return'dan keyin
-function BadComponent({ data }: { data: Data | null }) {
+function EarlyReturnBroken({ data }: { data: Data | null }) {
   if (!data) return null;
   
   const [count, setCount] = useState(0);  // ❌ Early return'dan keyin
@@ -434,7 +434,7 @@ function BadComponent({ data }: { data: Data | null }) {
 }
 
 // ❌ XATO — nested function
-function BadHandler() {
+function NestedHandlerBroken() {
   const handleClick = () => {
     const [count, setCount] = useState(0);  // ❌ Nested function
   };
@@ -492,7 +492,7 @@ React'ning runtime check'i:
 - "Rendered fewer hooks than during the previous render" — hook count past
 - "Rendered more hooks than during the previous render" — hook count yuqori
 
-**Qoida tegishli kontekst:**
+**Qoida tegishli context:**
 
 ```tsx
 // Hook chaqirilishi mumkin:
@@ -619,7 +619,7 @@ Strict Mode'da component 2 marta render qilinadi (cross-ref [`02-rendering.md`](
 Top-level only:
 
 ```tsx
-function GoodComponent({ userId }: { userId: number | null }) {
+function UserFetchPanel({ userId }: { userId: number | null }) {
   // ✅ Top-level — har doim chaqiriladi
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -653,7 +653,7 @@ Anti-pattern — early return then hook:
 
 ```tsx
 // ❌ Conditional hook
-function BadComponent({ data }: { data: Data | null }) {
+function TabsEarlyReturnBroken({ data }: { data: Data | null }) {
   if (!data) return <p>No data</p>;  // Early return
   
   const [count, setCount] = useState(0);  // ❌ Conditional hook
@@ -661,7 +661,7 @@ function BadComponent({ data }: { data: Data | null }) {
 }
 
 // ✅ Hooks first, conditional return after
-function GoodComponent({ data }: { data: Data | null }) {
+function TabsPanel({ data }: { data: Data | null }) {
   const [count, setCount] = useState(0);  // ✅ Top-level
   
   if (!data) return <p>No data</p>;
@@ -673,7 +673,7 @@ Anti-pattern — loop:
 
 ```tsx
 // ❌ Loop
-function BadList({ items }: { items: Item[] }) {
+function InlineItemListBroken({ items }: { items: Item[] }) {
   return (
     <ul>
       {items.map((item) => {
@@ -690,7 +690,7 @@ function ItemRow({ item }: { item: Item }) {
   return <li>...</li>;
 }
 
-function GoodList({ items }: { items: Item[] }) {
+function SplitItemList({ items }: { items: Item[] }) {
   return (
     <ul>
       {items.map((item) => (
@@ -1025,7 +1025,7 @@ function ChainDemo() {
 
 ### Nazariya
 
-React **hook nomini bilmaydi** — faqat **chaqiruv tartibi**ga qarab indekslashtiradi. Bu — Hooks'ning fundamental implementatsiya choice'i.
+React **hook nomini bilmaydi** — faqat **chaqiruv tartibi**ga qarab indekslashtiradi. Bu — Hooks'ning fundamental implementation choice'i.
 
 ```tsx
 function Component() {
@@ -1204,7 +1204,7 @@ Named hooks — qo'shimcha overhead (Map lookup), conflict (har komponent uchun 
 Tartib stable — to'g'ri pattern:
 
 ```tsx
-function GoodComponent({ enabled, data }: { enabled: boolean; data: Data | null }) {
+function StableHooksPanel({ enabled, data }: { enabled: boolean; data: Data | null }) {
   // Har render — har hook chaqiriladi (har xil tartibda EMAS)
   const [count, setCount] = useState(0);
   const [name, setName] = useState('');
@@ -1232,7 +1232,7 @@ Conditional hook — anti-pattern + fix:
 
 ```tsx
 // ❌ Anti-pattern
-function BadComponent({ feature }: { feature: 'A' | 'B' }) {
+function FeatureRouteBroken({ feature }: { feature: 'A' | 'B' }) {
   if (feature === 'A') {
     const [a] = useState(0);  // ❌ hook[0] only when feature='A'
   }
@@ -1240,7 +1240,7 @@ function BadComponent({ feature }: { feature: 'A' | 'B' }) {
 }
 
 // ✅ Fix — har doim har hook
-function GoodComponent({ feature }: { feature: 'A' | 'B' }) {
+function FeatureRoute({ feature }: { feature: 'A' | 'B' }) {
   const [a] = useState(0);  // hook[0] — har doim
   const [b] = useState(0);  // hook[1] — har doim
   
@@ -1282,7 +1282,7 @@ Component split — hook scope:
 
 ```tsx
 // ❌ Loop ichida hook
-function BadList({ items }: { items: Item[] }) {
+function MapHookListBroken({ items }: { items: Item[] }) {
   return (
     <ul>
       {items.map((item) => {
@@ -1294,7 +1294,7 @@ function BadList({ items }: { items: Item[] }) {
 }
 
 // ✅ Per-item Component
-function ItemRow({ item }: { item: Item }) {
+function CollapsibleRow({ item }: { item: Item }) {
   const [open, setOpen] = useState(false);  // ✅ Top-level
   return (
     <li>
@@ -1306,11 +1306,11 @@ function ItemRow({ item }: { item: Item }) {
   );
 }
 
-function GoodList({ items }: { items: Item[] }) {
+function MapItemList({ items }: { items: Item[] }) {
   return (
     <ul>
       {items.map((item) => (
-        <ItemRow key={item.id} item={item} />
+        <CollapsibleRow key={item.id} item={item} />
       ))}
     </ul>
   );
@@ -1327,7 +1327,7 @@ Har `<ItemRow>` — alohida Fiber. Har Fiber — alohida hooks linked list. `use
 
 ### Nazariya
 
-Hooks ikki implementatsiyaga ega: **Mount** (birinchi render) va **Update** (keyingi render'lar). React render boshida qaysi'ni ishlatish kerakligini aniqlaydi.
+Hooks ikki implementation'ga ega: **Mount** (birinchi render) va **Update** (keyingi render'lar). React render boshida qaysi'ni ishlatish kerakligini aniqlaydi.
 
 **Mount path — birinchi render:**
 
@@ -2065,8 +2065,8 @@ Bir-biriga ulanadigan oddiy linked list. Har hook chaqiruvi — bir node.
 ```ts
 function mountEffect(create: () => () => void, deps: any[] | null): void {
   return mountEffectImpl(
-    PassiveEffect | PassiveStaticEffect,  // Effect flags
-    HookPassive,                           // Hook tag
+    Passive | PassiveStatic,  // Fiber flags (ReactFiberFlags.js exports)
+    HookPassive,              // Hook tag (ReactHookEffectTags.js)
     create,
     deps
   );
@@ -2485,7 +2485,7 @@ function BailoutDemo() {
   console.log('Render', count);
   
   return (
-    <Stack gap={4}>
+    <div>
       <button onClick={() => setCount(0)}>setCount(0)</button>
       {/* Eager bailout — render bo'lmaydi (Object.is(0, 0) === true) */}
       
@@ -2494,7 +2494,7 @@ function BailoutDemo() {
       
       <button onClick={() => setCount(c => c + 1)}>setCount(c => c + 1)</button>
       {/* Render trigger */}
-    </Stack>
+    </div>
   );
 }
 
@@ -2535,7 +2535,7 @@ Conditional hook chaqiruv — **silent bug** manbai. React positional indexing'd
 **Misol — anti-pattern:**
 
 ```tsx
-function Bad({ feature }: { feature: 'A' | 'B' }) {
+function FeatureSwitchBroken({ feature }: { feature: 'A' | 'B' }) {
   if (feature === 'A') {
     const [a, setA] = useState(0);  // hook[0] — only when feature='A'
   }
@@ -2561,7 +2561,7 @@ useState(0) → hook[0]  // React: bu a edi! Lekin endi b ishlatadi
 **Yana misol — silent state corruption:**
 
 ```tsx
-function MyComponent({ adminMode }: { adminMode: boolean }) {
+function AdminLoggerBroken({ adminMode }: { adminMode: boolean }) {
   if (adminMode) {
     useEffect(() => {
       console.log('Admin mounted');
@@ -2581,7 +2581,7 @@ function MyComponent({ adminMode }: { adminMode: boolean }) {
 **To'g'ri yondashuv — har doim har hook:**
 
 ```tsx
-function Good({ feature }: { feature: 'A' | 'B' }) {
+function FeatureSwitch({ feature }: { feature: 'A' | 'B' }) {
   const [a, setA] = useState(0);  // Always
   const [b, setB] = useState(0);  // Always
   
@@ -2675,7 +2675,7 @@ function renderWithHooks(...) {
 
 Aniq farqlash — **fewer** vs **more**:
 
-- **Fewer:** Hook conditional skip → keyingi hook'lar pozitsiyaga ko'chadi → React detect
+- **Fewer:** Hook conditional skip → keyingi hook'lar position'ga ko'chadi → React detect
 - **More:** Hook conditional add → mavjud hook list'dan keyin yangi → React detect
 
 **`updateWorkInProgressHook` — null check:**
@@ -2727,7 +2727,7 @@ if (__DEV__) {
 }
 ```
 
-Lekin production'da — type check yo'q (performance). Silent bug.
+Production'da hook **type** check yo'q (faqat dev mode'da `mountHookTypesDev` array tracks qiladi). Hook **count** check production'da ham ishlaydi va throw beradi. Lekin type swap (e.g., `useState` ↔ `useEffect` bir xil index'da, count o'zgarmasa) — production'da silent bug bo'lib qoladi.
 
 **ESLint plugin — static check:**
 
@@ -2762,14 +2762,14 @@ Anti-pattern + fix examples:
 
 ```tsx
 // ❌ 1. Conditional in if
-function Bad1({ enabled }: { enabled: boolean }) {
+function TogglePanelBroken({ enabled }: { enabled: boolean }) {
   if (enabled) {
     const [count] = useState(0);  // ❌
   }
 }
 
 // ✅ 1. Hook always, logic conditional
-function Good1({ enabled }: { enabled: boolean }) {
+function TogglePanel({ enabled }: { enabled: boolean }) {
   const [count, setCount] = useState(0);  // ✅
   
   // Conditional logic
@@ -2777,21 +2777,21 @@ function Good1({ enabled }: { enabled: boolean }) {
 }
 
 // ❌ 2. Early return then hook
-function Bad2({ user }: { user: User | null }) {
+function UserTabsEarlyReturn({ user }: { user: User | null }) {
   if (!user) return null;
   const [tab, setTab] = useState('overview');  // ❌
 }
 
 // ✅ 2. Hook before return
-function Good2({ user }: { user: User | null }) {
+function UserTabs({ user }: { user: User | null }) {
   const [tab, setTab] = useState('overview');  // ✅
   
   if (!user) return null;
-  return <Tabs value={tab} onChange={setTab} />;
+  return <div role="tablist" data-active={tab}>{/* tabs */}</div>;
 }
 
 // ❌ 3. Loop
-function Bad3({ items }: { items: Item[] }) {
+function ProductListBroken({ items }: { items: Item[] }) {
   return (
     <ul>
       {items.map((item) => {
@@ -2803,27 +2803,27 @@ function Bad3({ items }: { items: Item[] }) {
 }
 
 // ✅ 3. Per-item Component
-function Item({ item }: { item: Item }) {
+function ProductRow({ item }: { item: Item }) {
   const [open, setOpen] = useState(false);  // ✅
   return <li>...</li>;
 }
-function Good3({ items }: { items: Item[] }) {
+function ProductList({ items }: { items: Item[] }) {
   return (
     <ul>
-      {items.map((item) => <Item key={item.id} item={item} />)}
+      {items.map((item) => <ProductRow key={item.id} item={item} />)}
     </ul>
   );
 }
 
 // ❌ 4. Try-catch wrap
-function Bad4() {
+function CounterTryCatchBroken() {
   try {
     const [count] = useState(0);  // ❌ try-catch — conditional implicit
   } catch (e) {}
 }
 
 // ✅ 4. Hook outside try-catch
-function Good4() {
+function Counter() {
   const [count] = useState(0);  // ✅
   
   // Try-catch other logic
@@ -2838,7 +2838,7 @@ Component split — feature toggle:
 ```tsx
 type FeatureFlag = 'A' | 'B';
 
-function Bad({ feature }: { feature: FeatureFlag }) {
+function ToggleScreenBroken({ feature }: { feature: FeatureFlag }) {
   if (feature === 'A') {
     const [aData] = useState<A | null>(null);
     useEffect(() => { fetchA(); }, []);
@@ -2850,7 +2850,7 @@ function Bad({ feature }: { feature: FeatureFlag }) {
   // ❌ Hooks conditional — undefined behavior
 }
 
-function Good({ feature }: { feature: FeatureFlag }) {
+function ToggleScreen({ feature }: { feature: FeatureFlag }) {
   return feature === 'A' ? <FeatureA /> : <FeatureB />;
 }
 
@@ -2897,14 +2897,14 @@ function App() {
   const { count, increment, decrement, reset } = useCounter(0);
   
   return (
-    <Stack gap={4}>
+    <div>
       <p>{count}</p>
-      <Inline gap={4}>
+      <div>
         <button onClick={increment}>+</button>
         <button onClick={decrement}>-</button>
         <button onClick={reset}>Reset</button>
-      </Inline>
-    </Stack>
+      </div>
+    </div>
   );
 }
 ```
@@ -3095,7 +3095,7 @@ function useCounter() {
   
   // increment — closure ichida count'ni capture qiladi
   const increment = () => setCount(count + 1);
-  // ⚠️ count snapshot — async kontekstda stale (cross-ref 12)
+  // ⚠️ count snapshot — async context'da stale (cross-ref 12)
   
   // Functional update — safe
   const incrementSafe = () => setCount((c) => c + 1);
@@ -3147,10 +3147,10 @@ function App() {
   const [open, toggleOpen] = useToggle();
   
   return (
-    <Stack gap={4}>
+    <div>
       <button onClick={toggleOpen}>{open ? 'Close' : 'Open'}</button>
       {open && <p>Content</p>}
-    </Stack>
+    </div>
   );
 }
 ```
@@ -3261,10 +3261,10 @@ function App() {
         Theme: {theme}
       </button>
       {user && (
-        <Inline gap={4}>
+        <div>
           <span>Logged in as {user.name}</span>
           <button onClick={removeUser}>Logout</button>
-        </Inline>
+        </div>
       )}
     </div>
   );
@@ -3360,11 +3360,11 @@ function useAuthenticatedFetch<T>(url: string): FetchState<T> {
   return useFetch<T>(user ? url : '');
 }
 
-function MyDashboard() {
+function DashboardPage() {
   const { user, logout } = useAuth();
-  const { data, loading } = useAuthenticatedFetch<Dashboard>('/api/dashboard');
+  const { data, loading } = useAuthenticatedFetch<DashboardData>('/api/dashboard');
   
-  if (!user) return <LoginPrompt />;
+  if (!user) return <p>Please log in</p>;
   if (loading) return <p>Loading...</p>;
   
   return (
@@ -3373,7 +3373,7 @@ function MyDashboard() {
         Welcome, {user.name}
         <button onClick={logout}>Logout</button>
       </header>
-      <Dashboard data={data} />
+      <pre>{JSON.stringify(data, null, 2)}</pre>
     </div>
   );
 }
@@ -3578,12 +3578,12 @@ function ManualFetch() {
   );
   
   return (
-    <Stack gap={4}>
+    <div>
       <button onClick={() => execute()} disabled={loading}>
         {loading ? 'Loading...' : 'Fetch'}
       </button>
       {data && <pre>{JSON.stringify(data)}</pre>}
-    </Stack>
+    </div>
   );
 }
 ```
@@ -3731,14 +3731,14 @@ class MyClass {
 **`exhaustive-deps` topadigan xatolar:**
 
 ```tsx
-function Bad({ userId }: { userId: number }) {
+function UserLoaderStale({ userId }: { userId: number }) {
   useEffect(() => {
     fetch(`/api/users/${userId}`);  // userId ishlatiladi
   }, []);  // ← ESLint warning: missing dependency 'userId'
 }
 
 // Fix: Add userId to deps
-function Good({ userId }: { userId: number }) {
+function UserLoader({ userId }: { userId: number }) {
   useEffect(() => {
     fetch(`/api/users/${userId}`);
   }, [userId]);  // ✅
@@ -3755,7 +3755,7 @@ eslint --fix src/
 
 `exhaustive-deps` — missing dep'larni avtomatik qo'sha oladi. Lekin **ehtiyot bo'ling** — ba'zi case'larda manual control kerak.
 
-**Disable rule (kam ishlatish):**
+**Disable rule (kamdan-kam ishlatish):**
 
 ```tsx
 // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3781,9 +3781,9 @@ function myHelper() {
   useState(0);  // ← ESLint error
 }
 
-// ⚠️ ESLint tekshira olmaydi (lowercase)
+// ⚠️ ESLint regular function deb biladi (use<lowercase> — hook emas)
 function usable() {
-  useState(0);  // ← ESLint warning yo'q (lekin runtime error)
+  useState(0);  // ❌ ESLint: "called in function 'usable' which is neither a React component nor a custom Hook"
 }
 ```
 
@@ -3896,8 +3896,8 @@ function isStable(variable) {
 
 `eslint-plugin-react-hooks` — React komandasi ishlab chiqaradi. R18, R19 yangi hook'lar bilan plugin yangilanadi:
 
-- R18: `useTransition`, `useId`, `useSyncExternalStore` deps tekshiruvi
-- R19: `use()` (Promise unwrap) — deps yo'q (one-shot)
+- **R18:** yangi hook'lar (`useTransition`, `useDeferredValue`, `useId`, `useSyncExternalStore`, `useInsertionEffect`) plugin tomonidan hook deb tanildi. `useSyncExternalStore`'ning `subscribe`/`getSnapshot` argument'lari deps-like — stale reference muammosi flag qilinadi.
+- **R19:** `use()` hook — Rules of Hooks uchun **istisno** (conditional/loop ichida chaqirilishi mumkin, Promise yoki Context unwrap qiladi). Plugin uni hisobga oladi va boshqa hook'lardek strict tekshirmaydi.
 
 </details>
 
@@ -3936,27 +3936,27 @@ Common fix scenarios:
 
 ```tsx
 // 1. Missing dep
-function Bad({ id }: { id: number }) {
+function ResourceFetcherStale({ id }: { id: number }) {
   useEffect(() => {
     fetch(`/api/${id}`);
   }, []);  // ⚠️ Warning: missing 'id'
 }
 
-function Good({ id }: { id: number }) {
+function ResourceFetcher({ id }: { id: number }) {
   useEffect(() => {
     fetch(`/api/${id}`);
   }, [id]);  // ✅
 }
 
 // 2. Function dep — useCallback
-function Bad({ items }: { items: Item[] }) {
+function FilteredItemListBroken({ items }: { items: Item[] }) {
   const filter = (item: Item) => item.active;  // Har render yangi
   
   const filtered = useMemo(() => items.filter(filter), [items, filter]);
   // ⚠️ filter har render yangi → useMemo bailout buziladi
 }
 
-function Good({ items }: { items: Item[] }) {
+function FilteredItemList({ items }: { items: Item[] }) {
   const filter = useCallback((item: Item) => item.active, []);
   
   const filtered = useMemo(() => items.filter(filter), [items, filter]);
@@ -3964,7 +3964,7 @@ function Good({ items }: { items: Item[] }) {
 }
 
 // 3. Stable refs — deps'ga kiritmaslik
-function Stable() {
+function StableRefsCounter() {
   const ref = useRef(0);
   const [count, setCount] = useState(0);
   
@@ -4025,7 +4025,7 @@ Hook'lar faqat function declaration/expression sifatida e'lon qilingan komponent
 ### Gotcha 2: Conditional Effect Dependency
 
 ```tsx
-function Bad({ enabled, data }: { enabled: boolean; data: Data | null }) {
+function DataObserverBroken({ enabled, data }: { enabled: boolean; data: Data | null }) {
   if (enabled) {
     useEffect(() => {
       // ❌ Conditional hook
@@ -4034,7 +4034,7 @@ function Bad({ enabled, data }: { enabled: boolean; data: Data | null }) {
 }
 
 // ✅ Effect har doim, conditional logic ichida
-function Good({ enabled, data }: { enabled: boolean; data: Data | null }) {
+function DataObserver({ enabled, data }: { enabled: boolean; data: Data | null }) {
   useEffect(() => {
     if (!enabled) return;
     // ✅ Logic conditional
@@ -4065,7 +4065,7 @@ function useData() {
 ### Gotcha 4: Hook Order Change Within Component
 
 ```tsx
-function Bad({ adminMode }: { adminMode: boolean }) {
+function AdminWidgetBroken({ adminMode }: { adminMode: boolean }) {
   if (adminMode) {
     useEffect(...);  // hook[0] only adminMode=true
   }
@@ -4073,7 +4073,7 @@ function Bad({ adminMode }: { adminMode: boolean }) {
 }
 ```
 
-Hook count va type har render bir xil bo'lishi shart. `useState(0)` har xil pozitsiyada — eski state corrupt.
+Hook count va type har render bir xil bo'lishi shart. `useState(0)` har xil position'da — eski state corrupt.
 
 ---
 
@@ -4200,12 +4200,12 @@ function Demo() {
   const [open, toggleOpen, setOpen] = useToggle();
   
   return (
-    <Stack gap={4}>
+    <div>
       <button onClick={toggleOpen}>{open ? 'Close' : 'Open'}</button>
       <button onClick={() => setOpen(true)}>Force Open</button>
       <button onClick={() => setOpen(false)}>Force Close</button>
       {open && <p>Content</p>}
-    </Stack>
+    </div>
   );
 }
 ```
@@ -4242,10 +4242,10 @@ function Counter() {
   const prev = usePrevious(count);
   
   return (
-    <Stack gap={4}>
+    <div>
       <p>Now: {count}, Was: {prev ?? 'first render'}</p>
       <button onClick={() => setCount(c => c + 1)}>+</button>
-    </Stack>
+    </div>
   );
 }
 ```
@@ -4300,7 +4300,7 @@ function SearchPage() {
   }, [debouncedQuery]);
   
   return (
-    <Stack gap={8}>
+    <div>
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -4310,7 +4310,7 @@ function SearchPage() {
       <ul>
         {results.map((r) => <li key={r.id}>{r.title}</li>)}
       </ul>
-    </Stack>
+    </div>
   );
 }
 ```
@@ -4575,8 +4575,8 @@ function FeatureView({ feature, userId }: { feature: 'A' | 'B'; userId: number }
 - `react-hooks/exhaustive-deps` — useEffect/useMemo/useCallback deps array
 - `use<Uppercase>` convention — plugin static analysis
 
-Keyingi bo'limda useEffect deep dive: "lifecycle hook EMAS, sinxronizatsiya" mental model, side effects, dependency array, cleanup, timing (Commit'dan keyin), Strict Mode 2x effect cycle, race conditions (AbortController), va "You Might Not Need an Effect" anti-patterns.
+Keyingi bo'limda useEffect deep dive: "lifecycle hook EMAS, sync mexanizmi" mental model, side effects, dependency array, cleanup, timing (Commit'dan keyin), Strict Mode 2x effect cycle, race conditions (AbortController), va "You Might Not Need an Effect" anti-patterns.
 
 ---
 
-**Keyingi bo'lim:** [16-useeffect.md](16-useeffect.md) — useEffect deep dive: **lifecycle hook EMAS — sinxronizatsiya mexanizmi** (MAJBURIY first section, React docs philosophy), side effects tushunchasi, dependency array (`[]`/`[deps]`/no array), cleanup (return function), timing (Commit'dan keyin, browser paint dan keyin), effect ordering (child before parent), pitfalls (infinite loop, missing deps, object/array referential, race conditions AbortController), Strict Mode 2x effect cycle (R18+ — sinxronizatsiya invariant'i), "You Might Not Need an Effect" anti-patterns (Dan Abramov post — sinxronizatsiya modelidan kelib chiqadi), Under the Hood (passive flag, effect list, cleanup chain).
+**Keyingi bo'lim:** [16-useeffect.md](16-useeffect.md) — useEffect deep dive: **lifecycle hook EMAS — sync mexanizmi** (MAJBURIY first section, React docs philosophy), side effects tushunchasi, dependency array (`[]`/`[deps]`/no array), cleanup (return function), timing (Commit'dan keyin, browser paint dan keyin), effect ordering (child before parent), pitfalls (infinite loop, missing deps, object/array referential, race conditions AbortController), Strict Mode 2x effect cycle (R18+ — sync invariant'i), "You Might Not Need an Effect" anti-patterns (Dan Abramov post — sync modelidan kelib chiqadi), Under the Hood (passive flag, effect list, cleanup chain).

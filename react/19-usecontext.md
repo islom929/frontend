@@ -32,7 +32,7 @@
 
 ### Nazariya
 
-Prop drilling — props'ni komponent ierarxiyasi bo'ylab uzun zanjir orqali pastga uzatish. Har oraliq komponent props'ni qabul qiladi va to'g'ridan-to'g'ri keyingi child'ga uzatadi, lekin o'zi ishlatmaydi. Bu — React'ning bir tomonlama data flow modelining tabiiy oqibati (cross-ref [`10-props.md`](10-props.md)).
+Prop drilling — props'ni komponent hierarchy'si bo'ylab uzun zanjir orqali pastga uzatish. Har oraliq komponent props'ni qabul qiladi va to'g'ridan-to'g'ri keyingi child'ga uzatadi, lekin o'zi ishlatmaydi. Bu — React'ning bir tomonlama data flow modelining tabiiy oqibati (cross-ref [`10-props.md`](10-props.md)).
 
 **Misol — 4 darajali drilling:**
 
@@ -413,15 +413,16 @@ type ReactContext<T> = {
   _currentValue: T,        // Default value (mutated har Provider'da)
   _currentValue2: T,       // SSR / secondary renderer
   _threadCount: number,
-  Provider: ReactProviderType<T>,
-  Consumer: ReactConsumerType<T>,
+  Provider: ReactContext<T>,   // R19: context.Provider = context (Context o'zi Provider)
+  Consumer: ReactContext<T>,   // R19: ham bir xil reference
   displayName?: string,
 };
 
-type ReactProviderType<T> = {
-  $$typeof: REACT_PROVIDER_TYPE,
-  _context: ReactContext<T>,
-};
+// R18 va undan oldin alohida ReactProviderType mavjud edi:
+//   { $$typeof: REACT_PROVIDER_TYPE, _context: ReactContext<T> }
+// R19'da `REACT_PROVIDER_TYPE` symbol olib tashlandi — Provider Fiber type endi
+// Context'ning o'zi (ReactContext). `<Context.Provider>` legacy syntax hali ishlaydi,
+// chunki `context.Provider = context` assignment orqali backward compat saqlangan.
 ```
 
 `_currentValue` — Provider tomonidan render paytida mutate qilinadi. Render paytida `useContext` shu mutated value'ni o'qiydi. Render tugagandan keyin (Commit Phase'da) `_currentValue` avvalgi qiymatga qaytariladi (stack pop semantic).
@@ -1292,23 +1293,22 @@ Object default — bir marta yaratiladi (`createContext` chaqirilganda). Lekin s
 **Default value semantikasi:**
 
 ```ts
-// createContext implementation (soddalashtirilgan)
+// createContext implementation (R19, soddalashtirilgan)
 function createContext<T>(defaultValue: T) {
   const context = {
     $$typeof: REACT_CONTEXT_TYPE,
     _currentValue: defaultValue,  // Default
     _currentValue2: defaultValue,  // SSR
     _threadCount: 0,
-    Provider: null,
-    Consumer: null,
+    Provider: null as any,
+    Consumer: null as any,
   };
   
-  context.Provider = {
-    $$typeof: REACT_PROVIDER_TYPE,
-    _context: context,
-  };
+  // R19: Context o'zi Provider sifatida ishlaydi
+  context.Provider = context;
+  // R18 va undan oldin: alohida Provider obyekt ({$$typeof: REACT_PROVIDER_TYPE, _context})
   
-  context.Consumer = context;  // Legacy
+  context.Consumer = context;  // Legacy Consumer ham bir xil
   
   return context;
 }
@@ -1801,8 +1801,11 @@ function App() {
 R19'da ikkala variant ishlaydi. Yangi kod uchun shorthand tavsiya. Mavjud kodlarda `<Context.Provider>` o'zgartirish shart emas (codemod mavjud, ixtiyoriy).
 
 ```bash
-# Codemod
-npx @react/codemod context-as-provider ./src
+# R19 migration recipe (barcha codemod'lar)
+npx codemod@latest react/19/migration-recipe
+
+# Yoki specific codemod (faqat <Context.Provider> → <Context>):
+npx codemod@latest react/19/replace-context-provider
 ```
 
 **TypeScript types:**
@@ -1857,10 +1860,9 @@ R19 React internal'da `ThemeContext` (Context obyekt) `$$typeof: REACT_CONTEXT_T
 // React internal R19 (soddalashtirilgan)
 function reconcileChildren(...) {
   if (element.type.$$typeof === REACT_CONTEXT_TYPE) {
-    // Direct Context usage — Provider sifatida ishlash
-    return reconcileContextProvider(element);
-  } else if (element.type.$$typeof === REACT_PROVIDER_TYPE) {
-    // Legacy <Context.Provider>
+    // R19: Context o'zi Provider sifatida ishlaydi.
+    // `<MyContext value>` va `<MyContext.Provider value>` ikkalasi shu yo'lga tushadi,
+    // chunki context.Provider = context (REACT_PROVIDER_TYPE symbol R19'da olib tashlangan).
     return reconcileContextProvider(element);
   }
   // ...
@@ -1971,7 +1973,7 @@ function ThemeProviderR19({ children }: { children: React.ReactNode }) {
 **Misol 5 — TypeScript R19:**
 
 ```tsx
-// R19+ TS — <Context value={...}> sintaksisni qabul qiladi
+// R19+ TS — <Context value={...}> syntax'ni qabul qiladi
 import { createContext } from 'react';
 
 type Config = { apiUrl: string };
@@ -2076,7 +2078,7 @@ function Items({ ids }: { ids: string[] }) {
 
 `useContext` bilan bu pattern Rules of Hooks buzilishi. `use()` bilan — valid.
 
-**`use(context)` sintaksisni cheklov:**
+**`use(context)` syntax cheklovi:**
 
 `use()` faqat **React render paytida** chaqiriladi:
 
@@ -2126,7 +2128,7 @@ function use<T>(usable: Context<T> | Promise<T>): T {
 
 **Conditional bo'lishi mumkinligi sabab:**
 
-`useContext` — Hook chain'da pozitsiyaga bog'liq emas (state queue yo'q). Faqat dependency tracking. Conditional chaqirish silent bug emas (linked list integrity buzilmaydi).
+`useContext` — Hook chain'da position'ga bog'liq emas (state queue yo'q). Faqat dependency tracking. Conditional chaqirish silent bug emas (linked list integrity buzilmaydi).
 
 Lekin React linter `useContext` uchun Rules of Hooks majbur qilardi (consistency uchun). `use()` — yangi hook, Rules of Hooks'dan ataylab istisno.
 
@@ -4225,11 +4227,16 @@ function New() {
 
 **Migration codemod:**
 
-```bash
-npx @react/codemod legacy-context-to-create-context ./src
+Legacy Context API uchun rasmiy codemod yo'q (R19 migration recipe modern Context'ni nazarda tutadi). Migration qo'lda:
+
+```tsx
+// 1. createContext bilan yangi Context yarating
+// 2. childContextTypes / getChildContext → <Context.Provider value>
+// 3. contextTypes + this.context → useContext yoki static contextType = MyContext
+// 4. PropTypes validation → TypeScript types
 ```
 
-Codemod legacy `contextTypes`/`getChildContext` → modern `createContext` o'zgartiradi.
+`react-codemod` (legacy npm package) ham eski Context migration codemod taklif qilmaydi. Manual migration majburiy.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>

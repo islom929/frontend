@@ -1,6 +1,6 @@
 # Bo'lim 7: JSX Asoslari va Qoidalari
 
-> JSX — JavaScript'ga XML-style syntax qo'shadigan **language extension**. Babel/SWC kompilyatorlar tomonidan oddiy JS funksiya chaqiruvlariga aylantiriladi. JSX HTML emas — u JS, lekin tag-based syntax bilan. Bu bo'lim JSX va TSX farqi, JSX vs HTML qoidalari, transform mexanikasi (Classic vs Automatic R17+), expressions, fragments, conditional rendering va xavfsizlik nuanslari'ni yoritadi.
+> JSX — JavaScript'ga XML-style syntax qo'shadigan **language extension**. Babel/SWC compiler'lar tomonidan oddiy JS funksiya chaqiruvlariga aylantiriladi. JSX HTML emas — u JS, lekin tag-based syntax bilan. Bu bo'lim JSX va TSX farqi, JSX vs HTML qoidalari, transform mexanikasi (Classic vs Automatic R17+), expressions, fragments, conditional rendering va xavfsizlik nuanslari'ni yoritadi.
 
 ---
 
@@ -41,7 +41,7 @@
 
 - **Syntax nomi har doim "JSX"** — kod TSX bo'lsa ham
 - **JSX qoidalari TSX'da bir xil**
-- **Runtime'da JSX va TSX farqi YO'Q** — kompilyatordan keyin ikkalasi ham bir xil `_jsx(...)` chaqiruvlariga aylanadi
+- **Runtime'da JSX va TSX farqi YO'Q** — compiler'dan keyin ikkalasi ham bir xil `_jsx(...)` chaqiruvlariga aylanadi
 - **Farq faqat type system layer'da**
 
 ```jsx
@@ -69,7 +69,7 @@ Babel/SWC ikkala variantni ham bir xil `_jsx('button', { onClick, children: labe
 
 Bu kursda **TSX** majburiy. Sabab:
 
-1. ~90% production React kodi TypeScript bilan yozilgan (2026 holati)
+1. Production React kodbazalarining katta qismi TypeScript bilan yozilgan
 2. Type safety — bug'larni compile-time'da topish
 3. IDE autocomplete va refactoring yaxshi
 
@@ -79,7 +79,7 @@ Bu kursda **TSX** majburiy. Sabab:
 
 ### Nazariya
 
-**JSX** — Facebook tomonidan 2013-yilda joriy etilgan **syntactic extension** for JavaScript. JSX **HTML emas**, lekin HTML'ga o'xshash sintaksis.
+**JSX** — Facebook tomonidan 2013-yilda joriy etilgan **syntactic extension** for JavaScript. JSX **HTML emas**, lekin HTML'ga o'xshash syntax.
 
 ```tsx
 // JSX
@@ -127,7 +127,7 @@ JSX — **birinchi variant'ni yozish vositasi**.
 
 **JSX spec:** [https://facebook.github.io/jsx/](https://facebook.github.io/jsx/) — language-agnostic. React, Preact, Vue, Solid har biri o'z transformatsiyasi bilan ishlatadi.
 
-**React Element struktura** (JSX expression natijasi — `_jsx(...)` return qiymati):
+**React Element structure** (JSX expression natijasi — `_jsx(...)` return qiymati):
 
 ```typescript
 interface ReactElement {
@@ -139,7 +139,7 @@ interface ReactElement {
 }
 ```
 
-`$$typeof` — `Symbol.for('react.element')`. Bu — XSS protection marker: Untrusted JSON-string serverdan kelganda React'ning `createElement`'siz to'qima JSON object'ni Element sifatida render qila olmaydi, chunki Symbol JSON'da serializable emas (cross-realm Symbol.for orqali qayta tiklash ham client-side bo'shashlik talab qiladi).
+`$$typeof` — `Symbol.for('react.element')`. Bu — XSS protection marker: untrusted JSON serverdan kelganda React `JSON.parse` natijasidagi object'ni Element sifatida render qilmaydi, chunki `Symbol` JSON'da serializable emas (`JSON.parse(...)` natijasida `$$typeof` field `undefined` bo'ladi). Cross-realm `Symbol.for` orqali sun'iy `react.element` symbol yaratish uchun attacker'da allaqachon client-side JS execution kerak — ya'ni XSS allaqachon boshqa vector orqali sodir bo'lgan bo'lardi.
 
 `type` qiymati uchun **uch variant** mavjud:
 - `string` — DOM host (`'div'`, `'span'`)
@@ -248,7 +248,7 @@ JSX HTML'ga o'xshash, lekin **JavaScript reserved keyword'lar** va **camelCase c
 
 **Diqqat qiling:**
 
-- `style` — JavaScript object (**string TAQIQ**: `style="color: red"` JSX dev warning chiqaradi, React DOM property sifatida tan olmaydi)
+- `style` — JavaScript object (**string TAQIQ**: `style="color: red"` React DOM dev mode'da error throws — `"The 'style' prop expects a mapping from style properties to values, not a string"`)
 - Property nomlari camelCase (`fontSize`, not `font-size`)
 - Number → ko'pchilik dimension property'lari uchun `px` avtomatik qo'shiladi, lekin **unitless property'lar bundan istisno**: `lineHeight`, `opacity`, `zIndex`, `flex`, `flexGrow`, `flexShrink`, `order`, `fontWeight`, `gridRow`, `gridColumn`, `columnCount`, `aspectRatio`, `tabSize`, `zoom`, SVG opacity property'lari (`fillOpacity`, `stopOpacity`, `strokeOpacity`) va boshqalar. To'liq ro'yxat React'ning `isUnitlessNumber` jadvalida.
 - CSS custom properties (`--my-var`) — to'g'ridan-to'g'ri qo'llab-quvvatlanadi, `px` qo'shilmaydi: `style={{ '--accent': '#f00', color: 'var(--accent)' }}`
@@ -276,8 +276,8 @@ JSX HTML'ga o'xshash, lekin **JavaScript reserved keyword'lar** va **camelCase c
 <input value={value} onChange={(e) => setValue(e.target.value)} />
 ```
 
-- **Native HTML/DOM:** `change` event blur'da fires
-- **React:** `onChange` har keystroke'da fires (DOM `input` event'iga bog'langan)
+- **Native HTML/DOM:** `<input type="text">` va `<textarea>` uchun `change` event commit'da fires (blur yoki Enter); `<input type="checkbox|radio">`, `<select>` uchun darhol fires
+- **React:** `onChange` text input/textarea uchun har keystroke'da fires (DOM `input` event'iga bog'langan); checkbox/radio/select uchun native bilan bir xil
 
 ```tsx
 function Input() {
@@ -320,10 +320,18 @@ function setProperty(node, key, value) {
   } else if (key === 'htmlFor') {
     node.htmlFor = value;
   } else if (key === 'style') {
-    Object.assign(node.style, value);
+    // CSS custom properties (--my-var) — setProperty; aks holda inline style
+    for (const prop in value) {
+      if (prop.startsWith('--')) node.style.setProperty(prop, value[prop]);
+      else node.style[prop] = typeof value[prop] === 'number' && !isUnitlessNumber(prop)
+        ? value[prop] + 'px'
+        : value[prop];
+    }
   } else if (key.startsWith('on')) {
-    // Event delegation
-    node.addEventListener(key.slice(2).toLowerCase(), value);
+    // React DOM event'ni element'ga emas — root container'ga
+    // `listenToAllSupportedEvents(rootContainer)` orqali ulagan (R17+).
+    // Element-level addEventListener YO'Q; React Synthetic Event delegation
+    // event.target → fiber tree walk → handler dispatch.
   } else {
     node.setAttribute(key, value);
   }
@@ -332,7 +340,7 @@ function setProperty(node, key, value) {
 
 **Reserved keyword'lar tarixi:**
 
-JSX JS expression'ga transform qilinadi va attribute nomlari `_jsx(type, props, key)` chaqirig'idagi `props` object'ining key'lariga aylanadi. ES5 davrida `class` JS reserved word edi (ES3'dan), ES6'dan boshlab faqat strict mode'da reserved — lekin DOM API darajasida `Element.prototype.className` IDL property HTML element'larining standart property nomi. Shu sababli React `class` o'rniga `className` (DOM property nomi bilan mos), `for` o'rniga `htmlFor` (DOM `HTMLLabelElement.htmlFor`) tanladi. Convention shundan boshlab saqlanib qoldi. R19'dan boshlab DOM-rendering paytida lowercase `class` va `for` ham qabul qilinadi (R19 release notes — "Support for `<form>` actions" va "`class` instead of `className`" kichik o'zgarishlari), lekin amaliy konvention va TypeScript types `className`/`htmlFor`'ni asosiy yo'l deb saqlaydi.
+JSX JS expression'ga transform qilinadi va attribute nomlari `_jsx(type, props, key)` chaqirig'idagi `props` object'ining key'lariga aylanadi. ES5 davrida `class` JS reserved word edi (ES3'dan), ES6'dan boshlab faqat strict mode'da reserved — lekin DOM API darajasida `Element.prototype.className` IDL property HTML element'larining standart property nomi. Shu sababli React `class` o'rniga `className` (DOM property nomi bilan mos), `for` o'rniga `htmlFor` (DOM `HTMLLabelElement.htmlFor`) tanladi. Standart HTML element'lar (`<div>`, `<label>`, ...) uchun `className`/`htmlFor` hozirgacha asosiy yo'l. **R19 yangiligi — Custom Elements support:** web component'lar (`<my-element>` kabi hyphen bilan lowercase tag'lar) uchun lowercase `class`, `for` va boshqa attribute'lar to'g'ridan-to'g'ri qabul qilinadi va element'ga setAttribute orqali uzatiladi. Bu standart HTML element'larga qo'llanilmaydi.
 
 </details>
 
@@ -463,15 +471,15 @@ JSX Automatic Transform `children` shaklini va build mode'ni tahlil qilib, uch f
 - **`_jsx(type, props, key?)`** — production build, `children` array EMAS (bitta element, string, number, yoki yo'q)
 - **`_jsxs(type, props, key?)`** — production build, `children` **literal static array** (manba kodida bir nechta JSX child element yonma-yon yozilgan)
 - **`_jsxDEV(type, props, key, isStaticChildren, source, self)`** — development build, har qanday holat uchun. Qo'shimcha argumentlar:
-  - `isStaticChildren: boolean` — `_jsxs` ekvivalenti (true) yoki `_jsx` ekvivalenti (false)
-  - `source: { fileName, lineNumber, columnNumber }` — error message'larda manba lokatsiya
+  - `isStaticChildren: boolean` — `_jsxs` equivalent (true) yoki `_jsx` equivalent (false)
+  - `source: { fileName, lineNumber, columnNumber }` — error message'larda manba location
   - `self` — `this` context (legacy)
 
 **Source paketlar:**
 - `react/jsx-runtime` — `jsx`, `jsxs`, `Fragment` (production)
 - `react/jsx-dev-runtime` — `jsxDEV`, `Fragment` (development)
 
-**`_jsx` vs `_jsxs` farq sabab — key validation:** Dev mode'da React har element'da `key` mavjudligini tekshiradi. **Static array** (manbada `<Comp />` lar yonma-yon yozilgan, dynamic `map` natijasi emas) holatida transformer kompilatsiya vaqtida key'larni tekshiradi — runtime per-child validation kerak emas. `_jsxs` shu sababli per-child key warning chiqarmaydi. **Dynamic array** holatida (`array.map(...)` natijasi `_jsx` ga single child sifatida tushadi) — bu yerda key validation runtime'da bajariladi (dynamic array element'larini transformer ko'rmaydi).
+**`_jsx` vs `_jsxs` farq sabab — key validation:** React dev mode'da children array element'larida `key` mavjudligini runtime'da tekshiradi. **Static children** (manbada `<A /><B />` yonma-yon yozilgan, transformer compile paytida ko'radi va array sifatida `children` ga joylaydi) — bu element'larning position'i bundle'da fixed, qayta tartiblanmaydi, shu sababli `key` kerak emas va `_jsxs` per-child key warning chiqarmaydi. **Dynamic array** holatida (`array.map(...)` natijasi) — array runtime'da hosil bo'ladi, transformer uning element'larini ko'rmaydi, `_jsx` ga **bitta `children` argument sifatida** array uzatiladi va React per-element `key` tekshiruvini yoqadi.
 
 ### Configuration
 
@@ -600,7 +608,7 @@ import { useState } from 'react';
 import { useState } from 'react';
 ```
 
-**Eslatma:** Agar koda'da `React.memo`, `React.Component` kabi namespace access ishlatilsa, `import React from 'react'` kerak. Lekin idiomatik pattern — `import { memo, Component, useState } from 'react'` named import — automatic transform bilan birga `React` default import'siz ishlaydi.
+**Eslatma:** Agar kodda `React.memo`, `React.Component` kabi namespace access ishlatilsa, `import React from 'react'` kerak. Lekin idiomatik pattern — `import { memo, Component, useState } from 'react'` named import — automatic transform bilan birga `React` default import'siz ishlaydi.
 
 ESLint config R17+ uchun:
 
@@ -658,12 +666,12 @@ const age = 25;
 | Qiymat | Render qiyoslash |
 |--------|------------------|
 | `string`, `number` | Text node |
-| `bigint` | Text node (`String(BigInt)` orqali) |
+| `bigint` | R18.3+: Text node (`String(bigint)` orqali); R18.2 va oldin: **Error** |
 | `JSX element` | Nested element |
 | `JSX array` | Lists (key kerak) |
 | `null`, `undefined`, `false`, `true` | **Hech narsa** (skip) |
 | `0` | **Text node "0"** (gotcha!) |
-| `Promise` | R19+ — Suspense boundary bilan `use()` orqali. R18 va undan oldin: **Error** |
+| `Promise` | R19+: to'g'ridan-to'g'ri JSX child sifatida qabul qilinadi — React Suspense boundary'gacha render'ni pauza qiladi, resolve bo'lganda continue (`use()` hook'i alohida pattern — komponent ichida any thenable'ni unwrap qiladi). R18 va undan oldin: **Error** |
 | Plain `Object` (non-element) | **Error** "Objects are not valid as a React child" |
 
 ```tsx
@@ -906,7 +914,7 @@ _jsxs(_Fragment, {
 
 Fragment fiber **stateNode = null**. DOM mutation paytida Fragment skip qilinadi — child'lar bevosita parent host'ga `appendChild` qilinadi.
 
-`<></>` short syntax — **0 bytes** runtime cost.
+**`<></>` va `<Fragment>` farqi:** Ikkalasi ham `_jsxs(_Fragment, ...)` chaqirig'iga compile bo'ladi — bundle va Reconciler narxi bir xil. Farq syntax ergonomicssida: `<></>` qisqaroq, lekin `key` qabul qilmaydi; `<Fragment key="...">` to'liq syntax `key` ishlatilganda kerak. Ikkalasi ham DOM'da hech qanday element yaratmaydi.
 
 </details>
 
@@ -916,8 +924,8 @@ Fragment fiber **stateNode = null**. DOM mutation paytida Fragment skip qilinadi
 Single root vs Fragment:
 
 ```tsx
-// ❌ Multiple root
-function Bad() {
+// ❌ Multiple root — kompilatsiya xatosi
+function ArticleHeaderBroken() {
   return (
     <h1>Title</h1>
     <p>Body</p>
@@ -925,7 +933,7 @@ function Bad() {
 }
 
 // ✅ Wrapping div (extra DOM)
-function WithDiv() {
+function ArticleHeaderWithDiv() {
   return (
     <div>
       <h1>Title</h1>
@@ -935,7 +943,7 @@ function WithDiv() {
 }
 
 // ✅ Fragment (no extra DOM)
-function WithFragment() {
+function ArticleHeader() {
   return (
     <>
       <h1>Title</h1>
@@ -1536,7 +1544,7 @@ JSX transform `key` va `ref` attribute'larini props object'idan **alohida ajrati
 //   ↑ key 3-argument, props ichida emas
 ```
 
-Agar spread'dagi `obj` ichida `key` field bo'lsa, u props'ga kiritiladi, lekin React Reconciler uni e'tiborga olmaydi (`element.key` faqat 3-argumentdan o'qiladi). React 18.3+ va R19 dev mode'da bu holatda quyidagi warning chiqadi:
+Agar spread'dagi `obj` ichida `key` field bo'lsa, JSX transform uni 3-argument sifatida ajratmaydi (faqat explicit `key="..."` 3-argumentga aylanadi). `_jsx` runtime esa config object'ida `key` ko'rsa, uni `RESERVED_PROPS` ro'yxati bilan props'dan chiqarib, `element.key` ga ko'chiradi — ya'ni Reconciler aslida `key` ni oladi va ishlatadi. Lekin bu **brittle pattern**: agar keyingi render'da spread manbai (`obj.key`) yo'qolsa yoki o'zgarsa, element identity buziladi. Dev mode bu xavf uchun warning chiqaradi:
 
 ```
 Warning: A props object containing a "key" prop is being spread into JSX:
@@ -1551,7 +1559,7 @@ React keys must be passed directly to JSX without using spread:
 
 **Performance:**
 
-JSX kompilyatsiyasi har render'da `_jsx(type, props, key)` chaqirig'i ichida yangi `props` object yaratadi (spread bo'lsa ham, bo'lmasa ham). Spread'ning o'zi qo'shimcha overhead emas — `Object.assign` ekvivalenti tezligi. `React.memo` shallow compare qiymatlarni `Object.is` bilan tekshiradi: agar spread orqali uzatiladigan barcha qiymatlar (function reference, object reference) avvalgi render bilan teng bo'lsa, `memo` re-render qilmaydi. Lekin har render'da yangi inline object/function spread'ga tushsa — referensial farq sababli memo bypass qilinadi.
+JSX compilationsi har render'da `_jsx(type, props, key)` chaqirig'i ichida yangi `props` object yaratadi (spread bo'lsa ham, bo'lmasa ham). Spread'ning o'zi qo'shimcha overhead emas — `Object.assign` equivalent tezligi. `React.memo` shallow compare qiymatlarni `Object.is` bilan tekshiradi: agar spread orqali uzatiladigan barcha qiymatlar (function reference, object reference) avvalgi render bilan teng bo'lsa, `memo` re-render qilmaydi. Lekin har render'da yangi inline object/function spread'ga tushsa — reference farq sababli memo bypass qilinadi.
 
 </details>
 
@@ -1561,36 +1569,37 @@ JSX kompilyatsiyasi har render'da `_jsx(type, props, key)` chaqirig'i ichida yan
 Wrapping component:
 
 ```tsx
-import { ButtonHTMLAttributes, forwardRef } from 'react';
+import { ButtonHTMLAttributes, Ref } from 'react';
 
 interface CustomButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }
 
-const CustomButton = forwardRef<HTMLButtonElement, CustomButtonProps>(
-  function CustomButton({
-    variant = 'primary',
-    size = 'md',
-    isLoading,
-    className,
-    children,
-    disabled,
-    ...rest
-  }, ref) {
-    return (
-      <button
-        ref={ref}
-        className={`btn btn-${variant} btn-${size} ${className ?? ''}`}
-        disabled={disabled || isLoading}
-        {...rest}
-      >
-        {isLoading ? 'Loading...' : children}
-      </button>
-    );
-  }
-);
+// R19: ref oddiy prop sifatida — forwardRef keraksiz
+function CustomButton({
+  variant = 'primary',
+  size = 'md',
+  isLoading,
+  className,
+  children,
+  disabled,
+  ref,
+  ...rest
+}: CustomButtonProps) {
+  return (
+    <button
+      ref={ref}
+      className={`btn btn-${variant} btn-${size} ${className ?? ''}`}
+      disabled={disabled || isLoading}
+      {...rest}
+    >
+      {isLoading ? 'Loading...' : children}
+    </button>
+  );
+}
 
 <CustomButton
   variant="primary"
@@ -1632,7 +1641,7 @@ function Good({ className, ...rest }: Props) {
 
 ### Nazariya
 
-React'da DOM elementga **raw HTML insert qilish** uchun maxsus prop bor. Bu prop **`dangerously`** prefiksi bilan — chunki **XSS (Cross-Site Scripting)** xavfini keltiradi.
+React'da DOM elementga **raw HTML insert qilish** uchun maxsus prop bor. Bu prop **`dangerously`** prefix'i bilan — chunki **XSS (Cross-Site Scripting)** xavfini keltiradi.
 
 ### Pattern
 
@@ -1665,7 +1674,9 @@ const userInput = '<script>alert("XSS")</script>';
 
 <div dangerouslySetInnerHTML={{ __html: userInput }} />
 // DOM: <div><script>alert("XSS")</script></div>
-// XSS attack vector ochiladi.
+// Diqqat: <script> innerHTML orqali qo'shilganda execute QILINMAYDI (HTML5 parsing spec qoidasi).
+// Lekin event handler attribute'lar (`onerror`, `onload`, `onclick`) va `javascript:` URL'lar
+// orqali XSS hali mumkin — quyida real vector misol.
 ```
 
 ### Qachon ishlatiladi (legitimately)
@@ -2411,18 +2422,17 @@ function Inbox({ messages }: { messages: Message[] }) {
 <summary><strong>Javob</strong></summary>
 
 ```tsx
-import { forwardRef, InputHTMLAttributes, useId } from 'react';
+import { InputHTMLAttributes, Ref, useId } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   label?: string;
+  ref?: Ref<HTMLInputElement>;
 }
 
-const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { error, label, className, id, ...rest },
-  ref
-) {
-  // React'ning `useId()` hook'i — SSR-safe, deterministic, hydration uchun stabil.
+// R19: ref oddiy prop — forwardRef keraksiz
+function Input({ error, label, className, id, ref, ...rest }: InputProps) {
+  // React'ning `useId()` hook'i — SSR-safe, deterministic, hydration uchun stable.
   // `Math.random()` render ichida — har render'da yangi ID, hydration mismatch xavfi.
   const reactId = useId();
   const inputId = id ?? reactId;
@@ -2439,7 +2449,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       {error && <span className="error-text">{error}</span>}
     </div>
   );
-});
+}
 
 <Input
   type="email"

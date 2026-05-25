@@ -61,7 +61,7 @@ function Component() {
 }
 ```
 
-Render paytida `ref.current = X` — **render purity buzilishi**. Strict Mode 2x render'da bug ko'rinadi (boshqa kontekst bilan farq).
+Render paytida `ref.current = X` — **render purity buzilishi**. Strict Mode 2x render'da bug ko'rinadi (boshqa context bilan farq).
 
 To'g'ri pattern — mutation faqat event handler yoki effect ichida:
 
@@ -536,12 +536,19 @@ function Timer() {
 **Misol 3 — Lazy initialization:**
 
 ```tsx
-function VideoPlayer() {
-  const playerRef = useRef<VideoPlayer | null>(null);
+// External video library — komponent o'zi emas
+declare class HLSPlayer {
+  constructor(config?: { src?: string; autoplay?: boolean });
+  destroy(): void;
+  getStatus(): string;
+}
+
+function HLSVideoPanel() {
+  const playerRef = useRef<HLSPlayer | null>(null);
   
   // Lazy init — birinchi render'da yaratish (heavy constructor)
   if (playerRef.current === null) {
-    playerRef.current = new VideoPlayer({ /* config */ });
+    playerRef.current = new HLSPlayer({ autoplay: false });
   }
   
   useEffect(() => {
@@ -551,7 +558,7 @@ function VideoPlayer() {
     };
   }, []);
   
-  // playerRef.current har doim VideoPlayer (null check shart)
+  // playerRef.current har doim HLSPlayer (null check shart)
   return <div>{playerRef.current?.getStatus()}</div>;
 }
 ```
@@ -829,7 +836,7 @@ Hidden file input + custom button — common pattern UI customization uchun.
 **Misol 3 — Video controls:**
 
 ```tsx
-function VideoPlayer({ src }: { src: string }) {
+function VideoControls({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   
@@ -1064,7 +1071,7 @@ function AsyncComponent() {
 }
 ```
 
-Bu pattern R17 dan oldin "Can't perform setState on unmounted component" warning'ni oldini olar edi. R17+ warning olib tashlangan, lekin pattern hali ham foydali (race condition prevention — cross-ref [`16-useeffect.md`](16-useeffect.md) "Race Conditions" `AbortController` afzal).
+Bu pattern R18'dan oldin "Can't perform setState on unmounted component" warning'ni oldini olar edi. R18'da warning olib tashlangan (PR #22114 — false positive ko'p edi), lekin pattern hali ham foydali (race condition prevention — cross-ref [`16-useeffect.md`](16-useeffect.md) "Race Conditions" `AbortController` afzal).
 
 **Use case 6 — Render count (debug):**
 
@@ -1658,7 +1665,7 @@ function WorkingToggle() {
 > **🕐 Versiya evolyutsiyasi (Refs API):**
 > - **Pre-R16 (legacy):** String refs — `<input ref="myInput" />` + `this.refs.myInput`. Class component'da only.
 > - **R16+ (modern):** `React.createRef()` (class) yoki `useRef` (function). Object refs.
-> - **R19:** String refs **to'liq olib tashlandi** — kompilyatsiya xatosi yoki runtime warning.
+> - **R19:** String refs **to'liq olib tashlandi** — compilation xatosi yoki runtime warning.
 > - **Sabab:** String refs Concurrent Mode'da broken (bir xil string component bir necha marta render bo'lsa, `this.refs` qaysi instance'ni saqlaydi noaniq), type-unsafe (TypeScript inferensiya yo'q), hidden state (component'ning `this.refs` namespace'ida implicit).
 
 **Eski API (Pre-R16):**
@@ -1708,7 +1715,7 @@ function FunctionComponent() {
 
 1. **Concurrent Mode incompatible** — bir xil string ref ko'p instance'ga ulanishi mumkin, qaysi instance saqlanadi noaniq
 2. **Type unsafe** — `this.refs.myInput` har doim `any` (TypeScript inferensiya yo'q)
-3. **Hidden state** — `this.refs` "magic" namespace, kompilyator analiz qila olmaydi
+3. **Hidden state** — `this.refs` "magic" namespace, compiler analiz qila olmaydi
 4. **Bundle size** — string refs uchun React internal lookup mexanizmi
 5. **Performance** — string lookup vs object reference
 
@@ -1723,7 +1730,7 @@ const inputRef = useRef(null);
 <input ref={inputRef} />
 ```
 
-Codemod mavjud (`@react/codemod`) — string refs'ni avtomatik o'zgartiradi.
+Codemod mavjud (`codemod@latest react/19/...` yoki `react-codemod`) — string refs'ni avtomatik o'zgartiradi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1767,7 +1774,8 @@ Class component'larda `createRef` instance field'ida saqlanadi (instantiation pa
 
 - String refs deprecation — facebook/react CHANGELOG R16+
 - R19 string refs olib tashlanishi — facebook/react R19 release notes
-- @react/codemod — facebook/react `packages/react-codemod`
+- `react-codemod` — reactjs/react-codemod repository (legacy codemods)
+- `codemod` CLI — codemod-com/codemod repository (R19 codemod registry)
 
 </details>
 
@@ -1892,7 +1900,7 @@ class TabsModern extends React.Component {
 > **🕐 Versiya evolyutsiyasi (`forwardRef` → ref as prop):**
 > - **Pre-R16.3:** Function component'lar ref qabul qila olmaydi — class component yoki ref forwarding HOC manual implement qilingan.
 > - **R16.3 (`forwardRef`):** `React.forwardRef(...)` wrapper introduced — function component'da ref qabul qilish.
-> - **R19:** `ref` oddiy prop bo'ldi — `forwardRef` wrapper kerak emas. Lekin `forwardRef` **deprecated emas** — gradually phased out (mavjud kod ishlaydi).
+> - **R19:** `ref` oddiy prop bo'ldi — `forwardRef` wrapper kerak emas. `forwardRef` esa **soft-deprecated** (hali ishlaydi, warning yo'q, lekin yangi kod uchun tavsiya etilmaydi).
 > - **Sabab:** `forwardRef` API ortiqcha boilerplate edi (har component uchun wrapper). R19'da JSX transform ref'ni avtomatik prop sifatida o'tkazadi. Yagona qoida — function component'lar ref qabul qiladi.
 
 **Pre-R16.3 muammo:**
@@ -1957,7 +1965,7 @@ R19'da JSX transform ref'ni avtomatik prop sifatida o'tkazadi. `forwardRef` wrap
 
 **Backward compatibility:**
 
-R19'da `forwardRef` hali ham ishlaydi (deprecated emas, lekin "phased out"). Mavjud kod o'zgartirish shart emas. Yangi kod uchun ref oddiy prop afzal:
+R19'da `forwardRef` hali ham ishlaydi (soft-deprecated — warning yo'q). Mavjud kod o'zgartirish shart emas. Yangi kod uchun ref oddiy prop afzal:
 
 ```tsx
 // ✅ R19'da ham ishlaydi (legacy)
@@ -2027,10 +2035,14 @@ type RefObject<T> = { readonly current: T | null };
 **Migration codemod:**
 
 ```bash
-npx @react/codemod forward-ref-to-ref-prop ./src
+# R19 migration recipe (barcha tuzatishlar)
+npx codemod@latest react/19/migration-recipe
+
+# Yoki specific codemod (faqat forwardRef → ref prop):
+npx codemod@latest react/19/replace-forward-ref-with-ref-prop
 ```
 
-Codemod `forwardRef` wrapper'ni olib tashlaydi va ref'ni prop sifatida qayta yozadi. R19 migration uchun.
+Codemod `forwardRef` wrapper'ni olib tashlaydi va ref'ni prop sifatida qayta yozadi. R19 migration uchun (manba: react.dev/blog/2024/04/25/react-19-upgrade-guide).
 
 **Source citation:**
 
@@ -2238,7 +2250,7 @@ type CustomRef = ComponentRef<typeof MyComponent>;  // Component'ning ref tipi
 
 ```bash
 # Codemod — forwardRef → ref as prop
-npx @react/codemod forward-ref-to-ref-prop ./src
+npx codemod@latest react/19/replace-forward-ref-with-ref-prop
 
 # Manual migration:
 # 1. forwardRef wrapper olib tashlash
@@ -2831,7 +2843,7 @@ type VideoHandle = {
   getCurrentTime: () => number;
 };
 
-function VideoPlayer({ ref, src }: {
+function VideoPlayerHandle({ ref, src }: {
   ref?: React.Ref<VideoHandle>;
   src: string;
 }) {
@@ -2855,7 +2867,7 @@ function App() {
   
   return (
     <div>
-      <VideoPlayer ref={playerRef} src="/video.mp4" />
+      <VideoPlayerHandle ref={playerRef} src="/video.mp4" />
       <button onClick={() => playerRef.current?.play()}>Play</button>
       <button onClick={() => playerRef.current?.seek(60)}>Skip 60s</button>
     </div>
@@ -2970,8 +2982,8 @@ function mountImperativeHandle<T>(
   const effectDeps = deps !== null && deps !== undefined ? deps.concat([ref]) : null;
   
   return mountEffectImpl(
-    UpdateEffect,
-    HookLayout,  // Layout phase'da ishlaydi
+    Update | LayoutStatic,  // Fiber flags — ReactFiberFlags.js
+    HookLayout,              // Hook tag — Layout phase'da ishlaydi
     imperativeHandleEffect.bind(null, create, ref),
     effectDeps
   );
@@ -4592,7 +4604,7 @@ Production'da Pointer Events (touch + mouse + pen) afzal — `pointerdown`, `poi
 - **Ikki katta use case:** (1) DOM refs — element'larga imperative kirish (focus, scroll, measurement, video controls), (2) Mutable values — timer ID, latest closure, prev value, singleton, mount tracker.
 - **`ref` vs `state` Decision Guide:** UI'da ko'rsatiladi yoki state mutation re-render trigger qilishi kerak — `useState`. Re-render trigger qilmaydigan, internal mutable qiymat — `useRef`.
 - **String refs versiya tarixi** (Versiya callout): Pre-R16 `<input ref="myInput" />` + `this.refs.myInput` → R16+ `createRef`/`useRef` modern → R19'da string refs to'liq olib tashlandi. Sabab: Concurrent Mode incompatible, type-unsafe, hidden state.
-- **`forwardRef` evolyutsiyasi** (Versiya callout): Pre-R16.3 function component'lar ref qabul qilmasdi → R16.3 `forwardRef(...)` wrapper introduced → R19 `ref` oddiy prop, `forwardRef` deprecated emas (gradually phased out). Sabab: ortiqcha boilerplate, JSX transform avtomatik.
+- **`forwardRef` evolyutsiyasi** (Versiya callout): Pre-R16.3 function component'lar ref qabul qilmasdi → R16.3 `forwardRef(...)` wrapper introduced → R19 `ref` oddiy prop, `forwardRef` soft-deprecated (hali ishlaydi, warning yo'q). Sabab: ortiqcha boilerplate, JSX transform avtomatik.
 - **R19 ref oddiy prop** — function component'lar `props.ref`'ni qabul qiladi, JSX transform ref'ni boshqa props bilan birga o'tkazadi. `React.ComponentProps<E>` R19'da ref ham ichkariga kiritilgan.
 - **Ref cleanup functions (R19)** (Versiya callout): Pre-R19 callback ref `null` argument bilan unmount paytida → R19 callback **cleanup function qaytarishi mumkin** (DOM node o'chirilganda). `useEffect` cleanup pattern bilan teng. Backward compat — legacy callback hali ishlaydi.
 - **`useImperativeHandle`** — ref orqali parent'ga ixtiyoriy imperative API ekspoz qilish. Use case'lar: Modal open/close, video player play/pause/seek, form submit/reset/validate, animation. Anti-pattern: declarative bilan hal qilinishi mumkin bo'lgan narsalarga ishlatmaslik. Deps array har doim explicit.

@@ -6,18 +6,20 @@
 
 ## Mundarija
 
-**QISM A: Sync vs Concurrent** (savollar 1-4)
-**QISM B: startTransition + Tearing** (savollar 5-7)
-**QISM C: Suspense** (savollar 8-12)
-**QISM D: Streaming SSR** (savollar 13-15)
-**QISM E: Output & Bug Fix** (savollar 16-18)
-**QISM F: R19 Hooks va Form Actions** (savollar 19-20)
+- [**QISM A: Sync vs Concurrent**](#qism-a) (savollar 1-4)
+- [**QISM B: startTransition + Tearing**](#qism-b) (savollar 5-8)
+- [**QISM C: Suspense**](#qism-c) (savollar 9-13)
+- [**QISM D: Streaming SSR**](#qism-d) (savollar 14-16)
+- [**QISM E: Output & Bug Fix**](#qism-e) (savollar 17-19)
+- [**QISM F: R19 Hooks va Form Actions**](#qism-f) (savollar 20-22)
 
-**Jami:** 20 savol — Junior+ (2), Middle (7), Middle+ (6), Senior (5)
+**Jami:** 22 savol — Junior+ (2), Middle (7), Middle+ (8), Senior (5)
 
 ---
 
 ## QISM A: Sync vs Concurrent
+
+<a id="qism-a"></a>
 
 ### 1. Sync rendering qanday muammolarni keltiradi? [Junior+]
 
@@ -32,7 +34,7 @@ Sync rendering — render fazasi to'liq bajarilmaguncha browser'ning main thread
 
 **Sync render muammolari:**
 
-1. **Long render block** — heavy component tree (10K items, complex JSX) — render 100ms+ olishi mumkin. Browser bu vaqtda hech narsa qila olmaydi (paint, scroll, input).
+1. **Long render block** — heavy component tree (10K items, complex JSX) — render frame budget'dan (16.67ms) oshishi mumkin. Browser bu vaqtda hech narsa qila olmaydi (paint, scroll, input).
 
 2. **Input lag** — typing yoki click paytida — React render bo'layotgan bo'lsa, input event handler kechiktiriladi.
 
@@ -211,7 +213,7 @@ function scheduleYield() {
 }
 ```
 
-`MessageChannel` — `setTimeout(fn, 0)` dan tezroq (no 4ms minimum, no clamping).
+`MessageChannel` — `setTimeout(fn, 0)` dan tezroq (setTimeout 5+ nested call'da 4ms minimum clamping beradi, MessageChannel'da bu cheklov yo'q).
 
 **Frame budget hisobi:**
 
@@ -224,28 +226,28 @@ Reserved for browser: 11.67ms (paint, layout, GC, etc.)
 **Lanes priority — concurrent enabler:**
 
 ```typescript
-SyncLane = 1                           // Highest — event handler updates
-InputContinuousLane = 4                // Drag, scroll
-DefaultLane = 16                        // Most updates
+SyncHydrationLane = 1                   // Hydration sync
+SyncLane = 2                            // Highest — event handler updates
+InputContinuousLane = 8                 // Drag, scroll
+DefaultLane = 32                        // Most updates
 TransitionLane1...16 = 128...4194304    // Transitions
 IdleLane = 1073741824                   // Lowest
 ```
 
 Higher priority lanes — render first, abort lower-priority renders.
 
-**Sync vs Concurrent measurement:**
+**Sync vs Concurrent — asosiy farq:**
 
 ```
-Initial render 10K items (R17 sync):
-- Total time: 200ms
-- Main thread blocked: 200ms
-- Frame drops: 12 (3.3x dropped)
+Sync render (R17):
+- Main thread to'liq bloklanadi (render tugaguncha)
+- Har frame budget'dan oshsa — frame drop
 
-Initial render 10K items (R18 concurrent + transition):
-- Total time: 250ms (slightly more due to yields)
-- Main thread blocked per slice: 5ms
-- Frame drops: 0
-- User experience: instant input, gradual content fill
+Concurrent render (R18+ transition):
+- Har ~5ms slice'dan keyin browser'ga yield
+- Main thread per slice: ~5ms (frameYieldMs)
+- Frame drop'lar minimallashadi
+- Total render vaqti biroz ko'proq (yield overhead), lekin UI responsive
 ```
 
 **`createRoot` opt-in (R18):**
@@ -482,20 +484,12 @@ function requestUpdateLane(fiber: Fiber): Lane {
   return getCurrentEventPriorityLane();
 }
 
-function getCurrentEventPriorityLane(): Lane {
-  const eventName = window.event?.type;
-  switch (eventName) {
-    case "click":
-    case "keydown":
-    case "input":
-      return SyncLane;
-    case "drag":
-    case "scroll":
-      return InputContinuousLane;
-    default:
-      return DefaultLane;
-  }
-}
+// React internally tracks current event priority via
+// react-dom event system, not direct window.event check
+// Mental model:
+// Discrete events (click, keydown, input) → DiscreteEventPriority → SyncLane
+// Continuous events (drag, scroll, mousemove) → ContinuousEventPriority → InputContinuousLane
+// Default (no event context) → DefaultEventPriority → DefaultLane
 ```
 
 **Render loop with yield:**
@@ -529,16 +523,19 @@ function performWorkOnRoot(root: FiberRoot) {
 
 ```typescript
 let frameDeadline = 0;
-const yieldInterval = 5; // ms
+const frameYieldMs = 5; // ms — React source'da frameYieldMs = 5
 
 function shouldYield(): boolean {
-  if (performance.now() < frameDeadline) {
-    return false; // Continue
+  const currentTime = performance.now();
+  if (currentTime >= frameDeadline) {
+    // Frame deadline o'tgan — browser'ga yield
+    if (needsPaint || scheduling.isInputPending?.()) {
+      return true;
+    }
+    // frameDeadline'ni yangilash: currentTime + frameYieldMs
+    return currentTime >= frameDeadline;
   }
-  // Check if browser has higher priority work
-  if (needsPaint) return true;
-  // ...
-  return performance.now() - frameDeadline >= 0;
+  return false; // Davom etish mumkin
 }
 ```
 
@@ -552,16 +549,13 @@ const NormalPriority = 3;        // 5000ms timeout
 const LowPriority = 4;           // 10000ms timeout
 const IdlePriority = 5;          // No timeout
 
-// Priority → expiration time
-function getExpirationTime(priority: number): number {
-  switch (priority) {
-    case ImmediatePriority: return performance.now() - 1;
-    case UserBlockingPriority: return performance.now() + 250;
-    case NormalPriority: return performance.now() + 5000;
-    case LowPriority: return performance.now() + 10000;
-    case IdlePriority: return performance.now() + 1073741823;
-  }
-}
+// Priority → timeout offset (ms)
+// Expiration = currentTime + timeout
+const IMMEDIATE_PRIORITY_TIMEOUT = -1;        // Darhol expire
+const USER_BLOCKING_PRIORITY_TIMEOUT = 250;   // 250ms
+const NORMAL_PRIORITY_TIMEOUT = 5000;         // 5s
+const LOW_PRIORITY_TIMEOUT = 10000;           // 10s
+const IDLE_PRIORITY_TIMEOUT = 1073741823;     // maxSigned31BitInt (~12.4 kun)
 ```
 
 **Interruption mechanism:**
@@ -601,7 +595,7 @@ function ensureRootIsScheduled(root: FiberRoot) {
 
 Concurrent rendering may render 2x, abort + retry. Pure components — immune. Impure — bug exposed.
 
-**Memoization durumostan kelishimi:**
+**Memoization abort'da saqlanishimi:**
 
 Concurrent rendering aborts mid-render. State updates replayed. Memoization (`useMemo`) cache — preserved across aborts (Fiber memoizedState).
 
@@ -946,7 +940,7 @@ function PureComponent() {
 
 ### Follow-up savollar
 
-- "Concurrent rendering — render N times?" — Yo'q, kafolatlangan times. Lekin abort + restart natijasida muloqot bor. Pure components — abort-safe.
+- "Concurrent rendering — render N times?" — Aniq son kafolatlanmaydi. Abort + restart natijasida bir necha marta render bo'lishi mumkin. Pure components — abort-safe (side effect yo'q).
 - "Strict Mode production'da bormi?" — Yo'q. Faqat dev. Production single render.
 - "How to detect impurity?" — ESLint `react-compiler/react-compiler` rule, Strict Mode dev (visual check), Profiler (suspicious behavior).
 
@@ -1207,12 +1201,12 @@ function useSyncExternalStore(subscribe, getSnapshot) {
 </StrictMode>
 ```
 
-**Concurrent rendering — re-render multiplier:**
+**Concurrent rendering — re-render imkoniyati:**
 
 ```
-Single sync render: 1x
-Concurrent abort + restart: 2x
-Strict Mode dev: 2x or 4x with concurrent
+Production: 1x (normal), abort + restart bo'lsa 2+ (abort'lar discard)
+StrictMode dev: 2x (intentional double invoke)
+StrictMode dev + abort: 2x per attempt (har render 2x invoke)
 ```
 
 Anti-patterns proportionally amplified.
@@ -1292,6 +1286,8 @@ function UserProfile({ userId }: { userId: string }) {
 ---
 
 ## QISM B: startTransition + Tearing
+
+<a id="qism-b"></a>
 
 ### 5. `startTransition` ichki mexanikasi va lanes mapping [Middle+]
 
@@ -1550,21 +1546,20 @@ Bu Reconciler'ga 2 ta render generates: 1) sync render with pending=true, 2) tra
 **Async vs sync inside transition:**
 
 ```tsx
-// ❌ Async inside transition — only sync part affected
+// ❌ R18 — async function'da await'dan keyingi setState TransitionLane'dan tushadi
 startTransition(async () => {
   await fetch(...);
-  setState(...); // Outside transition (after await)
+  setState(...); // R18'da await'dan keyin — transition scope tugagan
 });
 
-// ✅ R19 — async transitions (with action support)
+// ✅ R19 — async transitions to'liq qo'llab-quvvatlanadi
 startTransition(async () => {
-  // Async transitions in R19
   await mutateAsync();
-  setState(...); // Still inside transition
+  setState(...); // R19'da await'dan keyin ham transition scope'da
 });
 ```
 
-R18'da `startTransition` faqat sync function'larni qabul qiladi. R19'da async transition support qo'shildi (Server Actions integration uchun).
+R18'da `startTransition` async function qabul qilsa, `await`'dan keyingi `setState`'lar transition scope'dan chiqadi (sync qism faqat transition). R19'da to'liq async transition lifecycle qo'shildi (Form Actions asosi).
 
 **`useDeferredValue` vs `useTransition`:**
 
@@ -1592,22 +1587,22 @@ const deferredQuery = useDeferredValue(query);
 | No `isPending` | `isPending` true/false |
 | Outside component (any module) | Inside component only |
 | Single API call | 2-element tuple |
-| Light Hook overhead | Hook overhead (~0.5µs) |
+| Hook overhead yo'q | Hook slot allocate qilinadi |
 
-**Performance:**
+**Performance farqi:**
 
 ```
 Without useTransition:
-- Heavy filter blocks UI for 200ms
-- Input lag visible
-- Frame drops during filter
+- Heavy filter main thread'ni bloklaydi
+- Input lag seziladi
+- Frame drop'lar yuzaga keladi
 
 With useTransition:
-- Filter starts in low priority
-- Yields every 5ms to browser
-- Input event interrupts filter (abort + restart)
-- Total filter time slightly longer (250ms) due to yield overhead
-- But UI never blocked → user perception: instant
+- Filter TransitionLane'da — low priority
+- Har ~5ms (frameYieldMs) browser'ga yield
+- Input event kelsa — filter abort + restart
+- Total filter vaqti biroz ko'proq (yield overhead)
+- Lekin UI hech qachon bloklanmaydi → responsive
 ```
 
 </details>
@@ -1615,7 +1610,7 @@ With useTransition:
 ### Edge Cases
 
 - **`startTransition` doesn't make sync work async**: `startTransition(() => { /* heavy compute */ })` — heavy compute still sync. Only `setState`'lar transition lane'ga.
-- **Promise inside transition**: `startTransition(async () => ...)` — only sync portion in transition. Awaited continuations — outside transition.
+- **Promise inside transition (R18)**: `startTransition(async () => ...)` — R18'da faqat sync qism transition scope'da, `await`'dan keyingi `setState`'lar scope'dan tashqari. R19'da bu muammo hal qilingan.
 - **`flushSync` inside transition**: Forces sync flush, breaks transition. Avoid mixing.
 
 ### Follow-up savollar
@@ -2017,7 +2012,7 @@ function useWindowSize() {
 
 - **Zustand** — `useSyncExternalStore` based
 - **Jotai** — atom subscriptions
-- **Redux v9** — `useSyncExternalStore`
+- **react-redux v8+** — `useSyncExternalStore` ichida
 - **MobX** — observer wrapper bilan
 
 </details>
@@ -2267,13 +2262,14 @@ function useDeferredValue<T>(value: T): T {
 }
 ```
 
-**Timeout argument (R19+):**
+**`initialValue` argument (R19):**
 
 ```tsx
-// R19 experimental — timeout argument
-const deferred = useDeferredValue(value, { timeoutMs: 2000 });
-// If transition takes longer than 2000ms, force commit
-// (Not yet stable, may change)
+// R19 — initialValue argument
+const deferred = useDeferredValue(value, initialValue);
+// Birinchi render'da deferred = initialValue (mount uchun)
+// Keyin background re-render'da value'ga converge
+// Use case: birinchi mount'da heavy compute'ni kechiktirish
 ```
 
 **Concurrent suspend integration:**
@@ -2348,17 +2344,17 @@ const debouncedQuery = useDebounced(query, 300);
 //                   adapts to system performance
 ```
 
-**Performance characteristics:**
+**Performance xususiyatlari:**
 
 ```
-useDeferredValue overhead:
-- Hook slot allocation: ~0.5µs
-- Per render comparison: ~0.1µs
+useDeferredValue mexanizmi:
+- Hook slot allocation va Object.is comparison — minimal overhead
+- Heavy compute'ni TransitionLane'ga surish — asosiy qiymat
 
-Heavy computation amortization:
-- Without: blocks main thread
-- With: yields, retries on abort
-- Net cost: similar, but UI responsive
+Natija:
+- useDeferredValue'siz: heavy compute main thread'ni bloklaydi
+- useDeferredValue bilan: yield + abort/retry, UI responsive
+- Total compute vaqti biroz ko'proq (yield overhead), lekin UX yaxshi
 ```
 
 **Multiple deferred values:**
@@ -2526,13 +2522,15 @@ Both use TransitionLane — non-urgent. Difference is API ergonomics.
 ### Follow-up savollar
 
 - "Compiler auto-applies?" — No. Manual decision.
-- "Performance overhead?" — Minimal. Lane bookkeeping ~5%, perceived smoothness huge.
+- "Performance overhead?" — Minimal. Lane bookkeeping overhead negligible, perceived smoothness sezilarli.
 
 </details>
 
 ---
 
 ## QISM C: Suspense
+
+<a id="qism-c"></a>
 
 ### 9. Suspense — code splitting uchun qanday ishlatiladi? [Junior+]
 
@@ -2979,7 +2977,9 @@ function getUserPromise(id: string): Promise<User> {
   if (!cache.has(id)) {
     cache.set(id, fetch(`/api/users/${id}`).then((r) => r.json()));
   }
-  return cache.get(id)!;
+  const cached = cache.get(id);
+  if (!cached) throw new Error(`No cache entry for user ${id}`);
+  return cached;
 }
 
 function UserProfile({ userId }: { userId: string }) {
@@ -3071,33 +3071,34 @@ type Thenable<T> =
 function trackUsedThenable<T>(thenable: Thenable<T>): T {
   if (typeof thenable.then === "function") {
     if (!("status" in thenable)) {
-      // Wrap native Promise to track status
-      const wrapped = thenable;
-      wrapped.then(
+      // React internal: Promise object'ga status/value property qo'shadi
+      // (bu React engine internal — user code'da bunday qilmaslik kerak)
+      const tracked = thenable as Record<string, unknown>;
+      thenable.then(
         (value) => {
-          (wrapped as any).status = "fulfilled";
-          (wrapped as any).value = value;
+          tracked.status = "fulfilled";
+          tracked.value = value;
         },
         (reason) => {
-          (wrapped as any).status = "rejected";
-          (wrapped as any).reason = reason;
+          tracked.status = "rejected";
+          tracked.reason = reason;
         },
       );
-      (wrapped as any).status = "pending";
+      tracked.status = "pending";
     }
   }
   return thenable as T;
 }
 ```
 
-**Why `use()` doesn't follow Rules of Hooks:**
+**`use()` nima uchun conditional chaqirilishi mumkin:**
 
-`use()` doesn't store state in Fiber's hook list (unlike `useState`). It reads from external Promise. Conditional/loop usage doesn't desync hook order.
+`use()` Fiber'ning hook linked list'iga element qo'shmaydi (useState/useEffect'dan farqli). Promise yoki Context'dan value'ni to'g'ridan-to'g'ri o'qiydi. Shuning uchun conditional/loop ichida chaqirish hook order'ni buzmaydi.
 
 ```typescript
 // Internal:
-// use() does NOT advance hook pointer
-// It directly reads Promise/Context value
+// use() hook pointer'ni advance qilmaydi
+// Promise status'ini tekshiradi yoki Context value o'qiydi
 ```
 
 **Tracking pattern — useMemo for stable Promise:**
@@ -3470,17 +3471,17 @@ When suspense triggered, fallback **replaces** primary children. Primary tree hi
 // Effects: cleanup runs, then setup again on reveal
 ```
 
-**Performance implications:**
+**Performance ta'siri:**
 
 ```
-Coarse Suspense (1 boundary, 1MB chunks):
-- Initial: 1 fallback shown
-- Load time: 5s
-- User experience: blank for 5s
+Coarse Suspense (1 boundary, katta chunk):
+- Initial: 1 ta fallback ko'rinadi
+- Butun chunk yuklanguncha — fallback
+- User experience: uzoq vaqt fallback
 
-Fine Suspense (10 boundaries, 100KB each):
-- Initial: 10 small fallbacks
-- Load time: 1s for first chunk, parallel
+Fine Suspense (ko'p boundary, kichik chunk'lar):
+- Har boundary o'z chunk'ini yuklay boshlaydi (parallel)
+- Birinchi boundary tez resolve — qisman content
 - User experience: progressive reveal
 ```
 
@@ -3552,7 +3553,7 @@ function DelayedSuspense({ children, fallback, delay = 200 }: Props) {
 
 ### Qisqa javob
 
-`SuspenseList` — bir necha `Suspense` boundary'lar yuklash tartibini koordinatsiya qiluvchi komponent. **Hozirda unstable** (R18-R19) — `unstable_SuspenseList` shaklida. Props: `revealOrder` (`forwards`/`backwards`/`together`), `tail` (`collapsed`/`hidden`). Use case: multiple async sections — controlled reveal order. Fallback: native ordering (random load completion). Future: stable release ko'p versiyalardan keyin (Meta hali interneal'da). Workaround: manual coordination via `useState` flags.
+`SuspenseList` — bir necha `Suspense` boundary'lar yuklash tartibini koordinatsiya qiluvchi komponent. **Hozirda unstable** (R18-R19) — `unstable_SuspenseList` shaklida. Props: `revealOrder` (`forwards`/`backwards`/`together`), `tail` (`collapsed`/`hidden`). Use case: multiple async sections — controlled reveal order. Fallback: native ordering (random load completion). Future: stable release ko'p versiyalardan keyin (Meta hali internal'da). Workaround: manual coordination via `useState` flags.
 
 ### To'liq tushuntirish
 
@@ -3635,7 +3636,7 @@ function ArticlesList({ articleIds }: { articleIds: string[] }) {
 **Manual coordination workaround (stable):**
 
 ```tsx
-import { useState, Suspense } from "react";
+import { useState, useCallback, Suspense } from "react";
 
 function CoordinatedList<T>({
   items,
@@ -4061,7 +4062,10 @@ class ErrorBoundary extends React.Component<Props, State> {
 ```tsx
 import { createRoot } from "react-dom/client";
 
-const root = createRoot(document.getElementById("root")!, {
+const container = document.getElementById("root");
+if (!container) throw new Error("Root element not found");
+
+const root = createRoot(container, {
   onCaughtError: (error, errorInfo) => {
     // Error caught by ErrorBoundary
     logTelemetry({ type: "caught", error, errorInfo });
@@ -4185,6 +4189,8 @@ R18+ streaming SSR — graceful error handling per chunk.
 ---
 
 ## QISM D: Streaming SSR
+
+<a id="qism-d"></a>
 
 ### 14. Streaming SSR — concept va R18 implementation [Middle]
 
@@ -4476,17 +4482,16 @@ const { pipe, abort } = renderToPipeableStream(<App />, {
 **Streaming benefits:**
 
 ```
-Without streaming (R17):
-- TTFB: 2000ms (wait for all data)
-- FCP: 2100ms
-- TTI: 2500ms
-- User experience: blank for 2s
+Without streaming (R17 renderToString):
+- TTFB: barcha data ready bo'lguncha kutadi
+- FCP: TTFB + HTML parse
+- User experience: data slow bo'lsa, blank sahifa uzoq
 
-With streaming (R18):
-- TTFB: 50ms (immediate)
-- FCP: 100ms (shell rendered)
-- TTI: 800ms (selective hydration)
-- User experience: immediate UI, progressive content
+With streaming (R18 renderToPipeableStream):
+- TTFB: shell tayyor bo'lgandan beri — darhol
+- FCP: shell HTML parse'dan keyin — tezkor
+- Selective hydration: user interaction'ga prioritize
+- User experience: progressive — shell, keyin content chunk'lar
 ```
 
 **`bootstrapScripts` — auto inject:**
@@ -4810,19 +4815,18 @@ R18+ — recoverable mismatches: log warning, continue.
 // Yields to browser
 ```
 
-**Performance characteristics:**
+**Performance farqi:**
 
 ```
-Pre-R18 hydration (1MB JS, 100KB HTML):
-- Hydration: 200ms blocking
-- Time to Interactive: 250ms
-- User clicks during hydration → ignored
+Pre-R18 hydration:
+- Hydration: sync, blocking (tree hajmiga proporsional)
+- User click'lar hydration davomida — ignored (R17)
 
 R18 selective hydration:
-- Initial: 50ms (shell)
-- User interaction → prioritized boundary: 80ms
-- Total time slightly higher (yields), but TTI better
-- Click pre-hydration → replayed
+- Shell tezkor hydrate bo'ladi
+- User interaction → shu boundary prioritize qilinadi
+- Total vaqt biroz ko'proq (yield overhead), lekin TTI yaxshi
+- Click pre-hydration → replay qilinadi (R18 discreteUpdates)
 ```
 
 **Best practices:**
@@ -5009,18 +5013,18 @@ function Article() {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Bundle splitting impact:**
+**Bundle splitting ta'siri:**
 
 ```
 Pre-progressive:
-- main.js: 1MB (includes everything)
-- TTI: 200ms+
+- main.js: hamma narsa bitta bundle'da
+- TTI: butun bundle parse + hydrate kerak
 
 Progressive:
-- main.js: 200KB (critical path)
-- below-fold.js: 300KB (lazy)
-- footer.js: 100KB (lazy)
-- TTI: 50ms (critical only)
+- main.js: faqat critical path
+- below-fold.js: lazy load (kerak bo'lganda)
+- footer.js: lazy load
+- TTI: faqat critical bundle parse + hydrate — sezilarli tezroq
 ```
 
 **Architecture comparisons:**
@@ -5078,18 +5082,19 @@ Trade-off:
 - Qwik: minimal upfront, complex tooling
 ```
 
-**Hydration cost breakdown:**
+**Hydration cost asosiy qadamlari:**
 
 ```typescript
 // Per component:
-// 1. Component function called: ~5-50µs
-// 2. Hooks initialized: ~0.5µs each
-// 3. JSX evaluated: ~5-10µs
-// 4. Event listeners attached: ~5-10µs each
-// 5. Effects scheduled: ~1µs each
+// 1. Component function call (render)
+// 2. Hooks initialization
+// 3. JSX evaluation
+// 4. DOM node matching (Fiber ↔ server HTML)
+// 5. Event listener attach
+// 6. Effects scheduled
 
-// 1000 components:
-// ~50-100ms hydration time
+// Cost: component tree hajmiga proporsional
+// Ko'proq komponent = ko'proq hydration vaqt
 ```
 
 **Selective hydration triggers:**
@@ -5114,15 +5119,15 @@ const root = hydrateRoot(container, <App />, {
 });
 ```
 
-**Performance budgets:**
+**Web Vitals maqsadlari (Google tavsiya):**
 
 ```
-Initial JS bundle: < 100KB gzipped (critical path)
-TTI: < 800ms on 3G
-Hydration: < 100ms per Suspense boundary
-First Input Delay: < 100ms
-INP: < 200ms
+First Input Delay (FID): < 100ms (Google "good" threshold)
+Interaction to Next Paint (INP): < 200ms (Google "good" threshold)
+Largest Contentful Paint (LCP): < 2.5s (Google "good" threshold)
 ```
+
+Initial JS bundle hajmi va hydration vaqti — loyihaga bog'liq, profiling bilan o'lchanadi.
 
 **Production patterns:**
 
@@ -5168,6 +5173,8 @@ RSC reduces hydration cost:
 ---
 
 ## QISM E: Output va Bug Fix
+
+<a id="qism-e"></a>
 
 ### 17. Output savol — `useTransition` behavior [Middle]
 
@@ -5809,7 +5816,7 @@ function UserSearch() {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["users", query],
     queryFn: () => fetch(`/api/users?q=${query}`).then((r) => r.json()),
-    keepPreviousData: true,
+    placeholderData: (prev) => prev, // TanStack Query v5+ (keepPreviousData o'rniga)
   });
 
   return (
@@ -5903,6 +5910,8 @@ R19 Server Actions — built-in cancellation semantics.
 
 ## QISM F: R19 Hooks va Form Actions
 
+<a id="qism-f"></a>
+
 ### 20. `useId` Hook nima va SSR'da nima uchun u kerak? [Middle]
 
 <details>
@@ -5970,15 +5979,15 @@ function FormField() {
 
 > **Best practice:** Single `useId` chaqirib, suffix bilan multiple ID. Har element uchun alohida `useId` chaqirish ortiqcha.
 
-**Tree path encoding (format):**
+**ID format:**
 
 ```
-:r0:        — root depth 0
-:r1:        — root depth 1
-:R3l5:      — nested deeper
+:r0:        — client-only render (globalClientIdCounter base32)
+:R1a:       — hydration mode (tree path base32)
+:prefix-r0: — identifierPrefix berilsa
 ```
 
-Format React internal — sintaks `:` (CSS-incompatible) ataylab tanlangan — CSS selector'da ishlatmaslik uchun.
+Format React internal — `:` colon ataylab tanlangan (CSS selector'da to'g'ridan-to'g'ri ishlatib bo'lmaydi — `querySelector` uchun escape kerak).
 
 ### Kod misoli
 
@@ -6052,11 +6061,15 @@ Bir xil page'da multiple React roots (microfrontend) — ID collision xavfi. `cr
 ```tsx
 import { createRoot } from "react-dom/client";
 
-const rootA = createRoot(document.getElementById("app-a")!, {
+const containerA = document.getElementById("app-a");
+const containerB = document.getElementById("app-b");
+if (!containerA || !containerB) throw new Error("Root elements not found");
+
+const rootA = createRoot(containerA, {
   identifierPrefix: "a-",
 });
 
-const rootB = createRoot(document.getElementById("app-b")!, {
+const rootB = createRoot(containerB, {
   identifierPrefix: "b-",
 });
 
@@ -6189,17 +6202,18 @@ R19 **Form Actions** — `<form action={fn}>` syntax bilan declarative form hand
 **R18 vs R19 — `startTransition` async support:**
 
 ```tsx
-// R18 — async TAQIQ
-startTransition(() => {
-  setLoading(true);
-  await fetch(...); // ❌ "Functions passed to startTransition must not return promises"
+// R18 — async function'da await'dan keyingi setState scope'dan tushadi
+startTransition(async () => {
+  setLoading(true);       // ✅ transition scope'da
+  await fetch("/api");    // await'dan keyin...
+  setLoading(false);      // ❌ R18'da transition scope tugagan — DefaultLane
 });
 
-// R19 — async OK
+// R19 — async to'liq qo'llab-quvvatlanadi
 startTransition(async () => {
-  setLoading(true);
-  await fetch(...);
-  setLoading(false);
+  setLoading(true);       // ✅ transition scope'da
+  await fetch("/api");
+  setLoading(false);      // ✅ R19'da ham transition scope'da
 });
 ```
 
@@ -6718,11 +6732,11 @@ const { data } = useQuery({
 Bu fayl Concurrent React va Suspense'ning to'liq spektrini qamrab oldi:
 
 - **QISM A — Sync vs Concurrent** (4 savol): Sync limitations, Concurrent solutions, render purity, anti-patterns
-- **QISM B — startTransition + Tearing** (3 savol): `startTransition` mexanizmi, tearing va `useSyncExternalStore`, `useDeferredValue`
+- **QISM B — startTransition + Tearing** (4 savol): `startTransition` mexanizmi, tearing va `useSyncExternalStore`, `useDeferredValue`, decision tree
 - **QISM C — Suspense** (5 savol): Code splitting, R19 `use()`, nested boundaries, SuspenseList, ErrorBoundary integration
 - **QISM D — Streaming SSR** (3 savol): Streaming concept, selective hydration, progressive hydration patterns
 - **QISM E — Output & Bug Fix** (3 savol): `useTransition` behavior trace, Suspense timing, race condition + transition fix
-- **QISM F — R19 Hooks va Form Actions** (2 savol): `useId` (SSR-safe ID), Form Actions integration (`startTransition(async)`, `useActionState`, `useFormStatus`, `useOptimistic`)
+- **QISM F — R19 Hooks va Form Actions** (3 savol): `useId` (SSR-safe ID), Form Actions integration (`startTransition(async)`, `useActionState`, `useFormStatus`, `useOptimistic`), Suspense flicker prevention
 
 **Asosiy mental model'lar:**
 

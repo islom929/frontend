@@ -1,6 +1,6 @@
 # Bo'lim 30: Concurrent Rendering — Mental Model va Invariants
 
-> Concurrent rendering — React 18'da **default** bo'lib stabilizatsiyalangan ichki rendering modeli. Bu fayl `useTransition`/`useDeferredValue` API'larini qaytarib tushuntirmaydi (ular `22-concurrent-hooks.md`'da) va Scheduler'ning bit-darajali implementatsiyasini ham takrorlamaydi (u `05-scheduler-lanes.md`'da). Bu yerda **mental model** va **invariants** o'rganiladi: nima uchun komponent yozish usuli sync rendering bilan solishtirganda o'zgaradi, nima uchun render purity endi qattiq talab, Strict Mode 2x effect cycle nima uchun qo'shilgan, tearing nima va nima uchun external store consistency muammoga aylanadi, va `startTransition` invariants bilan qanday bog'lanadi.
+> Concurrent rendering — React 18'da **default** sifatida stable bo'lgan ichki rendering modeli. Bu fayl `useTransition`/`useDeferredValue` API'larini qaytarib tushuntirmaydi (ular `22-concurrent-hooks.md`'da) va Scheduler'ning bit-darajali implementation'ini ham takrorlamaydi (u `05-scheduler-lanes.md`'da). Bu yerda **mental model** va **invariants** o'rganiladi: nima uchun komponent yozish usuli sync rendering bilan solishtirganda o'zgaradi, nima uchun render purity endi qattiq talab, Strict Mode 2x effect cycle nima uchun qo'shilgan, tearing nima va nima uchun external store consistency muammoga aylanadi, va `startTransition` invariants bilan qanday bog'lanadi.
 
 ---
 
@@ -18,7 +18,7 @@
 - [Anti-Pattern 2: setState Callback Side Effects](#anti-pattern-2-setstate-callback-side-effects)
 - [Anti-Pattern 3: Stale Closure Concurrent State](#anti-pattern-3-stale-closure-concurrent-state)
 - [Anti-Pattern 4: External Mutable Reads During Render](#anti-pattern-4-external-mutable-reads-during-render)
-- [`startTransition` Invariants Kontekstida](#starttransition-invariants-kontekstida)
+- [`startTransition` Invariants Context'ida](#starttransition-invariants-contextida)
 - [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
 - [Amaliy Mashqlar](#amaliy-mashqlar)
@@ -30,15 +30,15 @@
 
 ### Nazariya
 
-**Sync rendering** (R16/R17 default) — render bir marta boshlangach, **yakuniga yetguncha to'xtatib bo'lmaydi**. Komponent funksiyasi chaqiriladi → Reconciler virtual tree quradi → Commit Phase'da DOM'ga mutation qiladi. Bu jarayon **uninterruptible**: agar ota-komponent 50ms davomida render bo'lsa, brauzerning main thread shu 50ms ga to'liq band bo'ladi, hech qanday user input/animation/scroll handler ishlamaydi.
+**Sync rendering** (R16/R17 default) — render bir marta boshlangach, **yakuniga yetguncha to'xtatib bo'lmaydi**. Komponent funksiyasi chaqiriladi → Reconciler virtual tree quradi → Commit Phase'da DOM'ga mutation qiladi. Bu jarayon **uninterruptible**: agar ota-komponent uzoq vaqt render bo'lsa (frame budget ≈16.67ms dan oshsa), brauzerning main thread shu davr ichida to'liq band bo'ladi, hech qanday user input/animation/scroll handler ishlamaydi.
 
-**Concurrent rendering** (R18+ default `createRoot` orqali) — render **interruptible** va **restartable**: Scheduler `frameYieldMs` (R18 source'da `5` konstanta) bo'yicha `shouldYield()` chaqiradi va main thread'ni brauzerga qaytaradi. R18'da Scheduler `isInputPending` Web API bilan integratsiya qilindi — paint kerak yoki user input pending bo'lsa, yieldda yuqori sezgirlik. User input keladi, paint kerak bo'ladi, yoki yuqori-priority lane chiqadi — Reconciler **joriy work-in-progress tree'ni tashlaydi va boshqatdan boshlaydi**.
+**Concurrent rendering** (R18+ default `createRoot` orqali) — render **interruptible** va **restartable**: Scheduler `frameYieldMs` (R16.5+ source'da `5` konstanta, R18/R19'da o'zgarmagan) bo'yicha `shouldYield()` chaqiradi va main thread'ni brauzerga qaytaradi. R18'da Scheduler'ga `isInputPending` Web API integration kodi qo'shildi (`enableIsInputPending` feature flag orqali; default `false` OSS production'da, Meta internal'da `true`) — flag yoqilganda paint kerak yoki user input pending bo'lsa, yieldda yuqori sezgirlik. User input keladi, paint kerak bo'ladi, yoki yuqori-priority lane chiqadi — Reconciler **joriy work-in-progress tree'ni tashlaydi va boshqatdan boshlaydi**.
 
 > **Versiya evolyutsiyasi (Rendering Model):**
 > - **R0.14–R15:** Stack Reconciler — recursive DFS, single-pass, **interrupt qilib bo'lmaydi** (call stack'dagi recursion'ni to'xtatish chaqiriq orqasiga qaytarish'siz iloji yo'q).
-> - **R16:** Fiber Reconciler joriy etildi — **iterativ DFS** linked list pointers (child/sibling/return), interruption mexanikasi infrastruktura sifatida tayyor, lekin **production sync mode** default.
+> - **R16:** Fiber Reconciler joriy etildi — **iterativ DFS** linked list pointers (child/sibling/return), interruption mexanikasi infrastructure sifatida tayyor, lekin **production sync mode** default.
 > - **R18 (2022):** `createRoot` API → **Concurrent rendering default**, `useTransition`/`useDeferredValue` stable, automatic batching kengaytirildi.
-> - **R19:** Concurrent + Server Components + Compiler integratsiyasi, asosiy mental model R18'dagi bilan bir xil — concurrent invariants barchasi qoladi.
+> - **R19:** Concurrent + Server Components + Compiler integration'i, asosiy mental model R18'dagi bilan bir xil — concurrent invariants barchasi qoladi.
 > - **Sabab:** Sync rendering 60fps frame budget (≈16.67ms) ichiga sig'mas edi katta tree'larda — input lag, jank, dropped frames. Concurrent rendering Scheduler'ni high-priority work uchun ajratadi.
 
 Bu o'zgarish **bir qator fundamental ta'sir** qiladi:
@@ -88,13 +88,13 @@ function shouldYield() {
     if (needsPaint || scheduling.isInputPending(continuousOptions)) {
       return true;
     }
-    return timeElapsed >= maxYieldInterval;
+    return timeElapsed >= maxYieldMs;
   }
   return true;
 }
 ```
 
-`frameYieldMs` (R18 source'da `5`) — yield interval. R17 va undan oldinroq Scheduler ham 5ms yield ishlatardi; R18'dagi asosiy yangilik — Chrome `isInputPending` Web API integratsiyasi (input/paint pending bo'lsa darhol yield) va lane priority bilan birga ishlash (rasmiy paint priority hisobi).
+`frameYieldMs = 5` ms (R16.5+ source'da kiritilgan konstanta, R18/R19'da o'zgarmagan) — yield interval. R17 va undan oldinroq Scheduler ham 5ms yield ishlatardi; R18'dagi asosiy yangilik — Chrome `isInputPending` Web API integration kodining `enableIsInputPending` feature flag orqali kiritilishi (flag yoqilsa, input/paint pending bo'lsa darhol yield) va lane priority bilan birga ishlash (paint priority hisobi). OSS build'da `enableIsInputPending = false` default — fallback `timeElapsed >= frameYieldMs` bo'yicha yield ishlaydi.
 
 **Restart mexanikasi:** agar render davomida yangi yuqori-priority update kelsa (masalan, click event SyncLane'ga keladi, joriy render Transition Lane), Reconciler:
 
@@ -146,9 +146,12 @@ render(<App />, document.getElementById('root'));
 
 // ✅ Concurrent rendering (R18+):
 import { createRoot } from 'react-dom/client';
-const root = createRoot(document.getElementById('root')!);
+
+const container = document.getElementById('root');
+if (!container) throw new Error('Root container "#root" topilmadi');
+const root = createRoot(container);
 root.render(<App />);
-// Har setState barcha kontekstlarda batched.
+// Har setState barcha context'larda batched.
 // useTransition/startTransition orqali interruptible work.
 ```
 
@@ -194,7 +197,7 @@ Bu yerda foydalanuvchi tez yozsa, `setQuery` har keystroke'ga sync render qiladi
 
 ### Nazariya
 
-Concurrent rendering kafolatining eng kuchli tomoni — **render funksiyasi har vaqt restart bo'lishi mumkin**. Komponent funksiyasi bir logical render uchun **bir, ikki, yoki uch marta** chaqirilishi mumkin (interrupt → restart, Strict Mode 2x cycle). Reconciler shu hodisani **silently** qiladi — komponent buni sezmaydi.
+Concurrent rendering kafolatining eng kuchli tomoni — **render funksiyasi har vaqt restart bo'lishi mumkin**. Komponent funksiyasi bir logical render uchun **bir necha marta** chaqirilishi mumkin: production'da odatda 1 marta, Strict Mode dev'da minimum 2 marta, concurrent restart sodir bo'lsa N+ marta (yuqori-priority update interrupted Transition'ni qayta-qayta restartlashi mumkin). Reconciler shu hodisani **silently** qiladi — komponent buni sezmaydi.
 
 Bu sababdan **Render Purity** Concurrent rendering'da **invariant**, anti-pattern emas:
 
@@ -216,7 +219,7 @@ Render Phase **qayerda boshlanadi va tugaydi**:
 
 Shu oraliqda **ruxsat etilgan**: `useState`/`useReducer` snapshot o'qish, `useMemo`/`useCallback` cached computation, `useContext` value o'qish, lazy initial state (`useState(() => expensive())` — bir marta mount'da).
 
-**Ruxsat etilmagan**: setState boshqa komponentga (Render Phase ichida warning), DOM mutation, fetch, Date/Math/Crypto/Performance random reads, mutable global o'qish, refsiz `ref.current = x` yozish (state-mutation analog), uncached side effect (har render bajariladigan).
+**Ruxsat etilmagan**: setState boshqa komponentga (Render Phase ichida warning — "Cannot update a component while rendering a different component"), DOM mutation, fetch, Date/Math/Crypto/Performance random reads, mutable global o'qish, render Phase'da `ref.current = x` yozish (state mutation'ga teng — bailout buzadi), uncached side effect (har render bajariladigan).
 
 Yagona istisno: **rendering phase setState o'zining state'iga** — bu shart bo'yicha pure (yangi state old state'dan derive bo'ladi), lekin to'g'ri ishlatilsa — `useState` ga setter ichida `setState(prev => derive(prev))` yangi state'ni hisoblaydi va **render qaytadan boshlanadi** (warning'siz, faqat **bir marta to'g'rilash** sifatida ruxsat).
 
@@ -250,10 +253,10 @@ Strict Mode shuningdek: `useState` initializer, `useMemo` factory, `useReducer` 
 **Compiler-time invariant** (React Compiler):
 ```javascript
 // Pseudocode: Compiler analiz
-function MyComponent({ items }) {
+function CartSummary({ items }) {
   items.push('extra'); // ❌ Compiler error: mutation of non-local value
   
-  const total = items.reduce((s, x) => s + x.price, 0);
+  const total = items.reduce((sum, item) => sum + item.price, 0);
   // ✅ Pure read, memoized as _c[0]
   
   return <div>{total}</div>;
@@ -264,7 +267,7 @@ Compiler `eslint-plugin-react-compiler` orqali statik check qiladi (cross-ref `3
 
 **Bailout va render purity bog'liqligi:**
 
-Reconciler'ning bailout algoritmi (cross-ref `04-reconciliation.md`) **shallowEqual props** comparisongan asoslanadi. Agar Component props/state o'zgarmasa, Reconciler komponentni **qayta render qilmaydi** va eski JSX'ni qayta ishlatadi:
+Reconciler'ning bailout algoritmi (cross-ref `04-reconciliation.md`) **default FunctionComponent uchun `prevProps === nextProps` reference equality** ga asoslanadi (`MemoComponent` uchun `shallowEqual`). Agar Fiber'da pending update yo'q va props/context o'zgarmasa, Reconciler komponentni **qayta render qilmaydi** va eski JSX'ni qayta ishlatadi:
 
 ```
 Update propagation
@@ -272,12 +275,13 @@ Update propagation
        ▼
    Reconciler tries Component
        │
-       ├─ props/state/context unchanged → bailout, reuse JSX
+       ├─ prevProps === nextProps && no context change && no pending lanes
+       │  → bailoutOnAlreadyFinishedWork → komponent funksiyasi chaqirilmaydi
        │
-       └─ changed → render Component(props)
+       └─ changed → renderWithHooks(Component, nextProps) chaqiriladi
 ```
 
-Agar render impure bo'lsa (mutation), bailout natijasida **mutation skipped** bo'lib qoladi va silent bug paydo bo'ladi.
+Agar render impure bo'lsa (mutation render Phase'da), bailout natijasida **mutation skipped** bo'lib qoladi va silent bug paydo bo'ladi: state'da kuzatilmaydigan o'zgarish saqlanadi.
 
 **Restart wasted work cost:**
 
@@ -469,7 +473,7 @@ useEffect setup #2 (analytics.track)
 NIMA UCHUN R18'da qo'shildi:
 
 1. **Concurrent rendering preparation** — render restart bo'lsa, useEffect cleanup → setup ham takrorlanishi mumkin (nadir holat). Strict Mode bu invariant'ni har mount'da test qiladi.
-2. **Offscreen API** (R18 eksperimental) — komponent "yashirilishi" mumkin (DOM'da qoladi, lekin ko'rinmaydi). Yashirilish va qaytarib ko'rsatish — effect cleanup → setup cycle'iga teng.
+2. **Offscreen API** (R18 experimental) — komponent "yashirilishi" mumkin (DOM'da qoladi, lekin ko'rinmaydi). Yashirilish va qaytarib ko'rsatish — effect cleanup → setup cycle'iga teng.
 3. **Fast Refresh** — file save'da komponent state saqlanib effects qayta ishga tushadi. Cleanup buzuq bo'lsa, dev experience yomon.
 4. **Error recovery** — Suspense yoki Error Boundary recovery'sida re-mount mumkin.
 
@@ -531,7 +535,7 @@ useEffect(() => {
 
 **Reactivity vs Idempotency:**
 
-Strict Mode 2x cycle "**network 2x request**" muammoga olib kelishi mumkin. Bu, aslida, **bug — aslidagi setup**. To'g'ri implementatsiya `AbortController` bilan birinchi request bekor qilinadi va faqat 2-chi request resolve bo'ladi. Server'da ikki request bo'lsa ham — javob faqat oxirgisi bo'ladi, side effect yo'q.
+Strict Mode 2x cycle "**network 2x request**" muammoga olib kelishi mumkin. Bu, aslida, **bug — aslidagi setup**. To'g'ri implementation: `AbortController` bilan birinchi request bekor qilinadi va faqat 2-chi request resolve bo'ladi. Server'da ikki request bo'lsa ham — javob faqat oxirgisi bo'ladi, side effect yo'q.
 
 GET request'lar idempotent — 2x bajarilishida side effect yo'q (faqat qo'shimcha network cost). POST/PUT/DELETE — **idempotent emas**, ularni `useEffect` ichiga qo'ymaslik kerak (event handler'da bo'lsin).
 
@@ -584,8 +588,8 @@ function UserProfile({ userId }: { userId: string }) {
     fetch(`/api/users/${userId}`, { signal: controller.signal })
       .then((res) => res.json())
       .then((data: User) => setUser(data))
-      .catch((err) => {
-        if (err.name !== 'AbortError') console.error(err);
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name !== 'AbortError') console.error(err);
       });
     
     return () => controller.abort(); // ✅ Cleanup
@@ -622,7 +626,7 @@ import { useEffect } from 'react';
 
 function ProductPage({ productId }: { productId: string }) {
   useEffect(() => {
-    // ✅ Faqat router navigatsiyasi paytida event sifatida
+    // ✅ Faqat router navigation'i paytida event sifatida
     if (typeof window !== 'undefined' && window.history.state?.tracked !== productId) {
       analytics.track('product_view', { productId });
       window.history.replaceState({ tracked: productId }, '');
@@ -730,7 +734,7 @@ Bu mexanizm Redux v8+, Zustand v4+, MobX, Jotai — barcha modern store kutubxon
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`useSyncExternalStore` implementatsiyasi (soddalashtirilgan):
+`useSyncExternalStore` implementation'i (soddalashtirilgan):
 
 ```javascript
 function useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot) {
@@ -947,8 +951,8 @@ NIMA UCHUN **invariant**:
 
 - **Restart safety** — render restart bo'lsa, side effect ikki marta sodir bo'ladi.
 - **Strict Mode 2x render** — har komponent ikki marta chaqiriladi (R16.3+), purity buzilsa darhol ko'rinadi.
-- **Compiler talabi** — React Compiler (R19+) komponent'ni pure deb hisoblaydi va memoization qiladi. Mutation bo'lsa, optimizatsiya **buzuq kod** ishlab chiqaradi.
-- **Bailout** — Reconciler `props` shallow comparison'siga asoslanadi. Mutation bailout'ni buzadi (cross-ref `04-reconciliation.md`).
+- **Compiler talabi** — React Compiler (1.0 stable, R19.1+ bilan 2025-aprel) komponent'ni pure deb hisoblaydi va memoization qiladi. Mutation bo'lsa, optimization **buzuq kod** ishlab chiqaradi.
+- **Bailout** — Reconciler default'da `prevProps === nextProps` reference equality bilan bailout qiladi (`React.memo` HOC esa shallow comparison qiladi). Mutation reference'ni saqlaydi → bailout natijada o'zgarish ko'rinmaydi (cross-ref `04-reconciliation.md`).
 - **Concurrent restart** — render davomida yuqori-priority update kelsa, joriy work tashlab yuboriladi va qayta boshlanadi. Side effect bo'lsa — observable change.
 
 QANDAY tekshirish (development):
@@ -956,7 +960,7 @@ QANDAY tekshirish (development):
 1. **Strict Mode** — komponent funksiyasini 2x chaqiradi. Mutation qiymatda farq beradi (`renderCount++`).
 2. **`eslint-plugin-react-hooks`** — `react-hooks/exhaustive-deps` linter via static analysis.
 3. **`eslint-plugin-react-compiler`** — yangi rules-of-react checks (mutation, side effect).
-4. **React Compiler** — kompilyatsiya paytida static analysis, mutation bo'lsa kompilyatsiya qiladi lekin warning bilan.
+4. **React Compiler** — compile vaqtida static analysis; mutation aniqlansa, build chiqariladi lekin warning bilan (yoki bypass: `"use no memo"` directive).
 
 Yagona istisno — **lazy initial state**:
 
@@ -977,7 +981,7 @@ Render Purity'ning **observable consequences** (kuzatilishi mumkin oqibatlar):
 
 ```javascript
 // React Compiler ichki algoritmi (oddiy holat)
-function MyComponent({ items }) {
+function CartSummary({ items }) {
   // Compiler analiz qiladi:
   // - items prop, immutable
   // - total computed from items, depends on items only
@@ -985,7 +989,7 @@ function MyComponent({ items }) {
   
   if (cache[0] !== items) {
     cache[0] = items;
-    cache[1] = items.reduce((s, x) => s + x.price, 0); // total
+    cache[1] = items.reduce((sum, item) => sum + item.price, 0); // total
   }
   const total = cache[1];
   
@@ -993,17 +997,24 @@ function MyComponent({ items }) {
 }
 ```
 
-Agar `items.push('extra')` qilinsa render ichida — Compiler Cache slot mismatch ko'radi va **eski qiymat**ni qaytaradi (yoki kompilyatsiya error).
+Agar `items.push('extra')` qilinsa render ichida — Compiler Cache slot mismatch ko'radi va **eski qiymat**ni qaytaradi (yoki compile error).
 
 **2. Bailout break:**
 
 ```javascript
-// Reconciler bailout
-function shouldBailout(prevProps, nextProps) {
-  // Object.is(props, nextProps) || shallowEqual(props, nextProps)
+// Default FunctionComponent bailout (Reconciler)
+function shouldBailoutDefault(prevProps, nextProps) {
+  return prevProps === nextProps; // === reference equality
   // Mutation bo'lsa — reference saqlanadi → bailout TRUE → re-render skipped
-  // Yangi qiymat ko'rinmaydi
 }
+
+// MemoComponent bailout (React.memo HOC)
+function shouldBailoutMemo(prevProps, nextProps) {
+  return shallowEqual(prevProps, nextProps); // har property `Object.is`
+  // Mutation bo'lsa — har property reference bir xil → shallowEqual true → bailout
+}
+
+// Ikkala holatda ham mutation natijasi bir xil: yangi qiymat ko'rinmaydi.
 ```
 
 **3. Concurrent restart amplification:**
@@ -1322,7 +1333,7 @@ Async setState — stale closure bug:
 ```tsx
 import { useState } from 'react';
 
-// ❌ Direct value — async kontekstda stale closure
+// ❌ Direct value — async context'da stale closure
 function ClickCounter() {
   const [count, setCount] = useState(0);
   
@@ -1397,8 +1408,14 @@ useReducer — bog'liq state'lar guruhi:
 ```tsx
 import { useReducer } from 'react';
 
+interface CartItem {
+  id: string;
+  qty: number;
+  price: number;
+}
+
 interface CartState {
-  items: { id: string; qty: number }[];
+  items: CartItem[];
   total: number;
 }
 
@@ -1415,17 +1432,20 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ? state.items.map((i) =>
             i.id === action.id ? { ...i, qty: i.qty + 1 } : i
           )
-        : [...state.items, { id: action.id, qty: 1 }];
+        : [...state.items, { id: action.id, qty: 1, price: action.price }];
       return {
         items,
         total: state.total + action.price,
       };
     }
-    case 'REMOVE':
+    case 'REMOVE': {
+      const item = state.items.find((i) => i.id === action.id);
+      if (!item) return state;
       return {
         items: state.items.filter((i) => i.id !== action.id),
-        total: 0, // recompute from items
+        total: state.total - item.price * item.qty,
       };
+    }
     case 'CLEAR':
       return { items: [], total: 0 };
     default:
@@ -1591,7 +1611,7 @@ function commitHookEffectListMount() {
 
 R18'da atomic separation — Offscreen API uchun, komponent "yashiringan" bo'lsa cleanup bajariladi va keyinroq mount paytida setup, lekin atomic.
 
-**Cleanup'siz subscription'ning konsekvensiyasi:**
+**Cleanup'siz subscription oqibati:**
 
 ```javascript
 // Component A mount
@@ -1614,7 +1634,7 @@ Cleanup'siz subscription/listener'larning quyidagi resurslari saqlanadi:
 - **Listener entry** — store/event-target ichidagi listener ro'yxat slot'i (Set/Array entry).
 - **Fiber retention** — handler closure orqali Fiber tree'ning bir qismi (parent chain) reachable bo'lib qoladi → GC ushlamaydi.
 
-Ko'p mount/unmount cycle (masalan, navigation orqali bir komponent qayta-qayta yaratilsa) cleanupsiz holatda heap kattalashadi va listener registry sekinlashadi — har store change handler'larning **sonidan ortib boruvchi soni** chaqiriladi. Aniq qiymatlar bundle, scope o'lchami va store implementatsiyasiga bog'liq, lekin order of magnitude — bir necha KB per leak.
+Ko'p mount/unmount cycle (masalan, navigation orqali bir komponent qayta-qayta yaratilsa) cleanupsiz holatda heap kattalashadi va listener registry sekinlashadi — har store change handler'larning **sonidan ortib boruvchi soni** chaqiriladi. Aniq qiymatlar bundle, scope o'lchami va store implementation'iga bog'liq.
 
 </details>
 
@@ -1707,9 +1727,9 @@ function UserCard({ userId }: { userId: string }) {
         return res.json();
       })
       .then((data: User) => setUser(data))
-      .catch((err) => {
-        if (err.name === 'AbortError') return; // Expected
-        setError(err);
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') return; // Expected
+        if (err instanceof Error) setError(err);
       });
     
     return () => controller.abort(); // ✅ Cancel inflight
@@ -1795,7 +1815,7 @@ QANDAY ishlatish:
 
 `getServerSnapshot` (SSR):
 
-1. **Deterministik** — server'da tushunarli qiymat (default state, browser API'siz).
+1. **Deterministic** — server'da tushunarli qiymat (default state, browser API'siz).
 2. **No browser globals** — `window`, `document`, `localStorage` yo'q.
 3. **Hydration mismatch** — agar server snapshot va client first snapshot farq qilsa, hydration warning paydo bo'ladi.
 
@@ -2096,9 +2116,9 @@ function bailoutOnAlreadyFinishedWork(workInProgress) {
     return null;
   }
   
-  // Props/state shallow comparison
+  // Props reference comparison (React internal uses ===, not Object.is)
   if (
-    Object.is(workInProgress.memoizedProps, workInProgress.pendingProps) &&
+    workInProgress.memoizedProps === workInProgress.pendingProps &&
     !workInProgress.queue?.shared.pending
   ) {
     return cloneChildren(workInProgress);
@@ -2115,7 +2135,7 @@ const items = ['a', 'b'];
 <List items={items} />
 // items.push('c') — same reference
 <List items={items} />
-// Object.is(prev, next) === true → bailout
+// prev === next → bailout TRUE (props uses ===)
 // items.length === 3, lekin <List> render qilinmaydi
 // UI: faqat 'a', 'b' ko'rinadi
 ```
@@ -2566,7 +2586,7 @@ Klassik stale closure manbalari:
 
 NIMA UCHUN Concurrent'da kuchayadi:
 
-- **Transition pending** — useTransition ichida ish lik commit qilinmagan vaqtda yangi state hali ham eski (Transition ishlanmaguncha). Async kontekstda eski state'ni o'qish bug keltirib chiqaradi.
+- **Transition pending** — useTransition ichida ish lik commit qilinmagan vaqtda yangi state hali ham eski (Transition ishlanmaguncha). Async context'da eski state'ni o'qish bug keltirib chiqaradi.
 - **Suspense retry** — komponent re-mount bo'lsa closure qayta yaratiladi, lekin saqlangan timer/listener eski closure'ga ega.
 - **Interrupted render** — render uzilib boshqa state bilan resume bo'lsa, ba'zi closure'lar eski snapshot'dan.
 
@@ -2602,8 +2622,8 @@ useEffect(() => {
 
 > **Versiya evolyutsiyasi (Effect Event):**
 > - **Pre-R19 (R18 va undan oldin):** Stale closure muammoga uchta pattern (functional update / useRef latest / deps to'g'ri).
-> - **R19 RFC (eksperimental):** `useEffectEvent` hook joriy etilmoqda — non-reactive event handler'lar uchun. Render'da yopilgan state'ni har chaqiriqda **latest** qiymat bilan o'qish, deps'ga kiritmasdan.
-> - **Status:** R19'da hali stable emas, RFC stage. Production'da ishlatish tavsiya etilmaydi.
+> - **Experimental (RFC stage):** `experimental_useEffectEvent` hook canary build'lar uchun — non-reactive event handler'lar uchun. Render'da yopilgan state'ni har chaqiriqda **latest** qiymat bilan o'qish, deps'ga kiritmasdan.
+> - **Status:** R19.x stable'da hali yo'q (faqat experimental/canary build'larda mavjud). Production'da ishlatish tavsiya etilmaydi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2888,7 +2908,7 @@ const [id] = useState(() => crypto.randomUUID());
 // SSR: server'da generate, client'da hydrate'da SSR qiymati ishlatiladi
 ```
 
-Lekin SSR uchun `crypto.randomUUID()` mismatch xavfi — server va client har xil ID. `useId` SSR-safe (Fiber tree path'ga asoslangan deterministik).
+Lekin SSR uchun `crypto.randomUUID()` mismatch xavfi — server va client har xil ID. `useId` SSR-safe (Fiber tree path'ga asoslangan deterministic).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2980,7 +3000,7 @@ function FormField() {
 }
 // Strict Mode 2x render: 2 farqli ID, label/input mismatch.
 
-// ✅ useId — SSR-safe deterministik
+// ✅ useId — SSR-safe deterministic
 function FormField() {
   const id = useId();
   return (
@@ -3098,7 +3118,7 @@ function Clock() {
 
 ---
 
-## `startTransition` Invariants Kontekstida
+## `startTransition` Invariants Context'ida
 
 ### Nazariya
 
@@ -3260,7 +3280,7 @@ Render to completion
 Commit
 ```
 
-Yuvilgan ishlash 100+150 = 250 Fiber render — wasted. Lekin UI responsive (input lag yo'q).
+Sarflangan ish: 100+150 = 250 Fiber render — wasted. Lekin UI responsive (input lag yo'q).
 
 </details>
 
@@ -4022,7 +4042,7 @@ Concurrent rendering — React'ning **fundamental rendering modeli**, R18+'da de
 - **Tearing** — Concurrent yield orasida external store o'zgarsa, UI'ning ikki qismida turli qiymat ko'rinishi. `useSyncExternalStore` rasmiy yechim — tear detection sync degradation.
 - **4 ta Concurrent Invariants** — render purity, state functional merge, effect cleanup/setup symmetry, external subscription consistency.
 - **4 ta Anti-Pattern** — render-time mutation, setState callback side effects, stale closure, external mutable reads.
-- **`startTransition`** — explicit Concurrent boundary, invariants kontekstida — render purity kuchayadi (restart 2x), functional update afzal, cleanup symmetry shart.
+- **`startTransition`** — explicit Concurrent boundary, invariants context'ida — render purity kuchayadi (restart 2x), functional update afzal, cleanup symmetry shart.
 
 QISM 7 (Advanced Patterns) **TUGADI** ✅. Keyingi qism — QISM 8 (Performance & Compiler) — React Compiler bilan boshlanadi: build-time auto-memoization, manual `useMemo`/`useCallback`/`React.memo` kerak emas bo'lib qolishi.
 

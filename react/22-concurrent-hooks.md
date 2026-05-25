@@ -1,6 +1,6 @@
 # Bo'lim 22: Concurrent Hooks (R18)
 
-> R18 React'ga **Concurrent Mode** va u bilan bog'liq 4 ta yangi hook olib keldi: `useTransition` (non-urgent state update + isPending flag), `useDeferredValue` (defer expensive value), `useSyncExternalStore` (external store subscription tearing prevention library author'lar uchun), `useId` (SSR-safe deterministik unique ID generation). Bu hook'lar Concurrent rendering (Lanes priority, time slicing, render restart) bilan to'g'ridan-to'g'ri bog'lanadi (cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)). Bu bo'limda har hook'ning API, mexanizmi, use case'lari, decision tree va edge case'lari yoritiladi.
+> R18 React'ga **Concurrent Mode** va u bilan bog'liq 4 ta yangi hook olib keldi: `useTransition` (non-urgent state update + isPending flag), `useDeferredValue` (defer expensive value), `useSyncExternalStore` (external store subscription tearing prevention library author'lar uchun), `useId` (SSR-safe deterministic unique ID generation). Bu hook'lar Concurrent rendering (Lanes priority, time slicing, render restart) bilan to'g'ridan-to'g'ri bog'lanadi (cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)). Bu bo'limda har hook'ning API, mexanizmi, use case'lari, decision tree va edge case'lari yoritiladi.
 
 ---
 
@@ -30,7 +30,7 @@
 
 R18'dan boshlab Concurrent rendering — **default** (`createRoot`). R16-R17'dagi Sync rendering R18'da legacy mode'ga ko'chgan (`ReactDOM.render` deprecated), R19'da `ReactDOM.render` va `ReactDOM.hydrate` butunlay olib tashlangan — faqat `createRoot`/`hydrateRoot` qoldi.
 
-**Concurrent Mode asosiy g'oyalari** (cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)):
+**Concurrent Mode asosiy printsiplari** (cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)):
 
 1. **Time slicing** — render katta ish bo'lsa kichik chunks'ga bo'linadi (~5ms har chunk), browser frame'lar orasida bajariladi
 2. **Interruptible rendering** — render davomida high-priority work (user input) kelsa, joriy render to'xtatiladi va high-priority ish birinchi bajariladi
@@ -56,7 +56,7 @@ Concurrent (R18):
 | `useTransition` | State update'ni non-urgent transition lane'ga ko'chirish |
 | `useDeferredValue` | Value'ni "ortda" yangilash (priority pastroq) |
 | `useSyncExternalStore` | External store subscription Concurrent-safe |
-| `useId` | SSR-safe unique ID (Concurrent rendering paytida ham deterministik) |
+| `useId` | SSR-safe unique ID (Concurrent rendering paytida ham deterministic) |
 
 **Use case'lar — qachon kerak:**
 
@@ -79,13 +79,20 @@ R19'da `createRoot` yagona entry point — Concurrent default. R18'da `ReactDOM.
 **Lanes va priority (cross-ref 05):**
 
 ```ts
-// React internal — Lanes bitmap
-const SyncLane                = 0b0000000000000000000000000000001;
-const InputContinuousLane     = 0b0000000000000000000000000000100;
-const DefaultLane             = 0b0000000000000000000000000010000;
-const TransitionLane1         = 0b0000000000000000000000001000000;
-// ... TransitionLane2-16 ...
-const IdleLane                = 0b0100000000000000000000000000000;
+// React internal — Lanes bitmap (source: ReactFiberLane.js)
+const SyncHydrationLane         = 0b0000000000000000000000000000001;  // bit 0
+const SyncLane                  = 0b0000000000000000000000000000010;  // bit 1
+const InputContinuousHydrationLane = 0b0000000000000000000000000000100;  // bit 2
+const InputContinuousLane       = 0b0000000000000000000000000001000;  // bit 3
+const DefaultHydrationLane      = 0b0000000000000000000000000010000;  // bit 4
+const DefaultLane               = 0b0000000000000000000000000100000;  // bit 5
+const TransitionHydrationLane   = 0b0000000000000000000000001000000;  // bit 6
+const TransitionLane1           = 0b0000000000000000000000010000000;  // bit 7
+// ... TransitionLane2..16 — bits 8-22 (16 ones, 0b...11111111111111110000000) ...
+const IdleHydrationLane         = 0b0001000000000000000000000000000;  // bit 28
+const IdleLane                  = 0b0010000000000000000000000000000;  // bit 29
+const OffscreenLane             = 0b0100000000000000000000000000000;  // bit 30
+// Total: 31 lanes (V8 SMI range — Small Integer optimization)
 ```
 
 `useTransition` updates → TransitionLane (priority pastroq DefaultLane'dan).
@@ -657,7 +664,7 @@ startTransition(async () => {
 });
 ```
 
-R18'da transition flag faqat sinxron execution davomida active edi. R19'da React Actions infratuzilmasi async transition'ni qo'llab-quvvatlaydi: `startTransition` async scope qabul qiladi, internal'da React `await` davomida transition lane'ni tracking qiladi (ReactCurrentBatchConfig.transition har microtask boundary'da to'g'ri saqlanadi). Bu — `useActionState`/`<form action>` foundation.
+R18'da transition flag faqat sinxron execution davomida active edi. R19'da React Actions infrastructure'si async transition'ni qo'llab-quvvatlaydi: `startTransition` async scope qabul qiladi, internal'da React `await` davomida transition lane'ni tracking qiladi (ReactCurrentBatchConfig.transition har microtask boundary'da to'g'ri saqlanadi). Bu — `useActionState`/`<form action>` foundation.
 
 **Source citation:**
 
@@ -1093,7 +1100,7 @@ const results = useMemo(() => search(deferredQuery), [deferredQuery]);
 const deferred = useDeferredValue(value, initialValue);
 // initialValue — birinchi render'da qaytariladi (value o'rniga)
 // Keyingi render'larda value defer qilinadi (oddiy useDeferredValue mantig'i)
-// Foydali: SSR'da initial render uchun deterministik fallback
+// Foydali: SSR'da initial render uchun deterministic fallback
 ```
 
 R19'da qo'shilgan ikkinchi argument — initial value (kamdan-kam ishlatiladi, kompleks SSR yoki eager hydration scenarios uchun).
@@ -1610,7 +1617,7 @@ function useWindowWidth() {
 }
 ```
 
-`getServerSnapshot` — SSR paytida deterministik qiymat. Hydration mismatch oldini olish (cross-ref [`06-hydration.md`](06-hydration.md)).
+`getServerSnapshot` — SSR paytida deterministic qiymat. Hydration mismatch oldini olish (cross-ref [`06-hydration.md`](06-hydration.md)).
 
 `getServerSnapshot` ham bir xil reference qaytarish kerak — har gal `() => ({})` har gal yangi → mismatch.
 
@@ -1982,7 +1989,7 @@ React render davomida store snapshot consistency'ni tekshiradi.
 
 **`useSyncExternalStore` SSR `getServerSnapshot`:**
 
-SSR'da `window` yo'q, store deterministik bo'lishi shart:
+SSR'da `window` yo'q, store deterministic bo'lishi shart:
 
 ```ts
 function useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot) {
@@ -2122,7 +2129,7 @@ function useStoreFilter(): string {
 
 ### Nazariya
 
-`useId` (R18+) — komponent uchun **deterministik unique ID** generate qiluvchi hook. SSR-safe (server va client bir xil ID), accessibility (ARIA) uchun mo'ljallangan.
+`useId` (R18+) — komponent uchun **deterministic unique ID** generate qiluvchi hook. SSR-safe (server va client bir xil ID), accessibility (ARIA) uchun mo'ljallangan.
 
 **Signature:**
 
@@ -2229,7 +2236,7 @@ function List({ items }: { items: Item[] }) {
 function useId(): string {
   const hook = mountWorkInProgressHook();
   
-  // Fiber tree path asosida deterministik ID
+  // Fiber tree path asosida deterministic ID
   // Path: root → ... → currentlyRenderingFiber
   const id = ':' + 'r' + getTreeId(currentlyRenderingFiber) + ':';
   
@@ -2421,7 +2428,7 @@ function EmailField({ error }: { error?: string }) {
 
 ### Nazariya
 
-SSR'da server va client farq qiluvchi qiymatlar — hydration mismatch (cross-ref [`06-hydration.md`](06-hydration.md)). `useId` bu muammoni hal qiladi (deterministik IDs uchun).
+SSR'da server va client farq qiluvchi qiymatlar — hydration mismatch (cross-ref [`06-hydration.md`](06-hydration.md)). `useId` bu muammoni hal qiladi (deterministic IDs uchun).
 
 **Hydration mismatch sabablari:**
 
@@ -2488,12 +2495,12 @@ function useWindowWidth() {
   return useSyncExternalStore(
     (cb) => { window.addEventListener('resize', cb); return () => window.removeEventListener('resize', cb); },
     () => window.innerWidth,
-    () => 1024  // SSR deterministik
+    () => 1024  // SSR deterministic
   );
 }
 ```
 
-`getServerSnapshot` SSR uchun deterministik value.
+`getServerSnapshot` SSR uchun deterministic value.
 
 **Pattern 4 — `useId` keys uchun emas:**
 
@@ -2536,7 +2543,7 @@ Root
 └─ Footer
 ```
 
-Tree position deterministik — server va client bir xil tree → bir xil IDs.
+Tree position deterministic — server va client bir xil tree → bir xil IDs.
 
 **Conditional render trapi:**
 
@@ -2648,7 +2655,7 @@ function useViewport() {
     () => ({
       width: 1024,
       height: 768,
-    })  // SSR deterministik
+    })  // SSR deterministic
   );
 }
 ```
@@ -3315,7 +3322,7 @@ function Layout() {
 - `useSyncExternalStore` — Concurrent-safe (tearing prevention)
 - `subscribe` — `matchMedia` change listener
 - `getSnapshot` — joriy media query state
-- `getServerSnapshot` — SSR fallback (deterministik)
+- `getServerSnapshot` — SSR fallback (deterministic)
 - `useCallback` — subscribe va getSnapshot stable references
 
 `getSnapshot` boolean qaytaradi — primitive, reference identity muammo yo'q.
@@ -3336,7 +3343,7 @@ R18+ Concurrent hooks — Concurrent rendering bilan birga keldi. Asosiy fikrlar
 - **`isPending` flag pattern** — variants: spinner show, opacity + disable, skeleton, stale content + indicator. Multiple transitions overlap — `isPending` umumiy.
 - **`useDeferredValue`** — `useDeferredValue<T>(value)` value'ni defer qiladi (DeferredLane priority). Stale value detection (`oldValue !== newValue`). Initial render — `deferred === value` (sync).
 - **`useTransition` vs `useDeferredValue`** — bir xil maqsad, har xil API: `useTransition` setter joyida (write), `useDeferredValue` value joyida (read). `isPending` kerak — `useTransition`. Faqat props value — `useDeferredValue`.
-- **`useSyncExternalStore`** — `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot?)`. Library author'lar uchun (Redux, Zustand, Jotai, Recoil). `getSnapshot` har chaqiruvda **bir xil reference** qaytarish shart (yo'qsa infinite re-render). `getServerSnapshot` SSR uchun deterministik value.
+- **`useSyncExternalStore`** — `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot?)`. Library author'lar uchun (Redux, Zustand, Jotai, Recoil). `getSnapshot` har chaqiruvda **bir xil reference** qaytarish shart (yo'qsa infinite re-render). `getServerSnapshot` SSR uchun deterministic value.
 - **Tearing prevention** — Concurrent rendering paytida external state o'zgarsa, render davomida snapshot consistency. `useState + useEffect` manual subscription tearing-prone (R18+ Concurrent), `useSyncExternalStore` Concurrent-safe (snapshot pinned, render restart store o'zgarsa).
 - **`useId`** — `useId(): string`. Deterministik unique ID Fiber tree path asosida. SSR-safe (server va client bir xil ID). Format `:r0:`, `:r1:`. Multiple IDs single hook (suffix). Anti-pattern: keys uchun (Rules of Hooks buzilishi).
 - **Hydration mismatch prevention** — `useId` `Math.random`/`Date.now`/`window.*` patterns o'rniga. `useEffect` client-only state. `suppressHydrationWarning` aniq nuqta. `useSyncExternalStore` `getServerSnapshot` browser API'lar uchun.

@@ -39,7 +39,7 @@ React Render Lifecycle (R18+):
    ├─ JSX → Fiber tree (workInProgress)
    └─ Reconciliation (eski vs yangi tree)
 
-2. Commit Phase (sync, atomik, restart yo'q)
+2. Commit Phase (sync, atomic, restart yo'q)
    ├─ Before Mutation sub-phase
    │   └─ getSnapshotBeforeUpdate (legacy class)
    │
@@ -780,7 +780,7 @@ DOM measurement — `useLayoutEffect`'ning eng tipik use case'i. Komponent mount
 
 1. Komponent render qilinadi (initial DOM)
 2. JavaScript real DOM o'lchamini o'qiydi (`getBoundingClientRect`, `offsetWidth`)
-3. Olingan o'lcham asosida boshqa narsa hisoblaydi (e.g., tooltip pozitsiyasi, dynamic layout)
+3. Olingan o'lcham asosida boshqa narsa hisoblaydi (e.g., tooltip positionsi, dynamic layout)
 4. State yangilanadi → komponent re-render → yangi o'lcham bilan
 5. Browser paint — foydalanuvchi faqat oxirgi natijani ko'radi
 
@@ -797,7 +797,7 @@ DOM measurement — `useLayoutEffect`'ning eng tipik use case'i. Komponent mount
 | `getComputedStyle(element)` | CSSStyleDeclaration | Computed CSS values |
 | `window.innerWidth` / `innerHeight` | int (px) | Viewport size |
 
-**Eng ko'p ishlatiladigani:** `getBoundingClientRect()` — element pozitsiyasi va o'lchami bir vaqtda. Float values qaytaradi (sub-pixel precision).
+**Eng ko'p ishlatiladigani:** `getBoundingClientRect()` — element positionsi va o'lchami bir vaqtda. Float values qaytaradi (sub-pixel precision).
 
 **Layout thrashing — qochish kerak:**
 
@@ -892,7 +892,7 @@ interface DOMRect {
 
 **`ResizeObserver` performance:**
 
-`ResizeObserver` browser'ning o'z layout cycle'iga integratsiyalangan — har frame'da bir marta callback chaqiradi (debounced). `useLayoutEffect`'da poll'lash o'rniga afzal.
+`ResizeObserver` browser'ning o'z layout cycle'iga integration qilingan — har frame'da bir marta callback chaqiradi (debounced). `useLayoutEffect`'da poll'lash o'rniga afzal.
 
 ```ts
 // ❌ Polling (sekin)
@@ -1100,17 +1100,17 @@ function ScaleByContent() {
 
 ### Nazariya
 
-Tooltip — element ustiga hover qilganda paydo bo'ladigan kichik UI. Pozitsiyasini aniqlash uchun:
+Tooltip — element ustiga hover qilganda paydo bo'ladigan kichik UI. Position'ini aniqlash uchun:
 
-1. Trigger element pozitsiyasini o'qish (`getBoundingClientRect`)
+1. Trigger element positionsini o'qish (`getBoundingClientRect`)
 2. Tooltip o'lchamini o'qish
 3. Viewport chegaralarini hisobga olish (off-screen bo'lmasligi)
-4. Tooltip pozitsiyasini hisoblash
+4. Tooltip positionsini hisoblash
 5. State yangilash → tooltip render qilingan joyda
 
 Bu — `useLayoutEffect`'ning klassik use case. `useEffect`'da paint orasida tooltip noto'g'ri joyda ko'rinadi (flicker).
 
-**Pozitsiyalash logikasi:**
+**Position'lash logikasi:**
 
 ```
 Trigger (button)
@@ -1166,7 +1166,7 @@ Portal — `useLayoutEffect` bilan birga. Render Phase Portal child'larni kerakl
 
 **Scroll va resize tracking:**
 
-Tooltip pozitsiyasi viewport o'zgarishlarida (scroll, resize) yangilanishi kerak. `useLayoutEffect` ichida event listener:
+Tooltip positionsi viewport o'zgarishlarida (scroll, resize) yangilanishi kerak. `useLayoutEffect` ichida event listener:
 
 ```ts
 useLayoutEffect(() => {
@@ -1386,13 +1386,13 @@ function StickyTooltip({ targetRef, content }: {
 
 ### Nazariya
 
-Scroll restoration — sahifa orasida o'tganida scroll pozitsiyasini saqlash va qaytarish. Klassik use case'lar:
+Scroll restoration — sahifa orasida o'tganida scroll positionsini saqlash va qaytarish. Klassik use case'lar:
 
-- Back button: avvalgi sahifaga qaytganda scroll pozitsiyasi
+- Back button: avvalgi sahifaga qaytganda scroll positionsi
 - Tab switching: tab'ga qaytganida scroll
-- Modal close: modal yopilganida sahifa scroll pozitsiyasi tiklanadi
+- Modal close: modal yopilganida sahifa scroll positionsi tiklanadi
 
-`useLayoutEffect` ishlatiladi chunki scroll set'i paint'dan oldin bo'lishi kerak — yo'qsa user avval boshqa pozitsiyani, keyin to'g'ri pozitsiyani ko'radi (flicker).
+`useLayoutEffect` ishlatiladi chunki scroll set'i paint'dan oldin bo'lishi kerak — yo'qsa user avval boshqa positionni, keyin to'g'ri positionni ko'radi (flicker).
 
 **Scroll API:**
 
@@ -1400,7 +1400,7 @@ Scroll restoration — sahifa orasida o'tganida scroll pozitsiyasini saqlash va 
 |-----|-------|
 | `window.scrollY` / `pageYOffset` | Sahifa vertikal scroll px |
 | `element.scrollTop` | Element ichki vertikal scroll |
-| `window.scrollTo({ top, behavior })` | Scroll pozitsiyasini set qilish |
+| `window.scrollTo({ top, behavior })` | Scroll positionsini set qilish |
 | `element.scrollIntoView()` | Element ko'rinishga keltirish |
 
 **Scroll lock — body scroll'ni to'xtatish:**
@@ -1461,7 +1461,7 @@ function useScrollRestoration(key: string) {
 }
 ```
 
-`useLayoutEffect` — restoration paint'dan oldin → user to'g'ridan-to'g'ri saqlangan pozitsiyani ko'radi.
+`useLayoutEffect` — restoration paint'dan oldin → user to'g'ridan-to'g'ri saqlangan positionni ko'radi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1566,7 +1566,7 @@ function ChatMessages({ messages }: { messages: Message[] }) {
     if (ref.current) {
       ref.current.scrollTop = ref.current.scrollHeight;
       // Yangi message qo'shilganda — eng pastga scroll
-      // useLayoutEffect: paint dan oldin → user faqat oxirgi pozitsiyani ko'radi
+      // useLayoutEffect: paint dan oldin → user faqat oxirgi positionni ko'radi
     }
   }, [messages.length]);
   
@@ -2142,7 +2142,7 @@ useEffect(() => {
 });
 ```
 
-`requestIdleCallback` — browser bo'sh vaqtda chaqiriladi. **Safari'da yo'q** (cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)) — React MessageChannel ishlatadi.
+`requestIdleCallback` — browser bo'sh vaqtda chaqiriladi. Browser support: Chrome 47+ (2015-12), Firefox 55+ (2017-08), **Safari 16.4+** (2023-03) — `requestIdleCallback`'ni qo'shdi (eski Safari versiyalarda yo'q edi, shu sababli React MessageChannel fallback ishlatadi — cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)).
 
 **Source citation:**
 
@@ -3119,7 +3119,7 @@ Quyidagi savollar bilan to'g'ri hook tanlash:
 90%+ holatlarda `useEffect` to'g'ri tanlov. `useLayoutEffect` faqat:
 
 - DOM measurement → state update → re-render kerak
-- Tooltip/popover/modal pozitsiyalash
+- Tooltip/popover/modal positionlash
 - Scroll restoration
 - Focus management
 - Layout-dependent calculation (equal heights, dynamic sizing)
@@ -3248,7 +3248,7 @@ function Tooltip({ targetRef }: { targetRef: React.RefObject<HTMLElement> }) {
     }
   }, [targetRef]);
   
-  // Avval (0, 0)'da paint, keyin to'g'ri pozitsiyada paint
+  // Avval (0, 0)'da paint, keyin to'g'ri positionda paint
   return <div style={{ position: 'fixed', left: position.x, top: position.y }} />;
 }
 
@@ -3419,7 +3419,7 @@ function UserCard({ userId }: { userId: string }) {
 // Suspense fallback paytida cleanup chaqirilmaydi
 ```
 
-Sinxronizatsiya invariant'i Suspense'da ham qo'llanadi — agar effect resurslar yaratsa va Suspense pause qilsa, cleanup paytida muammo bo'lishi mumkin.
+Sync invariant'i Suspense'da ham qo'llanadi — agar effect resurslar yaratsa va Suspense pause qilsa, cleanup paytida muammo bo'lishi mumkin.
 
 ---
 
@@ -3596,7 +3596,7 @@ function useElementSize<T extends HTMLElement>(): [
 
 ### Mashq 2 — `useScrollPosition` Hook (Oson)
 
-Scroll pozitsiyasi (`x`, `y`) ni track qiluvchi hook yozing.
+Scroll positionsi (`x`, `y`) ni track qiluvchi hook yozing.
 
 ```tsx
 function useScrollPosition(): { x: number; y: number } {
@@ -3729,7 +3729,7 @@ R19'dan `inert` attribute (parent darajasida) — focus trap'ning yarmini avtoma
 
 ### Mashq 4 — `useTooltipPosition` Hook (O'rta)
 
-Tooltip pozitsiyasini hisoblovchi hook yozing. Viewport chegaralarini hisobga olib, tooltip'ni "above" yoki "below" placement'ga o'tkazsin.
+Tooltip positionsini hisoblovchi hook yozing. Viewport chegaralarini hisobga olib, tooltip'ni "above" yoki "below" placement'ga o'tkazsin.
 
 ```tsx
 function useTooltipPosition(
@@ -3808,9 +3808,9 @@ function useTooltipPosition(
 
 **Tushuntirish:**
 
-- `useLayoutEffect` — pozitsiya paint'dan oldin (no flicker)
+- `useLayoutEffect` — position paint'dan oldin (no flicker)
 - Off-screen check — tooltip viewport'dan chiqib ketmasligi
-- Scroll/resize event'lar — pozitsiya yangilanishi
+- Scroll/resize event'lar — position yangilanishi
 - `tooltipHeight` approximate — production'da ref orqali o'lchash kerak
 
 Production'da `@floating-ui/react` library ishlatish tavsiya — collision detection, virtual element'lar, transform handling avtomatik.
@@ -3892,7 +3892,7 @@ Production'da `react-textarea-autosize` library ishlatish tavsiya (cross-browser
 
 `useLayoutEffect` va `useInsertionEffect` — `useEffect`'ning **timing variant**'lari. Asosiy fikrlar:
 
-- **`useLayoutEffect`** Commit Phase'ning Layout sub-phase'ida sinkron chaqiriladi — DOM yangilangandan keyin, browser paint'dan oldin. DOM measurement, tooltip positioning, scroll restoration, focus management, layout-dependent calculation uchun.
+- **`useLayoutEffect`** Commit Phase'ning Layout sub-phase'ida sync chaqiriladi — DOM yangilangandan keyin, browser paint'dan oldin. DOM measurement, tooltip positioning, scroll restoration, focus management, layout-dependent calculation uchun.
 - **API `useEffect` bilan bir xil** — `useLayoutEffect(setup, deps?)`. Cleanup, deps semantikasi, Strict Mode 2x cycle (R18+), exhaustive-deps linter — barchasi bir xil ishlaydi.
 - **Sinxron — paint bloklaydi.** Effect ichida og'ir ish bo'lsa, browser paint kechikadi → user "jank" sezadi. Performance critical: 5ms+ ish bo'lsa optimize qilish kerak (read-then-write pattern, ResizeObserver, useEffect'ga ko'chirish).
 - **`useEffect` default tanlov** — `useLayoutEffect` faqat visual flicker oldini olish kerak bo'lganda. React docs: *"This Hook is used less often than `useEffect`."*
@@ -3908,4 +3908,4 @@ Keyingi bo'lim: `useRef` — mutable container, DOM access, ref forwarding evolu
 
 ---
 
-**Keyingi bo'lim:** [18-useref.md](18-useref.md) — `useRef` mutable container (re-render trigger qilmaydi), DOM refs element access, mutable values (timer ID, prev value, latest closure), ref vs state decision guide, **`forwardRef` evolyutsiyasi (R16.3 → R19)** — R19'da ref oddiy prop bo'ldi, lekin `forwardRef` hali deprecated emas (gradually phased out), **ref cleanup functions (R19)** — DOM node o'chirilganda chaqiriladi, `useImperativeHandle` chuqur (imperative API expose, video player/modal/focus management misol), callback refs (dynamic attachment).
+**Keyingi bo'lim:** [18-useref.md](18-useref.md) — `useRef` mutable container (re-render trigger qilmaydi), DOM refs element access, mutable values (timer ID, prev value, latest closure), ref vs state decision guide, **`forwardRef` evolyutsiyasi (R16.3 → R19)** — R19'da ref oddiy prop bo'ldi, `forwardRef` esa soft-deprecated (hali ishlaydi, warning yo'q), **ref cleanup functions (R19)** — DOM node o'chirilganda chaqiriladi, `useImperativeHandle` chuqur (imperative API expose, video player/modal/focus management misol), callback refs (dynamic attachment).

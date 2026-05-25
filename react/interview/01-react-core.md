@@ -8,14 +8,16 @@
 
 ## Mundarija
 
-**QISM A: React Fundamentals** (savollar 1-9)
-**QISM B: Rendering Pipeline** (savollar 10-19)
-**QISM C: JSX va TSX** (savollar 20-30)
-**QISM D: List Rendering va Keys** (savollar 31-36)
+- [**QISM A: React Fundamentals** (savollar 1-9)](#qism-a)
+- [**QISM B: Rendering Pipeline** (savollar 10-19)](#qism-b)
+- [**QISM C: JSX va TSX** (savollar 20-30)](#qism-c)
+- [**QISM D: List Rendering va Keys** (savollar 31-36)](#qism-d)
 
 ---
 
 ## QISM A: React Fundamentals
+
+<a id="qism-a"></a>
 
 ### 1. React nima va declarative model nima ma'noni anglatadi? [Junior+]
 
@@ -373,7 +375,7 @@ type Fiber = {
 ### Follow-up savollar
 
 - "VDOM tezroqmi DOM'dan?" — Yo'q. **VDOM doim sekinroq** chunki bu qo'shimcha layer. Foyda — **batching va minimal mutation** orqali real DOM ishini kamaytirish. Bitta DOM mutation arzon, 1000 tasi qimmat — VDOM 1000 tasini 1 ta batch'ga jamlaydi.
-- "Fiber qanday qilib pause qiladi?" — Render phase pure (no DOM mutation). Pause = work loop'dan chiqish, browser'ga `MessageChannel.postMessage` orqali microtask yield. Resume — saqlangan `nextUnitOfWork`'dan davom.
+- "Fiber qanday qilib pause qiladi?" — Render phase pure (no DOM mutation). Pause = work loop'dan chiqish, browser'ga `MessageChannel.postMessage` orqali macrotask yield. Resume — saqlangan `nextUnitOfWork`'dan davom.
 - "`alternate` pointer nima uchun kerak?" — Double buffering. Render phase'da yangi `workInProgress` tree quriladi (ammo render xatosi bo'lsa, `current` o'zgarmasdan qoladi). Commit muvaffaqiyatli bo'lsa, swap: `current = workInProgress`.
 
 </details>
@@ -423,7 +425,9 @@ function Greeting({ name }: { name: string }) {
 
 // 1. react-dom (browser)
 import { createRoot } from "react-dom/client";
-const root = createRoot(document.getElementById("app")!);
+const container = document.getElementById("app");
+if (!container) throw new Error("Root element not found");
+const root = createRoot(container);
 root.render(<Greeting name="World" />);
 // → DOM: <div>Hello, World!</div>
 
@@ -776,10 +780,10 @@ function ProductPage({ product }: { product: Product }) {
 **Hozirgi developer impact:**
 - Modern React = Function komponent + Hooks + R18+ features
 - Class komponent — faqat error boundaries (hozircha)
-- R19 — hatto error boundaries Compiler/SSR-safe alternativalar bilan almashtirilmoqda
+- R19 — error boundaries hali class component sifatida qolmoqda (function component alternativasi hali yo'q)
 
 **Migration breaking changes:**
-- R15 → R16: deprecated lifecycle methods (`componentWillReceiveProps`, `componentWillUpdate`, `componentWillMount`) — R17.4'da `UNSAFE_` prefix
+- R15 → R16: deprecated lifecycle methods (`componentWillReceiveProps`, `componentWillUpdate`, `componentWillMount`) — R16.3'da `UNSAFE_` prefix qo'shildi, R17'da eski nomlar olib tashlandi
 - R16 → R17: ko'p kod o'zgarishi yo'q, faqat event delegation testing
 - R17 → R18: `createRoot` ishlatish, automatic batching effects (ba'zi kodlar break)
 - R18 → R19: ref forwardRef → ref prop, `<Context.Provider>` → `<Context>`, propTypes/defaultProps olib tashlandi function komponentlardan
@@ -1283,7 +1287,7 @@ React design system'larda (MUI, Chakra, shadcn/ui) shu pattern qo'llanadi.
 
 ### Edge Cases
 
-- **God component** anti-pattern: 500+ qatorli komponent — barcha logic'ni o'z ichiga oladi. Yechim: bola komponentlarga ajratish (single responsibility).
+- **Monolith component** anti-pattern: 500+ qatorli komponent — barcha logic'ni o'z ichiga oladi. Yechim: bola komponentlarga ajratish (single responsibility).
 - **Over-componentization**: Har element uchun komponent yaratish — overhead. Inline JSX bilan yetadi agar reuse yo'q bo'lsa.
 - **Inline arrow function as component**: `const Comp = () => <p>{x}</p>` parent ichida — har gal yangi komponent type, butun subtree unmount/remount.
 
@@ -1296,6 +1300,8 @@ React design system'larda (MUI, Chakra, shadcn/ui) shu pattern qo'llanadi.
 </details>
 
 ---
+
+<a id="qism-b"></a>
 
 ### 10. `UI = f(state)` deganda nima ma'no? Pure function model qanday ishlaydi? [Middle]
 
@@ -2052,15 +2058,15 @@ button.addEventListener("click", () => {
 
 Compile-time'da `count` o'zgarganda nima update bo'lishi aniq. Virtual DOM yo'q, runtime overhead minimal.
 
-**Performance comparison (microbenchmark):**
+**Performance comparison (umumiy tendentsiya — js-framework-benchmark natijalariga asoslanadi):**
 
-| Operation | React | Vue 3 | Solid | Svelte |
-|-----------|-------|-------|-------|--------|
-| Initial render (1k items) | 100ms | 80ms | 60ms | 70ms |
-| Update single item | 5ms | 1ms | <1ms | <1ms |
-| Bundle size (minimal) | 45kb | 35kb | 8kb | 5kb |
+| Aspekt | React | Vue 3 | Solid | Svelte |
+|--------|-------|-------|-------|--------|
+| Initial render | O'rta | O'rta-tez | Tez | Tez |
+| Single item update | Subtree diff overhead | Component-level | Minimal (signal-direct) | Minimal (compile-time) |
+| Bundle size (minimal) | ~45kb (gzipped ~15kb) | ~35kb (gzipped ~13kb) | ~8kb (gzipped ~3kb) | ~5kb (gzipped ~2kb) |
 
-(Yaxshilangan: Solid/Svelte fine-grained — kichikroq update overhead)
+(Aniq raqamlar js-framework-benchmark repo'da — app complexity, browser, va hardware'ga bog'liq)
 
 **Real-world differences:**
 
@@ -2400,7 +2406,7 @@ Hooks themselves — pure interface (function body that reads state). Effect cal
 
 ### Follow-up savollar
 
-- "Pure render Reconciler bailout uchun nima uchun kerak?" — `Object.is` comparison reference identity bilan ishlaydi. Mutation bo'lsa same reference, no bailout (lekin no re-render ham — bug). Pure render — yangi reference yangi state'ga.
+- "Pure render Reconciler bailout uchun nima uchun kerak?" — `Object.is` comparison identity bilan ishlaydi (primitive value yoki reference equality). Mutation bo'lsa same reference → `Object.is` true → bailout (lekin DOM'da eski qiymat — bug). Pure render — immutable update yangi reference beradi → `Object.is` false → re-render trigger.
 - "RSC'da render purity?" — Server Components ham pure (deterministik). Async data — Promise return (use), lekin compute pure.
 - "React Compiler purity yo'qligini qanday aniqlaydi?" — Static analysis — assignment patterns, side effect calls (DOM API, fetch). Aniqlanmagan kod — Compiler skip qiladi (safe-by-default).
 
@@ -2451,11 +2457,13 @@ function App() {
   return <div>{data.name}</div>;
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+const el = document.getElementById("root");
+if (!el) throw new Error("Root container missing");
+createRoot(el).render(<App />);
 
 // Browser:
 // 1. HTML <div id="root"></div> empty
-// 2. JS bundle yuklanadi (~150kb React + komponent)
+// 2. JS bundle yuklanadi (React + komponent kodi)
 // 3. React renders Spinner
 // 4. fetch /api/data
 // 5. setData → render real content
@@ -2480,8 +2488,10 @@ res.send(`
 
 // Client (browser)
 import { hydrateRoot } from "react-dom/client";
+const rootElement = document.getElementById("root");
+if (!rootElement) throw new Error("Root element missing");
 hydrateRoot(
-  document.getElementById("root")!,
+  rootElement,
   <App data={window.__INITIAL_DATA__} />
 );
 ```
@@ -2811,7 +2821,7 @@ function Search({ items }: { items: Item[] }) {
 
 ```typescript
 // React lanes — priority bitmap
-const SyncLane              = 0b0000000000000000000000000000001;
+const SyncLane              = 0b0000000000000000000000000000010;
 const InputContinuousLane   = 0b0000000000000000000000000000100;
 const DefaultLane           = 0b0000000000000000000000000010000;
 const TransitionLane1       = 0b0000000000000000000000001000000;
@@ -2838,7 +2848,7 @@ function shouldYield() {
   return performance.now() >= deadline;  // 5ms slice
 }
 
-// Yield = MessageChannel.postMessage → microtask
+// Yield = MessageChannel.postMessage → macrotask
 // Browser idle bo'lganda (input handle, paint) yana resume
 ```
 
@@ -2959,7 +2969,7 @@ R19'gacha — `createRoot` concurrent enabled, lekin ko'p featurelar opt-in. R19
 
 ### Follow-up savollar
 
-- "Concurrent rendering performance overhead bo'ladi-mi?" — Minimal. Bookkeeping (lane tracking) ~5% overhead, lekin user-perceived performance yaxshilanadi (jank yo'q).
+- "Concurrent rendering performance overhead bo'ladi-mi?" — Minimal. Bookkeeping (lane tracking, Fiber alternates) biroz overhead qo'shadi, lekin user-perceived performance yaxshilanadi (jank yo'q, input responsiveness oshadi).
 - "Class komponentlar concurrent ichida ishlaydi-mi?" — Ha, lekin lifecycle methods cleanup-resilient bo'lishi shart (`UNSAFE_componentWillMount` deprecated).
 - "`useTransition` real-world ko'p ishlatiladi-mi?" — Search/filter UIs, tab switching (heavy content), navigation transitions. Routine handlers — kerak emas.
 
@@ -2995,7 +3005,9 @@ ReactDOM.render(<App />, document.getElementById("root"));
 // ✅ R18+
 import { createRoot } from "react-dom/client";
 
-const root = createRoot(document.getElementById("root")!);
+const container = document.getElementById("root");
+if (!container) throw new Error("Root container missing");
+const root = createRoot(container);
 root.render(<App />);
 
 // Cleanup (kerak bo'lsa, masalan microfrontend)
@@ -3035,19 +3047,23 @@ root.render(
 
 // 2. Multiple roots (microfrontend, embedded widget)
 const widgetContainer = document.getElementById("chat-widget");
-const widgetRoot = createRoot(widgetContainer!);
+if (!widgetContainer) throw new Error("Widget container missing");
+const widgetRoot = createRoot(widgetContainer);
 widgetRoot.render(<ChatWidget />);
 
 // Mainframe
 const appContainer = document.getElementById("main-app");
-const appRoot = createRoot(appContainer!);
+if (!appContainer) throw new Error("App container missing");
+const appRoot = createRoot(appContainer);
 appRoot.render(<App />);
 
 // 3. Hydration (SSR'dan keyin)
 import { hydrateRoot } from "react-dom/client";
 
-const root = hydrateRoot(
-  document.getElementById("root")!,
+const hydrateContainer = document.getElementById("root");
+if (!hydrateContainer) throw new Error("Root container missing");
+const hydrateRootInstance = hydrateRoot(
+  hydrateContainer,
   <App />,
   {
     onRecoverableError: (error) => console.warn("Hydration mismatch:", error),
@@ -3139,7 +3155,7 @@ const root2 = createRoot(container); // ⚠️ warning: existing root
 
 - "Test'larda `createRoot` ishlatiladi-mi?" — `@testing-library/react` v13+ avtomatik `createRoot` ishlatadi. Manual'da React Testing Library API orqali (`render(<App />)`).
 - "Why two `createRoot`/`hydrateRoot` API'lar?" — Mount source farqli: client-only va SSR ishlatish kontekstida sintaksis aniqroq, mismatch handling alohida.
-- "TypeScript da `getElementById` null bo'lishi mumkin?" — Ha, `Element | null`. Production'da non-null assertion (`!`) yoki guard (`if (!container) throw`).
+- "TypeScript da `getElementById` null bo'lishi mumkin?" — Ha, `Element | null`. Production'da guard ishlatish tavsiya (`if (!container) throw new Error(...)`).
 
 </details>
 
@@ -3185,7 +3201,9 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 // ✅ Top-level StrictMode
-const root = createRoot(document.getElementById("root")!);
+const container = document.getElementById("root");
+if (!container) throw new Error("Root container missing");
+const root = createRoot(container);
 root.render(
   <StrictMode>
     <App />
@@ -3497,7 +3515,7 @@ function GoodCounter({ id }: { id: string }) {
 **Passive effects (Commit'dan keyin):**
 
 - `useEffect` callback — async, browser paint'dan keyin
-- Browser idle bo'lsa (microtask queue) chaqiriladi
+- Browser idle bo'lsa chaqiriladi (macrotask — `MessageChannel` orqali)
 - Render'ni bloklamaydi
 
 **Render Phase abort mexanizmi:**
@@ -3707,15 +3725,14 @@ function commitRoot(root) {
 **Effect flags (Fiber `flags` bitmask):**
 
 ```typescript
-const enum Flags {
-  Placement       = 0b0000000010,  // insert
-  Update          = 0b0000000100,  // mutate
-  Deletion        = 0b0000001000,  // remove
-  Snapshot        = 0b0000010000,  // before mutation
-  Passive         = 0b0000100000,  // useEffect
-  Layout          = 0b0001000000,  // useLayoutEffect, didMount/Update
-  Ref             = 0b0010000000,  // ref attach/detach
-}
+// React source — asosiy Fiber flag'lar (soddalashtirilgan)
+const Placement    = 0b0000000000000010;  // insert
+const Update       = 0b0000000000000100;  // mutate
+const ChildDeletion = 0b0000000000010000; // child remove
+const Snapshot     = 0b0000010000000000;  // before mutation
+const Passive      = 0b0000100000000000;  // useEffect
+const LayoutMask   = Update | Placement;  // useLayoutEffect trigger
+const Ref          = 0b0001000000000000;  // ref attach/detach
 ```
 
 Har sub-phase faqat tegishli flag'larni traverse qiladi (subtreeFlags bilan tez skip).
@@ -3771,6 +3788,8 @@ Concurrent rendering faqat Render Phase'da. Commit boshlangach — sync to oxirg
 </details>
 
 ---
+
+<a id="qism-c"></a>
 
 ### 20. `useEffect` timing — passive effects qachon chaqiriladi? [Middle+]
 
@@ -3886,13 +3905,13 @@ channel.port2.onmessage = () => {
 
 // Schedule
 channel.port1.postMessage(null);
-// → Browser idle bo'lganda (microtask queue) chaqiriladi
+// → Macrotask — joriy JS task va paint tugagandan keyin chaqiriladi
 ```
 
 **Nima uchun MessageChannel:**
 - `setTimeout(0)` — minimum 4ms delay (HTML spec)
-- `requestIdleCallback` — Safari'da yo'q, har xil browser support
-- `MessageChannel` — universal, fast, post-paint trigger
+- `requestIdleCallback` — Safari 16.4+ da qo'shilgan, lekin behavioral inconsistency bor
+- `MessageChannel` — universal, fast, predictable macrotask trigger
 
 **Effect order:**
 
@@ -3925,8 +3944,8 @@ R18+ concurrent mode'da:
 // 4. Style/Layout/Paint pipeline ishlaydi
 
 // useEffect MessageChannel'da scheduled:
-// - Microtask queue (fast)
-// - Tipik 5-50ms paint'dan keyin
+// - Macrotask (MessageChannel orqali)
+// - Paint tugagandan keyin chaqiriladi
 ```
 
 **`useEffect` performance pattern:**
@@ -4989,7 +5008,7 @@ fetchData().then((data) => {
 
 ### Follow-up savollar
 
-- "Native event listener nima uchun R17'da batching'siz edi?" — React event delegation `document` (R16) yoki root (R17)'ga. Native listener bypass qilib, React'ning `dispatchEvent` wrapper'iga kirmaydi. R18 lanes mexanizmi orqali univerlsal.
+- "Native event listener nima uchun R17'da batching'siz edi?" — React event delegation `document` (R16) yoki root (R17)'ga. Native listener bypass qilib, React'ning `dispatchEvent` wrapper'iga kirmaydi. R18 lanes mexanizmi orqali universal.
 - "`Promise.all` ichida ko'p setState — qanday batched?" — R18: bir tick'da ishlasa batched. R17: har one alohida.
 - "WebSocket message — batched-mi?" — R18: ha (native event listener). R17: yo'q.
 
@@ -5022,7 +5041,8 @@ R19'dan `createRoot` (va `hydrateRoot`) **error callback options**'ni qabul qila
 import { createRoot, hydrateRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
 
-const container = document.getElementById("root")!;
+const container = document.getElementById("root");
+if (!container) throw new Error("Root container missing");
 
 const root = createRoot(container, {
   onCaughtError: (error, errorInfo) => {
@@ -5299,7 +5319,7 @@ Frame N (16.67ms budget):
 │ 4. Composite                            │ ← GPU
 ├─────────────────────────────────────────┤
 │ 5. requestAnimationFrame callbacks      │
-│ 6. requestIdleCallback (idle)          │
+│ 6. MessageChannel macrotask            │
 │    - useEffect (passive) shu yerda      │
 └─────────────────────────────────────────┘
 ```
@@ -5383,7 +5403,7 @@ function SlowComponent({ items }: { items: Item[] }) {
   return <List items={processed} />;
 }
 
-// Render takes 200ms — 12 dropped frames (60fps)
+// Render 16ms'dan oshsa — dropped frame'lar (60fps'da har frame 16.67ms budget)
 // User: jank, choppy interaction
 ```
 
@@ -5427,10 +5447,10 @@ Composite (GPU layers)
     ↓
 [Frame end — browser idle]
     ↓
-Idle tasks (rAF, useEffect, etc.)
+Post-paint tasks (MessageChannel macrotask — useEffect shu yerda)
 ```
 
-React render — JS execution ichida. `useLayoutEffect` — JS task'dan oldin paint'ga, `useEffect` — paint'dan keyin idle.
+React render — JS execution ichida. `useLayoutEffect` — paint'dan oldin sync, `useEffect` — paint'dan keyin (MessageChannel macrotask orqali).
 
 **Frame budget:**
 
@@ -5474,10 +5494,10 @@ function shouldYield() {
 **`MessageChannel` vs `setTimeout(0)`:**
 
 - `setTimeout(0)` — minimum 4ms delay (HTML spec clamp)
-- `MessageChannel` — fast, post-paint trigger
-- `requestIdleCallback` — Safari'da yo'q, har xil browser
+- `MessageChannel` — fast, predictable macrotask trigger
+- `requestIdleCallback` — Safari 16.4+ da qo'shilgan, lekin predictability past
 
-React Scheduler `MessageChannel` ishlatadi (universal, fast).
+React Scheduler `MessageChannel` ishlatadi (universal, fast, predictable).
 
 **`useLayoutEffect` paint'ni bloklaydi:**
 
@@ -5897,7 +5917,7 @@ const Context = createContext(0);
 function Parent() {
   const [value, setValue] = useState(0);
   return (
-    <Context.Provider value={value}>  {/* value change → all consumers re-render */}
+    <Context value={value}>  {/* R19: Provider kerak emas; value change → all consumers re-render */}
       <Child />
     </Context.Provider>
   );
@@ -6258,7 +6278,7 @@ DevTools "Components" tab — Fiber tree (with hooks, props, state). HTML inspec
 
 - "Why Element ≠ Fiber?" — Element immutable (function output). Fiber mutable (state, hooks, alternate). Render — pure (Element). Reconciler — stateful (Fiber).
 - "Can a Component have multiple Elements?" — Ha, har JSX usage yangi Element. Component itself — single function.
-- "How big is a Fiber object?" — ~100+ properties, ~1KB memory. 1000 komponentli app — ~1MB Fiber memory.
+- "How big is a Fiber object?" — 30+ field'larga ega (type, props, state, tree pointers, flags, lanes, alternate). Aniq hajm V8 hidden class layout va property'lar soniga bog'liq.
 
 </details>
 
@@ -6526,6 +6546,8 @@ function Component() {
 ---
 
 ## QISM C: JSX va TSX
+
+<a id="qism-d"></a>
 
 ### 31. JSX va TSX farqi nima? Runtime'da farq bormi? [Middle]
 
@@ -8719,25 +8741,25 @@ function Dashboard({ status, data, error }: DashboardProps) {
   // 1. Early returns (guards)
   if (status === "loading") return <Spinner />;
   if (status === "error" && error) return <ErrorBanner error={error} />;
-  if (status === "empty") return <EmptyState />;
+  if (status === "empty" || !data) return <EmptyState />;
 
-  // status === "success"
+  // status === "success", data guaranteed
   return (
     <div>
       <h1>Dashboard</h1>
 
       {/* 2. Logical AND for header */}
-      {data!.length > 0 && <h2>{data!.length} items</h2>}
+      {data.length > 0 && <h2>{data.length} items</h2>}
 
       {/* 3. Map for list */}
       <ul>
-        {data!.map((item) => (
+        {data.map((item) => (
           <li key={item.id}>{item.title}</li>
         ))}
       </ul>
 
       {/* 4. Ternary for footer */}
-      {data!.length > 10 ? (
+      {data.length > 10 ? (
         <Pagination />
       ) : (
         <SimpleFooter />
@@ -9934,7 +9956,7 @@ function Polymorphic<E extends React.ElementType = "div">({
 
 - **`<this.Component />`**: Class instance member — works (class component context).
 - **String tag from variable**: `const Tag = "div"; <Tag />` — Capitalized variable holding string, treated as Component reference (props normalized).
-- **Underscore-prefixed**: `<_Component />` — `_` lowercase, parsed as HTML tag.
+- **Underscore-prefixed**: `<_Component />` — `_` uppercase bilan boshlanmagan, lekin amalda Babel/SWC buni component sifatida parse qiladi (lowercase letter bilan boshlanmagan). Babel'ning haqiqiy behavior'i: faqat `a-z` bilan boshlangan tag'lar string'ga aylantiriladi.
 - **Numeric prefix**: `<1Component />` — invalid identifier, syntax error.
 
 ### Follow-up savollar

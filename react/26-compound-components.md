@@ -850,9 +850,11 @@ React.Children.map(children, c => /* iterate */);
 
 `Children.map` avtomatik:
 - **Auto-key generation** — parent fragment depth + index
-- **Skip falsy values** — `null`, `undefined`, `true`, `false` (callback chaqirilmaydi, iteration ham skip)
+- **Skip falsy values** — `null`/`undefined`/`true`/`false` natijada result array'da bo'lmaydi (auto-filter)
 
-`Children.map` `null`/`undefined`/`boolean` children uchun callback chaqirmaydi (skip). Callback `string`/`number`/`ReactElement` uchun chaqiriladi. Callback return qilgan `null`/`undefined` natijada result array'da skip qilinadi (auto-filter).
+**Aniq mexanizm (React source `mapIntoArray`):** `undefined`/`true`/`false` avval `null` ga aylantiriladi, keyin callback `null` qiymat bilan ham chaqiriladi (technically). Lekin callback qaytargan `null`/`undefined` natijada result array'ga qo'shilmaydi — shu sabab amaliy "skip" effekt'i. Callback `string`/`number`/`ReactElement` uchun mazmunli qiymat bilan chaqiriladi.
+
+Foydalanuvchi nuqtai nazaridan: `Children.map(children, (c, i) => c)` filtersiz pass-through ham `null`/`false` qiymatlarini result array'dan olib tashlaydi.
 
 **`Children.toArray`** — children'ni clean array'ga aylantiradi:
 
@@ -1138,7 +1140,7 @@ const buttonWithTooltip = withTooltip(button, 'This is a tooltip');
 
 1. **Faqat React Element** — `isValidElement` check shart.
 2. **Direct children only** — nested struktura'ga inject qilmaydi.
-3. **Props collision** — original props bilan kollizion (override behavior).
+3. **Props collision** — original props bilan collision (override behavior).
 4. **`ref` callback re-attach** — har clone'da ref callback yangidan chaqirilishi mumkin.
 
 > **Versiya evolyutsiyasi (`cloneElement`):**
@@ -1686,7 +1688,7 @@ function Tabs() {
 
 `setActive` `useState` setter — har render bir xil reference (cross-ref [`12-state-and-usestate.md`](12-state-and-usestate.md)). `value` faqat `active` o'zgarganda yangilanadi.
 
-React Compiler (stable 2026, R17/18/19 mos) — auto-memoization (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). Manual `useMemo` kerak emas (Compiler infer qiladi).
+React Compiler (1.0 stable, R19.1+ bilan 2025-aprel; R17/18/19 mos) — auto-memoization (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). Manual `useMemo` kerak emas (Compiler infer qiladi).
 
 **Splitting Context** — performance optimization:
 
@@ -2271,10 +2273,10 @@ function SelectContent({ children }: { children: React.ReactNode }) {
 
 Cross-ref [`28-portals.md`](28-portals.md) — Portal pattern.
 
-Position calculation — trigger button bo'yicha:
+Position calculation — trigger button bo'yicha (`useLayoutEffect` — paint'dan oldin, no flicker; cross-ref [`17-uselayouteffect.md`](17-uselayouteffect.md)):
 
 ```tsx
-useEffect(() => {
+useLayoutEffect(() => {
   if (isOpen && triggerRef.current && contentRef.current) {
     const rect = triggerRef.current.getBoundingClientRect();
     contentRef.current.style.top = `${rect.bottom}px`;
@@ -2284,7 +2286,9 @@ useEffect(() => {
 }, [isOpen]);
 ```
 
-Modern alternative — `@floating-ui/react` (positioning library, viewport-aware).
+`useEffect` ishlatilsa, content avval default position'da paint qilinadi (`top: 0, left: 0`), keyin to'g'ri position'ga "sakraydi" (flicker). `useLayoutEffect` paint'dan oldin position'ni o'rnatadi.
+
+Modern alternative — `@floating-ui/react` (positioning library, viewport-aware, auto-flip, collision detection).
 
 </details>
 
@@ -2893,7 +2897,7 @@ NIMA UCHUN Context default tanlov:
 - Modern React idiomatic
 - TypeScript inference yaxshi
 - DevTools clean
-- React Compiler optimization (stable 2026)
+- React Compiler optimization (1.0 stable, R19.1+ bilan 2025-aprel)
 - Custom hook composition
 
 NIMA UCHUN cloneElement hali kerak:
@@ -2940,7 +2944,7 @@ Re-render frequency:
 - `cloneElement`: All children re-render on parent state change
 - Context: Only consumers (and their descendants) re-render
 
-React Compiler (stable 2026, R17/18/19 mos):
+React Compiler (1.0 stable, R19.1+ bilan 2025-aprel; R17/18/19 mos):
 - Auto-memoizes Context value (no manual `useMemo`)
 - Inlines hook calls (less function overhead)
 - `cloneElement` patterns harder to optimize (dynamic element creation)
@@ -3762,7 +3766,7 @@ const value = useMemo(() => ({ active, setActive }), [active]);
 
 `setActive` `useState` setter — bir xil reference (`useState` kafolati). `value` faqat `active` o'zgarganda yangilanadi.
 
-React Compiler (stable 2026) — auto-memoize (manual `useMemo` kerak emas).
+React Compiler (1.0 stable, R19.1+ bilan 2025-aprel) — auto-memoize (manual `useMemo` kerak emas).
 
 ### Gotcha 3: `Children.map` key generation — collision
 
@@ -4607,7 +4611,7 @@ Compound Components — UI library design'ning fundamental pattern'i. Hozirgi ku
 - **`React.Children` API** — `Children.map` (auto-key, skip null), `Children.toArray` (filter + flatten), `Children.count` (node count), `Children.only` (single child validation), `Children.forEach` (no return). Native `arr.map` va `Children.map` farq — `null`/`false` handling + auto-key.
 - **`cloneElement`** — Element kloni + qo'shimcha props inject. Shallow merge (last-wins). `key`/`ref` saqlanadi yoki override. **Cheklov'lar**: faqat React Element, direct children, props collision (event handler manual chain), ref re-attach.
 - **`Children.only` va `Children.count`** — validation va layout decisions. `Children.only` single child shart (Tooltip). `Children.count` `null`/`boolean`/`undefined` skip qiladi.
-- **Context-Based (Modern)** — Provider value + `useContext`. **Avantajlar:** har chuqurlikda nested, TypeScript inference, React Compiler optimization (stable 2026), custom hook integration, DevTools clean. Strict consumer hook (`useTabsContext` Provider'sini majbur qiladi).
+- **Context-Based (Modern)** — Provider value + `useContext`. **Avantajlar:** har chuqurlikda nested, TypeScript inference, React Compiler optimization (1.0 stable, R19.1+ bilan 2025-aprel), custom hook integration, DevTools clean. Strict consumer hook (`useTabsContext` Provider'sini majbur qiladi).
 - **Real-World Tabs** — `Tabs` + `Tabs.List` + `Tabs.Tab` + `Tabs.Panel`. Controlled/Uncontrolled, ARIA roles (`tablist`, `tab`, `tabpanel`), keyboard navigation (Arrow keys, Home/End), Roving tabindex pattern, `useId` SSR-safe IDs, Tab registry (focus next/prev).
 - **Real-World Select** — `Select` + `Trigger` + `Content` + `Item`. Dropdown ochish/yopish, click outside (`useOnClickOutside` cross-ref 24), Escape key close, Portal (cross-ref 28), position calculation, ARIA combobox/listbox/option.
 - **Real-World Accordion** — `Accordion` + `Item` + `Trigger` + `Content`. Two-level Context (root + item-level), single/multiple expansion (discriminated union props), CSS height animation, ARIA region.

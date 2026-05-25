@@ -98,9 +98,9 @@ DOM tree:
 
 > **Versiya evolyutsiyasi (Portals):**
 > - **Pre-R16:** Rasmiy `createPortal` mavjud emas. Workaround sifatida `ReactDOM.unstable_renderSubtreeIntoContainer` (experimental API) yoki `componentDidMount` ichida manual DOM manipulation ishlatilardi.
-> - **R16 (2017):** `createPortal(children, container)` API kiritildi. DOM tree va React tree ajratish standartlashdi.
-> - **R18 (2022):** Portal Concurrent rendering bilan ishlaydi. Suspense Boundary va Error Boundary Portal children'larini ushlaydi (React tree bo'ylab — DOM joyi ahamiyatsiz).
-> - **R19 (2024):** Portal API o'zgarmagan. Lekin `<title>`/`<meta>` document metadata Portal alternative R19 native (cross-ref [`37-react-19-document-apis.md`](37-react-19-document-apis.md)).
+> - **R16 (2017):** `createPortal(children, container)` API kiritildi. DOM tree va React tree ajratish standartlashdi. Error Boundary (R16.0) va Suspense (R16.6) Portal children'larini React tree bo'ylab ushlaydi (DOM joyi ahamiyatsiz — birinchi versiyadan beri).
+> - **R18 (2022):** Portal Concurrent rendering bilan ishlaydi — `useTransition`, `useDeferredValue`, automatic batching, va concurrent Suspense Portal children'larida ham normal ishlaydi. Selective hydration boundary'lar Portal'lar atrofida ham.
+> - **R19 (2024):** Portal API o'zgarmagan. Lekin `<title>`/`<meta>` document metadata Portal alternative R19 native (cross-ref [`37-react-19-document-apis.md`](37-react-19-document-apis.md)). HTML `inert` boolean prop sifatida proper render qilinadi (pre-R19 string serialization warning bergan).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -159,7 +159,7 @@ Portal children DOM'ga `container` ichiga append qilinadi (default `document.bod
 Performance impact:
 - Portal Fiber'i bir qo'shimcha Fiber node sifatida tree'da turadi (har Fiber'ning struktura overhead'i: tag, stateNode, child/sibling/return pointer'lari, alternate, va h.k.).
 - Render paytida bir qo'shimcha traversal qadami — boshqa Fiber tag'lariga (HostComponent, FunctionComponent) nisbatan farq sezilarli emas.
-- DOM commit'da `appendChild`/`removeChild` — bir element ko'chirish, native DOM operatsiyasi.
+- DOM commit'da `appendChild`/`removeChild` — bir element ko'chirish, native DOM operation.
 
 </details>
 
@@ -290,7 +290,7 @@ Argumentlar:
 Return — React Portal element. JSX render output sifatida ishlatiladi.
 
 ```tsx
-function MyComponent() {
+function ParentWithPortal() {
   return (
     <div className="parent">
       <p>Inside parent</p>
@@ -490,7 +490,7 @@ Custom hook — Portal target dynamic management (yaratish + cleanup).
 Portal'larning **eng muhim xususiyati** — DOM tree va React tree o'rtasidagi farq:
 
 - **DOM tree** — browser HTML elements'i (visible structure).
-- **React tree** — React komponent ierarxiyasi (logical structure).
+- **React tree** — React komponent hierarchy'si (logical structure).
 
 Portal **ikki tree'ni ajratadi**:
 
@@ -1069,12 +1069,14 @@ R16+ React capture phase ham qo'llab-quvvatlaydi (`onClickCapture`, `onMouseOver
 
 ### Nazariya
 
-Modal — Portal'ning eng klassik use case. Production-grade Modal:
+> **Modern alternative:** R19 + modern browser context'da **HTML native `<dialog>` element + `.showModal()`** ko'p holatda afzal — top layer (z-index'siz), browser-native ESC handling, focus trap (Chrome/Firefox/Safari'ning so'nggi versiyalarida), `::backdrop` CSS pseudo-element. Portal-based Modal — animation flexibility yoki `<dialog>` mavjud bo'lmagan browser fallback uchun. Tafsilot pastda "[z-index va Stacking Contexts](#z-index-va-stacking-contexts)" bo'limida.
+
+Modal — Portal'ning eng klassik use case. Production-grade Portal-based Modal:
 
 1. **Portal** — `<body>`'ga render (overflow/z-index/transform escape).
 2. **Backdrop click close** — outside click yopish.
-3. **Escape key close** — keyboard accessibility.
-4. **Focus trap** — Tab key Modal ichida cycle.
+3. **Escape key close** — keyboard accessibility (manual listener — `<dialog>`'da native).
+4. **Focus trap** — Tab key Modal ichida cycle (manual — `<dialog>` modern browser'da native).
 5. **Focus return** — close paytida triggering element'ga focus qaytarish.
 6. **Body scroll lock** — Modal ochiq paytida arqa scroll bloklash.
 7. **ARIA** — `role="dialog"`, `aria-modal="true"`, `aria-labelledby`.
@@ -1148,10 +1150,10 @@ Modal lifecycle:
 Body scroll lock cross-platform issue:
 
 ```tsx
-// ❌ Doesn't work on iOS Safari
+// ⚠️ Eski iOS Safari (pre-15) momentum scroll'ni hammasini bloklamaydi
 document.body.style.overflow = 'hidden';
 
-// ✅ iOS Safari workaround — position: fixed
+// ✅ Universal — position: fixed scroll position'ni ham saqlaydi
 function lockBodyScroll() {
   const scrollY = window.scrollY;
   document.body.style.position = 'fixed';
@@ -1168,7 +1170,7 @@ function unlockBodyScroll() {
 }
 ```
 
-iOS Safari `overflow: hidden` ignore qiladi `<body>`'da. `position: fixed` workaround'i scroll position'ni saqlab tiklaydi.
+iOS Safari'ning eski versiyalari (pre-15.4) `overflow: hidden` momentum scroll'ni to'liq bloklamaydi. Joriy iOS (16+) ko'p holatda to'g'ri ishlaydi, lekin `position: fixed` workaround universal — har platforma va versiyada scroll position'ni saqlab tiklaydi. Production'da `body-scroll-lock` library tavsiya etiladi (edge case'larni qamrab oladi).
 
 </details>
 
@@ -1444,7 +1446,7 @@ Asosiy elementlar:
 
 1. **Trigger** — children element (hover/focus listener).
 2. **Tooltip content** — Portal'da `<body>` ostida.
-3. **Position** — trigger element pozitsiyasiga qarab calculate.
+3. **Position** — trigger element position'iga qarab calculate.
 4. **Arrow** — visual indicator (optional).
 
 State:
@@ -1760,7 +1762,7 @@ Behavior:
 - **Click trigger** → toggle open.
 - **Click outside** → close (via `useOnClickOutside` cross-ref [`24-custom-hooks.md`](24-custom-hooks.md)).
 - **Escape key** → close.
-- **Position** — trigger pozitsiyasi ostida (yoki adjustable).
+- **Position** — trigger position'i ostida (yoki adjustable).
 - **ARIA** — `aria-haspopup`, `aria-expanded`, `aria-controls`.
 
 NIMA UCHUN Portal: parent overflow constraints, z-index stacking, positioning fixed (viewport-relative).
@@ -2218,7 +2220,7 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
         gap: 8,
       }}
       role="region"
-      aria-live="polite"
+      aria-label="Notifications"
     >
       {toasts.map(toast => (
         <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />
@@ -2229,10 +2231,15 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
 }
 
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
+  // role="alert" — assertive, screen reader darhol e'lon (errors uchun)
+  // role="status" — polite, joriy gapni tugatib e'lon (success/info/warning)
+  // Hammasiga "alert" qo'yish noto'g'ri: success/info uchun overkill, AT user'larni bezovta qiladi
+  const ariaRole = toast.type === 'error' ? 'alert' : 'status';
+  
   return (
     <div 
       className={`toast toast-${toast.type}`}
-      role="alert"
+      role={ariaRole}
       style={{
         background: getBackgroundColor(toast.type),
         color: '#fff',
@@ -2475,7 +2482,30 @@ Modern alternative — **`<dialog>` element + top layer** (CSS):
 </dialog>
 ```
 
-`<dialog>` element CSS **top layer**'ga ko'chiriladi (`showModal()` orqali) — z-index'siz har stacking context'dan ustun. React versiya'ga bog'liq emas (HTML native). Browser support: Chrome 37+, Firefox 98+ (2022), Safari 15.4+ (2022) — cross-browser parity 2022 yilning birinchi yarmidan boshlangan.
+`<dialog>` element `.showModal()` orqali chaqirilganda **CSS top layer**'ga ko'chiriladi — z-index'siz har stacking context'dan ustun (top layer DOM tree dan ham, paint order dan ham tashqarida — alohida render layer).
+
+**`.showModal()` native xususiyatlari:**
+- **Top layer** — barcha stacking context'lardan ustun (`transform`/`opacity`/`filter` parent'lardan ozod), z-index management kerak emas
+- **`::backdrop`** — pseudo-element backdrop styling uchun (`dialog::backdrop { background: rgba(0,0,0,0.5); }`)
+- **Avtomatik focus** — birinchi focusable element'ga focus qo'yiladi (`autofocus` attribute orqali boshqarish mumkin)
+- **Focus trap** — Tab key dialog ichida cycle (Chrome 90+, Firefox 118+, Safari 17+)
+- **ESC key** — native handling: `close` event fire qiladi (preventDefault bilan to'sish mumkin; HTML 2024 `closedby` attribute fine-grained nazorat beradi)
+- **Stack** — bir nechta `.showModal()` chaqirig'i stack hosil qiladi, oxirgi ochilgan eng tepada
+- **`return value`** — `<form method="dialog">` yoki `dialog.close('value')` orqali natija qaytarish
+
+**Portal-based Modal vs `<dialog>` taqqoslash:**
+
+| Xususiyat | Portal Modal | `<dialog>.showModal()` |
+|-----------|--------------|------------------------|
+| Top layer | ❌ (z-index management) | ✅ Native |
+| ESC handling | ❌ Manual listener | ✅ Native |
+| Focus trap | ❌ Manual (yoki `inert`) | ✅ Native (modern browser) |
+| Backdrop styling | CSS class | `::backdrop` pseudo-element |
+| Animation control | ✅ To'liq erkinlik | ⚠️ `display: none` muammosi (workaround: `@starting-style`, `transition-behavior: allow-discrete`) |
+| Browser support | R16+ (2017) — universal | Chrome 37+/Firefox 98+/Safari 15.4+ (cross-browser 2022-mart) |
+| SSR | Manual handling | Element'ning o'zi SSR-safe |
+
+**Qachon Portal afzal:** Animation flexibility kerak (slide-in drawer, complex transition), eski browser (Firefox <98, Safari <15.4) qo'llab-quvvatlash zarur, yoki nested modal'larning custom stack management kerak. Aks holda `<dialog>` afzal.
 
 </details>
 
@@ -2543,23 +2573,33 @@ Modern `<dialog>` element:
 function NativeModal({ isOpen, onClose, children }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   
+  // useEffect (commit'dan keyin) — DOM mavjud bo'lganda showModal/close chaqirish
   useEffect(() => {
-    if (isOpen) {
-      dialogRef.current?.showModal();
-    } else {
-      dialogRef.current?.close();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    
+    if (isOpen && !dialog.open) {
+      dialog.showModal();
+    } else if (!isOpen && dialog.open) {
+      dialog.close();
     }
   }, [isOpen]);
   
   return (
     <dialog 
       ref={dialogRef}
+      // ESC key yoki dialog.close() chaqirilganda fire bo'ladi — state sync uchun
       onClose={onClose}
       onClick={(e) => {
-        // Click outside — backdrop click
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
+        // Backdrop click — dialog element'ning o'zi target (content ichida emas)
+        // Eslatma: dialog'da padding bo'lsa, padding zone ham backdrop hisoblanadi.
+        // Yaxshiroq: getBoundingClientRect tekshiruvi
+        const rect = dialogRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const isInDialog = 
+          rect.top <= e.clientY && e.clientY <= rect.top + rect.height &&
+          rect.left <= e.clientX && e.clientX <= rect.left + rect.width;
+        if (!isInDialog) onClose();
       }}
     >
       {children}
@@ -2567,11 +2607,43 @@ function NativeModal({ isOpen, onClose, children }: ModalProps) {
   );
 }
 
-// Browser native top layer — no Portal needed
-// Browser support: Chrome 37+, Firefox 98+, Safari 15.4+
+// Avzaliklari:
+// - Top layer (z-index management yo'q)
+// - Native ESC (manual listener kerak emas)  
+// - Native focus trap (modern browser'larda)
+// - aria-modal="true" implicit
+// Browser support: Chrome 37+, Firefox 98+, Safari 15.4+ (cross-browser 2022-mart)
 ```
 
-`<dialog>` modern alternative — Portal kerak emas, browser top layer.
+`::backdrop` styling:
+
+```css
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+/* Open animation — @starting-style (Chrome 117+, Firefox 129+, Safari 17.5+) */
+dialog {
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity 0.2s, transform 0.2s, overlay 0.2s allow-discrete, display 0.2s allow-discrete;
+}
+
+dialog[open] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@starting-style {
+  dialog[open] {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+```
+
+`@starting-style` + `transition-behavior: allow-discrete` — `<dialog>` ochilish animation muammosini hal qiladi (eski browser'larda `display: none` transition'lar bekor qilardi).
 
 </details>
 
@@ -2592,6 +2664,8 @@ NIMA UCHUN focus trap:
 - Keyboard user'lar Modal ichida navigate qiladi.
 - Tab key Modal tashqariga chiqsa — context lost (foydalanuvchi qayerga focus tushganini bilmaydi).
 - ARIA spec talab qiladi (`aria-modal="true"` bilan).
+
+> **Modern pattern (afzal):** Manual Tab handler o'rniga **HTML `inert` attribute** background element'ga qo'yish — focus trap avtomatik (Chrome 102+/Firefox 112+/Safari 15.5+). Yoki **`<dialog>.showModal()`** — focus trap native (modern browser'larda spec'ga muvofiq). Manual Tab cycle pattern faqat eski browser fallback yoki `inert` mavjud bo'lmagan kontekst uchun. Manual pattern'ning ma'lum kamchiligi: focus modal tashqarisida bo'lsa (masalan, browser chrome'da yoki dev tools'da), Tab key trap'ga yetib bormaydi — bunday holatda `inert` background ishonchli yechim.
 
 QANDAY ISHLAYDI:
 
@@ -2693,7 +2767,7 @@ Edge cases:
 
 `element.focus({ preventScroll: true })` — focus without scroll (avoid jumping).
 
-R18+ Strict Mode 2x effect cycle — focus trap ikki marta setup. Initial focus 2x. UX'da farq yo'q (deterministik), lekin metric'larda visible.
+R18+ Strict Mode 2x effect cycle — focus trap ikki marta setup. Initial focus 2x. UX'da farq yo'q (deterministic), lekin metric'larda visible.
 
 </details>
 
@@ -3851,7 +3925,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999 }}
         >
           {toasts.map(t => (
-            <div key={t.id} className={`toast toast-${t.type}`} role="alert">
+            <div 
+              key={t.id} 
+              className={`toast toast-${t.type}`} 
+              role={t.type === 'error' ? 'alert' : 'status'}
+            >
               {t.message}
               <button onClick={() => dismiss(t.id)} aria-label="Dismiss">×</button>
             </div>
@@ -4070,6 +4148,14 @@ export function Drawer({
 @keyframes slideIn-bottom {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
+}
+
+// Accessibility — animation foydalanuvchi reduced motion ni xohlasa o'chirish (WCAG 2.3.3)
+@media (prefers-reduced-motion: reduce) {
+  .drawer-backdrop,
+  .drawer {
+    animation: none;
+  }
 }
 */
 

@@ -281,20 +281,20 @@ function FormButtons({ onSave, onCancel, onDelete }: FormButtonsProps) {
 Anti-pattern — function call:
 
 ```tsx
-function BadButton() {
+function HandlerCallAntiPattern() {
   const handleClick = () => console.log('hello');
   
   return (
     <>
       {/* ❌ handleClick darhol chaqiriladi (render paytida) */}
-      <button onClick={handleClick()}>Bad 1</button>
+      <button onClick={handleClick()}>Anti 1</button>
       {/* "hello" console'da har render'da chiqadi */}
       
       {/* ❌ Same problem with arguments */}
-      <button onClick={handleClickWithArg('x')}>Bad 2</button>
+      <button onClick={handleClickWithArg('x')}>Anti 2</button>
       
       {/* ✅ To'g'ri — wrapper bilan */}
-      <button onClick={() => handleClickWithArg('x')}>Good</button>
+      <button onClick={() => handleClickWithArg('x')}>OK</button>
     </>
   );
 }
@@ -362,7 +362,7 @@ function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
   
   // Native event — browser API
   event.nativeEvent;  // MouseEvent (DOM)
-  event.nativeEvent.movementX;  // Native API, SyntheticEvent'da yo'q
+  event.nativeEvent.composedPath();  // Event'ning method'i, SyntheticEvent'da yo'q
 }
 ```
 
@@ -606,12 +606,13 @@ Native event API — `nativeEvent`:
 ```tsx
 function PointerTracker() {
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    // SyntheticEvent properties
+    // SyntheticEvent properties — React MouseEvent/PointerEvent type'lariga kiritilgan
     console.log(e.clientX, e.clientY);
+    console.log(e.movementX, e.movementY);  // SyntheticEvent'da mavjud (MouseEvent uzaytmasi)
     
-    // Native API — pointer-specific (movementX/Y)
-    console.log(e.nativeEvent.movementX, e.nativeEvent.movementY);
-    // movementX/Y — modern browser API, SyntheticEvent'da yo'q (gohida)
+    // Native-only API'lar — SyntheticEvent'da yo'q
+    console.log(e.nativeEvent.composedPath());  // Event method
+    console.log((e.nativeEvent as any).layerX);  // Non-standard, ba'zi browser'larda
   };
   
   return <div onPointerMove={handlePointerMove}>Track</div>;
@@ -931,7 +932,7 @@ function AsyncHandler() {
 > **🕐 Versiya evolyutsiyasi (Event Delegation):**
 > - **R16 va undan oldin:** React `document` node'ga delegate qilardi. Bu — single React app uchun OK, lekin **multiple React apps bir page'da** bo'lsa, document'ga ikki listener registratsiya qilinardi va `stopPropagation` semantikasi noaniq edi.
 > - **R17+:** **Root container** (`ReactDOM.render(<App/>, container)` yoki R18+ `createRoot(container)`'da `container`) ga delegate qiladi. Har React app — o'z root container'iga listener qo'yadi, mustaqil ishlaydi.
-> - **Sabab:** **Microfrontends** va gradual upgrade support — bir page'da bir nechta React versiya yoki React + boshqa framework integration. R17+ — har app o'z scope'ida event handle qiladi va eski versiya bilan birga ishlashda kollizyon kamayadi.
+> - **Sabab:** **Microfrontends** va gradual upgrade support — bir page'da bir nechta React versiya yoki React + boshqa framework integration. R17+ — har app o'z scope'ida event handle qiladi va eski versiya bilan birga ishlashda collision kamayadi.
 
 ```tsx
 // User code
@@ -955,7 +956,7 @@ createRoot(document.getElementById('app1')!).render(<MainApp />);
 // App 2 — embedded widget
 createRoot(document.getElementById('app2')!).render(<Widget />);
 
-// R16: document'ga ikki listener — kollizyon, event order noaniq
+// R16: document'ga ikki listener — collision, event order noaniq
 // R17+: har root'ga alohida listener — mustaqil ishlaydi
 ```
 
@@ -1242,7 +1243,7 @@ const handleButtonClick = (e: React.MouseEvent) => {
 
 ```tsx
 // R16 anti-pattern
-function BadHandler() {
+function PooledEventAsyncDemo() {
   const handleClick = (e: React.MouseEvent) => {
     setTimeout(() => {
       console.log(e.target);  // ⚠️ R16: null (event pooled)
@@ -1252,7 +1253,7 @@ function BadHandler() {
 }
 
 // R16 yechim — e.persist():
-function R16Handler() {
+function R16PersistDemo() {
   const handleClick = (e: React.MouseEvent) => {
     e.persist();  // Event'ni pool'dan chiqarish
     setTimeout(() => {
@@ -1823,7 +1824,7 @@ return <form onSubmit={handleSubmit}>...</form>;
 2. **Function creation cost** — minimal (V8 inline allocation, GC tezda yiqiladi)
 3. **Object identity** — `React.memo` ishlatilmasa, ta'sir yo'q
 
-Real performance impact — `React.memo` + child component'lar ko'p bo'lganda. Bu konkret holatlarda `useCallback` orqali optimize qilinadi.
+Real performance impact — `React.memo` + child component'lar ko'p bo'lganda. Bu aniq holatlarda `useCallback` orqali optimize qilinadi.
 
 **Profile birinchi, optimize keyin:**
 
@@ -2539,7 +2540,7 @@ function UniversalDrag() {
 }
 ```
 
-React'da pointer event handler'lar (`onPointerDown`, `onPointerMove`, va h.k.) `react-dom` paketida boshidan qo'llab-quvvatlanadi — versiya-spetsifik feature emas, browser support'ga bog'liq.
+React'da pointer event handler'lar (`onPointerDown`, `onPointerMove`, va h.k.) `react-dom` paketida boshidan qo'llab-quvvatlanadi — versiya-specific feature emas, browser support'ga bog'liq.
 
 **`onChange` controlled vs uncontrolled:**
 
@@ -3924,26 +3925,33 @@ const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
 
 ---
 
-### ❌ Xato 4: `stopPropagation` R17+'da Native'gacha Yetmaydi
+### ❌ Xato 4: `stopPropagation` Capture-Phase Listener'lar va Bir-Node Listener'larni To'xtatmaydi
 
 ```tsx
-// Document'da global listener
-document.addEventListener('click', () => console.log('Global'));
+// Document'da global listener — CAPTURE phase
+document.addEventListener('click', () => console.log('Global capture'), { capture: true });
 
 const handleClick = (e: React.MouseEvent) => {
   e.stopPropagation();
-  // R16: Global listener chaqirilmaydi (chunki React document'da)
-  // R17+: Global listener CHAQIRILADI (chunki React root'da, bubble document'gacha davom etadi)
-};
-
-// ✅ R17+ — native ham to'xtatish
-const handleClick = (e: React.MouseEvent) => {
-  e.stopPropagation();
-  e.nativeEvent.stopPropagation();  // Native layer ham
+  // ⚠️ Capture listener — React handler ishga tushishidan OLDIN chaqirilgan
+  // stopPropagation kech keladi → "Global capture" chiqib bo'lgan
 };
 ```
 
-**Sabab:** R17+ event delegation root container'da, R16 — document'da. `e.stopPropagation()` SyntheticEvent ichida `nativeEvent.stopPropagation()` ham chaqiradi, lekin bubble path R16 vs R17 da farq qiladi. Eng aniq nazorat uchun `e.nativeEvent.stopImmediatePropagation()` ishlatish — bir node'dagi qo'shimcha listener'lar (capture/bubble) ham to'xtatiladi.
+`e.stopPropagation()` SyntheticEvent ichida `nativeEvent.stopPropagation()` ham chaqiradi. Bubble phase'da React handler root container'da fire bo'ladi va undan keyingi bubble (document, window) to'xtatiladi — odatdagi `document.addEventListener('click', fn)` (bubble) **chaqirilmaydi**. Lekin ikki kategoriya hali ham ishlaydi:
+
+1. **Capture-phase listener'lar** — React handler'gacha allaqachon chaqirilgan (capture target'gacha, keyin bubble root'gacha — order: document-capture → root-capture → target → root-bubble → React handler).
+2. **React listener attach qilingan node'dagi boshqa listener'lar** — `nativeEvent.stopPropagation()` boshqa nodes'ga bubble qilmaydi, lekin **bir node'da registered listener'lar bir-birini to'xtatmaydi**.
+
+```tsx
+// ✅ Bir node'dagi boshqa listener'larni ham to'xtatish
+const handleClick = (e: React.MouseEvent) => {
+  e.nativeEvent.stopImmediatePropagation();
+  // stopImmediatePropagation — bir node'dagi qolgan listener'lar ham skip
+};
+```
+
+**Sabab:** `stopPropagation` faqat **keyingi node'larga** bubble'ni to'xtatadi. Capture-phase'da yoki bir node'dagi multiple listener uchun — `stopImmediatePropagation` kerak. Bundan tashqari, capture phase listener'lar har holda React handler'gacha chaqiriladi — bularni to'xtatish uchun capture-phase'da event'ni intercept qilish kerak.
 
 ---
 

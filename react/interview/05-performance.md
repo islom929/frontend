@@ -6,21 +6,23 @@
 
 ## Mundarija
 
-**QISM A: React.memo** (savollar 1-4)
-**QISM B: Re-render Mechanics** (savollar 5-8)
-**QISM C: useMemo / useCallback Usage** (savollar 9-11)
-**QISM D: React Compiler** (savollar 12-14)
-**QISM E: Profiling** (savollar 15-17)
-**QISM F: Code Splitting & Virtualization** (savollar 18-22)
-**QISM G: Web Vitals** (savollar 23-24)
+- [**QISM A: React.memo**](#qism-a) (savollar 1-4)
+- [**QISM B: Re-render Mechanics**](#qism-b) (savollar 5-8)
+- [**QISM C: useMemo / useCallback Usage**](#qism-c) (savollar 9-11)
+- [**QISM D: React Compiler**](#qism-d) (savollar 12-14)
+- [**QISM E: Profiling**](#qism-e) (savollar 15-17)
+- [**QISM F: Code Splitting & Virtualization**](#qism-f) (savollar 18-22)
+- [**QISM G: Web Vitals & Compiler Status**](#qism-g) (savollar 23-27)
 
-**Jami:** 24 savol — Junior+ (5), Middle (8), Middle+ (7), Senior (4)
+**Jami:** 27 savol — Junior+ (4), Middle (8), Middle+ (8), Senior (7)
 
 
 
 ---
 
 ## QISM A: React.memo
+
+<a id="qism-a"></a>
 
 ### 1. React.memo nima va u qanday shallow comparison bajaradi? [Junior+]
 
@@ -254,7 +256,7 @@ Custom `compare` funksiya berilmagan bo'lsa, React `SimpleMemoComponent` tag'ini
 ### Follow-up savollar
 
 - "Agar komponent state'i bor bo'lsa, memo state o'zgarganda nima qiladi?" — State o'zgarsa, komponent **scheduled update** bor — `checkScheduledUpdateOrContext` `true` qaytaradi, `compare` chaqirilmaydi, normal render bajariladi.
-- "memo Fiber tree'da qancha joy oladi?" — Bitta qo'shimcha Fiber node yaratmaydi. Mavjud function/class fiber'ning `tag`ini o'zgartiradi (zero allocation overhead).
+- "memo Fiber tree'da qancha joy oladi?" — `SimpleMemoComponent` (custom compare yo'q) uchun alohida Fiber wrapper yaratilmaydi — mavjud Fiber'ning `tag`i o'zgaradi. `MemoComponent` (custom compare bilan) uchun bitta qo'shimcha wrapper Fiber bo'ladi (child'ni o'z ichiga oladi).
 - "Class component uchun `memo` ishlaydimi?" — Ha, lekin `PureComponent` (built-in shallow check) odatda yetarli. `memo(class)` orqali HOC qatlami ortiqcha bo'ladi.
 
 </details>
@@ -401,12 +403,12 @@ if (!hasScheduledUpdateOrContext) {
 **Anti-pattern — over-comparing:**
 
 ```typescript
-// ❌ Deep clone + JSON.stringify — 100x sekin
+// ❌ JSON.stringify — katta object'lar uchun sezilarli sekin
 const areEqual = (prev, next) =>
   JSON.stringify(prev) === JSON.stringify(next);
 ```
 
-`JSON.stringify` har solishtirish 1-10ms olishi mumkin (katta object'lar uchun) — bu render cost'idan ko'p. Memoization'ning ma'nosi yo'qoladi.
+`JSON.stringify` katta object'lar uchun sezilarli vaqt oladi — bu render cost'idan ko'p bo'lishi mumkin. Memoization'ning ma'nosi yo'qoladi.
 
 **Anti-pattern — under-comparing (false positive):**
 
@@ -679,7 +681,7 @@ function Counter() {
 }
 ```
 
-**`memo` + `useCallback` payg'ambari prinsipi:**
+**`memo` + `useCallback` kombinatsiya jadvali:**
 
 | Memo'lash | Bailout | Sabab |
 |-----------|---------|-------|
@@ -721,12 +723,12 @@ function Parent() {
 
 - **`useCallback` deps unstable**: Agar deps har render'da yangi (object/array literal), `useCallback` har render'da yangi function qaytaradi — memoization yo'qoladi.
 - **`useCallback` o'zi yetmaydi, props ham stable bo'lishi kerak**: Object/array props uchun `useMemo`. Agar bitta props unstable bo'lsa — barchasi bekor.
-- **`React.Compiler` (R19) bekor qiladi**: Compiler ishlatilsa, `useCallback`/`useMemo` qo'l bilan yozish ortiqcha. Compiler avtomat memoization qiladi.
+- **React Compiler (R19) bekor qiladi**: Compiler ishlatilsa, `useCallback`/`useMemo` qo'l bilan yozish ortiqcha. Compiler avtomat memoization qiladi.
 
 ### Follow-up savollar
 
 - "Closure'da fresh state olish va memoization — kelishishi qiyin?" — Functional state updates (`setX(x => ...)`), `useReducer` (action dispatch), `useRef` (mutable storage) — ularning hammasi closure'siz ishlaydi.
-- "`useEvent` (proposal) nima vazifani bajaradi?" — RFC: stable callback identity, lekin har chaqirilganda fresh state ko'radi. Hozircha `useEffectEvent` shaklida React'da implement qilingan (R19 stable emas hali, eksperimental kanal).
+- "`useEvent` (proposal) nima vazifani bajaradi?" — RFC: stable callback identity, lekin har chaqirilganda fresh state ko'radi. Hozircha `useEffectEvent` shaklida React'da mavjud (experimental API — stable release'ga kiritilmagan).
 - "Inline function har doim performance muammomi?" — Yo'q. Faqat `memo`'langan komponentga props sifatida uzatilsa muhim. Oddiy DOM `<button onClick={() => ...}>` — DOM event listener, performance ta'siri yo'q.
 
 </details>
@@ -1033,6 +1035,8 @@ Bu xabar bypass'ni aniqlashtirish uchun eng qulay tool.
 
 ---
 
+<a id="qism-b"></a>
+
 ### 5. `React.memo` + Context — bypass scenario [Senior]
 
 <details>
@@ -1091,7 +1095,7 @@ function readContext(Context) {
 }
 ```
 
-Each `useContext` call subscribes fiber to context. Provider value change → all subscribers re-render (regardless of memo).
+Har `useContext` chaqiruvi fiber'ni context'ga subscribe qiladi. Provider value o'zgarganda — barcha subscriber'lar qayta render qilinadi (memo'ga qaramay).
 
 **Context splitting pattern:**
 
@@ -1168,14 +1172,14 @@ function Provider({ children }) {
 
 ### Edge Cases
 
-- **Context with object value**: New object each render — all consumers re-render. Memoize.
-- **Multiple contexts in component**: Each subscribes separately. Any change re-renders.
-- **Context update via setState in Provider**: Provider re-renders → consumers re-render.
+- **Context object value**: Har render'da yangi object — barcha consumer'lar re-render. `useMemo` bilan stabilize qilish kerak.
+- **Bir komponentda bir nechta context**: Har biri alohida subscribe. Istalgan biri o'zgarganda — re-render.
+- **Provider ichida setState**: Provider re-render → consumer'lar re-render.
 
 ### Follow-up savollar
 
-- "Why React doesn't auto-bailout?" — Context = subscription model. Selector pattern outside core.
-- "use-context-selector library?" — dai-shi's library. Adds selector subscription.
+- "React nima uchun avtomat bailout qilmaydi?" — Context subscription model'da ishlaydi. Selector pattern React core'da yo'q — tashqi library.
+- "use-context-selector library?" — dai-shi'ning library'si. Context'ga selector-based subscription qo'shadi.
 
 </details>
 
@@ -1183,14 +1187,14 @@ function Provider({ children }) {
 
 ## QISM B: Re-render Mechanics
 
-### 6. Komponent qayta render bo'lishining 4 ta asosiy sababi nima? [Junior+]
+### 6. Komponent qayta render bo'lishining asosiy sabablari nima? [Junior+]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-Komponent quyidagi 4 ta sabab bilan re-render qilinadi: (1) **State o'zgarishi** — `useState`/`useReducer`/`forceUpdate` chaqiruvi. (2) **Props o'zgarishi** — parent re-render bo'lib, props yangi reference yoki value bilan berildi. (3) **Context o'zgarishi** — komponent `useContext` orqali subscribe qilgan provider value yangilandi. (4) **Parent re-render** — default tarzda parent qayta render bo'lsa, barcha child'lar ham qayta render qilinadi (memo bypass bo'lmaganda).
+Komponent quyidagi 3 ta asosiy sabab bilan re-render qilinadi: (1) **State o'zgarishi** — `useState`/`useReducer` chaqiruvi. (2) **Parent re-render** — default tarzda parent qayta render bo'lsa, barcha child'lar ham qayta render qilinadi (`memo` bo'lmaganda). (3) **Context o'zgarishi** — komponent `useContext` orqali subscribe qilgan provider value yangilandi. **Props o'zgarishi o'z-o'zidan trigger EMAS** — parent re-render natijasida child re-render bo'ladi, props yangi bo'lishi bu re-render'ning sababiy emas, oqibati.
 
 ### To'liq tushuntirish
 
@@ -1369,7 +1373,7 @@ R18+ "lazy context propagation" — faqat haqiqatan ham consumer fiber'lar yangi
 
 ```typescript
 // Scheduler priority lanes (selected)
-SyncLane = 0b0000000000000000000000000000001;
+SyncLane = 0b0000000000000000000000000000010;
 InputContinuousLane = 0b0000000000000000000000000000100;
 DefaultLane = 0b0000000000000000000000000010000;
 TransitionLane1 = 0b0000000000000000000000010000000;
@@ -1983,6 +1987,8 @@ Reconciler `Subtree`'ga kelganda — `bailoutOnAlreadyFinishedWork` `null` qayta
 
 ---
 
+<a id="qism-c"></a>
+
 ### 9. Output savol — re-render trace [Middle+]
 
 <details>
@@ -2318,14 +2324,14 @@ function Parent() {
 
 ### Edge Cases
 
-- **Primitive props**: Numbers, strings, booleans — Object.is works. No issue.
-- **`null`/`undefined`**: Same reference (always Object.is true).
-- **Nested object change**: Outer reference same — Object.is true → memo bailout (potentially stale UI).
+- **Primitive props**: Number, string, boolean — `Object.is` ishlaydi. Muammo yo'q.
+- **`null`/`undefined`**: Doim bir xil reference (`Object.is` true).
+- **Nested object o'zgarishi**: Tashqi reference o'zgarmagan — `Object.is` true → memo bailout (stale UI xavfi).
 
 ### Follow-up savollar
 
-- "Why React doesn't deep compare?" — Performance: shallow O(n keys), deep O(tree size). Default cheap.
-- "When deep compare worth it?" — Expensive child render (large list, heavy calc). Measure first.
+- "React nima uchun deep compare qilmaydi?" — Performance: shallow O(n keys), deep O(tree size). Default arzon.
+- "Deep compare qachon to'g'ri keladi?" — Qimmat child render (katta list, murakkab hisoblash). Avval Profiler bilan o'lchang.
 
 </details>
 
@@ -2366,7 +2372,7 @@ useMemo/useCallback kerakmi?
 function ProductList({ products }: { products: Product[] }) {
   const [filter, setFilter] = useState("");
 
-  // ✅ Filter + sort — 10K elementlar uchun ~5-50ms
+  // ✅ Filter + sort — katta dataset'lar (1K+) uchun sezilarli vaqt olishi mumkin
   const visibleProducts = useMemo(() => {
     return products
       .filter((p) => p.name.includes(filter))
@@ -2627,6 +2633,8 @@ Trivial computation uchun `useMemo` — performance LOSS bo'lishi mumkin. Profil
 </details>
 
 ---
+
+<a id="qism-d"></a>
 
 ### 12. `useMemo`/`useCallback` qachon ortiqcha (over-engineering)? [Middle+]
 
@@ -3178,7 +3186,7 @@ Mutation, side effects, va Rules of React buzilishi linting orqali aniqlash imko
 
 ## QISM D: React Compiler
 
-### 14. React Compiler ichki mexanizmi qanday ishlaydi (HIR, reactive scopes)? [Junior+]
+### 14. React Compiler ichki mexanizmi qanday ishlaydi (HIR, reactive scopes)? [Senior]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -3389,8 +3397,8 @@ Branch'lar bo'yicha Compiler reactive scopes'ni har branch'da alohida tahlil qil
 ```typescript
 // Compiler tracks:
 type Effect =
-  | "Read"        // x.foo (qiymat o'qilgan)
-  | "Mutate"      // x.foo = y (qiymat o'zgartirilgan)
+  | "Read"        // user.name (qiymat o'qilgan)
+  | "Mutate"      // user.name = value (qiymat o'zgartirilgan)
   | "Capture"     // closure'da olingan
   | "Store";      // boshqa joyga assigned
 
@@ -3477,6 +3485,8 @@ Compiler source maps yaratadi — debugging'da original kod ko'rinadi. Productio
 </details>
 
 ---
+
+<a id="qism-e"></a>
 
 ### 15. "Rules of React" — Compiler nimani majbur qiladi? [Middle]
 
@@ -4053,7 +4063,7 @@ function App() {
 
 **Real-world Compiler adoption:**
 
-Meta — Instagram'da ishlatish boshlandi (2024). Reports: 10-20% render time qisqarishi (large lists). Bug rate impact: minimal — Compiler conservative.
+Meta — Instagram'da ishlatish boshlandi (2024). Internal reports render time qisqarishini ko'rsatgan (large list'lar uchun). Bug rate impact: minimal — Compiler conservative.
 
 </details>
 
@@ -4229,7 +4239,7 @@ function commitRoot(root: FiberRoot) {
 
 **Profiler limitations:**
 
-1. **Production overhead**: Profiler instrumented build slower (5-10%). Faqat debugging uchun.
+1. **Production overhead**: Profiler instrumented build sekinroq (har Fiber uchun timer overhead). Faqat debugging uchun.
 2. **Concurrent rendering edge cases**: Aborted renders ham qayd qilinishi mumkin (DevTools indicator bor).
 3. **Sub-second granularity**: 0.1ms aniqlikda. Mikrosekund-darajadagi farqlar ko'rinmaydi.
 
@@ -4248,7 +4258,7 @@ function commitRoot(root: FiberRoot) {
 
 **`Highlight updates when components render`:**
 
-DevTools settings → "Highlight updates when components render" — har render bo'lgan komponent atrofida quvur ko'k chiziq. Real-time visual feedback.
+DevTools settings → "Highlight updates when components render" — har render bo'lgan komponent atrofida rangli border highlight. Real-time visual feedback.
 
 > **Performance note:** Highlighting o'zi rendering overhead qo'shadi. Faqat debugging uchun yoqing.
 
@@ -4288,6 +4298,8 @@ performance.measure("filter", "ProductList:filter:start", "ProductList:filter:en
 </details>
 
 ---
+
+<a id="qism-f"></a>
 
 ### 18. `<Profiler>` komponent va `onRender` callback'i programmatik qanday ishlatiladi? [Middle]
 
@@ -4489,8 +4501,8 @@ function commitProfilerEffects(finishedWork: Fiber) {
       onRender(
         id,
         finishedWork.alternate === null ? "mount" : "update",
-        profilerInstance.effectDuration,
-        profilerInstance.passiveEffectDuration,
+        profilerInstance.actualDuration,    // render vaqti (sub-tree bilan)
+        profilerInstance.treeBaseDuration,  // memoization'siz nominal duration
         profilerInstance.startTime,
         commitTime,
       );
@@ -4536,21 +4548,21 @@ fiber.baseDuration = sum of all child render durations
 
 `<Profiler>` tag enabled — Reconciler tracking timer overhead per render. Production bundle:
 
-- `react-dom/profiling` — full instrumentation, ~5-10% overhead
-- `react-dom` (default) — `<Profiler>` API present, but minimal overhead
+- `react-dom/profiling` — full instrumentation, sezilarli overhead (har Fiber uchun timer)
+- `react-dom` (default) — `<Profiler>` API present, lekin minimal overhead
 
 > **Performance note:** `<Profiler>` ko'p bo'lsa (ko'p sub-tree'lar) — overhead summasi sezilarli bo'ladi. Production'da nuanced: faqat critical path'larga.
 
 **Sample telemetry — Web Vitals:**
 
 ```tsx
-import { onLCP, onFID, onCLS } from "web-vitals";
+import { onLCP, onINP, onCLS } from "web-vitals";
 
 // React render metrics + Web Vitals
 function App() {
   useEffect(() => {
     onLCP(reportToAnalytics);
-    onFID(reportToAnalytics);
+    onINP(reportToAnalytics);
     onCLS(reportToAnalytics);
   }, []);
 
@@ -4627,7 +4639,7 @@ function App() {
 
 ### Qisqa javob
 
-Production performance monitoring 4 ta darajada amalga oshiriladi: (1) **Web Vitals** (Core: LCP, FID/INP, CLS) — user experience metrics. (2) **React Profiler API** — komponent render metrics, slow renders detection. (3) **Custom marks** — `performance.measure` bilan business operations. (4) **Real User Monitoring (RUM)** — DataDog, New Relic, Sentry'da real user data. Bundle size va render frequency cost'i bor — sampling strategy talab qilinadi (10-20% users).
+Production performance monitoring 4 ta darajada amalga oshiriladi: (1) **Web Vitals** (Core: LCP, INP, CLS) — user experience metrics. (2) **React Profiler API** — komponent render metrics, slow renders detection. (3) **Custom marks** — `performance.measure` bilan business operations. (4) **Real User Monitoring (RUM)** — DataDog, New Relic, Sentry'da real user data. Bundle size va render frequency cost'i bor — sampling strategy talab qilinadi (10-20% users).
 
 ### To'liq tushuntirish
 
@@ -4678,7 +4690,7 @@ if (Math.random() < samplingRate) {
 **`web-vitals` integration:**
 
 ```tsx
-import { onLCP, onFID, onCLS, onINP, onFCP, onTTFB } from "web-vitals";
+import { onLCP, onCLS, onINP, onFCP, onTTFB } from "web-vitals";
 import { sendToAnalytics } from "./analytics";
 
 function reportWebVitals(metric: any) {
@@ -4811,7 +4823,7 @@ const App = Sentry.withProfiler(AppRoot);
 
 **INP — Interaction to Next Paint (R19 era):**
 
-INP measures **worst** interaction latency in session (default — 98th percentile across all interactions). FID — only first interaction. INP — more representative of user experience.
+INP sessiya davomidagi eng sekin interaction latency'ni approximatsiya qiladi (ko'p interaction'lar bo'lsa, eng yomon interaction'lardan biri tashlab qo'yiladi). FID — faqat birinchi interaction. INP — UX'ni aniqroq ifodalaydi.
 
 ```typescript
 // web-vitals onINP triggers:
@@ -4854,12 +4866,7 @@ LoAF — frames > 50ms (jank). React Concurrent rendering avoids this.
 // rollup-plugin-visualizer
 ```
 
-Bundle size impact:
-
-```typescript
-// Before: 350KB gzipped → LCP 2.8s
-// After dynamic imports: 120KB initial → LCP 1.9s
-```
+Bundle size impact — dynamic imports initial bundle'ni sezilarli kamaytiradi, LCP yaxshilanadi. Aniq raqamlar ilova va tarmoq sharoitlariga bog'liq — bundle analyzer va Lighthouse bilan o'lchang.
 
 **Code splitting telemetry:**
 
@@ -4927,16 +4934,7 @@ Best practice: **both**. Synthetic for regression detection, RUM for user experi
 
 **Cost analysis:**
 
-```
-Telemetry cost per session:
-- 5 Web Vitals events
-- ~50 render events (slow > 16ms)
-- ~10 custom marks
-= 65 events × ~200 bytes = 13KB
-
-10% sampling × 1M users/day = 100K sessions × 13KB = 1.3GB/day
-→ ~$30-50/month at standard pricing
-```
+Telemetry cost sessiya hajmi (Web Vitals events + render events + custom marks), sampling rate va kunlik aktiv foydalanuvchilar soniga bog'liq. Sampling rate (1-10%) ni ilova traffic'iga qarab tanlash kerak. Aniq cost provider (DataDog, Sentry, custom backend) pricing'iga bog'liq — har ilovada alohida hisoblash talab qilinadi.
 
 **Server-Timing header — backend correlation:**
 
@@ -4957,7 +4955,7 @@ Server-Timing — backend → frontend correlation. RUM tools auto-parse.
 ### Follow-up savollar
 
 - "Sampling rate qanday tanlash?" — Trade-off: cost vs statistical power. 10% — typical. High-traffic site (1M+/day): 1-5%. Low-traffic: 50-100%.
-- "Performance budget qanday belgilash?" — Web Vitals targets (LCP < 2.5s, INP < 200ms, CLS < 0.1). Bundle size: 200KB initial JS gzipped. Render: p95 < 16ms.
+- "Performance budget qanday belgilash?" — Web Vitals targets (LCP < 2.5s, INP < 200ms, CLS < 0.1 — Google web.dev'da e'lon qilingan). Bundle size va render budget — ilovaga bog'liq, Lighthouse va Profiler bilan aniqlang.
 - "Regression detection qanday avtomatlash?" — CI'da Lighthouse CI (synthetic). Production'da RUM dashboards + alerts. Bisect on regression.
 
 </details>
@@ -5013,7 +5011,7 @@ function App() {
 |----------|-----------|-------|
 | Route'lar (`/dashboard`, `/settings`) | ✅ | Har route alohida chunk |
 | Modal'lar / dialog'lar | ✅ | Faqat ochilganda yuklanadi |
-| Editor (Monaco, CodeMirror) | ✅ | 500KB+ bundle |
+| Editor (Monaco, CodeMirror) | ✅ | Katta bundle hajmi |
 | Chart libraries | ✅ | Faqat dashboard'da |
 | Footer komponent | ❌ | Initial render'da kerak |
 | Header / Nav | ❌ | Always visible |
@@ -5216,7 +5214,7 @@ export default defineConfig({
 
 Hash-based filenames + Cache-Control: max-age=31536000 → repeat visits — 0 network.
 
-> **Performance benchmark:** Initial bundle 800KB → 200KB after splitting. LCP 3.2s → 1.8s (mid-range device, 3G network).
+> **Performance note:** Code splitting initial bundle hajmini sezilarli kamaytiradi, bu esa LCP'ni yaxshilaydi (ayniqsa past tezlikdagi tarmoqlarda). Aniq raqamlar ilova va tarmoq tezligiga bog'liq — Profiler va Lighthouse bilan o'lchang.
 
 </details>
 
@@ -5243,7 +5241,7 @@ Hash-based filenames + Cache-Control: max-age=31536000 → repeat visits — 0 n
 
 ### Qisqa javob
 
-Bundle size'ni 5 ta darajada optimizatsiya qilinadi: (1) **Code splitting** — `React.lazy`, dynamic imports. (2) **Tree shaking** — ESM imports, named imports (named lodash o'rniga `lodash-es`). (3) **Library replacement** — Moment → date-fns, lodash → es-toolkit. (4) **Asset optimization** — image formats (WebP, AVIF), font subsetting. (5) **Bundle analysis** — `webpack-bundle-analyzer`, `vite-bundle-visualizer`. Production target: < 200KB initial JS gzipped, < 100KB main chunk.
+Bundle size'ni 5 ta darajada optimizatsiya qilinadi: (1) **Code splitting** — `React.lazy`, dynamic imports. (2) **Tree shaking** — ESM imports, named imports (named lodash o'rniga `lodash-es`). (3) **Library replacement** — Moment → date-fns, lodash → es-toolkit. (4) **Asset optimization** — image formats (WebP, AVIF), font subsetting. (5) **Bundle analysis** — `webpack-bundle-analyzer`, `vite-bundle-visualizer`. Production target ilovaga bog'liq — bundle analyzer va Lighthouse bilan o'lchab, performance budget belgilang.
 
 ### To'liq tushuntirish
 
@@ -5256,28 +5254,30 @@ Bundle size'ni 5 ta darajada optimizatsiya qilinadi: (1) **Code splitting** — 
 **2. Tree shaking:**
 
 ```typescript
-// ❌ Default import — entire library
+// ❌ Default import — butun library bundle'ga kiradi
 import _ from "lodash";
-_.debounce(fn, 300); // → 70KB+ in bundle
+_.debounce(fn, 300);
 
-// ✅ Named import (with ESM library)
+// ✅ Named import (ESM library) — tree-shaking ishlaydi
 import { debounce } from "lodash-es";
-debounce(fn, 300); // → ~3KB
+debounce(fn, 300);
 
-// ✅ Better — specific function
+// ✅ Direct path import — eng kichik bundle
 import debounce from "lodash-es/debounce";
-debounce(fn, 300); // → ~2KB
+debounce(fn, 300);
 ```
 
 **3. Library size comparison:**
 
-| Original | Replacement | Size diff |
-|----------|------------|-----------|
-| `moment` | `date-fns` | -200KB |
-| `lodash` | `es-toolkit` | -50KB |
-| `redux-toolkit` | `zustand` | -30KB |
-| `axios` | `fetch` (native) | -15KB |
-| `formik` | `react-hook-form` | -25KB |
+| Original | Replacement | Natija |
+|----------|------------|--------|
+| `moment` | `date-fns` | Sezilarli kichikroq (tree-shakable) |
+| `lodash` | `es-toolkit` | Kichikroq (ESM, tree-shakable) |
+| `redux-toolkit` | `zustand` | Yengilroq bundle |
+| `axios` | `fetch` (native) | 0 KB qo'shimcha (browser native) |
+| `formik` | `react-hook-form` | Kichikroq bundle + kamroq re-render |
+
+> Aniq hajm farqlari versiyaga bog'liq — `bundlephobia.com` da tekshiring.
 
 **4. Asset optimization:**
 
@@ -5350,7 +5350,7 @@ async function exportToPdf(data: any) {
   doc.save("export.pdf");
 }
 
-// jsPDF (~150KB) — initial bundle'da yo'q
+// jsPDF katta library — initial bundle'da yo'q
 function ExportButton({ data }: Props) {
   return <button onClick={() => exportToPdf(data)}>Export PDF</button>;
 }
@@ -5375,7 +5375,7 @@ await loadPolyfills();
 **`react-helmet` removal (R19):**
 
 ```tsx
-// ❌ Old (R18) — react-helmet ~25KB
+// ❌ Old (R18) — react-helmet (qo'shimcha bundle)
 import { Helmet } from "react-helmet";
 <Helmet><title>Page</title></Helmet>
 
@@ -5417,8 +5417,8 @@ Bundler (Webpack/Rollup) — `sideEffects: false` → unused exports removed (de
 
 ```typescript
 // ❌ Dynamic property access
-const fns = { foo: () => {}, bar: () => {} };
-fns[methodName](); // bundler can't statically determine
+const handlers = { create: () => {}, update: () => {} };
+handlers[methodName](); // bundler can't statically determine
 
 // ❌ CommonJS require (no static analysis)
 const lib = require("lib");
@@ -5514,7 +5514,7 @@ Filename hash — content-based. Content o'zgarsa hash o'zgaradi → cache inval
 ### Follow-up savollar
 
 - "Bundle analysis qachon qilish kerak?" — Production deploy oldidan har gal. CI'da automated check.
-- "300KB bundle yomonmi?" — Context'ga bog'liq. Mobile 3G — yes (parse time 200ms+). Desktop fiber — OK. Target: gzipped < 200KB initial.
+- "300KB bundle yomonmi?" — Context'ga bog'liq. Mobile 3G — sezilarli sekin (parse + execute vaqti uzoq). Desktop fiber — yetarli. Lighthouse va target qurilmada real test qiling.
 - "Polyfill strategy modern browsers uchun?" — `<script type="module">` (ESM only) — modern browsers. Legacy fallback: `<script nomodule>`. Differential bundling.
 
 </details>
@@ -5614,10 +5614,10 @@ useEffect(() => {
 import { preload, preinit, prefetchDNS, preconnect } from "react-dom";
 
 function App() {
-  // DNS prefetch (early — saves ~50-200ms)
+  // DNS prefetch — DNS resolution'ni oldindan bajaradi
   prefetchDNS("https://api.example.com");
 
-  // TCP/TLS preconnect (saves more — ~200-500ms)
+  // TCP/TLS preconnect — DNS + TCP + TLS handshake'ni oldindan bajaradi
   preconnect("https://cdn.example.com");
 
   // Preload font/script
@@ -5757,8 +5757,13 @@ Browser evaluate'lab, sahifa render qiladi (DOM, CSS, JS). User click — instan
 **`navigator.connection` — adaptive prefetching:**
 
 ```typescript
+interface NetworkInformation {
+  saveData: boolean;
+  effectiveType: string;
+}
+
 function shouldPrefetch(): boolean {
-  const conn = (navigator as any).connection;
+  const conn = (navigator as unknown as { connection?: NetworkInformation }).connection;
   if (!conn) return true;
   // Save data mode
   if (conn.saveData) return false;
@@ -5862,6 +5867,8 @@ Browser idle time'da prefetch — main thread block qilinmaydi.
 </details>
 
 ---
+
+<a id="qism-g"></a>
 
 ### 23. Virtualization (windowing) konseptsiyasi [Middle]
 
@@ -6025,14 +6032,9 @@ function VirtualList({ items }: { items: Item[] }) {
 
 **Performance benefit:**
 
-| Items | Without virt | With virt |
-|-------|--------------|-----------|
-| 100 | 5ms | 5ms (same) |
-| 1K | 50ms | 5ms |
-| 10K | 500ms+ | 5-10ms |
-| 100K | 5s+ (freeze) | 5-15ms |
+Virtualization'siz — item soni oshganda render vaqti chiziqli (yoki undan yuqori) o'sadi. 10K+ item'larda browser jank (main thread block) seziladi. Virtualization bilan — faqat visible window (~20-50 item) render qilinadi, shuning uchun item soni oshsa ham render vaqti deyarli o'zgarmaydi.
 
-Virtualization breakeven point — ~500-1000 items.
+Breakeven point odatda 500-1000 items atrofida — undan kam item'larda virtualization overhead foydasiz. Aniq raqamlar item murakkabligi va qurilmaga bog'liq — Profiler bilan o'lchang.
 
 **Memory:**
 
@@ -6041,14 +6043,14 @@ Without virtualization (10K items):
 - 10K React elements
 - 10K Fiber nodes
 - 10K DOM nodes
-- Memory: ~50-100MB
 
 With virtualization:
-- 20-50 React elements
+- 20-50 React elements (faqat visible window)
 - 20-50 Fiber nodes
 - 20-50 DOM nodes
-- Memory: ~5-10MB
 ```
+
+Memory farqi sezilarli — Fiber va DOM node'lar soni mingdan o'ntalabga tushadi.
 
 **Overscan — buffer for smooth scroll:**
 
@@ -6549,7 +6551,7 @@ useLayoutEffect(() => {
 // 3. React reconciliation: O(window_size)
 // 4. DOM updates: minimal (transform-only changes)
 
-// Total: ~5-10ms per scroll tick (60fps target: 16.67ms)
+// Total: 60fps target 16.67ms — visible window kichik bo'lganda yetarli
 ```
 
 **Comparison with `react-window`:**
@@ -7092,7 +7094,7 @@ Compiler kod oshiradi (cache array, conditional checks). Lekin re-render kamayga
 
 ### Qisqa javob
 
-Bundle analysis tools: **rollup-plugin-visualizer** (Vite), **webpack-bundle-analyzer** (Webpack), **source-map-explorer** (CLI). Metrics: **gzipped size** (network), **brotli size** (modern), **parse + execute time** (JS engine), **dependency tree** (tree-shaking gaps). Threshold: 100kb initial JS — moderate, 200kb+ — slow on mid-tier mobile.
+Bundle analysis tools: **rollup-plugin-visualizer** (Vite), **webpack-bundle-analyzer** (Webpack), **source-map-explorer** (CLI). Metrics: **gzipped size** (network), **brotli size** (modern), **parse + execute time** (JS engine), **dependency tree** (tree-shaking gaps). Threshold ilovaga bog'liq — Lighthouse va bundle analyzer bilan aniqlang.
 
 ### Kod misoli
 

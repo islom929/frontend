@@ -6,17 +6,19 @@
 
 ## Mundarija
 
-**QISM A: Components & Render Purity** (savollar 1-4)
-**QISM B: Props** (savollar 5-9)
-**QISM C: Composition** (savollar 10-12)
-**QISM D: State Lifting & Controlled** (savollar 13-15)
-**QISM E: Event Handling** (savollar 16-19)
-**QISM F: Legacy Patterns** (savollar 20-22)
-**QISM G: Compound Components & Children API** (savollar 23-25)
-**QISM H: Error Boundaries** (savollar 26-28)
-**QISM I: Portals** (savollar 29-30)
+- [**QISM A: Components & Render Purity** (savollar 1-4)](#qism-a)
+- [**QISM B: Props** (savollar 5-10)](#qism-b)
+- [**QISM C: Composition** (savollar 11-13)](#qism-c)
+- [**QISM D: State Lifting & Controlled** (savollar 14-17)](#qism-d)
+- [**QISM E: Event Handling** (savollar 18-22)](#qism-e)
+- [**QISM F: Legacy Patterns** (savollar 23-26)](#qism-f)
+- [**QISM G: Compound Components & Children API** (savollar 27-29)](#qism-g)
+- [**QISM H: Error Boundaries** (savollar 30-33)](#qism-h)
+- [**QISM I: Portals** (savollar 34-36)](#qism-i)
 
 ---
+
+<a id="qism-a"></a>
 
 ## QISM A: Components & Render Purity
 
@@ -241,6 +243,20 @@ const value = useSyncExternalStore(store.subscribe, store.getSnapshot);
 
 **Idempotency** — bir xil operatsiyani **bir necha marta bajarish bir martalik bilan teng natija beradi**. React rendering uchun: komponent N marta render qilinsa ham, oxirgi DOM holati bir martalik render bilan bir xil bo'lishi shart. Strict Mode 2x render — idempotency tekshiradi (dev). Side effects ham idempotent (effect cleanup-resilient).
 
+### To'liq tushuntirish
+
+**Idempotency React uchun nima uchun muhim:**
+
+1. **Concurrent rendering** — render abort qilinib, qaytadan boshlanishi mumkin. Har safar bir xil natija berishi shart
+2. **Strict Mode dev** — 2x render, 2x effect setup-cleanup-setup — impure code xatolarini aniqlash uchun
+3. **Memoization** — `React.memo` va `useMemo` idempotent render'ga tayanadi (same input = same output)
+4. **Server rendering** — server va client render bir xil HTML berishi shart (hydration uchun)
+
+**Idempotent vs deterministic farqi:**
+- **Deterministic** — same input = same output (har safar)
+- **Idempotent** — N marta bajarish = 1 marta bajarish (natija ortiqcha o'zgarmaydi)
+- React ikkalasini talab qiladi: render pure (deterministic) va effects idempotent (cleanup-resilient)
+
 ### Kod misoli
 
 ```tsx
@@ -453,6 +469,15 @@ function reducer(state, action) {
 
 JSX'da **PascalCase** (`<Component />`) — komponent (function/class). **lowercase** (`<div>`) — HTML/SVG element. JSX transform shu farq bilan `_jsx(Component, ...)` (function reference) yoki `_jsx("div", ...)` (string tag) qiladi. ESLint rule majburlaydi.
 
+### To'liq tushuntirish
+
+JSX transpiler (Babel/SWC/TypeScript) element tag'ni case bo'yicha aniqlaydi:
+- **PascalCase** (`<Header />`) — user-defined component. Transform: `_jsx(Header, {})` — `Header` function/class reference sifatida pass qilinadi
+- **lowercase** (`<div />`) — built-in HTML/SVG element. Transform: `_jsx("div", {})` — string sifatida pass qilinadi
+- **Dot notation** (`<Components.Button />`) — member expression, case ahamiyatsiz (har doim expression sifatida resolve qilinadi)
+
+Bu convention React runtime uchun muhim — string tag'lar DOM element yaratadi, function reference'lar component render qiladi.
+
 ### Kod misoli
 
 ```tsx
@@ -608,7 +633,7 @@ Both HTML and SVG use lowercase.
 
 ---
 
-### 4. Output: render side effect bug [Output] [Middle]
+### 4. Output: render side effect bug [Middle]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -824,6 +849,8 @@ document.title = title;  // ❌
 
 ---
 
+<a id="qism-b"></a>
+
 ## QISM B: Props
 
 ### 5. Props basics + immutability invariant [Junior+]
@@ -833,7 +860,7 @@ document.title = title;  // ❌
 
 ### Qisqa javob
 
-**Props** = **parameters** komponentga. Read-only — child mutate qilmasligi kerak. Ko'p hollarda object sifatida pass qilinadi (`{ name, onClick }`). Bu **konventsiya** (React runtime'da `Object.freeze` deep-freeze qilmaydi) — TS read-only types va ESLint qoidalari orqali enforce qilinadi. Mutation bug-prone: parent state'ni buzishi, memoization'ni siniqtirishi va concurrent rendering'da nondeterministic xatti-harakat keltirib chiqarishi mumkin.
+**Props** = komponentga beriladigan parametrlar. Runtime'da har doim object (`{ name, onClick, ... }`). Read-only — child mutate qilmasligi kerak. Bu **konventsiya** (React runtime'da `Object.freeze` deep-freeze qilmaydi) — TS `Readonly<P>` va ESLint qoidalari orqali enforce qilinadi. Mutation bug-prone: parent state'ni buzishi, memoization'ni siniqtirishi va concurrent rendering'da nondeterministic xatti-harakat keltirib chiqarishi mumkin.
 
 ### Kod misoli
 
@@ -891,18 +918,21 @@ function GoodList({ items }: { items: Item[] }) {
 // React calls component:
 const element = _jsx(MyComponent, props);
 // MyComponent(props) — receives props object
-// In dev: Object.freeze(props) (some cases)
+// Dev mode: Object.freeze(props) — shallow freeze (top-level assignment xato beradi)
+// Production: freeze qilinmaydi — mutation silently muvaffaqiyatga erishadi
 ```
 
 **Default values — JS default parameters:**
 
 ```tsx
-// R19+ — defaultProps removed from function components
+// R19+ — defaultProps function component'larda deprecated (console warning beradi)
+// JS default parameters ishlatish kerak
 function Button({ label = "Click", disabled = false }: Props) {
   return <button disabled={disabled}>{label}</button>;
 }
 
-// Pre-R19 — defaultProps (deprecated)
+// Pre-R19 pattern — defaultProps (R19'da function component'lar uchun deprecated)
+// Class component'larda hali supported
 Button.defaultProps = { label: "Click", disabled: false };
 ```
 
@@ -997,9 +1027,10 @@ function Profile({ user }: { user: User }) {
 
 **Runtime mutation detection:**
 
-React **deep-freeze props qilmaydi**. Ba'zi tarixiy implementatsiyalarda dev'da shallow freeze bo'lar edi (`Object.freeze(props)`), lekin hozirgi versiyalarda bu kafolat yo'q. Mutation'lar runtime'da silently muvaffaqiyatga erishadi va keyinroq bug'larga olib keladi.
+React dev mode'da props object'ni **shallow freeze** qiladi (`Object.freeze(props)`) — top-level property'ga assign qilish `TypeError` beradi. Lekin **deep freeze emas** — nested object mutation'lar (`props.user.name = "X"`) catch qilinmaydi. Production'da freeze yo'q — mutation silently muvaffaqiyatga erishadi.
 
 Himoya mexanizmlari:
+- **Dev mode freeze** — shallow level mutation catch qilinadi
 - **TypeScript** — props parameter `Readonly<P>` ko'rinishida olinadi (interface declaration orqali)
 - **ESLint** — `no-param-reassign` (props mutation oldini olish)
 - **StrictMode dev** — 2x render orqali mutation effekti ko'rinarli bo'ladi
@@ -1062,7 +1093,7 @@ interface ButtonProps {
 
 ### Qisqa javob
 
-**`children`** — special prop, JSX `<Comp>...</Comp>` ichidagi nodes. `React.ReactNode` type — most permissive (string, number, JSX, array, fragment, null/undefined). Other types: `ReactElement` (faqat JSX), `JSX.Element` (function component return). Composition pattern asosi.
+**`children`** — special prop, JSX `<Comp>...</Comp>` ichidagi nodes. `React.ReactNode` type — most permissive (string, number, JSX, array, fragment, null/undefined). Other types: `ReactElement` (faqat JSX element), `JSX.Element` (`ReactElement<any, any>` alias — TS'da JSX expression return type). Composition pattern asosi.
 
 ### Kod misoli
 
@@ -1801,12 +1832,12 @@ const users: User[] = [{ id: "1", name: "Ali" }];
 interface FormProps<T> {
   initial: T;
   onSubmit: (values: T) => void;
-  render: (props: { values: T; setField: (key: keyof T, value: any) => void }) => React.ReactNode;
+  render: (props: { values: T; setField: <K extends keyof T>(key: K, value: T[K]) => void }) => React.ReactNode;
 }
 
 function Form<T>({ initial, onSubmit, render }: FormProps<T>) {
   const [values, setValues] = useState<T>(initial);
-  const setField = (key: keyof T, value: any) => {
+  const setField = <K extends keyof T>(key: K, value: T[K]) => {
     setValues(prev => ({ ...prev, [key]: value }));
   };
 
@@ -2103,12 +2134,15 @@ type ButtonProps = BaseProps & (
 
 ### Follow-up savollar
 
-- "Vue 3 equivalent?" — `defineProps` with conditional (less type-safe).
-- "Performance impact?" — Zero runtime — types erased.
+- "Exhaustive switch default case?" — `never` type assertion — compile-time xato agar variant qo'shilsa lekin handle qilinmasa.
+- "Performance impact?" — Zero runtime — types erased. Discriminator check standard JS `switch`/`if`.
+- "Multiple discriminators?" — Bir necha field bo'yicha narrow qilish mumkin, lekin bitta discriminator (variant/type/kind) konventsiya.
 
 </details>
 
 ---
+
+<a id="qism-c"></a>
 
 ## QISM C: Composition
 
@@ -2666,7 +2700,8 @@ function Fetch<T>({
   {({ data, loading, error }) => {
     if (loading) return <Spinner />;
     if (error) return <Error message={error.message} />;
-    return <UserCard user={data!} />;
+    if (!data) return null;
+    return <UserCard user={data} />;
   }}
 </Fetch>
 ```
@@ -2820,16 +2855,18 @@ Combine multiple IoC layers.
 ### Follow-up savollar
 
 - "When IoC vs hooks?" — Hooks for logic-only (no wrapper). IoC for component structure (Disclosure, Combobox).
-- "Render props in 2026?" — Less common (hooks dominate). Compound components prefered for component IoC.
+- "Render props in 2026?" — Less common (hooks dominate). Compound components preferred for component IoC.
 - "Performance overhead?" — Function call per render. Negligible.
 
 </details>
 
 ---
 
+<a id="qism-d"></a>
+
 ## QISM D: State Lifting & Controlled
 
-### 14. Lifting state up — sibling siblings'ga uzata olmaydi [Middle]
+### 14. Lifting state up — sibling komponentlar state share qilolmaydi [Middle]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -3462,7 +3499,7 @@ function ProductFilter() {
 | Redux Toolkit | Modern Redux | Less boilerplate | Still some |
 | Zustand | Medium apps | Simple, fast | Smaller ecosystem |
 | Jotai | Atomic state | Fine-grained | Conceptually different |
-| Recoil | Atomic state (FB) | Async support | Still experimental |
+| Recoil | Atomic state (Meta) | Async support | Archived/unmaintained (2024+), Jotai alternative |
 | TanStack Query | Server state | Caching, retry, dedupe | Server-focused |
 | SWR | Server state | Smaller, simpler | Less features |
 | React Hook Form | Forms | Performance | Form-only |
@@ -3736,12 +3773,14 @@ R19 form actions — uncontrolled-friendly (FormData), works with Server Actions
 
 ### Follow-up savollar
 
-- "RHF vs Formik for new project?" — RHF (active development, better performance, smaller bundle).
+- "RHF vs Formik for new project?" — RHF tavsiya etiladi (faol development, yaxshiroq performance, kichikroq bundle). Formik'ning development tezligi sekinlashgan (oxirgi major release 2021).
 - "Server Actions replace form libraries?" — Partially. Validation, complex UX still need library.
 
 </details>
 
 ---
+
+<a id="qism-e"></a>
 
 ## QISM E: Event Handling
 
@@ -3752,14 +3791,14 @@ R19 form actions — uncontrolled-friendly (FormData), works with Server Actions
 
 ### Qisqa javob
 
-**SyntheticEvent** — React'ning **cross-browser normalized** event wrapper. Native DOM event'larni o'rab oladi, har browser'da consistent API beradi. `e.target`, `e.preventDefault()`, `e.stopPropagation()` — native'ga o'xshash. `e.nativeEvent` — original DOM event'ga access. R17+'da event pooling olib tashlandi (modern memory mgmt yetarli).
+**SyntheticEvent** — React'ning **cross-browser normalized** event wrapper. Native DOM event'larni o'rab oladi, har browser'da consistent API beradi. `e.target`, `e.preventDefault()`, `e.stopPropagation()` — native'ga o'xshash. `e.nativeEvent` — original DOM event'ga access. R17+'da event pooling olib tashlandi (zamonaviy browser'larda GC yetarli samarali, pooling ortiqcha murakkablik qo'shar edi).
 
 ### To'liq tushuntirish
 
 **Why SyntheticEvent:**
 
-- Browser inconsistencies (IE vs others)
-- Performance — pooling (R16-R17, deprecated)
+- Browser event API normalization (tarixiy sabab, hozir kam relevant lekin architecture saqlanib qolgan)
+- Performance — pooling (R16-R17, olib tashlangan)
 - Type-safe (TS) — `MouseEvent<HTMLButtonElement>`
 - React-specific — `onChange` semantics differ from native
 
@@ -4051,8 +4090,9 @@ const appRoot = createRoot(document.getElementById("app"));
 // - React: bubbles only within widget fiber tree (widget root delegated listener handles it)
 // App root listener — DOESN'T receive (different root container)
 
-// R16 with two ReactDOM.render calls:
-// Both apps share `document`-level delegation
+// R16 (va R17 legacy mode) ReactDOM.render bilan:
+// R16: barcha app'lar `document`-level delegation share qiladi
+// R17 legacy mode: hali `ReactDOM.render` (lekin delegation root container'ga o'tgan)
 // Click in widget could trigger app's bubble handlers (if not stopped)
 ```
 
@@ -4302,7 +4342,7 @@ Portal events bubble through React tree, not DOM tree.
 
 ### Qisqa javob
 
-**R19 form actions** — `<form action={functionFromState}>` — function attached to form. Submit'da function chaqiriladi `FormData` argument bilan. **Server actions** (`"use server"`) yoki **client actions** ham bo'lishi mumkin. Auto-pending state (`useFormStatus`), uncontrolled form-friendly, progressive enhancement (works without JS for server actions).
+**R19 form actions** — `<form action={asyncFunction}>` — function prop sifatida form'ga attach qilinadi. Submit'da function `FormData` argument bilan chaqiriladi. **Server actions** (`"use server"` directive) yoki **client actions** (oddiy async function) bo'lishi mumkin. `useFormStatus` (child component ichida) pending state beradi, `useActionState` form state management. Uncontrolled form-friendly, progressive enhancement (server actions JS'siz ham ishlaydi).
 
 ### Kod misoli
 
@@ -4654,16 +4694,16 @@ function Parent() {
 
 ```tsx
 // 5. Debounced handler
-function useDebouncedCallback<T extends (...args: any[]) => any>(
+function useDebouncedCallback<T extends (...args: never[]) => void>(
   fn: T,
   delay: number
-): T {
-  const timeoutRef = useRef<number | null>(null);
+): (...args: Parameters<T>) => void {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  return useCallback(((...args: Parameters<T>) => {
+  return useCallback((...args: Parameters<T>) => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = window.setTimeout(() => fn(...args), delay);
-  }) as T, [fn, delay]);
+    timeoutRef.current = setTimeout(() => fn(...args), delay);
+  }, [fn, delay]);
 }
 
 function Search() {
@@ -4683,7 +4723,7 @@ function Form() {
     try {
       await api.submit();
     } catch (err) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "Unknown error");
     }
   };
 
@@ -4989,8 +5029,9 @@ function MyComponent() {
       console.log(e.detail.value);
     };
 
-    el.addEventListener("my-event" as any, handler as EventListener);
-    return () => el.removeEventListener("my-event" as any, handler as EventListener);
+    // CustomEvent type'lari TS standard EventMap'da yo'q — type assertion zarur
+    el.addEventListener("my-event", handler as EventListener);
+    return () => el.removeEventListener("my-event", handler as EventListener);
   }, []);
 
   return <div ref={ref}><my-component /></div>;
@@ -5107,6 +5148,8 @@ function App() {
 </details>
 
 ---
+
+<a id="qism-f"></a>
 
 ## QISM F: Legacy Patterns
 
@@ -5258,7 +5301,8 @@ function DataLoader<T>({ url, children }: DataLoaderProps<T>) {
   {({ data, loading, error }) => {
     if (loading) return <Spinner />;
     if (error) return <Error />;
-    return <UserCard user={data!} />;
+    if (!data) return null;
+    return <UserCard user={data} />;
   }}
 </DataLoader>
 ```
@@ -5545,14 +5589,14 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
 Wrapper component instead of HOC — simpler.
 
-**`memo` and `forwardRef` are technically HOCs:**
+**`memo` va `forwardRef` texnik jihatdan HOC-like:**
 
 ```tsx
-const MemoButton = memo(Button);  // HOC pattern
-const FwdInput = forwardRef(Input);  // HOC pattern
+const MemoButton = memo(Button);  // HOC-like wrapper pattern
+const FwdInput = forwardRef(Input);  // HOC-like (R18 pattern)
+// R19: forwardRef function component'lar uchun kerak emas (ref oddiy prop)
+// memo hali aktual va keng ishlatiladi
 ```
-
-These specific HOCs unlikely to disappear (built into React).
 
 **TypeScript HOC complexity:**
 
@@ -5563,13 +5607,14 @@ type WithAuthProps = { user: User };
 function withAuth<P extends WithAuthProps>(
   Component: React.ComponentType<P>
 ): React.ComponentType<Omit<P, "user">> {
-  return function WithAuth(props) {
+  return function WithAuth(props: Omit<P, "user">) {
     const { user } = useAuth();
-    return <Component {...(props as any)} user={user} />;
+    // HOC'da generic props forwarding TS limitation — workaround
+    return <Component {...(props as P)} user={user} />;
   };
 }
 
-// Strict typing harder than custom hook
+// Strict typing harder than custom hook — HOC'ning asosiy kamchiliklaridan biri
 ```
 
 **Migration strategy:**
@@ -5603,7 +5648,7 @@ function Profile() {
 
 - "Convert HOC to hook?" — Extract logic to hook, replace HOC usages with hook calls.
 - "When HOC over hook?" — Cross-cutting wrapper (error boundary, suspense). Else hook.
-- "memo and forwardRef HOCs deprecated?" — No. Built-in. Used for component identity (memo) and ref forwarding (R18).
+- "memo va forwardRef deprecated?" — `memo` deprecated emas, aktual. `forwardRef` R19'da function component'lar uchun kerak emas (ref oddiy prop), lekin deprecated emas — class component'lar va backward compatibility uchun mavjud.
 
 </details>
 
@@ -5823,7 +5868,7 @@ Hooks bir oz tezroq (kam wrapping va Fiber overhead), lekin amaliyotda farq sezi
 
 ### Qisqa javob
 
-HOC TypeScript signature: `<P extends object>(Component: ComponentType<P>) => ComponentType<P & ExtraProps>` — preserve original props (P) plus add extra. Real-world: `withAuth(Component) => Component & { user: User }`. R19'da `forwardRef` deprecated bo'lmagan, lekin oddiy props tarqalishi yetadi (HOC simpler).
+HOC TypeScript signature: `<P extends object>(Component: ComponentType<P>) => ComponentType<P & ExtraProps>` — preserve original props (P) plus add extra. Real-world: `withAuth(Component) => Component & { user: User }`. R19'da function component'larda `forwardRef` kerak emas (ref oddiy prop), shuning uchun HOC'da ref forwarding soddalashgan.
 
 ### Kod misoli
 
@@ -5932,6 +5977,8 @@ Custom hooks — cleaner, no wrapping, better TypeScript.
 </details>
 
 ---
+
+<a id="qism-g"></a>
 
 ## QISM G: Compound Components & Children API
 
@@ -6509,7 +6556,7 @@ Useful for sorting/filtering while preserving keys.
 ### Follow-up savollar
 
 - "Children.map vs JSX map?" — Children.map handles non-array children safely.
-- "cloneElement deprecation?" — Not deprecated, but Context preferred for modern code.
+- "cloneElement deprecation?" — Rasmiy deprecated emas, lekin React docs "legacy API" sifatida ko'rsatadi va Context-based alternative tavsiya qiladi. Yangi kod'da ishlatmaslik afzal.
 - "When `Children.toArray`?" — Filtering, sorting, counting specific children types.
 
 </details>
@@ -6751,7 +6798,7 @@ function Form({ children, errors }) {
 
 ### Qisqa javob
 
-`react-error-boundary` — popular library: `<ErrorBoundary>` wrapper with reset support. Function-component friendly hooks (`useErrorBoundary`, `useErrorHandler`). Reset patterns: `resetKeys` (array — change reset boundary), `onReset` callback, manual `reset()` from hook. Class boundary (vanilla React) — no built-in reset.
+`react-error-boundary` — popular library: `<ErrorBoundary>` wrapper with reset support. Function-component friendly hook `useErrorBoundary` (v4+: `showBoundary` method). Reset patterns: `resetKeys` (array — change reset boundary), `onReset` callback, manual `resetErrorBoundary` from fallback. Class boundary (vanilla React) — no built-in reset.
 
 ### Kod misoli
 
@@ -6892,6 +6939,8 @@ R19 + library — combined for full coverage.
 
 ---
 
+<a id="qism-h"></a>
+
 ## QISM H: Error Boundaries
 
 ### 31. Error boundaries — class komponentlar [Middle]
@@ -6901,7 +6950,7 @@ R19 + library — combined for full coverage.
 
 ### Qisqa javob
 
-**Error boundary** — komponent tree'da xatolarni tutib, fallback UI ko'rsatadigan komponent. **Faqat class komponent** — `getDerivedStateFromError` (error state set) + `componentDidCatch` (logging) lifecycle methods. Hooks ekvivalenti yo'q (R19'da hali). `react-error-boundary` library hooks-friendly wrapper beradi.
+**Error boundary** — komponent tree'da xatolarni tutib, fallback UI ko'rsatadigan komponent. **Faqat class komponent** — `getDerivedStateFromError` (error state set) + `componentDidCatch` (logging) lifecycle methods. R19 ham hook-based error boundary API bermagan — class component yagona yo'l. `react-error-boundary` library ichida class ishlatib, hooks-friendly wrapper beradi.
 
 ### Kod misoli
 
@@ -7114,24 +7163,24 @@ componentDidCatch(error, errorInfo) {
 </ErrorBoundary>
 ```
 
-**`react-error-boundary` features:**
+**`react-error-boundary` features (v4+):**
 
 - Hooks-friendly wrapper
-- `useErrorHandler` hook (rethrow async errors to nearest boundary)
+- `useErrorBoundary` hook (`showBoundary` — async error'larni nearest boundary'ga yo'naltirish)
 - `withErrorBoundary` HOC
 
 ```tsx
-import { withErrorBoundary, useErrorHandler } from "react-error-boundary";
+import { useErrorBoundary } from "react-error-boundary";
 
 function AsyncComponent() {
-  const handleError = useErrorHandler();
+  const { showBoundary } = useErrorBoundary();
 
   const fetchData = async () => {
     try {
       const data = await api.get();
       // ...
     } catch (error) {
-      handleError(error);  // throw to nearest boundary
+      showBoundary(error);  // throw to nearest boundary
     }
   };
 }
@@ -7306,25 +7355,25 @@ function Component() {
 
 `useState`'s setter accepts function — calling it during render propagates throw.
 
-**`useErrorHandler` from `react-error-boundary`:**
+**`useErrorBoundary` from `react-error-boundary` (v4+):**
 
 ```tsx
-import { useErrorHandler } from "react-error-boundary";
+import { useErrorBoundary } from "react-error-boundary";
 
 function AsyncComponent() {
-  const handleError = useErrorHandler();
+  const { showBoundary } = useErrorBoundary();
 
   const fetchData = async () => {
     try {
       await api.get();
     } catch (error) {
-      handleError(error);
+      showBoundary(error);
     }
   };
 }
 ```
 
-`handleError` schedules error to propagate to nearest boundary on next render.
+`showBoundary` error'ni nearest boundary'ga yo'naltiradi — keyingi render'da boundary catch qiladi.
 
 **Error in different scenarios:**
 
@@ -7487,7 +7536,10 @@ if (effectError) throw effectError;  // re-throws on render
 ```tsx
 import { createRoot } from "react-dom/client";
 
-const root = createRoot(document.getElementById("root")!, {
+const container = document.getElementById("root");
+if (!container) throw new Error("Root element not found");
+
+const root = createRoot(container, {
   // Caught by error boundary
   onCaughtError: (error, errorInfo) => {
     console.error("Caught:", error);
@@ -7614,23 +7666,31 @@ const root = createRoot(container, {
 **Error info shape:**
 
 ```typescript
+// Root callback'lar uchun errorInfo
 type ErrorInfo = {
   componentStack: string;  // React component stack trace
-  digest?: string;         // R19 — error digest (server-client correlation)
 };
+
+// SSR onError — digest return qiladi, client'da error.digest sifatida keladi
+// hydrateRoot onRecoverableError'da error object'da digest bo'lishi mumkin
 ```
 
-**`digest` — server log correlation:**
+**`digest` — server-client error correlation (SSR):**
 
 ```typescript
-// Server SSR error
-console.error("SSR error", { digest: "abc123", error: ... });
+// Server SSR error — digest return qilinadi
+const stream = await renderToReadableStream(<App />, {
+  onError: (error) => {
+    console.error("SSR error", error);
+    return "abc123";  // digest — client'ga uzatiladi
+  },
+});
 
-// Client recoverable error
+// Client hydration — onRecoverableError'da error.digest orqali match
 hydrateRoot(container, <App />, {
-  onRecoverableError: (error, info) => {
-    // info.digest === "abc123" — match with server log
-    correlateErrors(error, info.digest);
+  onRecoverableError: (error) => {
+    // error.digest === "abc123" (server'dan kelgan)
+    correlateErrors(error);
   },
 });
 ```
@@ -7712,6 +7772,8 @@ Multiple options for advanced use cases.
 </details>
 
 ---
+
+<a id="qism-i"></a>
 
 ## QISM I: Portals
 
@@ -8352,7 +8414,9 @@ function SafePortal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body);
 }
 
-// ✅ With typeof guard (concurrent-safe)
+// ⚠️ typeof guard — server'da ishlaydi, lekin hydration mismatch xavfi bor
+// (server: null, client: portal content — React hydration warning beradi)
+// useEffect + mounted pattern afzal
 function GuardedPortal({ children }: { children: React.ReactNode }) {
   if (typeof document === "undefined") return null;
   return createPortal(children, document.body);
@@ -8472,21 +8536,21 @@ Bu faylda quyidagilar yoritildi:
 
 **QISM A — Components & Render Purity (1-4)**: Function components, render purity invariant, idempotency, naming convention, render side effect bug.
 
-**QISM B — Props (5-9)**: Props basics + immutability, children prop + ReactNode types, spread attributes, polymorphic components (`as` prop), generic components.
+**QISM B — Props (5-10)**: Props basics + immutability, children prop + ReactNode types, spread attributes, polymorphic components (`as` prop), generic components, discriminated union props.
 
-**QISM C — Composition (10-12)**: Composition vs Inheritance, slots/named children, inversion of control.
+**QISM C — Composition (11-13)**: Composition vs Inheritance, slots/named children, inversion of control.
 
-**QISM D — State Lifting & Controlled (13-15)**: Lifting state up, controlled vs uncontrolled, state management decision tree.
+**QISM D — State Lifting & Controlled (14-17)**: Lifting state up, controlled vs uncontrolled, state management decision tree, form library patterns.
 
-**QISM E — Event Handling (16-19)**: Synthetic events, event delegation R16/R17+, R19 form actions, event handler patterns.
+**QISM E — Event Handling (18-22)**: Synthetic events, event delegation R16/R17+, R19 form actions, event handler patterns, native vs synthetic event listener.
 
-**QISM F — Legacy Patterns (20-22)**: Render Props, HOC, custom hooks vs HOC vs render props.
+**QISM F — Legacy Patterns (23-26)**: Render Props, HOC, custom hooks vs HOC vs render props, HOC TypeScript pattern.
 
-**QISM G — Compound Components & Children API (23-25)**: Compound component pattern, React.Children API + cloneElement, modern compound vs Children API.
+**QISM G — Compound Components & Children API (27-29)**: Compound component pattern, React.Children API + cloneElement, modern compound vs Children API.
 
-**QISM H — Error Boundaries (26-28)**: Error boundaries (class), error scope (render/lifecycle vs events/async), R19 root error callbacks.
+**QISM H — Error Boundaries (30-33)**: react-error-boundary library, error boundaries (class), error scope (render/lifecycle vs events/async), R19 root error callbacks.
 
-**QISM I — Portals (29-30)**: createPortal + event bubbling, focus management + a11y.
+**QISM I — Portals (34-36)**: createPortal + event bubbling, focus management + a11y, portal SSR.
 
 **Keyingi:** [05-performance.md](05-performance.md) — Performance: memo, useMemo/useCallback application, React Compiler, profiling, code splitting, virtualization.
 

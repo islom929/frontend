@@ -60,7 +60,7 @@ NIMA UCHUN bu pattern'lar hali tushunilishi muhim:
 3. **Interview** — senior darajada legacy pattern'larni tushunish kutiladi ("HOC Hell nima?", "Render Props vs HOC?").
 4. **Niche use case'lar** — class komponent ichidan logic reuse (Error Boundary cross-ref [`27-error-boundaries.md`](27-error-boundaries.md) hooks ishlamaydi), framework-level integration.
 
-QANDAY ISHLAYDI: Render Props va HOC fundamental jihatdan **funksional kompozitsiya** pattern'lariga asoslangan. JavaScript'da function'lar first-class — boshqa function'larga argument sifatida uzatilishi yoki function qaytarilishi mumkin. React'da:
+QANDAY ISHLAYDI: Render Props va HOC fundamental jihatdan **functional kompozitsiya** pattern'lariga asoslangan. JavaScript'da function'lar first-class — boshqa function'larga argument sifatida uzatilishi yoki function qaytarilishi mumkin. React'da:
 
 - **Render Props** — komponent prop sifatida function qabul qiladi, render output'iga uzatadi.
 - **HOC** — function komponent qabul qiladi va yangi (enhanced) komponent qaytaradi.
@@ -120,7 +120,7 @@ Pattern'lar evolution timeline:
 2017 (R16): Render Props popularized
 2019 (R16.8): Hooks
 2024 (R19): Stable release — ref oddiy prop, Server Actions, async transitions
-2026: React Compiler stable (R17/18/19 mos, opt-in Babel plugin)
+2025-aprel (R19.1): React Compiler 1.0 stable (R17/18/19 mos, opt-in Babel plugin)
 ```
 
 </details>
@@ -570,7 +570,7 @@ class FormField extends React.Component<{
 
 ### Nazariya
 
-Render Props ikki sintaktik shaklda ishlatiladi:
+Render Props ikki syntactic shaklda ishlatiladi:
 
 **1. `render` prop** — function explicit `render` (yoki boshqa nomli) prop sifatida uzatiladi:
 
@@ -586,7 +586,7 @@ Render Props ikki sintaktik shaklda ishlatiladi:
 </MouseProvider>
 ```
 
-Ikkalasi **funksional teng** — faqat sintaktik farq. Children-as-function aksariyat kontekstda preferable, chunki:
+Ikkalasi **functional teng** — faqat syntactic farq. Children-as-function aksariyat kontekstda preferable, chunki:
 
 - **JSX-native** — children pattern React'da standart (har komponent children oladi).
 - **Visual hierarchy** — JSX nesting parent-child munosabatini ko'rsatadi.
@@ -1408,7 +1408,7 @@ Discriminated union XOR pattern — `render` yoki `children`, ikkalasi birga taq
 
 ### Nazariya
 
-**Higher-Order Component (HOC)** — komponent qabul qilib, **yangi (enhanced) komponent** qaytaradigan function. Funksional dasturlashda "higher-order function" tushunchasi (function function qabul qiladi/qaytaradi) — komponent dunyosida.
+**Higher-Order Component (HOC)** — komponent qabul qilib, **yangi (enhanced) komponent** qaytaradigan function. Functional dasturlashda "higher-order function" tushunchasi (function function qabul qiladi/qaytaradi) — komponent dunyosida.
 
 ```tsx
 // HOC signature
@@ -1659,7 +1659,7 @@ function withAuth<P>(Component: React.ComponentType<P>) {
   };
 }
 
-const Wrapped = withAuth(MyComponent);
+const Wrapped = withAuth(UserDashboard);
 const ref = useRef();
 <Wrapped ref={ref} />;  // ref undefined — HOC'da yo'qoldi
 
@@ -1705,12 +1705,12 @@ function withAuth<P>(Component: React.ComponentType<P>) {
 ```tsx
 // ❌ Anti-pattern — har render new HOC
 function App() {
-  const Wrapped = withAuth(MyComponent);  // ❌ har render new component
+  const Wrapped = withAuth(UserDashboard);  // ❌ har render new component
   return <Wrapped />;
 }
 
 // ✅ Module level
-const Wrapped = withAuth(MyComponent);
+const Wrapped = withAuth(UserDashboard);
 function App() {
   return <Wrapped />;
 }
@@ -1725,11 +1725,11 @@ React reconciliation type identity:
 
 ```
 Render 1:
-  WrappedA = withAuth(MyComponent)  ← type A
+  WrappedA = withAuth(UserDashboard)  ← type A
   <WrappedA />  ← Fiber type = A, mount
 
 Render 2 (HOC inside render):
-  WrappedB = withAuth(MyComponent)  ← type B (different reference)
+  WrappedB = withAuth(UserDashboard)  ← type B (different reference)
   <WrappedB />  ← Fiber type = B
   
 Reconciliation:
@@ -2223,23 +2223,23 @@ NIMA UCHUN hooks afzal: composition Fiber tree'ga ko'chmaydi, har hook lokal. HO
 HOC tree depth measurement:
 
 ```tsx
-const A = withA(MyComponent);     // 1 wrapper
+const A = withA(UserDashboard);     // 1 wrapper
 const AB = withB(A);               // 2 wrappers
 const ABC = withC(AB);             // 3 wrappers
 const ABCD = withD(ABC);           // 4 wrappers
 
 // React tree:
-// <withD(withC(withB(withA(MyComponent))))>
-//   <withC(withB(withA(MyComponent)))>
-//     <withB(withA(MyComponent))>
-//       <withA(MyComponent)>
-//         <MyComponent>
+// <withD(withC(withB(withA(UserDashboard))))>
+//   <withC(withB(withA(UserDashboard)))>
+//     <withB(withA(UserDashboard))>
+//       <withA(UserDashboard)>
+//         <UserDashboard>
 //           <div>...</div>
-//         </MyComponent>
-//       </withA(MyComponent)>
-//     </withB(withA(MyComponent))>
-//   </withC(withB(withA(MyComponent)))>
-// </withD(withC(withB(withA(MyComponent))))>
+//         </UserDashboard>
+//       </withA(UserDashboard)>
+//     </withB(withA(UserDashboard))>
+//   </withC(withB(withA(UserDashboard)))>
+// </withD(withC(withB(withA(UserDashboard))))>
 
 // 5 Fiber nodes vs hooks 1 Fiber node
 ```
@@ -2264,11 +2264,11 @@ function withB<P>(Component: React.ComponentType<P & { value: string }>) {
   return (props: P) => <Component {...props} value="hello" />;
 }
 
-const Enhanced = withB(withA(MyComponent));
+const Enhanced = withB(withA(UserDashboard));
 //                       └─ value: 1 (number)
 //                  └─ value: "hello" (string) overrides 1
 
-// Inside MyComponent: value === "hello" (silent collision)
+// Inside UserDashboard: value === "hello" (silent collision)
 ```
 
 TypeScript bu collision'ni catch qilmasligi mumkin — props spread'da type widening.
@@ -2479,7 +2479,7 @@ function withProps<TInjected>(getProps: () => TInjected) {
 
 // Usage
 const withCurrentUser = withProps(() => ({ user: useAuth() }));
-const ProtectedPage = withCurrentUser(MyPage);
+const ProtectedPage = withCurrentUser(ProfilePage);
 ```
 
 <details>
@@ -2583,17 +2583,17 @@ const withAuth = withInjectedProps(() => {
 });
 
 // Compose
-interface MyPageProps {
+interface ProfilePageProps {
   pageId: string;
   user: User;       // from withAuth
   theme: Theme;     // from withTheme
 }
 
-function MyPage({ pageId, user, theme }: MyPageProps) {
+function ProfilePage({ pageId, user, theme }: ProfilePageProps) {
   return <div style={{ color: theme.primary }}>{user.name} on {pageId}</div>;
 }
 
-const EnhancedPage = withAuth(withTheme(MyPage));
+const EnhancedPage = withAuth(withTheme(ProfilePage));
 
 // Caller:
 <EnhancedPage pageId="dashboard" />
@@ -2648,7 +2648,7 @@ Uch pattern'ni har jihatdan solishtirish:
 
 | Aspect | HOC | Render Props | Hooks |
 |--------|-----|--------------|-------|
-| **Sintaksis** | `withX(Component)` | `<X>{(state) => ...}</X>` | `const x = useX()` |
+| **Syntax** | `withX(Component)` | `<X>{(state) => ...}</X>` | `const x = useX()` |
 | **Logic reuse** | ✅ | ✅ | ✅ |
 | **Type safety** | ⚠️ Generics murakkab | ✅ Yaxshi | ✅ Eng yaxshi |
 | **DevTools** | ❌ Wrapper hell | ⚠️ Anonymous function | ✅ Hook nomi bilan |
@@ -2719,7 +2719,7 @@ Render Props provider (class with state):
 
 Memory'da hooks afzal. Performance jihatdan reconciliation cost har Fiber bo'yicha kichik (`O(1)` per Fiber match), lekin total work proportional Fiber count'ga.
 
-React Compiler (stable 2026, R17/18/19 mos) — hooks code'ni statik analyze qiladi va auto-memoize qiladi (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). HOC va Render Props uchun Compiler optimization yo'q.
+React Compiler (1.0 stable, R19.1+ bilan birga 2025-aprel'da chiqdi; R17/18/19 mos) — hooks code'ni statik analyze qiladi va auto-memoize qiladi (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). HOC va Render Props uchun Compiler optimization yo'q.
 
 </details>
 
@@ -3050,7 +3050,7 @@ function withAuthNew<P>(Component: React.ComponentType<P & { user: User }>) {
 }
 
 // Caller code unchanged:
-const ProtectedPage = withAuthNew(MyPage);
+const ProtectedPage = withAuthNew(ProfilePage);
 ```
 
 API o'zgarmaydi — internal class → function + hooks. Caller bilmaydi.
@@ -3151,7 +3151,7 @@ Hook conditional chaqirilmaydi (Rules of Hooks). JSX'da conditional render prop 
 
 ```tsx
 // ❌ Hook conditional
-function MyComponent({ enabled }: { enabled: boolean }) {
+function UserDashboard({ enabled }: { enabled: boolean }) {
   if (enabled) {
     const x = useX();  // ❌ taqiq
   }
@@ -3159,7 +3159,7 @@ function MyComponent({ enabled }: { enabled: boolean }) {
 }
 
 // ✅ Render prop conditional
-function MyComponent({ enabled }: { enabled: boolean }) {
+function UserDashboard({ enabled }: { enabled: boolean }) {
   return (
     <>
       {enabled && (
@@ -3314,12 +3314,12 @@ Render ichida HOC chaqirish — har render yangi komponent type. State lost, DOM
 ```tsx
 // ❌ Anti-pattern
 function App() {
-  const Wrapped = withAuth(MyComponent);  // ❌ har render new
+  const Wrapped = withAuth(UserDashboard);  // ❌ har render new
   return <Wrapped />;
 }
 
 // ✅ Module level
-const Wrapped = withAuth(MyComponent);
+const Wrapped = withAuth(UserDashboard);
 function App() {
   return <Wrapped />;
 }
@@ -3327,7 +3327,7 @@ function App() {
 // ✅ Or useMemo (rare case)
 function App({ requireAdmin }: { requireAdmin: boolean }) {
   const Wrapped = useMemo(
-    () => withAuth(MyComponent, { requireAdmin }),
+    () => withAuth(UserDashboard, { requireAdmin }),
     [requireAdmin]
   );
   return <Wrapped />;
@@ -3373,8 +3373,8 @@ function withTheme<P>(Component: React.ComponentType<P & { count: number }>) {
   return (props: P) => <Component {...props} count={42} />;  // collision!
 }
 
-const Enhanced = withTheme(withCounter(MyComponent));
-// Inside MyComponent: count === 42 (not 1) — collision
+const Enhanced = withTheme(withCounter(UserDashboard));
+// Inside UserDashboard: count === 42 (not 1) — collision
 ```
 
 Yechim — naming convention (prefix HOC nomi):
@@ -3408,7 +3408,7 @@ function withAuth<P>(Component: React.ComponentType<P>) {
   WithAuth.displayName = `withAuth(${Component.displayName || Component.name})`;
   return WithAuth;
 }
-// DevTools: <withAuth(MyComponent)>
+// DevTools: <withAuth(UserDashboard)>
 ```
 
 ### Gotcha 5: Render Props children type narrow
@@ -3993,15 +3993,15 @@ Har ikkalasi ishlaydi, lekin hooks variant — kamroq boilerplate, debug oson.
 Render Props va Higher-Order Components — Hooks oldidan dominant logic reuse pattern'lari. Hozir aksariyat use case'larda hooks afzal, lekin bu pattern'lar legacy codebase'larda mavjud va ba'zi vaziyatlarda hali kerak. Asosiy fikrlar:
 
 - **Pre-Hooks Era** — Mixins (R0.13'gacha, deprecated), HOC (R0.14+ dominant), Render Props (R16+ ergonomic). Hooks (R16.8) aksariyat use case'larni almashtirdi.
-- **Render Props** — komponent prop sifatida function qabul qiladi, render output'da chaqiradi. **Inversion of control** — komponent data, parent rendering. Ikki sintaktik shakl: `render` prop vs Children-as-Function (funksional teng, children-as-function aksariyat kontekstda preferable).
+- **Render Props** — komponent prop sifatida function qabul qiladi, render output'da chaqiradi. **Inversion of control** — komponent data, parent rendering. Ikki syntactic shakl: `render` prop vs Children-as-Function (functional teng, children-as-function aksariyat kontekstda preferable).
 - **Render Props Real-World** — DataFetcher, Toggle, FormField, GeolocationProvider, Subscription, Wizard. Library misollar (React Router v4, Apollo Client v2, Downshift, react-motion) — ko'pi hooks API'ga ko'chdi.
 - **Render Props TypeScript** — `React.ReactElement` (strict) vs `React.ReactNode` (loose), generic `<T>` provider, discriminated union state pattern (status-based narrowing), polymorphic XOR (`render` yoki `children`).
-- **HOC** — komponent qabul qiladi, **enhanced komponent** qaytaradi. Funksional dasturlash higher-order function. **Use case'lar:** cross-cutting concerns, props injection, container/presentational separation, lifecycle reuse. Library misollar: Redux `connect`, React Router v5 `withRouter`, Material UI `withStyles`.
+- **HOC** — komponent qabul qiladi, **enhanced komponent** qaytaradi. Functional dasturlash higher-order function. **Use case'lar:** cross-cutting concerns, props injection, container/presentational separation, lifecycle reuse. Library misollar: Redux `connect`, React Router v5 `withRouter`, Material UI `withStyles`.
 - **HOC Wrapping Qoidalari** — `displayName` (DevTools), static methods hoist (`hoist-non-react-statics`), ref forwarding (R18 `forwardRef` → R19 ref oddiy prop), props passthrough (`{...props}`), HOC inside render TAQIQ (type identity → unmount).
 - **HOC Real-World** — `withAuth`, `withLoading`, `withTheme`, `withRouter`, `withFeatureFlag`, `withErrorBoundary`, `withAnalytics`. Single responsibility har HOC.
 - **HOC Composition + Wrapper Hell** — `compose` helper `reduceRight` (declarative tartib), 4-5 HOC chain debug murakkab, props collision silent override, performance overhead (har wrapper Fiber). Hooks bilan migration — wrapper hell yo'qoladi.
 - **HOC TypeScript Generics** — `<P extends object>` constraint, `Omit<P, keyof InjectedProps>` injected'larni caller'dan olib tashlash, generic factory pattern (`withInjectedProps`).
-- **Render Props vs HOC vs Hooks Comparison** — har jihatdan jadval (sintaksis, type safety, DevTools, performance, composition, testing). Hooks default (R16.8+), HOC class komponent integration uchun, Render Props library author flexibility.
+- **Render Props vs HOC vs Hooks Comparison** — har jihatdan jadval (syntax, type safety, DevTools, performance, composition, testing). Hooks default (R16.8+), HOC class komponent integration uchun, Render Props library author flexibility.
 - **Migration Pattern** — 4 qadam (identify → extract hook → replace usage → remove HOC). Gradual jarayon — yangi kod hooks, eski komponent'lar refactor paytida ko'chiriladi. **Backward compatibility** — HOC implementation hooks bilan saqlanadi (caller bilmaydi).
 - **Qachon Legacy Pattern'lar Hali Kerak** — class komponent integration, error boundaries (`getDerivedStateFromError`/`componentDidCatch` class shart), library author API, conditional logic JSX'da, backward compatibility.
 

@@ -187,7 +187,7 @@ DevTools panel (F12) — ikkita React tab:
 
 **Components tab:**
 
-- Tree view — Fiber tree (komponent ierarxiya).
+- Tree view — Fiber tree (komponent hierarchy'si).
 - Selected komponent: props, state, hooks, owner, source.
 - Search bar — komponent name bo'yicha filter.
 - Settings — display options.
@@ -200,20 +200,27 @@ DevTools panel (F12) — ikkita React tab:
 - Commit slider (record bo'lgan commits navigation).
 - Component details panel.
 
-### Settings Yoqish (Majburiy)
+### Settings Yoqish (Tavsiya etiladi)
 
-Profile uchun **2 ta setting** majburiy:
+Profile to'liq foydali bo'lishi uchun bitta setting majburiy, ikkinchisi alohida visual debug feature:
 
 ```
-1. F12 → Profiler tab
-2. Settings (gear icon)
-3. ☑ "Record why each component rendered while profiling"
-   - Bu "Why did this render?" panel'ni yoqadi
-4. ☑ "Highlight updates when components render"
-   - Visual feedback — har render bo'lgan komponent atrofida rectangle
+F12 → DevTools panel → Settings (gear icon)
+
+Profiler tab settings:
+  ☑ "Record why each component rendered while profiling"
+     - Profile recording'ga "Why did this render?" panel'ni qo'shadi
+     - Overhead: har commit'da extra fiber metadata (yuqorida UTH section'da)
+
+Components tab settings (alohida feature):
+  ☑ "Highlight updates when components render"
+     - Real-time visual feedback (rectangle border)
+     - Profile recording'dan mustaqil — har doim ishlaydi (DevTools yoniq bo'lsa)
 ```
 
-**`Record why each component rendered`** — overhead bor, faqat profile vaqtida yoqish (production'da har doim off).
+**`Record why each component rendered`** — overhead bor (commit'da DevTools heap o'sadi), faqat profile session vaqtida yoqish. Production'da DevTools odatda foydalanuvchilarda yo'q.
+
+> **Eslatma:** Highlight Updates Profile recording'dan ALOHIDA feature — Components tab settings ostida. Profile uchun majburiy emas, lekin "qaysi komponent qachon re-render bo'lyapti" deb tezkor visual scan uchun foydali.
 
 ### Components vs Profiler Tab Farqi
 
@@ -334,7 +341,7 @@ export default defineConfig({
 
 ### Nazariya
 
-Recording — Profiler tab'da konkret performance interval'ni o'lchash. Workflow 3 qadam:
+Recording — Profiler tab'da aniq performance interval'ni o'lchash. Workflow 3 qadam:
 
 ### Qadam 1: Reproduce Stepslarni Aniqlash
 
@@ -543,13 +550,14 @@ CPU throttling for realistic profile:
 ```
 
 - **Width** — render duration (wider = slower).
-- **Color** — render speed:
-  - Gray — bailout (no render)
-  - Light blue — fast (< 1ms)
-  - Light green — medium (1-5ms)
-  - Yellow — slow (5-16ms)
-  - Red — very slow (> 16ms, drops frame)
-- **Number** — milliseconds.
+- **Color** — bu commit'ning eng sekin fiber'iga **nisbatan** rang scale:
+  - Gray — bailout (render qilmagan)
+  - Cool tones (teal/blue) — joriy commit'da nisbatan tez fiber'lar
+  - Warm tones (yellow/orange) — joriy commit'da nisbatan sekin fiber'lar
+  - Eng "issiq" rang shu commit'ning eng sekin fiber'iga to'g'ri keladi; absolute ms threshold yo'q
+- **Tooltip** — hover bilan aniq duration (ms) ko'rsatiladi.
+
+> **Eslatma:** Rang **commit ichidagi relative position**'ga bog'liq. Agar bir commit'da hamma fiber 50ms+ bo'lsa, "tez" rang ham 30ms fiber'ga tushishi mumkin. Frame budget tahlili uchun absolute ms threshold (16ms = 60fps frame) tooltip orqali tekshiriladi, rang scale orqali emas.
 
 ### Klik Behavior
 
@@ -563,7 +571,7 @@ Flame chart top'dan boshlanadi (root) va pastga. Reading order:
 
 1. **Root** — total commit duration. Agar > 16ms — frame drop.
 2. **Wide children** — bottleneck candidates.
-3. **Deep narrow** — komponent ierarxiya tracking.
+3. **Deep narrow** — komponent hierarchy tracking.
 4. **Gray bars** — bailout bo'lgan, performance positive.
 
 Misol — slow commit:
@@ -619,12 +627,14 @@ Flame chart algoritm:
 function renderFlameChart(commit, container) {
   const totalDuration = commit.duration;
   const containerWidth = container.clientWidth;
+  // Commit ichidagi eng sekin fiber — rang scale uchun anchor
+  const maxFiberDuration = findMaxActualDuration(commit.root);
   
   function renderFiber(fiber, x, y, depth) {
     const width = (fiber.actualDuration / totalDuration) * containerWidth;
     const height = 20; // Fixed bar height
     
-    drawRect(x, y + depth * height, width, height, getColor(fiber.actualDuration));
+    drawRect(x, y + depth * height, width, height, getColor(fiber.actualDuration, maxFiberDuration));
     drawText(x + 4, y + depth * height + 12, `${fiber.componentName} (${fiber.actualDuration.toFixed(2)}ms)`);
     
     // Recurse children
@@ -638,11 +648,13 @@ function renderFlameChart(commit, container) {
   renderFiber(commit.root, 0, 0, 0);
 }
 
-function getColor(duration) {
-  if (duration < 1) return '#5bc0de'; // Light blue
-  if (duration < 5) return '#5cb85c'; // Light green
-  if (duration < 16) return '#f0ad4e'; // Yellow
-  return '#d9534f'; // Red
+function getColor(duration, maxDuration) {
+  if (duration === 0) return '#aaa'; // Gray (bailout)
+  // Joriy commit'ga nisbatan intensity (0..1)
+  const intensity = maxDuration > 0 ? duration / maxDuration : 0;
+  // HSL hue mapping: cool (teal ~180°) → hot (red ~0°)
+  const hue = (1 - intensity) * 180;
+  return `hsl(${hue}, 70%, 50%)`;
 }
 ```
 
@@ -1198,12 +1210,16 @@ function App(): ReactElement {
 //    Why did this render panel'da ItemRow ko'rinmaydi (render bo'lmagan).
 
 // Profile session 2 — input'ga "App" yozilganda:
-// 1. ItemList:
+// 1. App:
 //    Why did this render?
-//    • Hooks changed (filter), Props changed (filter)
-// 2. ItemRow #1 (Apple): bailout — item reference bir xil, filter mos kelganligi ListItem darajasida hal qilinadi
-// 3. ItemRow #2 (Banana): unmount — filtered'dan tushib qoldi
-// 4. Reconciler key match qiladi (id-based stable identity)
+//    • Hooks changed (state: filter — App'ning useState)
+// 2. ItemList:
+//    Why did this render?
+//    • Props changed: filter (App'dan kelgan yangi prop)
+//    (Hooks changed YO'Q — ItemList'ning o'z useState'i yo'q)
+// 3. ItemRow #1 (Apple): bailout — item reference bir xil (items array stable), memo bailout
+// 4. ItemRow #2 (Banana): unmount — filter qilingan natijadan tushib qoldi
+// 5. Reconciler key match qiladi (id-based stable identity)
 ```
 
 </details>
@@ -1251,12 +1267,12 @@ Har commit'da har Profiler `onRender` chaqiriladi (granular monitoring).
 ### Performance Impact
 
 Development build:
-- `<Profiler>` overhead negligible (~0.1ms per commit).
-- DevTools panel'da `<Profiler>` ko'rinadi.
+- `<Profiler>` overhead — fiber commit hook + `onRender` chaqirig'i (commit'dagi boshqa DEV warning'lar oldida sezilarli emas).
+- DevTools panel'da `<Profiler>` Fiber ko'rinadi.
 
 Production build:
-- `<Profiler>` default'da **no-op** (React'ning production build'da Profiler component pass-through).
-- Profile data measure qilish uchun — `react-dom/profiling` build kerak.
+- `<Profiler>` Fiber yaratiladi, lekin `commitProfiler` instrumentation kod yo'li bundle'ga kirmaydi — `onRender` chaqirilmaydi (no-op timing).
+- Profile data measure qilish uchun — `react-dom/profiling` build kerak (Profiler instrumentation production'da ham yoqilgan variant).
 
 ### Use Cases
 
@@ -1275,44 +1291,68 @@ Production build:
 
 `<Profiler>` — **measurement tool**, mo'ljallanadi production'da minimal overhead bilan.
 
-> **Eslatma:** `<Profiler>` component R16.5'da experimental sifatida joriy etilgan, R16.9'da stable. Hali rasmiy React API.
+> **Eslatma:** `<Profiler>` R16.5 (2018-09) DevTools integration uchun joriy etilgan, R16.9 (2019-08) `react` package'dan rasmiy export sifatida stable. R18+'da `nested-update` phase qiymati qo'shildi (`useLayoutEffect`/`useEffect` ichidagi `setState` natijasidagi commit'lar).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`<Profiler>` Fiber tag — `Profiler` (cross-ref `03-fiber-architecture.md`).
+`<Profiler>` JSX'da maxsus type — `react` package'dan `Profiler` import qilinganda `$$typeof: REACT_PROFILER_TYPE` Symbol bilan element yaratiladi. Reconciler shu Symbol'ni tanib `Profiler` Fiber tag (cross-ref `03-fiber-architecture.md`) bilan Fiber yaratadi. Bu **funksional komponent emas** — JS function body chaqirilmaydi; barcha xatti-harakat React internal Fiber lifecycle hook'larida.
 
-Production build'da minimal:
+Element yaratish:
 
 ```javascript
-// react/src/ReactProfiler.js
-function Profiler({ id, onRender, children }) {
-  // Production: pass-through
-  return children;
+// react/src/ReactProfiler.js (oddiylashtirilgan)
+export const Profiler = Symbol.for('react.profiler');
+
+// jsx() Profiler'ni tanib element yaratadi:
+// {
+//   $$typeof: REACT_ELEMENT_TYPE,
+//   type: Profiler,  // Symbol
+//   props: { id, onRender, children }
+// }
+```
+
+Production build (`react-dom.production.min.js`):
+
+```javascript
+// commitWork — Profiler Fiber ko'radi, lekin instrumentation kod yo'li bundle'ga kirmaydi
+function commitWork(fiber) {
+  // ... boshqa fiber tag'lar
+  if (fiber.tag === Profiler) {
+    // Production: faqat children commit, onRender chaqirilmaydi
+    // (treeBaseDuration/actualDuration field'lari ham hisoblanmaydi)
+  }
+  // ... children commit qilinadi (Fiber subtree normal ishlaydi)
 }
 ```
 
-`react-dom/profiling` build:
+`react-dom/profiling` build (`react-dom.profiling.min.js`):
 
 ```javascript
-// react-dom/profiling
-function commitProfiler(fiber) {
-  const onRender = fiber.memoizedProps.onRender;
-  const id = fiber.memoizedProps.id;
-  
-  if (typeof onRender === 'function') {
-    const phase = fiber.alternate ? 'update' : 'mount';
-    const actualDuration = fiber.actualDuration;
-    const baseDuration = fiber.treeBaseDuration;
-    const startTime = fiber.actualStartTime;
-    const commitTime = currentCommitTime;
+// commitWork — Profiler instrumentation yoqilgan
+function commitWork(fiber) {
+  if (fiber.tag === Profiler) {
+    const { onRender, id } = fiber.memoizedProps;
     
-    onRender(id, phase, actualDuration, baseDuration, startTime, commitTime);
+    if (typeof onRender === 'function') {
+      const phase = fiber.alternate === null
+        ? 'mount'
+        : (isNestedUpdate ? 'nested-update' : 'update');
+      
+      onRender(
+        id,
+        phase,
+        fiber.actualDuration,
+        fiber.treeBaseDuration,
+        fiber.actualStartTime,
+        currentCommitTime
+      );
+    }
   }
 }
 ```
 
-`onRender` chaqiriladi har commit'da, `<Profiler>` subtree o'zgargan bo'lsa.
+`onRender` chaqiriladi har commit'da, agar `<Profiler>` subtree'da render bo'lgan bo'lsa (`actualDuration > 0`). Pure bailout commit'larda (subtree butunlay skip'da) `onRender` chaqirilmaydi.
 
 </details>
 
@@ -1429,9 +1469,9 @@ Render phase:
 
 - **`mount`** — initial render (komponent yangi).
 - **`update`** — re-render (state/props change).
-- **`nested-update`** — render davomida boshqa setState (rare, anti-pattern).
+- **`nested-update`** (R18+) — bu commit oldingi commit'ning `useLayoutEffect` yoki `useEffect` ichidagi `setState` natijasida boshlangan. Anti-pattern emas — DOM measure'dan keyin state set (masalan, tooltip position'ini layout'dan o'qib state'ga yozish) standart pattern.
 
-Use: mount vs update statistik distinguish.
+Use: mount vs update vs nested-update statistik distinguish (nested-update tez-tez bo'lsa — measure-then-update pattern qayta-qayta layout shift keltirib chiqishi mumkin, optimization candidate).
 
 #### 3. `actualDuration`
 
@@ -1587,13 +1627,15 @@ function performUnitOfWork(workInProgress) {
 }
 ```
 
-`treeBaseDuration` — Reconciler bashorat qiladi (komponent'ning "ideal" render vaqti):
+`treeBaseDuration` — subtree'dagi har fiber'ning `selfBaseDuration` qiymatini yig'ish (oxirgi render'dan o'lchangan). Bashorat emas, balki memoization olib tashlangan holatdagi nazariy tree render vaqti:
 
 ```javascript
 function completeWork(workInProgress) {
   // ...
+  // Har fiber'ning oxirgi render'da o'lchangan o'z selfBaseDuration'idan boshlanadi
   workInProgress.treeBaseDuration = workInProgress.selfBaseDuration;
   
+  // Children'ning aggregat treeBaseDuration'i qo'shiladi
   let child = workInProgress.child;
   while (child !== null) {
     workInProgress.treeBaseDuration += child.treeBaseDuration;
@@ -1601,6 +1643,8 @@ function completeWork(workInProgress) {
   }
 }
 ```
+
+`selfBaseDuration` — har fiber render qilinganda update qilinadi (memoization bailout bo'lsa, oldingi qiymat reused). Shu sababli `treeBaseDuration` bailout fiber'larni ham hisobga oladi (eski o'lchov qiymati bilan) — bu "no-memo" baseline.
 
 </details>
 
@@ -1877,10 +1921,12 @@ function commitWork(fiber) {
   // ...
 }
 
-// vs production build
+// vs production build (react-dom.production.min.js)
 function commitWork(fiber) {
   // ...
-  // Profiler tag ko'rilmaydi, no-op
+  // Profiler Fiber tag tanildi, lekin instrumentation kod yo'li
+  // bundle'ga kirmaydi (dead code elimination): timing field'lar
+  // hisoblanmaydi, onRender chaqirilmaydi
   // ...
 }
 ```
@@ -2101,35 +2147,55 @@ function onLCP(callback) {
 
 `PerformanceObserver` browser API — performance entries'ni async track qiladi.
 
-INP measurement:
+INP measurement (`web-vitals` v4 algoritm, oddiylashtirilgan):
 
 ```javascript
-// onINP — har interaction lifecycle
+// Browser native: 'event' Performance API har interaction'ning to'liq
+// duration'ini (input handler + render + paint) o'lchaydi
 function onINP(callback) {
-  const interactions = [];
+  // Eng sekin 10 interaction'ni saqlash (reservoir)
+  const slowestInteractions = []; // sorted descending by duration
+  const MAX_RESERVOIR = 10;
   
-  // Track user interactions
-  ['pointerdown', 'pointerup', 'keydown', 'keyup'].forEach((type) => {
-    addEventListener(type, (event) => {
-      const start = event.timeStamp;
-      requestAnimationFrame(() => {
-        const paint = performance.now();
-        const duration = paint - start;
-        interactions.push({ type, duration, start });
-      });
-    });
-  });
-  
-  // Report periodically — p95 of interactions
-  setInterval(() => {
-    if (interactions.length > 0) {
-      const sorted = interactions.map((i) => i.duration).sort((a, b) => a - b);
-      const inp = sorted[Math.floor(sorted.length * 0.95)];
-      callback({ name: 'INP', value: inp, entries: interactions });
+  const observer = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      // entry.duration — interaction'ning to'liq lifecycle vaqti
+      const interaction = { duration: entry.duration, entry };
+      
+      // Reservoir'ga qo'shish (eng sekin 10'ta saqlanadi)
+      slowestInteractions.push(interaction);
+      slowestInteractions.sort((a, b) => b.duration - a.duration);
+      if (slowestInteractions.length > MAX_RESERVOIR) {
+        slowestInteractions.length = MAX_RESERVOIR;
+      }
     }
-  }, 30000);
+  });
+  observer.observe({ type: 'event', durationThreshold: 40, buffered: true });
+  
+  // INP qiymatini hisoblash:
+  // - 50+ interaction bo'lsa: ~98-th percentile (har 50 interaction'da 1'ta drop)
+  // - 50'dan kam: eng sekin interaction
+  function computeINP(totalInteractionCount) {
+    if (slowestInteractions.length === 0) return null;
+    // Har 50 interaction'da 1'ta drop — index = floor(count / 50)
+    const dropIndex = Math.min(
+      Math.floor(totalInteractionCount / 50),
+      slowestInteractions.length - 1
+    );
+    return slowestInteractions[dropIndex];
+  }
+  
+  // Report page hide/unload'da (NOT setInterval — final value page session uchun)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      const inp = computeINP(/* total count */);
+      if (inp) callback({ name: 'INP', value: inp.duration, entries: [inp.entry] });
+    }
+  });
 }
 ```
+
+INP — page session uchun **eng yomon** interaction (>50 interaction bo'lsa, top 2% drop bilan). Boshqa Web Vitals (LCP, CLS) ham final value page hide'da reported — bu sababli `navigator.sendBeacon` ishlatish kerak (sync, unload kafolatlangan).
 
 </details>
 
@@ -2226,7 +2292,7 @@ function App({ children }: AppProps): ReactElement {
 }
 
 // INP correlation: slow INP → find React renders during interaction
-import { onINP } from 'web-vitals';
+// (onINP allaqachon yuqorida import qilingan)
 
 onINP((metric) => {
   if (metric.value > 200) {
@@ -2589,11 +2655,15 @@ F12 → Profiler tab → Settings (gear) → ☑ "Highlight updates when compone
 
 ### Color Coding
 
+DevTools komponent'ning yaqin vaqt ichidagi re-render **chastotasi**'ni kuzatadi (recent commits rolling window) va shu chastotaga qarab rang tanlaydi:
+
 | Border rangi | Ma'no |
 |--------------|-------|
-| Yashil | Bir marta render (commit oralig'ida) |
-| Sariq | Ikki marta render — odatda Strict Mode 2x cycle |
-| Qizil | Uch yoki ko'p marta tez ketma-ket — frequent re-render hot spot |
+| Cool (yashil/teal) | Kam-uchraydigan re-render — yangi mount yoki ahyon-ahyonda update |
+| Sariq | Moderate frequency — yaqin commit'larda bir necha re-render |
+| Qizil | High frequency — tez ketma-ket ko'p re-render, hot spot, optimization candidate |
+
+> **MUHIM:** Rang **commit chastotasi**ga bog'liq, ms duration emas. Strict Mode 2x cycle bitta commit ichida komponent funksiyasini ikki marta chaqiradi (alohida highlight emas, alohida render commit emas) — Highlight Updates'ning ranglarini "Strict Mode signal" deb o'qish noto'g'ri. Strict Mode'ni aniqlash uchun "Why did this render?" panel'da `mount (1st pass)` / `mount (2nd pass)` belgilar yoki Profiler'ning `actualDuration` ikki barobar oshishini kuzatish kerak.
 
 ### Use Cases
 
@@ -2681,14 +2751,17 @@ function highlightElement(element, color) {
   setTimeout(() => overlay.remove(), 100);
 }
 
-function getColor(count) {
-  if (count === 1) return '#5cb85c'; // Green
-  if (count === 2) return '#f0ad4e'; // Yellow
-  return '#d9534f'; // Red
+function getColor(recentRenderCount) {
+  // recentRenderCount — komponent'ning rolling window'dagi (yaqin commit'lar)
+  // re-render soni. Strict Mode 2x cycle bitta commit'da bo'ladi va
+  // alohida count sifatida hisoblanmaydi.
+  if (recentRenderCount <= 1) return '#5cb85c'; // Cool — kam-uchraydigan
+  if (recentRenderCount <= 3) return '#f0ad4e'; // Moderate frequency
+  return '#d9534f'; // Hot — frequent
 }
 ```
 
-Render count tracking — DevTools shu commit'dagi fiber render frequency'ni saqlaydi.
+Render count tracking — DevTools komponent'ning yaqin commit'lardagi re-render chastotasini rolling window'da kuzatadi (vaqt o'tgan sayin count decay qilinadi).
 
 </details>
 
@@ -2783,7 +2856,9 @@ Options:
 ```typescript
 // Profile session uchun
 // <StrictMode> olib tashlash
-ReactDOM.createRoot(root).render(<App />);
+const container = document.getElementById('root');
+if (!container) throw new Error('Root container not found');
+ReactDOM.createRoot(container).render(<App />);
 ```
 
 Lekin Strict Mode bug surface qiladi — production deployment'gacha qaytarish.
@@ -2918,7 +2993,9 @@ import App from './App';
 
 const PROFILE_MODE = window.location.search.includes('profile=true');
 
-const root = ReactDOM.createRoot(document.getElementById('root')!);
+const container = document.getElementById('root');
+if (!container) throw new Error('Root container not found');
+const root = ReactDOM.createRoot(container);
 
 if (PROFILE_MODE) {
   // Profile session — no Strict Mode
@@ -3289,30 +3366,42 @@ Rare bug — DevTools `actualDuration < 0` ko'rsatadi.
 
 **Yechim:** `Math.max(0, actualDuration)` sanitize.
 
-### Gotcha 3: Profiler Component Memory Leak
+### Gotcha 3: `onRender` Callback'da Cheksiz Accumulation
 
-`<Profiler>` har commit'da `onRender` chaqiradi. Agar `onRender` closure katta state ushlasa — memory leak.
+`<Profiler>` har commit'da `onRender` chaqiradi. Closure'da existing state'ga reference ushlash o'z-o'zidan leak emas (data baribir App state'da bor). Real leak — `onRender` ichida boundsiz buffer'ga push qilish:
 
 ```tsx
-// ❌ Closure leak
-function App() {
-  const [largeData] = useState(() => generateLargeArray(1_000_000));
-  
-  const onRender = useCallback((id, phase, duration) => {
-    console.log(largeData.length, duration); // Closure ushlaydi
-  }, [largeData]);
-  
-  return <Profiler id="App" onRender={onRender}>...</Profiler>;
-}
+// ❌ Real leak — har commit'da metrics array o'sadi
+const metrics: any[] = [];
+
+const onRender = (id, phase, duration) => {
+  metrics.push({ id, phase, duration, timestamp: Date.now() });
+  // Hech qachon flush yoki bound yo'q → heap o'sadi
+};
+
+return <Profiler id="App" onRender={onRender}>...</Profiler>;
 ```
 
-**Yechim:** `onRender` minimal closure, external state'siz.
+**Yechim:** Buffer'ga bound qo'yish va periodic flush:
+
+```tsx
+const MAX_BUFFER = 100;
+const metrics: any[] = [];
+
+const onRender = (id, phase, duration) => {
+  metrics.push({ id, phase, duration });
+  if (metrics.length >= MAX_BUFFER) {
+    navigator.sendBeacon('/api/metrics', JSON.stringify(metrics));
+    metrics.length = 0;
+  }
+};
+```
 
 ### Gotcha 4: Production Profile Build Bundle Size
 
-`react-dom/profiling` ~7% kattaroq. CDN traffic, mobile users impact.
+`react-dom/profiling` instrumentation kodi production build'dan birmuncha kattaroq (aniq qiymat React versiyasi va bundler tree-shaking'iga bog'liq — `webpack-bundle-analyzer` yoki `rollup-plugin-visualizer` bilan o'lchanadi). CDN traffic va mobile users uchun bu xarajat sezilarli bo'lishi mumkin.
 
-**Yechim:** Sampling deployment (1% users — profiling build).
+**Yechim:** Sampling deployment — user'larning kichik foiziga (masalan 1%) profiling build, qolganiga normal build (CDN routing yoki feature flag).
 
 ### Gotcha 5: Web Vitals Page Unload Loss
 
@@ -3367,13 +3456,11 @@ Result: Some improvement, but root cause ignored
 
 **Yechim:** "Why did this render?" panel orqali root cause topish, targeted fix.
 
-### ❌ Xato 4: "Why did this render?" Production'da
+### ❌ Xato 4: DevTools Profile Recording'ni Uzoq Vaqt Yoniq Qoldirish
 
-```typescript
-// Production'da settings yoqilsa — overhead bor
-```
+"Record why each component rendered" yoqilgan holatda DevTools har commit'da fiber tree snapshot + per-fiber render reason metadata saqlaydi. Uzun recording sessiyalarda DevTools tab heap'i sezilarli o'sadi, panel'ning o'zi sekinlashadi. Ba'zi developer'lar profile setting'ni yoqib qolib, kun davomida ishlashda davom etadi.
 
-**Yechim:** Faqat profile session, production'da off.
+**Yechim:** Profile recording'ni faqat aniq scenario uchun (5-10 second), keyin to'xtatish. Recording oxirida settings'ni o'chirish opsional, lekin yangi profile session uchun yana yoqish kerak bo'ladi. Production deployment'ga `<Profiler>` instrumentation ham keraksiz overhead — sampling deployment ishlatish.
 
 ### ❌ Xato 5: Web Vitals Ignored
 
@@ -3621,7 +3708,7 @@ Test:
 
 ### Mashq 3: Production Profile Setup (O'rta)
 
-Vite konfiguratsiya yarating: profile build (`react-dom/profiling`) va normal build alohida output. CI'da deploy qachon profile build deploy qilinadi (1% sampling).
+Vite configuration yarating: profile build (`react-dom/profiling`) va normal build alohida output. CI'da deploy qachon profile build deploy qilinadi (1% sampling).
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -4185,7 +4272,7 @@ Bu fayl React profiling'ning to'liq spectrum'ini o'rgandi:
 - **Profiling Concept** — measurement-based optimization, hot path identification, real-world impact, regression detection.
 - **React DevTools Profiler** — installation (browser extension), Components vs Profiler tab, settings yoqish (Record why each component rendered, Highlight Updates).
 - **Recording Workflow** — symptom → reproduce → record → analyze → re-profile → confirm → production monitoring.
-- **Flame Chart** — top-down structural view, width = duration, color coding (green/yellow/red), self vs tree time.
+- **Flame Chart** — top-down structural view, width = duration, color **commit'ga nisbatan** (cool → hot, eng sekin fiber rang scale anchor), self vs tree time.
 - **Ranked Chart** — slowest first, optimization priority.
 - **Commit Details** — props/state/hooks inspection, source location, diff view.
 - **"Why did this render?"** — re-render reasons (first time, hooks changed, props changed, parent rendered, context changed). Optimization strategy jadval.
@@ -4194,7 +4281,7 @@ Bu fayl React profiling'ning to'liq spectrum'ini o'rgandi:
 - **Production Profiling** — `react-dom/profiling` Vite/Webpack/Next.js setup, sampling deployment (1% users).
 - **Web Vitals Integration** — Core Web Vitals (LCP, INP, CLS), 2024-yil mart oyida FID o'rniga INP qo'shildi (FID → INP transition March 2024 — Google Web Vitals, React'dan mustaqil), `web-vitals` package, INP correlation with React renders.
 - **Real-World Workflow** — 8-step (symptom → reproduce → local repro → profile → analyze → hypothesis+optimize → re-profile → deploy+monitor).
-- **Highlight Updates** — visual debug, color coding (green 1x / yellow 2x Strict Mode / red 3+ frequent), production'da yo'q.
+- **Highlight Updates** — visual debug, rang **frequency-based** (cool yashil — kam-uchraydigan / sariq — moderate / qizil — hot spot, tez-tez re-render). Production'da yo'q. Strict Mode 2x bitta commit ichida ikki function call (alohida highlight signal emas).
 - **Strict Mode Profile Impact** — development 2x render, profile data ~2x kattaroq. Production build profile yoki conditional StrictMode.
 - **Performance Budget** — React-specific (component render p99, total commit p95), Web Vitals (LCP/INP/CLS), bundle size. Real-time + aggregated alerting, CI/CD integration (Lighthouse CI).
 

@@ -27,7 +27,7 @@
 
 ### Nazariya
 
-React — JavaScript bilan UI qurish uchun mo'ljallangan **declarative**, **component-based** library. Facebook (hozir Meta) tomonidan 2011-yilda ichki loyiha sifatida boshlanib, 2013-yilda ochiq manba qilingan. Asosiy vazifasi — komponent (function yoki class) sifatida e'lon qilingan UI tasviriga qarab, real DOM (yoki boshqa platform target) ni samarali yangilash.
+React — JavaScript bilan UI qurish uchun mo'ljallangan **declarative**, **component-based** library. Facebook (hozir Meta) tomonidan 2011-yilda ichki loyiha sifatida boshlanib, 2013-yilda ochiq manba qilingan. Asosiy vazifasi — komponent (function yoki class) sifatida e'lon qilingan UI tasvirini real DOM'ga (yoki boshqa platform target — Native, terminal, WebGL, va h.k.) aylantirish va state o'zgarganda uni effektiv yangilash (faqat farq qilgan qismni DOM'ga commit qilish orqali).
 
 React **framework EMAS, library**. Bu farq texnik jihatdan ham, ekosistemada ham muhim:
 
@@ -44,11 +44,11 @@ Shu sababli **React'ning yagona vazifasi — UI rendering**. Routing uchun React
 React paketlarining asosiy modulyar tuzilishi:
 
 - **`react`** — core paket: hooks (`useState`, `useEffect`), `createElement`, component abstraktlar. Bu paket **DOM, native, CLI haqida hech narsa bilmaydi**.
-- **`react-dom`** — web renderer (brauzer DOM). Faqat brauzerda ishlaydi.
+- **`react-dom`** — web renderer (DOM API'siga asoslangan). Asosan brauzerda (`react-dom/client`), lekin `react-dom/server` kichik moduli Node.js'da SSR (Server-Side Rendering) uchun ishlaydi.
 - **`react-native`** — mobile renderer (iOS/Android native komponentlar).
-- **`react-reconciler`** — diffing va scheduling algoritmi. Renderer'lar shu paketni `Host Config` interfeysi orqali ishlatadi.
+- **`react-reconciler`** — diffing algoritmi va work loop. Scheduler bilan birga ishlaydi (`scheduler/` — alohida paket). Renderer'lar shu paketni `Host Config` interface'i orqali ishlatadi.
 
-Bu modulyar tuzilish — React'ning "**reconciler + renderer**" architectura'sining asosiy g'oyasi. Bitta `react` paketi ko'plab renderer bilan ishlay oladi: `react-dom` (web), `react-native` (mobile), `react-three-fiber` (Three.js/WebGL, community), `ink` (CLI, community), `react-pdf` (PDF, community), `react-test-renderer` (testing), va h.k. Barchasi `react-reconciler` paketini ortidan ishlatadi.
+Bu modulyar tuzilish — React'ning "**reconciler + renderer**" architecture'sining asosiy g'oyasi. Bitta `react` paketi ko'plab renderer bilan ishlay oladi: `react-dom` (web), `react-native` (mobile), `react-three-fiber` (Three.js/WebGL, community), `ink` (CLI, community), `react-pdf` (PDF, community), `react-test-renderer` (testing), va h.k. Barchasi ichki tomondan `react-reconciler` paketiga tayanadi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -90,15 +90,15 @@ React'ning ichki tuzilishi quyidagi qatlamlardan iborat:
                │
                ▼
         Real platform output
-        (DOM, Native UI, Canvas, terminal text)
+        (DOM, Native UI, WebGL scene, terminal text)
 ```
 
-Reconciler **algoritm** sifatida ishlaydi: u qaysi komponent yangilanishi kerak, qaysi tartibda, qachon to'xtatib turish mumkinligini hisoblaydi. Lekin u **real DOM ga tegmaydi** — buning uchun renderer'ning Host Config metodlarini chaqiradi (`createInstance`, `appendChild`, va h.k.).
+Reconciler **algoritm** sifatida ishlaydi: u qaysi komponent yangilanishi kerak, qaysi tartibda hisoblaydi va work loop'ni boshqaradi. Yield qilish (brauzer'ga vaqt berish) qachon kerakligini esa Scheduler hal qiladi — Reconciler `shouldYield()` orqali Scheduler'dan so'raydi. Reconciler **real DOM ga tegmaydi** — buning uchun renderer'ning Host Config metodlarini chaqiradi (`createInstance`, `appendChild`, va h.k.).
 
 Bu ajratish (separation) — React 16-versiyada (Fiber rewrite) joriy etilgan asosiy architectural qaror. Eski Stack Reconciler (React 15 va undan oldin) DOM bilan chambarchas bog'langan edi, shuning uchun React Native uchun mustaqil renderer yozish qiyin edi. Yangi reconciler — `react-reconciler` npm paketi sifatida ham mustaqil ishlatish mumkin (custom renderer yozish uchun).
 
 Reconciler va Renderer alohida ekanligi quyidagi imkoniyatlarni beradi:
-- **Concurrent rendering** — reconciler ishni qism-qism (5ms chunk) qila oladi, renderer'ga to'liq tayyor bo'lganda commit qiladi.
+- **Concurrent rendering** — reconciler ishni kichik vaqt bo'laklariga bo'lib bajara oladi (React Scheduler default budget `frameYieldMs = 5` ms), renderer'ga to'liq tayyor bo'lganda commit qiladi. Chuqur — `05-scheduler-lanes.md`.
 - **Cross-platform code reuse** — bitta komponent (logic) bir nechta platformada ishlay oladi (agar platform-specific API ishlatilmasa).
 - **Custom renderer'lar** — `react-reconciler` paketi orqali siz o'z renderer'ingizni yozishingiz mumkin (masalan, React → AWS Cloud Resources, React → SVG-only, va h.k.).
 
@@ -178,14 +178,14 @@ React'ning rivojlanishi 15 yildan ortiq vaqtni qamrab oladi. Asosiy bosqichlar:
 
 | Yil | Voqea | Ahamiyati |
 |-----|-------|-----------|
-| **2011** | Facebook'da ichki loyiha (Newsfeed) | Jordan Walke yaratdi, faqat FB ichida ishlatildi |
-| **2013 (May)** | JSConf US'da open source | Birinchi public release; ko'plari "JSX'ni HTML'ni JS'ga aralashtirgan" deb tanqid qildi |
+| **2011** | Facebook'da ichki loyiha | Jordan Walke FaxJS prototipini yaratdi (keyin React'ga aylandi); birinchi marta Facebook Ads sahifasida ishlatildi |
+| **2013 (May)** | JSConf US'da open source | Birinchi public release (Jordan Walke prezentatsiyasi); frontend hamjamiyati "JSX HTML'ni JavaScript'ga aralashtirgan" deb tanqid qildi (separation of concerns buzilishi sifatida) |
 | **2015 (Mart)** | React Native | Mobile platforma — bitta library web va mobile uchun (cross-platform code reuse) |
 | **2016 (Aprel)** | React 15 | DOM optimizatsiyalar, ammo asosiy o'zgarishlar 16-da |
-| **2017 (Sentabr)** | React 16 — **Fiber rewrite** | Yangi reconciler architectura; interruptible rendering uchun asos |
-| **2018** | Context API (stable), `React.lazy` + Suspense | Code splitting deklarativ formada |
+| **2017 (Sentabr)** | React 16 — **Fiber rewrite** | Yangi reconciler arxitekturasi (interruptible rendering uchun infratuzilma; concurrent rendering opt-in `unstable_AsyncMode` sifatida — R18'da default bo'ldi) |
+| **2018** | Context API (stable), `React.lazy` + Suspense | Code splitting declarative formaga keltirildi |
 | **2019 (Fevral)** | React 16.8 — **Hooks** | Class komponentlarisiz state va lifecycle; React'ning eng katta API o'zgarishi |
-| **2020 (Oktabr)** | React 17 | Yangi xususiyat YO'Q. JSX automatic transform, event delegation root'ga ko'chdi (microfrontend qo'llab-quvvatlash uchun) |
+| **2020 (Oktabr)** | React 17 | "No new features" deb e'lon qilingan release: JSX automatic transform (React import majburiyligi olib tashlandi), event delegation `document` o'rniga root container'ga ko'chdi (microfrontend va embed qo'llab-quvvatlash uchun), gradual upgrade strategiyasi uchun zamin |
 | **2022 (Mart)** | React 18 | **Concurrent Rendering** stable, Automatic Batching, `useTransition`/`useDeferredValue`, Suspense for SSR |
 | **2024 (Dekabr)** | React 19 | Actions, `use()` hook, `useActionState`/`useFormStatus`/`useOptimistic`, ref oddiy prop, Document Metadata API, Server Components stable spec |
 | **2024+** | React Compiler | Build-time auto-memoization (beta, stable yo'lida) |
@@ -218,7 +218,7 @@ Farqning amaliy ahamiyati:
 
 Bu formula React'ning butun mental modelining asosi. Kursda har bir tushuncha shu formula atrofida quriladi.
 
-> **Tarixiy kontekst:** Declarative UI 2010-yillarning oxirida frontend'ga keng kirib keldi (React 2013, Elm 2012). Lekin ilk g'oyalar ancha eski — Functional Reactive Programming (Conal Elliott, 1997), React'ga ta'sir qilgan asosiy ilhom manbalari `XHP` (Facebook), Standard ML va Haskell.
+> **Tarixiy kontekst:** Declarative UI 2010-yillarning boshida frontend'ga keng kirib keldi (Elm 2012, React 2013). Lekin ilk g'oyalar ancha eski — Functional Reactive Programming (Conal Elliott, 1997). React'ga ta'sir qilgan asosiy ilhom manbalari: `XHP` (Facebook'ning PHP'ga XML-tipidagi extension'i), Standard ML va Haskell.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -356,7 +356,7 @@ function TodoList() {
 }
 ```
 
-Imperative versiya bu xil ro'yxat uchun ~3-4 marta uzun bo'ladi: har element uchun `<li>` yaratish, `appendChild`, click listener qo'shish, toggle uchun textContent va style yangilash, delete uchun removeChild — barchasini qo'lda boshqarish.
+Imperative versiya bu xil ro'yxat uchun sezilarli darajada uzun bo'ladi: har element uchun `<li>` yaratish, `appendChild`, click listener qo'shish, toggle uchun `textContent` va `style` yangilash, delete uchun `removeChild` — barchasini qo'lda boshqarish. Bundan tashqari, state va DOM o'rtasidagi sinxronizatsiyani siz nazorat qilasiz: bitta `update` chaqiruvini unutsangiz — UI state'dan ortda qoladi.
 
 </details>
 
@@ -524,11 +524,11 @@ function UserCard({ name }: { name: string }) {
 
 "**Virtual DOM**" (VDOM) — React'ning eng ko'p eslatib o'tiladigan, ammo eng ko'p tushunmovchilik tug'diradigan tushunchasi. Asl ma'no: **real DOM ning JavaScript obyektlari ko'rinishidagi yengil tasviri**. React har render'da bunday "virtual" tree quradi, eski va yangi tree'larni solishtiradi (diff), va faqat farq qilgan qismni haqiqiy DOM'ga commit qiladi.
 
-**Lekin muhim haqiqat:** zamonaviy React (R16+, 2017'dan beri) **toza Virtual DOM emas**. U Fiber arxitekturasi asosida ishlaydi — bu doubly-linked tree va work units sistemasi. "Virtual DOM" — endi **mental model**, **implementation emas**.
+**Lekin muhim haqiqat:** zamonaviy React (R16+, 2017'dan beri) **klassik Virtual DOM emas**. U Fiber arxitekturasi asosida ishlaydi — har node'da `child`, `sibling`, `return` pointer'lari bilan bog'langan linked tree va work units sistemasi. "Virtual DOM" — endi **mental model**, **implementation emas**.
 
 Bu tafovut nima uchun muhim:
 
-1. **react.dev rasmiy hujjatlari** (2023 yangilanishidan beri) "Virtual DOM" terminini ishlatmaydi. Faqat "render output" yoki "render tree" deb yoziladi.
+1. **react.dev rasmiy hujjatlari** (2023 yangilanishidan beri) "Virtual DOM" terminini **asosiy konsept sifatida** ishlatmaydi — yangi docs "render output", "render tree", "JSX", "elements" terminlariga fokuslanadi (eski docs'da esa "Virtual DOM" markaziy konsept edi).
 2. Eski tutoriallar "React VDOM bilan tez" deb yozadi — bu ham noto'g'ri framing. Tez bo'lishning sababi VDOM emas, balki **diffing algoritmi** (Reconciler) va **batched updates** (Scheduler).
 3. Vue, Preact, SolidJS kabi boshqa library'lar ham "Virtual DOM" ishlatadi, ammo har birining implementatsiyasi farqli (Vue 3 — proxy-based reactivity + VDOM hybrid, Preact — strict VDOM, SolidJS — Compiled reactivity, VDOMsiz).
 
@@ -540,7 +540,8 @@ Bu tafovut nima uchun muhim:
 
 Fiber = Implementation (amaliy yechim):
   "Bu g'oyani interruptible rendering, prioritization, time slicing
-   bilan kengaytirgan doubly-linked tree va work units sistemasi"
+   bilan kengaytirgan linked tree (`child`/`sibling`/`return` pointers)
+   va work units sistemasi"
 ```
 
 Kursda biz "Virtual DOM" iborasini **mental model** sifatida ishlatamiz, ammo haqiqiy mexanizmni Fiber atamalarida yoritamiz. Fiber chuqur — `03-fiber-architecture.md` da.
@@ -582,11 +583,11 @@ React har render'da nima qiladi (soddalashtirilgan):
 - Priority lanes (urgent vs non-urgent)
 - Restartable (high-priority work kelganda current ishni tashlab, qayta boshlaydi)
 
-Shu sababli "Virtual DOM" termini React kontekstida **2017-yildan beri eskirgan**. Fiber butunlay boshqa narsa, lekin "Virtual DOM" g'oyasini saqlab qoldi (deklarativ, diffing-based).
+Shu sababli "Virtual DOM" termini React kontekstida **R16'dan (2017) keyin implementation darajasida noaniq** — Fiber linked tree (har node'da `child`, `sibling`, `return` pointer'lari) va work units sistemasi, klassik "tree clone + diff" emas. Rasmiy hujjatlarning yangi versiyasida (`react.dev`, 2023 mart) "Virtual DOM" termini **asosiy mental model sifatida ishlatilmaydi** — uning o'rniga "render tree", "React tree", "elements" terminlari kiritilgan (eski `legacy.reactjs.org` docs'da esa "Virtual DOM" markaziy konsept edi). Lekin Fiber "Virtual DOM" g'oyasini (declarative tasvir, diffing-based update) saqlab qoldi — shu sababli mental model sifatida hali ham foydali.
 
 Boshqa library'larda holat:
 - **Vue 3** — "Virtual DOM" + Proxy-based reactivity (kombinatsiya)
-- **Preact** — minimal VDOM (3KB, React API mos)
+- **Preact** — minimal VDOM (rasmiy `preactjs.com` bundle size'i ~4KB gzipped, React API'si bilan ko'p qismda mos)
 - **SolidJS** — Compiled fine-grained reactivity, **VDOM yo'q** (compile-time'da DOM mutations generatsiya qilinadi)
 - **Svelte** — Compiled reactivity, **VDOM yo'q** (har component'ni o'z imperative kodiga aylantiradi)
 
@@ -697,7 +698,7 @@ Bu yondashuvning rasmiy nomi — **"unidirectional data flow"** yoki **"props do
 1. **Predictability** (oldindan aytib bo'ladiganlik) — state qaerdan kelganini va qayerga ketishini aniq bilish oson
 2. **Debugging osonligi** — bug topilganda, state'ni o'zgartirgan komponent'ni topish oson (faqat parent o'zgartira oladi)
 3. **Single Source of Truth** — har data uchun bitta "haqiqat manbai" (eng yuqori parent)
-4. **Konkurent rendering bilan uyg'unlik** — React 18 concurrent mode'da rendering interruptible bo'lgani uchun ikki yo'nalishli binding race condition'larga olib kelishi mumkin edi
+4. **Concurrent rendering bilan uyg'unlik** — React 18 concurrent mode'da rendering interruptible bo'lgani uchun ikki yo'nalishli binding race condition'larga olib kelishi mumkin edi (render to'xtatib qayta boshlanganda, ikkala yo'nalish update'lari konfliktga uchrardi)
 
 **Ikki yo'nalishli binding (two-way binding) — Vue va Angular yondashuvi:**
 
@@ -711,7 +712,7 @@ React'da bu pattern **explicit** yoziladi:
 
 Bu kod ko'proq qator, lekin **ko'rinarli** — qiymat qaerdan kelgan va qayerga boryapti aniq.
 
-> **Eslatma:** "Two-way binding" Vue/Angular'da ham aslida bir yo'nalishli ostida sintaktik shakar (sugar) — Vue ham `v-model` ni `:value + @input` ga aylantiradi. Farq faqat sintaktik.
+> **Eslatma:** Modern Vue 2+/Angular 2+'da "two-way binding" — aslida bir yo'nalishli oqim ustiga qurilgan sintaktik shakar (sugar). Vue `v-model="x"`'ni `:value="x" @input="x = $event"` ga aylantiradi, Angular `[(ngModel)]="x"`'ni `[ngModel]="x" (ngModelChange)="x = $event"` ga. Lekin AngularJS 1.x'da two-way binding **haqiqatan** ikki yo'nalishli edi — `$digest` cycle har scope o'zgarishini dirty-check qilardi (performance pessimizmi va race condition'lar manbai bo'lgani uchun Angular 2'da olib tashlandi).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -857,7 +858,7 @@ Controlled vs Uncontrolled inputs `14-lifting-and-controlled.md` da batafsil yor
 
 ### Nazariya
 
-React'ning eng ko'p eslatilmaydigan, ammo eng kuchli arxitektura xususiyati — **Reconciler va Renderer ajratilgan**. Ya'ni `react` paketi DOM haqida hech narsa bilmaydi. U faqat komponent tree'ni boshqaradi, real platform target'ga (DOM, Native, va h.k.) ulanish — alohida renderer paketning vazifasi.
+React'ning kamdan-kam eslatiladigan, ammo eng kuchli arxitektura xususiyati — **Reconciler va Renderer ajratilgan**. Ya'ni `react` paketi DOM haqida hech narsa bilmaydi. U faqat komponent tree'ni boshqaradi, real platform target'ga (DOM, Native, va h.k.) ulanish — alohida renderer paketning vazifasi.
 
 Asosiy renderer'lar:
 
@@ -880,7 +881,7 @@ Bularning hammasi `react-reconciler` paketi orqali **bir xil `react` core**ni is
 
 **Custom renderer asoslari:**
 
-`react-reconciler` paketi Host Config interfeysini kutadi — siz quyidagi metodlarni implement qilasiz:
+`react-reconciler` paketi Host Config interface'ini kutadi — siz quyidagi metodlarni implement qilasiz:
 
 | Metod | Ma'no |
 |-------|-------|
@@ -888,7 +889,7 @@ Bularning hammasi `react-reconciler` paketi orqali **bir xil `react` core**ni is
 | `createTextInstance(text)` | Text node yaratish |
 | `appendChild(parent, child)` | Element'ni parent'ga qo'shish |
 | `removeChild(parent, child)` | Element'ni o'chirish |
-| `commitUpdate(instance, prevProps, nextProps)` | Element propertyrlarini yangilash |
+| `commitUpdate(instance, prevProps, nextProps)` | Element property'larini yangilash |
 | `prepareForCommit()` | Commit boshidan oldin tayyorgarlik |
 | `resetAfterCommit()` | Commit oxiridan keyin tozalash |
 
@@ -968,7 +969,7 @@ Lekin JSX element tag'lari platform'ga xos:
 - Three.js: `<mesh>`, `<boxGeometry>`, `<meshStandardMaterial>`
 - Ink: `<Box>`, `<Text>`
 
-Shu sababli "logic shared" lekin "view layer platform-specific" — faqat hooks va business logic'ni shared qilib, komponentlarni platform per implementatsiya qilish kerak.
+Shu sababli "logic shared" lekin "view layer platform-specific" — hooks va business logic'ni shared qilib ishlatish mumkin, lekin view layer komponentlarini har platform uchun alohida implement qilish kerak.
 
 </details>
 
@@ -992,7 +993,8 @@ function Counter() {
   );
 }
 
-const container = document.getElementById('root')!;
+const container = document.getElementById('root');
+if (!container) throw new Error('Root element topilmadi');
 createRoot(container).render(<Counter />);
 ```
 
@@ -1027,7 +1029,7 @@ function Counter() {
   });
   return (
     <Box>
-      <Text>Soni: {count} (probel bosing)</Text>
+      <Text>Soni: {count} (`Space` bosing)</Text>
     </Box>
   );
 }
@@ -1133,7 +1135,7 @@ React 18 (2022 mart) va React 19 (2024 dekabr) — eng katta ikki versiya. Quyid
 
 ### Nazariya
 
-**React Compiler** — Meta tomonidan yaratilgan **build-time** optimizatsiya vositasi. Bog'lab turilgan komponent kodini tahlil qiladi va **avtomatik memoization** qo'llaydi: `useMemo`, `useCallback`, `React.memo` qo'lda yozish kerak emas.
+**React Compiler** — Meta tomonidan yaratilgan **build-time** optimization vositasi. Komponent kodini tahlil qiladi va **automatic memoization** qo'llaydi: `useMemo`, `useCallback`, `React.memo` qo'lda yozish kerak emas.
 
 Hozirgi (2026 boshi) holat: **beta** — production'da Meta o'z mahsulotlarida ishlatadi (Instagram web), lekin keng public release stable yo'lida.
 
@@ -1155,7 +1157,7 @@ function ProductList({ products, filter }: Props) {
   return <List items={filtered} onClick={handleClick} />;
 }
 
-// Compiler bilan (avtomatik):
+// Compiler bilan (automatic):
 function ProductList({ products, filter }: Props) {
   const filtered = products.filter(p => p.category === filter);
   const handleClick = (id: number) => console.log(id);
@@ -1184,7 +1186,7 @@ function ProductList({ products, filter }: Props) {
 - Kod tozaroq, o'qish oson
 - Bug'larni kamaytiradi (manual `useMemo` deps array'ni unutish — keng tarqalgan xato)
 
-> **Cross-ref:** React Compiler chuqur — `31-react-compiler.md` da. Manual memoization mexanizmi va kogda kerak bo'lishi — `21-usememo-usecallback.md` da.
+> **Cross-ref:** React Compiler chuqur — `31-react-compiler.md` da. Manual memoization mexanizmi va qachon kerak bo'lishi — `21-usememo-usecallback.md` da.
 
 ---
 
@@ -1540,7 +1542,7 @@ function Toggle() {
 }
 ```
 
-E'tibor bering: `style.display` boshqarish o'rniga **conditional rendering** (`{isVisible && <div>...</div>}`) ishlatildi. Bu deklarativ usul — React DOM'ni o'zi qo'shadi/o'chiradi.
+E'tibor bering: `style.display` boshqarish o'rniga **conditional rendering** (`{isVisible && <div>...</div>}`) ishlatildi. Bu declarative usul — element bor yoki yo'q deyiladi, DOM'ga qo'shish/o'chirishni React hal qiladi.
 
 </details>
 

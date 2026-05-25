@@ -32,9 +32,9 @@
 
 Donald Knuth'ning klassik tezisi (Computing Surveys, 1974): "Premature optimization is the root of all evil." Bu React'ga ham to'liq tegishli — har joyda `useMemo`/`useCallback`/`React.memo` qo'shish:
 
-1. **Code noise** — logic'dan ko'p memoization wrapper'lar (idiomatik komponentda 30-50%).
+1. **Code noise** — logic'dan ko'proq memoization wrapper'lar (memoization-heavy komponentda boilerplate logic kodidan ko'p hajmni egallashi mumkin).
 2. **Performance regression** — memoization ham overhead'iga ega (cache slot allocation, deps comparison). Cheap component'da benefit < cost.
-3. **Bug surface** — `useCallback` deps stale, `useMemo` cache "garantiya emas" (React keyingi render'da cache'ni tashlashi mumkin).
+3. **Bug surface** — `useCallback` deps stale bo'lishi, `useMemo` cache "garantiya emas" (React aniq sabablar bilan cache'ni tashlashi mumkin).
 4. **Maintenance burden** — har komponent o'zgarishida deps array'ni qo'lda yangilash.
 
 React docs (`react.dev/learn/you-might-not-need-an-effect`) explicitly: **"You don't need to optimize re-renders. React is fast by default."**
@@ -75,7 +75,7 @@ Har biri uchun **alohida tool**'lar:
 
 - React DevTools Profiler — re-render frequency va duration.
 - Chrome DevTools Performance — JavaScript execution flame chart, Network, paint timing.
-- Lighthouse — production user metrics (LCP, FID, CLS).
+- Lighthouse / Core Web Vitals — production user metrics: **LCP** (Largest Contentful Paint), **INP** (Interaction to Next Paint — March 2024'da FID o'rniga stable), **CLS** (Cumulative Layout Shift).
 - Bundle analyzer — kod hajmi.
 
 > **Eslatma:** React Compiler era'da manual memoization aksariyat ortiqcha (cross-ref `31-react-compiler.md`). Compiler `'use memo'` directive bilan komponent darajasidagi va per-property granular memoization qo'shadi. Profile zarur bo'lgan optimization scenarios kelajakda kamayadi.
@@ -83,16 +83,17 @@ Har biri uchun **alohida tool**'lar:
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`useMemo` cache "garantiya emas" — React docs:
+`useMemo` cache "garantiya emas" — React docs (`react.dev/reference/react/useMemo` "Caveats" bo'limi):
 
-> "useMemo is a performance optimization. React may choose to "throw away" the cached value and recalculate it. For example, if it detects that the cache size is too large, or if the component is re-mounted (for example, due to a key change)."
+> "React will not throw away the cached value unless there is a specific reason to do that. For example, in development, React throws away the cache when you edit the file of your component. Both in development and in production, React will throw away the cache if your component suspends during the initial mount."
 
 Bu degani `useMemo` faqat **performance hint** — semantik garantiya emas. Komponent quyidagi holatlarda qayta hisoblaydi:
 
-1. Deps o'zgardi (default).
-2. Strict Mode 2x render (development).
-3. React internal cache eviction (kelajakda mumkin).
-4. Component re-mount (key change, conditional render).
+1. Deps o'zgardi (asosiy holat).
+2. Strict Mode 2x render (development — purity check).
+3. Component re-mount (key change, conditional render, unmount/mount).
+4. Development'da source file edit (HMR/Fast Refresh).
+5. Initial mount paytida component suspend bo'ldi (production'da ham).
 
 Bu sababdan `useMemo` ni **state replacement** sifatida ishlatish anti-pattern:
 
@@ -273,7 +274,7 @@ Targeted — faqat bottleneck'ga:
 | Parent rendered, props bir xil | `React.memo` |
 | Context changed har gal | Context split / selector |
 | Heavy computation har render | `useMemo` cache |
-| List 1000+ items | Virtualization (cross-ref 36) |
+| List 1000+ items | Virtualization (cross-ref [`36-virtualization.md`](36-virtualization.md)) |
 
 ### Qadam 6: Re-profile va Confirm
 
@@ -1557,12 +1558,13 @@ function ParentList({ items }: { items: Item[] }): ReactElement {
 `useCallback` source (cross-ref `21-usememo-usecallback.md`):
 
 ```javascript
+// Conceptual equivalence (real React'da alohida `mountCallback`/`updateCallback` funksiyalari):
 function useCallback(callback, deps) {
   return useMemo(() => callback, deps);
 }
 ```
 
-Sintaktik shorthand. Hook chain'da bir xil mexanika.
+Konseptual ekvivalent. Real React internal'da alohida hook implementation (`mountCallback` va `updateCallback` `ReactFiberHooks.js`'da), lekin mexanika `useMemo` bilan deyarli bir xil — Hook chain'da bir slot, `areHookInputsEqual` deps check, cached value qaytarish.
 
 `useCallback` ahamiyati — function reference saqlash:
 
@@ -1732,28 +1734,44 @@ Key-based reset — atomic, single render.
 
 ### Use Case 2: Modal State Reset
 
+**Muhim nuance:** `key` trick faqat komponent **mounted bo'lib turgan paytda** ishlaydi. Agar Modal `{isOpen && <Modal>...}` orqali conditional render qilinsa, har close'da Modal va children unmount bo'ladi — fresh state allaqachon kafolat qilingan (key kerak emas). `key` trick foydali bo'ladigan stsenariy: Modal har doim mounted bo'lib, internal CSS hide/show (yoki Portal) bilan visibility boshqarsa.
+
 ```tsx
+// Modal har doim mounted (CSS hide)
+function Modal({ open, onClose, children }: ModalProps): ReactElement {
+  return (
+    <div
+      style={{ display: open ? 'block' : 'none' }}
+      className="modal-backdrop"
+      onClick={onClose}
+    >
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function App(): ReactElement {
   const [isOpen, setIsOpen] = useState(false);
   const [openCount, setOpenCount] = useState(0);
   
   function handleOpen() {
+    setOpenCount((c) => c + 1); // Force children re-mount via key change
     setIsOpen(true);
-    setOpenCount((c) => c + 1); // Force unmount on each open
   }
   
   return (
     <>
       <button onClick={handleOpen}>Open Modal</button>
-      {isOpen && (
-        <Modal key={openCount} onClose={() => setIsOpen(false)}>
-          <FormContent />
-        </Modal>
-      )}
+      <Modal open={isOpen} onClose={() => setIsOpen(false)}>
+        <FormContent key={openCount} /> {/* key trick — even though Modal stays mounted */}
+      </Modal>
     </>
   );
 }
-// Modal yopilib qayta ochilsa: openCount++ → key change → fresh state
+// Modal yopilib qayta ochilsa: openCount++ → FormContent key change → unmount + mount → fresh state
+// Modal o'zi mounted, faqat FormContent reset bo'ladi.
 ```
 
 ### Use Case 3: Route-Based Reset (React Router pattern)
@@ -1937,7 +1955,7 @@ function UserListPage({ users, onSaveUser }: UserListPageProps): ReactElement {
 // User typing'ni boshqa user'ga olib o'tmaydi.
 ```
 
-Modal reset:
+Modal reset — Modal har doim mounted (CSS hide bilan), children key orqali reset:
 
 ```tsx
 import { useState } from 'react';
@@ -1948,10 +1966,14 @@ interface ModalProps {
   children: ReactNode;
 }
 
-function Modal({ open, onClose, children }: ModalProps): ReactElement | null {
-  if (!open) return null;
+// Modal CSS hide ishlatadi (har doim mounted, faqat visibility o'zgaradi)
+function Modal({ open, onClose, children }: ModalProps): ReactElement {
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div
+      className="modal-backdrop"
+      style={{ display: open ? 'flex' : 'none' }}
+      onClick={onClose}
+    >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
@@ -1964,7 +1986,7 @@ function App(): ReactElement {
   const [resetKey, setResetKey] = useState(0);
   
   function openModal() {
-    setResetKey((k) => k + 1); // Force re-mount
+    setResetKey((k) => k + 1); // Force ContactForm re-mount
     setIsOpen(true);
   }
   
@@ -1977,8 +1999,12 @@ function App(): ReactElement {
     </>
   );
 }
-// Har Modal open'da resetKey o'zgaradi → ContactForm fresh state
+// Modal har doim mounted (children persist).
+// Har openModal'da resetKey o'zgaradi → ContactForm key change → unmount + mount → fresh state.
 // (avval-yarim to'ldirilgan form ko'rinmaydi)
+
+// Eslatma: agar Modal `if (!open) return null` pattern ishlatsa, conditional render
+// children'ni unmount qiladi va resetKey redundant — fresh state allaqachon kafolat qilingan.
 ```
 
 </details>
@@ -1994,7 +2020,7 @@ function App(): ReactElement {
 NIMA UCHUN foydali:
 
 - **Parent re-render → barcha children top-down propagation**.
-- **State izolyatsiya** — bir state qism o'zgarsa, boshqa qismlar memo bailout.
+- **State isolation** — bir state qism o'zgarsa, boshqa qismlar memo bailout.
 - **Re-render scope cheklash** — komponent o'z state'ini boshqarsa, parent re-render kerak emas.
 
 ### Anti-Pattern: Bitta State Provider
@@ -3258,7 +3284,7 @@ const UserAvatar = memo(function UserAvatar({ user }: { user: User }) {
   return <span>{user.name[0]}</span>;
 });
 
-function BadParent(): ReactElement {
+function OverMemoizedDashboard(): ReactElement {
   const [count, setCount] = useState(0);
   
   // 1. ❌ Useless useMemo
@@ -3283,7 +3309,7 @@ function BadParent(): ReactElement {
 }
 
 // ✅ Cleaned up
-function GoodParent(): ReactElement {
+function CleanDashboard(): ReactElement {
   const [count, setCount] = useState(0);
   const doubled = count * 2; // Direct
   
@@ -3408,7 +3434,7 @@ function ChatRoom({ roomId }: { roomId: string }): ReactElement {
 }
 ```
 
-R19 RFC `useEffectEvent` (cross-ref `30-concurrent-react.md`) bu pattern'ni soddalashtirishi mumkin (kelajakda).
+`useEffectEvent` RFC (experimental — R19 canary/experimental build'larda mavjud, stable'da yo'q; cross-ref `30-concurrent-react.md`) bu pattern'ni soddalashtirishi mumkin (kelajakda stable bo'lganda).
 
 ### Pattern 5: External Store Subscription
 
@@ -4324,7 +4350,7 @@ function DataDashboard(): ReactElement {
 // - Chart/Table memo: faqat data o'zgarsa re-render
 // - p95 commit duration: 200ms → 20ms (sezilarli improvement)
 
-// 5. Future: Virtualization (cross-ref 36) for DataTable agar 10000+ rows
+// 5. Future: Virtualization (cross-ref `36-virtualization.md`) for DataTable agar 10000+ rows
 import { FixedSizeList } from 'react-window';
 // 10000 rows: ~12 visible items, smooth scroll
 
@@ -4340,7 +4366,7 @@ import { FixedSizeList } from 'react-window';
 2. ✅ `useMemo` for filtered — expensive computation cache.
 3. ✅ `useTransition` — input sync, filter non-urgent (Concurrent rendering).
 4. ✅ `useDeferredValue` alternative pattern — value defer.
-5. ⚠ Virtualization (cross-ref 36) — 10000+ rows uchun.
+5. ⚠ Virtualization (cross-ref [`36-virtualization.md`](36-virtualization.md)) — 10000+ rows uchun.
 
 </details>
 
@@ -4358,12 +4384,12 @@ Bu fayl optimization'ning real qo'llash patternlari:
 - **State splitting** — bitta state Provider re-render scope kengaytiradi, alohida komponent'larga split (parent re-render frequency kamayadi). Container component, local state, FormData uncontrolled.
 - **Lift state down** — state'ni komponent boundary'ga tushirish (hover, modal open, animation). Re-render scope minimal.
 - **Context optimization** — Provider value memo, split contexts (state vs dispatch), granular Context (User/Theme/Notifications), selector pattern (use-context-selector library yoki state library Zustand/Jotai).
-- **Virtualization preview** (cross-ref 36) — `react-window`/`@tanstack/react-virtual`, 100,000+ items smooth scroll.
+- **Virtualization preview** (cross-ref [`36-virtualization.md`](36-virtualization.md)) — `react-window`/`@tanstack/react-virtual`, 100,000+ items smooth scroll.
 - **Anti-Patterns** — useMemo har joyda (primitive computation), useCallback memo'siz, memo always-changing props, premature Context splitting, useMemo for side effects, memo useState setter wrap, useMemo for JSX.
 - **React Compiler era** — manual aksariyat ortiqcha, lekin manual qoladigan: custom comparator, library boundary, imperative refs, useEffect dep stability, selector pattern. Compiler bail-out manual fallback.
 
-QISM 8 (Performance & Compiler) — 3/6 yozildi. Keyingi fayl `34-profiling.md` — DevTools Profiler chuqur, `<Profiler>` component, production profiling, Web Vitals integration.
+Keyingi fayl [`34-profiling.md`](34-profiling.md) — DevTools Profiler chuqur, `<Profiler>` component, production profiling, Web Vitals integration.
 
 ---
 
-**Keyingi bo'lim:** [34-profiling.md](34-profiling.md) — DevTools Profiler chuqur (record, flame chart, ranked chart, commit details), `<Profiler>` component programmatic API (onRender callback fields actualDuration/baseDuration/startTime/commitTime), production profiling (`react-dom/profiling` build), Web Vitals integration (LCP/FID/CLS), real-world workflow (slow component identify → optimize → measure), Highlight Updates option, Strict Mode 2x render impact on profile.
+**Keyingi bo'lim:** [34-profiling.md](34-profiling.md) — DevTools Profiler chuqur (record, flame chart, ranked chart, commit details), `<Profiler>` component programmatic API (onRender callback fields actualDuration/baseDuration/startTime/commitTime), production profiling (`react-dom/profiling` build), Web Vitals integration (LCP/INP/CLS — March 2024'da INP FID o'rniga stable), real-world workflow (slow component identify → optimize → measure), Highlight Updates option, Strict Mode 2x render impact on profile.

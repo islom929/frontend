@@ -699,11 +699,12 @@ function updateCallback<T>(
 **`useCallback` aslida `useMemo`:**
 
 ```ts
-// Equivalent
+// Behaviorally equivalent (semantik teng), lekin har biri o'z closure'i:
 const fn1 = useCallback(callback, deps);
 const fn2 = useMemo(() => callback, deps);
 
-// fn1 === fn2 (semantically)
+// fn1 va fn2 — turli function instance'lar (fn1 !== fn2),
+// lekin har biri o'z render'lari orasida stable (deps bir xil bo'lsa).
 ```
 
 Internal'da implementation faqat bir kichik farq bilan ekvivalent.
@@ -877,11 +878,12 @@ Implementation deyarli identik — `mountMemo` factory chaqiradi, `mountCallback
 **`useMemo` factory bilan function qaytarish — `useCallback` ekvivalent:**
 
 ```tsx
-// Bu ikkalasi ekvivalent:
+// Bu ikkalasi semantik ekvivalent (bir xil xulq-atvor):
 const fn1 = useCallback(() => doStuff(a), [a]);
 const fn2 = useMemo(() => () => doStuff(a), [a]);  // Function returning function
 
-// fn1 === fn2 har render'da (deps bir xil bo'lsa)
+// Lekin fn1 !== fn2 (turli function instance'lar — turli source position).
+// Har biri o'z render'lari orasida stable (deps bir xil bo'lsa fn1_prev === fn1_curr).
 ```
 
 `useMemo` factory function qaytarsa — `useCallback`'ga teng. Lekin syntax xunuk (`() => () =>`).
@@ -977,13 +979,17 @@ const fn1 = useCallback((id: string) => {
   doStuff(id);
 }, []);
 
-// useMemo equivalent
+// useMemo equivalent (semantik)
 const fn2 = useMemo(() => (id: string) => {
   doStuff(id);
 }, []);
 
-// Identical behavior
-console.log(fn1 === fn2);  // true (har gal — deps bir xil)
+// Identical behavior — har biri o'z render'lari orasida STABLE:
+console.log(fn1 === fn1_prev_render);  // true (deps bir xil bo'lsa)
+console.log(fn2 === fn2_prev_render);  // true (deps bir xil bo'lsa)
+
+// LEKIN fn1 va fn2 — turli function instance'lar:
+console.log(fn1 === fn2);  // false (turli source code position'lar)
 ```
 
 **Misol 2 — `useMemo` factory function returning function:**
@@ -1122,7 +1128,7 @@ function Component() {
 }
 ```
 
-Har hook chaqiruvi linked list'da pozitsiyaga ega. Conditional hook → pozitsiya o'zgaradi → silent state corruption (cross-ref [`15-hooks-fundamentals.md`](15-hooks-fundamentals.md) "Conditional Hook Why TAQIQ").
+Har hook chaqiruvi linked list'da position'ga ega. Conditional hook → position o'zgaradi → silent state corruption (cross-ref [`15-hooks-fundamentals.md`](15-hooks-fundamentals.md) "Conditional Hook Why TAQIQ").
 
 **Memory layout:**
 
@@ -1278,7 +1284,7 @@ function Component({ flag }: { flag: boolean }) {
     const x = useMemo(() => compute(), []);
   }
   
-  const y = useState(0);  // Pozitsiya o'zgaradi flag bilan
+  const y = useState(0);  // Position o'zgaradi flag bilan
 }
 
 // flag=true: hook chain = [useMemo, useState]
@@ -2214,7 +2220,7 @@ Per-call overhead:
 - Memory: Hook obyekt + tuple
 
 Compute cost qiyosi:
-- Primitive arithmetic — engine optimizatsiya bilan minimal
+- Primitive arithmetic — engine optimization bilan minimal
 - Array.map (kichik array) — tez
 - Array.sort/filter (katta array) — sezilarli kechikish potential
 

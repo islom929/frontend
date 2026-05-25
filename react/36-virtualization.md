@@ -1,6 +1,6 @@
 # Bo'lim 36: Virtualization
 
-> Virtualization (yoki **windowing**) — uzun ro'yxatlar (10,000+ item) yoki katta jadvallarni render qilish uchun fundamental texnika. DOM'da faqat **ko'rinadigan element'lar** mavjud, qolganlari virtual offset orqali joylashtiriladi. Bu pattern `useRef` + `onScroll` + visible range calc bilan native React'da implement qilinishi mumkin, lekin production'da `react-window` (1D) yoki `@tanstack/react-virtual` (modern, headless, 2D) library'lari ishlatiladi. Bu fayl pure React implementatsiyadan tortib, library taqqoslash, variable heights, infinite scroll integration, va edge case'larni qamrab oladi.
+> Virtualization (yoki **windowing**) — uzun ro'yxatlar (10,000+ item) yoki katta jadvallarni render qilish uchun fundamental texnika. DOM'da faqat **ko'rinadigan element'lar** mavjud, qolganlari virtual offset orqali joylashtiriladi. Bu pattern `useRef` + `onScroll` + visible range calc bilan native React'da implement qilinishi mumkin, lekin production'da `react-window` (1D) yoki `@tanstack/react-virtual` (modern, headless, 2D) library'lari ishlatiladi. Bu fayl pure React implementation'dan tortib, library taqqoslash, variable heights, infinite scroll integration, va edge case'larni qamrab oladi.
 
 ---
 
@@ -50,7 +50,7 @@ function ProductList({ products }: { products: Product[] }) {
 1. **React Render Phase** — 10,000 ta komponent funksiyasi chaqiriladi, 10,000 ta Fiber yaratiladi → CPU intensive.
 2. **Reconciliation diff** — har Fiber children diff qilinadi → O(n) Fiber tree traversal.
 3. **DOM mutation** — 10,000 ta `<li>` element yaratiladi va DOM'ga qo'shiladi → DOM API call'lar.
-4. **Layout/Reflow** — brauzer 10,000 element o'lchami va pozitsiyasini hisoblaydi → layout phase katta.
+4. **Layout/Reflow** — brauzer 10,000 element o'lchami va position'ini hisoblaydi → layout phase katta.
 5. **Paint** — har element pixel'larga aylantiriladi → paint phase katta.
 6. **Memory** — har DOM node Fiber + DOM struct + layout object overhead beradi (aniq miqdor browser engine'ga bog'liq).
 7. **Initial scroll** — har scroll event'da layer compositing rebuild → janjitter.
@@ -217,7 +217,7 @@ function VirtualizedProductList({ products }: { products: Product[] }) {
 
 Windowing — virtualization'ning yadro algoritmi. To'rtta asosiy parametr orqali **visible range**'ni hisoblaydi:
 
-1. **`scrollTop`** — container'ning vertical scroll pozitsiyasi (pikselda).
+1. **`scrollTop`** — container'ning vertical scroll position'i (pikselda).
 2. **`itemHeight`** — har bir item balandligi (fixed yoki measured).
 3. **`containerHeight`** — viewport balandligi.
 4. **`itemCount`** — umumiy item soni.
@@ -238,7 +238,7 @@ visibleCount = endIndex - startIndex
 
 **Spacer pattern** (total height saqlash):
 
-Virtualization scroll bar pozitsiyasi va proporsiyasini saqlash uchun container ichida total height bilan spacer element zarur:
+Virtualization scroll bar position'i va proporsiyasini saqlash uchun container ichida total height bilan spacer element zarur:
 
 ```
 Container (overflowY: auto, height: 600)
@@ -251,7 +251,7 @@ Container (overflowY: auto, height: 600)
 
 ```
 offsetY = startIndex × itemHeight
-transform = translateY(offsetY) → ko'rinadigan items o'zlarining haqiqiy pozitsiyasiga
+transform = translateY(offsetY) → ko'rinadigan items o'zlarining haqiqiy position'iga
 ```
 
 **Key reuse:** Virtualization'da `key={index}` ishlatish **NOTO'G'RI** — har scroll'da indices o'zgaradi va React Reconciler item'larni unmount/mount qiladi (state lost, Fiber rebuild). Item'ning unique ID ishlatish kerak (cross-ref `08-list-rendering.md`).
@@ -1011,16 +1011,19 @@ new ResizeObserver((entries, observer) => {
 });
 ```
 
-**Observer notification timing:**
+**Observer notification timing (spec: "deliver resize loop notifications" step):**
 
 ```
-1. Layout phase complete
-2. Browser collects element changes
-3. ResizeObserver callback queued (microtask after layout)
-4. Callback fires before next paint
-5. setState in callback → React re-render
-6. New layout cycle
+1. Layout phase complete (style + layout computed)
+2. Browser collects elements whose size changed
+3. "deliver resize loop notifications" step runs — alohida queue,
+   microtask queue YOK'O idle queue EMAS (spec'da maxsus step)
+4. Callback fires synchronously in this step, before paint
+5. setState in callback → React schedules re-render (next frame)
+6. Next frame: new layout cycle
 ```
+
+**MUHIM:** Bu callback "microtask after layout" emas — bu rendering pipeline'da layout va paint orasida joylashgan **alohida bosqich** (CSS Resize Observer spec § 3.5 "Procedure"). Shu sababli ResizeObserver callback'da DOM read'lar (`getBoundingClientRect`) layout reflow keltirib chiqarmaydi — layout endigina hisoblangan.
 
 **Loop prevention:**
 
@@ -1271,7 +1274,7 @@ function ChatMessages({ messages }: { messages: ChatMessage[] }) {
 </FixedSizeList>
 ```
 
-`Row` komponenti `({ index, style })` props oladi va **`style`'ni o'z element'ga uzatishi MAJBURIY** (library transform translateY orqali pozitsiyani belgilaydi).
+`Row` komponenti `({ index, style })` props oladi va **`style`'ni o'z element'ga uzatishi MAJBURIY** (library transform translateY orqali position'ni belgilaydi).
 
 > **⚠️ MUHIM — Row komponentni module-level define qilish:** `<FixedSizeList>{({index, style}) => <div>...</div>}</FixedSizeList>` shaklida **inline arrow function** ishlatilsa, har parent render'da yangi component reference yaratiladi. Bu Reconciler uchun **yangi komponent turi** kabi ko'rinadi → barcha visible item'lar har render'da unmount/mount qilinadi (state lost, ResizeObserver attach/detach, DOM rebuild). To'g'ri pattern: alohida `const Row = memo(({...}: RowProps) => ...)` define qilib `{Row}` pass qilish. Quyidagi misollardagi inline'lar **soddalashtirilgan** — production'da har doim `Row` alohida.
 
@@ -1512,11 +1515,11 @@ const virtualizer = useVirtualizer({
 
 **Returns:**
 
-- `virtualizer.getVirtualItems()` — visible items array (index, start, size, key)
-- `virtualizer.getTotalSize()` — total scroll height
-- `virtualizer.scrollToIndex(index, options)` — programmatic scroll
-- `virtualizer.measureElement(element)` — manual measurement
-- `virtualizer.resizeItem(index, size)` — manual size update
+- `virtualizer.getVirtualItems()` — visible items array (`{ index, start, size, end, key, lane }`)
+- `virtualizer.getTotalSize()` — total scroll height (px)
+- `virtualizer.scrollToIndex(index, options?): void` — programmatic scroll (sync, return value yo'q)
+- `virtualizer.measureElement` — **ref callback** (har item'ga `ref={virtualizer.measureElement}` ulanadi, library ResizeObserver attach qiladi)
+- `virtualizer.resizeItem(item: VirtualItem, size: number): void` — manual size override (VirtualItem object qabul qiladi, index emas)
 
 **Key benefit — automatic measurement:**
 
@@ -2691,16 +2694,94 @@ useEffect(() => {
 }, [virtualizer]);
 ```
 
-### Programmatic scroll racing
+### Accessibility — Screen reader Visible Items'ni "list end" deb ko'radi
 
-`scrollToIndex(i)` chaqirilgandan so'ng darhol component height o'zgartirilsa — measurement va scroll position rasing condition'ga tushadi. TanStack Virtual `scrollToIndex` async (returns promise via `scrollMargin` mechanism). Ketma-ket scroll'lar uchun:
+Virtualization fundamental a11y muammosi: faqat visible items DOM'da → screen reader (NVDA, JAWS, VoiceOver) butun list'ni emas, faqat visible portion'ni ko'radi. "10000 items" da'vo qilingan list 12 ta visible item bilan navigatsiya qilinsa, user "list end"'ga yetdim deb noto'g'ri yo'l oladi.
+
+**ARIA roles + size attributes — standart pattern:**
 
 ```tsx
-await virtualizer.scrollToIndex(targetIndex, { align: 'center' });
-// keyingi action
+// ❌ Native list — screen reader 12 visible item'ni "list end" deb e'lon qiladi
+<div ref={parentRef} style={{ height: 600, overflow: 'auto' }}>
+  <div style={{ height: virtualizer.getTotalSize() }}>
+    {virtualizer.getVirtualItems().map(virtualItem => (
+      <div key={virtualItem.key}>...</div>
+    ))}
+  </div>
+</div>
+
+// ✅ ARIA-aware virtualization
+<div
+  ref={parentRef}
+  role="list"
+  aria-label="Mahsulotlar ro'yxati"
+  aria-rowcount={items.length}  // ← TOTAL count (visible emas)
+  style={{ height: 600, overflow: 'auto' }}
+>
+  <div style={{ height: virtualizer.getTotalSize() }}>
+    {virtualizer.getVirtualItems().map(virtualItem => (
+      <div
+        key={virtualItem.key}
+        role="listitem"
+        aria-rowindex={virtualItem.index + 1}  // ← 1-based, real position
+        aria-setsize={items.length}              // ← total set size
+        aria-posinset={virtualItem.index + 1}    // ← position in set
+      >
+        {/* content */}
+      </div>
+    ))}
+  </div>
+</div>
 ```
 
-`react-window` `scrollToItem` sync, lekin ResizeObserver callbacks async — race condition mumkin.
+**ARIA atributlari semantikasi:**
+
+| Atribut | Maqsad | Misol qiymati |
+|---------|--------|---------------|
+| `aria-rowcount` | Total rows (grid/table'da) | `10000` |
+| `aria-rowindex` | Joriy item position (1-based) | `4523` |
+| `aria-setsize` | Total set size (listitem'da) | `10000` |
+| `aria-posinset` | Position in set (1-based) | `4523` |
+
+**Keyboard navigation challenges:**
+
+- **Tab/Shift+Tab** — visible items orasidagi focus normal, lekin scroll oxiriga yetganda navigatsiya uziladi
+- **Arrow keys (Up/Down)** — custom keyboard handler kerak: focus next item, agar visible bo'lmasa `scrollToIndex` chaqirish
+- **Page Up/Down, Home/End** — full container scroll uchun custom handler
+
+**Modern alternative — CSS `content-visibility: auto`:**
+
+Native browser virtualization-like behavior. Browser hidden elements'ni render skip qiladi (lekin DOM'da qoladi, screen reader uchun mavjud). Modern, lekin variable heights uchun manual `contain-intrinsic-size` kerak. Bundle size 0 (CSS feature).
+
+```css
+.list-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px; /* estimate height */
+}
+```
+
+Browser support: Chrome 85+ (2020-08), Firefox 125+ (2024-04), Safari 18+ (2024-09). Cross-browser parity 2024 yil oxiridan boshlangan.
+
+### Programmatic scroll racing
+
+`scrollToIndex(i)` chaqirilgandan so'ng darhol component height o'zgartirilsa — measurement va scroll position race condition'ga tushadi. TanStack Virtual `scrollToIndex(index, options?): void` **synchronous** API — qiymat qaytarmaydi, lekin scroll natija ResizeObserver measurement bilan asynchronous to'g'irlanadi (item haqiqiy size estimateSize'dan farq qilsa). Shu sababli `await virtualizer.scrollToIndex(...)` qiymat bermaydi (`undefined` await qiladi).
+
+Ketma-ket scroll'lar yoki measurement settle bo'lguncha kutish uchun pattern:
+
+```tsx
+virtualizer.scrollToIndex(targetIndex, { align: 'center' });
+
+// Layout settle uchun rAF kutish, keyin ikkinchi scroll (measurement
+// haqiqiy heights bilan adjust qildi)
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    // Endi accurate position'da
+    virtualizer.scrollToIndex(targetIndex, { align: 'center' });
+  });
+});
+```
+
+`react-window` `scrollToItem` ham sync (void qaytaradi); har ikkala library'da ResizeObserver callbacks browser pipeline bilan async — variable heights case'da scroll position'i layout'dan keyin to'g'irlanadi.
 
 ---
 
@@ -2720,7 +2801,17 @@ await virtualizer.scrollToIndex(targetIndex, { align: 'center' });
   return <div key={item.id}>...</div>;
 })}
 
-// Yoki virtualizer.key (TanStack Virtual auto-stable):
+// virtualItem.key TanStack Virtual default'da `index` — `key={virtualItem.key}`
+// stable EMAS (xuddi `key={index}` kabi). Stable key uchun `useVirtualizer`'ga
+// `getItemKey` callback uzatish:
+const virtualizer = useVirtualizer({
+  count: items.length,
+  getScrollElement: () => parentRef.current,
+  estimateSize: () => 60,
+  getItemKey: (index) => items[index].id, // ← stable item ID
+});
+
+// Endi virtualItem.key = items[index].id (stable):
 {virtualizer.getVirtualItems().map((virtualItem) => (
   <div key={virtualItem.key}>...</div>
 ))}
@@ -3040,7 +3131,7 @@ function CommentCard({ comment }: { comment: Comment }) {
 - `ref={virtualizer.measureElement}` — ResizeObserver attach, automatic real height measurement.
 - `data-index` — library tomonidan kuzatiladigan attribute.
 - Subsequent scroll'larda haqiqiy heights cache'dan ishlatiladi.
-- Width: `top/left/right`+ `transform: translateY` o'rniga `position: absolute` strategiyasi `@tanstack/react-virtual`'ning rasmiy pattern'i.
+- Rasmiy `@tanstack/react-virtual` pattern: `position: absolute; top: 0; left: 0; right: 0` (full-width container'da) + `transform: translateY(${virtualItem.start}px)` GPU-accelerated positioning uchun. Bitta render layer ichida barcha visible items absolute, container `position: relative`.
 
 </details>
 

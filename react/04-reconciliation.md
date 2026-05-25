@@ -214,15 +214,15 @@ function Demo() {
 
 Ikki tree o'rtasidagi minimal "edit distance" (qancha insert/delete/update operatsiya kerak ekanligi) hisoblash — algoritmik nuqtai nazardan murakkab masala. Eng yaxshi ma'lum algoritmlar (Zhang-Shasha, 1989) **O(n³)** komplekslikda ishlaydi.
 
-**Amaliy ta'sir:**
+**Amaliy ta'sir (asimptotik):**
 
-| Tree o'lcham | Operatsiya soni | Vaqt (modern CPU'da) |
-|--------------|-----------------|----------------------|
-| 100 node | 1 million | ~1ms |
-| 1,000 node | 1 billion | ~1 soniya |
-| 10,000 node | 1 trillion | ~1000 soniya |
+| Tree o'lcham | Operatsiya soni (O(n³)) |
+|--------------|--------------------------|
+| 100 node | 10⁶ (1 million) |
+| 1,000 node | 10⁹ (1 milliard) |
+| 10,000 node | 10¹² (1 trillion) |
 
-10,000 node — bu o'rtacha React app'i. UI yangilash 1000 soniya kutsa — foydalanuvchi uxlab qoladi.
+10¹² ta operatsiya — har qanday CPU uchun UI rendering'da amaliyotsiz hajm. Aniq wall-clock vaqt CPU IPS, payload va engine optimization'lariga bog'liq, lekin polynomial o'sish bilan O(n³) algorithm interactive UI uchun yaroqsiz.
 
 **React'ning ikki heuristic'i** bu muammoni hal qiladi:
 
@@ -252,7 +252,7 @@ Agar element type **o'zgargan** bo'lsa (masalan `<div>` → `<p>`), Reconciler e
 // UserList ichidagi fetched data — yo'qolgan, qayta fetch qilinadi
 ```
 
-Bu — qattiq qaror. Ammo amaliyotda **type kamdan-kam o'zgaradi** (siz `<div>`'ni `<p>`'ga aylantirib turmaysiz). Type o'zgargan holatlar — odatda butunlay boshqa UI section.
+Bu — qattiq qaror. Ammo amaliyotda **type kamdan-kam o'zgaradi** (`<div>` `<p>`'ga aylantirilmaydi odatda). Type o'zgargan holatlar — odatda butunlay boshqa UI section.
 
 ### Heuristic 2: Keys = stable identity
 
@@ -282,7 +282,7 @@ Jami: **O(n)** — har Fiber bir marta tekshiriladi.
 
 **Trade-off:**
 
-React optimal diff'ni topmaydi — agar siz `<div>` → `<p>` qilsangiz, ehtimol child'larni saqlab qolish mumkin edi (ikkalasi ham container element). Lekin algoritm bu holatni qidirmaydi (ko'p hisob talab qilardi). React **amaliy bo'lgan, optimal bo'lmagan** algoritm tanlagan — natijada tezroq ishlaydi.
+React optimal diff'ni topmaydi — agar `<div>` → `<p>` o'zgarish bo'lsa, child'larni saqlab qolish ehtimoli bor edi (ikkalasi ham container element). Lekin algoritm bu holatni qidirmaydi (ko'p hisob talab qilardi). React **amaliy bo'lgan, optimal bo'lmagan** algoritm tanlagan — natijada tezroq ishlaydi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -294,7 +294,7 @@ Tree diff problem'i (Zhang-Shasha, 1989) — bu ikki tree o'rtasidagi minimal **
 - Delete node
 - Update node label
 
-Algoritm dynamic programming bilan O(n³) (yoki ba'zi optimizatsiyalar bilan O(n² log n)).
+Algoritm dynamic programming bilan O(n³) (yoki ba'zi optimizationlar bilan O(n² log n)).
 
 React **optimal diff'ni topmaydi**. Misol:
 
@@ -341,7 +341,7 @@ React heuristic'lari uchun "yomon" misollar:
 // Reorder bo'lganda key bir xil qoladi, lekin item boshqa — props bilan force update
 ```
 
-Bu pathological case'lar real applikatsiyada kamdan-kam — odatda ongli dizayn qaroriga aylanadi (state preserve qilish kerak yoki yo'qmi degan masala).
+Bu pathological case'lar real applicationda kamdan-kam — odatda ongli dizayn qaroriga aylanadi (state preserve qilish kerak yoki yo'qmi degan masala).
 
 **O(n) prooflari (mental):**
 
@@ -462,7 +462,7 @@ function ConditionalReorder() {
     <h1 key="h">Header</h1>
   </>
 )}
-// Endi key="c" Counter ikki rendernaria mos topadi → state saqlanadi
+// Endi key="c" Counter ikki render holatida mos topadi → state saqlanadi
 ```
 
 </details>
@@ -512,11 +512,11 @@ Reconciler eski Fiber va yangi React Element'ni solishtirayotganda birinchi navb
 | `<div>` | `<div>` | Update — reuse Fiber |
 | `<div>` | `<p>` | Unmount + mount |
 | `<Counter />` | `<MemoCounter />` (memo wrapped) | Unmount + mount (memo wrapper boshqa type) |
-| `<Counter />` | `<ForwardCounter />` (forwardRef wrapped) | Unmount + mount |
+| `<Counter />` | `<ForwardCounter />` (forwardRef wrapped) | Unmount + mount (R19'da `forwardRef` function komponent uchun keraksiz — ref oddiy prop, lekin wrap qilingan elementni o'rab olish hali ham type'ni o'zgartiradi) |
 
-**Type referensial tenglik:**
+**Type reference tenglik:**
 
-React `Object.is(prevType, nextType)` ishlatadi. Bu degani:
+React `===` (strict equality) ishlatadi: `child.elementType === elementType` taqqoslashi `react-reconciler/src/ReactChildFiber.js` ichida. Type qiymatlari function yoki object (memo/forwardRef wrappers) bo'lgani uchun bu **reference identity** taqqoslash bilan ekvivalent (`Object.is` ham bir xil natija beradi function/object'lar uchun, faqat `NaN` va `±0` uchun farq qiladi — bunday qiymatlar Fiber type'da uchramaydi). Ya'ni:
 - **Bir xil function reference** — reuse
 - **Yangi function har render'da** — unmount + remount (state yo'qoladi!)
 
@@ -604,7 +604,7 @@ const MemoMyComp = memo(MyComp);
 // type = MyComp (resolved — ichki function)
 ```
 
-Reconciler `elementType` bilan solishtiradi (chunki bu — JSX'dagi original). Bu tushunarli xulq-atvor: agar siz `MemoMyComp` ni `MyComp` (memosiz)'ga almashtirsangiz — type farqli, unmount + mount.
+Reconciler `elementType` bilan solishtiradi (chunki bu — JSX'dagi original). Bu tushunarli xulq-atvor: `MemoMyComp` `MyComp` (memosiz)'ga almashtirilsa — type farqli, unmount + mount.
 
 **Class komponent type:**
 
@@ -1294,7 +1294,14 @@ function ReorderableList() {
   }
 
   function shuffle() {
-    setItems([...items].sort(() => Math.random() - 0.5));
+    // Fisher-Yates uniform shuffle (`[...items].sort(() => Math.random() - 0.5)`
+    // statistik bir tekis emas — illyustratsiya uchun ham yaroqsiz)
+    const shuffled = [...items];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    setItems(shuffled);
   }
 
   return (
@@ -1421,7 +1428,7 @@ Misol uchun bu — pozitsiya-based bug, va u faqat **stable, unique key** bilan 
 
 ### Nazariya
 
-`key` prop — list item'ning **identity belgi**si. React `key` orqali eski va yangi item'larni eshlashtiradi. Bu — Reconciliation algoritmining asosiy "informatsiya manbai".
+`key` prop — list item'ning **identity belgi**si. React `key` orqali eski va yangi item'larni juftlashtiradi. Bu — Reconciliation algoritmining asosiy "informatsiya manbai".
 
 **Key qoidalari:**
 
@@ -1510,7 +1517,7 @@ function FormFields() {
 }
 ```
 
-Bu pattern `33-optimization.md` da yana ishlatiladi (state reset bilan optimizatsiya).
+Bu pattern `33-optimization.md` da yana ishlatiladi (state reset bilan optimization).
 
 ### Key warning'lari
 
@@ -1560,7 +1567,7 @@ function updateFromMap(existingChildren, returnFiber, newIdx, newChild, lanes) {
 }
 ```
 
-`existingChildren` Map'ida key=null Fiber'lar — index orqali saqlanadi. Bu degani — keyless fiber'lar ham faza 4'da matching ishtirok etadi (lekin index bilan).
+`existingChildren` Map'ida key=null Fiber'lar — index orqali saqlanadi. Ya'ni — keyless fiber'lar ham faza 4'da matching ishtirok etadi (lekin index bilan).
 
 **`createFiberFromElement` key'ni nusxalaydi:**
 
@@ -1669,7 +1676,7 @@ function TodoApp() {
   
   function addTodo(text: string) {
     setTodos([...todos, {
-      id: crypto.randomUUID(),  // ✅ bir marta generatsiya, har item uchun
+      id: crypto.randomUUID(),  // ✅ bir marta generation, har item uchun
       text,
     }]);
   }
@@ -1726,11 +1733,11 @@ function TabBar({ active, onChange }: TabBarProps) {
 
 ### Nazariya
 
-**Bailout** — Reconciler subtree'ni qayta render qilishni **skip** qilish qarori. Bu — React'ning eng muhim performance optimizatsiyasi. Bailout 4 ta sababdan biri orqali yuz berishi mumkin:
+**Bailout** — Reconciler subtree'ni qayta render qilishni **skip** qilish qarori. Bu — React'ning eng muhim performance optimizationsi. Bailout 4 ta sababdan biri orqali yuz berishi mumkin:
 
-### Sabab 1: Element identity (Object.is)
+### Sabab 1: Element identity (`===`)
 
-Agar yangi element **bir xil reference** bo'lsa (Object.is true):
+Agar yangi element **bir xil reference** bo'lsa (`===` strict equality):
 
 ```tsx
 const memoizedElement = useMemo(() => <Child data={someData} />, [someData]);
@@ -1738,7 +1745,9 @@ const memoizedElement = useMemo(() => <Child data={someData} />, [someData]);
 return <Parent>{memoizedElement}</Parent>;
 ```
 
-`memoizedElement` doim bir xil reference (agar deps o'zgarmasa). Reconciler ko'radi: `prevElement === nextElement` (Object.is) → `Child` Fiber'ni qayta ishlash kerak emas, bailout.
+`memoizedElement` doim bir xil reference (agar deps o'zgarmasa). Reconciler ko'radi: `prevElement === nextElement` (strict equality, NOT `Object.is`) → `Child` Fiber'ni qayta ishlash kerak emas, bailout.
+
+> **Eslatma:** Props uchun React `===` ishlatadi (`oldProps === newProps`), state uchun esa `Object.is` (`useState`'ning eager bailout path'ida). Bu — ikki kod yo'lining tarixiy farqi.
 
 Bu — **eng tezkor** bailout — Reconciler `beginWork`'ni umuman chaqirmaydi.
 
@@ -1799,7 +1808,7 @@ const Child = React.memo(
 
 ### Sabab 3: useMemo / useCallback stable reference
 
-`useMemo` va `useCallback` — referensial barqarorlik vositasi. Bu sablon `React.memo` bilan birga ishlaydi:
+`useMemo` va `useCallback` — reference barqarorlik vositasi. Bu pattern `React.memo` bilan birga ishlaydi:
 
 ```tsx
 const MemoChild = React.memo(function Child({ onClick }: { onClick: () => void }) {
@@ -2329,14 +2338,21 @@ Bu mexanizm `childLanes` orqali Reconciler tree'ni **skip-friendly** qiladi:
 `lanes` 31-bit bitmask. Bir Fiber'da bir nechta priority lane bo'lishi mumkin:
 
 ```typescript
-const SyncLane = 0b0000000000000000000000000000001;
-const InputContinuousLane = 0b0000000000000000000000000000100;
-const DefaultLane = 0b0000000000000000000000000010000;
-const TransitionLane = 0b0000000000000000000010000000000;
+// Manba: react/packages/react-reconciler/src/ReactFiberLane.js
+// 31 ta lane (TotalLanes = 31, V8 smi range'da)
+const SyncHydrationLane     = 0b0000000000000000000000000000001;  // bit 0
+const SyncLane              = 0b0000000000000000000000000000010;  // bit 1
+const InputContinuousHydrationLane
+                            = 0b0000000000000000000000000000100;  // bit 2
+const InputContinuousLane   = 0b0000000000000000000000000001000;  // bit 3
+const DefaultHydrationLane  = 0b0000000000000000000000000010000;  // bit 4
+const DefaultLane           = 0b0000000000000000000000000100000;  // bit 5
+const TransitionLane1       = 0b0000000000000000000000010000000;  // bit 7
+// TransitionLane2..TransitionLane16 — 16 ta rotating lane (starvation oldini olish uchun)
 // ...
 
-// Bir Fiber'da bir vaqtda Sync va Transition update'lar:
-fiber.lanes = SyncLane | TransitionLane;
+// Bir Fiber'da bir vaqtda bir nechta lane bo'lishi mumkin:
+fiber.lanes = SyncLane | TransitionLane1;
 
 // Tekshirish
 if (fiber.lanes & SyncLane) { ... }
@@ -2388,7 +2404,7 @@ Bu — Context Provider performance considerations'ning sababi. `useContext` chu
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-Update propagation visualizatsiya:
+Update propagation visualization:
 
 ```tsx
 function Root() {
@@ -2523,10 +2539,10 @@ function Sidebar() {
 ### Sibling Fragment'lar — keys
 
 ```tsx
-{items.map(item => (
-  // ❌ Shorthand fragment — key qabul qilmaydi
-  <key={item.id}>...</>
-))}
+// ❌ Shorthand `<>...</>` fragment key qabul QILMAYDI — bunday yozish syntax xato:
+//    <key={item.id}>...</>  ← bu kod parse bo'lmaydi
+//
+// Shu sababli list'da fragment'ga key kerak bo'lsa, to'liq Fragment ishlatiladi:
 
 // ✅ To'liq Fragment — key qabul qiladi
 import { Fragment } from 'react';
@@ -2564,7 +2580,7 @@ function List({ items }) {
 
 ---
 
-### Type comparison referensial — anonymous komponentlar
+### Type comparison reference — anonymous komponentlar
 
 ```tsx
 // ❌ Render davomida component yaratish — har render yangi reference
@@ -2600,21 +2616,25 @@ function App() {
 // showHeader=true: children = [<h1>, <p>]
 // showHeader=false: children = [false, <p>]
 //
-// React `false`/`null`/`undefined`/`true` ni "yo'q" deb hisoblaydi
-// Reconciler bu "bo'sh" pozitsiyalarni o'tkazadi
+// React `false`/`null`/`undefined`/`true` ni "no fiber" deb hisoblaydi —
+// bu slot uchun Fiber yaratilmaydi, lekin pozitsiya YO'QOLMAYDI (newIdx aynan
+// shu newChildren array index'i bo'yicha yuritiladi). Demak:
 //
-// Lekin sibling matching pozitsiya o'zgarganda muammo:
-// Eski: [h1, p] (positions 0, 1)
-// Yangi: [null, p] → effektiv [p] (position 0)
-// Reconciler:
-//   Position 0: h1 vs p → DIFFERENT TYPE → unmount h1, mount p
-//   Position 1: p vs (yo'q) → unmount p
-// p state YO'QOLADI
+// Reconciler keyless (index-based) matching:
+//   newIdx=0, newChild=false → updateSlot null qaytaradi → faza 1 to'xtaydi
+//   Faza 4 (keyed map): existingChildren = { 0: h1Fiber, 1: pFiber }
+//     newIdx=0 (false) → skip (no fiber)
+//     newIdx=1 (<p>) → existingChildren.get(1) → pFiber MATCH → reuse
+//   Tugagach: existingChildren'da qoldiq h1 → ChildDeletion
 //
-// Aslida React bu pattern uchun yaxshi optimize qilingan, lekin keys ishlatish xavfsizroq:
+// Natija: h1 unmount, p REUSE — state SAQLANADI (DOM node identity ham)
+//
+// ⚠️ Lekin bu xulq-atvor faqat `{condition && <Element />}` shaklida — element
+//    pozitsiyasi siblings array ichida o'zgarmaganda — to'g'ri ishlaydi.
+//    Element pozitsiyasi o'zgarsa (masalan ikki conditional aralashsa) —
+//    keys ishlatish xavfsizroq:
 // {showHeader && <h1 key="header">Header</h1>}
 // <p key="body">Body</p>
-// Endi key'lar farqli — h1 unmount bo'ladi-yu, p saqlanadi
 ```
 
 ---
@@ -2970,7 +2990,7 @@ Bu — `React.memo` faqat shallow check qilishini va children prop muammosini ko
 
 ### Mashq 5: List reorder optimization (Qiyin)
 
-Quyidagi list `setItems(items.reverse())` chaqirilganda qancha DOM mutation bo'ladi (keyed bilan)?
+Quyidagi list `setItems([...items].reverse())` chaqirilganda qancha DOM mutation bo'ladi (keyed bilan)? (Eslatma: `items.reverse()` array'ni in-place mutate qiladi — state mutation anti-pattern; immutable variant ishlatiladi.)
 
 ```
 Eski: [A, B, C, D, E]
@@ -3004,13 +3024,11 @@ newIdx=4: A → topildi (oldIndex=0)
 
 **4 ta MOVE** (Placement flag) — D, C, B, A.
 
-LCS optimal:
-- E ni boshiga ko'chirish (1 move)
-- D ni 2-pozitsiyaga ko'chirish (1 move)
-- C — markazda qoladi (no move)
-- B ni 4-pozitsiyaga (1 move)
-- A oxirida qoladi (no move)
-- Optimal: 3 moves
+LCS analiz:
+- To'liq teskari list'da (`[A,B,C,D,E] → [E,D,C,B,A]`) LCS uzunligi = 1 (faqat o'rta element C tushadi LCS'ga, chunki teskari tartibda bitta uzaytirilgan subsequence yo'q)
+- Demak optimal move count ham = 4 (5 - LCS = 4)
+- To'liq reversal'da greedy va LCS bir xil natija beradi (4 move)
+- Greedy LCS'dan boshqa misol'larda suboptimal bo'ladi (masalan `[A,B,C,D] → [D,A,B,C]` — greedy 3 move, LCS 1 move)
 
 Yoki yana boshqa tahlil bilan: barcha element'lar joylarini almashtirgani uchun har holda 4 ta move kerak.
 
@@ -3026,7 +3044,7 @@ Bu bo'limda Reconciliation algoritmining barcha qismlari yoritildi:
 
 - **Reconciliation** — eski Fiber tree va yangi Element tree o'rtasida farq topish
 - **2 ta heuristic** — different types = rebuild, keys = stable identity → O(n)
-- **Type comparison** — `Object.is(prevType, nextType)`, function reference muhim
+- **Type comparison** — `===` strict equality (`child.elementType === elementType`), function reference muhim
 - **Sibling matching** — keyless (index-based, yomon) vs keyed (Map-based, yaxshi)
 - **Key qoidalari** — unique, stable, predictable; index OK faqat statik list'da
 - **Bailout 4 sabab** — element identity, React.memo shallow, useMemo/useCallback, state equality
