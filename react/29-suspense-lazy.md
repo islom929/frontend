@@ -71,7 +71,7 @@ NIMA UCHUN Suspense:
 
 1. **Declarative** — komponent "yuklanmoqda" holatini bilmaydi, `<Suspense>` parent boshqaradi.
 2. **Composition** — har qanday async resource (Promise, lazy module, Relay query) bir xil API.
-3. **Concurrent rendering** — R18+ Suspense Boundary inkremental rendering bilan ishlaydi.
+3. **Concurrent rendering** — R18+ Suspense Boundary incremental rendering bilan ishlaydi.
 4. **SSR streaming** — server progressive HTML yuboradi.
 5. **Error boundary'ga o'xshash** — Promise throw → eng yaqin Suspense catches.
 
@@ -136,8 +136,12 @@ function performWork(workInProgress) {
   try {
     nextChildren = renderComponent(workInProgress);
   } catch (thrownValue) {
-    // Check if thrownValue is a Promise (thenable)
-    if (typeof thrownValue.then === 'function') {
+    // Thenable check — null/string/number ham throw bo'lishi mumkin, type guard MAJBURIY
+    if (
+      thrownValue !== null &&
+      typeof thrownValue === 'object' &&
+      typeof thrownValue.then === 'function'
+    ) {
       const wakeable = thrownValue;
       const suspenseBoundary = findNearestSuspenseBoundary(workInProgress);
       
@@ -189,7 +193,7 @@ Component throws:
            - Promise resolves → re-render children
 ```
 
-R18+ Concurrent rendering — Suspense Boundary inkremental rendering:
+R18+ Concurrent rendering — Suspense Boundary incremental rendering:
 
 - Render paytida Promise throw bo'lsa, React **boshqa work**'ni davom ettiradi (yield).
 - Promise resolve bo'lganda — Reconciler retry qiladi.
@@ -296,6 +300,9 @@ class CustomResource<T> {
   }
 }
 
+// MUHIM: resource MODULE-level yaratiladi (komponent ichida emas) — har render
+// yangi resource → infinite Suspense. Cache layer (RSC `cache()`, framework cache,
+// yoki manual Map) per-key resource saqlaydi.
 const userResource = new CustomResource(() => fetchUser('123'));
 
 function UserCard() {
@@ -308,7 +315,7 @@ function UserCard() {
 </Suspense>
 ```
 
-Custom resource pattern — pre-R19 framework approach. R19'da `use(promise)` afzal.
+Custom resource pattern — pre-R19 framework approach (Relay, react-cache). R19'da `use(promise)` afzal — Promise'ga mutable `status` property qo'shadi (`'pending'`/`'fulfilled'`/`'rejected'`), keyingi chaqiriqlarda track qiladi.
 
 </details>
 
@@ -361,7 +368,7 @@ QANDAY ISHLAYDI:
 
 R18+ **Concurrent rendering** integration:
 
-- Suspense rendering inkremental (no blocking).
+- Suspense rendering incremental (no blocking).
 - Multiple boundaries parallel render.
 - Promise resolve order ahamiyatsiz — har boundary mustaqil.
 
@@ -624,11 +631,19 @@ function lazy(ctor) {
 }
 ```
 
-Lazy state machine:
-- `Uninitialized` (0) — initial
-- `Pending` (1) — loading
-- `Resolved` (2) — loaded successfully
-- `Rejected` (3) — load failed
+Lazy state machine (real konstantalar `react/src/ReactLazy.js`'dan):
+
+```javascript
+const Uninitialized = -1;
+const Pending = 0;
+const Resolved = 1;
+const Rejected = 2;
+```
+
+- `Uninitialized` (**-1**) — `lazy()` chaqirildi, lekin loader hali ishga tushmagan
+- `Pending` (**0**) — loader chaqirilgan, Promise pending
+- `Resolved` (**1**) — module yuklandi, `default` export saqlandi
+- `Rejected` (**2**) — load fail bo'ldi (network error, parse error)
 
 `throw payload._result`:
 - Pending: throws Promise → Suspense catches.
@@ -2155,9 +2170,13 @@ Streaming SSR HTML format:
 </script>
 ```
 
-`$RC` — React's runtime function. Replaces Suspense placeholder with real content (DOM manipulation).
+`$RC` — React'ning runtime function'i (resolveBoundary). Suspense placeholder'ni real content bilan almashtirish (DOM manipulation). Boshqa runtime function'lar: `$RM` (mounting), `$RX` (error).
 
-`<!--$?-->` — Suspense boundary marker (start). `<!--/$-->` — end.
+Suspense boundary marker'lari (comment node'lar — DOM'da ko'rinmaydi, lekin React tomonidan parsing'da ishlatiladi):
+- `<!--$-->` — resolved boundary (content tayyor, ko'rinadi)
+- `<!--$?-->` — pending boundary (fallback ko'rinadi, primary kelishini kutadi)
+- `<!--$!-->` — errored boundary (Error Boundary fallback yoki client retry)
+- `<!--/$-->` — boundary end marker (har holatda)
 
 Chunk order — server emits in resolution order (out-of-order). Client replaces in arrival order.
 
@@ -2371,9 +2390,10 @@ R19'da `SuspenseList` stable API'da YOQ. Production'da ishlatish tavsiya etilmay
 
 Alternatives:
 
-1. **Manual ordering** — `useState` + `useEffect` orchestration.
-2. **`useDeferredValue`** — sequential rendering.
-3. **Library** — `react-suspense-list` (3rd party — implementation farq).
+1. **Manual ordering** — `useState` + `useEffect` orchestration (per-section onReady callback).
+2. **`useDeferredValue`** — stale content'ni eski qiymatda saqlash, fallback flicker kamaytirish.
+3. **Nested Suspense boundaries** — sequential reveal pattern (parent boundary keyingisini ochish bilan).
+4. **`Promise.all` + bitta `use()`** — "together" semantik (parent'da `useMemo` bilan stable Promise).
 
 QANDAY ISHLAYDI (experimental):
 

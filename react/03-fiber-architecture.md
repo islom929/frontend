@@ -1,6 +1,6 @@
 # Bo'lim 3: Fiber Architecture
 
-> Fiber — React 16 (2017)'dan beri Reconciler'ning ichki tuzilmasi. Har Fiber **ikki rolga ega**: (1) **work unit** — Reconciler bo'lib-bo'lib bajaradigan ish; (2) **tree node** — komponent yoki host element'ning Reconciler ko'rinishidagi vakili. Bu bo'lim Fiber arxitekturasining barcha qismlarini yoritadi: tag types, traversal pointers, double buffering, effect list optimizatsiyasi va Stack Reconciler bilan farqi.
+> Fiber — React 16 (2017)'dan beri Reconciler'ning ichki tuzilmasi. Har Fiber **ikki rolga ega**: (1) **work unit** — Reconciler bo'lib-bo'lib bajaradigan ish; (2) **tree node** — komponent yoki host element'ning Reconciler ko'rinishidagi vakili. Bu bo'lim Fiber architecture'sining barcha qismlarini yoritadi: tag types, traversal pointers, double buffering, effect list optimization'i va Stack Reconciler bilan farqi.
 
 ---
 
@@ -30,8 +30,8 @@
 
 **Ikki tomoni:**
 
-1. **Work unit** — Reconciler ishni bo'lib-bo'lib bajarishi uchun atom birlik. Concurrent rendering'da React har Fiber'ni alohida ishlaydi va orasida brauzer'ga yo'l beradi (yield).
-2. **Tree node** — Fiber tree'da bitta tugun. Komponent ierarxiyasini va render natijasini ifodalaydi.
+1. **Work unit** — Reconciler ishni bo'lib-bo'lib bajarishi uchun atom birlik. Concurrent rendering'da React har Fiber'ni alohida ishlaydi va orasida browser'ga yo'l beradi (yield).
+2. **Tree node** — Fiber tree'da bitta tugun. Komponent hierarchysini va render natijasini ifodalaydi.
 
 **Asosiy maydonlar (Fiber struktura):**
 
@@ -64,7 +64,7 @@
 
 **Bitta Fiber — bitta render unit:**
 
-Reconciler render davomida har Fiber uchun ish bajaradi (komponent funksiyasini chaqirish, child Fiber'larni reconcile qilish). Bitta Fiber ish'i tugagandan keyin React **`shouldYield()`** ni tekshiradi — agar brauzer'ga yo'l berish vaqti kelgan bo'lsa, work loop to'xtatiladi va MessageChannel orqali keyinroq davom etadi. Bu mexanizm — interruptible rendering'ning asosi.
+Reconciler render davomida har Fiber uchun ish bajaradi (komponent funksiyasini chaqirish, child Fiber'larni reconcile qilish). Bitta Fiber ish'i tugagandan keyin React **`shouldYield()`** ni tekshiradi — agar browser'ga yo'l berish vaqti kelgan bo'lsa, work loop to'xtatiladi va MessageChannel orqali keyinroq davom etadi. Bu mexanizm — interruptible rendering'ning asosi.
 
 ### Fiber yaratilishi
 
@@ -159,11 +159,11 @@ function createWorkInProgress(current, pendingProps) {
 }
 ```
 
-Bu pattern — **memory allocation optimizatsiyasi**. Har render'da yangi obyekt yaratish (millionlab Fiber bo'lishi mumkin) GC bosimini oshiradi. Reuse esa minimal allocation bilan ishlaydi.
+Bu pattern — **memory allocation optimization'i**. Har render'da yangi obyekt yaratish (katta application'da o'n minglab Fiber bo'lishi mumkin) GC bosimini oshiradi. Reuse esa minimal allocation bilan ishlaydi.
 
-**Fiber'ning V8 optimizatsiyasi:**
+**Fiber'ning V8 optimization'i:**
 
-Fiber obyekti **monomorphic** struktura uchun mo'ljallangan — har Fiber bir xil maydon nomlari va tartibida yaratiladi. Bu V8'ga **bir xil hidden class** ishlatish imkonini beradi (cross-ref [`/js/01-js-engine.md`](../js/01-js-engine.md)). Property access optimizatsiya qilingan, polymorphism kamaytirilgan.
+Fiber obyekti **monomorphic** struktura uchun mo'ljallangan — har Fiber bir xil maydon nomlari va tartibida yaratiladi. Bu V8'ga **bir xil hidden class** ishlatish imkonini beradi (cross-ref [`/js/01-js-engine.md`](../js/01-js-engine.md)). Property access optimization qilingan, polymorphism kamaytirilgan.
 
 React source code'da Fiber yaratish constructor function bilan bo'lmaydi — `createFiber` har doim bir xil tartibda assign qilinadi. Bu — V8 hidden class transitionlarini minimallashtirish strategiyasi.
 
@@ -260,7 +260,7 @@ Production'da Fiber'lar visible emas (DevTools faqat dev'da ulanadi), ammo `__RE
 
 ### Nazariya
 
-**Component tree** (sizning kodingizda yozilgan):
+**Component tree** (application kodida yozilgan):
 
 ```jsx
 <App>
@@ -532,7 +532,7 @@ Har Fiber'ning **`tag`** maydoni Fiber turini belgilaydi. Bu — number constant
 |-----|---------------|------------|
 | 0 | `FunctionComponent` | Function komponent (`function MyComp() { return ... }`) |
 | 1 | `ClassComponent` | Class komponent (`class MyComp extends React.Component`) |
-| 2 | `IndeterminateComponent` | Hali aniqlanmagan (mount paytida class vs function aniqlanguncha) |
+| 2 | `IndeterminateComponent` | **R18 va undan oldin:** Hali aniqlanmagan (mount paytida class vs function aniqlanguncha). **R19'da olib tashlangan** — function komponent darhol `FunctionComponent` tag'i bilan yaratiladi |
 | 3 | `HostRoot` | Tree'ning ildizi (`createRoot` natijasida) |
 | 4 | `HostPortal` | Portal (`createPortal`) |
 | 5 | `HostComponent` | DOM element (`<div>`, `<button>`, va h.k.) |
@@ -552,7 +552,7 @@ Har Fiber'ning **`tag`** maydoni Fiber turini belgilaydi. Bu — number constant
 
 | Constant nomi | Vazifa |
 |---------------|--------|
-| `OffscreenComponent` | `<Activity>` / `<Offscreen>` (R19'gacha experimental) |
+| `OffscreenComponent` | `<Offscreen>` (R18 experimental) → `<Activity>` (R19'da rename qilindi, hali experimental) — offscreen rendering uchun |
 | `HostHoistable` | `<title>`, `<meta>`, `<link>` — head'ga hoisted host element'lar |
 | `HostSingleton` | `<html>`, `<head>`, `<body>` — singleton host element'lar |
 
@@ -606,7 +606,7 @@ function jsx(type, props, key) {
 | `string` (text children uchun) | `HostText` (6) |
 | `React.Fragment` (Symbol) | `Fragment` (7) |
 | `React.StrictMode` (Symbol) | `Mode` (8) |
-| Object with `$$typeof: REACT_PROVIDER_TYPE` | `ContextProvider` (10) |
+| Object with `$$typeof: REACT_CONTEXT_TYPE` (R19) yoki `REACT_PROVIDER_TYPE` (R18) | `ContextProvider` (10) |
 | Object with `$$typeof: REACT_FORWARD_REF_TYPE` | `ForwardRef` (11) |
 | Object with `$$typeof: REACT_MEMO_TYPE` | `MemoComponent` (14) |
 | Object with `$$typeof: REACT_LAZY_TYPE` | `LazyComponent` (16) |
@@ -637,15 +637,16 @@ function forwardRef(render) {
 Reconciler'da `createFiberFromElement` chaqirilganda `type.$$typeof`'ga qarab tegishli Fiber tag'i berilgan:
 
 ```typescript
+// R19 source (soddalashtirilgan — manba: react-reconciler/src/ReactFiber.js)
 function createFiberFromTypeAndProps(type, key, props, mode, lanes) {
-  let fiberTag = IndeterminateComponent;
+  let fiberTag: WorkTag = FunctionComponent;  // R19'da default
   let resolvedType = type;
-  
+
   if (typeof type === 'function') {
     if (shouldConstruct(type)) {
       fiberTag = ClassComponent;
     }
-    // function component — IndeterminateComponent qoladi va beginWork da aniqlanadi
+    // function bo'lsa — fiberTag FunctionComponent bo'lib qoladi
   } else if (typeof type === 'string') {
     fiberTag = HostComponent;
   } else {
@@ -654,13 +655,15 @@ function createFiberFromTypeAndProps(type, key, props, mode, lanes) {
       case REACT_FRAGMENT_TYPE: fiberTag = Fragment; break;
       case REACT_MEMO_TYPE: fiberTag = MemoComponent; break;
       case REACT_FORWARD_REF_TYPE: fiberTag = ForwardRef; break;
-      case REACT_PROVIDER_TYPE: fiberTag = ContextProvider; break;
+      case REACT_CONTEXT_TYPE: fiberTag = ContextProvider; break;
+        // R19: Context object o'zi Provider sifatida ishlatiladi.
+        // REACT_PROVIDER_TYPE symbol R19'da olib tashlandi.
       case REACT_CONSUMER_TYPE: fiberTag = ContextConsumer; break;
       case REACT_LAZY_TYPE: fiberTag = LazyComponent; break;
       // ... va h.k.
     }
   }
-  
+
   const fiber = createFiber(fiberTag, props, key, mode);
   fiber.elementType = type;
   fiber.type = resolvedType;
@@ -669,13 +672,11 @@ function createFiberFromTypeAndProps(type, key, props, mode, lanes) {
 }
 ```
 
-**`IndeterminateComponent` xususiy holati:**
+**`IndeterminateComponent` versiya tarixi:**
 
-Function komponent birinchi mount paytida `IndeterminateComponent` tag'i bilan yaratiladi. `beginWork`'da React komponent funksiyasini chaqiradi va natijaga qarab tag'ni o'zgartiradi:
-- Agar funksiya React Element qaytarsa → `FunctionComponent`
-- Agar funksiya React Element qaytarmasa (legacy class behavior) → `ClassComponent`
+R18 va undan oldin function komponent birinchi mount paytida `IndeterminateComponent` (tag 2) bilan yaratilardi. `beginWork`'da React komponent funksiyasini chaqirib, natijaga qarab tag'ni `FunctionComponent` yoki `ClassComponent`'ga o'zgartirardi (legacy `createClass` orqali yaratilgan komponent'larni tutib olish uchun).
 
-Bu legacy chek hali React'da qoldirilgan, ammo function component'lar uchun deyarli har doim `FunctionComponent` ga o'tadi.
+R19'da bu legacy chek olib tashlandi — function komponent darhol `FunctionComponent` tag'i bilan yaratiladi. `IndeterminateComponent` tag 2'siz qoldi, ammo enum'da raqam o'tkazib yuborilmadi (boshqa raqamlar siljimadi).
 
 **HostHoistable va HostSingleton (R19):**
 
@@ -753,7 +754,7 @@ React DevTools "Components" tab'ida har komponent o'z tagiga mos icon bilan ko'r
 - ForwardRef komponent — `ForwardRef` prefiksi bilan
 - Suspense — alohida ikonka
 
-Production build'da bu metadata ham ko'rinadi (DevTools React'ning rasmiy hookini ishlatadi).
+Production build'da DevTools hali ulanadi, lekin minifier (Terser, SWC) komponent funksiyalar nomlarini qisqartirsa, ba'zi komponent'lar "Anonymous" yoki bitta-ikki harfli nom bilan ko'rinadi. Real React production build'da nomlarni saqlash uchun `keep_fnames` (Terser) yoki `keep_names` (SWC) options'ni yoqish kerak.
 
 `React.memo` natijasini tekshirish:
 
@@ -899,7 +900,7 @@ function renderTree(element) {
 }
 ```
 
-Bu yondashuvda har komponent renderi JS call stack'da bitta frame'ni egallaydi. Tree katta bo'lsa — chuqur recursion, stack overflow xavfi. Eng muhimi — **uziluvchi emas**: agar yarmida brauzer'ga yo'l berish kerak bo'lsa — recursion'ni to'xtatib qayta tiklash imkoni yo'q (call stack'ni saqlay olmaysiz).
+Bu yondashuvda har komponent renderi JS call stack'da bitta frame'ni egallaydi. Tree katta bo'lsa — chuqur recursion, stack overflow xavfi. Eng muhimi — **uziluvchi emas**: agar yarmida browser'ga yo'l berish kerak bo'lsa — recursion'ni to'xtatib qayta tiklash imkoni yo'q (call stack'ni saqlay olmaysiz).
 
 Fiber tree linked list bilan iterative algoritm ishlatadi:
 
@@ -913,10 +914,10 @@ while (workInProgress !== null && !shouldYield()) {
 
 // Bu yerda biz to'xtab tursak — keyinroq qaytib boshlash mumkin
 // `workInProgress` shunchaki saqlanib turadi (variable)
-// Brauzer ishi tugagach, MessageChannel orqali davom etadi
+// Browser ishi tugagach, MessageChannel orqali davom etadi
 ```
 
-JS call stack'ni saqlash o'rniga, "hozirgi joy" — bu shunchaki `workInProgress` o'zgaruvchisidagi Fiber. Uni saqlab, brauzer'ga yo'l berib, keyin shu joydan davom etish mumkin.
+JS call stack'ni saqlash o'rniga, "hozirgi joy" — bu shunchaki `workInProgress` o'zgaruvchisidagi Fiber. Uni saqlab, browser'ga yo'l berib, keyin shu joydan davom etish mumkin.
 
 **`return` pointer — nima uchun "return" deb nomlangan:**
 
@@ -1141,7 +1142,7 @@ Tree swap **Mutation va Layout o'rtasida** bo'ladi. Sabab:
 - Mutation paytida DOM hali yangilanmoqda — `fiberRoot.current` `workInProgress`'ga o'rnatish noto'g'ri (yarim holat)
 - Layout Phase boshlanganda DOM to'liq yangi — endi `current` ham yangi tree
 
-`useLayoutEffect` ichidan `fiber.alternate` o'qisangiz — **eski tree**'ni ko'rasiz (chunki swap allaqachon bo'lgan, hozirgi `current` — yangi tree, alternate — eski).
+`useLayoutEffect` ichidan `fiber.alternate` o'qilganda — **eski tree** ko'rinadi (chunki swap allaqachon bo'lgan, hozirgi `current` — yangi tree, alternate — eski).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1206,12 +1207,12 @@ NEXT RENDER STARTS:
 
 Har Fiber **ikki nusxada** mavjud (current va alternate). Lekin:
 - Komponent'lar mount/unmount bo'lganda, alternate ham mos ravishda yaratiladi/o'chiriladi
-- Fiber obyekti kichik (~30 maydon), katta application'da ham memory'da o'rinli
+- Fiber obyekti har bir node uchun kompakt struktura (asosiy maydonlar `ReactInternalTypes.js`'da Fiber type'ida ro'yxatlangan); katta application'da ham memory'da o'rinli
 - `stateNode` ikki tree'da bir xil (DOM node bittagina) — duplikatsiya qilinmaydi
 
 Demak, double buffering **2x Fiber memory** + **1x DOM node** = umumiy memory'ga sezilarli ta'sir qilmaydi.
 
-**Concurrent rendering bilan integratsiya:**
+**Concurrent rendering bilan integration:**
 
 ```typescript
 function performWorkOnRoot(root: FiberRoot, lanes: Lanes) {
@@ -1250,7 +1251,7 @@ Agar high-priority update kelsa va render tashlansa:
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-Double buffering vizualizatsiyasi (mental model):
+Double buffering visualizationsi (mental model):
 
 ```tsx
 // Initial mount:
@@ -1393,7 +1394,7 @@ otherTreeFiber.alternate === fiber  // ikki tomonlama bog'lanish
 3. **Bailout detection** — alternate bilan deep equal bo'lsa, render skip qilish mumkin
 4. **Effect tracking** — eski (current) vs yangi (workInProgress) state farqini aniqlash
 
-### Alternate kog'da yaratiladi
+### Alternate qachon yaratiladi
 
 `createWorkInProgress(current, pendingProps)` chaqirilganda:
 
@@ -1638,23 +1639,24 @@ function App() {
 
 ### Nazariya
 
-React 16 (sentabr 2017)'gacha React **Stack Reconciler** ishlatardi. Stack Reconciler — recursive descent algoritmi: har komponent render JavaScript call stack'da bitta frame'ni egallaydi va to'liq sinkron ishlaydi.
+React 16 (sentabr 2017)'gacha React **Stack Reconciler** ishlatardi. Stack Reconciler — recursive descent algoritmi: har komponent render JavaScript call stack'da bitta frame'ni egallaydi va to'liq synchronous ishlaydi.
 
 **Stack Reconciler kamchiliklari:**
 
-1. **Sinkron, uziluvchi emas** — render boshlanganidan keyin to'liq tugaguncha to'xtab bo'lmasdi
+1. **Synchronous, uziluvchi emas** — render boshlanganidan keyin to'liq tugaguncha to'xtab bo'lmasdi
 2. **Long render UI'ni bloklaydi** — uzun list yoki murakkab tree → input lag, animation jank
 3. **Prioritization yo'q** — barcha update'lar bir xil priority'da
 4. **Restartable emas** — yangi update kelganda eski ish davom etardi
-5. **Stack overflow xavfi** — chuqur recursion (5000+ daraja) JS stack'ni to'ldirardi
+5. **Stack overflow xavfi** — chuqur recursion JS engine'ning configured call stack chegarasidan oshib ketishi mumkin edi (har engine va platforma uchun stack size farq qiladi — V8'da `--stack-size` flag bilan boshqariladi); Stack Reconciler tree'ning chuqurligi bo'yicha har komponent uchun JS frame ishlatardi
 
-**Fiber Reconciler (R16+) yechimlari:**
+**Fiber Reconciler (R16+) infrastructure yechimlari:**
 
-1. **Iterative algoritm** — recursive descent o'rniga linked list bo'ylab while loop
-2. **Interruptible** — har Fiber'dan keyin `shouldYield()` tekshirish, brauzer'ga yo'l berish
-3. **Priority lanes** — har update o'z priority'siga ega (cross-ref `05-scheduler-lanes.md`)
-4. **Restartable** — high-priority update kelganda eski workInProgress tashlanib, yangi boshlanadi
-5. **Stack overflow yo'q** — JavaScript call stack yetarlicha sayoz (har performUnitOfWork — bitta frame)
+1. **Iterative algoritm** — recursive descent o'rniga linked list bo'ylab while loop (har doim, sync va concurrent rendering uchun)
+2. **Stack overflow yo'q** — JavaScript call stack yetarlicha sayoz (har `performUnitOfWork` — bitta frame); concurrent va sync rendering ikkalasida amal qiladi
+3. **Concurrent infrastructure** — quyidagi xususiyatlar **faqat concurrent rendering'da** (R16-R17'da `unstable_AsyncMode` opt-in; R18+ `createRoot` bilan default):
+   - **Interruptible** — `workLoopConcurrent` har Fiber'dan keyin `shouldYield()` tekshiradi va browser'ga yo'l beradi (sync render — `workLoopSync` — yo'l bermaydi)
+   - **Priority lanes** — har update o'z priority'siga ega (cross-ref `05-scheduler-lanes.md`)
+   - **Restartable** — high-priority update kelganda eski workInProgress tashlanib, yangi boshlanadi
 
 ### Real-world misol
 
@@ -1669,29 +1671,31 @@ function ProductList({ products }: { products: Product[] }) {
   );
 }
 
-// 10,000 ta product — render ~500ms davom etishi mumkin
+// Katta list (masalan, o'n minglab product) — render bir necha 100ms davom etishi mumkin
+// (aniq vaqt komponent murakkabligi va element soniga bog'liq)
 // Stack Reconciler:
 // 1. handleClick chaqiriladi → setState
 // 2. Render boshlanadi
-// 3. 10,000 ta ComplexProductCard render qilinadi (recursive)
-// 4. 500ms davomida UI MUZLAYDI:
-//    - input javob bermaydi
-//    - animation to'xtaydi
-//    - tugma click ishlamaydi
+// 3. Barcha ComplexProductCard'lar recursive render qilinadi
+// 4. Render davom etgan vaqt davomida main thread bloklanadi:
+//    - input event'lar javob bermaydi
+//    - animation freeze
+//    - tugma click navbatga turadi
 // 5. Render tugadi → DOM yangilandi
 ```
 
-**Fiber Reconciler — bir xil list:**
+**Fiber Reconciler — bir xil list (concurrent rendering'da):**
 
 ```tsx
-// Bir xil komponent, lekin Fiber Reconciler:
+// Bir xil komponent, lekin createRoot (R18+) va concurrent rendering bilan:
 // 1. handleClick → setState
-// 2. Render boshlanadi (workLoop)
-// 3. Har 5ms chamasi React shouldYield() tekshiradi
-//    - Brauzer'ga yo'l beradi
+// 2. Render boshlanadi (`workLoopConcurrent`)
+// 3. `frameYieldMs = 5` ms budget tugagach React `shouldYield()` true qaytaradi
+//    (manba: react/packages/scheduler/src/forks/Scheduler.js)
+//    - Browser'ga yo'l beriladi
 //    - Input, animation javob beradi
-// 4. 100ms ichida 20 marta to'xtab davom etadi
-// 5. Foydalanuvchi UI'ni "muzlamagan" deb sezadi (brauzer'ga vaqt berildi)
+// 4. Render bir necha bo'lakka taqsimlanadi, har 5 ms'dan keyin yield
+// 5. Foydalanuvchi main thread'ni bloklanmagan deb sezadi (concurrent yield)
 
 // Plus useTransition bilan:
 const [isPending, startTransition] = useTransition();
@@ -1704,19 +1708,19 @@ function handleClick() {
 
 ### Migration jarayoni
 
-Fiber rewrite — React'ning eng katta texnik o'zgarishi. **2 yil davom etgan** (2015 boshlangach 2017 sentabrda Sebastian Markbåge boshchiligida release). Asosiy nuance'lar:
+Fiber rewrite — React'ning eng katta texnik o'zgarishi. **2 yil davom etgan** (2015 boshlangach 2017 sentabrda release; manba: `acdlite/react-fiber-architecture` README — "over two years of research by the React team"). Asosiy nuance'lar:
 
-- API o'zgarmadi — sizning kodingiz Fiber'ga o'tishda hech narsa yozilmagan
+- API o'zgarmadi — application kodi Fiber'ga o'tishda hech narsa yozilmagan
 - Internal'lar to'liq qayta yozildi
 - **`componentWillMount`, `componentWillReceiveProps`, `componentWillUpdate`** — bu lifecycle method'lar `UNSAFE_` prefiksi bilan deprecated bo'ldi (concurrent rendering bilan mos emas — render uziluvchi bo'lgani uchun bir necha marta chaqirilishi mumkin)
 - **R18'da concurrent features stable** bo'ldi (R16-R17'da hali experimental edi)
 
-> **Eslatma:** Fiber rewrite'dan keyin **dastlabki R16'da concurrent rendering hali yoqilmagan edi** — faqat infrastruktura tayyor edi. R17'gacha React har doim sinkron ishlardi (Fiber bo'lsa-da). R18'da `createRoot` bilan concurrent rendering aktiv bo'ldi. Demak, "Fiber + Concurrent" — ikki alohida bosqich.
+> **Eslatma:** Fiber rewrite'dan keyin **dastlabki R16'da concurrent rendering hali yoqilmagan edi** — faqat infrastructure tayyor edi. R17'gacha React har doim synchronous ishlardi (Fiber bo'lsa-da). R18'da `createRoot` bilan concurrent rendering aktiv bo'ldi. Demak, "Fiber + Concurrent" — ikki alohida bosqich.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Stack Reconciler implementatsiyasi (mental model):**
+**Stack Reconciler implementation'i (mental model):**
 
 ```typescript
 // Stack Reconciler (R15)
@@ -1746,9 +1750,9 @@ function reconcile(component) {
 // JavaScript synchronous nature'i tufayli
 ```
 
-Bu yondashuv — to'liq sinkron, JS event loop'ni bloklaydi.
+Bu yondashuv — to'liq synchronous, JS event loop'ni bloklaydi.
 
-**Fiber Reconciler implementatsiyasi (mental model):**
+**Fiber Reconciler implementation'i (mental model):**
 
 ```typescript
 // Fiber Reconciler (R16+)
@@ -1788,7 +1792,7 @@ function shouldYield(): boolean {
 // 1. workInProgress saqlanadi (variable)
 // 2. workLoop to'xtaydi
 // 3. JavaScript event loop davom etadi (input, animation)
-// 4. Brauzer task tugagach, MessageChannel orqali React qayta uyg'onadi:
+// 4. Browser task tugagach, MessageChannel orqali React qayta uyg'onadi:
 function performWorkUntilDeadline() {
   scheduler.scheduledHostCallback(true);
   // Yangi 5ms budget bilan workLoop davom etadi
@@ -1804,8 +1808,8 @@ window.requestIdleCallback(performWork);
 
 Lekin `requestIdleCallback`:
 - Cross-browser support yo'q (Safari'da yo'q)
-- Frequency past (~50ms gacha kechikishi mumkin)
-- Deterministik emas (brauzer "idle" deb hisoblashi noaniq)
+- Frequency deterministic emas — browser implementatsiyasiga bog'liq, ko'p hollarda kerakli tezlikda chaqirilmaydi
+- Deterministik emas (browser "idle" deb hisoblashi noaniq)
 
 `MessageChannel` ishlatish:
 ```typescript
@@ -1817,7 +1821,7 @@ function scheduleWork() {
 }
 ```
 
-`MessageChannel` har macrotask'dan keyin chaqiriladi — deterministik, har brauzer'da ishlaydi, kichik kechikish.
+`MessageChannel` har macrotask'dan keyin chaqiriladi — deterministik, har browser'da ishlaydi, kichik kechikish.
 
 **Why Fiber — bitta jumla bilan:**
 
@@ -1914,10 +1918,10 @@ function SearchPage() {
 // Foydalanuvchi tezda yozadi: "a", "ab", "abc"
 //
 // Stack Reconciler bo'lganda:
-// 1. "a" — render 200ms, input bloklanadi
-// 2. "ab" — render 200ms, input bloklanadi
-// 3. "abc" — render 200ms, input bloklanadi
-// → Foydalanuvchi UI'ni "muzlagan" deb sezadi
+// 1. "a" — render boshlanadi, sync (Stack Reconciler), input bloklanadi
+// 2. "ab" — keyingi keystroke kutib turadi; yangi render input javobini kechiktiradi
+// 3. "abc" — har keystroke render'ni boshlaydi, oldingisi tugamasa interruption yo'q
+// → Foydalanuvchi main thread bloklangan deb sezadi (input/animation javob bermaydi)
 //
 // Fiber Reconciler + useTransition:
 // 1. "a" — render boshlanadi (low priority)
@@ -1977,7 +1981,7 @@ type Fiber = {
 
 ### Subtree Flags — yangi yondashuv (R17+)
 
-R17'dan boshlab effect list optimizatsiyasi qo'llandi: **`subtreeFlags`** maydoni qo'shildi.
+R17'dan boshlab effect list optimization'i qo'llandi: **`subtreeFlags`** maydoni qo'shildi.
 
 ```typescript
 type Fiber = {
@@ -2032,19 +2036,21 @@ function commitMutationEffects(root, finishedWork) {
 }
 ```
 
-**Optimizatsiya foydasi:**
+**Optimization foydasi:**
 
-Tasavvur qiling — 1000 ta komponentdan iborat tree, lekin faqat 5 ta komponentda effect bor:
+Katta tree (masalan, mingdan ortiq Fiber)'da faqat bir nechta komponentda effect bo'lsa:
 
-- **Eski yondashuv:** 1000 ta Fiber tekshiriladi (har bittasini effect bo'lsa-yo'qsa)
-- **Yangi yondashuv:** Faqat 5 + parent fiber'lar (path) — taxminan 50 ta Fiber. **20x kamroq ish.**
+- **Eski yondashuv (R16 — effect list pointers):** har Fiber tekshiriladi, lekin alohida linked list (`firstEffect → lastEffect`) ishlatilardi
+- **Yangi yondashuv (R17+ `subtreeFlags`):** parent'da `subtreeFlags & MutationMask === 0` bo'lsa, butun subtree skip qilinadi — faqat effect bor branch'lar visit qilinadi
 
-Bu optimizatsiya `subtreeFlags` orqali — boshqa state, "alohida data structure" kerak emas.
+Traversal hajmi effect tarqalishiga bog'liq: agar effect'lar tree'da kam joyda lokalizatsiya bo'lsa, skip ko'p bo'ladi.
+
+Bu optimization `subtreeFlags` orqali — boshqa state, "alohida data structure" kerak emas.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Bitmask manipulyatsiya:**
+**Bitmask manipulation:**
 
 ```typescript
 // Flag'lar (R18 source kodidan, soddalashtirilgan)
@@ -2068,10 +2074,12 @@ if (fiber.flags & (Update | Ref)) { ... }  // Update yoki Ref bormi
 // Flag o'chirish
 fiber.flags &= ~Placement;  // Placement olib tashlash
 
-// Flag mask'lar (bir nechta flag birga)
-const MutationMask = Placement | Update | ChildDeletion | ContentReset;
-const LayoutMask = Update | Callback | Ref;
-const PassiveMask = Passive | ChildDeletion;
+// Flag mask'lar (R19 source — react-reconciler/src/ReactFiberFlags.js)
+const MutationMask =
+  Placement | Update | ChildDeletion | ContentReset |
+  Ref | Hydrating | Visibility | FormReset;
+const LayoutMask = Update | Callback | Ref | Visibility;
+const PassiveMask = Passive | Visibility | ChildDeletion;
 
 // Tekshirish
 if (fiber.subtreeFlags & MutationMask) { ... }
@@ -2112,11 +2120,11 @@ Article uchun bitta DOM mutation bajariladi.
 Header va Sidebar subtree'lari butunlay tekshirilmaydi.
 ```
 
-**`useEffect` skip optimizatsiyasi:**
+**`useEffect` skip optimization'i:**
 
 `PassiveMask` flag bilan ham bir xil mantiq — agar subtree'da hech qanday `useEffect` yo'q bo'lsa, butun subtree passive effect phase'da skip qilinadi.
 
-Bu optimizatsiya `React.memo`'siz ham ishlaydi — agar komponent'da `useEffect` yo'q va child'larida ham yo'q bo'lsa, passive phase'da bu Fiber tegmaydi.
+Bu optimization `React.memo`'siz ham ishlaydi — agar komponent'da `useEffect` yo'q va child'larida ham yo'q bo'lsa, passive phase'da bu Fiber tegmaydi.
 
 </details>
 
@@ -2148,10 +2156,11 @@ function Demo() {
 
 // Initial mount — Demo Fiber flag'lari:
 // - Placement (yangi insert qilinmoqda)
-// - Update (props bor)
 // - Ref (ref attach kerak)
-// - Passive (useEffect bor)
-// - Update (useLayoutEffect bor — Layout phase uchun)
+// - Passive (useEffect bor — passive phase scheduling)
+// - Update (useLayoutEffect bor — Layout phase scheduling uchun)
+// NOTE: Initial mount'da Update flag faqat layout effect (yoki ref) tufayli o'rnatiladi,
+// "props bor" sababli emas — chunki yangi mount'da props "diff" yo'q (eski holat yo'q).
 
 // Update (count o'zgargan):
 // - Update (text node yangilanmoqda)
@@ -2292,7 +2301,7 @@ Fiber'ning hayot davri uch holatdan iborat:
 
 **Mount path vs Update path — komponent funksiya darajasida:**
 
-React komponent funksiyasini chaqirishdan oldin **dispatcher** ni o'rnatadi. Dispatcher — hooks implementatsiyasi (mount yoki update path).
+React komponent funksiyasini chaqirishdan oldin **dispatcher** ni o'rnatadi. Dispatcher — hooks implementation'i (mount yoki update path).
 
 ```typescript
 // React internal
@@ -2595,7 +2604,7 @@ function Parent({ data }) {
 }
 ```
 
-**Optimizatsiya:** `subtreeFlags` orqali butun subtree commit'da skip qilinadi — Reconciler shu Fiber'ga umuman tegmaydi.
+**Optimization:** `subtreeFlags` orqali butun subtree commit'da skip qilinadi — Reconciler shu Fiber'ga umuman tegmaydi.
 
 ---
 
@@ -2607,7 +2616,7 @@ Eski hujjatlarda Fiber "lightweight Virtual DOM" deb tasvirlangan. Bu **noto'g'r
 
 - Fiber **tree node + work unit** (ikki rolda)
 - DOM copy emas — ko'plab qo'shimcha metadata bor (hooks state, effect flags, lanes, alternate)
-- Memory'da Fiber tree DOM tree'dan **kattaroq** (har Fiber ~30 maydon vs DOM Element ~10 asosiy property)
+- Memory'da Fiber tree DOM tree'dan **kattaroq** — har Fiber ko'p maydonga ega (`flags`, `lanes`, `child`/`sibling`/`return` pointers, `memoizedState`, `pendingProps`, va h.k. — to'liq ro'yxat `ReactInternalTypes.js`'da)
 
 **To'g'ri framing:** Fiber — Reconciler'ning ichki ish strukturasi. DOM emas, lekin DOM bilan parallel ishlovchi tree.
 
@@ -2793,7 +2802,7 @@ Walk: A(begin), B(begin), C(begin), C(complete), B(complete), D(begin), E(begin)
 
 ---
 
-### Mashq 3: subtreeFlags optimizatsiya (O'rta)
+### Mashq 3: subtreeFlags optimization (O'rta)
 
 Quyidagi tree'da har Fiber'ning `flags` va `subtreeFlags` ni ko'rsating (initial mount uchun, Placement flag'i bilan):
 
@@ -2923,13 +2932,13 @@ function HeavyList({ items }: { items: Item[] }) {
 <summary><strong>Javob</strong></summary>
 
 **Stack Reconciler (R15):**
-- Render to'liq sinkron — 1000ms davomida JS thread bloklanadi
-- Foydalanuvchi: input javob bermaydi, animation muzlaydi, click ishlamaydi
+- Render to'liq synchronous — 1000ms davomida JS thread bloklanadi
+- Foydalanuvchi: input javob bermaydi, animation freeze, click navbatga turadi
 - Recursive descent — 10,000 ta `ComplexCard` recursive funksiya chaqiruvi
 - Stack overflow xavfi (juda chuqur tree bo'lsa)
 
 **Fiber Reconciler (R16, sync rendering hali):**
-- Render hali sinkron (Concurrent yo'q edi R16-R17'da)
+- Render hali synchronous (Concurrent yo'q edi R16-R17'da)
 - Iterative algoritm — call stack overflow xavfi yo'q
 - 1000ms hali ham bloklash, lekin tuzilish jihatidan tayyorlangan
 
@@ -2955,8 +2964,8 @@ function Page() {
 ```
 
 - Render har 5ms chamasi to'xtaydi (`shouldYield`)
-- Brauzer'ga yo'l beriladi — input/animation javob beradi
-- Foydalanuvchi UI'ni "muzlamagan" deb sezadi
+- Browser'ga yo'l beriladi — input/animation javob beradi
+- Foydalanuvchi main thread bloklanmagan deb sezadi (concurrent yield)
 - Yangi update kelsa (boshqa setState), eski render TASHLANADI
 - Faqat oxirgi to'liq tugagan render commit qilinadi
 
@@ -2974,18 +2983,18 @@ function Page() {
 
 ## Xulosa
 
-Bu bo'limda Fiber arxitekturasining barcha asosiy qismlari yoritildi:
+Bu bo'limda Fiber architecture'sining barcha asosiy qismlari yoritildi:
 
 - **Fiber** — work unit + tree node ikki rolda
 - **Fiber tag types** — har komponent/element turi uchun maxsus handler (FunctionComponent, HostComponent, MemoComponent, va h.k.)
 - **Tree traversal** — child/sibling/return pointer'lar bilan iterative DFS walk
 - **Double buffering** — `current` va `workInProgress` ikki tree, atomic commit
 - **Alternate pointer** — ikki tree'dagi Fiber'lar juftligi, memory reuse uchun
-- **Why Fiber** — Stack Reconciler'ning sinkron, uziluvchi emasligi muammosini hal qildi
-- **subtreeFlags optimizatsiyasi (R17+)** — effect bo'lmagan subtree'larni Commit'da skip
+- **Why Fiber** — Stack Reconciler'ning synchronous, uziluvchi emasligi muammosini hal qildi
+- **subtreeFlags optimization'i (R17+)** — effect bo'lmagan subtree'larni Commit'da skip
 - **Fiber lifecycle** — mount/update/unmount jarayonlari, hooks dispatcher swap
 
-Bu arxitektura keyingi bo'limlarning asosi:
+Bu architecture keyingi bo'limlarning asosi:
 - **Reconciliation** (`04-`) — Fiber tree'larni qanday diff qiladi
 - **Scheduler & Lanes** (`05-`) — Fiber render'ini priority bilan boshqarish
 - **Hydration** (`06-`) — server HTML'ni Fiber tree'ga ulash

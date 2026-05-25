@@ -8,14 +8,16 @@
 
 ## Mundarija
 
-**QISM A: Fiber Architecture** (savollar 1-9)
-**QISM B: Reconciliation Algorithm** (savollar 10-18)
-**QISM C: Scheduler & Lanes** (savollar 19-25)
-**QISM D: Hydration** (savollar 26-31)
+- [**QISM A: Fiber Architecture** (savollar 1-13)](#qism-a)
+- [**QISM B: Reconciliation Algorithm** (savollar 14-25)](#qism-b)
+- [**QISM C: Scheduler & Lanes** (savollar 26-34)](#qism-c)
+- [**QISM D: Hydration** (savollar 35-42)](#qism-d)
 
 ---
 
 ## QISM A: Fiber Architecture
+
+<a id="qism-a"></a>
 
 ### 1. Fiber nima va Stack Reconciler bilan farqi nimada? [Middle]
 
@@ -34,7 +36,7 @@
 2. **Synchronous** — to'xtatib bo'lmaydi, oxirigacha ishlaydi
 3. **Long task** — katta tree (1000+ komponent) — ko'p ms, browser bloklanadi
 4. **Janky UI** — animation drop, input lag, scroll stutter
-5. **No prioritization** — kichik update va katta update bir xil traction
+5. **No prioritization** — kichik update va katta update bir xil treatment
 
 **Fiber yechimi (R16+):**
 
@@ -172,7 +174,7 @@ Fiber (heap):
   | alternate                  ... |
   | memoizedState              ... |
   | flags                      ... |
-  ↑ 8-16 bytes per pointer (V8 hidden class)
+  ↑ V8 hidden class — monomorphic IC fast property access
 ```
 
 V8 har Fiber bir xil hidden class — monomorphic IC fast property access.
@@ -209,7 +211,7 @@ Reconciler `tag`'ga qarab har xil mantiq ishlatadi (memo bailout, suspense throw
 1. **Create** — `createFiber(type, props, key)` — initial mount
 2. **Update** — alternate yaratiladi (clone), props yangilanadi
 3. **Reuse** — alternate fiber memory'sini qayta ishlatish (no GC)
-4. **Delete** — flag `Deletion`, parent'dan child'lar removed
+4. **Delete** — parent'da `ChildDeletion` flag, `deletions` array'ga qo'shiladi
 
 **Performance characteristics:**
 
@@ -225,7 +227,7 @@ Reconciler `tag`'ga qarab har xil mantiq ishlatadi (memo bailout, suspense throw
 
 ### Edge Cases
 
-- **Async render leak**: Render phase yieldlarsiz — long task, 50+ms — Lighthouse "Total Blocking Time" yomon. Fiber buni hal qiladi.
+- **Async render leak**: Render phase yieldlarsiz — long task bo'lsa, Lighthouse "Total Blocking Time" yomonlashadi. Fiber time slicing buni hal qiladi.
 - **`useState` mid-render**: Render phase set state — React limited support (queue va re-render shu fiber). Anti-pattern.
 - **Fiber memory**: Har fiber object — `tag`, `type`, `key`, `child`, `sibling`, `return`, `alternate`, `memoizedState`, `memoizedProps`, `pendingProps`, `flags`, `lanes` va boshqa ko'p field'lar (V8 hidden class). Katta tree'da fiber memory sezilarli, lekin alternate recycle bilan amortize qilinadi.
 
@@ -615,8 +617,7 @@ function createWorkInProgress(current: Fiber, pendingProps: any): Fiber {
     workInProgress.deletions = null;
   }
 
-  // Copy state from current
-  workInProgress.flags = current.flags;
+  // Copy scheduling state from current
   workInProgress.childLanes = current.childLanes;
   workInProgress.lanes = current.lanes;
   workInProgress.child = current.child;
@@ -1257,8 +1258,7 @@ const enum Flags {
   PerformedWork   = 0b00000000000000000000000001,  // 1
   Placement       = 0b00000000000000000000000010,  // 2 — DOM insert
   Update          = 0b00000000000000000000000100,  // 4 — DOM property update
-  PlacementAndUpdate = 0b110,
-  Deletion        = 0b00000000000000000000010000,  // 16
+  ChildDeletion   = 0b00000000000000000000010000,  // 16 — parent'da child o'chirilishi
   ContentReset    = 0b00000000000000000000100000,  // 32
   Callback        = 0b00000000000000000001000000,  // 64
   DidCapture      = 0b00000000000000000010000000,  // 128 — error caught
@@ -1313,7 +1313,6 @@ function MyComponent({ name }: { name: string }) {
 // div fiber:
 //   flags |= Placement     (insert into DOM)
 //   flags |= Ref           (ref attach)
-//   flags |= Update        (props apply)
 //
 // HostText (name) fiber:
 //   flags |= Placement
@@ -1444,7 +1443,7 @@ R18 advantages:
 |----------|----------|
 | New component mounted | `Placement` |
 | Props changed | `Update` |
-| Component unmounted | `Deletion` (parent's deletions list) |
+| Component unmounted | `ChildDeletion` (parent's deletions array'ga qo'shiladi) |
 | `useEffect` to run | `Passive` |
 | `useLayoutEffect` to run | `Update` (Layout phase processing) |
 | Ref attach/detach | `Ref` |
@@ -1481,10 +1480,8 @@ DevTools "Highlight Updates" — `PerformedWork` flag'ga qaraydi.
 
 ```
 Fiber:
-  flags: number (4 bytes, 26 bits used)
-  subtreeFlags: number (4 bytes)
-
-Total flags storage: 8 bytes per fiber
+  flags: number (bitwise integer, 28+ bits ishlatiladi)
+  subtreeFlags: number (bitwise integer)
 ```
 
 Bit operations — fastest CPU operations (no allocation, branch prediction-friendly).
@@ -1499,7 +1496,7 @@ Bit operations — fastest CPU operations (no allocation, branch prediction-frie
 
 ### Follow-up savollar
 
-- "Bitmask vs object?" — Bitmask 8 bytes; object {placement: true, update: true, ...} — 50+ bytes. CPU bit ops faster than property access. Critical hot path.
+- "Bitmask vs object?" — Bitmask — ikki number field (flags + subtreeFlags). Object {placement: true, update: true, ...} — ko'p property, V8 hidden class overhead. CPU bit ops property access'dan tezroq. Critical hot path.
 - "More than 26 flags?" — Use 64-bit (BigInt) — performance penalty. R team designed flag count carefully.
 - "Effect ordering — flags don't encode?" — Order determined by traversal (depth-first child-first). Flags only encode *what*.
 
@@ -1521,7 +1518,7 @@ Bit operations — fastest CPU operations (no allocation, branch prediction-frie
 **Recursion muammolari:**
 
 1. **Synchronous** — start to finish, no pause
-2. **Stack growth** — har frame 50-100 bytes, depth high → memory + risk of overflow
+2. **Stack growth** — har frame stack'ga qo'shiladi, depth high → memory + risk of overflow
 3. **No yield** — browser idle bo'lishni xohlasa ham — ishlatish mumkin emas
 4. **No prioritization** — kichik high-pri update vs katta low-pri update — sequential
 
@@ -1601,15 +1598,10 @@ function shouldYield(): boolean {
 ```
 60fps target → 16.67ms per frame budget
 
-Frame budget breakdown:
-- JavaScript:    ~5-8ms
-- Style/Layout:  ~3-5ms
-- Paint:         ~2-3ms
-- Composite:     ~1-2ms
-- Other:         ~1-2ms
-
-React work budget: ~5ms per frame
-Beyond 5ms → frame drop, user notices "lag"
+Frame budget — JS, Style/Layout, Paint, Composite orasida taqsimlanadi.
+React Scheduler `frameYieldMs = 5` — frame budget'ning bir qismini oladi,
+qolganini browser task'lariga qoldiradi.
+Beyond frame budget → frame drop, user notices "lag"
 ```
 
 Fiber 5ms slice — frame budget ichida.
@@ -1652,8 +1644,8 @@ function scheduleCallback() {
   channel.port1.postMessage(null);  // schedule next slice
 }
 
-// MessageChannel — microtask queue
-// Faster than setTimeout (4ms minimum delay)
+// MessageChannel — macrotask (task queue'da)
+// Faster than setTimeout (4ms minimum delay yo'q)
 // More reliable than requestIdleCallback (Safari support)
 ```
 
@@ -1663,7 +1655,7 @@ function scheduleCallback() {
 |--------|-------|----------------|-------------|
 | `setTimeout(fn, 0)` | 4ms minimum | ✅ All | Yes |
 | `MessageChannel` | ~0ms | ✅ All | Yes |
-| `requestIdleCallback` | Variable | ❌ Safari poor | No |
+| `requestIdleCallback` | Variable | ✅ Safari 16.4+ (2023) | No |
 | `requestAnimationFrame` | Until next paint | ✅ All | No (paint-tied) |
 
 React: MessageChannel for fast yield-resume.
@@ -2295,7 +2287,7 @@ Real React app'da Fiber tree komponent tree'dan kattaroq — har JSX element + w
 ### Follow-up savollar
 
 - "Component tree DevTools'da ko'rinadigan tree-mi?" — Ha, simplified version. Internal HostComponent, Fragment, etc. yashirin.
-- "Fiber count app size'ga bog'liqmi?" — Linear: ~1.5-2x component count.
+- "Fiber count app size'ga bog'liqmi?" — Linear: komponent soni + host element + wrapper fiber'lar (Fragment, Memo, Provider) soni.
 - "Suspense fallback rendered — Fiber tree o'zgaradimi?" — Ha. Primary children replaced with fallback subtree (different fibers).
 
 </details>
@@ -2351,7 +2343,10 @@ interface FiberRoot {
 
 ```tsx
 // createRoot creates FiberRoot
-const root = createRoot(document.getElementById("root")!, {
+const container = document.getElementById("root");
+if (!container) throw new Error("Root container missing");
+
+const root = createRoot(container, {
   identifierPrefix: "app-",
   onRecoverableError: (e) => console.warn(e),
 });
@@ -2481,7 +2476,7 @@ R18'dan default ConcurrentRoot. `ReactDOM.render` (deprecated) — LegacyRoot.
 ### Follow-up savollar
 
 - "Server-side render ham FiberRoot ishlatadi-mi?" — `renderToString` simpler model (no committed tree). `renderToReadableStream` — bor (streaming state).
-- "FiberRoot memory size?" — ~50+ properties, ~500 bytes. Per-root overhead.
+- "FiberRoot memory size?" — Ko'p property'larga ega (scheduling, lanes, error callbacks). Per-root overhead.
 - "Multi-root batching?" — R18'dan default no. Cross-root setState alohida cycle. `flushSync` per root.
 
 </details>
@@ -2858,7 +2853,7 @@ function basicStateReducer(state, action) {
 ### Follow-up savollar
 
 - "Why linked list, not array?" — Array would require pre-allocation. Linked list — dynamic, supports custom hooks naturally.
-- "Memory size of hooks?" — Each hook ~50 bytes. 100 hooks per component × 1000 components — ~5MB.
+- "Memory size of hooks?" — Har hook object (memoizedState, queue, next, ...) heap'da alohida allocation. Ko'p hooks + ko'p komponent — sezilarli memory.
 - "Can I access fiber.memoizedState?" — DevTools yes. Production code — no public API.
 
 </details>
@@ -3079,7 +3074,7 @@ Commit:
 ### Follow-up savollar
 
 - "What's in workInProgress that's not in current?" — Pending props (yet to be committed), updated state (mid-render), new flags.
-- "Memory overhead of alternate?" — 2x Fiber memory (current + alternate). For large trees, 1-2MB extra.
+- "Memory overhead of alternate?" — 2x Fiber memory (current + alternate). Katta tree'larda sezilarli, lekin GC pressure kamayadi (recycle).
 - "Why doesn't React just clone fibers?" — Performance: clone has GC pressure. Alternate reuse — stable allocation.
 
 </details>
@@ -3087,6 +3082,8 @@ Commit:
 ---
 
 ## QISM B: Reconciliation Algorithm
+
+<a id="qism-b"></a>
 
 ### 14. Reconciliation algorithm — O(n) sabab nima? [Middle]
 
@@ -3351,7 +3348,7 @@ function reconcileFiber(currentFiber, element) {
 
 ### Qisqa javob
 
-Reconciler position'da eski va yangi element'ni `===` (Object.is) bilan **type** field'ini solishtiradi. **Same type** (e.g., both `'div'` or both `Button` function) → existing fiber reuse, props update. **Different type** → unmount old subtree (cleanup, refs detach, effects), mount new subtree (fresh state, new fibers, mount effects). Type comparison element-level — komponent ichidagi children'lar ham reconciliation davom etadi.
+Reconciler position'da eski va yangi element'ni `===` bilan **type** field'ini solishtiradi. **Same type** (e.g., both `'div'` or both `Button` function) → existing fiber reuse, props update. **Different type** → unmount old subtree (cleanup, refs detach, effects), mount new subtree (fresh state, new fibers, mount effects). Type comparison element-level — komponent ichidagi children'lar ham reconciliation davom etadi.
 
 ### To'liq tushuntirish
 
@@ -3376,7 +3373,7 @@ function reconcileFiber(current: Fiber, newElement: Element) {
 - `Button`, `App` — function reference (FunctionComponent type)
 - `class Foo` — class reference (ClassComponent type)
 - `Symbol(react.fragment)` — Fragment
-- Special: `Symbol(react.memo)`, `Symbol(react.forward_ref)`, etc.
+- Special: `Symbol(react.memo)`, `Symbol(react.forward_ref)` (R19'da ref oddiy prop, forwardRef deprecated), etc.
 
 ### Kod misoli
 
@@ -3680,7 +3677,7 @@ function Page({ loading }: { loading: boolean }) {
 
 ### Qisqa javob
 
-**Bailout** — Reconciler subtree'ni qayta render qilmaydi (skip optimization). 4 ta asosiy sabab: (1) **Element identity** (`Object.is` element references) — same JSX reference, (2) **`React.memo` shallow check** — props same, (3) **`useMemo`/`useCallback`** — stable reference for child memo bypass, (4) **State equality** — `setState` bilan same value (`Object.is` bailout, no re-render).
+**Bailout** — Reconciler subtree'ni qayta render qilmaydi (skip optimization). 4 ta asosiy sabab: (1) **Element identity** (`oldProps === newProps` reference equality) — same JSX reference, (2) **`React.memo` shallow check** — props same, (3) **`useMemo`/`useCallback`** — stable reference for child memo bypass, (4) **State equality** — `setState` bilan same value (`Object.is` bailout, no re-render).
 
 ### To'liq tushuntirish
 
@@ -3688,7 +3685,7 @@ function Page({ loading }: { loading: boolean }) {
 
 | # | Sabab | Mexanizm | Misol |
 |---|-------|----------|-------|
-| 1 | Element identity | `Object.is(oldElement, newElement)` | Children prop forwarded |
+| 1 | Element identity | `oldProps === newProps` (reference equality) | Children prop forwarded |
 | 2 | `React.memo` shallow | Shallow props equality | `memo(Component)` |
 | 3 | `useMemo`/`useCallback` deps | Deps unchanged | `useMemo(() => x, [a])` |
 | 4 | State equality | `Object.is(prevState, newState)` | `setX(sameValue)` |
@@ -4352,7 +4349,7 @@ State update bo'lganda, React **shu Fiber'dan boshlab pastga** (descendants) ren
 4. Reconciler starts from root, traverses tree
 5. At each fiber, check `lanes & renderLanes` — if pending work, render
 6. Else if `childLanes & renderLanes` — bailout self, recurse children
-7. Else (`lanes & childLanes & renderLanes === 0`) — skip entire subtree
+7. Else (`(lanes & renderLanes) === 0 && (childLanes & renderLanes) === 0`) — skip entire subtree
 
 ### Kod misoli
 
@@ -5197,7 +5194,7 @@ function updateMemoComponent(current, workInProgress) {
   if (compare(prevProps, nextProps) && current.ref === workInProgress.ref) {
     // Bailout
     didReceiveUpdate = false;
-    if (current.lanes & renderLanes === NoLanes) {
+    if ((current.lanes & renderLanes) === NoLanes) {
       return bailoutOnAlreadyFinishedWork(current, workInProgress);
     }
   }
@@ -6511,13 +6508,15 @@ Algorithm minimizes moves — only items that "go backwards" relative to last pl
 
 - "Optimal move algorithm exists?" — Yes (Longest Increasing Subsequence). Vue 3 uses LIS for fewer DOM ops. React uses simpler O(n) heuristic.
 - "What if I `key={i}` and items reorder?" — Same fibers reused (positions match), but state attached to position, not item — bug.
-- "Performance — 1000 item reorder cost?" — O(n) reconciliation + O(moves) DOM ops. Typically < 50ms even for full reverse.
+- "Performance — 1000 item reorder cost?" — O(n) reconciliation + O(moves) DOM ops. DOM mutation cost tree hajmi va browser engine'ga bog'liq.
 
 </details>
 
 ---
 
 ## QISM C: Scheduler & Lanes
+
+<a id="qism-c"></a>
 
 ### 26. Concurrent rendering nima uchun kerak? [Middle]
 
@@ -6796,12 +6795,17 @@ cancelCallback(taskHandle);
 **Priority levels and timeouts:**
 
 ```typescript
-const PriorityLevel = {
-  ImmediatePriority: -1,        // expires immediately
+// Priority levels (internal enum values):
+// ImmediatePriority = 1, UserBlockingPriority = 2,
+// NormalPriority = 3, LowPriority = 4, IdlePriority = 5
+
+// Timeout values (ms) per priority:
+const PriorityTimeouts = {
+  ImmediatePriority: -1,        // expires immediately (darhol ishga tushadi)
   UserBlockingPriority: 250,    // 250ms — input, click handlers
   NormalPriority: 5000,         // 5s — default
   LowPriority: 10000,           // 10s — non-critical
-  IdlePriority: maxSigned31Bit, // never (lowest)
+  IdlePriority: maxSigned31BitInt, // ~12.4 kun (amalda cheksiz)
 };
 ```
 
@@ -7020,10 +7024,10 @@ const maxYieldMs = 300;        // long-task yield ceiling
 // Min-heap on expirationTime — peek() returns next to run
 
 // Example:
-// Immediate: now - 1 (expired)
+// Immediate: now + (-1) = now - 1 (darhol expired)
 // UserBlocking: now + 250
 // Normal: now + 5000
-// Idle: now + maxInt
+// Idle: now + 1073741823 (≈12.4 kun)
 
 // Heap order: Immediate < UserBlocking < Normal < Idle
 ```
@@ -7031,8 +7035,8 @@ const maxYieldMs = 300;        // long-task yield ceiling
 **Starvation prevention:**
 
 ```typescript
-// Even Idle priority eventually runs (expirationTime maxInt — never expires!)
-// But: if never high-pri tasks scheduled, idle gets a turn
+// Idle priority expirationTime maxSigned31BitInt (≈12.4 kun) — amalda expire bo'lmaydi
+// Lekin high-pri task'lar orasida idle vaqt bo'lsa, idle task ham ishlaydi
 
 // Real starvation case:
 // Continuous high-pri tasks (typing) — low-pri starves
@@ -7064,7 +7068,7 @@ Experimental package for tracing render work — DevTools integration.
 ```typescript
 requestIdleCallback(callback, { timeout: 100 });
 // - Variable timing (no fixed slice)
-// - No Safari support (until recently)
+// - Safari 16.4+ (2023) qo'shildi, lekin React allaqachon MessageChannel tanlagan
 // - Long task budget unpredictable
 
 // vs MessageChannel:
@@ -7106,11 +7110,12 @@ requestIdleCallback(callback, { timeout: 100 });
 
 ```typescript
 const NoLanes: Lanes = 0b0000000000000000000000000000000;
-const SyncLane: Lane = 0b0000000000000000000000000000001;
-const InputContinuousHydrationLane: Lane = 0b0000000000000000000000000000010;
-const InputContinuousLane: Lane = 0b0000000000000000000000000000100;
-const DefaultHydrationLane: Lane = 0b0000000000000000000000000001000;
-const DefaultLane: Lane = 0b0000000000000000000000000010000;
+const SyncHydrationLane: Lane = 0b0000000000000000000000000000001;
+const SyncLane: Lane = 0b0000000000000000000000000000010;
+const InputContinuousHydrationLane: Lane = 0b0000000000000000000000000000100;
+const InputContinuousLane: Lane = 0b0000000000000000000000000001000;
+const DefaultHydrationLane: Lane = 0b0000000000000000000000000010000;
+const DefaultLane: Lane = 0b0000000000000000000000000100000;
 // Transition lanes — 16 lanes for granular transitions
 const TransitionHydrationLane: Lane = 0b0000000000000000000000000100000;
 const TransitionLane1: Lane = 0b0000000000000000000000001000000;
@@ -7193,11 +7198,11 @@ function getNextLanes(root: FiberRoot, wipLanes: Lanes): Lanes {
 // Lane is a specific bit position within priority groups
 
 // Sync lanes (highest)
-SyncLane = 0b1
+SyncLane = 0b10        // bit 1
 // Input continuous (high)
-InputContinuousLane = 0b100
+InputContinuousLane = 0b1000  // bit 3
 // Default (normal user interactions)
-DefaultLane = 0b10000
+DefaultLane = 0b100000  // bit 5
 // Transitions (lower priority, can be interrupted)
 TransitionLane1, TransitionLane2, ..., TransitionLane16
 
@@ -8021,7 +8026,7 @@ function computeExpirationTime(lane: Lane, currentTime: number): number {
     case TransitionLane1:
       return currentTime + 5000;
     case IdleLane:
-      return currentTime + 60000;  // 60s
+      return NoTimestamp;  // Idle lane expiration set qilinmaydi (starvation'dan himoyalanmagan)
     default:
       return currentTime + 5000;
   }
@@ -8145,12 +8150,11 @@ function laneToIndex(lane: Lane): number {
 **Expiration timeouts (R18 sodda):**
 
 ```typescript
-const SyncLaneTimeout = -1;          // immediate, never expires (already highest)
-const SyncBatchedTimeout = 250;
-const InputContinuousTimeout = 250;
-const DefaultTimeout = 5000;          // 5s
-const TransitionTimeout = 5000;       // 5s
-const IdleTimeout = 60000;            // 60s
+const SyncLaneTimeout = -1;          // immediate (allaqachon eng yuqori)
+const InputContinuousTimeout = 250;  // 250ms
+const DefaultTimeout = 5000;         // 5s
+const TransitionTimeout = 5000;      // 5s
+// IdleLane — expiration set qilinmaydi (NoTimestamp)
 
 // Lower priority — longer timeout (more patient)
 ```
@@ -8258,7 +8262,7 @@ function StarvationDemo() {
 
 ### Edge Cases
 
-- **Idle lane never expires?**: 60s timeout. Eventually bumps if pending too long.
+- **Idle lane never expires?**: IdleLane'ga expiration set qilinmaydi (`NoTimestamp`). Faqat high-pri task'lar orasida idle vaqt bo'lganda ishlaydi.
 - **Sync lane already expired**: Default expiration -1 (immediate) — always rendered first.
 - **Concurrent expired lanes**: All forced sync, rendered together.
 
@@ -8279,7 +8283,7 @@ function StarvationDemo() {
 
 ### Qisqa javob
 
-React **`MessageChannel`** ishlatadi (`requestIdleCallback` emas). Sabab: (1) `requestIdleCallback` Safari'da yo'q (2026'gacha partial support), (2) timing **variable** (browser idle detection), (3) max 50ms idle slot kafolatlanadi (lekin variable). `MessageChannel` — universal, fast, predictable 5ms slice. React custom scheduler `requestIdleCallback` simulate qiladi.
+React **`MessageChannel`** ishlatadi (`requestIdleCallback` emas). Sabab: (1) `requestIdleCallback` Safari'da 16.4+ (2023) da qo'shildi, lekin React allaqachon o'z scheduler'ini yozgan edi, (2) timing **variable** (browser idle detection), (3) idle slot davomiyligi kafolatlanmaydi. `MessageChannel` — universal, fast, predictable 5ms slice. React custom scheduler `requestIdleCallback` funksionalligini o'zi implement qiladi.
 
 ### To'liq tushuntirish
 
@@ -8349,7 +8353,7 @@ const requestHostCallback = (() => {
 | Method | Browser support | Timing | Predictability | Speed |
 |--------|-----------------|--------|----------------|-------|
 | `MessageChannel` | All (IE10+) | Macrotask | Predictable | Fast |
-| `requestIdleCallback` | Chrome/FF, Safari partial | Variable (idle-driven) | Unpredictable | Variable |
+| `requestIdleCallback` | Chrome/FF/Safari 16.4+ | Variable (idle-driven) | Unpredictable | Variable |
 | `setTimeout(0)` | All | Macrotask | Predictable | 4ms min delay |
 | `setImmediate` | Node.js, IE | Macrotask | Predictable | Fast (Node only) |
 | `requestAnimationFrame` | All | Paint-aligned | Predictable | Frame-rate |
@@ -8358,8 +8362,8 @@ const requestHostCallback = (() => {
 **Why React doesn't use `requestIdleCallback`:**
 
 ```typescript
-// Issue 1: Safari support (older versions)
-// Polyfill needed — not native
+// Issue 1: Safari 16.4+ (2023) — React'ning scheduler'i bundan oldin yaratilgan
+// Oldingi Safari'larda polyfill kerak edi
 
 // Issue 2: Variable timing
 requestIdleCallback((deadline) => {
@@ -8569,11 +8573,11 @@ React Lanes — **31-bit bitmap** (TypeScript: `Lanes = number`). Har lane bir p
 ```typescript
 // React internal lanes (sodda)
 const NoLanes              = 0b0000000000000000000000000000000;
-const SyncLane             = 0b0000000000000000000000000000001;
-const InputContinuousLane  = 0b0000000000000000000000000000100;
-const DefaultLane          = 0b0000000000000000000000000010000;
-const TransitionLane1      = 0b0000000000000000000000001000000;
-const TransitionLane2      = 0b0000000000000000000000010000000;
+const SyncLane             = 0b0000000000000000000000000000010;  // bit 1
+const InputContinuousLane  = 0b0000000000000000000000000001000;  // bit 3
+const DefaultLane          = 0b0000000000000000000000000100000;  // bit 5
+const TransitionLane1      = 0b0000000000000000000001000000000;
+const TransitionLane2      = 0b0000000000000000000010000000000;
 const IdleLane             = 0b0010000000000000000000000000000;
 
 // Operations
@@ -8688,17 +8692,17 @@ root.pendingLanes &= ~SyncLane;
 **Lane priority hierarchy:**
 
 ```
-SyncLane (1)              ← highest, sync render
-InputContinuousLane (4)   ← drag, scroll
-DefaultLane (16)          ← generic setState
+SyncLane (bit 1)          ← highest, sync render
+InputContinuousLane (bit 3) ← drag, scroll
+DefaultLane (bit 5)       ← generic setState
 TransitionLane1-16        ← useTransition
 RetryLane                 ← Suspense retry
 IdleLane                  ← lowest, requestIdleCallback-like
 ```
 
-**`32-bit signed int` constraint:**
+**31-bit constraint:**
 
-JavaScript bitwise ops are 32-bit signed integers. React uses 31 lanes (sign bit reserved).
+JavaScript bitwise ops 32-bit signed integer sifatida ishlaydi. Sign bit (bit 31) manfiy son uchun — React undan foydalanmaydi, shuning uchun 31 lane mavjud. `maxSigned31BitInt = 1073741823` (2^31 - 1, ≈12.4 kun ms sifatida).
 
 </details>
 
@@ -8889,6 +8893,8 @@ function Search() {
 ---
 
 ## QISM D: Hydration
+
+<a id="qism-d"></a>
 
 ### 35. SSR + Hydration nima va nima uchun kerak? [Middle]
 
@@ -11085,175 +11091,7 @@ const root = hydrateRoot(container, <App />, {
 
 ---
 
-### 42. `useId` — SSR-safe unique ID generation [Middle+]
-
-<details>
-<summary><strong>Javob</strong></summary>
-
-### Qisqa javob
-
-`useId()` — R18+ hook, **SSR-safe unique ID** qaytaradi. Server va client'da bir xil value (Fiber tree position'iga asoslangan). Use case: form input `id`/`htmlFor`, `aria-describedby`, `aria-labelledby`. **Mantiq**: per-instance unique, NOT for list keys. Format: `:r0:`, `:r1:` (R18) yoki `:R1:` (R18.2+).
-
-### Kod misoli
-
-```tsx
-function FormField({ label, error }: { label: string; error?: string }) {
-  const inputId = useId();
-  const errorId = useId();
-
-  return (
-    <div>
-      <label htmlFor={inputId}>{label}</label>
-      <input
-        id={inputId}
-        aria-describedby={error ? errorId : undefined}
-      />
-      {error && <span id={errorId} role="alert">{error}</span>}
-    </div>
-  );
-}
-
-// Server render: id=":r0:", aria-describedby=":r1:"
-// Client hydrate: id=":r0:", aria-describedby=":r1:"  (same!)
-```
-
-<details>
-<summary><strong>Deep Dive</strong></summary>
-
-**ID generation algorithm:**
-
-```typescript
-// React internal (sodda)
-function generateId(fiber): string {
-  // Fiber tree path encoding
-  let path = "";
-  let node = fiber;
-  while (node !== null) {
-    path = node.index + ":" + path;
-    node = node.return;
-  }
-  return ":" + path + ":";
-}
-```
-
-ID — Fiber tree position bo'yicha encoded. Server va client bir xil tree → bir xil ID.
-
-**Multiple `useId` per component:**
-
-```tsx
-function MultiField() {
-  const id1 = useId();  // ":r0:"
-  const id2 = useId();  // ":r1:"
-  const id3 = useId();  // ":r2:"
-
-  return (
-    <>
-      <input id={id1} />
-      <input id={id2} />
-      <input id={id3} />
-    </>
-  );
-}
-```
-
-Each `useId` call increments counter. Position + sequence = unique.
-
-**Combine with suffix:**
-
-```tsx
-function ComplexField() {
-  const baseId = useId();
-  return (
-    <div>
-      <label htmlFor={`${baseId}-input`}>Name</label>
-      <input id={`${baseId}-input`} />
-      <span id={`${baseId}-error`}>...</span>
-    </div>
-  );
-}
-// One useId, derived multiple IDs (saves Fiber slots)
-```
-
-**Why NOT for list keys:**
-
-```tsx
-// ❌ Rules of Hooks violation (in loop)
-function BadList({ items }: { items: Item[] }) {
-  return items.map((item) => {
-    const id = useId();  // ERROR: hooks in loop
-    return <li key={id}>{item.name}</li>;
-  });
-}
-
-// useId returns same value for same component instance
-// Doesn't generate unique per-iteration value
-```
-
-**`identifierPrefix` (createRoot option):**
-
-```tsx
-const root = createRoot(container, {
-  identifierPrefix: "app-",
-});
-// useId() → "app-:r0:" (avoid collision with other React instances)
-```
-
-Multi-app (microfrontends) — each app sets prefix.
-
-**SSR streaming consideration:**
-
-In streaming SSR, ID generation respects stream order. Suspended boundaries — IDs continue counter after fallback resolves.
-
-**`useId` history:**
-
-```tsx
-// R18 introduced useId
-// R18.2+ — slight format change (R0 → R1 etc.)
-// R19 — backward-compatible improvements
-```
-
-**Comparison with old patterns:**
-
-```tsx
-// ❌ Old — random IDs, hydration mismatch
-function OldField() {
-  const id = useMemo(() => Math.random().toString(), []);
-  return <input id={id} />;
-}
-
-// ❌ Counter outside React — race condition with concurrent
-let counter = 0;
-function CounterField() {
-  const id = useMemo(() => `field-${counter++}`, []);
-  return <input id={id} />;
-}
-
-// ✅ useId — SSR-safe, concurrent-safe
-function GoodField() {
-  const id = useId();
-  return <input id={id} />;
-}
-```
-
-</details>
-
-### Edge Cases
-
-- **Conditional `useId`**: Rules of Hooks violation. Always top-level.
-- **Same component, different instances**: Each instance gets unique ID (different Fiber position).
-- **`useId` in HOC**: Position changes with HOC wrapping — ID different.
-
-### Follow-up savollar
-
-- "useId for CSS selector?" — Yes — CSS-safe characters. But escape `:` if used in querySelector.
-- "Performance — useId per component?" — Negligible. Counter increment + path encode.
-- "Backward compat with R17?" — No. R18+ only.
-
-</details>
-
----
-
-### 43. Bug fix: hydration mismatch scenarios [Bug Fix] [Senior]
+### 42. Bug fix: hydration mismatch scenarios [Bug Fix] [Senior]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -11510,13 +11348,13 @@ const root = hydrateRoot(container, <App />, {
 
 Bu faylda quyidagilar yoritildi:
 
-**QISM A — Fiber Architecture (1-9)**: Fiber nima va Stack Reconciler farqi, tree linked list (child/sibling/return), double buffering (current/workInProgress), alternate pointer recycling, fiber tag types (FunctionComponent, HostComponent, etc.), effect list (flags + subtreeFlags), iterative work loop, traversal order, Component vs Fiber tree.
+**QISM A — Fiber Architecture (1-13)**: Fiber nima va Stack Reconciler farqi, tree linked list (child/sibling/return), double buffering (current/workInProgress), alternate pointer recycling, fiber tag types (FunctionComponent, HostComponent, etc.), effect list (flags + subtreeFlags), iterative work loop, traversal order, Component vs Fiber tree, FiberRoot vs Fiber, stateNode, memoizedState hooks linked list.
 
-**QISM B — Reconciliation (10-18)**: O(n) heuristics, type comparison (same vs different), bailout algorithm (4 sabab: element identity, memo, useMemo, state equality), sibling matching (keyless vs keyed), update propagation (lanes + childLanes), `React.memo` shallow check, output traces, list rendering bug fixes, Context propagation.
+**QISM B — Reconciliation (14-25)**: O(n) heuristics, type comparison (same vs different), bailout algorithm (4 sabab: element identity, memo, useMemo, state equality), sibling matching (keyless vs keyed), update propagation (lanes + childLanes), `React.memo` shallow check, output traces, list rendering bug fixes, Context propagation, keyed list reconciliation.
 
-**QISM C — Scheduler & Lanes (19-25)**: Concurrent rendering rationale, scheduler package + 5 priority levels, lanes bitmap (31 lanes, OR/AND ops), time slicing (5ms work loop), interruptible rendering (high-pri abort), starvation prevention (lane expiration), MessageChannel vs requestIdleCallback choice.
+**QISM C — Scheduler & Lanes (26-34)**: Concurrent rendering rationale, scheduler package + 5 priority levels, lanes bitmap (31 lanes, OR/AND ops), time slicing (5ms work loop), interruptible rendering (high-pri abort), starvation prevention (lane expiration), MessageChannel vs requestIdleCallback choice, lane operations, useTransition internals.
 
-**QISM D — Hydration (26-31)**: SSR + Hydration concept, `hydrateRoot` vs `createRoot`, hydration mismatch causes + fixes, selective hydration (R18 Suspense), streaming SSR (`renderToReadableStream`/`renderToPipeableStream`), R19 improvements (better errors, document metadata hoisting, stylesheet precedence, root error callbacks).
+**QISM D — Hydration (35-42)**: SSR + Hydration concept, `hydrateRoot` vs `createRoot`, hydration mismatch causes + fixes, selective hydration (R18 Suspense), streaming SSR (`renderToReadableStream`/`renderToPipeableStream`), R19 improvements (better errors, document metadata hoisting, stylesheet precedence, root error callbacks), `suppressHydrationWarning`, hydration mismatch bug fix.
 
 **Keyingi:** [03-hooks.md](03-hooks.md) — Hooks fundamentals + 10 ta hook (useState, useEffect, useLayoutEffect, useRef, useContext, useReducer, useMemo, useCallback, concurrent hooks, R19 hooks, custom hooks). Eng katta interview fayli — hooks mexanikasi, Rules of Hooks, linked list internal, real-world patterns.
 

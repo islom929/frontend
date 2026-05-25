@@ -1,6 +1,6 @@
-# React Coding Challenges — Interview Implementatsiyalar
+# React Coding Challenges — Interview Implementations
 
-> 20 ta MAJBURIY challenge: custom hooks, HOCs, patterns, R19 features. Har biri uchun: signature, implementation, usage, edge cases, variations, tests.
+> 25 ta coding challenge: custom hooks, HOCs, patterns, R19 features. Har biri uchun: signature, implementation, usage, edge cases, variations, tests.
 
 ---
 
@@ -35,6 +35,13 @@
 18. [R19 use() data fetching](#18-r19-use-data-middle)
 19. [useOptimistic optimistic UI](#19-useoptimistic-senior)
 20. [Custom forwardRef + useImperativeHandle](#20-forwardref--useimperativehandle-middle)
+
+**Utility Hooks (21-25):**
+21. [useToggle](#21-usetoggle-junior)
+22. [useClickOutside](#22-useclickoutside-middle)
+23. [useMediaQuery](#23-usemediaquery-middle)
+24. [useCopyToClipboard](#24-usecopytoclipboard-middle)
+25. [useGeolocation](#25-usegeolocation-middle)
 
 ---
 
@@ -496,21 +503,23 @@ function useLocalStorage<T>(
     }
   });
 
-  // Setter
+  // Setter — functional update bilan stale closure'dan himoya
   const setValue = useCallback(
     (value: T | ((prev: T) => T)) => {
       try {
-        const valueToStore =
-          value instanceof Function ? value(storedValue) : value;
-        setStoredValue(valueToStore);
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(key, JSON.stringify(valueToStore));
-        }
+        setStoredValue((currentValue) => {
+          const valueToStore =
+            value instanceof Function ? value(currentValue) : value;
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(key, JSON.stringify(valueToStore));
+          }
+          return valueToStore;
+        });
       } catch (error) {
         console.warn(`Error writing localStorage key "${key}":`, error);
       }
     },
-    [key, storedValue],
+    [key],
   );
 
   // Remove
@@ -530,18 +539,23 @@ function useLocalStorage<T>(
     if (typeof window === "undefined") return;
 
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === key && e.newValue !== null) {
-        try {
-          setStoredValue(JSON.parse(e.newValue) as T);
-        } catch (error) {
-          console.warn(`Error parsing storage event:`, error);
+      if (e.key === key) {
+        if (e.newValue === null) {
+          // Key boshqa tab'da o'chirilgan — initialValue'ga qaytish
+          setStoredValue(initialValue);
+        } else {
+          try {
+            setStoredValue(JSON.parse(e.newValue) as T);
+          } catch (error) {
+            console.warn(`Error parsing storage event:`, error);
+          }
         }
       }
     };
 
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
-  }, [key]);
+  }, [key, initialValue]);
 
   return [storedValue, setValue, removeValue];
 }
@@ -603,9 +617,10 @@ function useLocalStorageTyped<T>(
   validator?: (value: unknown) => value is T,
 ): [T, (value: T) => void] {
   const [value, setValue] = useState<T>(() => {
-    const stored = localStorage.getItem(key);
-    if (stored === null) return initialValue;
+    if (typeof window === "undefined") return initialValue; // SSR-safe
     try {
+      const stored = window.localStorage.getItem(key);
+      if (stored === null) return initialValue;
       const parsed = JSON.parse(stored);
       if (validator && !validator(parsed)) {
         return initialValue;
@@ -618,7 +633,9 @@ function useLocalStorageTyped<T>(
 
   const setStoredValue = (newValue: T) => {
     setValue(newValue);
-    localStorage.setItem(key, JSON.stringify(newValue));
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(key, JSON.stringify(newValue));
+    }
   };
 
   return [value, setStoredValue];
@@ -663,6 +680,7 @@ function useIntersectionObserver<T extends HTMLElement = HTMLDivElement>(
 ): [React.RefObject<T>, IntersectionObserverEntry | null] {
   const ref = useRef<T>(null);
   const [entry, setEntry] = useState<IntersectionObserverEntry | null>(null);
+  const { root, rootMargin, threshold } = options;
 
   useEffect(() => {
     const node = ref.current;
@@ -670,12 +688,12 @@ function useIntersectionObserver<T extends HTMLElement = HTMLDivElement>(
 
     const observer = new IntersectionObserver(
       (entries) => setEntry(entries[0]),
-      options,
+      { root, rootMargin, threshold },
     );
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [options.root, options.rootMargin, options.threshold]);
+  }, [root, rootMargin, threshold]);
 
   return [ref, entry];
 }
@@ -834,6 +852,7 @@ function useFetch<T = unknown>(
     const controller = new AbortController();
     setLoading(true);
     setError(null);
+    setData(null); // Oldingi data'ni tozalash — stale data ko'rsatmaslik uchun
 
     fetch(url, { ...options, signal: controller.signal })
       .then((res) => {
@@ -912,7 +931,10 @@ function useFetch<T>(url: string): UseFetchResultWithRefetch<T> {
     setLoading(true);
 
     fetch(url, { signal: controller.signal })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        return r.json();
+      })
       .then(setData)
       .catch((err) => {
         if (err.name !== "AbortError") setError(err);
@@ -970,7 +992,7 @@ import { useEffect, useRef } from "react";
 function useEventListener<K extends keyof WindowEventMap>(
   eventName: K,
   handler: (event: WindowEventMap[K]) => void,
-  element: Window | HTMLElement | null = window,
+  element?: Window | HTMLElement | null,
 ): void {
   // Save handler ref to avoid re-attaching on each render
   const handlerRef = useRef(handler);
@@ -979,14 +1001,16 @@ function useEventListener<K extends keyof WindowEventMap>(
   }, [handler]);
 
   useEffect(() => {
-    if (!element) return;
+    // SSR-safe: element default = window, faqat client'da
+    const targetElement = element ?? (typeof window !== "undefined" ? window : null);
+    if (!targetElement) return;
 
     const eventListener: EventListener = (event) => {
       handlerRef.current(event as WindowEventMap[K]);
     };
 
-    element.addEventListener(eventName, eventListener);
-    return () => element.removeEventListener(eventName, eventListener);
+    targetElement.addEventListener(eventName, eventListener);
+    return () => targetElement.removeEventListener(eventName, eventListener);
   }, [eventName, element]);
 }
 ```
@@ -1021,11 +1045,14 @@ function ScrollTracker() {
 function ButtonClicks() {
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  useEventListener(
-    "click" as any, // HTMLElementEventMap
-    () => console.log("Button clicked"),
-    buttonRef.current,
-  );
+  // Element ref useEffect ichida read qilinadi — render paytida null bo'lishi mumkin
+  useEffect(() => {
+    const el = buttonRef.current;
+    if (!el) return;
+    const handler = () => console.log("Button clicked");
+    el.addEventListener("click", handler);
+    return () => el.removeEventListener("click", handler);
+  }, []);
 
   return <button ref={buttonRef}>Click me</button>;
 }
@@ -1410,13 +1437,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidUpdate(prevProps: ErrorBoundaryProps): void {
     // Reset error state when resetKeys change
-    if (
-      this.state.hasError &&
-      this.props.resetKeys &&
-      prevProps.resetKeys &&
-      this.props.resetKeys.length === prevProps.resetKeys.length &&
-      this.props.resetKeys.some((key, idx) => !Object.is(key, prevProps.resetKeys![idx]))
-    ) {
+    if (!this.state.hasError) return;
+
+    const prevKeys = prevProps.resetKeys ?? [];
+    const nextKeys = this.props.resetKeys ?? [];
+
+    const hasChanged =
+      prevKeys.length !== nextKeys.length ||
+      nextKeys.some((key, idx) => !Object.is(key, prevKeys[idx]));
+
+    if (hasChanged) {
       this.reset();
     }
   }
@@ -2466,7 +2496,8 @@ function useAsync<T, A extends any[] = []>(
     } else if (immediate) {
       execute(...([] as unknown as A));
     }
-  }, [immediate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [immediate, execute]);
 
   return { status, data, error, execute, reset };
 }
@@ -2515,27 +2546,50 @@ function UserAuto({ id }: { id: string }) {
 function useAsyncWithAbort<T>(
   asyncFn: (signal: AbortSignal) => Promise<T>,
 ): UseAsyncResult<T, []> {
+  const [status, setStatus] = useState<AsyncStatus>("idle");
+  const [data, setData] = useState<T | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      controllerRef.current?.abort();
+    };
+  }, []);
 
   const execute = useCallback(async () => {
-    // Abort previous
+    // Abort previous request
     controllerRef.current?.abort();
     controllerRef.current = new AbortController();
 
     setStatus("pending");
+    setData(null);
+    setError(null);
+
     try {
       const result = await asyncFn(controllerRef.current.signal);
-      setData(result);
-      setStatus("success");
+      if (mountedRef.current) {
+        setData(result);
+        setStatus("success");
+      }
     } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        setError(err as Error);
+      if (mountedRef.current && (err as Error).name !== "AbortError") {
+        setError(err instanceof Error ? err : new Error(String(err)));
         setStatus("error");
       }
     }
   }, [asyncFn]);
 
-  // ... rest
+  const reset = useCallback(() => {
+    controllerRef.current?.abort();
+    setStatus("idle");
+    setData(null);
+    setError(null);
+  }, []);
+
+  return { status, data, error, execute, reset };
 }
 ```
 
@@ -2747,11 +2801,22 @@ function Fetch<T>({ url, children }: FetchProps<T>) {
   }>({ data: null, loading: true, error: null });
 
   useEffect(() => {
+    const controller = new AbortController();
     setState({ data: null, loading: true, error: null });
-    fetch(url)
-      .then((r) => r.json())
+
+    fetch(url, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => setState({ data, loading: false, error: null }))
-      .catch((error) => setState({ data: null, loading: false, error }));
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          setState({ data: null, loading: false, error });
+        }
+      });
+
+    return () => controller.abort();
   }, [url]);
 
   return <>{children(state)}</>;
@@ -2868,10 +2933,12 @@ export function UserPage({ userId }: UserPageProps) {
 const userCache = new Map<string, Promise<User>>();
 
 function getUserPromise(id: string): Promise<User> {
-  if (!userCache.has(id)) {
-    userCache.set(id, fetchUser(id));
-  }
-  return userCache.get(id)!;
+  const cached = userCache.get(id);
+  if (cached) return cached;
+
+  const promise = fetchUser(id);
+  userCache.set(id, promise);
+  return promise;
 }
 
 // Usage:
@@ -3252,7 +3319,7 @@ const FancyInput = memo(
 ## 21. `useToggle` [Junior+]
 
 <details>
-<summary><strong>Yechim</strong></summary>
+<summary><strong>Implementation</strong></summary>
 
 ### Signature
 
@@ -3315,7 +3382,7 @@ function Modal() {
 ## 22. `useClickOutside` [Middle]
 
 <details>
-<summary><strong>Yechim</strong></summary>
+<summary><strong>Implementation</strong></summary>
 
 ### Signature
 
@@ -3333,19 +3400,23 @@ Element tashqarisida click bo'lganda callback chaqiradi. Common: dropdown close,
 ### Implementation
 
 ```tsx
-import { useEffect, RefObject } from "react";
+import { useEffect, useRef, RefObject } from "react";
 
 function useClickOutside<T extends HTMLElement>(
   ref: RefObject<T>,
   handler: (e: MouseEvent | TouchEvent) => void
 ) {
+  // Ref pattern — handler o'zgarganda listener qayta attach bo'lmaydi
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+
   useEffect(() => {
     const listener = (event: MouseEvent | TouchEvent) => {
       const el = ref.current;
       if (!el || el.contains(event.target as Node)) {
         return;
       }
-      handler(event);
+      handlerRef.current(event);
     };
 
     document.addEventListener("mousedown", listener);
@@ -3355,7 +3426,7 @@ function useClickOutside<T extends HTMLElement>(
       document.removeEventListener("mousedown", listener);
       document.removeEventListener("touchstart", listener);
     };
-  }, [ref, handler]);
+  }, [ref]);
 }
 ```
 
@@ -3395,7 +3466,7 @@ function Dropdown() {
 ## 23. `useMediaQuery` [Middle+]
 
 <details>
-<summary><strong>Yechim</strong></summary>
+<summary><strong>Implementation</strong></summary>
 
 ### Signature
 
@@ -3410,18 +3481,26 @@ CSS media query'ga reactive boolean. SSR-safe (default false). Common: responsiv
 ### Implementation
 
 ```tsx
-import { useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 function useMediaQuery(query: string): boolean {
-  return useSyncExternalStore(
-    (callback) => {
+  const subscribe = useCallback(
+    (callback: () => void) => {
       const mql = window.matchMedia(query);
       mql.addEventListener("change", callback);
       return () => mql.removeEventListener("change", callback);
     },
-    () => window.matchMedia(query).matches,
-    () => false  // SSR
+    [query],
   );
+
+  const getSnapshot = useCallback(
+    () => window.matchMedia(query).matches,
+    [query],
+  );
+
+  const getServerSnapshot = useCallback(() => false, []);
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 ```
 
@@ -3460,7 +3539,7 @@ function ResponsiveLayout() {
 ## 24. `useCopyToClipboard` [Middle]
 
 <details>
-<summary><strong>Yechim</strong></summary>
+<summary><strong>Implementation</strong></summary>
 
 ### Signature
 
@@ -3510,12 +3589,21 @@ function useCopyToClipboard(): [string | null, (text: string) => Promise<boolean
 function ShareButton({ url }: { url: string }) {
   const [copied, copy] = useCopyToClipboard();
   const [showFeedback, setShowFeedback] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const handleClick = async () => {
     const success = await copy(url);
     if (success) {
       setShowFeedback(true);
-      setTimeout(() => setShowFeedback(false), 2000);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setShowFeedback(false), 2000);
     }
   };
 
@@ -3545,7 +3633,7 @@ function ShareButton({ url }: { url: string }) {
 ## 25. `useGeolocation` [Middle+]
 
 <details>
-<summary><strong>Yechim</strong></summary>
+<summary><strong>Implementation</strong></summary>
 
 ### Signature
 
@@ -3555,7 +3643,7 @@ interface GeolocationState {
   accuracy: number | null;
   latitude: number | null;
   longitude: number | null;
-  error: GeolocationPositionError | null;
+  error: GeolocationPositionError | Error | null;
 }
 
 function useGeolocation(options?: PositionOptions): GeolocationState;
@@ -3570,7 +3658,15 @@ Browser Geolocation API'ga reactive wrapper. Watches position changes, cleanup o
 ```tsx
 import { useEffect, useState } from "react";
 
-function useGeolocation(options?: PositionOptions) {
+interface GeolocationState {
+  loading: boolean;
+  accuracy: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  error: GeolocationPositionError | Error | null;
+}
+
+function useGeolocation(options?: PositionOptions): GeolocationState {
   const [state, setState] = useState<GeolocationState>({
     loading: true,
     accuracy: null,
@@ -3586,7 +3682,7 @@ function useGeolocation(options?: PositionOptions) {
         accuracy: null,
         latitude: null,
         longitude: null,
-        error: { code: 2, message: "Geolocation not supported" } as any,
+        error: new Error("Geolocation API not supported"),
       });
       return;
     }
@@ -3648,7 +3744,7 @@ function LocationDisplay() {
 
 ## Xulosa
 
-20 ta majburiy implementation tugatildi:
+25 ta coding challenge implementation:
 
 - **Custom Hooks (1-7)**: useDebounce, useThrottle, usePrevious, useLocalStorage, useIntersectionObserver, useFetch, useEventListener
 - **HOC va Class Patterns (8-10)**: withAuth, withErrorBoundary, ErrorBoundary class
@@ -3656,6 +3752,7 @@ function LocationDisplay() {
 - **Performance (13-14)**: memo + useCallback, Virtualization
 - **Library Patterns (15-17)**: useAsync, Suspense + lazy, Render Props
 - **R19 Features (18-20)**: use() data, useOptimistic, forwardRef + useImperativeHandle
+- **Utility Hooks (21-25)**: useToggle, useClickOutside, useMediaQuery, useCopyToClipboard, useGeolocation
 
 **Asosiy printsiplar:**
 

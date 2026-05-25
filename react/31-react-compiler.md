@@ -1,6 +1,6 @@
 # Bo'lim 31: React Compiler
 
-> React Compiler — React kodini **build-time**'da tahlil qilib, **automatic memoization** qo'shadigan kompilyator. Bu fayl Compiler'ning qanday ishlashini, source kod va kompilyatsiya qilingan output orasidagi farqni, va manual `useMemo`/`useCallback`/`React.memo`'larning kelajakdagi rolini o'rganadi. Compiler avval "React Forget" deb atalgan, R19 bilan birga eksperimental release sifatida public chiqdi va 2025-yil April'da `babel-plugin-react-compiler@1.0` stable belgisi bilan release qilindi. **Concurrent rendering — runtime mexanizm** (cross-ref `30-concurrent-react.md`), **Compiler — build-time tool**: ikki tushuncha alohida lekin bir-birini to'ldiradi (Compiler Concurrent invariants ustiga quriladi).
+> React Compiler — React kodini **build-time**'da tahlil qilib, **automatic memoization** qo'shadigan compiler. Bu fayl Compiler'ning qanday ishlashini, source kod va compile qilingan output orasidagi farqni, va manual `useMemo`/`useCallback`/`React.memo`'larning kelajakdagi rolini o'rganadi. Compiler avval "React Forget" deb atalgan, 2024-yil May'da React Conf'da public experimental release sifatida chiqdi (R19 hali beta edi), 2024-yil Oktabr'da RC1, va 2025-yil Aprel'da `babel-plugin-react-compiler@1.0.0` stable sifatida release qilindi (R19.1+ ekosistemasi bilan to'liq matured). **Concurrent rendering — runtime mexanizm** (cross-ref `30-concurrent-react.md`), **Compiler — build-time tool**: ikki tushuncha alohida lekin bir-birini to'ldiradi (Compiler Concurrent invariants ustiga quriladi).
 
 ---
 
@@ -8,7 +8,7 @@
 
 - [Compiler Concept va Tarix](#compiler-concept-va-tarix)
 - [Auto-Memoization Mexanizmi](#auto-memoization-mexanizmi)
-- [Internal Cache Mechanism — `_c` Array](#internal-cache-mechanism--_c-array)
+- [Internal Cache Mechanism — `$` Cache Array](#internal-cache-mechanism--%24-cache-array)
 - [Static Analysis: HIR va Dataflow](#static-analysis-hir-va-dataflow)
 - [Rules of React — Compliance Talablar](#rules-of-react--compliance-talablar)
 - [`eslint-plugin-react-compiler` — Static Check](#eslint-plugin-react-compiler--static-check)
@@ -18,7 +18,7 @@
 - [Compiler Cheklovlari va Bail-Out](#compiler-cheklovlari-va-bail-out)
 - [Manual Memo bilan Munosabat](#manual-memo-bilan-munosabat)
 - [Library Compatibility](#library-compatibility)
-- [Performance Implikatsiyalari](#performance-implikatsiyalari)
+- [Performance Implications](#performance-implications)
 - [Future Paradigm — Manual Memoization Kelajagi](#future-paradigm--manual-memoization-kelajagi)
 - [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
@@ -31,7 +31,7 @@
 
 ### Nazariya
 
-**React Compiler** — React kodini **build-time**'da tahlil qilib, generated JavaScript ichiga **automatic memoization logic**'ni o'rnatuvchi kompilyator. Source kod yozilganda dasturchi `useMemo`/`useCallback`/`React.memo`'ni qo'lda yozmaydi — Compiler statik analiz natijasida qaysi qiymatlarni cache qilish kerakligini aniqlaydi va kompilyatsiya output'iga o'rnatadi.
+**React Compiler** — React kodini **build-time**'da tahlil qilib, generated JavaScript ichiga **automatic memoization logic**'ni o'rnatuvchi compiler. Source kod yozilganda dasturchi `useMemo`/`useCallback`/`React.memo`'ni qo'lda yozmaydi — Compiler statik analiz natijasida qaysi qiymatlarni cache qilish kerakligini aniqlaydi va compile output'iga o'rnatadi.
 
 Compiler **build-time** ishlaydi — bu Babel/SWC/TypeScript transpilation pipeline'ning qismi:
 
@@ -58,7 +58,7 @@ Bundler (Vite/Webpack) → bundle.js → Browser
 
 > **Versiya evolyutsiyasi (Compiler):**
 > - **2021–2023:** Loyihaning ichki kod-nom: "**React Forget**". Meta'da Instagram va Quest store'da ichki ishlatildi.
-> - **2024 May:** React Conf 2024 — public eksperimental release. `babel-plugin-react-compiler@beta` npm'ga chiqarildi.
+> - **2024 May:** React Conf 2024 — public experimental release. `babel-plugin-react-compiler@beta` npm'ga chiqarildi.
 > - **2024 Oktabr:** RC1 (Release Candidate) status, eslint-plugin-react-compiler RC1.
 > - **2025 April:** `babel-plugin-react-compiler@1.0.0` — birinchi stable release. R19 ekosistemasi bilan to'liq integration. Production ishlatish tavsiya etiladi.
 > - **Compiler React versiyasidan mustaqil:** `babel-plugin-react-compiler` `target` opsiyasi orqali R17, R18, R19 (va kelajak versiyalar) bilan ishlay oladi — runtime'da `react/compiler-runtime` paketi mos kelishi yetarli. Compiler R19'ga bog'lanmagan, faqat R19 ekosistemasi bilan stable matured.
@@ -75,8 +75,8 @@ NIMA UCHUN Compiler kerak:
 QANDAY ishlatiladi:
 
 - **Build-time integration**: Babel plugin (`babel-plugin-react-compiler`) yoki SWC plugin (kelajakda).
-- **Runtime overhead nol**: kompilyatsiya qilingan kod oddiy JavaScript — `react/compiler-runtime` modulidagi `c()` helper bilan cache slot'ga kirish.
-- **Opt-in (R19)**: default emas — `eslint-plugin-react-compiler` violations yo'q deb tasdiqlanganda enable qilinadi.
+- **Runtime overhead nol**: compile qilingan kod oddiy JavaScript — `react/compiler-runtime` modulidagi `c()` helper bilan cache slot'ga kirish.
+- **Opt-in**: default emas — babel plugin loyihaga qo'shilishi kerak (R17/R18/R19+), `eslint-plugin-react-compiler` violations yo'q deb tasdiqlanganda enable qilinadi.
 - **Backward compatible**: manual `useMemo`/`useCallback`/`React.memo` hali ishlaydi (Compiler ularni override qilmaydi, lekin ortiqcha bo'ladi).
 
 <details>
@@ -301,15 +301,15 @@ Hajm farqi: manual versiya 30+ qator memoization wrapper, Compiler versiya — k
 
 ### Nazariya
 
-**Auto-memoization** — Compiler'ning asosiy vazifasi: dasturchi `useMemo`/`useCallback`/`React.memo` yozmaydi, Compiler kompilyatsiya paytida har reactive computation va JSX strukturasiga cache logic'ini o'rnatadi.
+**Auto-memoization** — Compiler'ning asosiy vazifasi: dasturchi `useMemo`/`useCallback`/`React.memo` yozmaydi, Compiler compile paytida har reactive computation va JSX strukturasiga cache logic'ini o'rnatadi.
 
 QANDAY ishlatiladi (qadam-qadam):
 
-1. **Reactivity inference** — Compiler komponent input'larini topadi: props, state (`useState`/`useReducer`), context (`useContext`), custom hook return values, va `ref.current` (mutable, faqat o'qishda).
+1. **Reactivity inference** — Compiler reactive value'larni topadi: props, state (`useState`/`useReducer`), context (`useContext`), custom hook return values. **Non-reactive**: `ref.current` (Compiler refs'ni reactive deb hisoblamaydi va render Phase'da `ref.current` o'qish/yozish'ni anti-pattern sifatida flag qiladi), module-level constants, va effect ichida ishlatiladigan qiymatlar.
 2. **Dataflow tracking** — har local variable/expression qaysi reactive value'ga bog'liqligi aniqlanadi (transitive closure).
 3. **Reactive scope grouping** — bog'liq computation'lar bir scope'ga birlashadi (granular caching).
 4. **Cache allocation** — har scope uchun unikal cache slot ajratiladi (`_c[0]`, `_c[1]`, ...).
-5. **Code generation** — kompilyatsiya paytida har scope `if (deps changed) { recompute; cache; } else { use cached; }` patternga aylanadi.
+5. **Code generation** — compile paytida har scope `if (deps changed) { recompute; cache; } else { use cached; }` patternga aylanadi.
 
 Misol — manual vs auto memoization:
 
@@ -627,11 +627,11 @@ function TodoList({ todos, onToggle, onDelete }: TodoListProps): ReactElement {
 
 ---
 
-## Internal Cache Mechanism — `_c` Array
+## Internal Cache Mechanism — `$` Cache Array
 
 ### Nazariya
 
-Compiler'ning generated kodida har komponent boshida **`useMemoCache(N)`** chaqiriladi va **`_c` deb belgilangan array** qaytariladi (`_c` Compiler tomonidan tanlangan o'zgaruvchi nomi, "cache" qisqa shakli). `N` — komponent ichidagi cache slot'lar soni, build-time'da hisoblangan.
+Compiler'ning generated kodida har komponent boshida **`useMemoCache(N)`** (alias: `_c`) chaqiriladi va **`$` deb belgilangan local array** qaytariladi. Import: `import { c as _c } from 'react/compiler-runtime';` — `c` imported as `_c` (Compiler runtime helper), so `_c(N)` returns cache. Local cache variable nomi (`$`) Compiler tomonidan tanlangan, runtime'da konstant. `N` — komponent ichidagi cache slot'lar soni, build-time'da hisoblangan.
 
 ```tsx
 // Source
@@ -644,24 +644,26 @@ function Greeting({ name }: { name: string }) {
 import { c as _c } from 'react/compiler-runtime';
 
 function Greeting(t0) {
-  const $ = _c(3); // 3 ta slot
+  const $ = _c(4); // 4 slot: 2 ta scope × (deps + output)
   const { name } = t0;
   
+  // Scope 1: greeting (deps: name)
   let t1;
   if ($[0] !== name) {
     t1 = `Hello, ${name}!`;
-    $[0] = name;
-    $[1] = t1;
+    $[0] = name;  // dep slot
+    $[1] = t1;    // output slot
   } else {
     t1 = $[1];
   }
   const greeting = t1;
   
+  // Scope 2: JSX (deps: greeting)
   let t2;
   if ($[2] !== greeting) {
     t2 = <h1>{greeting}</h1>;
-    $[2] = greeting; // Aslida boshqa slot, oddiylashtirilgan
-    // Real Compiler: t2 ni alohida slot'da, deps'ni boshqa slot'da
+    $[2] = greeting; // dep slot
+    $[3] = t2;       // output slot
   } else {
     t2 = $[3];
   }
@@ -672,14 +674,14 @@ function Greeting(t0) {
 Cache slot turlari:
 
 1. **Dependency slots** — input value reference saqlash (props.name, items, ...).
-2. **Output slots** — kompilyatsiya qilingan computation natija (greeting string, JSX element).
+2. **Output slots** — compile qilingan computation natija (greeting string, JSX element).
 3. **Sentinel slots** — uninitialized marker (birinchi render uchun).
 
 NIMA UCHUN array (object emas):
 
 - **Performance** — array index access O(1), object property lookup property descriptor traversal.
 - **Memory locality** — array contiguous heap allocation (V8 SMI optimization).
-- **Build-time deterministik** — slot'lar build-time'da indekslanadi, runtime'da yangi slot qo'shilmaydi.
+- **Build-time deterministic** — slot'lar build-time'da indekslanadi, runtime'da yangi slot qo'shilmaydi.
 
 Slot count — Compiler statik analiz natijasi. Misol uchun 3 ta reactive scope bo'lsa va har biri 2 ta slot (deps + output) ishlatsa: `_c(6)`.
 
@@ -745,12 +747,12 @@ Comparison:
    ...
 ```
 
-`Object.is` comparison — har cache hit/miss check'da:
+Comparison strategy — har cache hit/miss check'da:
 
 ```javascript
 // Generated by Compiler
 let t1;
-if ($[0] !== name) { // Object.is(prev, next) ekvivalenti
+if ($[0] !== name) { // strict inequality (===/!== reference yoki primitive value)
   t1 = `Hello, ${name}!`;
   $[0] = name;
   $[1] = t1;
@@ -759,7 +761,7 @@ if ($[0] !== name) { // Object.is(prev, next) ekvivalenti
 }
 ```
 
-`!==` operator JavaScript'da `===` inverse, va `===` strict equality `Object.is` bilan **deyarli teng** (NaN va +0/-0 farqi). Compiler default `!==` ishlatadi — primitive uchun yetarli, object uchun reference comparison.
+Compiler default `!==` ishlatadi (strict inequality). Bu `Object.is` bilan **deyarli ekvivalent** lekin **bir xil emas**: `Object.is(NaN, NaN) === true` lekin `NaN !== NaN`; `Object.is(+0, -0) === false` lekin `+0 === -0`. Cache value NaN bo'lsa (`Math.sqrt(-1)`), `!==` har doim true qaytaradi — bu cache miss bo'lib qoladi va recompute har gal sodir bo'ladi (potentsial issue, lekin amaliyotda kamdan-kam). Object uchun esa `!==` reference inequality — bu `Object.is` ekvivalent (object reference uchun).
 
 Hook chain'da `useMemoCache` slot:
 
@@ -1055,7 +1057,7 @@ function badPush(items: Item[]) {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-HIR kompilyatsiya bosqichlari:
+HIR compile bosqichlari:
 
 ```
 AST (from Babel parser)
@@ -1215,7 +1217,7 @@ function PriceList({ items }: { items: Item[] }): ReactElement {
 // Memoize qila oladi.
 
 // ❌ Props mutation — bail-out
-function BadPriceList({ items }: { items: Item[] }): ReactElement {
+function PriceListMutating({ items }: { items: Item[] }): ReactElement {
   items.sort((a, b) => a.price - b.price); // ❌ Props mutation
   
   return (
@@ -1303,14 +1305,14 @@ Hooks top-level (yoki R19 `use()` istisno — cross-ref `23-r19-hooks.md`):
 
 ```typescript
 // ❌ Conditional hook
-function MyComponent({ flag }: { flag: boolean }) {
+function ConditionalCounter({ flag }: { flag: boolean }) {
   if (flag) {
     const [count] = useState(0); // ❌ Conditional
   }
 }
 
 // ✅ Top-level
-function MyComponent({ flag }: { flag: boolean }) {
+function ConditionalCounter({ flag }: { flag: boolean }) {
   const [count] = useState(0);
   if (flag) {
     // Use count...
@@ -1376,7 +1378,7 @@ useEffect(() => {
 QANDAY Compiler bu qoidalarni majburlaydi:
 
 1. **Statik analiz** — mutation/side effect detection HIR + dataflow.
-2. **`eslint-plugin-react-compiler`** — kompilyatsiya'dan oldin warning/error.
+2. **`eslint-plugin-react-compiler`** — compile'dan oldin warning/error.
 3. **Bail-out** — qoidalar buzilsa Compiler shu komponentni memoize qilmaydi (fallback to manual or no memoization).
 
 <details>
@@ -1423,7 +1425,7 @@ function shouldMemoize(component) {
   return true;
 }
 
-// Bail-out output: kompilyatsiya qilingan kod manual implementation bilan ekvivalent
+// Bail-out output: compile qilingan kod manual implementation bilan ekvivalent
 // (memoization yo'q, oddiy function call)
 ```
 
@@ -1623,7 +1625,7 @@ function FeatureFlag({ enabled }: { enabled: boolean }): ReactElement {
 
 ### Nazariya
 
-`eslint-plugin-react-compiler` — Compiler'ning **statik tekshirish** plagini. ESLint pipeline'iga qo'shiladi va **kompilyatsiya'dan oldin** Rules of React violations'ni topadi. Bu plagin Compiler enable qilishdan oldin **majburiy** — kodni mos qilish ishlash.
+`eslint-plugin-react-compiler` — Compiler'ning **statik tekshirish** plagini. ESLint pipeline'iga qo'shiladi va **compile'dan oldin** Rules of React violations'ni topadi. Bu plagin Compiler enable qilishdan oldin **majburiy** — kodni mos qilish ishlash.
 
 ### Install
 
@@ -1771,7 +1773,7 @@ const rule = {
 };
 ```
 
-Plagin aslida `babel-plugin-react-compiler` core analizini ishlatadi va **ESLint API'ga adaptatsiya** qiladi.
+Plagin aslida `babel-plugin-react-compiler` core analizini ishlatadi va **ESLint API'ga adaptation** qiladi.
 
 Detection misollari:
 
@@ -1941,7 +1943,7 @@ function useCounter(): { count: number; increment: () => void } {
 }
 
 // Anti-pattern: object inside ref
-function useCounterBad(): { count: number; increment: () => void } {
+function useCounterMutatingRef(): { count: number; increment: () => void } {
   const [count, setCount] = useState(0);
   const ref = useRef({ count: 0, increment: () => {} });
   
@@ -2051,18 +2053,18 @@ module.exports = {
 |--------|---------|--------|
 | `target` | `'19'` | React versiyasi (`'17'`, `'18'`, `'19'`) |
 | `compilationMode` | `'infer'` | `'all'`, `'annotation'`, `'infer'` |
-| `panicThreshold` | `'all_errors'` | Bail-out strategy: `'all_errors'`, `'critical_errors'`, `'none'` |
+| `panicThreshold` | `'none'` (1.0+) | Bail-out strategy: `'all_errors'`, `'critical_errors'`, `'none'`. 1.0 release safer default. |
 | `sources` | `auto` | Qaysi fayllar compile (regex) |
 | `eslintSuppressionRules` | `[]` | ESLint suppression directives |
 
 **`compilationMode: 'annotation'`** — faqat **`'use memo'`** directive bor fayllarni compile qilish:
 
 ```tsx
-'use memo'; // R19 directive — bu fayl Compiler tomonidan optimize qilinadi
+'use memo'; // Compiler directive — bu fayl Compiler tomonidan optimize qilinadi
 
 import type { ReactElement } from 'react';
 
-export function MyComponent({ data }: { data: string }): ReactElement {
+export function ArticleCard({ data }: { data: string }): ReactElement {
   // ...
 }
 ```
@@ -2080,7 +2082,7 @@ Compile qilingan kodni tekshirish:
 npm run build
 
 # Source map orqali generated kod ko'rish
-# Yoki devtools'da kompilyatsiya qilingan komponent ko'rish
+# Yoki devtools'da compile qilingan komponent ko'rish
 ```
 
 Generated kodda `_c(N)` chaqiriqlari mavjud bo'lishi shart:
@@ -2284,7 +2286,7 @@ function Component(t0) {
 
 ### Nazariya
 
-Compiler input (source kod) va output (kompilyatsiya qilingan kod) orasidagi farqni tushunish — manual memoization bilan solishtirish va debug uchun zarur.
+Compiler input (source kod) va output (compile qilingan kod) orasidagi farqni tushunish — manual memoization bilan solishtirish va debug uchun zarur.
 
 ### Misol 1: Sodda Counter
 
@@ -2556,7 +2558,7 @@ console.warn(
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-To'liq misol — kompilyatsiya qilingan output ko'rish:
+To'liq misol — compile qilingan output ko'rish:
 
 ```tsx
 // src/components/Greeting.tsx
@@ -2768,15 +2770,22 @@ Har fayl uchun:
 Compiler enabled fayllarda manual `useMemo`/`useCallback`/`React.memo` ortiqcha bo'ladi:
 
 ```tsx
+// Shared types (ikkala variant uchun)
+interface Item { id: string; price: number; }
+interface ProductListProps {
+  items: Item[];
+  onClick: (items: Item[]) => void;
+}
+
 // Before (manual)
 'use memo';
 
 import { useMemo, useCallback, memo } from 'react';
 
-export const ProductList = memo(function ProductList({ items, onClick }) {
-  const total = useMemo(() => items.reduce(...), [items]);
+export const ProductList = memo(function ProductList({ items, onClick }: ProductListProps) {
+  const total = useMemo(() => items.reduce((sum, item) => sum + item.price, 0), [items]);
   const handleClick = useCallback(() => onClick(items), [onClick, items]);
-  return <ul>...</ul>;
+  return <ul>{/* render total, items */}</ul>;
 });
 
 // After (Compiler-only)
@@ -2784,10 +2793,10 @@ export const ProductList = memo(function ProductList({ items, onClick }) {
 
 import type { ReactElement } from 'react';
 
-export function ProductList({ items, onClick }: Props): ReactElement {
-  const total = items.reduce((s, x) => s + x.price, 0);
+export function ProductList({ items, onClick }: ProductListProps): ReactElement {
+  const total = items.reduce((sum, item) => sum + item.price, 0);
   const handleClick = () => onClick(items);
-  return <ul>...</ul>;
+  return <ul>{/* render total, items */}</ul>;
 }
 ```
 
@@ -2797,18 +2806,19 @@ Olib tashlash darajasi loyihaga bog'liq — **gradual** approach tavsiya etiladi
 2. Mavjud kod — touch'da olib tashlash (har refactor paytida).
 3. Compiler-only kod — barcha komponentlar.
 
-### Qadam 7 (qo'shimcha): `compilationMode: 'all'`
+### Qadam 7 (qo'shimcha): `compilationMode: 'all'` yoki `'infer'`
 
-Loyiha barqaror bo'lganda — `'all'` mode'ga o'tish:
+Loyiha barqaror bo'lganda — `'all'` yoki `'infer'` mode'ga o'tish:
 
 ```typescript
 const ReactCompilerConfig = {
   target: '19',
-  compilationMode: 'infer', // Yoki 'all' — barcha React fayllar
+  compilationMode: 'infer', // Compiler heuristic'iga ko'ra (React komponent/hook detect)
+  // Yoki 'all' — barcha fayllar majburiy compile (eng aggressiv)
 };
 ```
 
-Bu mode'da `'use memo'` directive shart emas — Compiler avtomatik aniqlaydi.
+`'all'` mode'da barcha fayllar compile qilinadi (`'use memo'` shart emas). `'infer'` mode'da Compiler `react` import, JSX usage, va `use*` hook nomi orqali React komponent/hook'larni aniqlaydi va shu fayllarni compile qiladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2975,14 +2985,14 @@ Compiler **barcha komponent'larni memoize qilolmaydi**. Quyidagi holatlarda bail
 
 ```tsx
 // ❌ Props/state mutation
-function Bad({ items }: { items: Item[] }) {
+function MutatingCart({ items }: { items: Item[] }) {
   items.push(newItem); // Bail-out
   return <ul>...</ul>;
 }
 
 // ❌ Module-level mutation
 let counter = 0;
-function Counter() {
+function CounterImpure() {
   counter += 1; // Bail-out
   return <div>{counter}</div>;
 }
@@ -3295,7 +3305,17 @@ Performance-critical hot path'larda manual qoldirish (Compiler-mosligini debug q
 import { useMemo } from 'react';
 import type { ReactElement } from 'react';
 
-function VirtualizedList({ items, height }: Props): ReactElement {
+interface VirtualItem {
+  id: string;
+  size: number;
+}
+
+interface VirtualizedListProps {
+  items: VirtualItem[];
+  height: number;
+}
+
+function VirtualizedList({ items, height }: VirtualizedListProps): ReactElement {
   // Compiler avtomatik memoize qiladi
   const visibleItems = items.slice(0, 100);
   
@@ -3361,7 +3381,7 @@ Compiler-generated memoization vs manual:
 | Deps array | Manual (error-prone) | Auto-inferred |
 | Cache slot | Hook chain'da slot | Single `_c` array |
 | Hook overhead | 1 hook per `useMemo` | 1 `useMemoCache` total |
-| Comparison | `Object.is` (default) | `Object.is` (default) |
+| Comparison | `Object.is` (React `areHookInputsEqual`) | `!==` strict inequality (NaN/±0 farqi `Object.is`'dan) |
 | Custom equality | Argument'siz support | Yo'q (kelajakda?) |
 
 Performance — Compiler usually faster:
@@ -3580,7 +3600,7 @@ function LegacyAdapter({ data }: { data: Data }): ReactElement {
 
 ### Library Compilation (Advanced)
 
-Library author'lar kodini Compiler bilan kompilyatsiya qilib, dist'ga **pre-compiled** kod yuborishi mumkin:
+Library author'lar kodini Compiler bilan compile qilib, dist'ga **pre-compiled** kod yuborishi mumkin:
 
 ```javascript
 // library-package/src/index.tsx (source)
@@ -3618,7 +3638,7 @@ const ReactCompilerConfig = {
 
 Bu filter — `node_modules` fayllarni exclude qiladi (default behavior).
 
-Library kompilyatsiya — npm publish jarayonida:
+Library compile — npm publish jarayonida:
 
 ```json
 {
@@ -3712,7 +3732,7 @@ function LoginForm(): ReactElement {
 
 ---
 
-## Performance Implikatsiyalari
+## Performance Implications
 
 ### Nazariya
 
@@ -3727,7 +3747,7 @@ Compiler — performance optimization tool. Lekin har holatda manual memoization
 
 ### Compiler Loss'lari
 
-1. **Build-time overhead** — kompilyatsiya sekin (katta loyihada bundle qilish vaqti oshishi mumkin).
+1. **Build-time overhead** — compile sekin (katta loyihada bundle qilish vaqti oshishi mumkin).
 2. **Generated code size** — har komponentda cache logic — bundle hajmi hech qachon kichik bo'lmaydi.
 3. **Runtime cache memory** — har komponent instance N ta cache slot saqlaydi.
 4. **Bail-out cost** — bail-out komponent'lar manual memoization'siz, performance regress.
@@ -4149,7 +4169,7 @@ HMR Compiler-generated kod bilan ba'zan muammo:
 function Parent() {
   return <Child config={{ debounce: 300 }} />;
   // Compiler: <Child> JSX scope ichida {{ debounce: 300 }} har render yangi
-  // Compiler hozircha bu literal'ni cache qilmaydi (R1.0)
+  // Compiler 1.0 hozircha JSX prop literal'ini alohida scope'ga ajratmaydi
   // Child re-render'da config har gal yangi reference
 }
 ```
@@ -4837,7 +4857,7 @@ React Compiler — **build-time tool** bo'lib, source kod statik analiz natijasi
 - **Internal `_c` Array** — `useMemoCache(N)` chaqiriq build-time'da hisoblangan slot count'da array ajratadi, har scope `if ($[i] !== dep) { recompute; cache; } else { use cached; }` pattern.
 - **Static Analysis** — HIR (SSA form, CFG), reactivity inference (props/state/context/hook returns reactive vs refs/module-level non-reactive), dataflow analysis, mutability inference, reactive scope grouping.
 - **Rules of React** — komponent va hook'lar pure (mutation yo'q, side effect yo'q, top-level hooks, refs render-time yozilmaydi, effect cleanup symmetry). Bu qoidalar runtime invariants — Compiler build-time'da majburlaydi (cross-ref `30-concurrent-react.md`).
-- **`eslint-plugin-react-compiler`** — kompilyatsiya'dan oldin violation'larni topish, ESLint pipeline integratsiyasi, CI/CD'ga qo'shish.
+- **`eslint-plugin-react-compiler`** — compile'dan oldin violation'larni topish, ESLint pipeline integration'i, CI/CD'ga qo'shish.
 - **`babel-plugin-react-compiler`** — Vite/Webpack/Next.js Babel pipeline'iga qo'shiladi, opsiyalar (target, compilationMode, panicThreshold, sources).
 - **Migration Path 6 Qadam** — ESLint plugin → violations fix → ESLint error mode → Babel plugin (annotation mode) → per-file opt-in (`'use memo'`) → manual memo'ni gradual olib tashlash. Yangi kod default Compiler-friendly.
 - **Cheklovlar va Bail-out** — mutation, side effects, conditional hooks, ref render-time access, async hooks, complex closures. Bail-out qilingan komponent manual memoization'ga qaytadi.

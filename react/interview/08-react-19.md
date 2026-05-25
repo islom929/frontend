@@ -6,18 +6,20 @@
 
 ## Mundarija
 
-**QISM A: Document & Resource APIs** (savollar 1-6)
-**QISM B: Web Components Interop** (savollar 7-11)
-**QISM C: RSC Concept** (savollar 12-17)
-**QISM D: Server Actions** (savollar 18-20)
-**QISM E: Streaming & Architecture** (savollar 21-22)
-**QISM F: R19 Ref, Hooks & Class Changes** (savollar 23-28)
+- [**QISM A: Document & Resource APIs**](#qism-a) (savollar 1-6)
+- [**QISM B: Web Components Interop**](#qism-b) (savollar 7-11)
+- [**QISM C: RSC Concept**](#qism-c) (savollar 12-17)
+- [**QISM D: Server Actions**](#qism-d) (savollar 18-19)
+- [**QISM E: Streaming & Architecture**](#qism-e) (savollar 20-21)
+- [**QISM F: R19 Ref, Hooks & Class Changes**](#qism-f) (savollar 22-26)
 
-**Jami:** 28 savol — Junior+ (5), Middle (9), Middle+ (9), Senior (5)
+**Jami:** 26 savol — Junior+ (3), Middle (10), Middle+ (8), Senior (5)
 
 ---
 
 ## QISM A: Document & Resource APIs
+
+<a id="qism-a"></a>
 
 ### 1. R19 Document metadata hoisting nima va u qanday ishlaydi? [Junior+]
 
@@ -26,7 +28,7 @@
 
 ### Qisqa javob
 
-R19'da `<title>`, `<meta>`, `<link>` tag'larni komponent ichida har qayerda yozsangiz — React DOM ularni avtomat `<head>` ga ko'chiradi (hoist). Eski versiyalarda `react-helmet` library kerak bo'lardi. R19'da native, faqat React DOM bilan. **Muhim:** React `<title>` va `<meta>` tag'larni **deduplicate qilmaydi** — agar siz ikkita `<title>` render qilsangiz, ikkalasi ham `<head>` ga qo'shiladi va brauzer **birinchisini** tab title sifatida ishlatadi (DOM order bo'yicha birinchi `<title>`). Faqat `<link rel="stylesheet" precedence="...">` va `<script async src="...">` — `href`/`src` bo'yicha deduplicated. Komponent `useEffect`'siz, deklarativ tarzda metadata yozadi.
+R19'da `<title>`, `<meta>`, `<link>` tag'larni komponent ichida har qayerda yozsangiz — React DOM ularni avtomat `<head>` ga ko'chiradi (hoist). Eski versiyalarda `react-helmet` library kerak bo'lardi. R19'da native, faqat React DOM bilan. **Muhim:** React `<title>` va `<meta>` tag'larni **deduplicate qilmaydi** — agar siz ikkita `<title>` render qilsangiz, ikkalasi ham `<head>` ga qo'shiladi va brauzer **birinchisini** tab title sifatida ishlatadi (DOM order bo'yicha birinchi `<title>`). Faqat `<link rel="stylesheet" precedence="...">` va `<script async src="...">` — `href`/`src` bo'yicha deduplicated. Komponent `useEffect`'siz, declarative tarzda metadata yozadi.
 
 ### To'liq tushuntirish
 
@@ -326,7 +328,7 @@ function Analytics() {
 
 ### Qisqa javob
 
-R19'da `<link rel="stylesheet" href="..." precedence="...">` — komponent ichida deklarativ stylesheet load. `precedence` — JSX-level prop (DOM'ga `data-precedence` attribute'i sifatida render qilinadi). Bir xil precedence ichida render order saqlanadi, har xil precedence'lar — React emit qilgan tartibda joylashtiriladi. React stylesheet load'ini kuzatadi: agar component render'ida `<link rel="stylesheet" precedence>` topilsa va u hali yuklanmagan bo'lsa — React **commit'ni kechiktiradi** (yangi DOM hali insert qilinmaydi) va eng yaqin Suspense boundary'ning fallback'ini ko'rsatadi (FOUC oldini olish). Bir xil `href` — deduplicated.
+R19'da `<link rel="stylesheet" href="..." precedence="...">` — komponent ichida declarative stylesheet load. `precedence` — JSX-level prop (DOM'ga `data-precedence` attribute'i sifatida render qilinadi). Bir xil precedence ichida render order saqlanadi, har xil precedence'lar — React emit qilgan tartibda joylashtiriladi. React stylesheet load'ini kuzatadi: agar component render'ida `<link rel="stylesheet" precedence>` topilsa va u hali yuklanmagan bo'lsa — React **commit'ni kechiktiradi** (yangi DOM hali insert qilinmaydi) va eng yaqin Suspense boundary'ning fallback'ini ko'rsatadi (FOUC oldini olish). Bir xil `href` — deduplicated.
 
 > **Nuance:** React render qadamini "block" qilmaydi — render davom etadi va RSC payload yoki HTML chunk emit bo'lishi mumkin, lekin client'da CSS yuklanmaguncha **commit phase** kechikadi.
 
@@ -344,7 +346,7 @@ R19'da `<link rel="stylesheet" href="..." precedence="...">` — komponent ichid
 - Same precedence — render order ichida birinchi keladi
 - Har xil precedence — React encounter order'ni saqlaydi (alphabetically emas)
 - DOM'da: `<link rel="stylesheet" href="..." data-precedence="default">` — `data-precedence` attribute'i
-- API: JSX prop `precedence`, DOM atrribut `data-precedence`
+- API: JSX prop `precedence`, DOM attribut `data-precedence`
 
 **Suspense integration:**
 
@@ -515,7 +517,7 @@ function loadStylesheet(href: string): Promise<void> {
 
 ### Qisqa javob
 
-R19'da `<script async src="...">` — komponent ichida deklarativ async script load. React `src` bo'yicha **deduplicates** — bir xil src bilan multiple `<script>` instances bitta script tag'da hoist qilinadi. Synchronous va non-async scripts hoist qilinmaydi (chunki ular execution order critical). Async scripts — hoist + deduplicate. Use case: third-party (analytics, chat widgets, ads), feature flag scripts.
+R19'da `<script async src="...">` — komponent ichida declarative async script load. React `src` bo'yicha **deduplicates** — bir xil src bilan multiple `<script>` instances bitta script tag'da hoist qilinadi. Synchronous va non-async scripts hoist qilinmaydi (chunki ular execution order critical). Async scripts — hoist + deduplicate. Use case: third-party (analytics, chat widgets, ads), feature flag scripts.
 
 ### To'liq tushuntirish
 
@@ -536,7 +538,7 @@ R19'da `<script async src="...">` — komponent ichida deklarativ async script l
 
 - `<script async src="...">` — hoisted to `<head>`, deduplicated by `src`
 - `<script>` (non-async, sync) — NOT hoisted, inline DOM'da qoladi
-- `<script type="module">` — React DOM auto-hoist qilmaydi. Modullar deferred default, lekin React'ning `script` hoisting'i `async` flag bo'lishini talab qiladi. (`type="module"` + `async` — hoist; faqat `type="module"` — inline)
+- `<script type="module">` — React DOM auto-hoist qilmaydi. Modullar deferred default, lekin React'ning `script` hoisting'i `async` flag bo'lishini talab qiladi. (`type="module"` + `async` — hoist; faqat `type="module"` — hoist qilinmaydi, DOM'da joylashgan joyda qoladi)
 
 **Deduplication:**
 
@@ -796,7 +798,7 @@ preinit("/script.js", { as: "script" });
 // → <script async src="/script.js"></script>
 ```
 
-**Performance — qiziqarli tomon:**
+**Performance:**
 
 Preconnect/prefetchDNS handshake xarajatini "fetch boshlamasdan oldin" amalga oshiradi, shu sababli birinchi haqiqiy so'rov tezroq boshlanadi. Aniq savings: tarmoq RTT, TLS handshake vaqti, DNS resolution vaqtiga bog'liq — browser DevTools Network tab orqali o'lchaning.
 
@@ -930,7 +932,7 @@ function renderApp(req: Request) {
 
 **Edge cases that differ:**
 
-1. **Multiple `<title>`**: react-helmet — first wins. R19 — last wins.
+1. **Multiple `<title>`**: react-helmet — last rendered wins (internal management). R19 — React deduplicate qilmaydi, ikkalasi ham `<head>` ga qo'shiladi, brauzer DOM order bo'yicha **birinchi** `<title>` elementini `document.title` sifatida ishlatadi.
 2. **Async loading**: react-helmet — manual. R19 — Suspense integration.
 3. **Server collection**: react-helmet — context. R19 — automatic.
 
@@ -958,7 +960,7 @@ function PageTitle({ title }: { title?: string }) {
 
 ### Edge Cases
 
-- **Migration risk — multiple titles**: react-helmet first wins, R19 last wins. Audit cascading titles.
+- **Migration risk — multiple titles**: react-helmet internal dedup (oxirgi wins), R19 deduplicate QILMAYDI (ikkalasi ham `<head>` ga tushadi, brauzer birinchini oladi). Audit cascading titles.
 - **Lost context for tests**: `HelmetProvider` not needed → simpler test setup.
 
 ### Follow-up savollar
@@ -1020,17 +1022,18 @@ function App() {
 function Article() {
   return (
     <article>
-      <title>Article Title</title>  {/* OVERRIDES App's title */}
+      <title>Article Title</title>  {/* Ikkalasi ham <head>'ga tushadi — brauzer birinchini oladi */}
       <link rel="stylesheet" href="/article.css" precedence="component" />
       <h1>Article</h1>
     </article>
   );
 }
 
-// Final <head>:
+// Final <head> (React ikkalasini ham qo'shadi):
+// <title>App</title>
 // <title>Article Title</title>
 // <meta name="description" content="My App" />
-// <link rel="stylesheet" href="/article.css" />
+// <link rel="stylesheet" href="/article.css" data-precedence="component" />
 ```
 
 <details>
@@ -1188,6 +1191,8 @@ Server-side:
 
 ## QISM B: Web Components Interop
 
+<a id="qism-b"></a>
+
 ### 7. Web Components va React interop — tarixiy muammolar [Middle]
 
 <details>
@@ -1195,7 +1200,7 @@ Server-side:
 
 ### Qisqa javob
 
-R18 va undan oldingi versiyalarda Web Components (Custom Elements) bilan interop muammolari bor edi: (1) **Props as attributes only** — React har props'ni HTML attribute deb hisoblardi (string only), JS property emas. (2) **Custom events** — `addEventListener` manual qilinardi (`onMyEvent` ishlamasdi). (3) **Boolean/object props** — string'ga aylantirildi. (4) **TypeScript types** — manual deklaratsiya. R19'da hammasi hal qilindi: properties ham, custom events ham native support.
+R18 va undan oldingi versiyalarda Web Components (Custom Elements) bilan interop muammolari bor edi: (1) **Props as attributes only** — React har props'ni HTML attribute deb hisoblardi (string only), JS property emas. (2) **Custom events** — `addEventListener` manual qilinardi (`onMyEvent` ishlamasdi). (3) **Boolean/object props** — string'ga aylantirildi. (4) **TypeScript types** — manual deklaratsiya. R19'da properties to'g'ri ishlaydi (type-based dispatch). Custom events uchun — React avtomat `addEventListener` QILMAYDI, lekin function prop'lar property sifatida set qilinadi (WC tomonida setter orqali event handler'ga aylantirish mumkin).
 
 ### To'liq tushuntirish
 
@@ -1231,10 +1236,11 @@ function App() {
   return (
     <my-button
       color="red"  // ✅ Set as property if exists, else attribute
-      onMyClick={(e) => console.log(e)}  // ✅ Native listener
+      onMyClick={(e) => console.log(e)}  // ✅ Function → element.onMyClick = fn (property)
     />
   );
 }
+// WC tomonida `set onMyClick(fn)` orqali addEventListener qilinishi kerak
 ```
 
 ### Kod misoli
@@ -1285,7 +1291,7 @@ function App() {
 
 ```typescript
 // HTML attributes — string only
-<div data-foo="bar">
+<div data-config="enabled">
 
 // JS properties — any type
 element.config = { size: 10 };
@@ -1316,13 +1322,15 @@ function setProp(element: HTMLElement, name: string, value: any) {
 }
 ```
 
-**Custom event detection:**
+**Function prop handling (R19 custom elements):**
 
 ```typescript
-function setEventHandler(element: HTMLElement, name: string, handler: any) {
-  if (name.startsWith("on") && isCustomElement(element)) {
-    const eventName = camelCaseToKebab(name.slice(2));
-    element.addEventListener(eventName, handler);
+// React custom element'lar uchun avtomat addEventListener QILMAYDI
+// Function prop → element property sifatida set qilinadi
+function setProp(element: HTMLElement, name: string, value: unknown) {
+  if (typeof value === "function" && isCustomElement(element)) {
+    (element as any)[name] = value; // property assignment
+    // WC tomonida setter orqali addEventListener qilish mumkin
   }
 }
 ```
@@ -1606,7 +1614,7 @@ declare global {
 ```typescript
 // React DOM custom element handling (mental model):
 function setProp(node: Element, propName: string, value: unknown) {
-  const isCustomElement = node.tagName.includes("-") || node.localName.includes("-");
+  const isCustomElement = node.localName.includes("-"); // localName — lowercase (React DOM ham shu)
 
   // Standard HTML event'lar (onClick, onChange) — React synthetic events
   // Custom event name'lar (`my-event`) avtomat camelCase JSX prop'iga MAP qilinmaydi
@@ -1638,7 +1646,8 @@ function setProp(node: Element, propName: string, value: unknown) {
 **`composed: true` Shadow DOM ichidan:**
 
 ```typescript
-this.shadowRoot!.querySelector("button")!.addEventListener("click", () => {
+const button = this.shadowRoot?.querySelector("button");
+if (button) button.addEventListener("click", () => {
   this.dispatchEvent(
     new CustomEvent("my-event", { bubbles: true, composed: true }),
   );
@@ -1703,7 +1712,7 @@ class MyCard extends HTMLElement {
         <div class="footer"><slot name="footer"></slot></div>
       </div>
     `;
-    this.shadowRoot!.appendChild(tpl.content.cloneNode(true));
+    if (this.shadowRoot) this.shadowRoot.appendChild(tpl.content.cloneNode(true));
   }
 }
 customElements.define("my-card", MyCard);
@@ -1755,7 +1764,8 @@ Shadow DOM CSS isolated. Light DOM (slot content) — uses page CSS. `:slotted()
 **`composed: true` events:**
 
 ```typescript
-this.shadowRoot.querySelector("button").addEventListener("click", () => {
+const btn = this.shadowRoot?.querySelector("button");
+if (btn) btn.addEventListener("click", () => {
   this.dispatchEvent(
     new CustomEvent("custom-click", {
       bubbles: true,
@@ -1823,7 +1833,7 @@ class MyInput extends HTMLElement {
 
 ### Qisqa javob
 
-Web Component (WC) vs React Component tanlash 4 ta omilga bog'liq: (1) **Framework agnostic** — WC har joyda ishlaydi (React, Vue, vanilla, Angular). React component faqat React'da. (2) **Encapsulation** — Shadow DOM CSS isolation. (3) **Bundle size** — Lit/Stencil ~10-20KB. React komponentlar — React bundle ichida. (4) **Ecosystem** — React rich (state mgmt, routing).
+Web Component (WC) vs React Component tanlash 4 ta omilga bog'liq: (1) **Framework agnostic** — WC har joyda ishlaydi (React, Vue, vanilla, Angular). React component faqat React'da. (2) **Encapsulation** — Shadow DOM CSS isolation. (3) **Bundle size** — Lit/Stencil kichik runtime (aniq hajm versiyaga bog'liq — bundlephobia.com'da tekshiring). React komponentlar — React bundle ichida. (4) **Ecosystem** — React rich (state mgmt, routing).
 
 ### Decision matrix
 
@@ -1961,6 +1971,8 @@ React function component'lar — V8 JIT'da JIT-compile qilingan funksiya call, r
 ---
 
 ## QISM C: RSC Concept
+
+<a id="qism-c"></a>
 
 ### 12. Server vs Client Components — farqi [Junior+]
 
@@ -2208,7 +2220,7 @@ async function ProductPage() {
 
 ### Qisqa javob
 
-`"use client"` va `"use server"` — file-level (yoki function-level) directives, RSC'da component/function turini belgilaydi. `"use client"` — fayl boshida, "this file (and exports) are Client Components". `"use server"` — fayl boshida (yoki function ichida) — "this is a Server Action, can be invoked from Client Components". Convention: directive birinchi qator (commen't keyin), single quotes yoki double quotes. Bundler (Next.js, Webpack) bu directive'larni o'qib, code splitting qiladi.
+`"use client"` va `"use server"` — file-level (yoki function-level) directives, RSC'da component/function turini belgilaydi. `"use client"` — fayl boshida, "this file (and exports) are Client Components". `"use server"` — fayl boshida (yoki function ichida) — "this is a Server Action, can be invoked from Client Components". Convention: directive birinchi qator (comment keyin), single quotes yoki double quotes. Bundler (Next.js, Webpack) bu directive'larni o'qib, code splitting qiladi.
 
 ### Kod misoli
 
@@ -2641,8 +2653,8 @@ React DevTools R19 — RSC payload inspector. Shows:
 ### Edge Cases
 
 - **Circular references**: Encoded with cycle markers, but rare in practice.
-- **Non-serializable values**: Functions (except Server Actions), Symbols, Maps/Sets — error.
-- **Date objects**: Special handling (ISO string).
+- **Non-serializable values**: Functions (except Server Actions), anonymous Symbols, class instances — error.
+- **Date objects**: Special handling (ISO string). `Map`, `Set` — R19'da serializable.
 
 ### Follow-up savollar
 
@@ -3432,7 +3444,7 @@ import { renderToReadableStream } from "react-server-dom-webpack/server.edge";
 // File-based routing
 // "use client" support
 // Server Actions
-// ~2KB additional runtime
+// Minimal additional runtime (aniq hajm versiyaga bog'liq)
 ```
 
 **Why pure React doesn't include RSC:**
@@ -3483,6 +3495,8 @@ import { renderToReadableStream } from "react-server-dom-webpack/server.edge";
 ---
 
 ## QISM D: Server Actions
+
+<a id="qism-d"></a>
 
 ### 18. Server Actions — concept [Middle]
 
@@ -3967,7 +3981,7 @@ function useFormStatus() {
 **`useActionState`:**
 
 ```typescript
-// R19 rename: useFormState (R18 react-dom) → useActionState (R19 react)
+// R19 rename: useFormState (canary, react-dom) → useActionState (R19 stable, react)
 // Import: `import { useActionState } from 'react'`
 function useActionState<State, Payload>(
   action: (prevState: State, payload: Payload) => Promise<State> | State,
@@ -4079,7 +4093,7 @@ async function action(prev: State, formData: FormData): Promise<State> {
 
 ### Edge Cases
 
-- **Submit twice rapidly**: Second submit waits for first (R19 auto-debouncing).
+- **Submit twice rapidly**: R19'da form action transition ichida ishlaydi — `useFormStatus`/`useActionState` orqali `pending` holatini kuzatib, button'ni `disabled` qilish kerak. Avtomat debounce YO'Q.
 - **Network failure**: Action rejects, ErrorBoundary catches.
 - **JS disabled**: Falls back to HTML form action attribute (URL).
 
@@ -4093,346 +4107,11 @@ async function action(prev: State, formData: FormData): Promise<State> {
 
 ---
 
-### 20. Optimistic updates deep — `useOptimistic` [Middle+]
-
-<details>
-<summary><strong>Javob</strong></summary>
-
-### Qisqa javob
-
-`useOptimistic(state, updateFn)` — R19 Hook, optimistic UI uchun. Returns `[optimisticState, addOptimisticUpdate]`. `startTransition` ichida `addOptimisticUpdate(value)` chaqirilsa, UI darhol yangilanadi (optimistic state). Async action davom etganda — current state ko'rinadi. Action tugagach — optimistic state revert qilinadi (real state'ga). Failed action — optimistic auto-revert. Pattern: like buttons, comments, todo additions, drag-and-drop.
-
-### Kod misoli
-
-**Like button:**
-
-```tsx
-"use client";
-
-import { useOptimistic, useTransition } from "react";
-
-interface Post {
-  id: string;
-  liked: boolean;
-  likeCount: number;
-}
-
-interface Props {
-  post: Post;
-  toggleLike: (postId: string) => Promise<void>;
-}
-
-export function LikeButton({ post, toggleLike }: Props) {
-  const [isPending, startTransition] = useTransition();
-
-  // useOptimistic signature: (passthrough, reducer?) → [state, dispatch(action)]
-  // reducer: (currentOptimistic, action) → newOptimistic
-  const [optimisticPost, updateOptimistic] = useOptimistic<Post, void>(
-    post,
-    (current) => ({
-      ...current,
-      liked: !current.liked,
-      likeCount: current.liked ? current.likeCount - 1 : current.likeCount + 1,
-    }),
-  );
-
-  const handleClick = () => {
-    startTransition(async () => {
-      updateOptimistic(); // dispatch(undefined) — reducer faqat current'ni o'qiydi
-      try {
-        await toggleLike(post.id);
-      } catch (err) {
-        console.error(err);
-        // Optimistic state — re-render davomida discard qilinadi (next passthrough — original post)
-      }
-    });
-  };
-
-  return (
-    <button onClick={handleClick} disabled={isPending}>
-      {optimisticPost.liked ? "Liked" : "Like"} ({optimisticPost.likeCount})
-    </button>
-  );
-}
-```
-
-**Comment list:**
-
-```tsx
-"use client";
-
-import { useOptimistic } from "react";
-
-interface Comment {
-  id: string;
-  text: string;
-  pending?: boolean;
-}
-
-interface Props {
-  comments: Comment[];
-  addComment: (text: string) => Promise<Comment>;
-}
-
-export function CommentList({ comments, addComment }: Props) {
-  const [optimisticComments, addOptimisticComment] = useOptimistic<
-    Comment[],
-    string
-  >(
-    comments,
-    (state, newText) => [
-      ...state,
-      {
-        id: `optimistic-${Date.now()}`,
-        text: newText,
-        pending: true,
-      },
-    ],
-  );
-
-  const handleSubmit = async (formData: FormData) => {
-    const text = formData.get("text") as string;
-    if (!text) return;
-
-    addOptimisticComment(text);
-    await addComment(text);
-  };
-
-  return (
-    <div>
-      <ul>
-        {optimisticComments.map((c) => (
-          <li key={c.id} style={{ opacity: c.pending ? 0.5 : 1 }}>
-            {c.text}
-            {c.pending ? " (sending...)" : null}
-          </li>
-        ))}
-      </ul>
-
-      <form action={handleSubmit}>
-        <input name="text" />
-        <button type="submit">Send</button>
-      </form>
-    </div>
-  );
-}
-```
-
-<details>
-<summary><strong>Deep Dive</strong></summary>
-
-**Internal mechanism:**
-
-```typescript
-function useOptimistic<S, A>(
-  passthrough: S,
-  reducer?: (state: S, action: A) => S,
-): [S, (action: A) => void] {
-  const [optimisticState, setOptimisticState] = useState(passthrough);
-  const baseState = passthrough; // Real state
-
-  // If transition ends, revert to base state
-  useEffect(() => {
-    setOptimisticState(passthrough);
-  }, [passthrough]);
-
-  const addOptimistic = (action: A) => {
-    if (CurrentBatchConfig.transition === null) {
-      throw new Error("useOptimistic must be called inside startTransition");
-    }
-    const newState = reducer ? reducer(optimisticState, action) : (action as unknown as S);
-    setOptimisticState(newState);
-  };
-
-  return [optimisticState, addOptimistic];
-}
-```
-
-**Transition lane integration:**
-
-```typescript
-// useOptimistic uses transition lane
-// During transition:
-// - optimistic state shown
-// - real state still pending
-
-// After transition completes:
-// - revert to real state (passthrough)
-// - real setState applied
-```
-
-**Qachon transition kerak:**
-
-```tsx
-// useOptimistic — Action ichida yoki transition ichida ishlatilishi kerak
-// (re-render boshlash uchun)
-
-// ✅ Action ichida (form action, useActionState, useTransition):
-const handleSubmit = async (formData: FormData) => {
-  addOptimistic(value);
-  await serverAction(formData);
-};
-<form action={handleSubmit}>...</form>;
-
-// ✅ startTransition ichida:
-const handleClick = () => {
-  startTransition(async () => {
-    addOptimistic(value);
-    await someAsyncWork();
-  });
-};
-
-// Server Actions <form action={fn}> — avtomat transition'da wrapped
-```
-
-**Rollback mexanizmi:**
-
-```text
-useOptimistic explicit rollback API'siga ega EMAS:
-- Optimistic state — komponent re-render qilinmaguncha ko'rinadi
-- passthrough state o'zgargach (server response keldi) — React optimistic'ni "discard" qiladi
-- Action throw qilsa — transition tugaydi, passthrough o'zgarmagani uchun original state qaytadi
-- Faqat passthrough'ni komponentga uzatish orqali "rollback" boshqariladi
-```
-
-**With Server Actions:**
-
-```tsx
-// Server Action automatically transitions
-async function deletePost(id: string) {
-  "use server";
-  await db.post.delete({ where: { id } });
-}
-
-function PostList({ posts }: Props) {
-  const [optimisticPosts, removeOptimistically] = useOptimistic<
-    Post[],
-    string
-  >(
-    posts,
-    (state, idToRemove) => state.filter((p) => p.id !== idToRemove),
-  );
-
-  const handleDelete = async (id: string) => {
-    removeOptimistically(id);
-    await deletePost(id);
-  };
-
-  return (
-    <ul>
-      {optimisticPosts.map((p) => (
-        <li key={p.id}>
-          {p.title}
-          <button onClick={() => handleDelete(p.id)}>×</button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-```
-
-**Error handling:**
-
-```tsx
-const handleClick = () => {
-  startTransition(async () => {
-    addOptimistic();
-    try {
-      await action();
-    } catch (err) {
-      // Optimistic state auto-reverts when transition ends
-      // Show error to user
-      setError(err.message);
-    }
-  });
-};
-```
-
-**Multiple optimistic updates:**
-
-```tsx
-const [optimisticItems, addOptimistic] = useOptimistic<Item[], Item>(
-  items,
-  (state, newItem) => [...state, newItem],
-);
-
-const handleAdd = async (data: Partial<Item>) => {
-  startTransition(async () => {
-    addOptimistic({ ...data, id: `temp-${Date.now()}`, pending: true });
-    await createItem(data);
-  });
-};
-
-// User clicks rapidly → multiple optimistic items shown
-// Server processes each, real items replace optimistic
-```
-
-**Race conditions:**
-
-```tsx
-// User clicks like, then unlike rapidly
-// Optimistic: liked → unliked
-// Server processes in order:
-// 1. Like → server has liked
-// 2. Unlike → server has unliked
-// → Final: unliked (correct)
-
-// But what if requests arrive out of order?
-// Server: unlike then like → final: liked (wrong)
-// → Race condition
-
-// Solution: idempotent actions or sequential queue
-```
-
-**Comparison with manual optimistic:**
-
-```tsx
-// ❌ Manual — error-prone
-function LikeButton({ post }: { post: Post }) {
-  const [count, setCount] = useState(post.likeCount);
-  const [liked, setLiked] = useState(post.liked);
-
-  const handleClick = async () => {
-    // Optimistic
-    setLiked(!liked);
-    setCount(liked ? count - 1 : count + 1);
-
-    try {
-      await toggleLike(post.id);
-    } catch (err) {
-      // Manual revert
-      setLiked(liked);
-      setCount(count);
-    }
-  };
-
-  return <button onClick={handleClick}>{liked ? "❤️" : "🤍"} {count}</button>;
-}
-
-// useOptimistic — auto revert, simpler
-```
-
-</details>
-
-### Edge Cases
-
-- **Optimistic state outside transition**: Error thrown.
-- **Multiple updates same transition**: All applied, ordering preserved.
-- **Component unmount during transition**: Optimistic state lost. Real state may still process.
-
-### Follow-up savollar
-
-- "Why does it auto-revert on error?" — Transition fails → optimistic state discarded → real state shown.
-- "Can I delay revert?" — No (intentional). For UX patterns needing delay — manual with `useState`.
-- "Optimistic for non-action use cases?" — Not common. Designed for action UI.
-
-</details>
-
----
-
 ## QISM E: Streaming & Architecture
 
-### 21. `renderToReadableStream` vs `renderToPipeableStream` [Middle+]
+<a id="qism-e"></a>
+
+### 20. `renderToReadableStream` vs `renderToPipeableStream` [Middle+]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -4730,14 +4409,14 @@ Server timeline:
 
 ---
 
-### 22. RSC + Streaming + Suspense composition [Senior]
+### 21. RSC + Streaming + Suspense composition [Senior]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-R19'da 3 ta texnologiya birgalikda ishlaydi: (1) **RSC** — server vs client component split, less JS shipped. (2) **Streaming SSR** — chunked HTML delivery. (3) **Suspense** — async data + code splitting boundaries. Composition: Server Components fetch data (async), Suspense bilan wrapped, streaming chunked emit. Client Components hydrate progressively. Result: TTFB < 100ms, FCP early, INP < 200ms, smaller JS bundle. Frameworks (Next.js, Remix) bu compositionni sodda qilib beradi.
+R19'da 3 ta texnologiya birgalikda ishlaydi: (1) **RSC** — server vs client component split, less JS shipped. (2) **Streaming SSR** — chunked HTML delivery. (3) **Suspense** — async data + code splitting boundaries. Composition: Server Components fetch data (async), Suspense bilan wrapped, streaming chunked emit. Client Components hydrate progressively. Result: tezroq TTFB (shell darhol emit), erta FCP, kichikroq JS bundle. Aniq metrikalar app, payload, va infrastructure'ga bog'liq. Frameworks (Next.js, Remix) bu compositionni sodda qilib beradi.
 
 ### Architecture
 
@@ -5052,7 +4731,7 @@ Real metric'lar production RUM (Vercel/Cloudflare Analytics) yoki Web Vitals lib
 ### Follow-up savollar
 
 - "RSC + Streaming + Suspense — when not to use?" — Pure SPA, client-only data, no server-side benefit.
-- "Performance budget?" — TTFB < 100ms, FCP < 1s, TTI < 2s, INP < 200ms.
+- "Performance budget?" — Google CWV thresholds: LCP < 2.5s, INP < 200ms, CLS < 0.1. TTFB, FCP, TTI uchun aniq raqamlar app va infrastructure'ga bog'liq — production RUM bilan o'lchang.
 - "Migration cost from R17 SSR?" — Moderate. App Router structure, refactor data fetching.
 
 </details>
@@ -5061,303 +4740,16 @@ Real metric'lar production RUM (Vercel/Cloudflare Analytics) yoki Web Vitals lib
 
 ## QISM F: R19 Ref, Hooks & Class Changes
 
-### 23. Ref as prop — `forwardRef` o'rniga [Middle]
+<a id="qism-f"></a>
+
+### 22. Class component changes — `propTypes` & `defaultProps` [Middle]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-R19'da function component'lar `ref` propini **oddiy prop sifatida** qabul qila oladi — `forwardRef` wrapper'i shart emas. Funksiya signaturasida `ref` parametri prop'lar bilan birga keladi. `forwardRef` hali ham ishlaydi (deprecated emas) va eski kodlar buzilmaydi — lekin yangi kodlarda ortiqcha. Class component'lar — `ref` instance'ga ishora qiladi (avvalgidek). `useImperativeHandle` — funksiya component'larda ref API'sini boshqarish uchun saqlanadi.
-
-### Kod misoli
-
-**R18 — forwardRef pattern:**
-
-```tsx
-import { forwardRef } from "react";
-
-interface InputProps {
-  label: string;
-}
-
-const Input = forwardRef<HTMLInputElement, InputProps>(
-  function Input({ label }, ref) {
-    return (
-      <label>
-        {label}
-        <input ref={ref} />
-      </label>
-    );
-  },
-);
-```
-
-**R19 — ref as prop:**
-
-```tsx
-import { Ref } from "react";
-
-interface InputProps {
-  label: string;
-  ref?: Ref<HTMLInputElement>;
-}
-
-function Input({ label, ref }: InputProps) {
-  return (
-    <label>
-      {label}
-      <input ref={ref} />
-    </label>
-  );
-}
-
-// Usage — bir xil:
-const inputRef = useRef<HTMLInputElement>(null);
-<Input label="Name" ref={inputRef} />;
-```
-
-**`useImperativeHandle` saqlanadi:**
-
-```tsx
-import { useImperativeHandle, useRef, Ref } from "react";
-
-interface InputHandle {
-  focus: () => void;
-  clear: () => void;
-}
-
-function CustomInput({ ref }: { ref?: Ref<InputHandle> }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      focus: () => inputRef.current?.focus(),
-      clear: () => {
-        if (inputRef.current) inputRef.current.value = "";
-      },
-    }),
-    [],
-  );
-
-  return <input ref={inputRef} />;
-}
-```
-
-<details>
-<summary><strong>Deep Dive</strong></summary>
-
-**`forwardRef` deprecation holati:**
-
-| Holat | Versiya |
-|-------|---------|
-| `ref` as prop | R19 — yangi standart |
-| `forwardRef` | Hali ham ishlaydi, deprecated EMAS |
-| Migration | Codemod mavjud: `react-codemod forwardRef-to-ref` |
-
-**Kelajakda:** React jamoasi `forwardRef`'ni kelajakda deprecate qilishi mumkin, lekin **hozir** (R19) — deprecated emas. Eski kod buzilmaydi.
-
-**Class component bilan farq:**
-
-```tsx
-// Class component — ref instance'ga ishora qiladi
-class MyComp extends React.Component {
-  myMethod() { /* ... */ }
-}
-
-const ref = createRef<MyComp>();
-<MyComp ref={ref} />;
-ref.current?.myMethod(); // ✅ Instance access
-
-// Function component — ref DOM yoki imperative handle'ga
-function MyComp({ ref }: { ref?: Ref<HTMLDivElement> }) {
-  return <div ref={ref} />;
-}
-```
-
-**TypeScript:**
-
-```tsx
-import { ComponentPropsWithRef } from "react";
-
-// Type extraction
-type InputProps = ComponentPropsWithRef<"input">;
-
-// Custom component
-type CustomInputProps = ComponentPropsWithRef<typeof CustomInput>;
-```
-
-**Codemod:**
-
-```bash
-npx react-codemod@latest forwardRef-to-ref ./src
-# Avtomat: forwardRef wrapper'ni olib tashlaydi, ref'ni prop sifatida qo'shadi
-```
-
-</details>
-
-### Edge Cases
-
-- **`memo(forwardRef(...))`**: R19'da `memo(Component)` to'g'ridan-to'g'ri, chunki `ref` allaqachon prop'da.
-- **`ref` prop typings**: `Ref<T>` — `RefObject<T> | RefCallback<T> | null`.
-- **Eski kutubxonalar**: `forwardRef`'dan foydalanuvchi paketlar — buzilmasdan ishlaydi.
-
-### Follow-up savollar
-
-- "`forwardRef` deprecated bo'ldimi?" — Yo'q (R19). Hali ham ishlaydi, lekin yangi kodlarda `ref` as prop tavsiya etiladi.
-- "Migration kuchaytirilganmi?" — Yo'q, gradual. Codemod ixtiyoriy.
-- "`useImperativeHandle` hali kerakmi?" — Ha, ref API'ni custom qilish uchun.
-
-</details>
-
----
-
-### 24. Ref cleanup callback [Middle]
-
-<details>
-<summary><strong>Javob</strong></summary>
-
-### Qisqa javob
-
-R19'da callback ref'lar (`ref={(node) => { ... }}`) **cleanup funksiya qaytarishi mumkin** — `useEffect`'ga o'xshash. React DOM element'ni attach qilganda callback chaqiriladi; detach qilishdan oldin — cleanup chaqiriladi. R18'da cleanup yo'q edi — `null` argumenti bilan callback qayta chaqirilardi. R19'da ham `null`-based pattern ishlaydi (backward compatible), lekin yangi cleanup pattern soddaroq. TypeScript signature: `(node: T | null) => void | (() => void)`.
-
-### Kod misoli
-
-**R18 — null check:**
-
-```tsx
-function Component() {
-  return (
-    <div
-      ref={(node) => {
-        if (node) {
-          const observer = new ResizeObserver(handleResize);
-          observer.observe(node);
-          // observer'ni qaerga saqlash? — useRef kerak
-        } else {
-          // Detach — observer'ga ulanish yo'q
-        }
-      }}
-    />
-  );
-}
-```
-
-**R19 — cleanup return:**
-
-```tsx
-function Component() {
-  return (
-    <div
-      ref={(node) => {
-        // Attach
-        const observer = new ResizeObserver(handleResize);
-        observer.observe(node);
-
-        // Cleanup — useEffect kabi
-        return () => {
-          observer.disconnect();
-        };
-      }}
-    />
-  );
-}
-```
-
-**Real pattern — third-party library:**
-
-```tsx
-function Chart({ data }: { data: number[] }) {
-  return (
-    <canvas
-      ref={(canvas) => {
-        if (!canvas) return;
-        const chart = new ChartJS(canvas, {
-          type: "line",
-          data: { datasets: [{ data }] },
-        });
-        return () => chart.destroy();
-      }}
-    />
-  );
-}
-```
-
-<details>
-<summary><strong>Deep Dive</strong></summary>
-
-**Lifecycle:**
-
-```text
-1. Mount → React node yaratadi → callback(node) chaqiriladi → cleanup saqlanadi
-2. Callback ref reference o'zgarsa → eski cleanup → yangi callback(node)
-3. Unmount → cleanup chaqiriladi → node o'chiriladi
-```
-
-**Stable ref (re-create'dan saqlash):**
-
-```tsx
-import { useCallback } from "react";
-
-function Component() {
-  const setRef = useCallback((node: HTMLDivElement | null) => {
-    if (!node) return;
-    const observer = new ResizeObserver(() => {});
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
-  return <div ref={setRef} />;
-}
-```
-
-**Backward compatibility:**
-
-```tsx
-// R18 pattern hali ishlaydi:
-<div
-  ref={(node) => {
-    if (node) { /* attach */ } else { /* detach */ }
-  }}
-/>;
-
-// R19 cleanup callback — yangi pattern, `null` argument'i kerak emas
-```
-
-**`useEffect` vs ref cleanup farqi:**
-
-| Tomon | `useEffect` | Ref cleanup |
-|-------|-------------|-------------|
-| Trigger | Commit'dan keyin | Ref attach/detach |
-| Timing | Async (commit + delay) | Sync (commit ichida) |
-| Use case | Side effects, subscriptions | DOM-bound integrations |
-
-</details>
-
-### Edge Cases
-
-- **Cleanup return + null check**: Cleanup qaytarsangiz, callback `null` argumenti bilan chaqirilmaydi (faqat cleanup ishlatiladi).
-- **TypeScript**: `Ref<T>` type endi cleanup-return signature'ni qo'llaydi.
-- **`useImperativeHandle` bilan**: O'zgarmadi, useEffect-style cleanup.
-
-### Follow-up savollar
-
-- "`useEffect` o'rniga ref cleanup qachon yaxshi?" — DOM-bound integrations (ResizeObserver, IntersectionObserver, chart libraries) — ref'da darhol, useEffect commit'dan keyin.
-- "Eski callback ref'lar buziladimi?" — Yo'q, backward compatible.
-
-</details>
-
----
-
-### 25. Class component changes — `propTypes` & `defaultProps` [Middle]
-
-<details>
-<summary><strong>Javob</strong></summary>
-
-### Qisqa javob
-
-R19'da: (1) **`propTypes`** — function component'larda olib tashlandi (TypeScript bilan kerak emas). Class component'larda hali ham mavjud, lekin dev-only warning. (2) **`defaultProps`** — function component'larda olib tashlandi (ES default parametrlar bor). Class component'lar uchun saqlanadi. (3) **String refs** (`ref="myRef"`) — olib tashlandi (allaqachon R16'da deprecated edi). (4) **`React.createFactory`** — olib tashlandi. (5) **Legacy Context** (`childContextTypes`, `getChildContext`) — olib tashlandi.
+R19'da: (1) **`propTypes`** — function component'larda runtime check olib tashlandi (TypeScript bilan kerak emas). Class component'larda hali ham mavjud, lekin dev-only warning. (2) **`defaultProps`** — function component'larda deprecated (console warning beradi, hali olib tashlanmagan). Class component'lar uchun to'liq saqlanadi. (3) **String refs** (`ref="myRef"`) — olib tashlandi (allaqachon R16'da deprecated edi). (4) **`React.createFactory`** — olib tashlandi. (5) **Legacy Context** (`childContextTypes`, `getChildContext`) — olib tashlandi.
 
 ### Kod misoli
 
@@ -5460,7 +4852,7 @@ React jamoasi class component'larni hozircha rasman deprecate qilmagan, lekin ya
 
 ---
 
-### 26. `startTransition` async support va `useTransition` R19 [Middle+]
+### 23. `startTransition` async support va `useTransition` R19 [Middle+]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -5576,7 +4968,7 @@ const handleClick = () => {
 
 ### Edge Cases
 
-- **`startTransition` ichida unmount**: setState'lar bekor qilinadi (StrictMode warning).
+- **`startTransition` ichida unmount**: setState'lar bekor qilinadi (React silently ignores unmounted component'ga setState).
 - **Nested `startTransition`**: Ichki transition o'z lane'iga ega.
 - **Mix urgent + transition**: Bir xil setState ikki marta — urgent g'olib.
 
@@ -5589,7 +4981,7 @@ const handleClick = () => {
 
 ---
 
-### 27. `cache()` Hook — server-side memoization [Senior]
+### 24. `cache()` Hook — server-side memoization [Senior]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -5752,14 +5144,14 @@ const fetchUser = cache(async (id: string) => {
 
 ---
 
-### 28. `'use client'` va `'use server'` boundary qoidalari [Senior]
+### 25. `'use client'` va `'use server'` boundary qoidalari [Senior]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-`'use client'` va `'use server'` — **alohida fayllarda yashashi kerak** (bir faylda ikkalasi invalid). `'use client'` — fayl boshida (commen'tlardan keyin, import'dan oldin); fayl Client Boundary deb belgilanadi, har export — Client Component. `'use server'` — fayl boshida (har export — Server Action) yoki **function declaration ichida** birinchi statement (faqat shu funksiya Server Action). Arrow function body'sida ishlamaydi. Server Action **MAJBURIY `async function`**. Bundler (Webpack/Turbopack/Vite) directive'larni parse qilib, server/client split qiladi.
+`'use client'` va `'use server'` — **alohida fayllarda yashashi kerak** (bir faylda ikkalasi invalid). `'use client'` — fayl boshida (commentlardan keyin, import'dan oldin); fayl Client Boundary deb belgilanadi, har export — Client Component. `'use server'` — fayl boshida (har export — Server Action) yoki **function declaration ichida** birinchi statement (faqat shu funksiya Server Action). Arrow function body'sida ishlamaydi. Server Action **MAJBURIY `async function`**. Bundler (Webpack/Turbopack/Vite) directive'larni parse qilib, server/client split qiladi.
 
 ### Kod misoli
 
@@ -5836,7 +5228,7 @@ export async function action() { /* ... */ }
 
 | Directive | Joylashuv | Effekt |
 |-----------|-----------|--------|
-| `'use client'` | Fayl boshi (commen't keyin, import oldin) | Faqat fayl-level; har export — Client |
+| `'use client'` | Fayl boshi (comment keyin, import oldin) | Faqat fayl-level; har export — Client |
 | `'use server'` (fayl) | Fayl boshi | Har export — Server Action |
 | `'use server'` (function) | `async function` declaration body birinchi statement | Faqat shu funksiya |
 
@@ -5949,14 +5341,14 @@ async function ServerComponent({ userId }: { userId: string }) {
 
 ---
 
-### 29. R19 deprecation list — olib tashlangan API'lar [Middle+]
+### 26. R19 deprecation list — olib tashlangan API'lar [Middle+]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-R19'da olib tashlangan: **`propTypes`** (function components), **`defaultProps`** (function components — class hali), **String refs** (`ref="myInput"`), **Legacy Context API** (`childContextTypes`/`contextTypes`/`getChildContext`), **`module.createFactory`**. Migration: TypeScript interfaces (propTypes), JS default params (defaultProps), `useRef`/`forwardRef` (string refs), `createContext` (legacy Context).
+R19'da olib tashlangan: **`propTypes`** runtime check (function components), **String refs** (`ref="myInput"`), **Legacy Context API** (`childContextTypes`/`contextTypes`/`getChildContext`), **`React.createFactory`**. Deprecated (warning, hali mavjud): **`defaultProps`** (function components — class'da to'liq saqlanadi). Migration: TypeScript interfaces (propTypes), JS default params (defaultProps), `useRef`/callback refs (string refs), `createContext` (legacy Context).
 
 ### Kod misoli
 
@@ -6106,7 +5498,7 @@ await act(async () => {
 
 ### Follow-up savollar
 
-- "What about `Suspense.hidden`?" — Renamed to `<Activity>` (offscreen API) — coming R19+ stable.
+- "What about `Suspense.hidden`?" — `<Activity>` (offscreen API) hali experimental. R19 stable'da mavjud emas, kelajak versiyalarda kutilmoqda.
 - "Will `forwardRef` be removed?" — Not yet. Phased out gradually (deprecated path, not removed).
 
 </details>
@@ -6120,9 +5512,9 @@ Bu fayl React 19'ning to'liq spektrini qamrab oldi:
 - **QISM A — Document & Resource APIs** (6 savol): Hoisting (deduplikatsiya YO'Q `<title>`/`<meta>` uchun!), stylesheet/Suspense commit-delay, async script dedup, preload/preinit/prefetch `react-dom` orqali, react-helmet replacement, internal algorithm
 - **QISM B — Web Components Interop** (5 savol): Tarixiy muammolar, type-based property/attribute dispatch, custom events ref+effect pattern, slots/Shadow DOM, decision matrix
 - **QISM C — RSC Concept** (6 savol): Server vs Client, directives, RSC payload (JSON-superset), async server components, serialization boundary, framework requirement
-- **QISM D — Server Actions** (3 savol): Concept (action ID public — auth majburiy), `<form action>`, useOptimistic
+- **QISM D — Server Actions** (2 savol): Concept (action ID public — auth majburiy), `<form action>`
 - **QISM E — Streaming & Architecture** (2 savol): renderToReadableStream/PipeableStream, RSC + Streaming + Suspense composition
-- **QISM F — Ref, Hooks & Class Changes** (6 savol): ref as prop (`forwardRef` deprecated EMAS), ref cleanup callback, class component changes, `startTransition` async, `cache()`, directive boundary qoidalari
+- **QISM F — Ref, Hooks & Class Changes** (5 savol): class component changes, `startTransition` async, `cache()`, directive boundary qoidalari, deprecation list
 
 **Asosiy mental model'lar:**
 

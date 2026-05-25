@@ -1,6 +1,6 @@
 # Bo'lim 39: React Server Components va Server Actions
 
-> Kursning yakuniy bo'limi. **React Server Components (RSC)** — komponent type'larini "Server" va "Client" ga ajratuvchi paradigm. Server Component'lar server'da render qilinadi va **RSC Payload** sifatida client'ga yuboriladi (komponent kodi bundle'da emas, faqat render natijasi). Client Component'lar bundle'da yetkazib beriladi va brauzer'da hydrate qilinadi. **Server Actions** — `'use server'` direktiv bilan deklarativ RPC mexanizm: async funksiyalar client'dan chaqiriladi va server'da bajariladi (form action integration, JavaScript-less progressive enhancement). `cache(fn)` per-request memoization, Streaming SSR bilan RSC integratsiyasi, Next.js App Router framework standardlari, va kursning umumiy yakuni — bu fayl mazmuni.
+> Kursning yakuniy bo'limi. **React Server Components (RSC)** — komponent type'larini "Server" va "Client" ga ajratuvchi paradigm. Server Component'lar server'da render qilinadi va **RSC Payload** sifatida client'ga yuboriladi (komponent kodi bundle'da emas, faqat render natijasi). Client Component'lar bundle'da yetkazib beriladi va brauzer'da hydrate qilinadi. **Server Actions** — `'use server'` direktiv bilan declarative RPC mexanizm: async funksiyalar client'dan chaqiriladi va server'da bajariladi (form action integration, JavaScript-less progressive enhancement). `cache(fn)` per-request memoization, Streaming SSR bilan RSC integration'i, Next.js App Router framework standardlari, va kursning umumiy yakuni — bu fayl mazmuni.
 
 ---
 
@@ -73,9 +73,9 @@ RSC'da:
 5. **Progressive enhancement** — JavaScript disabled bo'lsa ham basic functionality (Server Actions form integration).
 
 > **Versiya evolyutsiyasi (RSC):**
-> - **2020 December:** RSC RFC (Lauren Tan, Joseph Savona, Sebastian Markbåge, Andrew Clark). Eksperimental demo.
+> - **2020 December:** RSC e'lon qilindi — "Introducing Zero-Bundle-Size React Server Components" blog post (Dan Abramov, Lauren Tan, Joseph Savona, Sebastian Markbåge) + React Conf talk. Eksperimental demo.
 > - **2022 October (Next.js 13):** App Router beta — birinchi production-ready RSC implementation.
-> - **2023 May (Next.js 13.4):** App Router stable. React 18 + RSC integration stabilizatsiya, `react-server-dom-webpack` package.
+> - **2023 May (Next.js 13.4):** App Router stable. React 18 + RSC integration stabilization, `react-server-dom-webpack` package.
 > - **2024 December (R19):** RSC API stable, `'use server'` va `'use client'` direktivlar React core'ga rasmiy ravishda kiritildi. Framework adoption: Next.js 15, TanStack Start (beta), Waku.
 > - **Kelajak:** Vanilla React standalone RSC bundler API'lari (`react-server-dom-*` package'lari ko'paymoqda).
 > - **Sabab:** Web app'lar bundle hajmi katta bo'lib ketdi (ko'pchilik production app'lar 200-500 KB+ JS), mobile-first va Web Vitals talablari, server-only data access ergonomics.
@@ -311,7 +311,7 @@ Har bir komponent **Server** yoki **Client** type'iga ega. Bu type komponent qay
 **Important rules:**
 
 1. **Server Component Client Component'ni JSX child sifatida render qila oladi**, lekin Client Component faylida deklaratsiya qilingan utility'lar Server context'da execute qilinmaydi — ular Client Reference proxy sifatida server bundle'ga kiritiladi. Demak `'use client'` faylidagi browser-only API'lar (window, document, useState) Server context'da chaqirilmaydi.
-2. **Client Component Server Component'ni `children` prop sifatida qabul qila oladi** — bu "interleaving" pattern (kompozitsiya bo'lim'ida). Lekin Client Component Server Component **modulini bevosita import qila olmaydi**.
+2. **Client Component Server Component'ni `children` prop sifatida qabul qila oladi** — bu "interleaving" pattern (composition bo'lim'ida). Lekin Client Component Server Component **modulini bevosita import qila olmaydi**.
 3. **Async Server Component** — funksiya `async` bo'lishi mumkin va `await` ishlatadi.
 4. **Default Server** — App Router'da `'use server'` direktiv yo'q bo'lsa Server Component.
 
@@ -496,14 +496,14 @@ Client bundle:
 
 `'use client'` — file top'idagi string literal direktiv. Faylni Client Component deb belgilaydi va modul boundary yaratadi.
 
-**Sintaksis:**
+**Syntax:**
 
 ```tsx
 'use client';
 
 import { useState } from 'react';
 
-export function MyComponent() {
+export function CounterButton() {
   const [count, setCount] = useState(0);
   return <button onClick={() => setCount(count + 1)}>{count}</button>;
 }
@@ -696,7 +696,7 @@ export function StaticHeader() {
 
 ### Nazariya
 
-`'use server'` — ikkita kontekstda ishlatiladi:
+`'use server'` — ikkita context'da ishlatiladi:
 
 1. **File top'ida** — barcha eksport funksiyalar **Server Actions**.
 2. **Function body birinchi qatorida** — yagona inline Server Action.
@@ -745,7 +745,7 @@ export default async function ProductsPage() {
 **Restrictions:**
 
 - Server Action funksiyalari **`async`** bo'lishi shart.
-- Argument va return value **serializable** bo'lishi kerak. RSC serialization JSON'dan kengroq: primitives, plain objects, arrays, `Date`, `Map`, `Set`, `BigInt`, `FormData`, `Promise`, JSX elementlar — qo'llab-quvvatlanadi. **Qo'llab-quvvatlanmaydi:** ixtiyoriy function reference (lekin Server Action sifatida `'use server'` bilan belgilangan funksiya — pass qilinishi mumkin), class instances, DB connection, Symbol, DOM nodes.
+- Argument va return value **serializable** bo'lishi kerak. RSC serialization JSON'dan kengroq: primitives, plain objects, arrays, `Date`, `Map`, `Set`, `BigInt`, `FormData`, `Promise`, JSX elementlar, **registered Symbols** (`Symbol.for(name)` — global registry orqali) — qo'llab-quvvatlanadi. **Qo'llab-quvvatlanmaydi:** ixtiyoriy function reference (lekin Server Action sifatida `'use server'` bilan belgilangan funksiya — pass qilinishi mumkin), class instances (method'lar bilan), DB connection, **local Symbols** (`Symbol(name)` — har chaqiriqda unique instance), DOM nodes.
 
 **RPC vs traditional API:**
 
@@ -1111,7 +1111,9 @@ function ClientRoot() {
   return use(rscPromise);
 }
 
-const root = createRoot(document.getElementById('root')!);
+const container = document.getElementById('root');
+if (!container) throw new Error('Root container not found');
+const root = createRoot(container);
 root.render(<ClientRoot />);
 ```
 
@@ -1886,7 +1888,7 @@ export async function deletePostBound(postId: string) {
 
 ### Nazariya
 
-R19 native `<form action={serverAction}>` Server Actions bilan to'liq integratsiya. Bu pattern Progressive Enhancement asosini quradi — JavaScript yo'q paytda ham form submission ishlaydi.
+R19 native `<form action={serverAction}>` Server Actions bilan to'liq integration. Bu pattern Progressive Enhancement asosini quradi — JavaScript yo'q paytda ham form submission ishlaydi.
 
 **Behavior:**
 
@@ -1928,7 +1930,7 @@ Bitta form ichida bir nechta action mumkin:
 
 **Cross-ref `13-event-handling.md`:**
 
-R19 form action pattern asoslari 13-bo'limda yoritilgan. Bu yerda **Server Action**'lar bilan integratsiyaning maxsus jihatlari ko'rsatiladi.
+R19 form action pattern asoslari 13-bo'limda yoritilgan. Bu yerda **Server Action**'lar bilan integrationning maxsus jihatlari ko'rsatiladi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -2055,7 +2057,7 @@ export function AvatarForm() {
 
 ### Nazariya
 
-`useActionState` (cross-ref `23-r19-hooks.md`) Server Actions bilan integratsiya uchun asosiy hook. Action result'ni state'da saqlaydi, pending state ta'minlaydi.
+`useActionState` (cross-ref `23-r19-hooks.md`) Server Actions bilan integration uchun asosiy hook. Action result'ni state'da saqlaydi, pending state ta'minlaydi.
 
 **Signature:**
 
@@ -2330,7 +2332,7 @@ async function handleAdd(formData: FormData) {
 **Lifecycle:**
 
 ```
-1. User clicks "Add" → addOptimistic(newItem) (Transition kontekstida)
+1. User clicks "Add" → addOptimistic(newItem) (Transition context'ida)
 2. UI updates immediately with optimistic state
 3. Server Action starts
 4. While action pending, optimistic state visible
@@ -2343,7 +2345,7 @@ async function handleAdd(formData: FormData) {
 
 **Concurrency:**
 
-`useOptimistic` Transition kontekstida ishlaydi. Bir nechta optimistic update bir vaqtda mumkin (queue).
+`useOptimistic` Transition context'ida ishlaydi. Bir nechta optimistic update bir vaqtda mumkin (queue).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -2932,9 +2934,9 @@ RSC vanilla React'da to'g'ridan-to'g'ri ishlamaydi — bundler integration (serv
 **TanStack Start:**
 
 - **Status:** Beta (2024+)
-- **Bundler:** Vite (via `react-server-dom-vite`)
+- **Bundler:** Vite + Vinxi (custom Vite plugin'lar bilan; rasmiy `react-server-dom-vite` npm package mavjud emas — TanStack Start o'z server runtime'iga ega)
 - **Convention:** File-based routing yoki manual
-- **Features:** Server Actions, type-safe routing, integration with TanStack Query
+- **Features:** Server Functions (Server Actions ekvivalenti), type-safe routing, integration with TanStack Query
 - **Use case:** Modern stack, Vite ecosystem
 
 **Remix (v3 RSC):**
@@ -3286,7 +3288,7 @@ async function ClientPage() {
 import { use } from 'react';
 
 function ClientPage({ dataPromise }: { dataPromise: Promise<Data> }) {
-  const data = use(dataPromise); // R19 use() Suspense bilan integratsiya
+  const data = use(dataPromise); // R19 use() Suspense bilan integration
   return <div>{data.value}</div>;
 }
 ```
@@ -3444,7 +3446,7 @@ function ProductCard({ product }: { product: Product }) {
 'use client';
 import { db } from '@/lib/db'; // ← Server only
 
-export function MyComponent() {
+export function ProductsList() {
   const products = db.query.products.findMany(); // ← Error
   return ...;
 }
@@ -3864,7 +3866,7 @@ Mashq 4 yuqoridagi `useOptimistic` Server Actions section'idagi TodoList pattern
 - **Client Component** `TodoList.tsx` `useOptimistic` reducer pattern'i bilan add/toggle/delete actions'ni boshqaradi.
 - **Server Actions** `addTodo`, `toggleTodo`, `deleteTodo` (`'use server'` faylida) — har biri `revalidatePath('/todos')` chaqiradi.
 - **Pending visual feedback** — optimistic item'da `pending: true` flag → `opacity: 0.5` styling.
-- **Transition kontekst** — `useOptimistic` Transition ichida ishlaydi: Server Action tugab `revalidatePath` chaqirilgach, server state bilan re-render → optimistic state discard. Action throw bo'lsa va revalidation bo'lmasa, manual `try/catch` ichida revert action kerak (yoki `useFormStatus` bilan error visualization).
+- **Transition context** — `useOptimistic` Transition ichida ishlaydi: Server Action tugab `revalidatePath` chaqirilgach, server state bilan re-render → optimistic state discard. Action throw bo'lsa va revalidation bo'lmasa, manual `try/catch` ichida revert action kerak (yoki `useFormStatus` bilan error visualization).
 - **Race condition prevention** — `useOptimistic` Transition queue avtomatik concurrency'ni boshqaradi: bir nechta optimistic update parallel bo'lsa, ular ketma-ket queue'ga qo'shiladi.
 
 </details>
@@ -4155,13 +4157,13 @@ React'ni o'rganish — bir martalik jarayon emas. Ekosistema doim yangilanadi (R
 
 **Interview Tayyorlik:**
 
-Har bo'lim uchun alohida `interview/N-name.md` fayllar yaratiladi (kurs tugagandan keyin). Interview fayllar **mustaqil** — kurs fayllariga havola yo'q, har savol javobida kontekst to'liq beriladi. Junior+/Middle/Middle+/Senior daraja belgilari bilan.
+Har bo'lim uchun alohida `interview/N-name.md` fayllar yaratiladi (kurs tugagandan keyin). Interview fayllar **mustaqil** — kurs fayllariga havola yo'q, har savol javobida context to'liq beriladi. Junior+/Middle/Middle+/Senior daraja belgilari bilan.
 
 **Yakuniy fikr:**
 
 React 19 va RSC paradigm — frontend development'ning yangi fundamental shift'i. Bu kursni o'qib bo'lib, siz nafaqat **React API**'ni bilasiz, balki **engine internals**, **architectural patterns**, va **production-grade decision making** ko'nikmalariga ega bo'lasiz.
 
-Frontend dunyosi tez o'zgaradi, lekin **fundamental patterns** (kompozitsiya, declarative rendering, immutability, separation of concerns) saqlanib qoladi. Shu kurs sizga **konkret API'lar emas, balki o'rganishni davom ettirish bazasini** beradi.
+Frontend dunyosi tez o'zgaradi, lekin **fundamental patterns** (composition, declarative rendering, immutability, separation of concerns) saqlanib qoladi. Shu kurs sizga **aniq API'lar emas, balki o'rganishni davom ettirish bazasini** beradi.
 
 **Muvaffaqiyat tilaymiz!**
 

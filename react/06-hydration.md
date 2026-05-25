@@ -25,9 +25,9 @@
 
 ### Nazariya
 
-**Server-Side Rendering (SSR)** — React komponent tree'ni **server'da** (Node.js, Deno, Bun, va h.k.) render qilib, oldindan tayyorlangan HTML string'ni client'ga yuborish. Brauzer HTML'ni darhol ko'rsatadi (JavaScript yuklanguncha kutilmaydi).
+**Server-Side Rendering (SSR)** — React komponent tree'ni **server'da** (Node.js, Deno, Bun, va h.k.) render qilib, oldindan tayyorlangan HTML string'ni client'ga yuborish. Browser HTML'ni darhol ko'rsatadi (JavaScript yuklanguncha kutilmaydi).
 
-**Hydration** — server HTML keldi-yu, brauzer uni ko'rsatdi. Endi React client-side ishga tushishi kerak: state, event listener, hooks. Lekin **DOM allaqachon mavjud** — yangi yaratish kerak emas. Hydration — **mavjud DOM'ga React'ni biriktirish**.
+**Hydration** — server HTML keldi-yu, browser uni ko'rsatdi. Endi React client-side ishga tushishi kerak: state, event listener, hooks. Lekin **DOM allaqachon mavjud** — yangi yaratish kerak emas. Hydration — **mavjud DOM'ga React'ni biriktirish**.
 
 **Pipeline:**
 
@@ -41,11 +41,11 @@
    ↓
 3. Server HTML'ni clientga yuboradi
    ↓
-4. Brauzer HTML'ni parse qiladi va ko'rsatadi (FIRST PAINT)
+4. Browser HTML'ni parse qiladi va ko'rsatadi (FIRST PAINT)
    - Foydalanuvchi sahifani ko'radi
    - Lekin click ishlamaydi (JS yo'q)
    ↓
-5. Brauzer JS bundle'ni yuklaydi va ishlaydi
+5. Browser JS bundle'ni yuklaydi va ishlaydi
    ↓
 6. React client'da hydrate qiladi
    - hydrateRoot(container, <App />)
@@ -168,7 +168,7 @@ app.get('/', (req, res) => {
 });
 ```
 
-`renderToPipeableStream` — Node.js streams ishlatadi. Streaming SSR'ning real-world implementatsiyasi (Next.js, Remix shu API'ni ishlatadi).
+`renderToPipeableStream` — Node.js streams ishlatadi. Streaming SSR'ning real-world implementationsi (Next.js, Remix shu API'ni ishlatadi).
 
 **Hydration internal:**
 
@@ -266,7 +266,7 @@ function App() {
 
 1. Server `renderToString(<App />)` chaqiradi → `<div><h1>...</h1>...<button>Click count: 0</button></div>`
 2. HTML clientga yuboriladi
-3. Brauzer parse qiladi va ko'rsatadi (paint)
+3. Browser parse qiladi va ko'rsatadi (paint)
 4. `bundle.js` yuklanadi
 5. `hydrateRoot` chaqiriladi
 6. React tree mavjud DOM ustiga quriladi
@@ -330,9 +330,9 @@ function App() {
 **Streaming oqimi:**
 
 1. Server initial shell yuboradi (Header, Suspense fallbacks, Footer) — TTFB kichik
-2. Brauzer initial HTML'ni ko'rsatadi (foydalanuvchi sarlavhalarni darhol ko'radi)
+2. Browser initial HTML'ni ko'rsatadi (foydalanuvchi sarlavhalarni darhol ko'radi)
 3. Server Articles fetched bo'lganda — chunk yuboradi (`<script>` orqali fallback'ni almashtirib)
-4. Brauzer mavjud Suspense fallback'ni yangi kontent bilan almashtiradi
+4. Browser mavjud Suspense fallback'ni yangi kontent bilan almashtiradi
 5. Comments tayyor bo'lganda — yana chunk
 6. Foydalanuvchi qism-qism yuklanishni ko'radi (ekran "to'lib boradi")
 
@@ -382,15 +382,17 @@ Barcha options optional. To'liq ro'yxat (R19 stable): `onRecoverableError`, `onC
 
 **`createRoot` bilan farqlar:**
 
-1. **Sintaksis** — `hydrateRoot(container, element, options)` (element parametr birinchi `render`'da emas)
+1. **Syntax** — `hydrateRoot(container, element, options)` (element parametr birinchi `render`'da emas)
 2. **`onRecoverableError`** — hydration mismatch'ni ushlash uchun
 3. **DOM expectation** — container ichida mos HTML kerak
 
 ```tsx
-const root = createRoot(container);
-root.render(<App />);
+// createRoot — render alohida chaqiruvda
+const clientRoot = createRoot(container);
+clientRoot.render(<App />);
 
-const root = hydrateRoot(container, <App />);
+// hydrateRoot — element ikkinchi argument sifatida darhol uzatiladi
+const ssrRoot = hydrateRoot(container, <App />);
 ```
 
 ### Hydration mode farqi
@@ -401,8 +403,9 @@ const root = hydrateRoot(container, <App />);
 - Mismatch holatda tegishli subtree'ni qayta render qiladi (`onRecoverableError`)
 
 > **🕐 Versiya evolyutsiyasi (Root API):**
-> - **Pre-R18 (`ReactDOM.hydrate`):** Eski API, sync hydration. Concurrent features yo'q.
-> - **R18+ (`hydrateRoot`):** Yangi API. Concurrent rendering, selective hydration, streaming bilan integratsiya.
+> - **R16/R17 (`ReactDOM.hydrate`):** Eski API, sync hydration. Concurrent features yo'q.
+> - **R18 (`hydrateRoot` qo'shildi):** Yangi API. Concurrent rendering, selective hydration, streaming bilan integration. `ReactDOM.hydrate` deprecated va R17 behavior warning chiqaradi.
+> - **R19 (`ReactDOM.hydrate` olib tashlangan):** `ReactDOM.render`, `ReactDOM.hydrate`, `ReactDOM.unmountComponentAtNode` butunlay olib tashlandi — `createRoot` / `hydrateRoot` majburiy.
 > - **Sabab:** Concurrent features faqat yangi root API'lar bilan ishlaydi (cross-ref `02-rendering.md`).
 
 <details>
@@ -474,7 +477,8 @@ Static site'da `createRoot` (no SSR):
 import { createRoot } from 'react-dom/client';
 import App from './App';
 
-const container = document.getElementById('root')!;
+const container = document.getElementById('root');
+if (!container) throw new Error('Root element topilmadi');
 createRoot(container).render(<App />);
 ```
 
@@ -484,7 +488,8 @@ SSR + `hydrateRoot`:
 import { hydrateRoot } from 'react-dom/client';
 import App from './App';
 
-const container = document.getElementById('root')!;
+const container = document.getElementById('root');
+if (!container) throw new Error('Root element topilmadi');
 hydrateRoot(container, <App />);
 ```
 
@@ -528,11 +533,14 @@ hydrateRoot(container, <App />, {
 Multi-root setup (microfrontend):
 
 ```tsx
-const widget1Container = document.getElementById('widget-1')!;
-const widget2Container = document.getElementById('widget-2')!;
+const productCatalogContainer = document.getElementById('product-catalog');
+const cartWidgetContainer = document.getElementById('cart-widget');
+if (!productCatalogContainer || !cartWidgetContainer) {
+  throw new Error('Microfrontend root container'lari topilmadi');
+}
 
-hydrateRoot(widget1Container, <WidgetOne />);
-hydrateRoot(widget2Container, <WidgetTwo />);
+hydrateRoot(productCatalogContainer, <ProductCatalog />);
+hydrateRoot(cartWidgetContainer, <CartWidget />);
 ```
 
 </details>
@@ -576,7 +584,7 @@ Hydration jarayoni quyidagi qadamlarni o'z ichiga oladi:
    ↓
 9. Commit Phase
    - BeforeMutation: snapshot (class component'lar)
-   - Mutation: faqat event listener bog'lash + ref detach (DOM struktura mutation YO'Q)
+   - Mutation: ref detach (DOM struktura mutation YO'Q — event listener'lar `hydrateRoot` chaqirilganda root container'ga delegatsiya bilan ulangan, per-element emas)
    - Layout: refs attach, useLayoutEffect, componentDidMount
    - Paint
    - Passive: useEffect
@@ -590,8 +598,8 @@ Hydration jarayoni quyidagi qadamlarni o'z ichiga oladi:
 | Komponent funksiyasi chaqirilishi | Ha | Ha |
 | Hooks ishga tushishi | Ha | Ha |
 | DOM yaratish | Ha (createElement) | YO'Q (existing reuse) |
-| DOM mutation (Commit) | Ha (appendChild) | YO'Q (faqat listener) |
-| Event listener attach | Ha | Ha |
+| DOM mutation (Commit) | Ha (appendChild) | YO'Q |
+| Root container event delegation | Ha (`createRoot`'da bir marta) | Ha (`hydrateRoot`'da bir marta) — R17+ event'lar har element'ga emas, root container'ga delegatsiya orqali ulanadi |
 | Mount effect'lari | Ha | Ha |
 
 ### Hydration mismatch detection
@@ -713,22 +721,34 @@ function App() {
 // "App render"
 ```
 
-Heavy server-side computation client'da qaytarmaslik:
+Hydration paytida hooks va `useMemo` qayta ishga tushadi:
 
 ```tsx
-function ProductList() {
+interface RawProduct { id: string; name: string; price: number; }
+
+function ProductList({ rawData }: { rawData: RawProduct[] }) {
+  // ⚠️ DIQQAT: useMemo cache server'dan client'ga uzatilmaydi.
+  // Server'da expensiveComputation chaqirilgan-u, client hydration'da
+  // ham qayta chaqiriladi (har mount'da yangi memoizedState).
+  // Demak `useMemo` "client'da qayta hisoblamaslik" uchun YECHIM EMAS.
   const products = useMemo(
     () => expensiveComputation(rawData),
     [rawData]
   );
-  
+
   return (
     <ul>
-      {products.map(p => <li key={p.id}>{p.name}</li>)}
+      {products.map(product => <li key={product.id}>{product.name}</li>)}
     </ul>
   );
 }
 ```
+
+**✅ TO'G'RI yechim:** framework darajasida serialize qilish:
+- Next.js: `getServerSideProps`/`loader` → tayyor `products` array client'ga prop sifatida
+- Remix: `loader` return → `useLoaderData()`
+- Vanilla SSR: `__INITIAL_STATE__` window'ga inject va client'da `JSON.parse`
+- R19 RSC: Server Component'da `await` ishlatish, client'ga serialize qilingan natija
 
 </details>
 
@@ -1214,7 +1234,7 @@ function App() {
 
 **Selective Hydration** — R18'da kiritilgan xususiyat. **`<Suspense>` boundary'lar** orqali tree alohida bo'laklarga bo'linadi va har boundary **mustaqil** hydrate bo'ladi.
 
-**Asosiy g'oya:**
+**Asosiy printsip:**
 
 ```
 Pre-R18 hydration:
@@ -1431,7 +1451,7 @@ function ProductPage() {
 
 **Streaming SSR** — server butun HTML'ni bir vaqtda emas, **qism-qism** yuboradi. Bu — `renderToReadableStream` (Web Streams) yoki `renderToPipeableStream` (Node Streams) bilan ishlaydi.
 
-**Asosiy g'oya:**
+**Asosiy printsip:**
 
 ```
 Pre-R18 SSR:
@@ -1448,7 +1468,7 @@ R18 streaming SSR:
 2. Foydalanuvchi initial shell'ni ko'radi
 3. Server async data fetch qiladi (parallel)
 4. Data tayyor bo'lganda → server yangi HTML chunk yuboradi
-5. Brauzer mavjud skeleton'ni yangi content bilan almashtiradi
+5. Browser mavjud skeleton'ni yangi content bilan almashtiradi
 6. Hydration ham parallel ravishda har boundary uchun
 ```
 
@@ -1828,7 +1848,8 @@ R19 error callbacks misol:
 import { hydrateRoot } from 'react-dom/client';
 import App from './App';
 
-const container = document.getElementById('root')!;
+const container = document.getElementById('root');
+if (!container) throw new Error('Root element topilmadi');
 
 hydrateRoot(container, <App />, {
   onCaughtError(error, errorInfo) {
@@ -1918,7 +1939,12 @@ function App() {
 // - R18+: click "saqlanadi" → hydration tugagach replay → alert ishlaydi
 ```
 
-R18 click replay faqat **discrete event'lar** uchun (click, submit). Continuous event'lar (mousemove) replay qilinmaydi.
+**Event kategoriyalari (R18 selective hydration):**
+- **Discrete events** (click, keypress, submit) — boundary'ni **synchronous hydration** qiladi (priority elevation), keyin event sync dispatch qilinadi.
+- **Continuous events** (mousemove, scroll, wheel) — **replay QILINMAYDI**.
+- **Persistent events** (focusin, mouseover, mouseenter, dragenter, pointerover, gotpointercapture) — hydration tugagach **rebroadcast** qilinadi (React focus/hover holatini bilishi uchun).
+
+Manba: `reactwg/react-18` discussion #130 (persistent events explicitly rebroadcast).
 
 ---
 
@@ -2041,7 +2067,7 @@ function Theme() {
 ### ❌ Xato 4: Eski `ReactDOM.hydrate` ishlatish
 
 ```tsx
-// ❌ R18+ deprecated
+// ❌ R18: deprecated, R19: olib tashlangan (RUNTIME ERROR — function mavjud emas)
 import ReactDOM from 'react-dom';
 ReactDOM.hydrate(<App />, container);
 ```
@@ -2137,7 +2163,7 @@ function Greeting() {
 
 ### Mashq 2: SSR-safe komponent yozish (O'rta)
 
-`WindowSize` komponentni yozing — brauzer'ning innerWidth va innerHeight'ini ko'rsatadi. SSR-safe bo'lishi shart.
+`WindowSize` komponentni yozing — browser'ning innerWidth va innerHeight'ini ko'rsatadi. SSR-safe bo'lishi shart.
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -2174,7 +2200,7 @@ function WindowSize() {
 
 ### Mashq 3: Selective hydration tahlil (O'rta)
 
-Quyidagi senaryo'da React qaysi tartibda hydrate qiladi?
+Quyidagi scenario'da React qaysi tartibda hydrate qiladi?
 
 ```tsx
 function App() {
@@ -2209,9 +2235,9 @@ T=100: Hydration boshlanadi
 
 T=150: User Comments tugmasini bosdi
   - React click event'ni "ushlaydi"
-  - Comments boundary'ga SelectiveHydrationLane priority
-  - Sidebar va Article hydration TO'XTAYDI
-  - Click event "saqlanadi" (replay queue)
+  - Comments boundary'ga SelectiveHydrationLane priority elevation
+  - Sidebar va Article hydration KECHIKTIRILADI (priority pasayadi, Scheduler interleave qiladi — to'xtatilmaydi)
+  - Click event sync dispatch qilinadi (Comments hydration tugaganda)
 
 T=150-450: Comments priority hydration
 

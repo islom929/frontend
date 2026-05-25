@@ -81,7 +81,7 @@ function PrimaryButton({ label, onClick }: { label: string; onClick: () => void 
 
 5. **Type safety:** TypeScript composition'ni yaxshi qo'llab-quvvatlaydi. Inheritance bilan generic'lar va override'lar murakkab.
 
-6. **React Compiler:** R19+ Compiler faqat function component'lar va hook'lar uchun ishlaydi. Class component'lar (inheritance bilan ham) — Compiler optimizatsiya doirasidan tashqarida (skip qilinadi, lekin kod ishlashda davom etadi).
+6. **React Compiler:** R19+ Compiler faqat function component'lar va hook'lar uchun ishlaydi. Class component'lar (inheritance bilan ham) — Compiler optimization doirasidan tashqarida (skip qilinadi, lekin kod ishlashda davom etadi).
 
 **Composition'ning 4 ta strategiyasi:**
 
@@ -929,7 +929,7 @@ function DataPanel({ children }: DataPanelProps) {
 
 **Slots vs Children-as-object:**
 
-| Pattern | Sintaksis | Foyda |
+| Pattern | Syntax | Foyda |
 |---------|-----------|-------|
 | Slots (named props) | `<Comp header={...} body={...} />` | Standart, simple |
 | Children as object | `<Comp>{{ header: ..., body: ... }}</Comp>` | Bir prop, kerakli "container" hissi |
@@ -1033,7 +1033,7 @@ Object'ning har key — alohida ReactNode. Reconciler ularni alohida render qila
 }
 ```
 
-Object'ning property'lari Element references — har biri o'z Fiber'ga eshlashtiriladi.
+Object'ning property'lari Element references — har biri o'z Fiber'iga bog'lanadi.
 
 </details>
 
@@ -1179,7 +1179,7 @@ function Layout({ children }: LayoutProps) {
 
 **Render props** pattern — komponent o'zining ichki state'ini yoki logic'ini parent'ga uzatish, parent esa o'sha qiymatdan foydalanib render qilish (cross-ref [`25-legacy-patterns.md`](25-legacy-patterns.md)).
 
-Sintaksis: `children` (function-as-children) yoki maxsus prop nomi bilan (`render`, `renderItem`, va h.k.).
+Syntax: `children` (function-as-children) yoki maxsus prop nomi bilan (`render`, `renderItem`, va h.k.).
 
 ```tsx
 import { useState, useEffect } from 'react';
@@ -1617,7 +1617,7 @@ Tabs.Panel = TabPanel;
 
 **Compound vs Slots vs Render Props:**
 
-| Pattern | When | Sintaksis |
+| Pattern | When | Syntax |
 |---------|------|-----------|
 | Slots (named props) | Static structure | `<Modal title={...} body={...} />` |
 | Children composition | Generic container | `<Card>{children}</Card>` |
@@ -2282,8 +2282,8 @@ function Text<T extends ElementType = 'span'>({
 > **🕐 Versiya evolyutsiyasi (`as` prop):**
 > - **Pre-Hooks era (R15-R16):** `as` prop yoki `component` prop ko'p UI library'larda (e.g. styled-components). TypeScript bilan polymorphic typing — `forwardRef` + complex generic.
 > - **R18 va undan oldin:** `forwardRef` zaruriy ref forwarding uchun, polymorphic typing — qo'shimcha utility types va boilerplate kerak.
-> - **R19+:** `ref` oddiy prop sifatida uzatilishi mumkin (`forwardRef` hali deprecated emas, kelajakda gradually phased out). Polymorphic typing soddalashdi — `forwardRef` HOC kerak emas, ref typing oson.
-> - **Sabab:** R19'da `ref` API restructuring — polymorphic component yozish ergonomikasi yaxshilanishi.
+> - **R19+:** `ref` oddiy prop sifatida uzatilishi mumkin. `forwardRef` — soft-deprecated (hali ishlaydi, warning yo'q, lekin yangi kodda zarurat yo'q). Polymorphic typing soddalashdi — `forwardRef` HOC kerak emas, ref typing oson.
+> - **Sabab:** R19'da `ref` API restructuring — polymorphic component yozish ergonomikasi yaxshilangan.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2360,7 +2360,7 @@ R19'da bu muammo soddalashgan, lekin convention saqlanadi.
 
 **`Omit<..., 'as'>` muhim sabab:**
 
-Agar `as` ham native HTML attribute bo'lsa (e.g. `<a as>`?), kollizyon bo'lardi. Aslida `as` HTML attribute emas, lekin TS validation uchun `Omit` qo'shimcha kafolat.
+Agar `as` ham native HTML attribute bo'lsa (e.g. `<a as>`?), collision bo'lardi. Aslida `as` HTML attribute emas, lekin TS validation uchun `Omit` qo'shimcha kafolat.
 
 </details>
 
@@ -3089,7 +3089,7 @@ Polymorphic component'ga ref forwarding qo'shish — eng murakkab pattern. R18 v
 
 > **🕐 Versiya evolyutsiyasi (`forwardRef` + Polymorphic):**
 > - **R18 va undan oldin:** `forwardRef<RefType, Props>` HOC bilan, polymorphic typing qo'shimcha utility'lar (`ComponentPropsWithRef<T>` + manual ref typing). Sezilarli boilerplate.
-> - **R19+:** `ref` oddiy prop sifatida uzatilishi mumkin (`forwardRef` hali deprecated emas, lekin yangi kodda kerak emas — gradually phased out). Polymorphic typing soddalashdi — `ComponentPropsWithoutRef<T>` + alohida `ref?: Ref<...>` prop bilan.
+> - **R19+:** `ref` oddiy prop sifatida uzatilishi mumkin. `forwardRef` — soft-deprecated (hali ishlaydi, warning yo'q, lekin yangi kodda zarurat yo'q). Polymorphic typing soddalashdi — `ComponentPropsWithoutRef<T>` + alohida `ref?: Ref<...>` prop bilan.
 > - **Sabab:** `forwardRef` API restructuring — pattern boilerplate kamaytirish, ergonomika yaxshilanishi.
 
 **R19+ pattern:**
@@ -3398,14 +3398,14 @@ function Form() {
 ### Gotcha 1: `as` Prop Lowercase Variable
 
 ```tsx
-function Bad({ as = 'span' }: { as?: ElementType }) {
+function PolymorphicTextUnsafe({ as = 'span' }: { as?: ElementType }) {
   const component = as; // ❌ lowercase variable
   return <component>Text</component>;
   // JSX transform: _jsx('component', ...) — string literal!
   // React: <component> HTML tag yo'q, invalid output
 }
 
-function Good({ as = 'span' }: { as?: ElementType }) {
+function PolymorphicText({ as = 'span' }: { as?: ElementType }) {
   const Component = as; // ✅ PascalCase variable
   return <Component>Text</Component>;
   // JSX transform: _jsx(Component, ...) — variable reference
@@ -4100,7 +4100,7 @@ function App() {
   - `ElementType` — element type generic constraint
   - `Omit<ComponentPropsWithoutRef<T>, 'as'>` — native HTML attributes inherit
   - PascalCase variable (`Component = as`) JSX transform talab qilinadi
-- **R19+ ref soddalashishi** — `ref` oddiy prop sifatida uzatiladi; `forwardRef` hali deprecated emas (gradually phased out); polymorphic + ref pattern sezilarli kamroq boilerplate
+- **R19+ ref soddalashishi** — `ref` oddiy prop sifatida uzatiladi; `forwardRef` soft-deprecated (hali ishlaydi, warning yo'q); polymorphic + ref pattern sezilarli kamroq boilerplate
 - **Compile-time vs runtime validation:** Slots (TS compile-time), Compound components (Context throw runtime)
 
 Keyingi bo'limda State va useState — state mental model, useState API, functional updates, queueing, stale closure muammolari, immutable updates, va Fiber state queue internals chuqur yoritiladi.

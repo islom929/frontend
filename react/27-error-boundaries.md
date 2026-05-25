@@ -382,26 +382,24 @@ interface CounterState {
   count: number;
 }
 
+const DEFAULT_INITIAL = 0;
+const DEFAULT_STEP = 1;
+
 class Counter extends React.Component<CounterProps, CounterState> {
-  static defaultProps = {
-    initial: 0,
-    step: 1,
-  };
-  
   state: CounterState = {
-    count: this.props.initial!,
+    count: this.props.initial ?? DEFAULT_INITIAL,
   };
   
   increment = () => {
-    this.setState(prev => ({ count: prev.count + this.props.step! }));
+    this.setState(prev => ({ count: prev.count + (this.props.step ?? DEFAULT_STEP) }));
   };
   
   decrement = () => {
-    this.setState(prev => ({ count: prev.count - this.props.step! }));
+    this.setState(prev => ({ count: prev.count - (this.props.step ?? DEFAULT_STEP) }));
   };
   
   reset = () => {
-    this.setState({ count: this.props.initial! });
+    this.setState({ count: this.props.initial ?? DEFAULT_INITIAL });
   };
   
   render() {
@@ -542,7 +540,7 @@ Class komponent **lifecycle methods** — har bir bosqichda chaqiriladigan maxsu
 
 > **Versiya evolyutsiyasi (Class Lifecycle Methods → Hooks):**
 > - **Pre-R16.8 (2018):** Class lifecycle methods majburiy (`componentDidMount`, `componentDidUpdate`, `componentWillUnmount`, `componentWillMount`, `componentWillReceiveProps`, `componentWillUpdate`).
-> - **R16.8+ (Hooks):** `useEffect`, `useLayoutEffect`, `useState`, `useReducer` lifecycle method'larning aksariyatini almashtirdi. **Sabab:** lifecycle method'lar logic reuse'ni qiyinlashtirardi (HOC, render props bilan kurashish), `this` binding murakkab edi, lifecycle "soup" — bir method'da turli concerns aralash. **MUHIM:** `useEffect` lifecycle method'ning **mexanik almashtiruvi emas** — sinxronizatsiya modeli (cross-ref [`16-useeffect.md`](16-useeffect.md)).
+> - **R16.8+ (Hooks):** `useEffect`, `useLayoutEffect`, `useState`, `useReducer` lifecycle method'larning aksariyatini almashtirdi. **Sabab:** lifecycle method'lar logic reuse'ni qiyinlashtirardi (HOC, render props bilan kurashish), `this` binding murakkab edi, lifecycle "soup" — bir method'da turli concerns aralash. **MUHIM:** `useEffect` lifecycle method'ning **mexanik almashtiruvi emas** — sync model (cross-ref [`16-useeffect.md`](16-useeffect.md)).
 > - **R19+:** Error boundaries hali class shart (`getDerivedStateFromError`/`componentDidCatch`). Hooks-only kelajak — kuting (RFC discussions).
 
 NIMA UCHUN `useEffect` lifecycle equivalent EMAS:
@@ -664,13 +662,13 @@ Lifecycle method'lar va hooks ekvivalent:
 
 ```tsx
 // === Class version ===
-interface MyComponentState {
+interface RiskyActionButtonState {
   data: any[];
   loading: boolean;
 }
 
-class MyClass extends React.Component<{ url: string }, MyComponentState> {
-  state: MyComponentState = { data: [], loading: true };
+class MyClass extends React.Component<{ url: string }, RiskyActionButtonState> {
+  state: RiskyActionButtonState = { data: [], loading: true };
   
   componentDidMount() {
     this.fetchData();
@@ -941,7 +939,8 @@ class NewComponent extends React.Component<{ userId: string }, { user: any }> {
       const user = await response.json();
       this.setState({ user });
     } catch (err) {
-      if ((err as any).name !== 'AbortError') throw err;
+      if (err instanceof Error && err.name === 'AbortError') return;
+      throw err;
     }
   };
   
@@ -1930,7 +1929,7 @@ function ManualErrorPattern() {
 Event handler va async error'lar Error Boundary ushlamasligi sababli, **manual try/catch** + `setState` pattern ishlatiladi:
 
 ```tsx
-function MyComponent() {
+function RiskyActionButton() {
   const [error, setError] = React.useState<Error | null>(null);
   
   const handleClick = async () => {
@@ -1947,7 +1946,7 @@ function MyComponent() {
 }
 
 <ErrorBoundary fallback={<ErrorMessage />}>
-  <MyComponent />
+  <RiskyActionButton />
 </ErrorBoundary>
 ```
 
@@ -1970,7 +1969,7 @@ function useErrorHandler() {
   return setError;
 }
 
-function MyComponent() {
+function RiskyActionButton() {
   const handleError = useErrorHandler();
   
   const handleClick = async () => {
@@ -2912,7 +2911,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 ```tsx
 import { useErrorBoundary } from 'react-error-boundary';
 
-function MyComponent() {
+function RiskyActionButton() {
   const { showBoundary } = useErrorBoundary();
   
   const handleClick = async () => {
@@ -3480,14 +3479,14 @@ componentDidCatch(error: Error) {
 
 ```tsx
 // ❌ Boundary kutib bo'lmaydi
-function MyComp() {
+function SubmitButton() {
   const handleClick = () => {
     throw new Error('Click error');  // Browser console error, no boundary
   };
 }
 
 // ✅ Manual try/catch + throwError
-function MyComp() {
+function SubmitButton() {
   const throwError = useErrorHandler();
   const handleClick = () => {
     try {

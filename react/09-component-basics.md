@@ -73,7 +73,7 @@ const UserCard = ({ user }: { user: User }) => {
 
 > **🕐 Versiya evolyutsiyasi (Function vs Class):**
 > - **R0.14 va undan oldin:** `React.createClass({ ... })` — original API. Mixin pattern bilan logic share.
-> - **R0.14 (2015):** `class extends React.Component` ES2015 class sintaksisi qo'shildi. Mixin'lar deprecated.
+> - **R0.14 (2015):** `class extends React.Component` ES2015 class syntax'i qo'shildi. Mixin'lar deprecated.
 > - **R16.8 (2019):** Hooks qo'shildi. Function component'lar lifecycle, state, va boshqa imkoniyatlarga ega bo'ldi. Class endi tavsiya qilinmaydi.
 > - **R19+ (2024):** Class component'lar hali ham qo'llab-quvvatlanadi (backward compatibility), lekin yangi feature'lar (`use`, `useFormStatus`, Server Components) faqat function context'da.
 > - **Sabab:** Function + Hooks model — kichik, taqqoslanuvchi, takrorlanmaydigan logic, va concurrent rendering uchun semantik jihatdan to'g'riroq.
@@ -232,7 +232,7 @@ _jsxs('header', {            // ← string: HostComponent
 });
 ```
 
-Bu qoida — JSX transform **statik analysis** orqali aniqlaydi va **runtime check emas**. Tag o'rnida string bo'lsa — DOM element, identifier bo'lsa — komponent.
+Bu qoida — JSX transform **static analysis** orqali aniqlaydi va **runtime check emas**. Tag o'rnida string bo'lsa — DOM element, identifier bo'lsa — komponent.
 
 **Qoidaning amaliy ta'siri:**
 
@@ -242,29 +242,30 @@ Bu qoida — JSX transform **statik analysis** orqali aniqlaydi va **runtime che
 
 ```tsx
 // ❌ XATO — lowercase identifier
-function mybutton() {
+function primarybutton() {
   return <button>Click</button>;
 }
 
-function App() {
-  return <mybutton />;
-  // JSX transform: _jsx('mybutton', {})
-  // React: 'mybutton' DOM'da `HTMLUnknownElement` sifatida yaratiladi (lowercase + dash siz =
-  // unknown HTML tag, Web Component emas). DOM'ga `<mybutton></mybutton>` quyiladi —
-  // valid DOM tree (HTMLUnknownElement), lekin foydalanuvchi kutgan komponent renderi YO'Q.
+function CheckoutPanelBroken() {
+  return <primarybutton />;
+  // JSX transform: _jsx('primarybutton', {})
+  // React: 'primarybutton' DOM'da `HTMLUnknownElement` sifatida yaratiladi
+  // (lowercase + dash siz = unknown HTML tag, Web Component emas).
+  // DOM'ga `<primarybutton></primarybutton>` quyiladi — valid DOM tree
+  // (HTMLUnknownElement), lekin foydalanuvchi kutgan komponent renderi YO'Q.
   // React komponent'ni umuman chaqirmaydi (string sifatida sanaganlik uchun).
 }
 ```
 
 ```tsx
 // ✅ TO'G'RI — PascalCase
-function MyButton() {
+function PrimaryButton() {
   return <button>Click</button>;
 }
 
-function App() {
-  return <MyButton />;
-  // JSX transform: _jsx(MyButton, {})
+function CheckoutPanel() {
+  return <PrimaryButton />;
+  // JSX transform: _jsx(PrimaryButton, {})
   // React: function component sifatida render
 }
 ```
@@ -315,7 +316,7 @@ JSX transform qoidasi `@babel/plugin-transform-react-jsx` (yoki SWC, esbuild) to
 3. **Dot mavjud bo'lsa** (`<obj.Prop />`) → har doim member expression (variable reference)
 4. **Underscore bilan boshlanadigan** (`<_Component />`) — ham capitalized deb sanaladi (kam uchraydi). **Raqam bilan boshlangan identifier'lar JavaScript'da haram** — `<1Title />` parse error; lekin `<H1Title />` (uppercase'dan boshlangan, ichida raqam) — to'g'ri, identifier sifatida qabul qilinadi
 
-Babel kompilyator log:
+Babel compiler log:
 
 ```
 JSX:  <header>...</header>
@@ -328,7 +329,7 @@ JSX:  <Page.Header />
 Out:  _jsx(Page.Header, {})  // member expression — har doim identifier
 ```
 
-Internal `JSXIdentifier` AST node tip:
+Internal `JSXIdentifier` AST node type:
 
 ```ts
 interface JSXIdentifier {
@@ -411,16 +412,16 @@ Anti-pattern — lowercase variable:
 
 ```tsx
 // ❌ XATO
-function App() {
-  const view = MyComponent; // lowercase variable
+function DashboardBroken() {
+  const view = ListView; // lowercase variable
   return <view />;
   // JSX transform: _jsx('view', {}) — string!
   // React: <view> HTML tag yo'q, warning
 }
 
 // ✅ TO'G'RI — uppercase
-function App() {
-  const View = MyComponent;
+function Dashboard() {
+  const View = ListView;
   return <View />;
 }
 ```
@@ -461,14 +462,15 @@ function Greeting({ name }: { name: string }) {
 
 ```tsx
 const element = <Greeting name="Alice" />;
-// Element:
+// Element (R19 default — ref endi props ichida, alohida slot yo'q):
 // {
 //   $$typeof: Symbol(react.element),
 //   type: Greeting,
-//   props: { name: 'Alice' },
 //   key: null,
-//   ref: null
+//   props: { name: 'Alice' },   // ref bo'lsa, bu yerda: props.ref
+//   _owner: null
 // }
+// R18 va undan oldin esa element.ref alohida slot edi.
 ```
 
 Element **immutable** — yaratilgandan keyin o'zgartirilmaydi. Har render Component qaytaradigan element'lar yangidan yaratiladi.
@@ -526,13 +528,23 @@ Class component holatida Instance — `class` instance (`new MyComponent(props)`
 React Element internal structure:
 
 ```ts
+// R19 default (enableRefAsProp = true):
 type ReactElement<P = any> = {
   $$typeof: Symbol;     // Symbol(react.element) — security marker (XSS prevention)
   type: string | ComponentType<P>; // 'div' yoki Greeting funksiyasi
-  props: P;             // Komponentga uzatiladigan props
   key: string | null;   // Reconciler identity uchun
-  ref: Ref<unknown> | null; // Forwarded ref
+  props: P;             // Komponentga uzatiladigan props (R19'da `ref` ham shu yerda)
+  _owner: Fiber | null; // Dev-mode debug uchun
 };
+
+// R18 va undan oldin (alohida `ref` slot):
+// type ReactElement<P = any> = {
+//   $$typeof: Symbol;
+//   type: string | ComponentType<P>;
+//   key: string | null;
+//   ref: Ref<unknown> | null;   // ← alohida slot
+//   props: P;
+// };
 ```
 
 `$$typeof: Symbol(react.element)` — server'dan kelgan JSON ichida React Element bo'lib ko'rinishini bloklash uchun (chunki Symbol JSON'ga serialize qilinmaydi).
@@ -541,15 +553,22 @@ type ReactElement<P = any> = {
 
 ```ts
 // _jsx implementation (soddalashtirilgan)
+// R19 default (enableRefAsProp = true) — ref alohida slot YO'Q, props ichida
 function _jsx<P>(type: ComponentType<P> | string, props: P, key?: string): ReactElement<P> {
   return {
     $$typeof: REACT_ELEMENT_TYPE,
     type,
-    props,
     key: key ?? null,
-    ref: null,
+    props,   // ← ref bo'lsa: props.ref (R19); R18'da alohida `ref` slot edi
+    _owner: null,
   };
 }
+
+// R18 va undan oldin (soddalashtirilgan):
+// function _jsx<P>(type, config, key) {
+//   const { ref, ...props } = config;
+//   return { $$typeof, type, key, ref, props, _owner: null };
+// }
 ```
 
 **Fiber Instance** Element'dan yaratiladi:
@@ -656,7 +675,7 @@ function Parent({ users }: { users: User[] }) {
   
   return <div>{memoElements}</div>;
   // useMemo bilan element identity Object.is bilan teng — Reconciler bailout qiladi
-  // (cross-ref 04-reconciliation.md — Bailout sabab 1: Element identity)
+  // (cross-ref 04-reconciliation.md — Bailout reason 1: Element identity)
 }
 ```
 
@@ -723,15 +742,15 @@ Bu invariant — matematikadagi pure function ta'rifining to'liq amaliyoti: inpu
 
 ```tsx
 // ❌ Non-deterministic
-function BadId() {
-  return <div id={`id-${Math.random()}`}>Click</div>;
-  // Strict Mode 2x render: ikki marta turli ID generatsiya
+function FieldIdUnsafe() {
+  return <div id={`field-${Math.random()}`}>Click</div>;
+  // Strict Mode 2x render: ikki marta turli ID hosil bo'ladi
   // Concurrent rendering uziladi: birinchi render bir ID, qayta render boshqa
 }
 
 // ✅ Deterministic
-function GoodId({ baseId }: { baseId: string }) {
-  return <div id={`id-${baseId}`}>Click</div>;
+function FieldId({ baseId }: { baseId: string }) {
+  return <div id={`field-${baseId}`}>Click</div>;
   // baseId — props orqali keladi, deterministic
 }
 ```
@@ -762,7 +781,7 @@ Concurrent rendering jarayonida React quyidagi steps'ni bajaradi:
 1. **Render boshlash:** `beginWork(fiber)` — komponent funksiyasi chaqiriladi
 2. **Hooks dispatcher swap:** `mountIndeterminateComponent` (mount) yoki `updateFunctionComponent` (update)
 3. **Component chaqiruv:** `Component(props)` natijasi — children JSX
-4. **Yield check:** Har 5ms (R18'dagi `frameYieldMs`) — main thread bandmi tekshiriladi
+4. **Yield check:** Har 5 ms (`frameYieldMs`, R16.5+ unchanged) — main thread bandmi tekshiriladi
 5. **Yield bo'lsa:** Render to'xtatiladi, brauzerga vaqt beriladi
 6. **Restart:** Yangi yuqori-priority update kelsa, render qayta boshlanadi (`workInProgress` reset, `current` o'zgarmagan)
 
@@ -811,10 +830,10 @@ Ikkala chaqiruv natijalari pure component'da bir xil bo'lishi shart. `Math.rando
 
 **`useId` SSR-safe ID generation:**
 
-`useId` ID'ni Fiber tree pozitsiyasidan generatsiya qiladi:
+`useId` ID'ni Fiber tree position'idan hosil qiladi:
 
 ```
-Fiber tree pozitsiya: root → div → form → useId hook
+Fiber tree position: root → div → form → useId hook
 Generated ID: ":r0:" yoki ":R12pj:" (Fiber path hash)
 ```
 
@@ -832,7 +851,7 @@ Anti-pattern — `Math.random()` render'da:
 
 ```tsx
 // ❌ Strict Mode'da 2x render — har safar yangi ID
-function BadModal() {
+function ModalDialogUnsafe() {
   const modalId = `modal-${Math.random()}`;
   return (
     <div id={modalId} role="dialog">
@@ -847,7 +866,7 @@ function BadModal() {
 ```tsx
 import { useId } from 'react';
 
-function GoodModal() {
+function ModalDialog() {
   const modalId = useId();
   return (
     <div id={modalId} role="dialog">
@@ -861,7 +880,7 @@ Anti-pattern — `Date.now()` render'da:
 
 ```tsx
 // ❌ Vaqt har render'da yangi
-function BadTimestamp() {
+function RenderTimestampUnsafe() {
   return <span>Rendered at: {Date.now()}</span>;
   // Har re-render'da boshqa raqam
 }
@@ -872,7 +891,7 @@ function BadTimestamp() {
 ```tsx
 import { useState, useEffect } from 'react';
 
-function GoodTimestamp() {
+function RenderTimestamp() {
   const [renderedAt] = useState(() => Date.now());
   // Lazy initial — bir marta hisob, state'da saqlanadi
   return <span>Rendered at: {renderedAt}</span>;
@@ -895,7 +914,7 @@ Anti-pattern — Module-level mutable state:
 // ❌ Module-scope mutable variable
 let renderCount = 0;
 
-function BadComponent() {
+function RenderTrackerUnsafe() {
   renderCount++;
   return <div>Render #{renderCount}</div>;
   // Strict Mode 2x: renderCount += 2 har render'da
@@ -908,7 +927,7 @@ function BadComponent() {
 ```tsx
 import { useRef } from 'react';
 
-function GoodComponent() {
+function RenderTracker() {
   const renderCountRef = useRef(0);
   renderCountRef.current += 1; // ⚠️ ref mutation render'da OK lekin tartib aniq emas
   return <div>Render #{renderCountRef.current}</div>;
@@ -956,7 +975,7 @@ Ikkinchi sub-invariant — **Side Effects Yo'q**: Component funksiyasi tanasida 
 
 ```tsx
 // ❌ XATO — render'da setState
-function BadCounter() {
+function CounterUnsafe() {
   const [count, setCount] = useState(0);
   setCount(count + 1); // ❌ Side effect — render'da state o'zgartirish
   // Natija: cheksiz re-render loop
@@ -966,7 +985,7 @@ function BadCounter() {
 
 ```tsx
 // ❌ XATO — render'da DOM mutation
-function BadTitle({ title }: { title: string }) {
+function PageTitleUnsafe({ title }: { title: string }) {
   document.title = title; // ❌ Render paytida tashqi DOM o'zgartirildi
   return <h1>{title}</h1>;
 }
@@ -977,7 +996,7 @@ function BadTitle({ title }: { title: string }) {
 1. **Event handler'lar** — `onClick`, `onChange`, `onSubmit` — bular render'dan tashqarida ishlaydi:
 
 ```tsx
-function GoodCounter() {
+function Counter() {
   const [count, setCount] = useState(0);
   return (
     <button onClick={() => setCount(c => c + 1)}>
@@ -988,12 +1007,12 @@ function GoodCounter() {
 }
 ```
 
-2. **`useEffect`** — render bilan sinxronizatsiya kerak bo'lganda:
+2. **`useEffect`** — render bilan sync kerak bo'lganda:
 
 ```tsx
 import { useEffect } from 'react';
 
-function GoodTitle({ title }: { title: string }) {
+function PageTitle({ title }: { title: string }) {
   useEffect(() => {
     document.title = title;
   }, [title]);
@@ -1007,12 +1026,12 @@ function GoodTitle({ title }: { title: string }) {
 ```tsx
 import { useState } from 'react';
 
-function GoodList({ initialItems }: { initialItems: string[] }) {
+function TagList({ initialItems }: { initialItems: string[] }) {
   const [items] = useState(() => {
     // ✅ Bir martalik tartiblash — useState lazy init
     return [...initialItems].sort();
   });
-  return <ul>{items.map((i) => <li key={i}>{i}</li>)}</ul>;
+  return <ul>{items.map((tag) => <li key={tag}>{tag}</li>)}</ul>;
 }
 ```
 
@@ -1061,7 +1080,7 @@ Side effect render'da bo'lsa, ikkita muammo:
 **Misol — render'da fetch:**
 
 ```tsx
-function BadComponent({ id }: { id: number }) {
+function ProfileLoaderUnsafe({ id }: { id: number }) {
   fetch(`/api/data/${id}`); // ❌
   return <div>Loading...</div>;
 }
@@ -1079,25 +1098,27 @@ Race condition: request 1 va 2'dan qaysi birinchi keladi — aniq emas. UI noani
 **To'g'ri yondashuv — `useEffect`:**
 
 ```tsx
-function GoodComponent({ id }: { id: number }) {
-  const [data, setData] = useState(null);
+type Profile = { id: number; name: string };
+
+function ProfileLoader({ id }: { id: number }) {
+  const [profile, setProfile] = useState<Profile | null>(null);
   
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/data/${id}`)
       .then((res) => res.json())
-      .then((d) => {
-        if (!cancelled) setData(d);
+      .then((data: Profile) => {
+        if (!cancelled) setProfile(data);
       });
     return () => { cancelled = true; };
-    // ✅ Cleanup — eski request natijasi setData chaqirmaydi
+    // ✅ Cleanup — eski request natijasi setProfile chaqirmaydi
   }, [id]);
   
-  return <div>{data ? data.name : 'Loading...'}</div>;
+  return <div>{profile ? profile.name : 'Loading...'}</div>;
 }
 ```
 
-**Render'da xato'larga qarshi React himoya qilmaydi** — buni Compiler tutadi (R19+) yoki ESLint plugin (`eslint-plugin-react-hooks`, `react/no-direct-mutation-state` qoidasi).
+**Render'da xato'larga qarshi React himoya qilmaydi** — ko'pchilik render-purity buzilishlarini React Compiler (R19+) static analysis bilan tutadi yoki ESLint `eslint-plugin-react-hooks` qoidalari (`react-hooks/exhaustive-deps`, `react-hooks/rules-of-hooks`) bilan ma'lum subset aniqlanadi. Lekin "render'da `setState`" yoki "render'da `document.title = ...`" kabi side effect'lar — runtime'da topiladi (cheksiz loop yoki Strict Mode dev warning orqali), to'liq static analysis bilan emas.
 
 </details>
 
@@ -1108,14 +1129,14 @@ Anti-pattern — render'da setState:
 
 ```tsx
 // ❌ Cheksiz loop
-function BadCounter() {
+function CounterRenderUnsafe() {
   const [count, setCount] = useState(0);
   setCount(count + 1);
   return <div>{count}</div>;
 }
 
 // ⚠️ Conditional setState — React documented exception
-function ConditionalSetState({ value }: { value: number }) {
+function DerivedValueSync({ value }: { value: number }) {
   const [prev, setPrev] = useState(value);
   if (prev !== value) {
     setPrev(value);
@@ -1132,15 +1153,17 @@ function ConditionalSetState({ value }: { value: number }) {
 ✅ To'g'ri — derived state for free:
 
 ```tsx
-function GoodDerivation({ value }: { value: number }) {
+function DoubledPrice({ value }: { value: number }) {
   const doubled = value * 2; // Render'da hisoblash — pure
   return <div>{doubled}</div>;
 }
 
 // Kompleks derivation — useMemo
-function ExpensiveDerivation({ items }: { items: Item[] }) {
+type Item = { id: number; name: string };
+
+function SortedItemList({ items }: { items: Item[] }) {
   const sorted = useMemo(() => [...items].sort(), [items]);
-  return <ul>{sorted.map((i) => <li key={i.id}>{i.name}</li>)}</ul>;
+  return <ul>{sorted.map((item) => <li key={item.id}>{item.name}</li>)}</ul>;
 }
 ```
 
@@ -1148,13 +1171,13 @@ Anti-pattern — render'da DOM mutation:
 
 ```tsx
 // ❌ document.title o'zgartirish
-function BadPage({ title }: { title: string }) {
+function ArticlePageUnsafe({ title }: { title: string }) {
   document.title = title;
   return <h1>{title}</h1>;
 }
 
 // ❌ Element class manipulation
-function BadHighlight({ active }: { active: boolean }) {
+function HighlightSectionUnsafe({ active }: { active: boolean }) {
   const el = document.querySelector('.highlight');
   if (active && el) el.classList.add('on');
   return <div className="highlight">Content</div>;
@@ -1164,7 +1187,7 @@ function BadHighlight({ active }: { active: boolean }) {
 ✅ To'g'ri — useEffect bilan:
 
 ```tsx
-function GoodPage({ title }: { title: string }) {
+function ArticlePage({ title }: { title: string }) {
   useEffect(() => {
     document.title = title;
   }, [title]);
@@ -1172,14 +1195,14 @@ function GoodPage({ title }: { title: string }) {
 }
 
 // React 19+ — Document Metadata API:
-function GoodPageR19({ title }: { title: string }) {
+function ArticlePageR19({ title }: { title: string }) {
   return (
     <>
       <title>{title}</title>
       <h1>{title}</h1>
     </>
   );
-  // ✅ R19'da <title>, <meta>, <link> deklarativ ishlaydi (cross-ref 37-react-19-document-apis.md)
+  // ✅ R19'da <title>, <meta>, <link> declarative ishlaydi (cross-ref 37-react-19-document-apis.md)
 }
 ```
 
@@ -1187,7 +1210,7 @@ Anti-pattern — render'da subscription:
 
 ```tsx
 // ❌ Subscription render'da
-function BadOnlineStatus() {
+function ConnectivityBannerUnsafe() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   
   window.addEventListener('online', () => setIsOnline(true));
@@ -1203,7 +1226,7 @@ function BadOnlineStatus() {
 ```tsx
 import { useSyncExternalStore } from 'react';
 
-function GoodOnlineStatus() {
+function ConnectivityBanner() {
   const isOnline = useSyncExternalStore(
     (callback) => {
       window.addEventListener('online', callback);
@@ -1224,7 +1247,7 @@ function GoodOnlineStatus() {
 Lazy initial state — render'da bir martalik hisob:
 
 ```tsx
-function GoodLazy({ rawData }: { rawData: string }) {
+function ConfigViewer({ rawData }: { rawData: string }) {
   const [parsed] = useState(() => JSON.parse(rawData));
   // ✅ JSON.parse faqat birinchi render'da chaqiriladi
   // Keyingi render'larda state'dan o'qiladi
@@ -1232,7 +1255,7 @@ function GoodLazy({ rawData }: { rawData: string }) {
 }
 
 // ⚠️ Ehtiyot bo'lish: useState'ning oddiy argument'i HAR render'da hisoblanadi
-function BadLazy({ rawData }: { rawData: string }) {
+function ConfigViewerWasteful({ rawData }: { rawData: string }) {
   const [parsed] = useState(JSON.parse(rawData));
   // ❌ JSON.parse har render'da hisoblanadi (lekin state value'ga ta'siri yo'q)
   // — performance waste, lekin pure (chunki side effect yo'q)
@@ -1262,7 +1285,7 @@ Uchinchi sub-invariant — **Mutable Reads Yo'q**: Component render paytida o'zg
 
 ```tsx
 // ❌ window.innerWidth render'da
-function BadResponsive() {
+function ResponsiveShellUnsafe() {
   const isMobile = window.innerWidth < 768;
   return <div className={isMobile ? 'mobile' : 'desktop'}>Content</div>;
   // window resize'da — komponent re-render bo'lmaydi
@@ -1275,7 +1298,7 @@ function BadResponsive() {
 ```tsx
 import { useState, useEffect } from 'react';
 
-function GoodResponsive() {
+function ResponsiveShell() {
   const [isMobile, setIsMobile] = useState(false); // SSR-safe initial
   
   useEffect(() => {
@@ -1371,7 +1394,7 @@ export const getCounter = () => ++globalCounter;
 // Component.tsx
 import { getCounter } from './utils';
 
-function BadComponent() {
+function CartItemUnsafe() {
   const id = getCounter(); // ❌ Module-scope mutable
   return <div id={`item-${id}`}>...</div>;
 }
@@ -1436,28 +1459,28 @@ Vaqt — props orqali parent'dan:
 
 ```tsx
 // ❌ Render'da Date.now()
-function BadGreeting() {
+function TimeGreetingUnsafe() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Morning' : 'Evening';
   return <h1>{greeting}</h1>;
 }
 
 // ✅ Vaqt parent'dan props orqali
-type Props = { currentHour: number };
+type GreetingProps = { currentHour: number };
 
-function GoodGreeting({ currentHour }: Props) {
+function TimeGreeting({ currentHour }: GreetingProps) {
   const greeting = currentHour < 12 ? 'Morning' : 'Evening';
   return <h1>{greeting}</h1>;
 }
 
 // Parent'da yangilab turish:
-function App() {
+function GreetingPage() {
   const [hour, setHour] = useState(() => new Date().getHours());
   useEffect(() => {
     const id = setInterval(() => setHour(new Date().getHours()), 60_000);
     return () => clearInterval(id);
   }, []);
-  return <GoodGreeting currentHour={hour} />;
+  return <TimeGreeting currentHour={hour} />;
 }
 ```
 
@@ -1473,8 +1496,10 @@ function PageTracker() {
   // ⚠️ Lazy initial — bir marta o'qiladi
   
   useEffect(() => {
+    const titleEl = document.querySelector('title');
+    if (!titleEl) return;
     const observer = new MutationObserver(() => setTitle(document.title));
-    observer.observe(document.querySelector('title')!, { childList: true });
+    observer.observe(titleEl, { childList: true });
     return () => observer.disconnect();
   }, []);
   
@@ -1531,7 +1556,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 
-createRoot(document.getElementById('root')!).render(
+const rootEl = document.getElementById('root');
+if (!rootEl) throw new Error('Root element #root not found');
+
+createRoot(rootEl).render(
   <StrictMode>
     <App />
   </StrictMode>
@@ -1596,7 +1624,7 @@ function renderWithHooks(
 }
 ```
 
-`disableLogs()` — React internal'ining 2-renderdagi `console.*` chaqiruvlari konsoldagi takrorlanuvchi noise'ini kamaytirish uchun ishlatadigan mexanizmi (`console.log = noop` kabi temporary patch). R18'gacha bu yondashuv 2-render log'larini to'liq yashirardi. R18+'dan boshlab React DevTools'ning brauzer integratsiyasi bilan birga — log'lar yashirilmasdan, "duplicate render" indikatori bilan grouped/dim qilingan ko'rinishda chiqadi (eski versiyalarda — to'liq bostirilgan).
+`disableLogs()` — React internal'ining 2-renderdagi `console.*` chaqiruvlari konsoldagi takrorlanuvchi noise'ini kamaytirish uchun ishlatadigan mexanizmi (`console.log = noop` kabi temporary patch). R18'gacha bu yondashuv 2-render log'larini to'liq yashirardi. R18+'dan boshlab React DevTools'ning browser integration'i bilan birga — log'lar yashirilmasdan, "duplicate render" indikatori bilan grouped/dim qilingan ko'rinishda chiqadi (eski versiyalarda — to'liq bostirilgan).
 
 R18+ effect 2x cycle:
 
@@ -1656,7 +1684,7 @@ let renderLog: string[] = [];
 // Component.tsx
 import { useState } from 'react';
 
-function ImpureComponent({ name }: { name: string }) {
+function LoggingGreeting({ name }: { name: string }) {
   renderLog.push(name); // ❌ Side effect — module mutable state
   return <div>{name}</div>;
 }
@@ -1664,7 +1692,7 @@ function ImpureComponent({ name }: { name: string }) {
 function App() {
   return (
     <StrictMode>
-      <ImpureComponent name="Alice" />
+      <LoggingGreeting name="Alice" />
     </StrictMode>
   );
 }
@@ -1677,11 +1705,13 @@ function App() {
 To'g'ri — pure component:
 
 ```tsx
-function PureComponent({ name }: { name: string }) {
+function PureGreeting({ name }: { name: string }) {
   return <div>{name}</div>;
   // ✅ Idempotent — ko'p chaqiruv natijasi bir xil
   // Strict Mode 2x render: bir xil JSX qaytariladi
-  // React Reconciler optimizatsiya qiladi (bailout)
+  // Reconciler optimization qiladi (bailout)
+  // ⚠️ Komponent nomi sifatida `PureComponent` ishlatish — React.PureComponent
+  //    class API'sini shadow qiladi, shuning uchun boshqa nom afzal
 }
 ```
 
@@ -1717,7 +1747,7 @@ Effect cleanup'ni to'g'ri yozish — restartable bo'lishi kerak:
 
 ```tsx
 // ✅ To'g'ri — har connect uchun disconnect, har subscribe uchun unsubscribe
-function GoodChat({ userId }: { userId: number }) {
+function ChatRoom({ userId }: { userId: number }) {
   useEffect(() => {
     const ws = new WebSocket(`/chat/${userId}`);
     return () => ws.close();
@@ -1729,7 +1759,7 @@ function GoodChat({ userId }: { userId: number }) {
 
 ```tsx
 // ❌ Xato — cleanup yo'q
-function BadChat({ userId }: { userId: number }) {
+function ChatRoomUnsafe({ userId }: { userId: number }) {
   useEffect(() => {
     const ws = new WebSocket(`/chat/${userId}`);
     // Cleanup yo'q — Strict Mode'da 2 ta WebSocket connection
@@ -1782,13 +1812,44 @@ class Counter extends Component<{}, { count: number }> {
 }
 ```
 
+**`super(props)` qachon zarur:**
+
+Yuqoridagi misol class field syntax (`state = { count: 0 }`) ishlatadi va explicit `constructor` yo'q — bunda `super(props)` chaqirilmaydi (TypeScript/Babel kompilyatsiyada avtomatik qo'shiladi). Lekin explicit `constructor` e'lon qilinsa, **`super(props)` birinchi statement bo'lishi shart**:
+
+```tsx
+class CounterExplicit extends Component<{ initial: number }, { count: number }> {
+  constructor(props: { initial: number }) {
+    super(props); // ← MAJBURIY: `this.props` ni ishga tushiradi
+    this.state = { count: props.initial };
+  }
+  
+  render() {
+    return <button>{this.state.count}</button>;
+  }
+}
+```
+
+`super()` (props'siz) ham JavaScript runtime'da ishlaydi (chunki React `Component` constructor `this.props = props` ni `componentMount` paytida o'rnatadi), lekin **`super(props)` afzal** — chunki `constructor` ichida `this.props` ni ishlatish kerak bo'lsa, undefined bo'lmaydi:
+
+```tsx
+class CounterBuggy extends Component<{ initial: number }, { count: number }> {
+  constructor(props: { initial: number }) {
+    super();              // ❌ props uzatilmagan
+    console.log(this.props); // undefined — constructor ichida
+    this.state = { count: 0 };
+  }
+}
+```
+
+ES2015 class semantikasi: `super()` chaqirilmaguncha `this` ga murojaat qilish — `ReferenceError`. Class field initializers (`state = ...`) implicit `super()` chaqiruvidan keyin ishlaydi.
+
 **Function vs Class — solishtirma:**
 
 | Xususiyat | Function | Class |
 |-----------|----------|-------|
 | State | `useState`, `useReducer` | `this.state`, `setState` |
 | Lifecycle | `useEffect`, `useLayoutEffect` | `componentDidMount`, `componentDidUpdate`, `componentWillUnmount` |
-| Refs | `useRef`, `forwardRef` | `React.createRef`, instance refs |
+| Refs | `useRef`, ref-as-prop (R19; `forwardRef` soft-deprecated — hali ham ishlaydi, warning yo'q) | `React.createRef`, instance refs |
 | Context | `useContext` | `static contextType`, `Context.Consumer` |
 | Memoization | `useMemo`, `useCallback`, `React.memo` | `shouldComponentUpdate`, `PureComponent` |
 | Logic share | Custom hooks | HOC, Render props |
@@ -1805,11 +1866,11 @@ class Counter extends Component<{}, { count: number }> {
 
 **Class component qachon hali ham qo'llaniladi:**
 
-1. **Error Boundaries** — hozircha (R19+) faqat class'da implement qilinishi mumkin (cross-ref [`27-error-boundaries.md`](27-error-boundaries.md)). Function alternative — `react-error-boundary` library.
+1. **Error Boundaries** — hozircha (R19+) `componentDidCatch` va `getDerivedStateFromError` faqat class'da mavjud (cross-ref [`27-error-boundaries.md`](27-error-boundaries.md)). `react-error-boundary` library — function-friendly **API** (`<ErrorBoundary>` component + `useErrorBoundary` hook) beradi, lekin internal'da hali ham class-based wrapper
 2. **Legacy codebase** — eski kod refactor qilish'gacha class qoladi
 3. **3rd-party library compatibility** — ba'zi eski kutubxonalar class component talab qiladi
 
-**Class → Function konvertatsiya:**
+**Class → Function migration:**
 
 ```tsx
 // Class
@@ -1935,7 +1996,7 @@ Function component'da `this` yo'q — state Fiber'ning `memoizedState` linked li
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-To'liq class → function konvertatsiya:
+To'liq class → function migration:
 
 ```tsx
 // Class component (legacy)
@@ -1961,8 +2022,9 @@ class UserProfile extends Component<
       const res = await fetch(`/api/users/${this.props.userId}`);
       const user = await res.json();
       this.setState({ user, loading: false });
-    } catch (error) {
-      this.setState({ error: error as Error, loading: false });
+    } catch (caught) {
+      const error = caught instanceof Error ? caught : new Error(String(caught));
+      this.setState({ error, loading: false });
     }
   };
   
@@ -2161,7 +2223,7 @@ function Parent() {
 }
 ```
 
-Bu konkret holat React.memo bilan ishlamaydi. Lekin asosiy muammo emas — funksiya reference uzatilishi `type` identity'ga ta'sir qilmaydi (faqat `props` o'zgaradi). Real bug — komponent o'zini-o'zi anonymous deklaratsiya qilganda.
+Bu aniq holat React.memo bilan ishlamaydi. Lekin asosiy muammo emas — funksiya reference uzatilishi `type` identity'ga ta'sir qilmaydi (faqat `props` o'zgaradi). Real bug — komponent o'zini-o'zi anonymous tarzda e'lon qilganda.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2360,8 +2422,8 @@ function Dashboard({ viewType }: { viewType: keyof typeof VIEW_MAP }) {
 
 ```tsx
 // ❌ Async function component — client'da ishlamaydi
-async function BadComponent() {
-  const data = await fetch('/api/data').then((r) => r.json());
+async function ArticleViewerUnsafe() {
+  const data = await fetch('/api/data').then((res) => res.json());
   return <div>{data.name}</div>;
 }
 ```
@@ -2371,36 +2433,38 @@ Client component bo'lsa — `async function` ReactElement emas, balki **Promise*
 **Yechim:** `useEffect` + `useState`, yoki R19'dagi `use` hook (Suspense bilan), yoki Server Component (RSC, cross-ref [`39-rsc-server-actions.md`](39-rsc-server-actions.md)).
 
 ```tsx
+type Article = { id: number; name: string };
+
 // ✅ Async data — useEffect + useState
-function GoodComponent() {
-  const [data, setData] = useState<Data | null>(null);
+function ArticleViewer() {
+  const [article, setArticle] = useState<Article | null>(null);
   useEffect(() => {
-    fetch('/api/data').then((r) => r.json()).then(setData);
+    fetch('/api/data').then((res) => res.json()).then(setArticle);
   }, []);
-  if (!data) return <p>Loading...</p>;
-  return <div>{data.name}</div>;
+  if (!article) return <p>Loading...</p>;
+  return <div>{article.name}</div>;
 }
 
 // ✅ R19 — use() + Suspense
 import { use, Suspense } from 'react';
 
-function DataDisplay({ promise }: { promise: Promise<Data> }) {
-  const data = use(promise);
-  return <div>{data.name}</div>;
+function ArticleDisplay({ promise }: { promise: Promise<Article> }) {
+  const article = use(promise);
+  return <div>{article.name}</div>;
 }
 
-function Wrapper() {
+function ArticlePage() {
   return (
     <Suspense fallback={<p>Loading...</p>}>
-      <DataDisplay promise={fetch('/api/data').then((r) => r.json())} />
+      <ArticleDisplay promise={fetch('/api/data').then((res) => res.json())} />
     </Suspense>
   );
 }
 
 // ✅ Server Component (only in RSC framework — Next.js, Remix)
-// async function ServerData() {
-//   const data = await fetchData();
-//   return <div>{data.name}</div>;
+// async function ServerArticle() {
+//   const article = await fetchArticle();
+//   return <div>{article.name}</div>;
 // }
 ```
 
@@ -2510,14 +2574,14 @@ Function declaration JavaScript hoisting bilan butun funksiya yuqoriga ko'tarila
 
 ```tsx
 // ❌ Cheksiz loop
-function BadCounter() {
+function LikeButtonUnsafe() {
   const [count, setCount] = useState(0);
   setCount(count + 1);
   return <div>{count}</div>;
 }
 
 // ✅ Event handler ichida
-function GoodCounter() {
+function LikeButton() {
   const [count, setCount] = useState(0);
   return (
     <button onClick={() => setCount((c) => c + 1)}>{count}</button>
@@ -2558,15 +2622,15 @@ function Parent() {
 
 ```tsx
 // ❌ Non-deterministic
-function BadId() {
-  const id = `id-${Math.random()}`;
+function FormFieldUnsafe() {
+  const id = `field-${Math.random()}`;
   return <div id={id} />;
 }
 
 // ✅ useId (R18+)
 import { useId } from 'react';
 
-function GoodId() {
+function FormField() {
   const id = useId();
   return <div id={id} />;
 }
@@ -2580,7 +2644,7 @@ function GoodId() {
 
 ```tsx
 // ❌ Render'da document mutation
-function BadPage({ title }: { title: string }) {
+function ArticleHeadUnsafe({ title }: { title: string }) {
   document.title = title;
   return <h1>{title}</h1>;
 }
@@ -2588,15 +2652,15 @@ function BadPage({ title }: { title: string }) {
 // ✅ useEffect bilan
 import { useEffect } from 'react';
 
-function GoodPage({ title }: { title: string }) {
+function ArticleHead({ title }: { title: string }) {
   useEffect(() => {
     document.title = title;
   }, [title]);
   return <h1>{title}</h1>;
 }
 
-// ✅ R19 Document API (deklarativ)
-function GoodPageR19({ title }: { title: string }) {
+// ✅ R19 Document API (declarative)
+function ArticleHeadR19({ title }: { title: string }) {
   return (
     <>
       <title>{title}</title>
@@ -2614,25 +2678,27 @@ function GoodPageR19({ title }: { title: string }) {
 
 ```tsx
 // ❌ Client component'da async
-async function BadData() {
-  const data = await fetch('/api').then(r => r.json());
+async function ProfileViewUnsafe() {
+  const data = await fetch('/api').then((res) => res.json());
   return <div>{data.name}</div>;
 }
 
+type Profile = { name: string };
+
 // ✅ useEffect + useState
-function GoodData() {
-  const [data, setData] = useState<Data | null>(null);
+function ProfileView() {
+  const [profile, setProfile] = useState<Profile | null>(null);
   useEffect(() => {
-    fetch('/api').then(r => r.json()).then(setData);
+    fetch('/api').then((res) => res.json()).then(setProfile);
   }, []);
-  if (!data) return <p>Loading...</p>;
-  return <div>{data.name}</div>;
+  if (!profile) return <p>Loading...</p>;
+  return <div>{profile.name}</div>;
 }
 
 // ✅ R19 use() (Suspense bilan)
-function R19Data({ promise }: { promise: Promise<Data> }) {
-  const data = use(promise);
-  return <div>{data.name}</div>;
+function ProfileViewR19({ promise }: { promise: Promise<Profile> }) {
+  const profile = use(promise);
+  return <div>{profile.name}</div>;
 }
 ```
 
@@ -2644,7 +2710,7 @@ function R19Data({ promise }: { promise: Promise<Data> }) {
 
 ### Mashq 1: Greeting Component Default Param Bilan (Oson)
 
-`Greeting` komponenti yarating — `name` prop qabul qiladi, default qiymat `'Guest'`. Sintaksis: function declaration + destructuring.
+`Greeting` komponenti yarating — `name` prop qabul qiladi, default qiymat `'Guest'`. Syntax: function declaration + destructuring.
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -2745,7 +2811,7 @@ function ProductPage({ productId }: { productId: number }) {
 - `Date.now()` → `useState(() => ...)` lazy initial
 - `setCount(1)` → initial value `1`
 
-R19+ alternative (`<title>` deklarativ):
+R19+ alternative (`<title>` declarative):
 
 ```tsx
 return (
@@ -2809,7 +2875,7 @@ PascalCase JSX transform tomonidan **identifier reference** sifatida qaraladi. E
 
 ---
 
-### Mashq 4: Class → Function Konvertatsiya (O'rta)
+### Mashq 4: Class → Function Migration (O'rta)
 
 Class komponentni function variant'iga o'tkazing. Lifecycle method'lar `useEffect` bilan almashtirilsin.
 
@@ -2847,9 +2913,13 @@ class DataFetcher extends Component<Props, State> {
       });
       const data = await res.json();
       this.setState({ data });
-    } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        this.setState({ error: err as Error });
+    } catch (caught) {
+      if (!(caught instanceof Error)) {
+        this.setState({ error: new Error(String(caught)) });
+        return;
+      }
+      if (caught.name !== 'AbortError') {
+        this.setState({ error: caught });
       }
     }
   };

@@ -1,6 +1,6 @@
 # Bo'lim 24: Custom Hooks
 
-> Custom hook — boshqa hook'lardan iborat bo'lgan, `use*` prefix bilan nomlangan oddiy JavaScript function. Logikni komponentdan ajratib, qayta ishlatish, test qilish va abstraktsiya qilishga imkon beradi. Bu bo'lim custom hook'larning fundamental qoidalari, composition pattern'lari, common toolkit (10+ production-grade hook), `useDebugValue` DevTools integration va TypeScript generic pattern'larni qamrab oladi.
+> Custom hook — boshqa hook'lardan iborat bo'lgan, `use*` prefix bilan nomlangan oddiy JavaScript function. Logic'ni komponentdan ajratib, qayta ishlatish, test qilish va abstraction qilishga imkon beradi. Bu bo'lim custom hook'larning fundamental qoidalari, composition pattern'lari, common toolkit (10+ production-grade hook), `useDebugValue` DevTools integration va TypeScript generic pattern'larni qamrab oladi.
 
 ---
 
@@ -121,27 +121,27 @@ ESLint identification logic (simplified):
 
 ```javascript
 // eslint-plugin-react-hooks/src/RulesOfHooks.js
-function isHook(node) {
-  if (node.type === 'Identifier') {
-    return node.name === 'use' || /^use[A-Z]/.test(node.name);
+function isHookName(s) {
+  if (__EXPERIMENTAL__) {
+    return s === 'use' || /^use[A-Z0-9]/.test(s);
   }
-  return false;
+  return /^use[A-Z0-9]/.test(s);
 }
 ```
 
-Regex `/^use[A-Z]/` — `use` keyin **uppercase** harf shart. `useState` ✓, `usercount` ✗ (lowercase u dan keyin), `useCounter` ✓.
+Regex `/^use[A-Z0-9]/` — `use` keyin **uppercase yoki raqam** shart. `useState` ✓, `usercount` ✗ (lowercase u dan keyin), `useCounter` ✓, `use2FA` ✓ (raqam). Plain `use` identifier — R19 `use()` hook (eski plugin'da `__EXPERIMENTAL__` flag bilan, R19 stable bilan default tanib olinadi).
 
-React Compiler (stable 2026, React 17/18/19 bilan mos) ham shu logic'ni ishlatadi (auto-memoization Rules of React asosida).
+React Compiler (1.0 stable, R19.1+ bilan birga 2025-aprel'da chiqdi; R17/18/19 mos) ham shu logic'ni ishlatadi (auto-memoization Rules of React asosida).
 
 </details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-Custom hook'siz duplikatsiya — `useState` + `useEffect` har komponentda:
+Custom hook'siz duplication — `useState` + `useEffect` har komponentda:
 
 ```tsx
-// ❌ Duplikatsiya — har komponent bir xil pattern
+// ❌ Duplication — har komponent bir xil pattern
 function ProductSearch() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -230,11 +230,11 @@ Counter A va B'ning state'lari mustaqil — bir-biriga ta'sir qilmaydi.
 
 ### Nazariya
 
-`use*` prefix — custom hook'larning **majburiy konvensiyasi**. Bu nafaqat stilistik tanlov, balki **funksional ahamiyatga ega**:
+`use*` prefix — custom hook'larning **majburiy konvensiyasi**. Bu nafaqat stilistik tanlov, balki **functional ahamiyatga ega**:
 
 1. **ESLint plugin** (`eslint-plugin-react-hooks`) `use*` regex orqali function'ni hook deb identify qiladi va Rules of Hooks tekshiradi (top-level only, conditional taqiq).
 
-2. **React Compiler** (stable 2026, R17/18/19 mos) `use*` function'larni hook deb tanib, auto-memoization va Rules of React tekshiradi.
+2. **React Compiler** (1.0 stable, R19.1+ bilan birga 2025-aprel'da chiqdi; R17/18/19 mos) `use*` function'larni hook deb tanib, auto-memoization va Rules of React tekshiradi.
 
 3. **Developer ergonomics** — kod o'qiganda `useFoo()` chaqiruv darrov hook ekanligi ma'lum. Komponent'larda `<Foo />` (PascalCase JSX), hook'larda `useFoo()` (camelCase function call).
 
@@ -255,12 +255,13 @@ function UseCounter() {}          // PascalCase — komponent emas
 function getUser() {}             // sodda function nomi (lekin hook bo'lsa, use kerak)
 ```
 
-`use*` keyin **uppercase** harf shart (`use[A-Z]`). Sabab — `user`, `using`, `useless` singari oddiy so'zlar hook deb tanib olinmasin.
+`use*` keyin **uppercase yoki raqam** shart (`/^use[A-Z0-9]/`). Sabab — `user`, `using`, `useless` singari oddiy so'zlar hook deb tanib olinmasin.
 
 ```tsx
-// ESLint regex: /^use[A-Z]/
+// ESLint regex: /^use[A-Z0-9]/
 function user() {}        // hook EMAS — `use` keyin lowercase
 function useCounter() {}  // hook — `use` keyin uppercase C
+function use2FA() {}      // hook — `use` keyin raqam (`2`)
 ```
 
 **Anti-pattern: hook bo'lmagan function'ga `use` prefix berish:**
@@ -284,7 +285,7 @@ NIMA UCHUN bu strict bo'lishi muhim: hook'lar va sodda function'lar React lifecy
 > **Versiya evolyutsiyasi (Naming convention):**
 > - **Pre-R16.8 (Hooks oldidan):** Konvensiya yo'q — function nomlari ixtiyoriy.
 > - **R16.8+:** `use*` konvensiya kiritildi (Hooks RFC), `eslint-plugin-react-hooks` qoida tekshiradi.
-> - **2026 (Compiler stable):** React Compiler `use*` ga tayanib auto-memoization qiladi (R17/18/19 mos, opt-in Babel plugin). Konvensiya endi build behavior'ga ta'sir qiladi.
+> - **R19.1+ (2025-aprel, Compiler 1.0 stable):** React Compiler `use*` ga tayanib auto-memoization qiladi (R17/18/19 mos, opt-in Babel plugin). Konvensiya endi build behavior'ga ta'sir qiladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -931,7 +932,7 @@ const [count, setCount] = useCounter(0);
 const [isOpen, setIsOpen] = useToggle();
 const [user, setUser] = useState<User | null>(null);
 
-// Tuple bilan komponentda 2 ta useCounter — kollizion yo'q
+// Tuple bilan komponentda 2 ta useCounter — collision yo'q
 function App() {
   const [aCount, setACount] = useCounter(0);
   const [bCount, setBCount] = useCounter(10);
@@ -1282,7 +1283,7 @@ Production build'da `useDebugValue` butunlay olib tashlanadi (dead code eliminat
 
 ```tsx
 // ❌ Anti-pattern — komponent ichida
-function MyComponent() {
+function CounterPanel() {
   const [count, setCount] = useState(0);
   useDebugValue(count);  // DevTools'da ko'rinmaydi
   return <div>{count}</div>;
@@ -1482,7 +1483,7 @@ Custom hooks library bundle size taqqoslash (taxminiy):
 
 Library'lar bundle hajmi va hook count'i versiyalar bo'yicha o'zgarib turadi. Aniq raqamlar uchun bundlephobia.com tekshiring.
 
-Tree-shaking — modern library'larda muhim. `usehooks-ts`, `@uidotdev/usehooks` per-hook export bilan tree-shake qilinadi (faqat ishlatilgan hook'lar bundle'ga kiradi). `react-use` library'sida tree-shaking unconsistent — barrel import bilan butun library yuklanishi mumkin.
+Tree-shaking — modern library'larda muhim. `usehooks-ts`, `@uidotdev/usehooks` per-hook export bilan tree-shake qilinadi (faqat ishlatilgan hook'lar bundle'ga kiradi). `react-use` library'sida tree-shaking inconsistent — barrel import bilan butun library yuklanishi mumkin.
 
 Ko'pchilik library `useSyncExternalStore` (R18+) ishlatadi (Concurrent-safe). Eski library'lar `useEffect` bilan subscribe qiladi — tearing potential R18 Concurrent rendering'da (cross-ref [`22-concurrent-hooks.md`](22-concurrent-hooks.md)).
 
@@ -1715,7 +1716,7 @@ function useStateLogger<T>(value: T, label: string) {
   }, [value, prev, label]);
 }
 
-function MyComponent() {
+function UserProfilePanel() {
   const [user, setUser] = useState<User | null>(null);
   useStateLogger(user, 'user');
   // user o'zgarsa console'da log
@@ -4528,7 +4529,7 @@ function ProductSearch() {
 **Tushuntirish:**
 - Debounce + AbortController + latest closure pattern.
 - `searchFnRef` — function dep'siz stable listener.
-- `minQueryLength` UX optimizatsiya — short query'larda search yo'q.
+- `minQueryLength` UX optimization — short query'larda search yo'q.
 - `controller.abort()` cleanup — pending fetch cancel.
 
 </details>
@@ -4826,7 +4827,7 @@ function UserCard({ userId }: { userId: string }) {
 Custom hooks — React'ning eng kuchli pattern'larini ifodalovchi konstruktsiya. Asosiy fikrlar:
 
 - **Custom hook = `use*` function** — boshqa hook'lar ichida chaqirilishi mumkin. React feature emas, **konvensiya**. Hech qanday "registratsiya" yo'q — function yozasiz va `use` prefix bilan nomlaysiz.
-- **`use*` prefix funksional ahamiyatga ega** — ESLint plugin (`react-hooks/rules-of-hooks`) `use*` regex orqali function'ni hook deb identify qiladi va Rules of Hooks tekshiradi. React Compiler (stable 2026, R17/18/19 mos) ham shu konvensiyaga tayanib auto-memoization qiladi.
+- **`use*` prefix functional ahamiyatga ega** — ESLint plugin (`react-hooks/rules-of-hooks`) `/^use[A-Z0-9]/` regex orqali function'ni hook deb identify qiladi va Rules of Hooks tekshiradi. React Compiler (1.0 stable, R19.1+ bilan 2025-aprel; R17/18/19 mos) ham shu konvensiyaga tayanib auto-memoization qiladi.
 - **Logic extraction pattern** — komponent ichidagi takrorlanadigan logic'ni custom hook'ga ko'chirish. Single Responsibility, reusability, testability. Premature abstraction xavfi — faqat 2+ joyda ishlatilsa yoki concern alohida bo'lsa extract qilinadi.
 - **Hook composition** — custom hook'lar boshqa custom hook'lar ichida. Layered architecture (primitive → domain → feature → page). Hook linked list flat — composition layer'lari React internal'da farqlanmaydi.
 - **Parameters va Return Types** — single value (1) / tuple (2) / object (3+). Tuple — destructuring rename oson (`const [count, setCount]`). Object — partial destructuring + named property. `as const` tuple readonly type infer qiladi.

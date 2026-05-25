@@ -8,19 +8,21 @@
 
 ## Mundarija
 
-**QISM A: Hooks Fundamentals** (savollar 1-5)
-**QISM B: useState** (savollar 6-9)
-**QISM C: useEffect** (savollar 10-15)
-**QISM D: useLayoutEffect va useInsertionEffect** (savollar 16-18)
-**QISM E: useRef** (savollar 19-23)
-**QISM F: useContext** (savollar 24-27)
-**QISM G: useReducer** (savollar 28-30)
-**QISM H: useMemo va useCallback** (savollar 31-34)
-**QISM I: Concurrent Hooks (R18)** (savollar 35-39)
-**QISM J: R19 Hooks** (savollar 40-43)
-**QISM K: Custom Hooks** (savollar 44-46)
+- [**QISM A: Hooks Fundamentals** (savollar 1-5)](#qism-a)
+- [**QISM B: useState** (savollar 6-9)](#qism-b)
+- [**QISM C: useEffect** (savollar 10-15)](#qism-c)
+- [**QISM D: useLayoutEffect va useInsertionEffect** (savollar 16-18)](#qism-d)
+- [**QISM E: useRef** (savollar 19-23)](#qism-e)
+- [**QISM F: useContext** (savollar 24-27)](#qism-f)
+- [**QISM G: useReducer** (savollar 28-30)](#qism-g)
+- [**QISM H: useMemo va useCallback** (savollar 31-34)](#qism-h)
+- [**QISM I: Concurrent Hooks (R18)** (savollar 44-49)](#qism-i)
+- [**QISM J: R19 Hooks** (savollar 50-53)](#qism-j)
+- [**QISM K: Custom Hooks** (savollar 54-56)](#qism-k)
 
 ---
+
+<a id="qism-a"></a>
 
 ## QISM A: Hooks Fundamentals
 
@@ -293,7 +295,7 @@ const [state, dispatch] = useReducer<Reducer<State, Action>>(reducer, initial);
 
 Class generics:
 ```tsx
-class Foo<T> extends React.Component<Props<T>, State<T>> { /* ... */ }
+class DataView<T> extends React.Component<Props<T>, State<T>> { /* ... */ }
 // Verbose, less inference
 ```
 
@@ -307,7 +309,7 @@ Hooks designed with concurrent rendering in mind:
 
 **When to still use class:**
 
-- Error boundaries (until R19 alternative)
+- Error boundaries (R19'da ham hooks-based alternative yo'q — hali class kerak)
 - Legacy codebase (gradual migration)
 - Specific lifecycle that hooks don't replicate (`getSnapshotBeforeUpdate`)
 
@@ -585,7 +587,7 @@ function Component({ promise, fallback, showFallback }: Props) {
 }
 ```
 
-`use()` — relaxed Rules of Hooks. Sabab: u **hook emas, special function** — fiber'da o'z slot'i yo'q (linked list'ga qo'shilmaydi). Promise tracking thenable status orqali, context reading direct.
+`use()` — relaxed Rules of Hooks. Sabab: u fiber'da **o'z hook slot'i yo'q** (linked list'ga qo'shilmaydi). Promise tracking thenable status orqali, context reading direct. React docs `use`'ni "hook" deb ataydi, lekin boshqa hook'lardan farqli — conditional/loop ichida chaqirish mumkin.
 
 **Custom hook calling other hooks:**
 
@@ -686,7 +688,7 @@ class Counter extends React.Component {
   state = { count: 0 };
 
   render() {
-    if (this.props.foo) {
+    if (this.props.visible) {
       // Class — `this.state` ob'ektga conditional access mumkin
       return <p>{this.state.count}</p>;
     }
@@ -897,7 +899,7 @@ type Update = {
 
 // Hook structure for useState:
 hook.queue = {
-  pending: null | Update (circular list head),
+  pending: null | Update,  // circular list — pending LAST node'ga ishora qiladi
   dispatch: setState,
   lastRenderedReducer: basicStateReducer,
   lastRenderedState: 0,
@@ -1283,7 +1285,7 @@ Dispatcher: branch decision made once. Per-hook lookup avoids per-call branch.
 const ContextOnlyDispatcher = {
   useState: () => { throw new Error("Hooks can only be called inside the body of a function component."); },
   // ... all hooks throw
-  useContext: readContext,  // useContext can be called outside (RSC)
+  useContext: readContext,  // context read'i server-side'da ham ishlaydi
 };
 
 // After render finishes, reset to ContextOnlyDispatcher
@@ -2032,8 +2034,8 @@ function useCounterWithReducer() {
   return count;
 }
 
-// 2. useEvent (Stage 1 RFC) — stable callback with latest closure
-// (Not yet stable in R19)
+// 2. useEffectEvent (experimental) — stable callback with latest closure
+// (2026 holicha experimental, production'da ishlatish tavsiya etilmaydi)
 
 // 3. requestAnimationFrame for smooth updates
 function useTimer() {
@@ -2078,29 +2080,31 @@ useEffect(() => {
 ### Edge Cases
 
 - **`useEffect` deps include count**: Re-creates interval each tick — wasteful, but correct.
-- **`useState` direct value `setCount(prevState)`**: Same closure issue.
+- **`useState` direct value `setCount(count)`**: Same closure issue.
 - **Multiple state in interval**: All captured at mount — all stale.
 
 ### Follow-up savollar
 
 - "Why React doesn't auto-update closures?" — Closures are JavaScript semantics. React doesn't override.
-- "useEvent (Stage 1) — solves this?" — Yes, designed for stable callback with latest values. Not yet stable.
+- "useEffectEvent (experimental) — solves this?" — Ha, stable callback with latest values uchun mo'ljallangan. 2026 holicha experimental.
 - "How to test stale closure bug?" — Time-based test (advance fake timers), assert state value after multiple ticks.
 
 </details>
 
 ---
 
+<a id="qism-b"></a>
+
 ## QISM B: useState
 
-### 8. useState API va lazy initializer [Middle]
+### 8. `useState` API va lazy initializer [Middle]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-**`useState(initialValue)`** — `[state, setState]` tuple qaytaradi. **Lazy initializer** — `useState(() => expensiveCompute())` — function pass qilinsa, **faqat mount paytida** chaqiriladi (re-render'larda skip). Expensive initial state uchun. `useState(value)` — value har render'da hisoblanadi (lekin faqat mount'da ishlatiladi — performance impact bo'lsa lazy ishlatish).
+**`useState(initialValue)`** — `[state, setState]` tuple qaytaradi. **Lazy initializer** — `useState(() => expensiveCompute())` — function pass qilinsa, **faqat mount paytida** chaqiriladi (re-render'larda skip). StrictMode'da 2 marta chaqiriladi, lekin **birinchi natija** saqlanadi. Expensive initial state uchun. `useState(value)` — value har render'da hisoblanadi (lekin faqat mount'da ishlatiladi — performance impact bo'lsa lazy ishlatish).
 
 ### To'liq tushuntirish
 
@@ -2360,7 +2364,7 @@ const [state, dispatch] = useReducer(reducer, initial);
 ### Edge Cases
 
 - **`useState(undefined)` vs `useState()`**: Ikkalasi ham ishlaydi — initial state `undefined`. TS'da `useState<T | undefined>(undefined)` ishlatilgani aniqroq.
-- **Lazy with side effect**: Discouraged. Strict Mode 2x exposes.
+- **Lazy with side effect**: Discouraged. Strict Mode 2 marta chaqiradi (purity test).
 - **`null` initial type narrowing**: TypeScript needs explicit type — `useState<T | null>(null)`.
 
 ### Follow-up savollar
@@ -3033,7 +3037,7 @@ class Counter extends Component {
 
 ### Qisqa javob
 
-`useState`'da agar yangi state value joriy state'ga **`Object.is`** orqali teng bo'lsa, React **re-render skip** qiladi (bailout). `Object.is` — `===` ga o'xshash, lekin `NaN === NaN` (true) va `+0 === -0` (false). Reference equality — object'larda yangi reference (har gal yangi `{...obj}`) — bailout ishlamaydi. Optimization: same primitive value setState → no render.
+`useState`'da agar yangi state value joriy state'ga **`Object.is`** orqali teng bo'lsa, React **re-render skip** qiladi (bailout). `Object.is` — `===` ga o'xshash, lekin ikki farq bor: `Object.is(NaN, NaN)` true qaytaradi (`===` da false), `Object.is(+0, -0)` false qaytaradi (`===` da true). Reference equality — object'larda yangi reference (har gal yangi `{...obj}`) — bailout ishlamaydi. Optimization: same primitive value setState → no render.
 
 ### To'liq tushuntirish
 
@@ -3044,8 +3048,8 @@ Object.is(1, 1)              // true
 Object.is("a", "a")          // true
 Object.is(null, null)        // true
 Object.is(undefined, undefined)  // true
-Object.is(NaN, NaN)          // true (vs === : false)
-Object.is(+0, -0)            // false (vs === : true)
+Object.is(NaN, NaN)          // true  (=== da false)
+Object.is(+0, -0)            // false (=== da true)
 
 Object.is({}, {})            // false (different references)
 Object.is([], [])            // false
@@ -3199,7 +3203,7 @@ NaN === NaN          // false
 +0 === -0            // true
 ```
 
-React chose `Object.is` for state comparison — `NaN` self-equality avoids unnecessary re-render when state legitimately is NaN.
+React `Object.is` tanladi — `NaN` self-equality avoids unnecessary re-render when state legitimately NaN. `===` da `NaN !== NaN` — har `setCount(NaN)` re-render trigger qilardi.
 
 **Performance impact:**
 
@@ -3413,6 +3417,8 @@ const [state, dispatch] = useReducer(
 </details>
 
 ---
+
+<a id="qism-c"></a>
 
 ## QISM C: useEffect
 
@@ -4077,7 +4083,7 @@ function Component({ url }: { url: string }) {
 }
 ```
 
-`useEffectEvent` — "stable function but always latest closure" muammosini hal qiladi. 2026 holicha experimental (stable emas, production'da ishlatish tavsiya etilmaydi).
+`useEffectEvent` — "stable function but always latest closure" muammosini hal qiladi. 2026 holicha **experimental** (`unstable_*` prefix bilan, stable emas, production'da ishlatish tavsiya etilmaydi).
 
 **Deps array allocation:**
 
@@ -5712,12 +5718,14 @@ useEffect(() => handler(), [handler]);
 
 ### Follow-up savollar
 
-- "useEffectEvent — solves this?" — Stage 1 RFC. Separates "latest closure" from "deps tracking".
+- "useEffectEvent — solves this?" — Experimental API. Separates "latest closure" from "deps tracking".
 - "React Compiler auto-stabilize?" — Yes, Compiler memoizes intermediate values.
 
 </details>
 
 ---
+
+<a id="qism-d"></a>
 
 ## QISM D: useLayoutEffect va useInsertionEffect
 
@@ -5916,11 +5924,13 @@ function Modal({ open, onClose }: Props) {
   useLayoutEffect(() => {
     if (!open) return;
     // Set initial position (off-screen)
-    ref.current!.style.transform = "translateY(100vh)";
+    if (!ref.current) return;
+    ref.current.style.transform = "translateY(100vh)";
 
     // Trigger animation by removing transform (next paint)
+    const el = ref.current;
     requestAnimationFrame(() => {
-      ref.current!.style.transform = "translateY(0)";
+      el.style.transform = "translateY(0)";
     });
   }, [open]);
 
@@ -6332,7 +6342,7 @@ Component library tooltips, dropdowns, modals — typically use useLayoutEffect 
 
 ### Qisqa javob
 
-**`useInsertionEffect`** (R18) — CSS-in-JS library'lar uchun maxsus hook. Har bir DOM mutation'dan **OLDIN** sync chaqiriladi (`useLayoutEffect`'dan ham oldin, refs attach qilinmagan). Maqsad: dynamic stylesheet'larni inject qilish — DOM mutation va keyingi `useLayoutEffect` measurements yangi style'larni hisobga olishi uchun. Userland kod uchun emas — faqat library author'lar.
+**`useInsertionEffect`** (R18) — CSS-in-JS library'lar uchun maxsus hook. Commit Phase'ning **Mutation sub-phase'idan OLDIN** sync chaqiriladi (`useLayoutEffect`'dan ham oldin, refs attach qilinmagan). Maqsad: dynamic stylesheet'larni inject qilish — DOM mutation va keyingi `useLayoutEffect` measurements yangi style'larni hisobga olishi uchun. Userland kod uchun emas — faqat library author'lar.
 
 ### To'liq tushuntirish
 
@@ -6351,7 +6361,7 @@ Commit Phase boshlandi:
 5. Passive effects (useEffect — async)
 ```
 
-**Manba:** [react.dev/reference/react/useInsertionEffect](https://react.dev/reference/react/useInsertionEffect) — *"useInsertionEffect fires before any DOM mutations"*
+**Manba:** [react.dev/reference/react/useInsertionEffect](https://react.dev/reference/react/useInsertionEffect) — *"useInsertionEffect is for CSS-in-JS library authors"*
 
 **Use case:**
 
@@ -6544,7 +6554,7 @@ Pre-R18 styled-components used `useLayoutEffect` for style injection. R18+ migra
 
 ### Qisqa javob
 
-Server'da `useLayoutEffect` ishlamaydi (no DOM) — React warning: "useLayoutEffect does nothing on the server". Workaround: `useIsomorphicLayoutEffect` pattern (`typeof window !== "undefined" ? useLayoutEffect : useEffect`). R19'da warning'siz no-op (silently skipped). Best — `useEffect` agar visual sync kerak emas.
+Server'da `useLayoutEffect` ishlamaydi (no DOM) — React warning: "useLayoutEffect does nothing on the server". Workaround: `useIsomorphicLayoutEffect` pattern (`typeof window !== "undefined" ? useLayoutEffect : useEffect`). Best — `useEffect` agar visual sync kerak emas.
 
 ### Kod misoli
 
@@ -6580,9 +6590,9 @@ const HooksDispatcherOnServer = {
 };
 ```
 
-**R19 silent:**
+**SSR warning:**
 
-R19'da useLayoutEffect server'da silently skipped — no warning by default.
+Server'da useLayoutEffect chaqirilganda warning chiqadi. `useIsomorphicLayoutEffect` pattern bilan hal qilinadi.
 
 **Library pattern:**
 
@@ -6616,6 +6626,8 @@ Layout effects run sync before paint. Server has no paint cycle → no semantic.
 </details>
 
 ---
+
+<a id="qism-e"></a>
 
 ## QISM E: useRef
 
@@ -6833,7 +6845,7 @@ function MyComponent() {
 
 ### Qisqa javob
 
-**R18 `forwardRef`** — `ref` prop'ini child komponentga **forward** qilish uchun wrapper. R18'da ref oddiy prop'dek pass qilinmaydi. **R19 ref as prop** — `forwardRef` kerak emas, `ref` oddiy prop. Mavjud `forwardRef` kod hali ishlaydi (deprecated emas), lekin yangi kod ref'ni oddiy prop sifatida qabul qiladi. Migration optional.
+**R18 `forwardRef`** — `ref` prop'ini child komponentga **forward** qilish uchun wrapper. R18'da ref oddiy prop'dek pass qilinmaydi. **R19 ref as prop** — `forwardRef` kerak emas, `ref` oddiy prop. Mavjud `forwardRef` kod hali ishlaydi (deprecated, lekin olib tashlanmagan), yangi kod ref'ni oddiy prop sifatida qabul qiladi. Migration optional.
 
 ### Kod misoli
 
@@ -6980,7 +6992,7 @@ function Input({ ref, ...props }: Props & { ref?: React.Ref<{ focus: () => void 
 ### Follow-up savollar
 
 - "Why R19 changed?" — DX, simpler types, no wrapper boilerplate.
-- "forwardRef deprecated?" — Not yet, but discouraged for new code.
+- "forwardRef deprecated?" — R19'da deprecated (console warning). Lekin olib tashlanmagan, mavjud kod ishlaydi. Yangi kod uchun ref as prop tavsiya.
 - "Class components ref?" — Class instances accept ref by default — refers to instance.
 
 </details>
@@ -7181,7 +7193,7 @@ useEffect(() => {
 
 ### Qisqa javob
 
-**`useImperativeHandle(ref, factoryFn, deps?)`** — komponent **imperative API**'sini parent ref orqali expose qiladi. Default ref behavior'ni override qiladi (DOM node o'rniga custom object). Use case: video player controls, modal open/close, complex component'da declarative bilan hal qilib bo'lmaydigan operations. Anti-pattern: declarative bilan hal qilinishi mumkin bo'lgan narsalarga ishlatmaslik.
+**`useImperativeHandle(ref, factoryFn, deps?)`** — komponent **imperative API**'sini parent ref orqali expose qiladi. Default ref behavior'ni override qiladi (DOM node o'rniga custom object). `deps` argument ko'rsatilishi tavsiya etiladi — bo'lmasa har render'da factory qayta chaqiriladi. Use case: video player controls, modal open/close, complex component'da declarative bilan hal qilib bo'lmaydigan operations. Anti-pattern: declarative bilan hal qilinishi mumkin bo'lgan narsalarga ishlatmaslik.
 
 ### Kod misoli
 
@@ -7587,7 +7599,7 @@ Pre-R19: needed `useEffect` for cleanup.
 **Performance:**
 
 - Callback ref — har attach/detach'da function chaqiriladi
-- Object ref + useEffect ko'proq qo'llaniladi (deklarativroq)
+- Object ref + useEffect ko'proq qo'llaniladi (more declarative)
 - Callback ref timing critical bo'lganda (mount-time measurement) tanlanadi
 
 </details>
@@ -7702,6 +7714,8 @@ function Component({ id }: { id: string }) {
 </details>
 
 ---
+
+<a id="qism-f"></a>
 
 ## QISM F: useContext
 
@@ -8161,7 +8175,7 @@ External store + selector = fine-grained subscription.
 
 ### Qisqa javob
 
-**R19 ikki yangilik**: (1) **`<Context value>`** — `<Context.Provider>` o'rniga to'g'ridan-to'g'ri Context as JSX (`<Context.Provider>` hali deprecated emas, lekin yangi syntax tavsiya), (2) **`use(context)`** — `useContext`'dan farqli, **conditional / loop ichida** ishlatilishi mumkin (Rules of Hooks bypass — `use()` hook emas, special function).
+**R19 ikki yangilik**: (1) **`<Context value>`** — `<Context.Provider>` o'rniga to'g'ridan-to'g'ri Context as JSX (`<Context.Provider>` R19'da deprecated, console warning chiqadi), (2) **`use(context)`** — `useContext`'dan farqli, **conditional / loop ichida** ishlatilishi mumkin (Rules of Hooks bypass — `use()` hook emas, special function).
 
 ### Kod misoli
 
@@ -8224,7 +8238,7 @@ Less verbose, JSX cleaner. Functional equivalence.
 
 **`<Context.Provider>` deprecated?**
 
-Not yet. Both syntaxes work in R19. Future may deprecate `.Provider`, but not in 2026.
+R19'da deprecated (console warning chiqadi). Lekin hali olib tashlanmagan — ikkala syntax ishlaydi. Yangi kod uchun `<Context value>` tavsiya.
 
 **`use(context)` semantics:**
 
@@ -8607,14 +8621,16 @@ function ThemedButton() {
 <ThemedButton />  // theme = "light" (default)
 
 // With Provider
-<ThemeContext.Provider value="dark">
+// R19: <ThemeContext value="dark">
+// R18: <ThemeContext.Provider value="dark">
+<ThemeContext value="dark">
   <ThemedButton />  // theme = "dark" (Provider value)
-</ThemeContext.Provider>
+</ThemeContext>
 
 // Provider value=undefined → STILL undefined (NOT default)
-<ThemeContext.Provider value={undefined as any}>
+<ThemeContext value={undefined as any}>
   <ThemedButton />  // theme = undefined (warning at runtime)
-</ThemeContext.Provider>
+</ThemeContext>
 ```
 
 <details>
@@ -8698,6 +8714,8 @@ const ApiContext = createContext({
 
 ---
 
+<a id="qism-g"></a>
+
 ## QISM G: useReducer
 
 ### 35. `useReducer` vs `useState` — qachon qaysi? [Middle]
@@ -8707,7 +8725,7 @@ const ApiContext = createContext({
 
 ### Qisqa javob
 
-**`useState`** — sodda state (single value, independent updates). **`useReducer`** — murakkab state, **multiple actions**, related state transitions, complex update logic. Reducer pattern: `(state, action) => newState`. `dispatch` reference stable (useCallback kerak emas), state transitions deklarativ va testable, large state object'larda yaxshi pattern.
+**`useState`** — sodda state (single value, independent updates). **`useReducer`** — murakkab state, **multiple actions**, related state transitions, complex update logic. Reducer pattern: `(state, action) => newState`. `dispatch` reference stable (useCallback kerak emas), state transitions declarative va testable, large state object'larda yaxshi pattern.
 
 ### To'liq tushuntirish
 
@@ -9753,6 +9771,8 @@ function mountState(initial) {
 
 ---
 
+<a id="qism-h"></a>
+
 ## QISM H: useMemo va useCallback
 
 ### 39. `useMemo` nima qiladi va qachon ishlatiladi? [Middle]
@@ -9762,7 +9782,7 @@ function mountState(initial) {
 
 ### Qisqa javob
 
-**`useMemo(factory, deps)`** — computed value'ni memoize qiladi (cache). Deps `Object.is` orqali bir xil bo'lsa, oldingi cached value qaytadi (factory chaqirilmaydi). Ikki use case: (1) **expensive computation** skip qilish, (2) **referential identity** stabil tutish (object/array — `React.memo` child uchun props reference saqlash).
+**`useMemo(factory, deps)`** — computed value'ni memoize qiladi (cache). Deps `Object.is` orqali bir xil bo'lsa, oldingi cached value qaytadi (factory chaqirilmaydi). **Cache kafolat yo'q** — React har qanday vaqtda cache'ni invalidate qilishi mumkin (memory pressure, Offscreen). Ikki use case: (1) **expensive computation** skip qilish, (2) **referential identity** stabil tutish (object/array — `React.memo` child uchun props reference saqlash).
 
 ### Kod misoli
 
@@ -9982,7 +10002,7 @@ const callback = useMemo(() => () => doSomething(value), [value]);
 
 ### Qisqa javob
 
-**`useCallback(fn, deps)`** — function reference'ini memoize qiladi. **Equivalent**: `useMemo(() => fn, deps)`. Maqsad: function identity'ni stabil tutish — memoized child komponentlarga function pass qilganda, har render'da yangi function reference yaratilmaydi → memo bailout ishlaydi. Effect/memo deps array'da function'ni stable qilish uchun.
+**`useCallback(fn, deps)`** — function reference'ini memoize qiladi. **Equivalent**: `useMemo(() => fn, deps)`. `useMemo` kabi, **cache kafolat yo'q** — React har qanday vaqtda invalidate qilishi mumkin. Maqsad: function identity'ni stabil tutish — memoized child komponentlarga function pass qilganda, har render'da yangi function reference yaratilmaydi → memo bailout ishlaydi. Effect/memo deps array'da function'ni stable qilish uchun.
 
 ### Kod misoli
 
@@ -10676,7 +10696,7 @@ R19+ — manual memo less needed.
 
 ### Edge Cases
 
-- **`React.memo` for component with no props**: `<Foo />` — no props, always equal, always bails. But: useless if Foo has no state.
+- **`React.memo` for component with no props**: `<StaticCard />` — no props, always equal, always bails. But: useless if component has no state.
 - **Custom areEqual lying**: Returns true when props actually different — UI shows stale.
 - **memo'd component with internal state**: Bailout doesn't prevent self-state-driven re-renders.
 
@@ -10697,7 +10717,7 @@ R19+ — manual memo less needed.
 
 ### Qisqa javob
 
-`useCallback(fn, deps)` ≡ `useMemo(() => fn, deps)` — semantik teng. `useCallback` faqat **syntactic sugar** function memoization uchun (DX yaxshilash). Ikkalasi ham `memoizedState`'da deps + value saqlaydi, `Object.is` comparison bilan deps tekshiradi. Fark: `useMemo` callback chaqiradi (`fn()` natijasi), `useCallback` callback'ni qaytaradi (`fn` o'zi).
+`useCallback(fn, deps)` ≡ `useMemo(() => fn, deps)` — semantik teng. `useCallback` faqat **syntactic sugar** function memoization uchun (DX yaxshilash). Ikkalasi ham `memoizedState`'da deps + value saqlaydi, `Object.is` comparison bilan deps tekshiradi. Farq: `useMemo` callback chaqiradi (`fn()` natijasi), `useCallback` callback'ni qaytaradi (`fn` o'zi).
 
 ### Kod misoli
 
@@ -10798,6 +10818,8 @@ useCallback((id: string) => fetch(`/api/${id}`), []);  // id is parameter
 </details>
 
 ---
+
+<a id="qism-i"></a>
 
 ## QISM I: Concurrent Hooks (R18)
 
@@ -11286,7 +11308,7 @@ const deferred = useDeferredValue(value);
 
 ### Qisqa javob
 
-**`useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot?)`** — external store (Redux, Zustand, browser API)'ni React'ga **safe** subscribe qilish. Concurrent rendering'da **tearing prevention** — React render davomida store o'zgarsa, consistent snapshot guarantees. R18'da kiritildi (avval `useState` + `useEffect` pattern bug-prone edi).
+**`useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot?)`** — external store (Redux, Zustand, browser API)'ni React'ga **safe** subscribe qilish. Concurrent rendering'da **tearing prevention** — React render davomida store o'zgarsa, consistent snapshot guarantees. R18'da kiritildi (avval `useState` + `useEffect` pattern bug-prone edi). SSR'da `getServerSnapshot` **majburiy** — server'da `window`/DOM API yo'q, fallback value berish kerak.
 
 ### Kod misoli
 
@@ -11552,7 +11574,7 @@ const x = useSyncExternalStore(
 
 **Library integration:**
 
-Most state management libraries (Zustand, Redux 9+) use `useSyncExternalStore` internally for tearing-safety.
+Most state management libraries (Zustand, react-redux 8+) use `useSyncExternalStore` internally for tearing-safety.
 
 **Performance:**
 
@@ -11588,7 +11610,7 @@ Builds selector pattern on top of `useSyncExternalStore`.
 ### Follow-up savollar
 
 - "Why R18 added this hook?" — Tearing in concurrent rendering. Old `useState + useEffect` pattern unsafe.
-- "Replace Redux with this?" — Building block, not full state mgmt. Redux 9+ uses internally.
+- "Replace Redux with this?" — Building block, not full state mgmt. Redux (react-redux 8+) uses `useSyncExternalStore` internally.
 - "Performance vs useContext?" — Faster: no whole-tree re-render, granular subscription.
 
 </details>
@@ -12245,6 +12267,8 @@ function useStore() {
 
 ---
 
+<a id="qism-j"></a>
+
 ## QISM J: R19 Hooks
 
 ### 50. `use()` — Promise va Context conditional [Middle+]
@@ -12454,16 +12478,28 @@ function Comp() {
 }
 
 // ✅ Or external cache
-const cache = new Map();
+const dataCache = new Map();
 function getCached(key: string) {
-  if (!cache.has(key)) {
-    cache.set(key, fetchData(key));
+  if (!dataCache.has(key)) {
+    dataCache.set(key, fetchData(key));
   }
-  return cache.get(key);
+  return dataCache.get(key);
 }
 
 function Comp({ key }: { key: string }) {
   const data = use(getCached(key));
+}
+
+// ✅ React cache (RSC) — request-scoped deduplication
+import { cache } from "react";
+const fetchUser = cache(async (id: string) => {
+  return fetch(`/api/users/${id}`).then(r => r.json());
+});
+
+function ServerView() {
+  const userPromise = fetchUser("123");
+  const user = use(userPromise);  // same request → cached
+  return <p>{user.name}</p>;
 }
 ```
 
@@ -13492,163 +13528,11 @@ async function action(prevState, formData) {
 
 ---
 
-### 54. `use()` hook — Promise unwrapping va conditional context [Senior]
-
-<details>
-<summary><strong>Javob</strong></summary>
-
-### Qisqa javob
-
-`use(promiseOrContext)` — R19'da yangi hook (boshqa hook'lardan farqli — **Rules of Hooks bo'lmagan**, conditional ishlatish mumkin). Ikki use case: (1) **Promise** — Suspense bilan unwrap async data, (2) **Context** — `useContext` o'rniga, conditional context read. Server Components va Client Components ikkalasida ham ishlaydi.
-
-### Kod misoli
-
-```tsx
-// 1. Promise unwrapping
-function UserProfile({ userPromise }: { userPromise: Promise<User> }) {
-  const user = use(userPromise);  // ✅ Suspense suspend qiladi to'lguncha
-  return <p>{user.name}</p>;
-}
-
-function App() {
-  const userPromise = fetchUser("123");
-  return (
-    <Suspense fallback={<Spinner />}>
-      <UserProfile userPromise={userPromise} />
-    </Suspense>
-  );
-}
-
-// 2. Conditional context
-function MyComponent({ shouldRead }: { shouldRead: boolean }) {
-  if (shouldRead) {
-    const value = use(MyContext);  // ✅ R19 — conditional OK
-    return <p>{value}</p>;
-  }
-  return null;
-}
-
-// useContext — Rules of Hooks (top-level)
-function MyComponentOld({ shouldRead }: { shouldRead: boolean }) {
-  const value = useContext(MyContext);  // ❌ Always calls
-  if (shouldRead) return <p>{value}</p>;
-  return null;
-}
-```
-
-<details>
-<summary><strong>Deep Dive</strong></summary>
-
-**Promise integration:**
-
-```tsx
-// Promise pending → throws Promise (Suspense catches)
-// Promise resolved → returns value
-// Promise rejected → throws Error (Error Boundary catches)
-
-function use<T>(promiseOrContext: Promise<T> | Context<T>): T {
-  if (isPromise(promiseOrContext)) {
-    if (promiseOrContext.status === "fulfilled") return promiseOrContext.value;
-    if (promiseOrContext.status === "rejected") throw promiseOrContext.reason;
-    if (promiseOrContext.status === "pending") {
-      promiseOrContext.then(
-        (value) => { promiseOrContext.status = "fulfilled"; promiseOrContext.value = value; },
-        (reason) => { promiseOrContext.status = "rejected"; promiseOrContext.reason = reason; }
-      );
-      throw promiseOrContext;  // suspend
-    }
-  }
-  if (isContext(promiseOrContext)) {
-    return readContext(promiseOrContext);
-  }
-}
-```
-
-**Promise caching gotcha:**
-
-```tsx
-// ❌ New promise each render — infinite suspend
-function BadView() {
-  const promise = fetch("/api");  // new promise each render!
-  const data = use(promise);
-  return <p>{data}</p>;
-}
-
-// ✅ Stable promise (parent or cache)
-function GoodView({ promise }: { promise: Promise<Data> }) {
-  const data = use(promise);
-  return <p>{data}</p>;
-}
-
-// Or React's cache (RSC)
-import { cache } from "react";
-const fetchUser = cache(async (id: string) => {
-  return fetch(`/api/users/${id}`).then(r => r.json());
-});
-
-function ServerView() {
-  const userPromise = fetchUser("123");
-  const user = use(userPromise);
-  return <p>{user.name}</p>;
-}
-```
-
-**`use` vs `useContext`:**
-
-```tsx
-// Both read context, different semantics:
-const value1 = useContext(MyContext);  // top-level only
-const value2 = use(MyContext);          // conditional OK
-
-// use() preferred in R19+ for new code (more flexible)
-```
-
-**Server Component pattern:**
-
-```tsx
-// Server Component
-async function ServerPage({ params }) {
-  const data = await db.findById(params.id);  // ✅ async OK in server
-  return <ServerContent data={data} />;
-}
-
-// Or pass promise to client
-function ServerPage({ params }) {
-  const dataPromise = db.findById(params.id);  // unawaited promise
-  return (
-    <Suspense fallback={<Spinner />}>
-      <ClientView dataPromise={dataPromise} />
-    </Suspense>
-  );
-}
-
-"use client";
-function ClientView({ dataPromise }) {
-  const data = use(dataPromise);  // ✅ unwraps in client
-  return <p>{data.name}</p>;
-}
-```
-
-</details>
-
-### Edge Cases
-
-- **`use()` in event handler**: Error — only in render body.
-- **Rejected promise**: Throws — Error Boundary catches.
-- **`use()` in loop**: OK (unlike other hooks). New in R19.
-
-### Follow-up savollar
-
-- "Why `use` exists alongside `useContext`?" — `use` more flexible (conditional). `useContext` legacy.
-- "Suspense for data fetching — replaces useEffect?" — In RSC + R19, yes. Client-only — `use` + Suspense possible but framework-supported.
-
-</details>
-
----
+<a id="qism-k"></a>
 
 ## QISM K: Custom Hooks
 
-### 55. Custom hooks pattern va composition [Middle]
+### 54. Custom hooks pattern va composition [Middle]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -13982,7 +13866,7 @@ function useUndoRedo<T>(initial: T) {
 
 ---
 
-### 56. `useDebugValue` — DevTools annotation [Middle+]
+### 55. `useDebugValue` — DevTools annotation [Middle+]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -14150,7 +14034,7 @@ const { data, status } = useQuery(...);
 
 ---
 
-### 57. Common custom hooks — useDebounce, useLocalStorage, useIntersectionObserver, useFetch [Middle+]
+### 56. Common custom hooks — useDebounce, useLocalStorage, useIntersectionObserver, useFetch [Middle+]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -14575,11 +14459,11 @@ Bu faylda quyidagilar yoritildi:
 
 **QISM H — useMemo & useCallback (31-34)**: useMemo mechanics, useCallback (useMemo wrapper), memo + useCallback paired, when NOT to memoize.
 
-**QISM I — Concurrent Hooks R18 (35-39)**: useTransition, useDeferredValue, useSyncExternalStore (tearing prevention), useId, decision tree.
+**QISM I — Concurrent Hooks R18 (44-49)**: useTransition, useDeferredValue, useSyncExternalStore (tearing prevention), useId, decision tree.
 
-**QISM J — R19 Hooks (40-43)**: use() hook, useFormStatus + useActionState, useOptimistic, decision tree.
+**QISM J — R19 Hooks (50-53)**: use() hook, useFormStatus + useActionState, useOptimistic, decision tree.
 
-**QISM K — Custom Hooks (44-46)**: Pattern va composition, useDebugValue, common custom hooks library.
+**QISM K — Custom Hooks (54-56)**: Pattern va composition, useDebugValue, common custom hooks library.
 
 **Keyingi:** [04-patterns.md](04-patterns.md) — Components, Composition, Patterns, Error Boundaries, Portals — function components, props, lifting state, controlled/uncontrolled, render props (legacy), HOC (legacy), compound components, error boundaries (R19 root callbacks), portals.
 

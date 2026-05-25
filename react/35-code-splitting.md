@@ -61,7 +61,7 @@ Chunk'larga ajratishning samarasi: foydalanuvchi initial pay-load 200 KB ko'radi
 1. `React.lazy(loader)` — komponent uchun loader funksiyasi (`() => Promise<{ default: Component }>`).
 2. `<Suspense fallback>` — chunk yuklanayotgan paytda fallback UI.
 
-Haqiqiy chunk emit qilish, manifest yaratish, prefetch/preload mexanizmlari — bularning hammasi **bundler darajasida** sodir bo'ladi. React faqat Promise'ni ushlab, Suspense bilan integratsiyalashadi.
+Haqiqiy chunk emit qilish, manifest yaratish, prefetch/preload mexanizmlari — bularning hammasi **bundler darajasida** sodir bo'ladi. React faqat Promise'ni ushlab, Suspense bilan integration qiladi.
 
 > **Versiya evolyutsiyasi (Code Splitting):**
 > - **Pre-R16 (2013-2018):** Manual workaround — `react-loadable` library, custom Promise wrapping, har bir setup uchun ad-hoc kod.
@@ -170,7 +170,7 @@ import { VideoPlayer } from './components/VideoPlayer';
 
 function App() {
   // Foydalanuvchi faqat HomePage ko'rsa ham,
-  // brauzer barcha kompbnent'larni parse va compile qiladi.
+  // brauzer barcha komponent'larni parse va compile qiladi.
   return <HomePage />;
 }
 ```
@@ -249,7 +249,7 @@ function lazy<T extends ComponentType<any>>(
 3. **Resolved (`1`)** — Promise resolve bo'ldi, modul `payload._result.default` da. Subsequent render'larda chunk'ni qayta yuklamasdan ushbu cache'ni ishlatadi.
 4. **Rejected (`2`)** — Promise reject bo'ldi (network error, chunk load failure). Render paytida xatolik throw qilinadi → `<ErrorBoundary>` catch qiladi.
 
-**Throw mexanizmi (Suspense integratsiyasi):**
+**Throw mexanizmi (Suspense integration'i):**
 
 Pending holatida `lazy()` wrapper komponent'ning render fazasi davomida `payload._result` (Promise) throw qiladi. React Reconciler shu Promise'ni catch qiladi, Fiber'ni "thrown" deb belgilaydi va eng yaqin `<Suspense>` boundary'gacha yuqoriga ko'tariladi. Boundary `fallback` prop'ni render qiladi va Promise'ga `.then()` callback ulaydi. Promise resolve bo'lganda — boundary qayta render qiladi va lazy komponent endi `Resolved` holatida — modul `_result.default` o'qiladi va component render qilinadi.
 
@@ -532,7 +532,7 @@ Route-based splitting — har bir route (URL path) uchun alohida chunk yaratish 
 - **Next.js App Router** — har bir `page.tsx` automatic chunk, hech qanday manual ish kerak emas.
 - **Remix / TanStack Start** — file-based + `defer`/`preload` mexanizmlari.
 
-> **Routing kursi:** Bu kursda routing alohida `/routing/` kursida o'rganiladi. Bu yerda faqat **code splitting kontekstida** routing pattern'lari ko'rsatiladi.
+> **Routing kursi:** Bu kursda routing alohida `/routing/` kursida o'rganiladi. Bu yerda faqat **code splitting context'ida** routing pattern'lari ko'rsatiladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -764,7 +764,7 @@ function NavMenu() {
 
 ### Nazariya
 
-Feature-based splitting — komponent darajasida (route emas) chunk yaratish. Foydalanuvchining barcha sahifa funksionalliklari kerak emas — ba'zi feature'lar conditional, lazy, on-demand:
+Feature-based splitting — komponent darajasida (route emas) chunk yaratish. Foydalanuvchining barcha sahifa functionality'lari kerak emas — ba'zi feature'lar conditional, lazy, on-demand:
 
 - **Modal va dialog'lar** — ochilmaguncha kerak emas (`HeavyModal`, `ConfirmDialog`)
 - **Heavy library wrappers** — RichTextEditor (Slate, Tiptap, Lexical) 200-500 KB, faqat edit mode'da
@@ -1046,7 +1046,7 @@ Vendor splitting — `node_modules`'dan kelgan third-party library'larni alohida
 
 **Webpack splitChunks default heuristic:**
 
-Webpack 4+ avtomatik split qiladi quyidagi shartlar bo'yicha (default `splitChunks` konfiguratsiyasi, Webpack 5):
+Webpack 4+ avtomatik split qiladi quyidagi shartlar bo'yicha (default `splitChunks` configuration'i, Webpack 5):
 
 ```
 1. Module 2+ chunk'da ishlatiladi (deduplication)
@@ -1130,7 +1130,7 @@ HTML (entry):
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-Vite manualChunks oddiy konfiguratsiya:
+Vite manualChunks oddiy configuration:
 
 ```typescript
 // vite.config.ts
@@ -1200,7 +1200,7 @@ export default defineConfig({
 });
 ```
 
-Webpack splitChunks konfiguratsiya:
+Webpack splitChunks configuration:
 
 ```javascript
 // webpack.config.js
@@ -1284,7 +1284,7 @@ Heavy library aniqlash (vendor splitting kerakligi):
 
 Magic Comments — Webpack'ning maxsus comment syntax'i, dynamic `import()` chaqiriqlariga metadata qo'shadi. Bundler comment'larni parse qilib, chunk emission paytida tegishli xatti-harakatni qo'llaydi.
 
-> **MUHIM:** Magic Comments **Webpack-specific** funksionallik. Vite/Rollup/Esbuild'da ishlamaydi. Vite'da chunk nomlash `manualChunks` orqali, prefetch/preload — manual `<link rel>` orqali bajariladi.
+> **MUHIM:** Magic Comments **Webpack-specific** functionality. Vite/Rollup/Esbuild'da ishlamaydi. Vite'da chunk nomlash `manualChunks` orqali, prefetch/preload — manual `<link rel>` orqali bajariladi.
 
 **Asosiy magic comments:**
 
@@ -1543,7 +1543,7 @@ Preloading — chunk'ni **kerak bo'lgan paytdan oldin** yuklab qo'yish strategiy
 **Trade-off'lar:**
 
 - **Hover preload** afzal: foydalanuvchi niyatining birinchi belgisi — hover va click orasida qisqa interval bo'ladi va shu vaqtda chunk yuklab qo'yiladi. Foydasiz preload kam.
-- **Idle preload** mobile'da xavfli: data plan va batareya iste'moli. `requestIdleCallback` desktop-friendly (Safari'da hali ham qo'llab-quvvatlanmaydi).
+- **Idle preload** mobile'da xavfli: data plan va batareya iste'moli. `requestIdleCallback` Safari 16.4+'da qo'llab-quvvatlanadi (2023-03'da qo'shildi); eski Safari versiyalar uchun `setTimeout` fallback kerak.
 - **Viewport preload** — list rendering va below-the-fold content uchun mos. Lekin foydalanuvchi scroll qilmasdan ham hammasini yuklash overhead beradi — `IntersectionObserver` bilan birga kerak.
 
 > **R19 alternativasi:** Quyidagi section'da `preload()`/`preinit()` runtime API'lari ko'rsatiladi — Webpack magic comments'ga zamonaviy alternativa.
@@ -1570,14 +1570,17 @@ requestIdleCallback(
 
 **Browser support:**
 
-- `requestIdleCallback`: Chrome 47+, Firefox 55+, Safari **NO** (16+ ham hali yo'q)
-- Polyfill: `requestIdleCallback-polyfill` (setTimeout fallback)
-- Safari uchun fallback: `setTimeout(callback, 1)` — ideal emas, lekin ishlaydi.
+- `requestIdleCallback`: Chrome 47+ (2015-12), Firefox 55+ (2017-08), Safari 16.4+ (2023-03)
+- Eski Safari versiyalar uchun polyfill: `requestIdleCallback-polyfill` (`setTimeout` fallback)
+- Manual fallback: `setTimeout(callback, 1)` — ideal emas (idle window'ni o'lchamaydi), lekin Safari 15- da ishlaydi.
 
 **`IntersectionObserver` performance:**
 
 ```javascript
-// Native API, Worker thread'da kuzatadi (main thread'ga ta'sir qilmaydi)
+// Native API — brauzer compositor/internal thread'da kuzatadi (Web Worker EMAS).
+// Callback main thread'da (microtask queue) chaqiriladi, lekin intersection o'lchash
+// layout/paint flow bilan birga bo'ladi va getBoundingClientRect kabi sync layout
+// reads'ga muqobil — main thread block qilmaydi.
 const observer = new IntersectionObserver(
   (entries) => {
     entries.forEach((entry) => {
@@ -1855,14 +1858,14 @@ React 19 `react-dom`'dan to'rtta yangi runtime API export qiladi: `preload`, `pr
 > **Versiya evolyutsiyasi (Preloading APIs):**
 > - **Pre-R19 (Manual):** Developer'lar `<Helmet>` (`react-helmet`) yoki manual `document.head.appendChild()` orqali `<link>` qo'shardi. SSR'da ko'p workaround va race condition.
 > - **R19 (2024+):** `preload()`/`preinit()`/`prefetchDNS()`/`preconnect()` rasmiy API `react-dom`'dan. Document Metadata hoist mexanizmi avtomatik.
-> - **Sabab:** SSR streaming va Suspense bilan to'liq integratsiya. Server `<link>` element'ini boshqa kontent'dan oldin chiqarishi mumkin (request waterfall'ni oldini olish, parallel network fetch boshlanadi).
+> - **Sabab:** SSR streaming va Suspense bilan to'liq integration. Server `<link>` element'ini boshqa kontent'dan oldin chiqarishi mumkin (request waterfall'ni oldini olish, parallel network fetch boshlanadi).
 
 **4 ta API:**
 
-1. **`preload(href, options)`** — resurs (script, style, font, image) **yuklab olish**.
+1. **`preload(href, options)`** — resurs **yuklab olish** (execute/apply yo'q).
    - `<link rel="preload" href={href} as={as} />` ekvivalenti
-   - `as`: `'script' | 'style' | 'font' | 'image' | 'fetch'`
-   - Resurs ishlatilishi haligacha emas, faqat brauzer cache'ga yuklanadi
+   - `as`: `'audio' | 'document' | 'embed' | 'fetch' | 'font' | 'image' | 'object' | 'script' | 'style' | 'track' | 'video' | 'worker'` (W3C `<link as>` to'liq list)
+   - Resurs brauzer cache'ga yuklanadi, lekin execute/apply qilinmaydi (script `<script>` tag bilan, stylesheet `<link rel="stylesheet">` bilan keyinroq ishlatiladi)
 
 2. **`preinit(href, options)`** — script `<script>` execute YOKI stylesheet `<link>` apply.
    - `<script async src={href}>` yoki `<link rel="stylesheet" href={href}>`
@@ -2160,7 +2163,7 @@ function ThemedApp() {
 
 ### Nazariya
 
-Service Worker — brauzer'da background'da ishlaydigan script. Network request'larni intercept qilib, custom cache strategy'larni qo'llashi mumkin. Code splitting kontekstida Service Worker chunk fayllarini cache'lash va offline support uchun ishlatiladi.
+Service Worker — brauzer'da background'da ishlaydigan script. Network request'larni intercept qilib, custom cache strategy'larni qo'llashi mumkin. Code splitting context'ida Service Worker chunk fayllarini cache'lash va offline support uchun ishlatiladi.
 
 **Caching strategy'lari:**
 
@@ -2169,7 +2172,7 @@ Service Worker — brauzer'da background'da ishlaydigan script. Network request'
 3. **Stale While Revalidate** — avval cache'dan instant javob, parallel network'dan yangilangan versiyani cache'ga saqlaydi.
 4. **Cache Only / Network Only** — faqat bittasi.
 
-**Workbox library** — Google tomonidan maintained, deklarativ Service Worker tuzilishi.
+**Workbox library** — Google tomonidan maintained, declarative Service Worker tuzilishi.
 
 **Versiya invalidation:** Chunk fayl nomida hash bo'lgani uchun (`vendor-react.a1b2c3.js`) — content o'zgarsa yangi hash, yangi URL → cache miss → network'dan olinadi.
 
@@ -2255,7 +2258,9 @@ export function registerServiceWorker() {
 // main.tsx
 import { registerServiceWorker } from './sw-register';
 
-const root = createRoot(document.getElementById('root')!);
+const container = document.getElementById('root');
+if (!container) throw new Error('Root container not found');
+const root = createRoot(container);
 root.render(<App />);
 
 registerServiceWorker();
@@ -2722,7 +2727,7 @@ Code splitting noto'g'ri qo'llanilsa **performance regressiyasi** keltirib chiqa
 
 **1. Critical above-the-fold lazy loading:** Foydalanuvchi sahifaga kelganda darhol ko'radigan komponent (header, hero, asosiy content) lazy bo'lsa — initial chunk yuklangach yana boshqa chunk yuklash kerak. LCP regressiyasi.
 
-**2. Too granular splits:** Har kichik komponent alohida chunk → 50+ HTTP request → HTTP/2 multiplexing bo'lsa ham overhead (har request uchun parsing/execution kontekst). Webpack default `splitChunks.minSize` 20 KB — undan kichikroq modul'lar odatda alohida chunk qilinmaydi. Amaliy tavsiya: tiny chunk'larni guruhlash, hatto 5-10 KB komponent'larni bitta `ui` yoki `dialogs` chunk'ida birlashtirish.
+**2. Too granular splits:** Har kichik komponent alohida chunk → 50+ HTTP request → HTTP/2 multiplexing bo'lsa ham overhead (har request uchun parsing/execution context). Webpack default `splitChunks.minSize` 20 KB — undan kichikroq modul'lar odatda alohida chunk qilinmaydi. Amaliy tavsiya: tiny chunk'larni guruhlash, hatto 5-10 KB komponent'larni bitta `ui` yoki `dialogs` chunk'ida birlashtirish.
 
 **3. Missing prefetch — UX waterfall:** Foydalanuvchi navigatsiya qiladi → chunk request → pending → content render. Bu sequential. Hover/idle preload bilan parallel qilinadi.
 
@@ -3282,7 +3287,7 @@ const Reviews = lazy(() => import('./Reviews'));
 
 ### Mashq 1: Sodda React.lazy bilan Modal (Oson)
 
-`HelpModal` komponentini lazy yuklash uchun konfiguratsiya qiling. Modal faqat `?` button bosilganda ochilishi kerak. Suspense fallback `null` (modal'ning o'zi loading state'ni boshqaradi).
+`HelpModal` komponentini lazy yuklash uchun configuration tuzing. Modal faqat `?` button bosilganda ochilishi kerak. Suspense fallback `null` (modal'ning o'zi loading state'ni boshqaradi).
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -3479,7 +3484,7 @@ function App() {
 
 ### Mashq 4: R19 Preload API Integration (O'rta)
 
-Application root'da kerakli resurs'lar uchun R19 preloading APIs ishlatib konfiguratsiya qiling: API server preconnect, critical font preload, theme stylesheet preinit, va admin chunk preload.
+Application root'da kerakli resurs'lar uchun R19 preloading APIs ishlatib configuration tuzing: API server preconnect, critical font preload, theme stylesheet preinit, va admin chunk preload.
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -3763,7 +3768,7 @@ function App() {
 - **Splitting strategy'lari:** Route-based (har sahifa alohida chunk), Feature-based (modal/editor/charts conditional), Vendor splitting (long-cache `node_modules`).
 - **Webpack Magic Comments** (`webpackChunkName`/`webpackPrefetch`/`webpackPreload`) — build-time metadata. Vite'da `manualChunks` orqali.
 - **Preloading strategy'lari:** Hover (eng tabiiy), Focus (accessibility), Touch (mobile), Viewport (IntersectionObserver), Idle (`requestIdleCallback`).
-- **R19 Preloading APIs** — `preload`, `preinit`, `prefetchDNS`, `preconnect` runtime API'lari `<head>`'ga `<link>` element'larni programmatic hoist. Bundler-agnostic, SSR streaming bilan integratsiya.
+- **R19 Preloading APIs** — `preload`, `preinit`, `prefetchDNS`, `preconnect` runtime API'lari `<head>`'ga `<link>` element'larni programmatic hoist. Bundler-agnostic, SSR streaming bilan integration.
 - **Service Worker** — chunk caching uchun Cache First strategy, offline support, deploy paytida versiya invalidation.
 - **Bundle Analyzer** — chunk tarkibini visualization qiluvchi tool. Heavy library aniqlash, vendor splitting qarorlash, tree shaking samarasi tekshirish uchun fundamental.
 - **Anti-pattern'lar:** Above-the-fold lazy (LCP regression), too granular splits, sequential waterfall (no preload), unbalanced chunks, render-level `lazy()`.
@@ -3771,4 +3776,4 @@ function App() {
 
 ---
 
-**Keyingi bo'lim:** [36-virtualization.md](36-virtualization.md) — Virtual List rendering: windowing concept, pure React implementation (`useRef` + `onScroll` + visible items calc), variable height items measurement strategiyalari, `react-window` va `@tanstack/react-virtual` library taqqoslash, IntersectionObserver pattern (cross-ref `24-custom-hooks.md`), infinite scroll integratsiyasi.
+**Keyingi bo'lim:** [36-virtualization.md](36-virtualization.md) — Virtual List rendering: windowing concept, pure React implementation (`useRef` + `onScroll` + visible items calc), variable height items measurement strategiyalari, `react-window` va `@tanstack/react-virtual` library taqqoslash, IntersectionObserver pattern (cross-ref `24-custom-hooks.md`), infinite scroll integration.

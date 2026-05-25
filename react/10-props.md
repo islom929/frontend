@@ -125,13 +125,16 @@ Boolean shorthand (`disabled`) → `disabled: true`. Children — alohida `child
 `_jsx` natijasi — ReactElement object:
 
 ```ts
+// R19 default (enableRefAsProp = true):
 {
   $$typeof: Symbol(react.element),
   type: Greeting,
-  props: { name: 'Alice', age: 30, disabled: true, children: 'Welcome' },
   key: null,
-  ref: null,
+  props: { name: 'Alice', age: 30, disabled: true, children: 'Welcome' },
+  // ref alohida slot YO'Q — `ref` bo'lsa props.ref'da
+  _owner: null,
 }
+// R18 va undan oldin element.ref alohida slot edi.
 ```
 
 Reconciler bu element'dan Fiber yaratadi va `pendingProps` slot'iga props object'ni saqlaydi:
@@ -299,7 +302,7 @@ function Button({
 Props **read-only** — Component'lar o'zlariga uzatilgan props'ni mutate qilmasligi shart. Bu — React'ning fundamental invariant'laridan biri.
 
 ```tsx
-function BadComponent({ user }: { user: User }) {
+function ProfileHeaderUnsafe({ user }: { user: User }) {
   user.name = user.name.toUpperCase(); // ❌ Props mutation
   return <h1>{user.name}</h1>;
 }
@@ -322,7 +325,7 @@ function BadComponent({ user }: { user: User }) {
 **To'g'ri yondashuv — yangi qiymat yaratish:**
 
 ```tsx
-function GoodComponent({ user }: { user: User }) {
+function ProfileHeader({ user }: { user: User }) {
   const upperName = user.name.toUpperCase(); // ✅ Local variable
   return <h1>{upperName}</h1>;
 }
@@ -480,30 +483,30 @@ Anti-pattern — props mutation:
 
 ```tsx
 // ❌ Object property mutation
-function BadCard({ user }: { user: User }) {
+function UserCardUnsafe({ user }: { user: User }) {
   user.lastViewed = Date.now(); // ❌ Props mutation
   return <div>{user.name}</div>;
 }
 
 // ❌ Array push
-function BadList({ items }: { items: string[] }) {
+function TagListUnsafe({ items }: { items: string[] }) {
   items.push('default'); // ❌ Parent array mutation
-  return <ul>{items.map((i) => <li key={i}>{i}</li>)}</ul>;
+  return <ul>{items.map((tag) => <li key={tag}>{tag}</li>)}</ul>;
 }
 ```
 
 ✅ To'g'ri — yangi qiymat:
 
 ```tsx
-function GoodCard({ user }: { user: User }) {
+function UserCard({ user }: { user: User }) {
   const enriched = { ...user, lastViewed: Date.now() };
   return <div>{enriched.name}</div>;
   // Yoki agar lastViewed kerak bo'lmasa, return faqat name
 }
 
-function GoodList({ items }: { items: string[] }) {
+function TagList({ items }: { items: string[] }) {
   const withDefault = items.length === 0 ? ['default'] : items;
-  return <ul>{withDefault.map((i) => <li key={i}>{i}</li>)}</ul>;
+  return <ul>{withDefault.map((tag) => <li key={tag}>{tag}</li>)}</ul>;
 }
 ```
 
@@ -1359,6 +1362,7 @@ function forEachChildren(children: ReactNode, fn: (c: ReactNode) => void) {
 `cloneElement` internal:
 
 ```ts
+// R19 (enableRefAsProp = true) — ref endi alohida slot emas, props ichida:
 function cloneElement<P>(
   element: ReactElement<P>,
   props?: Partial<P> | null,
@@ -1368,15 +1372,18 @@ function cloneElement<P>(
   if (children.length > 0) {
     newProps.children = children.length === 1 ? children[0] : children;
   }
-  
+
   return {
     $$typeof: REACT_ELEMENT_TYPE,
     type: element.type,
     key: element.key,
-    ref: element.ref,
-    props: newProps,
+    props: newProps,  // ref bo'lsa, props.ref'da
+    _owner: null,
   };
 }
+
+// R18 va undan oldin esa `ref` alohida slot edi va `cloneElement` uni
+// `element.ref`'dan ko'chirib qaytarardi (props ichiga kiritmasdan).
 ```
 
 `cloneElement` yangi ReactElement yaratadi (immutable), eski element'ni o'zgartirmaydi. Lekin yangi `props` object bilan, type bir xil.
@@ -1671,7 +1678,7 @@ const props = { key: 'k1', ref: myRef, name: 'X' };
 //                    funksiya 2-argument sifatida oladi; bo'lmasa — eski versiyalarda
 //                    warning chiqarib props'dan ham olib tashlanardi).
 // R19+: `key` hali ham alohida slot'da (props ichida emas), lekin spread'dan
-//       `key` extract qilinishi dev warning bilan kelad (explicit yozish tavsiya).
+//       `key` extract qilinishi dev warning bilan keladi (explicit yozish tavsiya).
 //       `ref` — function component'ning oddiy prop'i sifatida uzatiladi
 //       (forwardRef'siz). 
 ```
@@ -1717,12 +1724,12 @@ _jsx(Item, { ...props });
 // R18 va undan oldin: jsx funksiyasi spread natijasidan `key`/`ref` ni
 //   o'qib Element.key va Element.ref slot'lariga ko'chiradi (silent).
 // R19+: jsx funksiyasi `key` ni spread'dan extract qilsa ham, dev mode'da
-//   warning chiqadi: "A props object containing a 'key' prop is being spread..."
+//   warning chiqaradi: "A props object containing a 'key' prop is being spread..."
 ```
 
 > **🕐 Versiya evolyutsiyasi (`key` spread):**
 > - **R18 va undan oldin:** `<Item {...props} />` ichida `props.key` bo'lsa, runtime `jsx` funksiyasi key'ni Element.key slot'iga ko'chiradi (silent — warning yo'q).
-> - **R19+:** Dev mode'da warning: `key` ni spread orqali uzatish noaniq pattern. Tavsiya — `key`'ni explicit yozish: `<Item key={props.id} {...rest} />`.
+> - **R19+:** Dev mode'da warning chiqadi: `key` ni spread orqali uzatish noaniq pattern. Tavsiya — `key`'ni explicit yozish: `<Item key={props.id} {...rest} />`.
 > - **Sabab:** `key` semantik jihatdan oddiy prop emas — Reconciler identity uchun. Spread orqali yashirin uzatish — debug qiyin.
 
 **`ref` spread:**
@@ -1861,13 +1868,13 @@ type ButtonProps = {
   children: ReactNode;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>;
 
-function BadButton(props: ButtonProps) {
+function StyledButtonUnsafe(props: ButtonProps) {
   return <button {...props}>{props.children}</button>;
   // <button variant="primary"> — Console warning
 }
 
 // ✅ Wrapper-only prop'larni ajratish
-function GoodButton({ variant, children, ...rest }: ButtonProps) {
+function StyledButton({ variant, children, ...rest }: ButtonProps) {
   return (
     <button {...rest} className={`btn-${variant}`}>
       {children}
@@ -2052,7 +2059,7 @@ function Toolbar() {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Props drilling React arxitekturasi'ning natijal — chunki data flow **explicit** va **unidirectional**. Boshqa framework'larda implicit data sharing mavjud (Vue's provide/inject, Angular DI), lekin ular ham hozir Context'ga o'xshash mexanizm.
+Props drilling React architecture'sining natijasi — chunki data flow **explicit** va **unidirectional**. Boshqa framework'larda implicit data sharing mavjud (Vue'ning provide/inject, Angular DI), lekin ular ham hozir Context'ga o'xshash mexanizm.
 
 **Composition pattern Reconciliation'da:**
 
@@ -2293,7 +2300,7 @@ function Button({ label, onClick }: ButtonProps) {
 **Loyiha standartlari:**
 
 Ko'pchilik React loyihalarida:
-- **`interface`** — komponent props uchun (deklarativ shape)
+- **`interface`** — komponent props uchun (declarative shape)
 - **`type`** — union, utility, primitive alias uchun
 
 ```tsx
@@ -2848,8 +2855,9 @@ function UserView() {
     try {
       const data = await fetchUser();
       setState({ status: 'success', data });
-    } catch (error) {
-      setState({ status: 'error', error: error as Error });
+    } catch (caught) {
+      const error = caught instanceof Error ? caught : new Error(String(caught));
+      setState({ status: 'error', error });
     }
   };
   
@@ -3040,7 +3048,7 @@ type WrapperButtonProps = Omit<ComponentProps<'button'>, 'onClick'> & {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Utility types — TypeScript'ning mapped types va conditional types orqali implementatsiya:
+Utility types — TypeScript'ning mapped types va conditional types orqali implementation:
 
 **`Partial<T>` implementation:**
 
@@ -3321,8 +3329,8 @@ type MyButtonProps = ComponentProps<typeof MyButton>;
 | `ComponentPropsWithRef<E>` | Props plus `ref` | Explicit ref handling |
 
 > **🕐 Versiya evolyutsiyasi (`ref` and `ComponentProps`):**
-> - **R18 va undan oldin:** Function component'larga `ref` to'g'ridan-to'g'ri uzatilmaydi — `forwardRef` HOC kerak. Wrapper komponentlar polymorphic typing'da `ComponentPropsWithoutRef<E>` ishlatardi (ref kollizyon'ini oldini olish uchun).
-> - **R19+:** `ref` oddiy prop sifatida uzatilishi mumkin (cross-ref [`18-useref.md`](18-useref.md)). `forwardRef` hali deprecated emas (gradually phased out), `ComponentProps<E>` to'g'ridan-to'g'ri ishlaydi.
+> - **R18 va undan oldin:** Function component'larga `ref` to'g'ridan-to'g'ri uzatilmaydi — `forwardRef` HOC kerak. Wrapper komponentlar polymorphic typing'da `ComponentPropsWithoutRef<E>` ishlatardi (ref collision'ini oldini olish uchun).
+> - **R19+:** `ref` oddiy prop sifatida uzatilishi mumkin (cross-ref [`18-useref.md`](18-useref.md)). `forwardRef` soft-deprecated — hali ishlaydi, warning yo'q, lekin yangi kodda zarurat yo'q. `ComponentProps<E>` to'g'ridan-to'g'ri ishlaydi; polymorphic'da ref forward qilish uchun `ComponentPropsWithoutRef<E>` hali foydali.
 > - **Sabab:** `forwardRef` HOC qo'shimcha wrapper, function declaration'ni murakkab qiladi va generic component'lar bilan boilerplate keltirib chiqarardi. R19'da soddalashtirilgan.
 
 **Ishlatish — wrapper komponent:**
@@ -4023,7 +4031,7 @@ const orderColumns: Column<Order>[] = [
 > - **Pre-R19 (function component):** `MyComponent.defaultProps = { name: 'Guest' }` — props yetishmasa, default qo'yilardi.
 > - **R19+ (function component):** Olib tashlandi. JS default parameter ishlatiladi: `function MyComponent({ name = 'Guest' })`.
 > - **Class component:** `defaultProps` saqlanib qoldi (legacy).
-> - **Sabab:** JS default parameter native, deklarativ, va aniqroq. R19 Compiler optimizatsiyasi uchun ham yaxshi (defaults compile-time'da resolve qilinadi).
+> - **Sabab:** JS default parameter native, declarative, va aniqroq. R19 Compiler optimization uchun ham yaxshi (defaults compile-time'da resolve qilinadi).
 
 **Migration patterns:**
 
@@ -4131,12 +4139,12 @@ Greeting.propTypes = { name: PropTypes.string }; // R19: ignored (silent)
 Greeting.defaultProps = { name: 'Guest' };       // R19: ignored (warning if dev)
 ```
 
-Dev mode'da warning chiqadi:
+Dev mode'da R18.3 va undan keyingi versiyalarda warning chiqarilgan:
 ```
 Warning: Support for defaultProps will be removed from function components in a future major release. Use JavaScript default parameters instead.
 ```
 
-R19'da bu warning aktiv — kod hali ham ishlaydi, lekin propaga'da. R20+ da to'liq olib tashlanishi mumkin.
+**R19'da bu support to'liq olib tashlandi:** `function Greeting.defaultProps = { name: 'Guest' }` deklaratsiyasi e'tiborga olinmaydi — `name` prop berilmasa, u `undefined` qoladi (default qiymat **qo'llanilmaydi**). Bu — silent breaking change: kod compile bo'ladi, lekin runtime'da default'lar yo'qoladi. Migratsiya majburiy — ES6 default parameter (`function Greeting({ name = 'Guest' })`) ishlatish kerak. Class component'larda `static defaultProps` hali qo'llab-quvvatlanadi (legacy backward compatibility).
 
 **`defaultProps` Compiler optimization muammosi:**
 
@@ -4165,7 +4173,7 @@ Compiler bu pattern'ni tushunadi va memoization qiladi.
 
 **Class component nima uchun saqlandi:**
 
-Class component'lar — legacy, lekin Error Boundary kabi maxsus holatlar uchun zaruriy (cross-ref [`27-error-boundaries.md`](27-error-boundaries.md)). `defaultProps` class'da saqlanib qoldi — backward compatibility uchun. Yangi loyihalar function component bilan boshlanishi tavsiya qilinadi.
+Class component'lar — legacy, lekin Error Boundary kabi maxsus holatlar uchun zaruriy (cross-ref [`27-error-boundaries.md`](27-error-boundaries.md)). `defaultProps` class'da saqlanib qoldi — backward compatibility uchun. Yangi loyihalarda function component bilan boshlash tavsiya qilinadi.
 
 </details>
 
@@ -4295,7 +4303,7 @@ class Greeting extends React.Component<Props> {
 }
 ```
 
-Hozirgi kunda tavsiya: function component'larga konvertatsiya qiling.
+Hozirgi kunda tavsiya: function component'larga migration qilish.
 
 </details>
 
@@ -4490,7 +4498,7 @@ function Greeting({ name = 'Guest' }: { name?: string }) {
 }
 ```
 
-**Sabab:** R19'da function component'lar uchun `defaultProps` olib tashlandi. Compiler optimization'i va deklarativ stil uchun JS default afzal.
+**Sabab:** R19'da function component'lar uchun `defaultProps` olib tashlandi. Compiler optimization va declarative stil uchun JS default afzal.
 
 ---
 
@@ -4528,7 +4536,7 @@ function Button({ variant, label, ...rest }: Props) {
 // ❌ Object children — TS va runtime error
 const user = { name: 'Alice', age: 30 };
 
-function Greeting() {
+function GreetingUnsafe() {
   return <p>{user}</p>;
   // TS: Type '{ name: string; age: number; }' is not assignable to ReactNode
   // Runtime: "Objects are not valid as a React child"
@@ -4903,7 +4911,7 @@ function Card({
 | (default) | `?` optional |
 | `defaultProps.x` | `{ x = 'default' }` destructuring |
 
-R19+ uchun bu konvertatsiya majburiy — `propTypes` va `defaultProps` (function component'larda) ignored.
+R19+ uchun bu migration majburiy — `propTypes` va `defaultProps` (function component'larda) ignored.
 
 </details>
 

@@ -1,6 +1,6 @@
 # Bo'lim 2: Rendering — Render va Commit Phases
 
-> Rendering — React'ning komponent tree'ni real platformga (DOM) aylantirish jarayoni. Ikki asosiy bosqichdan iborat: **Render Phase** (pure, uziluvchi, workInProgress tree quradi) va **Commit Phase** (atomik, DOM mutation va effect'lar bajariladi). Bu bo'lim createRoot, Strict Mode, batching, va effect timing'ning ichki mexanikasini yoritadi.
+> Rendering — React'ning komponent tree'ni real platformga (DOM) aylantirish jarayoni. Ikki asosiy bosqichdan iborat: **Render Phase** (pure, uziluvchi, workInProgress tree quradi) va **Commit Phase** (atomic, DOM mutation va effect'lar bajariladi). Bu bo'lim createRoot, Strict Mode, batching, va effect timing'ning ichki mexanikasini yoritadi.
 
 ---
 
@@ -27,7 +27,7 @@
 
 ### Nazariya
 
-`createRoot` — React 18'dan boshlab joriy etilgan **yangi root API**. U brauzer DOM elementiga React komponent tree'ni "biriktirish" uchun ishlatiladi. Asosiy maqsad — concurrent features (interruptible rendering, Suspense improvements, automatic batching) uchun zarur infratuzilmani o'rnatish.
+`createRoot` — React 18'dan boshlab joriy etilgan **yangi root API**. U browser DOM elementiga React komponent tree'ni "biriktirish" uchun ishlatiladi. Asosiy maqsad — concurrent features (interruptible rendering, Suspense improvements, automatic batching) uchun zarur infrastructureni o'rnatish.
 
 ```tsx
 import { createRoot } from 'react-dom/client';
@@ -56,18 +56,18 @@ root.render(<App />);
 | `root.unmount()` | Tree'ni butunlay o'chirish, cleanup'lar bilan |
 
 > **🕐 Versiya evolyutsiyasi (Root API):**
-> - **Pre-R18 (`ReactDOM.render`):** `ReactDOM.render(<App />, container)` — sinkron rendering, concurrent features yo'q.
+> - **Pre-R18 (`ReactDOM.render`):** `ReactDOM.render(<App />, container)` — synchronous rendering, concurrent features yo'q.
 > - **R18+ (`createRoot`):** `createRoot(container).render(<App />)` — concurrent features yoqilgan, automatic batching, Suspense improvements.
 > - **Sabab:** Eski API bilan concurrent rendering'ni opt-in qilib bo'lmasdi (existing code'larni buzgan bo'lar edi). Yangi API yangi semantikani aniq belgiladi — eski `render()` "legacy mode" sifatida hali ishlaydi (warning bilan), lekin yangi loyihalar `createRoot` ishlatishi shart.
 
-`hydrateRoot` — SSR (Server-Side Rendering) uchun analogik API. Server tomonida generatsiya qilingan HTML'ga client-side React'ni "biriktirib" qo'yadi (cross-ref [`06-hydration.md`](06-hydration.md)).
+`hydrateRoot` — SSR (Server-Side Rendering) uchun o'xshash API. Server tomonida hosil qilingan HTML'ga client-side React'ni "biriktirib" qo'yadi (cross-ref [`06-hydration.md`](06-hydration.md)).
 
 ### Render qachon chaqiriladi
 
 `root.render()` ikki holatda chaqiriladi:
 
 1. **Initial render** — birinchi marta (entry point'da). Bu — komponent tree'ni mount qilish.
-2. **External re-render** — boshqa joydan (masalan, redux store update'idan tashqari `root.render(<App {...newProps} />)` chaqirish). Bu kamdan-kam ishlatiladi.
+2. **External re-render** — komponent state mexanizmidan tashqarida, `root.render(<App {...newProps} />)` ni qayta chaqirish orqali butun tree'ni yangi props bilan render qilish. Bu kamdan-kam ishlatiladi (odatda komponent ichidagi `setState` afzal).
 
 **Eslatma:** Komponent ichidagi `setState` chaqiriqlari `root.render()` ni qayta chaqirmaydi. State update'lari tree ichidagi mexanizm orqali ishlaydi (Fiber update queue). `root.render()` faqat tashqi entry point uchun.
 
@@ -82,7 +82,7 @@ root.render(<App />);
 2. FiberRootNode yaratiladi (root container fiber)
    - container DOM node'iga reference saqlanadi
    - update queue boshlang'ich holatga keltiriladi
-   - lanes bitmap (priority sistemasi) inicializatsiya qilinadi
+   - lanes bitmap (priority sistemasi) boshlang'ich qiymat bilan initialize qilinadi
    ↓
 3. HostRoot fiber yaratiladi
    - tag: HostRoot (3)
@@ -111,7 +111,7 @@ Birinchi `root.render(<App />)` chaqirilganda:
 6. performWorkOnRoot() — render+commit jarayoni boshlanadi
 ```
 
-`FiberRootNode` (root) va `HostRoot` (fiber) — ikki alohida obyekt. Fark:
+`FiberRootNode` (root) va `HostRoot` (fiber) — ikki alohida obyekt. Farq:
 - **`FiberRootNode`** — meta-information (container reference, pending lanes, callback queue)
 - **`HostRoot` fiber** — tree'ning eng yuqori tugun (root), boshqa fiber'lar bilan bir xil tuzilmaga ega
 
@@ -208,7 +208,10 @@ ReactDOM.render(<App />, document.getElementById('root'));
 ```tsx
 // ✅ Yangi (R18+)
 import { createRoot } from 'react-dom/client';
-createRoot(document.getElementById('root')!).render(<App />);
+
+const container = document.getElementById('root');
+if (!container) throw new Error('Root element topilmadi');
+createRoot(container).render(<App />);
 ```
 
 Multi-root setup (bir sahifada bir nechta React app — masalan, microfrontend yoki widget'lar):
@@ -216,8 +219,14 @@ Multi-root setup (bir sahifada bir nechta React app — masalan, microfrontend y
 ```tsx
 import { createRoot } from 'react-dom/client';
 
-const widgetA = createRoot(document.getElementById('widget-a')!);
-const widgetB = createRoot(document.getElementById('widget-b')!);
+const widgetAContainer = document.getElementById('widget-a');
+const widgetBContainer = document.getElementById('widget-b');
+if (!widgetAContainer || !widgetBContainer) {
+  throw new Error('Widget containerlari topilmadi');
+}
+
+const widgetA = createRoot(widgetAContainer);
+const widgetB = createRoot(widgetBContainer);
 
 widgetA.render(<UserWidget />);
 widgetB.render(<NotificationWidget />);
@@ -247,18 +256,18 @@ createRoot(container).render(
 
 `<StrictMode>` development'da quyidagi qo'shimcha chaqiriqlarni o'tkazadi (faqat dev'da, prod'da no-op):
 
-1. **Komponent funksiyasi tanasi ikki marta chaqiriladi** (R16.3+) — render purity'ni tekshirish uchun (class constructor, render, `shouldComponentUpdate` ham)
+1. **Function komponent tanasi ikki marta chaqiriladi** (R18+ — R16.3'da bu faqat class konstruktor/render/shouldComponentUpdate/getDerivedStateFromProps uchun ishlardi; R16.8 hooks bilan function body double-invocation qo'shildi va R18'da effect cycle ham qo'shildi)
 2. **`useState`/`useReducer` initializer funksiyalari ikki marta chaqiriladi** — initial state pure ekanligini tekshirish uchun
 3. **`useState` setter va `useReducer` reducer funksiyalari ikki marta chaqiriladi** (functional update'lar) — pure state transition tekshirish uchun
 4. **`useMemo` va `useCallback` factory funksiyalari ikki marta chaqiriladi** — pure derivation tekshirish uchun
-5. **Effect'lar mount paytida `mount → cleanup → mount` cycle bajariladi** (R18+) — sinxronizatsiya invariant'ini tekshirish uchun
+5. **Effect'lar mount paytida `mount → cleanup → mount` cycle bajariladi** (R18+) — synchronization invariant'ini tekshirish uchun
 6. **Deprecated API'lar haqida warning** — `findDOMNode`, legacy Context (`contextTypes`), string refs (oxirgi ikkitasi R19'da olib tashlandi)
 
 ### Nima uchun ikki marta chaqirish
 
-Concurrent rendering'da React render'ni **uzib qo'yib, qayta boshlashi** mumkin (high-priority update kelganda). Bu degani — komponent funksiyasi va effect'lar bir nechta marta chaqirilishi mumkin. Agar ular **pure** va **idempotent** bo'lmasa — bug yuz beradi.
+Concurrent rendering'da React render'ni **uzib qo'yib, qayta boshlashi** mumkin (high-priority update kelganda). Ya'ni komponent funksiyasi va effect'lar bir nechta marta chaqirilishi mumkin. Agar ular **pure** va **idempotent** bo'lmasa — bug yuz beradi.
 
-Strict Mode bu xatti-harakatni **dev'da majburan simulatsiya qiladi** — agar siz bug yozgan bo'lsangiz, u ikki marta chaqirilish tufayli aniq ko'rinadi.
+Strict Mode bu xatti-harakatni **dev'da majburan reproduce qiladi** — render davomida bug bo'lsa, u ikki marta chaqirilish tufayli aniq ko'rinadi.
 
 **Misol — bug:**
 
@@ -271,11 +280,21 @@ function Counter() {
 }
 ```
 
-Strict Mode'da `totalRenders` har render'da **2 ga oshadi** — bu sizga "render side effect bilan" ekanligini darhol ko'rsatadi.
+```tsx
+// ✅ To'g'ri — useRef render counter uchun (mutation faqat effect ichida)
+function Counter() {
+  const renderCount = useRef(0);
+  useEffect(() => { renderCount.current += 1; });
+  return <div>Renders: {renderCount.current}</div>;
+}
+```
+
+Strict Mode'da birinchi versiya'da `totalRenders` har render'da **2 ga oshadi** — bu render'ning "side effect bilan" ekanligini darhol ko'rsatadi. Ikkinchi versiya — render pure, mutation effect ichida.
 
 > **🕐 Versiya evolyutsiyasi (Strict Mode):**
-> - **R16.3 (2018):** Strict Mode joriy etildi. Komponent funksiyasi, class constructor/render/shouldComponentUpdate, useState initializer, useReducer reducer — barchasi ikki marta chaqirilardi.
-> - **R18 (2022):** Effect'lar uchun ham ikki marta cycle qo'shildi (`mount → cleanup → mount`). Effect "qaytadan o'rnatilishga chidamli" bo'lishi kerak — bu sinxronizatsiya invariant'ini tekshirish uchun.
+> - **R16.3 (2018):** Strict Mode joriy etildi — class konstruktor, render, shouldComponentUpdate, getDerivedStateFromProps, useState initializer, useReducer reducer ikki marta chaqirilardi.
+> - **R16.8 (2019):** Hooks bilan birga function komponent body ham ikki marta chaqiriladigan bo'ldi (purity check).
+> - **R18 (2022):** Effect'lar uchun ham ikki marta cycle qo'shildi (`mount → cleanup → mount`). Effect "qaytadan o'rnatilishga chidamli" bo'lishi kerak — bu synchronization invariant'ini tekshirish uchun.
 > - **Sabab:** Concurrent rendering invariant'larini dev'da topish. R18 effect 2x cycle "Reusable State" deb nomlangan kelajakdagi xususiyat (komponent unmount → remount qilinganda eski state'ni saqlab, qayta tiklash) uchun zamin yaratadi.
 
 ### StrictMode wrapper joylashuvi
@@ -297,7 +316,7 @@ Strict Mode'da `totalRenders` har render'da **2 ga oshadi** — bu sizga "render
 </App>
 ```
 
-Production build'da `<StrictMode>` butunlay olib tashlanadi — Babel/SWC dead code elimination qiladi.
+Production build'da `<StrictMode>` komponent o'z joyida qoladi (bundle'dan olib tashlanmaydi), lekin **no-op** sifatida ishlaydi — barcha development-only tekshiruvlar (double invocation, deprecated API warnings, va h.k.) `process.env.NODE_ENV === 'production'` shartiga qarab o'tkazib yuboriladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -307,15 +326,19 @@ Strict Mode'ning ichki mexanizmi:
 ```
 Function komponent render (Strict Mode aktiv):
 1. Komponent funksiyasi 1-marta chaqiriladi
-   - hooks executed
-   - JSX qaytariladi
-   - hook results cache qilinadi
+   - hooks dispatcher orqali execute qilinadi
+   - JSX qaytariladi (bu natija reconciliation'da ishlatilmaydi)
 2. Komponent funksiyasi 2-marta chaqiriladi (DEV ONLY)
-   - hooks REPLAYED (cache'dan foydalaniladi)
+   - hooks bir xil saqlangan state bilan qayta execute
+     (idempotent o'qish — yangi memoizedState yaratilmaydi)
    - JSX qaytariladi
-   - 1-marta natija bilan solishtiriladi
-3. Agar farq bo'lsa — warning yoki silent (purity violation indicator)
-4. Birinchi natija ishlatiladi (ikkinchisi tashlanadi)
+3. Ikkinchi invocation natijasi reconciliation uchun ishlatiladi
+   (purity qoidasi bo'yicha ikkala natija aynan bir xil bo'lishi shart —
+    React solishtirib tekshirmaydi, faqat ikkinchisini ishlatadi)
+
+React explicit purity tekshiruvi qilmaydi — agar render davomida
+side effect bo'lsa (counter++, log, fetch), u 2x execute bo'lib
+visible bo'lib qoladi. Bug ko'rinadi, lekin warning chiqarilmaydi.
 ```
 
 R18 effect 2x cycle (mount holatida):
@@ -324,7 +347,7 @@ R18 effect 2x cycle (mount holatida):
 Mount cycle (Strict Mode dev'da):
 1. Komponent mount qilinadi
 2. useEffect setup chaqiriladi
-3. useEffect cleanup chaqiriladi  ← SIMULATSIYA: unmount-remount
+3. useEffect cleanup chaqiriladi  ← Simulation: unmount-remount
 4. useEffect setup chaqiriladi  ← qayta-mount
 5. (browser paint)
 
@@ -336,19 +359,24 @@ Production'da:
 
 Bu cycle **faqat dev mode'da** va **faqat mount paytida**. Update yoki unmount holatlarida normal sikl ishlaydi.
 
-**Strict Mode'ning ichki implementatsiyasi:**
+**Strict Mode'ning ichki implementation'i:**
 
-`<StrictMode>` Fiber'da `Mode.StrictLegacyMode` (`StrictMode | StrictEffectsMode`) bayrog'i bilan belgilanadi. Reconciler render paytida Fiber'ning `mode` flag'ini tekshirib, ushbu Fiber subtree uchun double-invocation qoidalarini qo'llaydi.
+`<StrictMode>` Fiber'da `StrictLegacyMode | StrictEffectsMode` bayroqlari bilan belgilanadi. Reconciler render paytida Fiber'ning `mode` flag'ini tekshirib, ushbu Fiber subtree uchun double-invocation qoidalarini qo'llaydi.
 
 ```typescript
-// React internal (soddalashtirilgan)
-const StrictLegacyMode = 0b001000;
-const StrictEffectsMode = 0b100000;
+// React internal (soddalashtirilgan — manba: react/packages/react-reconciler/src/ReactTypeOfMode.js)
+const NoMode = 0b000000;
+const ConcurrentMode = 0b000001;
+const ProfileMode = 0b000010;
+// DebugTracingMode (0b000100) — R18.3+'da olib tashlangan (kommentariyada qoldirilgan)
+const StrictLegacyMode = 0b001000;   // bit 3
+const StrictEffectsMode = 0b010000;  // bit 4
+const NoStrictPassiveEffectsMode = 0b100000;  // bit 5
 
 if (fiber.mode & StrictLegacyMode && __DEV__) {
   // Komponent funksiyasini ikki marta chaqirish
   reactComponent(); // birinchi marta
-  reactComponent(); // ikkinchi marta — purity tekshirish
+  reactComponent(); // ikkinchi marta — side effect detection
 }
 
 if (fiber.mode & StrictEffectsMode && __DEV__) {
@@ -361,7 +389,7 @@ if (fiber.mode & StrictEffectsMode && __DEV__) {
 
 **Strict Mode va Console:**
 
-R17 va undan oldin Strict Mode `console.log` chiqishlarini "deduplicate" qilardi (ikki marta render — bir marta log). R18'dan boshlab bu xatti-harakat olib tashlandi — har log alohida ko'rinadi (xira shrift bilan), bu debug uchun aniqroq.
+R17 va undan oldin Strict Mode'da ikkala invocation'ning `console.log` chiqishlari oddiy tarzda ko'rinardi (ikkilanish foydalanuvchini chalkashtirardi). R18'da yangi behavior qo'shildi — ikkinchi render'dagi `console.log/warn/error` chiqishlari **xira shrift bilan** dim qilinadi (suppression), React DevTools'da `Hide logs during second render in Strict Mode` opsiyasi orqali to'liq yashirish mumkin. R19'da bu standart sozlama saqlanib qoldi.
 
 </details>
 
@@ -443,7 +471,7 @@ function ChatRoom({ roomId }: { roomId: string }) {
 // 1. Mount → connect → 1 ta connection
 // 2. Cleanup → disconnect → 0 ta connection
 // 3. Remount → connect → 1 ta connection
-// Result: 1 ta connection (sinxronizatsiya invariant'i bajarildi)
+// Result: 1 ta connection (synchronization invariant'i bajarildi)
 ```
 
 Conditional Strict Mode (faqat ma'lum subtree uchun):
@@ -737,7 +765,7 @@ function Parent() {
 
 1. **Pure / Deterministic** — bir xil props/state/context bilan har doim bir xil JSX qaytariladi (`Math.random`, `Date.now` kabi non-deterministic manbalar ishlatilmaydi)
 2. **Side-effect free** — render davomida DOM mutation, fetch, subscribe (`addEventListener` va h.k.), boshqa komponent'da `setState`, tashqi mutable state'ga yozish — ishlatilmaydi
-3. **Read-only** — props, state, context, ref — faqat o'qiladi, mutate qilinmaydi (`ref.current` esa render davomida o'qilmasligi kerak — uning qiymati nodeterministic)
+3. **Read-only** — props, state, context, ref — faqat o'qiladi, mutate qilinmaydi. `ref.current` render davomida o'qilmasligi va yozilmasligi kerak (istisno: lazy initialization pattern, `ref.current ??= initialValue`); boshqa render holatlarida ref qiymati commit'dan oldin/keyin farq qiladi (non-deterministic)
 4. **Idempotent va Restartable** — render qancha marta chaqirilsa, natija bir xil. Concurrent rendering high-priority update kelganda joriy render'ni tashlab, qaytadan boshlashi mumkin
 
 Bu invariant'lar **concurrent rendering uchun zarur**. Render uziluvchi bo'lgani uchun, React render'ni **bir nechta marta chaqirishi** mumkin (high-priority update kelganda eski render tashlanib, qayta boshlanadi). Agar render side effect bilan bo'lsa — bu effect'lar bir nechta marta yuz beradi (yoki tashlangan render'dagi effect'lar "yo'qolib ketadi").
@@ -764,16 +792,19 @@ Lazy init exception:
 const [data, setData] = useState(() => expensiveComputation());
 
 // ✅ "Render-phase update" — useState'ni o'zining ichida o'zgartirish OK
-function Counter() {
-  const [count, setCount] = useState(0);
-  const [prevCount, setPrevCount] = useState(0);
-  
-  if (prevCount !== count) {
-    // Render-phase setState — React darhol qayta render qiladi
-    setPrevCount(count);
-    return null; // bu render tashlanadi
+// (faqat o'sha komponent'ning o'z setState'i; boshqa komponent setState'i — runtime error)
+function Counter({ initial }: { initial: number }) {
+  const [count, setCount] = useState(initial);
+  const [prevInitial, setPrevInitial] = useState(initial);
+
+  // Derived state pattern: parent prop o'zgarsa, lokal state'ni reset qilish
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
+    setCount(initial);
+    // ❌ `return null` shart EMAS — React bu render natijasini avtomatik tashlaydi
+    //    va yangi state qiymatlari bilan darhol qayta render qiladi.
   }
-  
+
   return <div>{count}</div>;
 }
 ```
@@ -821,10 +852,10 @@ function workLoopConcurrent() {
 }
 
 function shouldYield(): boolean {
-  // Brauzer'ga yo'l berish vaqti keldi mi?
-  // - 5ms taxminiy budget'dan oshdimi?
-  // - High-priority input bormi?
-  return performance.now() > deadline;
+  // Browser'ga yo'l berish vaqti keldi mi?
+  // - 5ms budget tugadimi? (`frameYieldMs`, manba: scheduler/src/forks/Scheduler.js)
+  // - High-priority input bormi? (R18+ `isInputPending`)
+  return performance.now() >= deadline;
 }
 ```
 
@@ -845,17 +876,17 @@ function performUnitOfWork(fiber: Fiber) {
 }
 ```
 
-Concurrent mode'da har 5-millisekund chamasi (`frameYieldMs` budget) `shouldYield()` `true` qaytaradi va React work loop'ni to'xtatadi. Brauzer tasks (input, animation) ishlash imkonini oladi. Keyin `MessageChannel` orqali React qayta uyg'onadi va qolgan ishni davom ettiradi.
+Concurrent mode'da `frameYieldMs = 5` ms budget tugagach `shouldYield()` `true` qaytaradi va React work loop'ni to'xtatadi (manba: `react/packages/scheduler/src/forks/Scheduler.js`). Browser tasks (input, animation) ishlash imkonini oladi. Keyin `MessageChannel.postMessage` orqali React qayta uyg'onadi va qolgan ishni davom ettiradi.
 
 **Render davomida side effect — nima sodir bo'ladi:**
 
-Tasavvur qiling, render ichida `fetch` chaqirilgan:
+Misol — render ichida `fetch` chaqirilgan:
 
 ```tsx
-// ❌ Anti-pattern
-function Bad() {
-  fetch('/api/data');  // ← har render'da yangi request
-  return <div>...</div>;
+// ❌ Anti-pattern — render ichida fetch
+function UserProfile({ userId }: { userId: string }) {
+  fetch(`/api/users/${userId}`);  // ← har render'da yangi request
+  return <div>Loading...</div>;
 }
 ```
 
@@ -865,7 +896,20 @@ Concurrent mode'da:
 3. Render qayta boshlanadi → `fetch` qayta chaqiriladi (request 2)
 4. Strict Mode'da har biri yana 2x → 4 ta network request
 
-To'g'ri pattern: `useEffect` (yoki React 19 `use()` + Suspense).
+```tsx
+// ✅ To'g'ri pattern — useEffect (yoki R19 `use()` + Suspense)
+function UserProfile({ userId }: { userId: string }) {
+  const [user, setUser] = useState<User | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/users/${userId}`)
+      .then(res => res.json())
+      .then((data: User) => { if (!cancelled) setUser(data); });
+    return () => { cancelled = true; };
+  }, [userId]);
+  return user ? <div>{user.name}</div> : <div>Loading...</div>;
+}
+```
 
 **Reconciliation render phase ichida:**
 
@@ -994,7 +1038,7 @@ function ProductList({ products }: { products: Product[] }) {
 
 **Asosiy xususiyatlar:**
 
-- **Sinkron** — uziluvchi emas (concurrent mode'da ham)
+- **Synchronous** — uziluvchi emas (concurrent mode'da ham)
 - **Atomik** — boshlandimi, to'liq tugaydi (yarim holat yo'q)
 - **Side-effects ruxsat etilgan** — DOM mutation, ref'lar, callback'lar
 - **Tezkor** — DOM operations imkon qadar minimal qilinadi (faqat farq)
@@ -1056,17 +1100,17 @@ Bu phase'da DOM **inconsistent state'da** bo'ladi — ba'zi node'lar yangi, ba'z
 
 **3. Layout Phase:**
 
-Bu sub-phase'da DOM butunlay yangilangan, lekin brauzer hali paint qilmagan. Quyidagilar bajariladi:
+Bu sub-phase'da DOM butunlay yangilangan, lekin browser hali paint qilmagan. Quyidagilar bajariladi:
 
 - **Refs attach** — yangi DOM node'larga ref'lar bog'lanadi (`ref.current = newDOMNode`)
 - **`useLayoutEffect`** callbacks chaqiriladi (cleanup → setup tartibida)
 - **Class lifecycle**: `componentDidMount` (yangi komponent'lar) yoki `componentDidUpdate` (mavjud komponent'lar)
 
-Layout Phase **sinkron** — to'liq tugamaguncha brauzer paint qilmaydi. Shuning uchun bu phase'da DOM measurement (`offsetWidth`, `getBoundingClientRect`) xavfsiz va aniq.
+Layout Phase **synchronous** — to'liq tugamaguncha browser paint qilmaydi. Shu sababli bu phase'da DOM measurement (`offsetWidth`, `getBoundingClientRect`) xavfsiz va aniq.
 
 **Layout Phase tugagandan keyin:**
-1. Brauzer paint qiladi (foydalanuvchi yangilangan UI'ni ko'radi)
-2. **Passive effects** queue'dan `useEffect` callback'lari async chaqiriladi (Scheduler `MessageChannel` orqali macrotask sifatida rejalashtiradi — paint'dan keyin keyingi task'da)
+1. Browser paint qilish imkoniyatini oladi (foydalanuvchi yangilangan UI'ni ko'radi)
+2. **Passive effects** queue'dan `useEffect` callback'lari async chaqiriladi: Scheduler `scheduleCallback(NormalPriority, flushPassiveEffects)` orqali rejalashtiradi (`MessageChannel.postMessage` bilan yangi task ochiladi). Paint passive effects'dan oldin yoki keyin yuz berishi browser qaroriga bog'liq (React faqat **commit-before-passive** kafolatini beradi, **paint-before-passive**'ni emas).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1118,7 +1162,7 @@ Render Phase tugadi → workInProgress tree tayyor
 
 **Effect list traversal:**
 
-React har sub-phase'da **effect list** bo'ylab yuradi. Effect list — fiber tree ichidagi `flags` (effect bayroqlari) bo'lgan Fiber'larning ro'yxati. Bu list `subtreeFlags` orqali optimizatsiya qilingan — effect yo'q subtree butunlay skip qilinadi.
+React har sub-phase'da **effect list** bo'ylab yuradi. Effect list — fiber tree ichidagi `flags` (effect bayroqlari) bo'lgan Fiber'larning ro'yxati. Bu list `subtreeFlags` orqali optimize qilingan — effect yo'q subtree butunlay skip qilinadi.
 
 ```typescript
 // React internal (soddalashtirilgan)
@@ -1146,16 +1190,16 @@ function commitMutationEffects(root, finishedWork) {
 
 **Layout Phase synchronously blocks paint:**
 
-Brauzer rendering pipeline:
+Browser rendering pipeline:
 
 ```
 JavaScript executes
     ↓
 React Commit Phase (mutation + layout)
     ↓
-Style recalculation (brauzer)
+Style recalculation (browser)
     ↓
-Layout (brauzer)
+Layout (browser)
     ↓
 Paint (foydalanuvchi ko'radi)
     ↓
@@ -1329,9 +1373,9 @@ React'da **uch xil effect timing** mavjud:
 
 | Hook | Phase | Timing | Use case |
 |------|-------|--------|----------|
-| **`useInsertionEffect`** | Mutation oldidan | DOM mutation'dan **oldin** | CSS-in-JS library'lar uchun (stylesheet inject) |
-| **`useLayoutEffect`** | Layout Phase | DOM mutation'dan **keyin**, paint'dan **oldin** | DOM measurement, scroll position, focus |
-| **`useEffect`** | Passive Phase | Paint'dan **keyin**, async | Subscription, fetch, timer, log |
+| **`useInsertionEffect`** | Mutation Phase ichida (DOM mutation'dan oldin) | Refs hali attach qilinmagan, `setState` ishlatib bo'lmaydi | CSS-in-JS library'lar uchun (stylesheet inject) |
+| **`useLayoutEffect`** | Layout Phase | DOM mutation'dan **keyin**, paint'dan **oldin**, refs attach qilingan | DOM measurement, scroll position, focus |
+| **`useEffect`** | Passive Phase | Commit'dan keyin async (paint'dan oldin yoki keyin — browser qaroriga bog'liq) | Subscription, fetch, timer, log |
 
 **Vizual timeline:**
 
@@ -1384,11 +1428,11 @@ Default tanlov — `useEffect`. `useLayoutEffect` faqat **DOM measurement** yoki
 `useEffect` ning passive flag'i:
 
 ```typescript
-// React internal (soddalashtirilgan)
+// React internal (soddalashtirilgan — manba: ReactFiberHooks.js)
 function mountEffect(create, deps) {
   return mountEffectImpl(
-    PassiveEffect | PassiveStaticEffect,  // ← passive flag
-    HookPassive,
+    Passive | PassiveStatic,                // Fiber flags (ReactFiberFlags.js)
+    HookHasEffect | HookPassive,            // Hook effect tags (ReactHookEffectTags.js)
     create,
     deps
   );
@@ -1396,8 +1440,8 @@ function mountEffect(create, deps) {
 
 function mountLayoutEffect(create, deps) {
   return mountEffectImpl(
-    UpdateEffect,  // ← update flag (layout phase)
-    HookLayout,
+    Update | LayoutStatic,                  // Fiber flags — layout phase
+    HookHasEffect | HookLayout,
     create,
     deps
   );
@@ -1430,23 +1474,21 @@ if (rootHasPassiveEffects) {
 }
 ```
 
-**Brauzer rendering timeline (mikrosaniyalarda):**
+**Browser rendering timeline (tartib — aniq ms qiymatlari hardware/payload'ga bog'liq):**
 
 ```
-0ms    JS executes (event handler, setState)
-~1ms   React render phase (workInProgress tree)
-~2ms   React commit phase (mutation + layout effects + refs)
-~3ms   useLayoutEffect callbacks
-~4ms   Style recalc + Layout (brauzer)
-~5ms   Paint (brauzer) — foydalanuvchi UI'ni ko'radi
-~6ms   Composite
-~10ms  React passive effects scheduled
-~10ms  useEffect callbacks
+[1] JS executes (event handler, setState)
+[2] React render phase (workInProgress tree)
+[3] React commit phase — mutation phase
+[4] useLayoutEffect callbacks (sync, paint'dan oldin)
+[5] Browser: style recalc + layout
+[6] Browser: paint — foydalanuvchi UI'ni ko'radi
+[7] Browser: composite
+[8] React passive effects scheduled (Scheduler `MessageChannel`)
+[9] useEffect callbacks (paint'dan keyin)
 ```
 
-(Raqamlar taxminiy, real performance hardware/payload'ga bog'liq.)
-
-`useLayoutEffect` 3ms da ishlaganini ko'rib turibsiz — paint'dan oldin. `useEffect` 10ms — paint'dan keyin. Foydalanuvchi `useLayoutEffect`'ning ta'sirini darhol ko'radi (flicker yo'q), `useEffect`'ning ta'sirini esa keyingi render'da ko'radi (yoki o'zgarish bo'lmasa, ko'rmaydi).
+`useLayoutEffect` paint'dan oldin ishlaydi (DOM yangilanishi va paint orasida — flicker yo'q). `useEffect` paint'dan keyin keyingi task'da ishlaydi (foydalanuvchi UI'ni ko'rib bo'lganidan keyin). Aniq ms qiymatlari berilmaydi — ular hardware, payload va R18 Scheduler concurrent rendering qaroriga bog'liq.
 
 **SSR cheklov:**
 
@@ -1636,7 +1678,7 @@ function handleClick() {
 // Batched: 3 ta setState → 1 ta re-render
 ```
 
-Bu — performance optimizatsiyasi. Har `setState` alohida render qilinsa, 3 ta render+commit cycle bo'lardi (3x DOM mutation, 3x paint). Batching bilan — 1 ta cycle.
+Bu — performance optimization. Har `setState` alohida render qilinsa, 3 ta render+commit cycle bo'lardi (3x DOM mutation, 3x paint). Batching bilan — 1 ta cycle.
 
 > **🕐 Versiya evolyutsiyasi (Batching):**
 > - **Pre-R18 (R17 va undan oldin):** Batching faqat **React event handler ichida** ishlardi (`onClick`, `onChange`, va h.k.). `setTimeout`, `Promise.then`, `async/await`, native DOM listener (`addEventListener`) ichida har `setState` alohida render qilardi.
@@ -1733,34 +1775,31 @@ Sabab: birinchi pattern'da `count` — render paytidagi snapshot (closure). Batc
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-R18 Automatic Batching mexanizmi:
+R18 Automatic Batching mechanism (soddalashtirilgan):
 
 ```typescript
-// React internal (soddalashtirilgan)
-const pendingUpdates = new Set<Fiber>();
+// Manba: ReactFiberHooks.js, ReactFiberConcurrentUpdates.js, ReactFiberWorkLoop.js
+// React'da GLOBAL pendingUpdates Set'i YO'Q — har Fiber'da o'z updateQueue (linked list),
+// root'da esa pendingLanes bitmask. Quyida soddalashtirilgan model:
 
-function dispatchSetState(fiber, newValue) {
-  // Update'ni queue'ga qo'shish
-  enqueueUpdate(fiber, newValue);
-  pendingUpdates.add(fiber);
+function dispatchSetState(fiber, queue, action) {
+  const lane = requestUpdateLane(fiber);
+  const update = { lane, action, next: null };
 
-  // Scheduler orqali ish rejalashtirish.
-  // Joriy synchronous segment (event handler, microtask)
-  // tugamaguncha render boshlanmaydi —
-  // shu segment ichidagi barcha setState'lar bitta cycle'ga birlashadi.
-  ensureRootIsScheduled(fiber);
-}
+  // 1. Update'ni fiber'ning queue.pending linked list'iga qo'shish
+  enqueueConcurrentHookUpdate(fiber, queue, update, lane);
 
-function flushBatch() {
-  // Barcha pending update'lar uchun bitta render
-  for (const fiber of pendingUpdates) {
-    scheduleUpdateOnFiber(fiber);
-  }
-  pendingUpdates.clear();
+  // 2. Root'ni topib `root.pendingLanes |= lane` qilish
+  const root = getRootForUpdatedFiber(fiber);
+
+  // 3. Scheduler'ga ish rejalashtirish.
+  // Joriy synchronous segment (event handler, microtask) tugamaguncha
+  // render boshlanmaydi — shu segment ichidagi setState'lar bitta render'da birlashadi.
+  ensureRootIsScheduled(root);
 }
 ```
 
-Real implementatsiyada React `Scheduler` paketidan `scheduleCallback` ni ishlatadi (u esa `MessageChannel` orqali macrotask sifatida ish rejalashtiradi). Microtask emas — `await` chegarasi yangi macrotask emas, lekin yangi microtask hosil qiladi va React'ning execution context flag'i ham qayta tiklanadi, shu sababli `await` dan keyingi `setState`'lar yangi batch hosil qiladi.
+Real implementation'da Scheduler'ning `scheduleCallback` funksiyasi `MessageChannel.postMessage` orqali yangi task rejalashtiradi. R18 automatic batching esa `queueMicrotask` orqali flush rejalashtiradi: joriy synchronous segment tugagach microtask ishga tushadi va batch commit qilinadi. `await` joriy microtask'ni tugatib flush'ni triggerlaydi → continuation yangi microtask'da boshlanib yangi batch ochadi (shu sababli `await` chegarasi batching'ni uzadi).
 
 R17 va undan oldin esa batching faqat **`unstable_batchedUpdates`** ichida bo'lardi:
 
@@ -1958,8 +1997,10 @@ function FormSubmit() {
   );
 }
 
-// R18'da: jami 2 ta render
-// R17'da: jami 5 ta render (har setState alohida)
+// R18'da: jami 2 ta render (avval batch 1: 3 setState; await; keyin batch 2: 2 setState)
+// R17'da: jami 3 ta render — async function'ning sync prefix (await'gacha) React event
+//         handler context ichida bo'lib hisoblanadi va batched edi (1 render);
+//         await'dan keyingi setState'lar esa har biri alohida (2 render).
 ```
 
 </details>
@@ -1970,7 +2011,7 @@ function FormSubmit() {
 
 ### Nazariya
 
-`flushSync` — `react-dom` paketidagi API. U `setState` chaqiriqlarini **majburan sinkron** qilib, batching'ni chetlab o'tadi va **darhol render+commit** cycle'ni bajaradi.
+`flushSync` — `react-dom` paketidagi API. U `setState` chaqiriqlarini **majburan synchronous** qilib, batching'ni chetlab o'tadi va **darhol render+commit** cycle'ni bajaradi.
 
 ```tsx
 import { flushSync } from 'react-dom';
@@ -1983,9 +2024,9 @@ flushSync(() => {
 
 **Qachon kerak:**
 
-1. **Third-party DOM library bilan integratsiya** — masalan, `<select>` opsiyalarini React yangilaganidan keyin native scrollIntoView'ni chaqirish kerak
+1. **Third-party DOM library bilan integration** — masalan, `<select>` opsiyalarini React yangilaganidan keyin native scrollIntoView'ni chaqirish kerak
 2. **`onChange` callback'ida darhol DOM'ni o'qish** — masalan, focus o'zgartirish
-3. **Print/export** — yangi DOM holati bilan PDF generatsiya qilish
+3. **Print/export** — yangi DOM holati bilan PDF hosil qilish
 
 **Qachon ishlatmaslik:**
 
@@ -1993,7 +2034,7 @@ flushSync(() => {
 - `flushSync` qancha ko'p ishlatilsa, app shunchalik sekin
 - Ko'pincha boshqa pattern (useLayoutEffect, useImperativeHandle) yaxshiroq
 
-### Sintaksis
+### Syntax
 
 ```tsx
 import { flushSync } from 'react-dom';
@@ -2048,11 +2089,11 @@ function flushSync<T>(fn: () => T): T {
 
 `flushSync` callback ichidagi state update'larni `SyncLane` priority bilan rejalashtiradi — bu Concurrent Scheduler'da eng yuqori priority — va callback tugagandan keyin `flushSyncCallbacks()` orqali darhol render+commit cycle'ni majburan ishga tushiradi (boshqa pending updates ham birga flush bo'lishi mumkin). Lane'lar va priority haqida `05-scheduler-lanes.md` da batafsil.
 
-**Performance implikatsiyalari:**
+**Performance implications:**
 
-`flushSync` ichida render+commit **sinkron** bajariladi. Bu degani:
+`flushSync` ichida render+commit **synchronous** bajariladi. Ya'ni:
 - JS thread bloklanadi (foydalanuvchi input javob bermaydi)
-- Brauzer paint qila olmaydi (UI muzlaydi)
+- Browser paint qila olmaydi (UI muzlaydi)
 - Concurrent features (interruptibility) ushlab turilmaydi
 
 Shu sababli `flushSync` faqat **kichik, tezkor** state update'lar uchun ishlatilishi kerak. Katta tree update bo'lsa — UI sezilarli darajada muzlaydi.
@@ -2084,7 +2125,7 @@ flushSync(() => {
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-`flushSync` — third-party library integratsiyasi:
+`flushSync` — third-party library integration:
 
 ```tsx
 // Avto-scroll yangi message qo'shilganda
@@ -2267,14 +2308,16 @@ function SearchPage() {
 **Hydration** — server'da render qilingan HTML'ga client-side React'ni "biriktirish" jarayoni. SSR (Server-Side Rendering) yoki SSG (Static Site Generation) ishlatadigan loyihalar uchun zarur.
 
 ```tsx
-// Server: HTML generatsiya
+// Server: HTML hosil qilish
 import { renderToString } from 'react-dom/server';
 const html = renderToString(<App />);
 // → "<div><h1>Salom</h1></div>"
 
 // Client: hydrate
 import { hydrateRoot } from 'react-dom/client';
-hydrateRoot(document.getElementById('root')!, <App />);
+const container = document.getElementById('root');
+if (!container) throw new Error('Root element topilmadi');
+hydrateRoot(container, <App />);
 ```
 
 `hydrateRoot` `createRoot` o'rniga ishlatiladi — server HTML'ni "tan oladi" va event listener'larni biriktiradi (yangi DOM yaratmasdan).
@@ -2341,24 +2384,26 @@ useEffect(() => {
 ```tsx
 function Lottery() {
   const number = Math.random();  // ❌ render'da non-deterministic
-  return <div>Soningiz: {number}</div>;
+  return <div>Raqam: {number}</div>;
 }
 ```
 
 **Sabab:** Render Phase pure va idempotent bo'lishi shart. `Math.random()` har chaqiriqda yangi qiymat beradi — bu render purity invariant'ini buzadi. Concurrent mode'da render uzilib qayta boshlansa yoki Strict Mode 2x invocation paytida — har safar yangi qiymat hosil bo'ladi va komponent natijasi non-deterministic bo'lib qoladi.
 
-**Yechim:** Random qiymatni `useState` lazy init'da generatsiya qilish:
+**Yechim:** Random qiymatni `useState` lazy init'da hosil qilish:
 
 ```tsx
 function Lottery() {
-  const [number] = useState(() => Math.random());  // ✅ bir marta generatsiya
-  return <div>Soningiz: {number}</div>;
+  // Production'da bir marta chaqiriladi; Strict Mode dev'da 2 marta (purity check),
+  // lekin faqat ikkinchi natija foydalaniladi.
+  const [number] = useState(() => Math.random());  // ✅ render uchun stable
+  return <div>Raqam: {number}</div>;
 }
 ```
 
 ---
 
-### `flushSync` ichida boshqa komponent setState — sinkron
+### `flushSync` ichida boshqa komponent setState — synchronous
 
 ```tsx
 function handleClick() {
@@ -2366,13 +2411,13 @@ function handleClick() {
     setA(1);  // bu komponent
     notifyListener();  // boshqa komponent setState chaqiradi
   });
-  // Hammasi sinkron commit qilingan
+  // Hammasi synchronous commit qilingan
 }
 ```
 
-**Sabab:** `flushSync` o'z callback ichidagi **barcha** setState chaqiruvlarini bitta sinkron cycle'ga qo'yadi (boshqa komponent'larniki ham).
+**Sabab:** `flushSync` o'z callback ichidagi **barcha** setState chaqiruvlarini bitta synchronous cycle'ga qo'yadi (boshqa komponent'larniki ham).
 
-**Foydalanish:** Cross-component sync update kerak bo'lganda. **Xavf:** kutilmagan tomonlama ta'sirlar (boshqa komponent'lar ham sinkron yangilanadi).
+**Foydalanish:** Cross-component sync update kerak bo'lganda. **Xavf:** kutilmagan tomonlama ta'sirlar (boshqa komponent'lar ham synchronous yangilanadi).
 
 ---
 
@@ -2407,7 +2452,10 @@ ReactDOM.render(<App />, document.getElementById('root'));
 ```tsx
 // ✅ Yangi API
 import { createRoot } from 'react-dom/client';
-createRoot(document.getElementById('root')!).render(<App />);
+
+const container = document.getElementById('root');
+if (!container) throw new Error('Root element topilmadi');
+createRoot(container).render(<App />);
 ```
 
 ---
@@ -2415,33 +2463,35 @@ createRoot(document.getElementById('root')!).render(<App />);
 ### ❌ Xato 2: Render davomida `setState`
 
 ```tsx
+interface Product { id: string; name: string; price: number; }
+
 // ❌ Render ichida setState — infinite loop
-function Bad({ data }: { data: Item[] }) {
-  const [items, setItems] = useState<Item[]>([]);
-  
-  if (items.length === 0 && data.length > 0) {
-    setItems(data);  // ❌ render davomida
+function ProductListBuggy({ products }: { products: Product[] }) {
+  const [items, setItems] = useState<Product[]>([]);
+
+  if (items.length === 0 && products.length > 0) {
+    setItems(products);  // ❌ render davomida — har render'da yana setItems chaqiriladi
   }
-  
-  return <List items={items} />;
+
+  return <ProductGrid items={items} />;
 }
 ```
 
 ```tsx
-// ✅ useEffect bilan
-function Good({ data }: { data: Item[] }) {
-  const [items, setItems] = useState<Item[]>([]);
-  
+// ✅ useEffect bilan — props o'zgarsa state sinxronlanadi
+function ProductListWithEffect({ products }: { products: Product[] }) {
+  const [items, setItems] = useState<Product[]>([]);
+
   useEffect(() => {
-    setItems(data);
-  }, [data]);
-  
-  return <List items={items} />;
+    setItems(products);
+  }, [products]);
+
+  return <ProductGrid items={items} />;
 }
 
-// ✅ Yoki — derived state (pure hisob)
-function Best({ data }: { data: Item[] }) {
-  return <List items={data} />;
+// ✅ Yoki — derived state (state'siz, pure hisob — afzal)
+function ProductList({ products }: { products: Product[] }) {
+  return <ProductGrid items={products} />;
 }
 ```
 
@@ -2522,7 +2572,7 @@ function handleClick() {
 }
 ```
 
-`flushSync` faqat **third-party DOM library bilan integratsiya** yoki **darhol DOM o'qish kerak** bo'lganda ishlatiladi.
+`flushSync` faqat **third-party DOM library bilan integration** yoki **darhol DOM o'qish kerak** bo'lganda ishlatiladi.
 
 ---
 
@@ -2575,13 +2625,17 @@ async function handleClick() {
 <details>
 <summary><strong>Javob</strong></summary>
 
-**2 ta render.**
+**2 ta render** (R18+).
 
-- `setA(1)` va `setB(2)` — birinchi sinkron segment, batched → 1 ta render
+- `setA(1)` va `setB(2)` — birinchi synchronous segment, batched → 1 ta render
 - `await fetch('/api')` — microtask boundary, batch flush
-- `setC(3)` va `setD(4)` — yangi sinkron segment, batched → 1 ta render
+- `setC(3)` va `setD(4)` — yangi synchronous segment, batched → 1 ta render
 
-R17'da bo'lsa: 4 ta render (await dan keyingi setState'lar batching'siz).
+**R17'da 3 ta render** (async context'da batching'ning yo'qligi sababli):
+- `setA(1)` va `setB(2)` — async function'ning sync prefix React event handler context ichida → batched (1 render)
+- `await` dan keyin React event handler context tugadi
+- `setC(3)` — alohida render (Promise continuation, R17'da batching yo'q)
+- `setD(4)` — alohida render
 
 </details>
 
@@ -2715,7 +2769,7 @@ function ProductPage({ id }: { id: number }) {
 **Aniqlangan muammolar:**
 
 1. **`lastRenderTime = Date.now()`** — render davomida tashqi mutable state mutation
-2. **`localStorage.getItem` render davomida** — sinkron I/O, lekin har render'da tashqi state'ni o'qish (concurrent'da inconsistent)
+2. **`localStorage.getItem` render davomida** — synchronous I/O, lekin har render'da tashqi state'ni o'qish (concurrent'da inconsistent)
 3. **`fetch` render davomida** — eng katta xato; har render'da network request
 4. **`localStorage.setItem` render davomida** — side effect, render uziluvchi
 
@@ -2771,15 +2825,15 @@ Bu bo'limda React'ning rendering pipeline'ining ichki mexanikasi yoritildi:
 - **`createRoot`** — R18+ entry point, concurrent features uchun zamin
 - **Strict Mode** — render purity (R16.3+) va effect idempotency (R18+) tekshiruvi
 - **Render Phase** — pure, uziluvchi, workInProgress tree quradi
-- **Commit Phase 3 sub-phase** — Before Mutation → Mutation → Layout, atomik va sinkron
+- **Commit Phase 3 sub-phase** — Before Mutation → Mutation → Layout, atomic va synchronous
 - **Effect timing** — `useInsertionEffect` (CSS), `useLayoutEffect` (paint'dan oldin), `useEffect` (paint'dan keyin)
 - **Automatic Batching (R18+)** — barcha kontekstlarda setState'lar birlashtiriladi
-- **`flushSync`** — batching'dan opt-out, third-party integratsiya uchun
+- **`flushSync`** — batching'dan opt-out, third-party integration uchun
 - **Concurrent Features va Hydration** — qisqa intro, chuqur 22, 30, 06 da
 
-Bu mexanikani tushunish keyingi bo'limlardagi har bir hook va pattern'ning xatti-harakatini oydinlashtiradi. Misol uchun, `useEffect`ning "lifecycle hook EMAS, sinxronizatsiya mexanizmi" g'oyasi (`16-useeffect.md`) — concurrent rendering + Strict Mode 2x effect cycle'idan kelib chiqadi.
+Bu mechanism'ni tushunish keyingi bo'limlardagi har bir hook va pattern'ning xatti-harakatini oydinlashtiradi. Misol uchun, `useEffect`ning "lifecycle hook EMAS, synchronization mechanism" g'oyasi (`16-useeffect.md`) — concurrent rendering + Strict Mode 2x effect cycle'idan kelib chiqadi.
 
-Keyingi bo'limda Reconciler'ning ichki tuzilmasi — Fiber arxitekturasi — chuqur yoritiladi. Bu render+commit pipeline'ning **qanday** ishlashining texnik tafsiloti.
+Keyingi bo'limda Reconciler'ning ichki tuzilmasi — Fiber architecture'si — chuqur yoritiladi. Bu render+commit pipeline'ning **qanday** ishlashining texnik tafsiloti.
 
 ---
 

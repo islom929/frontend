@@ -132,7 +132,7 @@ State transitions explicit — har button bir action dispatch qiladi, reducer un
 
 **Functional programming reducer:**
 
-`reduce` operatsiyasi mathematics'dan: list'ni single value'ga "fold" qilish. Haskell, OCaml, Lisp'da fundamental.
+`reduce` operation'i mathematics'dan: list'ni single value'ga "fold" qilish. Haskell, OCaml, Lisp'da fundamental.
 
 ```haskell
 foldl :: (b -> a -> b) -> b -> [a] -> b
@@ -767,7 +767,7 @@ type FSA<P = unknown, M = unknown> = {
 - `error` — agar action error bo'lsa true (payload Error obyekt)
 - `meta` — qo'shimcha metadata (timestamp, source, etc.)
 
-`useReducer` FSA majburlamaydi — community pattern. React Toolkit `createAction` automatic FSA-compliant action creators yaratadi.
+`useReducer` FSA majburlamaydi — community pattern. Redux Toolkit (RTK) `createAction` automatic FSA-compliant action creators yaratadi.
 
 **Action serialization:**
 
@@ -1111,7 +1111,7 @@ type Hook = {
 };
 ```
 
-`useState` va `useReducer` Hook chain'da bir xil pozitsiyani egallaydi. Internal'da `useState` `useReducer` bilan delegate qiladi (basicStateReducer).
+`useState` va `useReducer` Hook chain'da bir xil position'ni egallaydi. Internal'da `useState` `useReducer` bilan delegate qiladi (basicStateReducer).
 
 **Functional update parity:**
 
@@ -1298,7 +1298,7 @@ function Form() {
 
 Discriminated union (yoki "tagged union", "sum type") — TypeScript'ning eng kuchli pattern'larining biri. `useReducer` action'lar uchun ideal.
 
-**Asosiy g'oya:** har variant'da bir xil **literal property** (tag) — TypeScript bu propertyga qarab variant'larni ajratadi.
+**Asosiy printsip:** har variant'da bir xil **literal property** (tag) — TypeScript bu property'ga qarab variant'larni ajratadi.
 
 ```ts
 type Action =
@@ -1864,7 +1864,7 @@ default: return assertNever(action);
 //    is not assignable to parameter of type 'never'.
 ```
 
-TypeScript compile-time'da bilan'mat — yangi action handle qilinmagani uchun.
+TypeScript compile-time'da xato beradi — yangi action handle qilinmagani uchun.
 
 **Misol 3 — Color exhaustiveness:**
 
@@ -3124,7 +3124,7 @@ function Counter() {
 
 1. **Bundle size** — Immer ~12-15KB (gzipped ~5KB)
 2. **Learning curve** — Immer Proxy semantics
-3. **Class instances** — Immer plain objects bilan (Map/Set R6+ qo'llab-quvvatlanadi)
+3. **Class instances** — Immer plain objects bilan (Map/Set Immer 6+'da qo'llab-quvvatlanadi)
 4. **External library** — React core emas
 
 **Tanlash:**
@@ -3356,7 +3356,7 @@ const newState = produce(state, draft => {
 });
 ```
 
-R6+ Immer Map/Set qo'llab-quvvatlaydi (opt-in).
+Immer 6+ Map/Set qo'llab-quvvatlaydi (opt-in `enableMapSet()` orqali).
 
 **Misol 4 — Conditional return (early exit):**
 
@@ -3419,7 +3419,7 @@ const updated = produce(state, draft => {
 
 ### Nazariya
 
-`useState` aslida `useReducer`'ning maxsus shakli — **internal'da `basicStateReducer` bilan**. Bu fakt React internal arxitekturasini chuqurroq tushunishga yordam beradi.
+`useState` aslida `useReducer`'ning maxsus shakli — **internal'da `basicStateReducer` bilan**. Bu fakt React internal architecture'sini chuqurroq tushunishga yordam beradi.
 
 **`basicStateReducer` definition:**
 
@@ -4756,7 +4756,7 @@ function Counter() {
 - `canUndo`/`canRedo` — UI button disable
 - Bailout — yangi present bir xil bo'lsa skip (history clean)
 
-Bu pattern Redux DevTools time-travel implementatsiyasiga o'xshash. Production'da library (`use-undo`, `redux-undo`) ishlatish.
+Bu pattern Redux DevTools time-travel implementation'iga o'xshash. Production'da library (`use-undo`, `redux-undo`) ishlatish.
 
 Performance considerations: `past`/`future` array — har action grow. Limit qo'yish: `past: state.past.slice(-50)` (oxirgi 50 holat).
 

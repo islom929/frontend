@@ -81,7 +81,7 @@ State Component'ning function tanasida e'lon qilingan oddiy local variable EMAS 
 
 ```tsx
 // ❌ Local variable — state EMAS
-function BadCounter() {
+function CounterLocalVar() {
   let count = 0;  // Har render'da 0 ga reset
   
   const increment = () => {
@@ -90,7 +90,7 @@ function BadCounter() {
   };
   
   return <button onClick={increment}>Count: {count}</button>;
-  // Click qilinsa — count o'zgaradi, lekin UI 0 ko'rsatadi
+  // Click qilinsa — count o'zgaradi (memory'da), lekin UI 0 ko'rsatadi
 }
 ```
 
@@ -310,7 +310,7 @@ Local variable — state EMAS:
 
 ```tsx
 // ❌ Local variable, har render'da reset
-function BadCounter() {
+function CounterLocalVarUnsafe() {
   let count = 0;
   return (
     <button onClick={() => count++}>
@@ -322,7 +322,7 @@ function BadCounter() {
 }
 
 // ✅ useState — React'ning state mexanizmi
-function GoodCounter() {
+function Counter() {
   const [count, setCount] = useState(0);
   return (
     <button onClick={() => setCount(c => c + 1)}>
@@ -418,8 +418,8 @@ function UserCard({ user, onEdit }: UserCardProps) {
 Agar bir state ikki sibling'a kerak bo'lsa, parent'ga ko'tariladi (cross-ref [`14-lifting-and-controlled.md`](14-lifting-and-controlled.md)):
 
 ```tsx
-// ❌ Sibling'lar mustaqil state'ga ega — sinxronizatsiya yo'q
-function BadParent() {
+// ❌ Sibling'lar mustaqil state'ga ega — sync yo'q
+function DashboardUnsynced() {
   return (
     <>
       <ChildA />  {/* o'z count */}
@@ -429,7 +429,7 @@ function BadParent() {
 }
 
 // ✅ State parent'ga lift qilinadi
-function GoodParent() {
+function Dashboard() {
   const [count, setCount] = useState(0);
   return (
     <>
@@ -446,7 +446,7 @@ State'dan boshqa state'ni hisoblash — ko'pchilik holatda anti-pattern. Render 
 
 ```tsx
 // ❌ Derived state — duplikat ma'lumot
-function BadList({ items }: { items: Item[] }) {
+function FilteredListWithDerivedState({ items }: { items: Item[] }) {
   const [filtered, setFiltered] = useState(items);
   const [search, setSearch] = useState('');
   
@@ -459,7 +459,7 @@ function BadList({ items }: { items: Item[] }) {
 }
 
 // ✅ Derive during render — pure
-function GoodList({ items }: { items: Item[] }) {
+function FilteredList({ items }: { items: Item[] }) {
   const [search, setSearch] = useState('');
   const filtered = items.filter((i) => i.name.includes(search));
   // ✅ Pure derivation, har render'da hisoblanadi
@@ -661,7 +661,7 @@ Anti-pattern — duplicated state:
 
 ```tsx
 // ❌ Duplikat — props va state'da bir xil ma'lumot
-function BadCard({ user }: { user: User }) {
+function UserCardDuplicatedState({ user }: { user: User }) {
   const [name, setName] = useState(user.name);
   // ❌ user.name o'zgarsa, state sync emas
   // useEffect bilan sync qilish — over-engineering
@@ -670,7 +670,7 @@ function BadCard({ user }: { user: User }) {
 }
 
 // ✅ Faqat prop'dan o'qish
-function GoodCard({ user }: { user: User }) {
+function UserCard({ user }: { user: User }) {
   return <h3>{user.name}</h3>;
 }
 
@@ -868,7 +868,7 @@ Internal'da Proxy bilan track qiladi. Output — yangi reference, lekin o'zgarma
 Anti-pattern — array mutation:
 
 ```tsx
-function BadTodoList() {
+function TodoListMutating() {
   const [todos, setTodos] = useState<Todo[]>([
     { id: 1, text: 'Buy milk', done: false },
     { id: 2, text: 'Walk dog', done: false },
@@ -903,7 +903,7 @@ function BadTodoList() {
 ✅ Immutable update:
 
 ```tsx
-function GoodTodoList() {
+function TodoList() {
   const [todos, setTodos] = useState<Todo[]>([
     { id: 1, text: 'Buy milk', done: false },
     { id: 2, text: 'Walk dog', done: false },
@@ -1201,9 +1201,9 @@ function mountWorkInProgressHook(): Hook {
 }
 ```
 
-**Rules of Hooks — pozitsiya muhim:**
+**Rules of Hooks — position muhim:**
 
-Hook'lar har render'da **bir xil tartibda** chaqirilishi shart (cross-ref [`15-hooks-fundamentals.md`](15-hooks-fundamentals.md) — Rules of Hooks). React linked list'ga pozitsiya bo'yicha murojaat qiladi:
+Hook'lar har render'da **bir xil tartibda** chaqirilishi shart (cross-ref [`15-hooks-fundamentals.md`](15-hooks-fundamentals.md) — Rules of Hooks). React linked list'ga position bo'yicha murojaat qiladi:
 
 ```tsx
 function Component() {
@@ -1224,7 +1224,7 @@ if (cond) {
 const [b, setB] = useState(2);  // ❌ position 0 ga keladi
 ```
 
-Hook list pozitsiyasi buziladi — React noto'g'ri state'ni qaytaradi. ESLint plugin (`eslint-plugin-react-hooks`) bu pattern'ni topa oladi.
+Hook list position'i buziladi — React noto'g'ri state'ni qaytaradi. ESLint plugin (`eslint-plugin-react-hooks`) bu pattern'ni topa oladi.
 
 </details>
 
@@ -1403,14 +1403,14 @@ const [data, setData] = useState(() => parseData()); // lazy
 **Farq:** Value har render'da hisoblanadi. Lazy faqat **birinchi render'da** chaqiriladi.
 
 ```tsx
-function Bad() {
+function ConfigViewerEager() {
   // ❌ JSON.parse har render'da chaqiriladi (re-render'da ham!)
   const [data, setData] = useState(JSON.parse(largeJsonString));
   // Lekin natija e'tiborsiz qoldiriladi (chunki birinchi render'dan keyin state queue'dan olinadi)
   // Performance overhead — keraksiz parse
 }
 
-function Good() {
+function ConfigViewer() {
   // ✅ JSON.parse faqat birinchi render'da
   const [data, setData] = useState(() => JSON.parse(largeJsonString));
 }
@@ -1527,14 +1527,14 @@ function updateReducer<S, I, A>(reducer: (s: S, a: A) => S, initialArg: I, init?
 **Lazy initial — performance demo:**
 
 ```tsx
-function Bad() {
+function EagerInitDemo() {
   console.log('initialState computed');
   const [val, setVal] = useState(JSON.parse(huge));
   // Har render'da: "initialState computed"
   // (lekin natija e'tiborsiz qoldiriladi)
 }
 
-function Good() {
+function LazyInitDemo() {
   const [val, setVal] = useState(() => {
     console.log('lazy initial computed');
     return JSON.parse(huge);
@@ -1651,7 +1651,7 @@ function Calendar({ year }: { year: number }) {
 Anti-pattern — value har render:
 
 ```tsx
-function BadCalendar({ year }: { year: number }) {
+function CalendarEagerInit({ year }: { year: number }) {
   const [days, setDays] = useState(generateDays(year));
   // ❌ generateDays har render'da chaqiriladi
   // Birinchi render'da natija ishlatiladi, qolganlarda — natija tashlab yuboriladi
@@ -2960,7 +2960,7 @@ setProfile((p) => ({
 }));
 ```
 
-**Immer** — copy-on-write technique bilan immutable update'larni mutate-like sintaksis bilan yozish imkonini beradi:
+**Immer** — copy-on-write technique bilan immutable update'larni mutate-like syntax bilan yozish imkonini beradi:
 
 ```tsx
 import { produce } from 'immer';
@@ -3007,7 +3007,7 @@ function NestedEditor() {
 
 **Foyda:**
 
-- **Sintaksis sodda** — nested update mutate-like
+- **Syntax sodda** — nested update mutate-like
 - **Type-safe** — TS bilan yaxshi integration
 - **Performance** — structural sharing (memory efficient)
 
@@ -3790,10 +3790,10 @@ function updateWorkInProgressHook(): Hook {
 }
 ```
 
-**Rules of Hooks — pozitsiya muhim:**
+**Rules of Hooks — position muhim:**
 
 ```tsx
-function Bad({ cond }: { cond: boolean }) {
+function ConditionalHookViolation({ cond }: { cond: boolean }) {
   if (cond) {
     const [a] = useState(1);  // Position 0 — faqat cond=true
   }
@@ -3801,12 +3801,12 @@ function Bad({ cond }: { cond: boolean }) {
 }
 ```
 
-`updateWorkInProgressHook` linked list pozitsiyasiga ko'ra hook'larni topadi. Conditional hook — pozitsiya buziladi:
+`updateWorkInProgressHook` linked list position'iga ko'ra hook'larni topadi. Conditional hook — position buziladi:
 
 - Render 1 (cond=true): hook list = [a, b]
 - Render 2 (cond=false): hook list = [b]
   - React: b'ning state = a'ning state? a'ning queue?
-  - Linked list traversal pozitsiya 0 → b'ni topa olmaydi yoki noto'g'ri hook bilan eshlashtiradi
+  - Linked list traversal position 0 → b'ni topa olmaydi yoki noto'g'ri hook bilan bog'lanadi
   - Throw: "Rendered fewer hooks than during the previous render"
 
 **Hooks chain example:**
@@ -3831,7 +3831,7 @@ updateEffect(...) — hook2 ni topadi
 updateState(initialState=3) — hook3 ni topadi
 ```
 
-Pozitsiya kafolat — linked list traversal `hook.next` orqali.
+Position kafolat — linked list traversal `hook.next` orqali.
 
 </details>
 
@@ -3897,7 +3897,7 @@ function App() {
 Conditional hook — Rules of Hooks violation:
 
 ```tsx
-function Bad({ cond }: { cond: boolean }) {
+function ToggleBoxBroken({ cond }: { cond: boolean }) {
   if (cond) {
     const [a] = useState(1);  // ❌ Position 0 — faqat cond=true
   }
@@ -3907,7 +3907,7 @@ function Bad({ cond }: { cond: boolean }) {
 }
 
 // ✅ To'g'ri — har doim har hook chaqiriladi
-function Good({ cond }: { cond: boolean }) {
+function ToggleBox({ cond }: { cond: boolean }) {
   const [a] = useState(1);   // Always position 0
   const [b] = useState(2);   // Always position 1
   
@@ -3915,7 +3915,7 @@ function Good({ cond }: { cond: boolean }) {
 }
 
 // ✅ Yoki — early return (lekin all hooks before return)
-function Good2({ cond }: { cond: boolean }) {
+function ToggleBoxEarlyReturn({ cond }: { cond: boolean }) {
   const [a] = useState(1);
   const [b] = useState(2);
   
@@ -4252,11 +4252,11 @@ function Parent() {
 ### Gotcha 1: State'ni Render'da O'zgartirishga Urinish
 
 ```tsx
-function Bad() {
+function StarterCounter() {
   const [count, setCount] = useState(0);
   
   if (count === 0) {
-    setCount(1);  // ⚠️ Render'da setState
+    setCount(1);  // ⚠️ Render'da setState — faqat conditional bo'lsa ruxsat etiladi
   }
   
   return <div>{count}</div>;
@@ -4320,14 +4320,14 @@ Functional update parameter (`prev`) — joriy state reference. Mutation — arr
 ### Gotcha 5: Conditional `useState`
 
 ```tsx
-function Bad({ enabled }: { enabled: boolean }) {
+function ToggleableCounter({ enabled }: { enabled: boolean }) {
   if (enabled) {
     const [count, setCount] = useState(0);  // ❌ Conditional hook
   }
 }
 ```
 
-Hook'lar har render'da bir xil tartibda chaqirilishi shart (Rules of Hooks). Conditional — pozitsiya o'zgaradi, hook list buziladi.
+Hook'lar har render'da bir xil tartibda chaqirilishi shart (Rules of Hooks). Conditional — position o'zgaradi, hook list buziladi.
 
 ESLint plugin `react-hooks/rules-of-hooks` bu pattern'ni topadi.
 
@@ -4424,7 +4424,7 @@ function Component({ cond }: { cond: boolean }) {
 }
 ```
 
-**Sabab:** Hooks pozitsiyasi linked list orqali eshlashtiriladi. Conditional — pozitsiya buziladi.
+**Sabab:** Hooks position'i linked list orqali bog'lanadi. Conditional — position buziladi.
 
 ---
 
@@ -4756,7 +4756,7 @@ Custom hook pattern — useState + useCallback birikmasi. Closure trap'siz, type
 **Under the Hood:**
 - **Fiber state queue** — circular linked list, har hook'ning o'z queue'si
 - **`mountState`** birinchi render'da (initial value hisoblash + queue yaratish), **`updateState`** keyingi render'larda (initialState e'tiborsiz, queue'dan latest state)
-- **Hooks linked list** — pozitsiya muhim, conditional hook → Rules of Hooks violation
+- **Hooks linked list** — position muhim, conditional hook → Rules of Hooks violation
 - **Bailout** — `Object.is(eski, yangi) === true` → render skip (eager dispatchSetState'da, late Reconciliation'da)
 
 Keyingi bo'limda Event Handling — SyntheticEvent, event delegation history (R16 document → R17+ root container), event pooling olib tashlanishi (R17), R19 `<form action={fn}>`, va TypeScript event types yoritiladi.

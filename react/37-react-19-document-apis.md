@@ -1,6 +1,6 @@
 # Bo'lim 37: React 19 Document & Resource APIs
 
-> React 19 — komponent darajasidagi `<title>`, `<meta>`, `<link>`, `<script async>`, va `<link rel="stylesheet">` tag'larni rasmiy qo'llab-quvvatlaydi. Bu element'lar JSX'da istalgan joyda yozilishi mumkin va React Reconciler ularni avtomatik `<head>`'ga **hoist** qiladi. Document Metadata (SEO meta tags), Stylesheet management (precedence ordering, Suspense integration), Async Scripts deduplication, va dasturiy Preloading APIs (`preload`, `preinit`, `prefetchDNS`, `preconnect`) — barchasi `react-helmet` yoki manual workaround'larni almashtiradi. Bu fayl R19 Document API'larining hoisting mexanizmi, Stylesheet precedence algoritmi, Suspense bilan integratsiyasi, SSR streaming workflow va migration pattern'larini qamrab oladi.
+> React 19 — komponent darajasidagi `<title>`, `<meta>`, `<link>`, `<script async>`, va `<link rel="stylesheet">` tag'larni rasmiy qo'llab-quvvatlaydi. Bu element'lar JSX'da istalgan joyda yozilishi mumkin va React Reconciler ularni avtomatik `<head>`'ga **hoist** qiladi. Document Metadata (SEO meta tags), Stylesheet management (precedence ordering, Suspense integration), Async Scripts deduplication, va dasturiy Preloading APIs (`preload`, `preinit`, `prefetchDNS`, `preconnect`) — barchasi `react-helmet` yoki manual workaround'larni almashtiradi. Bu fayl R19 Document API'larining hoisting mexanizmi, Stylesheet precedence algoritmi, Suspense bilan integration'i, SSR streaming workflow va migration pattern'larini qamrab oladi.
 
 ---
 
@@ -30,12 +30,12 @@
 
 ### Nazariya
 
-R19 Document & Resource APIs — komponent darajasida HTML document strukturasini boshqarish uchun rasmiy mexanizmlar to'plami. Pre-R19 davrida bu funksionallik uchun uchinchi taraf library'lari (`react-helmet`, `react-helmet-async`) yoki framework-specific API'lar (Next.js `<Head>`, Remix `meta`/`links`) kerak edi.
+R19 Document & Resource APIs — komponent darajasida HTML document strukturasini boshqarish uchun rasmiy mexanizmlar to'plami. Pre-R19 davrida bu functionality uchun uchinchi taraf library'lari (`react-helmet`, `react-helmet-async`) yoki framework-specific API'lar (Next.js `<Head>`, Remix `meta`/`links`) kerak edi.
 
 **R19'da nima yangi:**
 
 1. **Document Metadata hoisting** — `<title>`, `<meta>`, `<link>` element'lar render tree'da istalgan joyda yoziladi va React avtomatik `<head>`'ga ko'chiradi.
-2. **Stylesheet management** — `<link rel="stylesheet">` precedence prop, Suspense integratsiyasi, FOUC (Flash of Unstyled Content) oldini olish.
+2. **Stylesheet management** — `<link rel="stylesheet">` precedence prop, Suspense integration'i, FOUC (Flash of Unstyled Content) oldini olish.
 3. **Async Scripts deduplication** — `<script async src>` component'lar ichida, har src bir marta yuklanadi.
 4. **Preloading APIs** — `preload`, `preinit`, `prefetchDNS`, `preconnect` runtime API'lari (35-bo'limda intro qilingan, bu yerda chuqur).
 5. **SSR streaming integration** — server preload signal'larni stream'ga client'gacha yuboradi (waterfall'ni oldini olish).
@@ -52,7 +52,7 @@ R19 Document & Resource APIs — komponent darajasida HTML document strukturasin
 | `prefetchDNS(href)` | `react-dom` | DNS resolution oldindan |
 | `preconnect(href, opts)` | `react-dom` | DNS + TCP + TLS oldindan |
 
-**Versiya konteksti:**
+**Versiya context'i:**
 
 > **Versiya evolyutsiyasi (Document APIs):**
 > - **Pre-R19 (2015-2024):** `react-helmet` library (lightweight third-party, peer-dep React 0.14+), `react-helmet-async` (SSR-safe fork — Concurrent rendering bilan `react-helmet`'da context race condition bo'lardi), Next.js `<Head>` framework-specific. Manual `document.head.appendChild` workaround.
@@ -191,9 +191,9 @@ function ProductPagePreR19({ product }: { product: Product }) {
 R19 native afzalliklari:
 
 - Library bundle yo'q (third-party dependency olib tashlanadi)
-- Sintaksis sodda (`<Helmet>` wrap kerak emas)
+- Syntax sodda (`<Helmet>` wrap kerak emas)
 - Concurrent rendering safe
-- Suspense bilan to'liq integratsiya
+- Suspense bilan to'liq integration
 - Streaming SSR'da resources signal client'gacha yuboriladi
 
 </details>
@@ -608,7 +608,7 @@ function ContentPage({ content }: { content: ArticleContent | ProductContent }) 
 
 **Stylesheet alohida muomala:**
 
-`<link rel="stylesheet">` boshqa hoistable rel'lardan farqli — `precedence` prop'i va Suspense integratsiyasini qo'shimcha qiladi (alohida section'larda).
+`<link rel="stylesheet">` boshqa hoistable rel'lardan farqli — `precedence` prop'i va Suspense integration'ini qo'shimcha qiladi (alohida section'larda).
 
 **Programmatic vs Declarative:**
 
@@ -621,7 +621,7 @@ import { preconnect } from 'react-dom';
 preconnect('https://api.example.com');
 ```
 
-Ikkalasi ham bir xil HTML output. JSX deklarativ render bilan, API runtime'da chaqirish bilan ishlatiladi.
+Ikkalasi ham bir xil HTML output. JSX declarative render bilan, API runtime'da chaqirish bilan ishlatiladi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -749,7 +749,7 @@ R19 `<link rel="stylesheet">` element'ini komponent darajasida render qilish va 
 />
 ```
 
-**`precedence` prop majburiy** — bu prop stylesheet'ning hoisted bo'lishi va Suspense integratsiyasini "yoqadi". `precedence` siz `<link>` oddiy DOM render qilinadi (hoist'siz, deduplication'siz, Suspense'siz).
+**`precedence` prop majburiy** — bu prop stylesheet'ning hoisted bo'lishi va Suspense integration'ini "yoqadi". `precedence` siz `<link>` oddiy DOM render qilinadi (hoist'siz, deduplication'siz, Suspense'siz).
 
 **Properties:**
 
@@ -963,7 +963,7 @@ Konvensional nomlar (`'reset'`, `'base'`, `'default'`, `'theme'`, `'high'`) — 
 **Ordering rules ([rasmiy docs](https://react.dev/reference/react-dom/components/link#special-rendering-behavior)):**
 
 1. **Bir xil `precedence`** ichida — render order'da (birinchi render qilingan stylesheet birinchi insert qilinadi).
-2. **Turli `precedence` guruhlari** — **first-occurrence order**'da (har precedence qiymati birinchi marta render qilinganda `<head>`'da o'z pozitsiyasini oladi).
+2. **Turli `precedence` guruhlari** — **first-occurrence order**'da (har precedence qiymati birinchi marta render qilinganda `<head>`'da o'z position'ini oladi).
 3. `precedence` o'zgarsa stylesheet repositioning qilinadi.
 
 **Best practice ordering (konvensiya):**
@@ -1122,7 +1122,7 @@ function ThemedApp() {
 
 ### Nazariya
 
-R19 stylesheet'lar Suspense bilan to'liq integratsiyalashgan. `<link rel="stylesheet" precedence>` yuklanmaguncha React komponent commit'ni kechiktiradi (en eng yaqin Suspense boundary fallback ko'rsatiladi) — bu **FOUC (Flash of Unstyled Content)** muammosini oldini oladi.
+R19 stylesheet'lar Suspense bilan to'liq integration qilingan. `<link rel="stylesheet" precedence>` yuklanmaguncha React komponent commit'ni kechiktiradi (eng yaqin Suspense boundary fallback ko'rsatiladi) — bu **FOUC (Flash of Unstyled Content)** muammosini oldini oladi.
 
 **FOUC muammo:**
 
@@ -1314,7 +1314,7 @@ Bir xil `src` bilan ikki marta render qilinsa, faqat bitta `<script>` instance q
 
 **Loading order:**
 
-`async` script'lar load tartibi **garantiyalanmaydi** — har biri parallel yuklanadi va tayyor bo'lganda execute qilinadi. Agar order kerak bo'lsa — `defer` ishlatilishi kerak (lekin R19 hoist'da `defer` ham qo'llab-quvvatlanadi).
+`async` script'lar load tartibi **garantiyalanmaydi** — har biri parallel yuklanadi va tayyor bo'lganda execute qilinadi. **MUHIM:** R19 faqat **`async`** script'larni hoist qiladi (rasmiy docs: script must have `src` + `async`). `defer` yoki sync `<script>` element'lar hoist'siz oddiy DOM position'da qoladi va R19 deduplication/dedup'larsiz ishlaydi. Agar load order kritik bo'lsa — `defer` script'larni manual `<head>` ichida (komponent darajasidagi hoist'siz) qo'yish kerak yoki framework-specific API ishlatish.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1528,7 +1528,8 @@ function ProductPage({ product }: { product: Product }) {
 function preload(
   href: string,
   options: {
-    as: 'script' | 'style' | 'font' | 'image' | 'fetch' | 'audio' | 'video' | 'track' | 'worker' | 'document';
+    // W3C <link as> to'liq list (12 ta value):
+    as: 'audio' | 'document' | 'embed' | 'fetch' | 'font' | 'image' | 'object' | 'script' | 'style' | 'track' | 'video' | 'worker';
     crossOrigin?: 'anonymous' | 'use-credentials';
     integrity?: string;
     type?: string;
@@ -1779,7 +1780,7 @@ function preinit(
 
 **`preinit` vs JSX `<link>`/`<script>`:**
 
-JSX deklarativ — render tree'da yoziladi, lifecycle React boshqaradi (mount/unmount). `preinit` imperativ — render funksiyasi ichidan chaqiriladi, library yoki framework code'lardan handy.
+JSX declarative — render tree'da yoziladi, lifecycle React boshqaradi (mount/unmount). `preinit` imperative — render funksiyasi ichidan chaqiriladi, library yoki framework code'lardan handy.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1919,7 +1920,7 @@ function ThemedApp() {
 
 ### Nazariya
 
-`prefetchDNS` va `preconnect` — connection darajasida brauzer optimizatsiyasi. Resource yuklash boshlashidan oldin DNS resolution va TCP/TLS handshake'larni bajarib qo'yadi.
+`prefetchDNS` va `preconnect` — connection darajasida brauzer optimization'i. Resource yuklash boshlashidan oldin DNS resolution va TCP/TLS handshake'larni bajarib qo'yadi.
 
 **`prefetchDNS(href)`:**
 
@@ -2031,7 +2032,7 @@ function App() {
 
 ### Nazariya
 
-Server-side rendering paytida R19 Document API'lari va Preloading API'lari **streaming SSR**'ga to'liq integratsiyalashgan. Server stream output'ida resource hint'larni HTML stream'ning eng boshida (boshqa kontent'dan oldin) yuboradi.
+Server-side rendering paytida R19 Document API'lari va Preloading API'lari **streaming SSR**'ga to'liq integrationlashgan. Server stream output'ida resource hint'larni HTML stream'ning eng boshida (boshqa kontent'dan oldin) yuboradi.
 
 **Streaming SSR resource hints:**
 
@@ -2412,7 +2413,7 @@ function MetaTags({
 
 ### Stylesheet'siz `precedence` Hoist Yo'q
 
-`<link rel="stylesheet">` `precedence` prop'siz oddiy DOM'da render qilinadi (komponent ichidagi joyda). Suspense integratsiyasi ham yo'q.
+`<link rel="stylesheet">` `precedence` prop'siz oddiy DOM'da render qilinadi (komponent ichidagi joyda). Suspense integration'i ham yo'q.
 
 ```tsx
 // ❌ NOTO'G'RI — precedence yo'q, hoist'siz, FOUC mumkin
@@ -2476,12 +2477,13 @@ Yechim: `preload` ni faqat ishlatilishi aniq resource'lar uchun qo'llash.
 
 ### `<meta>` Charset Order
 
-`<meta charset>` HTML'ning birinchi 1024 byte ichida bo'lishi shart. R19 charset'ni avtomatik birinchi position'ga hoist qiladi, lekin custom hoist order disrupt qilsa bug mumkin.
+`<meta charset>` HTML'ning birinchi 1024 byte ichida bo'lishi shart (HTML5 spec § 4.2.5.4). R19 `<meta charset>` uchun **maxsus charset prioritization mexanizmi yo'q** — boshqa `<meta>` tag'lar singari first-occurrence order asosida hoist qilinadi. SSR'da `<meta charset>` HTML stream'ning eng birinchi flush'iga tushishi uchun **App root komponentining eng birinchi child sifatida** yozish tavsiya etiladi:
 
 ```tsx
 function App() {
   return (
     <>
+      {/* CHARSET BIRINCHI — App root'ning eng birinchi child */}
       <meta charSet="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       {/* ... boshqa metadata ... */}
@@ -2489,6 +2491,8 @@ function App() {
   );
 }
 ```
+
+CSR-only (no SSR) applikatsiya'larda `<meta charset>` HTML template'da hard-coded bo'ladi (Vite/CRA `index.html`), R19 qo'shimcha charset'ni hoist qilish duplicate keltirib chiqarmaydi (React dedup'lamaydi `<meta>`'ni). Best practice: HTML template'da charset, R19 component'da takrorlamaslik.
 
 ### Strict Mode 2x render `preload` deduplication
 

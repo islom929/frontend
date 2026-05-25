@@ -6,7 +6,7 @@
 
 ## Mundarija
 
-- [`useEffect` "Lifecycle Hook" EMAS — Sinxronizatsiya Mexanizmi](#useeffect-lifecycle-hook-emas--sinxronizatsiya-mexanizmi)
+- [`useEffect` "Lifecycle Hook" EMAS — Sync Mexanizmi](#useeffect-lifecycle-hook-emas--sync-mexanizmi)
 - [Side Effects Tushunchasi](#side-effects-tushunchasi)
 - [Syntax va Dependency Array](#syntax-va-dependency-array)
 - [Cleanup Function](#cleanup-function)
@@ -25,7 +25,7 @@
 
 ---
 
-## `useEffect` "Lifecycle Hook" EMAS — Sinxronizatsiya Mexanizmi
+## `useEffect` "Lifecycle Hook" EMAS — Sync Mexanizmi
 
 ### Nazariya
 
@@ -63,17 +63,17 @@ Bu kod ishlaydi, lekin yondashuv noto'g'ri. Sabab keyingi paragraflarda ko'rsati
 
 > "Joriy state berilgan bo'lsa, tashqi tizim qanday holatda bo'lishi kerak? Effect shu holatga keltiradi."
 
-Bu yondashuv declarative — siz tashqi tizimning **bir vaqtdagi holati**ni tasvirlaysiz. React esa state o'zgarganda effect'ni qaytadan ishlatib, tashqi tizimni joriy state bilan sinxronizatsiyaga keltiradi:
+Bu yondashuv declarative — siz tashqi tizimning **bir vaqtdagi holati**ni tasvirlaysiz. React esa state o'zgarganda effect'ni qaytadan ishlatib, tashqi tizimni joriy state bilan sync'ga keltiradi:
 
 ```tsx
-// ✅ TO'G'RI mental model — sinxronizatsiya yondashuvi
+// ✅ TO'G'RI mental model — sync yondashuvi
 useEffect(() => {
   // "userId berilgan bo'lsa, shu user uchun chat connection ochilsin"
   const connection = createConnection(userId);
   connection.connect();
   
   return () => {
-    // "Sinxronizatsiyadan chiqish — userId o'zgarganda yoki component unmount bo'lganda"
+    // "Sync'dan chiqish — userId o'zgarganda yoki component unmount bo'lganda"
     connection.disconnect();
   };
 }, [userId]);
@@ -81,9 +81,9 @@ useEffect(() => {
 
 Bu kodda "mount" yoki "update" so'zi yo'q. Faqat: **"userId berilgan bo'lsa, connection shu user'ga ochiq bo'lishi kerak"** — bu invariant. React qanday va qachon effect chaqirilishini o'zi boshqaradi.
 
-**Sinxronizatsiya invariant'i:**
+**Sync invariant'i:**
 
-Effect deklarativ aytishni anglatadi:
+Effect declarative aytishni anglatadi:
 
 > "Joriy state qiymati X bo'lsa, tashqi tizim Y holatda bo'lishi kerak."
 
@@ -91,9 +91,9 @@ Effect callback bu holatni **o'rnatadi** (setup), cleanup function uni **bekor q
 
 Bu mental model asosida qator dizayn qarorlari tabiiy bo'ladi:
 
-1. **Dependency array** — sinxronizatsiya uchun qaysi state'lar muhim. Hech qaysisi `null` bo'lmaydi: yo har render, yo `[]` (faqat bir marta), yo aniq deps.
+1. **Dependency array** — sync uchun qaysi state'lar muhim. Hech qaysisi `null` bo'lmaydi: yo har render, yo `[]` (faqat bir marta), yo aniq deps.
 2. **Strict Mode 2x effect cycle (R18+)** — effect "qaytadan o'rnatilishga chidamli" bo'lishi kerak. Agar mount→unmount→mount cycle effect'ni buzsa, demak cleanup to'liq emas.
-3. **"You Might Not Need an Effect"** anti-pattern'lari — agar aslida sinxronizatsiya yo'q (state'dan derivatsiya, parent'ga xabar berish) — `useEffect` o'rinsiz.
+3. **"You Might Not Need an Effect"** anti-pattern'lari — agar aslida sync yo'q (state'dan derivatsiya, parent'ga xabar berish) — `useEffect` o'rinsiz.
 
 **Class lifecycle bilan mexanik moslashuv — anti-pattern:**
 
@@ -107,11 +107,11 @@ Interview savoli: *"`useEffect` qaysi lifecycle method'larga teng?"* — savol n
 
 Bu jadval **noto'g'ri yo'naltiruvchi**. Aslida `useEffect` lifecycle method'ning almashtiruvi emas — u yondashuvni o'zgartiradi. To'g'ri javob:
 
-> "`useEffect` lifecycle method'larga teng emas. U sinxronizatsiya mexanizmi — joriy state berilgan bo'lsa, tashqi tizim qanday holatda bo'lishi kerakligini tasvirlaydi. Class lifecycle method'lar imperative qadamlar edi — har bir hodisaga alohida method. `useEffect` declarative — bir invariant, React uni ushlab turadi."
+> "`useEffect` lifecycle method'larga teng emas. U sync mexanizmi — joriy state berilgan bo'lsa, tashqi tizim qanday holatda bo'lishi kerakligini tasvirlaydi. Class lifecycle method'lar imperative qadamlar edi — har bir hodisaga alohida method. `useEffect` declarative — bir invariant, React uni ushlab turadi."
 
 **Nima uchun bu farq amaliyotda muhim:**
 
-Quyidagi misol — lifecycle yondashuvi ishlaydi, lekin sinxronizatsiya yondashuvi yashirin bug'ni topishga yordam beradi:
+Quyidagi misol — lifecycle yondashuvi ishlaydi, lekin sync yondashuvi yashirin bug'ni topishga yordam beradi:
 
 ```tsx
 // Lifecycle yondashuvi — userId o'zgarsa, connection o'zgaradimi?
@@ -129,10 +129,10 @@ function ChatRoom({ userId }: { userId: string }) {
 
 Lifecycle mental model'da bu kod tabiiy ko'rinadi: "mount paytida connect qil, unmount paytida disconnect qil." `userId` o'zgarganda nima bo'lishi haqida o'ylanmaydi.
 
-Sinxronizatsiya mental model'da xato darrov ko'rinadi: "joriy `userId` uchun connection ochiq bo'lishi kerak — `userId` o'zgarganda eski connection yopilib, yangisi ochilishi kerak." Demak `userId` deps array'da bo'lishi shart:
+Sync mental model'da xato darrov ko'rinadi: "joriy `userId` uchun connection ochiq bo'lishi kerak — `userId` o'zgarganda eski connection yopilib, yangisi ochilishi kerak." Demak `userId` deps array'da bo'lishi shart:
 
 ```tsx
-// ✅ Sinxronizatsiya yondashuvi — userId deps'da
+// ✅ Sync yondashuvi — userId deps'da
 function ChatRoom({ userId }: { userId: string }) {
   useEffect(() => {
     const connection = createConnection(userId);
@@ -145,12 +145,12 @@ function ChatRoom({ userId }: { userId: string }) {
 }
 ```
 
-ESLint rule `react-hooks/exhaustive-deps` bu xatoni avtomatik topadi (cross-ref Section "Stale Closure va Missing Deps"). Lekin rule sabab emas, **oqibat** — sinxronizatsiya invariant'i buzilgan.
+ESLint rule `react-hooks/exhaustive-deps` bu xatoni avtomatik topadi (cross-ref Section "Stale Closure va Missing Deps"). Lekin rule sabab emas, **oqibat** — sync invariant'i buzilgan.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-React jamoasi (Dan Abramov, Andrew Clark) `useEffect`'ning sinxronizatsiya modeliga o'tishni 2018-2019 yillarda hookslarni dizayn qilish jarayonida qabul qilgan. Sabablar texnik:
+React jamoasi (Dan Abramov, Andrew Clark) `useEffect`'ning sync modeliga o'tishni 2018-2019 yillarda hookslarni dizayn qilish jarayonida qabul qilgan. Sabablar texnik:
 
 **1. Concurrent Mode bilan moslik:**
 
@@ -164,19 +164,19 @@ Bu method'lar Render Phase'da chaqirilgani uchun Concurrent rendering bilan mos 
 
 `useEffect` bu muammolarni hal qiladi — Render Phase'dan keyin (Commit Phase'dan keyin) chaqiriladi, render qaytarilsa effect run qilinmaydi.
 
-**2. Strict Mode 2x effect (R18+) — sinxronizatsiya invariant'ini test qilish:**
+**2. Strict Mode 2x effect (R18+) — sync invariant'ini test qilish:**
 
-Strict Mode'da React har effect'ni mount, unmount, va yana mount qilib chaqiradi. Sabab: `Offscreen` komponentlar (kelajakdagi feature) yoki Fast Refresh holatlarida effect remount bo'lishi mumkin. Agar effect "lifecycle" mental model'da yozilgan bo'lsa, remount uni buzadi. Sinxronizatsiya mental model'da effect cleanup to'liq bo'lishi shart, demak remount muammosiz o'tadi.
+Strict Mode'da React har effect'ni mount, unmount, va yana mount qilib chaqiradi. Sabab: `Offscreen` komponentlar (kelajakdagi feature) yoki Fast Refresh holatlarida effect remount bo'lishi mumkin. Agar effect "lifecycle" mental model'da yozilgan bo'lsa, remount uni buzadi. Sync mental model'da effect cleanup to'liq bo'lishi shart, demak remount muammosiz o'tadi.
 
 **3. Effect — render natijasi:**
 
-React'ning fundamental modeli: UI = `f(state)`. Effect ham shu funksiyaning bir qismi: tashqi tizim holati = `f(state)`. Render JSX'ni hisoblaydi (DOM uchun), effect tashqi tizim sinxronizatsiyasini hisoblaydi (network, timer, subscription uchun).
+React'ning fundamental modeli: UI = `f(state)`. Effect ham shu funksiyaning bir qismi: tashqi tizim holati = `f(state)`. Render JSX'ni hisoblaydi (DOM uchun), effect tashqi tizim syncsini hisoblaydi (network, timer, subscription uchun).
 
 **Source citation:**
 
 Dan Abramov'ning "A Complete Guide to useEffect" (2019, overreacted.io) postida bu fikr aniq aytilgan: *"useEffect is closer to data flow than to lifecycle."* React official docs'ning "Synchronizing with Effects" (2023) sahifasi shu fikrni rasmiylashtiradi.
 
-Bu fikr falsafa emas — texnik zaruriyat. Concurrent rendering, Strict Mode 2x effect, future Offscreen API — barchasi sinxronizatsiya invariant'ini taxmin qiladi.
+Bu fikr falsafa emas — texnik zaruriyat. Concurrent rendering, Strict Mode 2x effect, future Offscreen API — barchasi sync invariant'ini taxmin qiladi.
 
 </details>
 
@@ -206,7 +206,7 @@ function UserStatus({ userId, isOnline }: { userId: string; isOnline: boolean })
   }, [isOnline]);
 }
 
-// ✅ Sinxronizatsiya yondashuvi — bir invariant
+// ✅ Sync yondashuvi — bir invariant
 function UserStatus({ userId, isOnline }: { userId: string; isOnline: boolean }) {
   useEffect(() => {
     // "Berilgan userId va isOnline uchun WebSocket holati shunday bo'lishi kerak"
@@ -218,12 +218,12 @@ function UserStatus({ userId, isOnline }: { userId: string; isOnline: boolean })
 }
 ```
 
-**Misol 2 — sinxronizatsiya invariant'i bilan o'ylash:**
+**Misol 2 — sync invariant'i bilan o'ylash:**
 
 ```tsx
 // Talab: search query o'zgarganda URL params ga sync qilish
 
-// ✅ Sinxronizatsiya — "URL search params query'ga teng bo'lishi kerak"
+// ✅ Sync — "URL search params query'ga teng bo'lishi kerak"
 function SearchPage({ query }: { query: string }) {
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -235,7 +235,7 @@ function SearchPage({ query }: { query: string }) {
 }
 ```
 
-Cleanup yo'qligi sinxronizatsiya yondashuvida tabiiy: keyingi effect run avvalgi URL'ni qaytadan o'rnatadi. State o'rniga URL — bir o'zgaruvchan resurs.
+Cleanup yo'qligi sync yondashuvida tabiiy: keyingi effect run avvalgi URL'ni qaytadan o'rnatadi. State o'rniga URL — bir o'zgaruvchan resurs.
 
 **Misol 3 — class lifecycle dan o'tkazish (xato):**
 
@@ -266,7 +266,7 @@ function Counter() {
   }, []);  // ❌ Lekin nima uchun [] — sabab tushunilmagan
 }
 
-// ✅ TO'G'RI — sinxronizatsiya invariant'i: "interval doim aktiv bo'lishi kerak"
+// ✅ TO'G'RI — sync invariant'i: "interval doim aktiv bo'lishi kerak"
 function Counter() {
   const [count, setCount] = useState(0);
   
@@ -343,7 +343,7 @@ Hamma side effect'lar uchun `useEffect` zaruriy emas — React boshqa mexanizmla
 | State'dan derivatsiya | Render paytida hisoblash, `useMemo` |
 | Reset state | `key` prop |
 
-`useEffect`'ni "har joyda ishlatish" — anti-pattern. Faqat tashqi tizim bilan sinxronizatsiya kerak bo'lganda ishlatiladi (cross-ref Section "You Might Not Need an Effect").
+`useEffect`'ni "har joyda ishlatish" — anti-pattern. Faqat tashqi tizim bilan sync kerak bo'lganda ishlatiladi (cross-ref Section "You Might Not Need an Effect").
 
 **Render purity ni saqlash sabab'lari:**
 
@@ -462,7 +462,7 @@ function CommentForm({ onSubmit }: { onSubmit: (text: string) => void }) {
 }
 ```
 
-User action (form submit) — `useEffect` uchun emas. Event handler ishlatiladi. Sinxronizatsiya yo'q — har submit bir martalik hodisa.
+User action (form submit) — `useEffect` uchun emas. Event handler ishlatiladi. Sync yo'q — har submit bir martalik hodisa.
 
 **Misol 3 — derived state — `useEffect` shart emas:**
 
@@ -519,7 +519,7 @@ useEffect(() => {
 
 Effect **har render'dan keyin** chaqiriladi. Boshlang'ich render'da, har state/prop o'zgarishida.
 
-Bu variant juda kam ishlatiladi. Sinxronizatsiya nuqtai nazaridan ma'noli emas — har render'da remount qilish maxsus holatlarga zarur.
+Bu variant juda kam ishlatiladi. Sync nuqtai nazaridan ma'noli emas — har render'da remount qilish maxsus holatlarga zarur.
 
 **Variant 2 — Bo'sh deps array (`[]`):**
 
@@ -762,7 +762,7 @@ function UserCard({ userId }: { userId: string }) {
 }
 ```
 
-Linter to'g'ri ko'rsatadi: agar `theme` ishlatilgan bo'lsa, deps'da bo'lishi shart. Lekin bu fetch'ni har `theme` o'zgarganda qaytadan keltirib chiqaradi — sinxronizatsiya nuqtai nazaridan to'g'ri (effect joriy holat bilan moslashadi). Performance kerak bo'lsa — `theme`'ni fetch'dan ajratish kerak (alohida effect yoki render time merge).
+Linter to'g'ri ko'rsatadi: agar `theme` ishlatilgan bo'lsa, deps'da bo'lishi shart. Lekin bu fetch'ni har `theme` o'zgarganda qaytadan keltirib chiqaradi — sync nuqtai nazaridan to'g'ri (effect joriy holat bilan moslashadi). Performance kerak bo'lsa — `theme`'ni fetch'dan ajratish kerak (alohida effect yoki render time merge).
 
 </details>
 
@@ -777,9 +777,9 @@ Effect callback `void` yoki **cleanup function** qaytarishi mumkin. Cleanup func
 1. **Effect qaytadan run bo'lishidan oldin** — deps o'zgarganda. Avval avvalgi effect'ning cleanup'i, keyin yangi effect setup.
 2. **Component unmount bo'lganda** — Fiber tree'dan o'chirilganda.
 
-Bu — sinxronizatsiya invariant'ining "teardown" qismi. Setup tashqi tizimni joriy state bilan moslaydi, cleanup eski moslashuvni bekor qiladi.
+Bu — sync invariant'ining "teardown" qismi. Setup tashqi tizimni joriy state bilan moslaydi, cleanup eski moslashuvni bekor qiladi.
 
-**Sintaksis:**
+**Syntax:**
 
 ```tsx
 useEffect(() => {
@@ -844,7 +844,7 @@ function Component({ userId }: { userId: string }) {
 // Render 3: userId='charlie' → Cleanup: bob, Setup: charlie
 ```
 
-Cleanup'da `userId` qiymati **avvalgi** setup'dan. Bu sinxronizatsiya modeli bilan to'g'ri — cleanup avvalgi sinxronizatsiyani bekor qiladi (avvalgi `userId` uchun).
+Cleanup'da `userId` qiymati **avvalgi** setup'dan. Bu sync modeli bilan to'g'ri — cleanup avvalgi sync'ni bekor qiladi (avvalgi `userId` uchun).
 
 **Cleanup MAJBURIY emas, lekin tavsiya etiladi:**
 
@@ -951,7 +951,7 @@ function commitHookEffectListUnmount(hookFlags: HookFlags, finishedWork: Fiber) 
 }
 ```
 
-**Cleanup va Setup tartibi — atomik:**
+**Cleanup va Setup tartibi — atomic:**
 
 R16-17'da cleanup va setup interleave qilinardi: bir effect cleanup → bir effect setup → keyingi effect cleanup → ...
 
@@ -1059,7 +1059,7 @@ function Logger({ id }: { id: number }) {
 // unmount:    "Cleanup: 3"
 ```
 
-Bu xulq-atvor sinxronizatsiya modeli bilan to'g'ri: avvalgi sinxronizatsiyani bekor qiluvchi cleanup avvalgi state'ni bilishi shart.
+Bu xulq-atvor sync modeli bilan to'g'ri: avvalgi sync'ni bekor qiluvchi cleanup avvalgi state'ni bilishi shart.
 
 **Misol 5 — Idempotent cleanup (Strict Mode safe):**
 
@@ -1105,7 +1105,7 @@ function ChatConnection({ roomId }: { roomId: string }) {
    ├─ JSX → Fiber tree
    └─ Reconciliation (eski vs yangi tree)
 
-2. Commit Phase (sync, atomik)
+2. Commit Phase (sync, atomic)
    ├─ Mutation sub-phase    — DOM yangilanadi
    ├─ Layout sub-phase       — useLayoutEffect chaqiriladi (sync)
    └─ Browser paint         — yangi DOM ekranda ko'rinadi
@@ -1402,7 +1402,7 @@ Commit Phase (deps changed):
 6. Parent setup
 ```
 
-Bu atomik separation R18 Concurrent Mode bilan kelgan. R17 da cleanup va setup interleave qilinardi (har component'da cleanup → setup → keyingi component).
+Bu atomic separation R18 Concurrent Mode bilan kelgan. R17 da cleanup va setup interleave qilinardi (har component'da cleanup → setup → keyingi component).
 
 **Bir component ichida — declaration order:**
 
@@ -1611,7 +1611,7 @@ function Page() {
 
 ### Nazariya
 
-`useEffect`'ning haqiqiy ishlash sohalari — tashqi tizimlar bilan sinxronizatsiya. Eng tez-tez uchraydigan pattern'lar:
+`useEffect`'ning haqiqiy ishlash sohalari — tashqi tizimlar bilan sync. Eng tez-tez uchraydigan pattern'lar:
 
 **1. Subscription / Event Listener:**
 
@@ -2116,7 +2116,7 @@ useEffect(() => {
 
 **Strict Mode (R18+) va race condition:**
 
-Strict Mode'da effect ikki marta chaqiriladi (mount → unmount → mount). AbortController pattern bilan birinchi fetch bekor qilinadi, ikkinchisi davom etadi. `ignore` pattern bilan ham bir xil mantiq. Demak race condition pattern'lari Strict Mode safe — bu sinxronizatsiya invariant'ining test'i.
+Strict Mode'da effect ikki marta chaqiriladi (mount → unmount → mount). AbortController pattern bilan birinchi fetch bekor qilinadi, ikkinchisi davom etadi. `ignore` pattern bilan ham bir xil mantiq. Demak race condition pattern'lari Strict Mode safe — bu sync invariant'ining test'i.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2483,7 +2483,7 @@ function ChatRoom({ roomId, theme }: { roomId: string; theme: string }) {
 
 JavaScript'da har function yaratilganda joriy lexical environment'ga reference saqlaydi (`[[Environment]]` internal slot). Function chaqirilganida shu environment'dan qiymatlarni o'qiydi.
 
-`useEffect` callback har render'da yangi function (closure). Lekin React deps o'zgarmasa, eski callback'ni hool qilmaydi (callback hech qachon chaqirilmaydi). Deps o'zgarsa — yangi callback (yangi closure) chaqiriladi.
+`useEffect` callback har render'da yangi function (closure). Lekin React deps o'zgarmasa, callback chaqirilmaydi (`HookHasEffect` flag o'rnatilmaydi). Deps o'zgarsa — yangi callback (yangi closure) chaqiriladi.
 
 ```ts
 // Render 1
@@ -3129,7 +3129,7 @@ function Component() {
 // Setup
 ```
 
-**Sabab — sinxronizatsiya invariant'i:**
+**Sabab — sync invariant'i:**
 
 R18 dan kelajakdagi feature'lar uchun React effect remount'ni qo'llab-quvvatlashi kerak:
 
@@ -3204,7 +3204,7 @@ Bu — anti-pattern emas, **dizayn kamchiligi** — effect noto'g'ri vazifaga is
 
 **`useEffectEvent` (R19 RFC):**
 
-Strict Mode 2x cycle'ni hal qilishning bir usuli — `useEffectEvent` (eksperimental). Lekin hali stable emas. Bugungi kunda to'g'ri yondashuv: cleanup yozish va effect'ni sinxronizatsiya invariant'i bilan dizayn qilish.
+Strict Mode 2x cycle'ni hal qilishning bir usuli — `useEffectEvent` (eksperimental). Lekin hali stable emas. Bugungi kunda to'g'ri yondashuv: cleanup yozish va effect'ni sync invariant'i bilan dizayn qilish.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -3378,7 +3378,7 @@ function CreateUser({ userData }: { userData: UserData }) {
 }
 ```
 
-POST asosan user action javobi — `useEffect` uchun emas. Sinxronizatsiya emas.
+POST asosan user action javobi — `useEffect` uchun emas. Sync emas.
 
 **Misol 5 — Modal — state parent'da:**
 
@@ -3416,7 +3416,7 @@ Modal — UI qismi, declarative JSX'da. `useEffect` uchun emas.
 
 Dan Abramov va React jamoasining 2023 yilda yozgan rasmiy qo'llanmasi (`react.dev` "You Might Not Need an Effect") — `useEffect`'ni noto'g'ri ishlatishning eng keng tarqalgan anti-pattern'larini sanaydi.
 
-Asosiy fikr: **`useEffect` — faqat tashqi tizim bilan sinxronizatsiya uchun**. Boshqa hamma vazifalar uchun yaxshi alternativlar bor.
+Asosiy fikr: **`useEffect` — faqat tashqi tizim bilan sync uchun**. Boshqa hamma vazifalar uchun yaxshi alternativlar bor.
 
 Quyida 9 ta anti-pattern va to'g'ri yondashuvlar:
 
@@ -3706,9 +3706,9 @@ Quyidagi savollarni o'zingizga bering:
 3. **Bu reset state'mi?** → `key` prop
 4. **Bu external store subscription'mi?** → `useSyncExternalStore`
 5. **Bu app init'mi?** → Module-level code
-6. **Bu lifecycle hodisaga bog'liq deb o'ylayapsizmi?** → To'xtang. Sinxronizatsiya invariant'ini ifodalang.
+6. **Bu lifecycle hodisaga bog'liq deb o'ylayapsizmi?** → To'xtang. Sync invariant'ini ifodalang.
 
-Agar javob "tashqi tizim bilan sinxronizatsiya" bo'lsa — `useEffect` to'g'ri tanlov. Boshqa har holatda — alternativ.
+Agar javob "tashqi tizim bilan sync" bo'lsa — `useEffect` to'g'ri tanlov. Boshqa har holatda — alternativ.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -3943,7 +3943,7 @@ React rasmiy warning bu pattern uchun chiqaradi. `react-hooks/exhaustive-deps` r
 
 ### Gotcha 2 — `setState` cleanup'da memory leak warning (R17 dan keyin yo'q)
 
-R16'da component unmount bo'lganidan keyin `setState` chaqirilsa, "Can't perform a React state update on an unmounted component" warning chiqar edi. R17'dan boshlab bu warning olib tashlandi (memory leak emas).
+R16-R17'da component unmount bo'lganidan keyin `setState` chaqirilsa, "Can't perform a React state update on an unmounted component" warning chiqar edi. R18'dan boshlab bu warning olib tashlandi (PR #22114 — false positive ko'p edi, real memory leak indikator emas).
 
 ```tsx
 useEffect(() => {
@@ -3973,15 +3973,15 @@ Deps array uzunligi statik bo'lishi shart. Conditional dep o'rniga conditional e
 
 ### Gotcha 4 — Effect callback throw qilsa
 
-Effect ichida throw qilingan error — Error Boundary'ga ushlanmaydi (R16-17). R18'dan boshlab effect error'lari Error Boundary'larga uzatiladi:
+Effect callback (passive yoki layout) ichida synchronous throw qilingan error — Error Boundary'ga ushlanadi (`commitPassiveMountEffects` va `commitLayoutEffects` try/catch bilan o'ralgan, `captureCommitPhaseError` chaqiriladi). Lekin error'ning kelishi paint'dan keyin bo'ladi (passive effect uchun) — bu UX ga ta'sir qiladi:
 
 ```tsx
 useEffect(() => {
-  throw new Error('Effect error');  // R16-17: silent / R18+: Error Boundary
+  throw new Error('Effect error');  // → Error Boundary fallback paint'dan keyin
 }, []);
 ```
 
-Lekin async error (fetch reject, promise reject) hech qachon Error Boundary'ga uzatilmaydi. `.catch` bilan handle qilish shart.
+**Async error (fetch reject, promise reject, setTimeout ichidagi throw) hech qachon Error Boundary'ga uzatilmaydi** — JS engine'ning microtask/macrotask queue React commit tree'dan tashqarida. `.catch` yoki `try/catch` bilan handle qilish shart.
 
 ### Gotcha 5 — Cleanup va Suspense bilan birga
 
@@ -4001,7 +4001,7 @@ function UserCard({ userId }: { userId: string }) {
 }
 ```
 
-Effect mount sinxronizatsiya invariant'iga ko'ra ishlaydi — agar real effect Suspense bilan bog'liq holatlarda muammo qiladi, dizayn'ni qayta ko'rib chiqish kerak.
+Effect mount sync invariant'iga ko'ra ishlaydi — agar real effect Suspense bilan bog'liq holatlarda muammo qiladi, dizayn'ni qayta ko'rib chiqish kerak.
 
 ---
 
@@ -4171,7 +4171,7 @@ function useDebounce<T>(value: T, delay: number): T {
 - Yangi `setTimeout` `delay` ms'dan keyin `debounced` state'ni yangilaydi
 - Tezkor o'zgarishlar — har gal eski timeout bekor → faqat oxirgisi ishga tushadi
 
-Sinxronizatsiya invariant: "joriy `value` `delay` ms tinch turgandan keyin `debounced`'ga teng bo'lsin."
+Sync invariant: "joriy `value` `delay` ms tinch turgandan keyin `debounced`'ga teng bo'lsin."
 
 </details>
 
@@ -4309,7 +4309,7 @@ function useFetch<T>(url: string): FetchState<T> {
 - Other error'lar `state.error`'ga yoziladi
 - Loading state — fetch boshida `true`, tugaganda `false`
 
-Sinxronizatsiya invariant: "joriy `url` uchun fetch state ko'rsatilgan."
+Sync invariant: "joriy `url` uchun fetch state ko'rsatilgan."
 
 Production'da TanStack Query, SWR ishlatish tavsiya — cache, retry, dedupe avtomatik.
 
@@ -4464,17 +4464,17 @@ Latest handler pattern — handler har render'da yangi function bo'lsa ham, list
 
 `useEffect` — React'da eng ko'p tushunmovchilik keltirib chiqaradigan hook. Bu bo'limning asosiy fikrlari:
 
-- **`useEffect` lifecycle method emas, sinxronizatsiya mexanizmi.** "Mount paytida X qil, unmount paytida Y qil" mental model'i — anti-pattern. To'g'ri yondashuv: "joriy state berilgan bo'lsa, tashqi tizim qanday holatda bo'lishi kerak — effect shu holatga keltiradi."
+- **`useEffect` lifecycle method emas, sync mexanizmi.** "Mount paytida X qil, unmount paytida Y qil" mental model'i — anti-pattern. To'g'ri yondashuv: "joriy state berilgan bo'lsa, tashqi tizim qanday holatda bo'lishi kerak — effect shu holatga keltiradi."
 - **Side effect'lar render'dan tashqarida bo'lishi kerak.** Render funksiyasi pure (Render Purity Rule). Side effect'lar `useEffect` ichida — Commit Phase'dan keyin chaqiriladi.
-- **Dependency array** — sinxronizatsiya uchun qaysi state'lar muhim. `Object.is` orqali comparison. `react-hooks/exhaustive-deps` linter — barcha reactive deps majbur qiladi.
-- **Cleanup function** — sinxronizatsiyani bekor qilish. Tashqi resurs (subscription, timer, listener) yaratilganda MAJBURIY.
+- **Dependency array** — sync uchun qaysi state'lar muhim. `Object.is` orqali comparison. `react-hooks/exhaustive-deps` linter — barcha reactive deps majbur qiladi.
+- **Cleanup function** — sync'ni bekor qilish. Tashqi resurs (subscription, timer, listener) yaratilganda MAJBURIY.
 - **Effect timing** — paint dan keyin (passive). Visible DOM o'zgarishi bo'lsa — `useLayoutEffect` (cross-ref [`17-uselayouteffect.md`](17-uselayouteffect.md)).
 - **Effect ordering** — bottom-up (children before parent). R18'dan cleanup va setup atomic separation.
-- **Strict Mode 2x effect cycle (R18+)** — mount → unmount → mount sikli. Sinxronizatsiya invariant'ini test qiladi (effect remount'ga chidamli bo'lishi shart). Strict Mode'ni o'chirish anti-pattern.
+- **Strict Mode 2x effect cycle (R18+)** — mount → unmount → mount sikli. Sync invariant'ini test qiladi (effect remount'ga chidamli bo'lishi shart). Strict Mode'ni o'chirish anti-pattern.
 - **Race condition'lar** — async operation'lar uchun `AbortController` yoki `ignore` flag pattern.
 - **Stale closure** — deps to'g'ri kelmasa eski qiymatlar. Functional update (`setX(prev => ...)`) yoki `useRef` latest pattern.
 - **Object/array deps** — referential identity comparison. Primitive deps yoki `useMemo` (cross-ref [`21-usememo-usecallback.md`](21-usememo-usecallback.md)).
-- **"You Might Not Need an Effect"** — derived state (render paytida), reset state (`key` prop), event reaction (event handler), external store (`useSyncExternalStore`), app init (module-level), POST request (event handler), state init (lazy initial state). `useEffect`'ni faqat tashqi tizim sinxronizatsiyasi uchun.
+- **"You Might Not Need an Effect"** — derived state (render paytida), reset state (`key` prop), event reaction (event handler), external store (`useSyncExternalStore`), app init (module-level), POST request (event handler), state init (lazy initial state). `useEffect`'ni faqat tashqi tizim syncsi uchun.
 - **Under the hood** — Effect — hook chain'da AND effect chain'da (Fiber.updateQueue circular linked list). `HookPassive` flag, `commitPassiveMountEffects` Commit'dan keyin MessageChannel orqali rejalashtiriladi.
 
 Keyingi bo'lim: `useLayoutEffect` — sync timing, paint'dan oldin chaqiriladigan effect, DOM measurement use cases, va `useInsertionEffect` (R18) — CSS-in-JS library'lar uchun.

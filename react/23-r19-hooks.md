@@ -42,14 +42,14 @@ To'rtta hook va ularning maqsadlari:
 | `useActionState()` | Form action state management | Validation errors, submit result |
 | `useOptimistic()` | Optimistic UI update | Like, comment, vote — instant feedback |
 
-Bu hooklar R19 `<form action={fn}>` (cross-ref [`13-event-handling.md`](13-event-handling.md)) bilan integratsiya qiladi. R19'gacha form submission `onSubmit={handler}` orqali yozilardi — handler ichida `e.preventDefault()`, `fetch`, `setState` manual edi. R19'da `<form action>` declarative — function ichida async operation, R19 hooklar pending/state/optimistic ni boshqaradi.
+Bu hooklar R19 `<form action={fn}>` (cross-ref [`13-event-handling.md`](13-event-handling.md)) bilan integration qiladi. R19'gacha form submission `onSubmit={handler}` orqali yozilardi — handler ichida `e.preventDefault()`, `fetch`, `setState` manual edi. R19'da `<form action>` declarative — function ichida async operation, R19 hooklar pending/state/optimistic ni boshqaradi.
 
 > **Versiya evolyutsiyasi (Form Hooks):**
 > - **Avval (R18):** `useFormState` experimental, faqat React DOM'da, `react-dom`'dan import qilinardi.
 > - **Hozir (R19+):** `useActionState` stable, `react`'dan import (umumiy hook), `useFormStatus`/`useOptimistic`/`use` ham yangi.
-> - **Sabab:** Form ekosistema standartlashdi, Server Components bilan integratsiya kerak edi, hook'lar `react` paketiga ko'chirildi (universal — DOM'gagina bog'liq emas).
+> - **Sabab:** Form ekosistema standartlashdi, Server Components bilan integration kerak edi, hook'lar `react` paketiga ko'chirildi (universal — DOM'gagina bog'liq emas).
 
-Bu hooklarning yana bir muhim xususiyati — **Server Components va Server Actions** (cross-ref [`39-rsc-server-actions.md`](39-rsc-server-actions.md)) bilan to'liq integratsiya. `useActionState` server action'ni qabul qila oladi, `useOptimistic` server action davomida UI'ni yangilab turadi. Lekin bu hooklar **vanilla React'da ham ishlaydi** — RSC majburiy emas.
+Bu hooklarning yana bir muhim xususiyati — **Server Components va Server Actions** (cross-ref [`39-rsc-server-actions.md`](39-rsc-server-actions.md)) bilan to'liq integration. `useActionState` server action'ni qabul qila oladi, `useOptimistic` server action davomida UI'ni yangilab turadi. Lekin bu hooklar **vanilla React'da ham ishlaydi** — RSC majburiy emas.
 
 `use()` hook'i alohida — u form'larga bog'liq emas. Maqsad: **conditional reading**. R16.8 dan beri Rules of Hooks barcha hook'larni top-level chaqirilishini talab qilardi (cross-ref [`15-hooks-fundamentals.md`](15-hooks-fundamentals.md)). `use()` esa `if`/`switch`/`for` ichida chaqirilishi mumkin — chunki u state'ga bog'lanmaydi (memoizedState slot ishlatmaydi). Bu fundamental yangilik — birinchi conditional-friendly hook.
 
@@ -93,7 +93,7 @@ export {
 
 `useFormState` R18 experimental versiyasi `react-dom`'da edi (form-specific). R19'da `useActionState` deb rename qilindi va `react`'ga ko'chirildi (chunki action concept umumiy — server action, framework action, va h.k.).
 
-Internal arxitektura jihatidan, R19 hooklar boshqa hooklar bilan bir xil dispatcher pattern'ni ishlatadi (cross-ref [`15-hooks-fundamentals.md`](15-hooks-fundamentals.md) Dispatcher Swap):
+Internal architecture jihatidan, R19 hooklar boshqa hooklar bilan bir xil dispatcher pattern'ni ishlatadi (cross-ref [`15-hooks-fundamentals.md`](15-hooks-fundamentals.md) Dispatcher Swap):
 
 ```javascript
 // react-reconciler ichida (simplified)
@@ -121,7 +121,7 @@ const HooksDispatcherOnUpdate = {
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-R19 hooklarni birgalikda ishlatish — minimal misol (kontekst uchun, har hook keyingi section'larda chuqur):
+R19 hooklarni birgalikda ishlatish — minimal misol (context uchun, har hook keyingi section'larda chuqur):
 
 ```tsx
 'use client';
@@ -463,7 +463,7 @@ Suspense boundary placement strategiyasi muhim. Boundary qayerda joylashsa — f
 
 Bu yondashuv "waterfall" muammosini hal qiladi (avval user, keyin posts) — har boundary mustaqil yuklanadi (parallel).
 
-NIMA UCHUN promise throw mexanizmi: declarative async. JavaScript'da `await` faqat async function ichida ishlaydi (suspends function execution). React component esa **sync function** — `await` ishlamaydi. Lekin `use(promise)` analog sintaksis beradi: component render "suspends" bo'ladi (throw orqali), Suspense boundary fallback ko'rsatadi, promise resolve bo'lgach — qayta render. Effekt — `await` ga o'xshaydi, lekin component sync qoladi.
+NIMA UCHUN promise throw mexanizmi: declarative async. JavaScript'da `await` faqat async function ichida ishlaydi (suspends function execution). React component esa **sync function** — `await` ishlamaydi. Lekin `use(promise)` analog syntax beradi: component render "suspends" bo'ladi (throw orqali), Suspense boundary fallback ko'rsatadi, promise resolve bo'lgach — qayta render. Effekt — `await` ga o'xshaydi, lekin component sync qoladi.
 
 QANDAY ISHLAYDI: React Fiber render davomida har komponent render qilinishini "try" qiladi. Komponent throw qilsa — React error qiymatini tekshiradi. Agar bu Promise (thenable) bo'lsa — React Suspense logic ishga tushadi. Eng yaqin Suspense boundary topiladi, fallback ko'rsatiladi. Boundary `wakeable` (promise) ga `then` listener qo'shadi — promise resolve bo'lgach, boundary "wakes up" va children'ni qayta render qiladi.
 
@@ -479,7 +479,12 @@ function performWork(unitOfWork) {
     // Component render
     nextChildren = renderComponent(unitOfWork);
   } catch (thrownValue) {
-    if (typeof thrownValue.then === 'function') {
+    // Thenable check — null/string/number throw'lardan himoya (type guard MAJBURIY)
+    if (
+      thrownValue !== null &&
+      typeof thrownValue === 'object' &&
+      typeof thrownValue.then === 'function'
+    ) {
       // Thenable — Suspense logic
       const wakeable = thrownValue;
       const suspenseBoundary = findNearestSuspenseBoundary(unitOfWork);
@@ -508,13 +513,16 @@ Promise tracking — `trackUsedThenable`:
 
 ```javascript
 function use(usable) {
-  if (typeof usable.then === 'function') {
-    // Thenable (Promise)
-    return trackUsedThenable(usable);
-  }
-  if (usable && usable.$$typeof === REACT_CONTEXT_TYPE) {
-    // Context
-    return readContext(usable);
+  // Type guard MAJBURIY — null/primitive throw error oldini olish
+  if (usable !== null && typeof usable === 'object') {
+    if (typeof usable.then === 'function') {
+      // Thenable (Promise)
+      return trackUsedThenable(usable);
+    }
+    if (usable.$$typeof === REACT_CONTEXT_TYPE) {
+      // Context
+      return readContext(usable);
+    }
   }
   throw new Error('use() takes a Promise or Context');
 }
@@ -721,7 +729,7 @@ function Header({ showUser }: { showUser: boolean }) {
 
 NIMA UCHUN bu kerak: ko'p hollarda Context conditional kerak bo'ladi. `useContext` bilan early return qilib bo'lmaydi (hooks count o'zgaradi). `use(context)` bilan tabiiy yozish mumkin.
 
-QANDAY ISHLAYDI: Internal'da `use(context)` `readContext` abstract operation'ni chaqiradi (`useContext` ham shu operation'ni chaqiradi). Lekin `use()` Hook linked list pozitsiyasini ishlatmaydi — `readContext` Fiber'ning context dependencies field'iga yoziladi (`firstContextDependency`). Bu mexanizm pozitsion indexing'ga bog'liq emas — har joyda chaqirilishi mumkin.
+QANDAY ISHLAYDI: Internal'da `use(context)` `readContext` abstract operation'ni chaqiradi (`useContext` ham shu operation'ni chaqiradi). Lekin `use()` Hook linked list position'ni ishlatmaydi — `readContext` Fiber'ning context dependencies field'iga yoziladi (`firstContextDependency`). Bu mexanizm positional indexing'ga bog'liq emas — har joyda chaqirilishi mumkin.
 
 > **Versiya evolyutsiyasi (Conditional Context):**
 > - **Avval (R18 va eski):** `useContext` faqat top-level chaqiriladi. Conditional kerak bo'lsa, separate component yaratish kerak edi.
@@ -953,7 +961,7 @@ Bu pattern'ni `useContext` bilan amalga oshirish uchun 3 ta alohida component ke
 | `useContext(ctx)` | Top-level | Subscribes Fiber | Standard Context reading |
 | `use(ctx)` | Conditional ham | Subscribes Fiber | Conditional Context reading |
 
-`await` vs `use(promise)` — komponent kontekstida farq:
+`await` vs `use(promise)` — komponent context'ida farq:
 
 ```tsx
 // ❌ TAQIQ — client component sync function bo'lishi shart
@@ -1377,7 +1385,7 @@ Bir form ichida 3 ta `useFormStatus()` consumer — har biri o'z UI logic'iga eg
 4. **Optimistic feedback** — submit data ko'rsatish (preview)
 5. **Cancel button** — submit paytida cancel imkoni
 
-Har pattern bir xil hook'ni ishlatadi, lekin UI behavior farq qiladi. `pending` boolean asosiy signal — boshqa property'lar (`data`, `method`, `action`) qo'shimcha kontekst beradi.
+Har pattern bir xil hook'ni ishlatadi, lekin UI behavior farq qiladi. `pending` boolean asosiy signal — boshqa property'lar (`data`, `method`, `action`) qo'shimcha context beradi.
 
 **Submit button pattern** — eng oddiy va keng ishlatiladigan:
 
@@ -1967,7 +1975,7 @@ export function Counter() {
 
 ### Nazariya
 
-`useActionState` Server Actions bilan to'liq integratsiya qiladi. Server Action — `'use server'` directive bilan belgilangan async function (cross-ref [`39-rsc-server-actions.md`](39-rsc-server-actions.md)). Bu function client'dan chaqirilganda **server'da bajariladi** (RPC analog).
+`useActionState` Server Actions bilan to'liq integration qiladi. Server Action — `'use server'` directive bilan belgilangan async function (cross-ref [`39-rsc-server-actions.md`](39-rsc-server-actions.md)). Bu function client'dan chaqirilganda **server'da bajariladi** (RPC analog).
 
 ```tsx
 // app/actions.ts
@@ -2597,7 +2605,7 @@ QANDAY ISHLAYDI:
 - Success holat: `state` real qiymatga yangilanadi → `optimisticState` real `state` bilan moslashadi (sync).
 - Error holat: action throw qilsa, `state` o'zgarmaydi (parent yangilanmaydi). Optimistic queue tozalanadi → `optimisticState` eski `state`'ga qaytadi (rollback). **Lekin** error message'ni ko'rsatish uchun qo'shimcha state kerak (`useActionState` yoki `useState`) — `useOptimistic` o'zi error display qilmaydi.
 
-Bu **transition kontekstida ishlaydi** — `useOptimistic` `<form action>` yoki `startTransition` bilan birga. Transition tashqarida `addOptimistic` chaqirilsa, optimistic value darrov bekor bo'ladi (transition lifecycle bog'lanmagan — React optimistic queue'ni tozalashi uchun "transition complete" eventi yo'q).
+Bu **transition context'ida ishlaydi** — `useOptimistic` `<form action>` yoki `startTransition` bilan birga. Transition tashqarida `addOptimistic` chaqirilsa, optimistic value darrov bekor bo'ladi (transition lifecycle bog'lanmagan — React optimistic queue'ni tozalashi uchun "transition complete" eventi yo'q).
 
 ```tsx
 'use client';
@@ -3812,7 +3820,7 @@ function MyForm() {
 
 ### Gotcha 4: `useOptimistic` Transition tashqarida — error
 
-`useOptimistic` `addOptimistic` faqat **transition kontekstida** chaqirilishi kerak. `<form action>` ichida (R19 transition'ga wrap qiladi), `useTransition` ichida, yoki `startTransition` ichida.
+`useOptimistic` `addOptimistic` faqat **transition context'ida** chaqirilishi kerak. `<form action>` ichida (R19 transition'ga wrap qiladi), `useTransition` ichida, yoki `startTransition` ichida.
 
 ```tsx
 // ❌ Anti-pattern — onClick handler tashqarida
@@ -3945,7 +3953,7 @@ function LikeButton({ post }: { post: Post }) {
   const [optimistic, add] = useOptimistic(post, reducer);
   
   async function handleClick() {
-    add('toggle');  // ❌ Transition kontekstida emas
+    add('toggle');  // ❌ Transition context'ida emas
     await toggleLike(post.id);
   }
   
@@ -4259,7 +4267,7 @@ export function PostLikeButton({ post }: { post: Post }) {
 **Tushuntirish:**
 
 - `useOptimistic` reducer — current state'dan yangi state hisoblash (toggle logic).
-- `<form action>` — Transition kontekst (useOptimistic uchun majburiy).
+- `<form action>` — Transition context (useOptimistic uchun majburiy).
 - `aria-pressed` — accessibility (toggle button).
 - Server response keyin `post` props yangilanadi → optimistic real ga sync.
 - Error case'da React optimistic ni rollback qiladi.
@@ -4510,7 +4518,7 @@ Cross-references:
 
 - [`13-event-handling.md`](13-event-handling.md) — R19 `<form action>` evolyutsiyasi
 - [`19-usecontext.md`](19-usecontext.md) — `useContext` va `use(context)` farqi
-- [`22-concurrent-hooks.md`](22-concurrent-hooks.md) — `useTransition` (transition kontekst)
+- [`22-concurrent-hooks.md`](22-concurrent-hooks.md) — `useTransition` (transition context)
 - [`27-error-boundaries.md`](27-error-boundaries.md) — Error Boundary integration
 - [`29-suspense-lazy.md`](29-suspense-lazy.md) — Suspense chuqur
 - [`39-rsc-server-actions.md`](39-rsc-server-actions.md) — Server Actions implementation
