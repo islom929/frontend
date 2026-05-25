@@ -89,10 +89,10 @@ Pattern type va literal type farqi muhim. Pattern type — `string` yoki `number
 
 type Greeting = `Hello ${string}`;
 
-const a: Greeting = "Hello World";      // ✅ — "Hello " bilan boshlanadi
-const b: Greeting = "Hello";            // ❌ — "Hello " kerak (probel bilan)
-const c: Greeting = "Hello TypeScript"; // ✅
-const d: Greeting = "Hi World";         // ❌ — "Hello " bilan boshlanmaydi
+const validGreeting: Greeting = "Hello World";        // ✅ — "Hello " bilan boshlanadi
+const tooShort: Greeting = "Hello";                    // ❌ — "Hello " kerak (probel bilan)
+const fullGreeting: Greeting = "Hello TypeScript";    // ✅
+const wrongPrefix: Greeting = "Hi World";              // ❌ — "Hello " bilan boshlanmaydi
 
 // === Aniq literal type lar ===
 
@@ -102,21 +102,21 @@ type HelloWorld = `Hello ${World}`; // "Hello World" — aniq literal type
 // === number interpolation ===
 
 type Port = `port:${number}`;
-const p1: Port = "port:3000";  // ✅
-const p2: Port = "port:abc";   // ❌ — "abc" number emas
+const httpPort: Port = "port:3000";  // ✅
+const invalidPort: Port = "port:abc"; // ❌ — "abc" number emas
 
 // === boolean interpolation ===
 
 type Flag = `is_${boolean}`;
 // "is_true" | "is_false" — faqat ikki variant
-const f: Flag = "is_true";    // ✅
-const g: Flag = "is_yes";     // ❌
+const activeFlag: Flag = "is_true"; // ✅
+const invalidFlag: Flag = "is_yes"; // ❌
 
 // === Ko'p interpolation ===
 
 type Coordinate = `${number},${number}`;
-const coord: Coordinate = "10,20";   // ✅
-const bad: Coordinate = "10,abc";    // ❌
+const validCoord: Coordinate = "10,20";    // ✅
+const invalidCoord: Coordinate = "10,abc"; // ❌
 
 // === null/undefined ===
 
@@ -497,9 +497,9 @@ type Trimmed = Trim<"  hello world  ">;
 type Includes<S extends string, Sub extends string> =
   S extends `${string}${Sub}${string}` ? true : false;
 
-type Has1 = Includes<"Hello World", "World">; // true
-type Has2 = Includes<"Hello World", "world">; // false (case-sensitive)
-type Has3 = Includes<"TypeScript", "Java">;   // false
+type HasWorld = Includes<"Hello World", "World">;       // true
+type HasLowerWorld = Includes<"Hello World", "world">;  // false (case-sensitive)
+type HasJava = Includes<"TypeScript", "Java">;          // false
 
 // === Replace — birinchi occurrence ni almashtirish ===
 
@@ -546,9 +546,9 @@ type StartsWith<S extends string, Prefix extends string> =
 type EndsWith<S extends string, Suffix extends string> =
   S extends `${string}${Suffix}` ? true : false;
 
-type T1 = StartsWith<"TypeScript", "Type">; // true
-type T2 = EndsWith<"TypeScript", "Script">; // true
-type T3 = StartsWith<"TypeScript", "Java">; // false
+type StartsTypeScript = StartsWith<"TypeScript", "Type">;  // true
+type EndsTypeScript = EndsWith<"TypeScript", "Script">;    // true
+type StartsJava = StartsWith<"TypeScript", "Java">;        // false
 ```
 
 </details>
@@ -596,7 +596,7 @@ Input: type Getters<T> = { [K in keyof T as `get${Capitalize<string & K>}`]: () 
    { getName: () => string; getAge: () => number; getEmail: () => string }
 ```
 
-Har bir `K` uchun kompilator yangi template literal type yaratadi. Agar `T` da N ta key bo'lsa — N ta template literal instantiation bajariladi. Bu oddiy holatlarda tez, lekin juda ko'p key li type lar bilan sezilarli bo'lishi mumkin.
+Har bir `K` uchun kompilator yangi template literal type yaratadi. Agar `T` da N ta key bo'lsa — N ta template literal instantiation bajariladi. Bu oddiy holatlarda tez, lekin ko'p key li type lar (yuzdan ortiq property) bilan sezilarli bo'lishi mumkin.
 
 Type erasure: bu construct butunlay compile-time da ishlaydi. JS output da faqat oddiy object literal yoki class qoladi — `as`, `Capitalize`, mapped type iz ham qolmaydi.
 
@@ -752,7 +752,7 @@ console.log(obj.getName());
 
 ### Nazariya
 
-Template literal type lar event-driven system larda juda kuchli. Klassik pattern — object ning property nomi asosida `"propChanged"` kabi event name larni avtomatik yaratish va handler ning parametr type larini shu property type iga bog'lash.
+Template literal type lar event-driven system larda kuchli vosita. Klassik pattern — object ning property nomi asosida `"propChanged"` kabi event name larni avtomatik yaratish va handler ning parametr type larini shu property type iga bog'lash.
 
 Bu Node.js ning `EventEmitter`, DOM ning `addEventListener`, yoki React ning callback prop lari kabi API lar uchun type-safe wrapper yaratishda ishlatiladi.
 
@@ -1015,8 +1015,8 @@ type ParseRoute<S extends string> =
     : S extends `/${infer Segment}`
       ? Segment extends `:${infer Param}`
         ? { [K in Param]: string }
-        : {}
-      : {};
+        : Record<string, never>
+      : Record<string, never>;
 
 type RouteObj = ParseRoute<"/users/:userId/posts/:postId/comments/:commentId">;
 // { userId: string } & { postId: string } & { commentId: string }
@@ -1168,7 +1168,7 @@ const port = get(config, "db.port");
 
 ### Nazariya
 
-Template literal types ning real-world qo'llanilishi — BEM CSS class nomlari, API endpoint tiplashtirish, i18n kalit validatsiyasi, SQL query builder types. Bu pattern larning barchasi bir xil asosiy mexanizmga tayangan: template literal union distribution + pattern matching. Har bir pattern da compile-time da barcha mumkin bo'lgan kombinatsiyalar hosil qilinadi yoki string pattern validate qilinadi. Runtime da hech qanday overhead yaratmaydi — barcha tekshirish compile-time da amalga oshadi.
+Template literal types ning real-world qo'llanilishi — BEM CSS class nomlari, API endpoint tiplashtirish, i18n key validation, SQL query builder types. Bu pattern larning barchasi bir xil asosiy mexanizmga tayangan: template literal union distribution + pattern matching. Har bir pattern da compile-time da barcha mumkin bo'lgan kombinatsiyalar hosil qilinadi yoki string pattern validate qilinadi. Runtime da hech qanday overhead yaratmaydi — barcha tekshirish compile-time da amalga oshadi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -1187,11 +1187,11 @@ type BEMClass =
   | `${Block}--${Modifier}`
   | `${Block}__${Element}--${Modifier}`;
 
-const cls1: BEMClass = "button";                     // ✅
-const cls2: BEMClass = "button__icon";               // ✅
-const cls3: BEMClass = "card--primary";              // ✅
-const cls4: BEMClass = "modal__footer--disabled";    // ✅
-// const cls5: BEMClass = "button__unknown";          // ❌
+const blockClass: BEMClass = "button";                       // ✅
+const blockElementClass: BEMClass = "button__icon";          // ✅
+const blockModifierClass: BEMClass = "card--primary";        // ✅
+const fullClass: BEMClass = "modal__footer--disabled";        // ✅
+// const invalidClass: BEMClass = "button__unknown";          // ❌
 
 // Tailwind-style responsive prefix
 type Breakpoint = "sm" | "md" | "lg" | "xl";
@@ -1202,9 +1202,9 @@ type SpacingClass =
   | `${SpacingProp}-${SpacingValue}`
   | `${Breakpoint}:${SpacingProp}-${SpacingValue}`;
 
-const space: SpacingClass = "p-4";        // ✅
-const resp: SpacingClass = "md:mx-8";     // ✅
-// const bad: SpacingClass = "p-100";      // ❌ — 100 yo'q
+const padding4: SpacingClass = "p-4";          // ✅
+const responsiveMargin: SpacingClass = "md:mx-8"; // ✅
+// const tooLarge: SpacingClass = "p-100";        // ❌ — 100 yo'q
 ```
 
 **API Endpoint Typing:**
@@ -1487,7 +1487,7 @@ type CamelUser = CamelCaseKeys<SnakeUser>;
 
 ### Nazariya
 
-Template literal type lar juda kuchli, lekin kompilator performance ga ta'sir qilishi mumkin. Quyidagi cheklovlar va optimizatsiya qoidalarini bilish muhim.
+Template literal type lar kuchli vosita, lekin kompilator performance ga sezilarli ta'sir qilishi mumkin. Quyidagi cheklovlar va optimizatsiya qoidalarini bilish kerak.
 
 **1. Kartezian ko'paytma limiti:**
 
@@ -1502,17 +1502,17 @@ type TwoDigit = `${Digit}${Digit}`;
 // 10 × 10 × 10 = 1,000 — OK, lekin sekin
 type ThreeDigit = `${Digit}${Digit}${Digit}`;
 
-// 10 × 10 × 10 × 10 = 10,000 — juda sekin
+// 10 × 10 × 10 × 10 = 10,000 — kompilatsiya sezilarli sekinlashadi
 type FourDigit = `${Digit}${Digit}${Digit}${Digit}`;
 
 // 10^5 = 100,000 — limitga yaqin
 type FiveDigit = `${Digit}${Digit}${Digit}${Digit}${Digit}`;
-// ❌ Error yoki juda sekin
+// ❌ Error: "Expression produces a union type that is too complex to represent"
 ```
 
 **2. Recursive depth limiti:**
 
-Oddiy recursion da taxminan **50** depth ga ega. TS 4.5+ da tail-call optimization bilan bu **taxminan 1000** ga oshadi. Juda uzun string larni parse qilish kerak bo'lsa — depth limit ga duch kelish mumkin.
+Oddiy recursion da taxminan **50** depth ga ega. TS 4.5+ da tail-call optimization bilan bu **taxminan 1000** ga oshadi. Uzun string larni parse qilish kerak bo'lsa — depth limit ga duch kelish mumkin.
 
 **3. `string` va `number` bilan pattern type:**
 
@@ -1537,19 +1537,37 @@ type Color = "red" | "blue" | "green";
 type Size = "sm" | "md" | "lg";
 type CSSClass = `${Color}-${Size}`;  // 3 × 3 = 9 ta
 
-// ❌ Yomon — chuqur recursion depth cheklovsiz
-type DeepPath<T> = /* 10+ darajali nested object */;
+// ❌ Yomon — chuqur recursion depth cheklovsiz (10+ daraja nested object da
+//    "Type instantiation is excessively deep" error berishi mumkin)
+type UnboundedPaths<T> = T extends object
+  ? { [K in keyof T & string]: `${K}` | `${K}.${UnboundedPaths<T[K]> & string}` }[keyof T & string]
+  : never;
 
-// ✅ Yaxshi — depth ni cheklash
-type BoundedPath<T, Depth extends number = 5> = /* max 5 daraja */;
+// ✅ Yaxshi — depth parametr bilan cheklash
+type BoundedPaths<T, Depth extends number = 5, Acc extends unknown[] = []> =
+  Acc["length"] extends Depth
+    ? never
+    : T extends object
+      ? {
+          [K in keyof T & string]:
+            | `${K}`
+            | `${K}.${BoundedPaths<T[K], Depth, [...Acc, unknown]> & string}`
+        }[keyof T & string]
+      : never;
 
-// ❌ Yomon — bir expressions da juda ko'p union
-type Bad = `${SomeUnion}_${AnotherUnion}_${ThirdUnion}_${FourthUnion}`;
+// ❌ Yomon — bir expression da ko'p union (kartezian portlash)
+type BrandColor = "red" | "blue" | "green";
+type Shade = "light" | "dark";
+type SizeUnit = "sm" | "md" | "lg";
+type Variant = "solid" | "outline" | "ghost";
+
+type BadCombined = `${BrandColor}_${Shade}_${SizeUnit}_${Variant}`;
+// 3 × 2 × 3 × 3 = 54 ta member — bitta type alias da hisoblash sekin
 
 // ✅ Yaxshi — intermediate type alias lar bilan bosqichma-bosqich
-type Step1 = `${SomeUnion}_${AnotherUnion}`;
-type Step2 = `${Step1}_${ThirdUnion}`;
-type Good = `${Step2}_${FourthUnion}`;
+type ColorShade = `${BrandColor}_${Shade}`;          // 6 ta — kompilator cache qiladi
+type ColorShadeSize = `${ColorShade}_${SizeUnit}`;   // 18 ta
+type FinalCombined = `${ColorShadeSize}_${Variant}`; // 54 ta, lekin har bosqich alohida
 
 // === --generateTrace bilan diagnostika ===
 // tsc --generateTrace ./trace-output
@@ -1595,13 +1613,13 @@ type Mapped = {
 ### 3. `infer` bo'sh string ni ham olishi mumkin
 
 ```typescript
-type Test1 = ".abc" extends `${infer A}.${infer B}` ? [A, B] : never;
+type LeadingDot = ".abc" extends `${infer A}.${infer B}` ? [A, B] : never;
 // ["", "abc"] — A bo'sh string ""
 
-type Test2 = "." extends `${infer A}.${infer B}` ? [A, B] : never;
+type OnlyDot = "." extends `${infer A}.${infer B}` ? [A, B] : never;
 // ["", ""] — ikkalasi ham bo'sh string
 
-type Test3 = "" extends `${infer A}.${infer B}` ? [A, B] : never;
+type EmptyString = "" extends `${infer A}.${infer B}` ? [A, B] : never;
 // never — "." topilmadi, pattern mos kelmaydi
 ```
 
@@ -1621,13 +1639,13 @@ type WithNeverUnion = `${"a" | never}_end`;
 ### 5. `Capitalize` faqat birinchi harf — qolganlariga tegmaydi
 
 ```typescript
-type T1 = Capitalize<"helloWorld">;
+type CapCamel = Capitalize<"helloWorld">;
 // "HelloWorld" — faqat h → H, qolgan harflar o'zgarishsiz
 
-type T2 = Capitalize<"hello world">;
+type CapWithSpace = Capitalize<"hello world">;
 // "Hello world" — faqat birinchi "h" → "H", probel dan keyingi "w" kichik qoladi
 
-type T3 = Capitalize<"">;
+type CapEmpty = Capitalize<"">;
 // "" — bo'sh string o'zgarishsiz
 
 // Agar so'zlarni capitaliza qilish kerak bo'lsa — recursive type kerak
@@ -1636,8 +1654,8 @@ type CapitalizeWords<S extends string> =
     ? `${Capitalize<First>} ${CapitalizeWords<Rest>}`
     : Capitalize<S>;
 
-type T4 = CapitalizeWords<"hello world foo">;
-// "Hello World Foo"
+type AllCapWords = CapitalizeWords<"hello world example">;
+// "Hello World Example"
 ```
 
 ---
@@ -1664,13 +1682,13 @@ type GoodGetters<T> = {
 ### ❌ Xato 2: Kartezian ko'paytmaning kattaligini hisobga olmaslik
 
 ```typescript
-// ❌ Yomon — juda ko'p kombinatsiya
+// ❌ Yomon — kartezian portlash
 type Letter = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j"
             | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t"
             | "u" | "v" | "w" | "x" | "y" | "z";
 
 type ThreeLetterWord = `${Letter}${Letter}${Letter}`;
-// 26 × 26 × 26 = 17,576 ta member — kompilator sekinlashadi!
+// 26 × 26 × 26 = 17,576 ta member — kompilator sezilarli sekinlashadi
 
 // ✅ Yaxshi — cheklangan ro'yxat yoki `string` ishlatish
 type Word = string;
@@ -1752,7 +1770,7 @@ type ActionEvents = /* sizning yechimingiz */;
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```typescript
 type ActionEvents = `on${Capitalize<Actions>}`;
@@ -1773,18 +1791,18 @@ type ActionEvents = `on${Capitalize<Actions>}`;
 type Replace<S extends string, From extends string, To extends string> = /* ? */;
 
 // Test:
-type T1 = Replace<"Hello World", "World", "TypeScript">;
+type ReplacedTS = Replace<"Hello World", "World", "TypeScript">;
 // "Hello TypeScript"
 
-type T2 = Replace<"user name user", "user", "admin">;
+type ReplacedFirstUser = Replace<"user name user", "user", "admin">;
 // "admin name user" — faqat birinchi
 
-type T3 = Replace<"hello", "xyz", "abc">;
+type NoReplace = Replace<"hello", "xyz", "abc">;
 // "hello" — topilmadi, o'zgarishsiz
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```typescript
 type Replace<
@@ -1827,7 +1845,7 @@ type ProductAccessors = GetterSetterPair<Product>;
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```typescript
 type GetterSetterPair<T> = {
@@ -1851,24 +1869,24 @@ type GetterSetterPair<T> = {
 type ParseQueryString<S extends string> = /* ? */;
 
 // Test:
-type Q1 = ParseQueryString<"name=Ali&age=25">;
+type UserQuery = ParseQueryString<"name=Ali&age=25">;
 // { name: "Ali"; age: "25" }
 
-type Q2 = ParseQueryString<"page=1&limit=10&sort=name">;
+type PaginatedQuery = ParseQueryString<"page=1&limit=10&sort=name">;
 // { page: "1"; limit: "10"; sort: "name" }
 
-type Q3 = ParseQueryString<"key=value">;
+type SinglePair = ParseQueryString<"key=value">;
 // { key: "value" }
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```typescript
 type ParsePair<S extends string> =
   S extends `${infer Key}=${infer Value}`
     ? { [K in Key]: Value }
-    : {};
+    : Record<string, never>;
 
 type MergeIntersection<T> =
   { [K in keyof T]: T[K] };
@@ -1919,7 +1937,7 @@ type CamelResponse = CamelCaseKeys<ApiResponse>;
 ```
 
 <details>
-<summary>Javob</summary>
+<summary><strong>Javob</strong></summary>
 
 ```typescript
 type CamelCase<S extends string> =

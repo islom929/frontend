@@ -2,7 +2,7 @@
 
 > Advanced Generics — TypeScript'ning type-level programming imkoniyatlari: conditional types bilan type darajasida shartli logic, `infer` bilan type extraction, mapped types bilan type transformation, template literal types bilan string-level typing, recursive types va variadic tuples. Bu tushunchalar TypeScript'da murakkab, lekin type-safe abstraction'lar yaratish uchun asos bo'ladi.
 >
-> Bu bo'lim — advanced type system'ning **sayohat xaritasi**. Har mavzu alohida bo'lim'larda (12, 13, 14) chuqur ko'riladi; bu yerda esa ularning umumiy kontekstdagi ishlatilishini, o'zaro munosabatini, va real-world pattern'larda qanday birlashishini o'rganasiz.
+> Bu bo'lim advanced type system tushunchalarining **umumiy ko'rinishi**. Har mavzu alohida bo'lim'larda (12, 13, 14) chuqur ko'riladi; bu yerda esa ularning o'zaro munosabati va real-world pattern'larda qanday birlashishi o'rganiladi.
 
 ---
 
@@ -32,7 +32,7 @@
 
 Conditional type — type darajasida `if/else` logic. Sintaksis JavaScript ternary operatoriga (`? :`) o'xshaydi, lekin bu **type'lar** bilan ishlaydi, **qiymatlar** bilan emas:
 
-```
+```typescript
 T extends U ? TrueType : FalseType
 ```
 
@@ -62,7 +62,7 @@ Kompilator conditional type'ni ikki xil usulda evaluate qiladi:
 - **Resolved (darhol hisoblangan)** — `T` concrete type bo'lganda. Kompilator `T extends U` shartini darhol tekshiradi va true yoki false branch'ni tanlaydi. Natija — bitta aniq type.
 - **Deferred (keyinga qoldirilgan)** — `T` hali noma'lum type parameter bo'lganda (generic funksiya ichida). Kompilator bu conditional type'ni resolve qilmaydi, keyinroq — `T` concrete type bilan instantiate bo'lganda hisoblaydi.
 
-```
+```text
 Conditional type evaluation:
 
 IsString<string>  (T = string, concrete)
@@ -134,7 +134,7 @@ type IsNullable<T> = T extends null | undefined ? true : false;
 type N1 = IsNullable<string>;        // false
 type N2 = IsNullable<null>;           // true
 type N3 = IsNullable<undefined>;      // true
-type N4 = IsNullable<string | null>;  // boolean (distributive, pastda)
+type N4 = IsNullable<string | null>;  // boolean — distribution natijasi (Distributive Conditional Types section'iga qarang)
 
 // 5. Function check
 type IsFunction<T> = T extends (...args: any[]) => any ? true : false;
@@ -208,7 +208,7 @@ type C = ElementOf<boolean>;   // never — boolean array emas
 4. True branch'da U ishlatilsa — shu infer qilingan type bilan almashtiriladi
 5. Agar T mos kelmasa — false branch'ga o'tiladi
 
-```
+```text
 Pattern matching vizualizatsiya:
 
 T = Promise<string>
@@ -383,14 +383,14 @@ Distributive behavior — TypeScript'ning eng muhim built-in utility type'larini
 
 Kompilator conditional type'ni evaluate qilganda, avval check type'ning **naked type parameter** ekanligini tekshiradi. Agar `T` to'g'ridan-to'g'ri tursa — distribution mexanizmi ishga tushadi va union'ning har bir member'i uchun alohida evaluation qiladi.
 
-```
+```text
 Distributive jarayon:
 
 type ToArray<T> = T extends any ? T[] : never;
 
 ToArray<string | number>
   ↓
-(string | number) ni "distribute" qilamiz:
+(string | number) distribute qilinadi:
   - string extends any ? string[] : never → string[]
   - number extends any ? number[] : never → number[]
   ↓
@@ -515,7 +515,7 @@ type B = IsStringNonDist<string | number>;
 
 Kompilator conditional type'ni evaluate qilganda avval check type'ning **naked type parameter** ekanligini tekshiradi. `[T] extends [string]` yozganda, kompilator `T`'ni endi naked emas deb biladi — u tuple ichida wrapped. Natijada distribution mexanizmi ishlamaydi.
 
-```
+```text
 Non-distributive evaluation:
 
 type Check<T> = [T] extends [string] ? true : false;
@@ -641,11 +641,11 @@ type U3 = IsUnion<never>;            // false
 
 ### Nazariya
 
-Mapped type — mavjud object type'ning har bir property'sini **transform** qilish mexanizmi. `{ [K in keyof T]: NewType }` — T'ning barcha key'larini iterate qiladi va har property uchun yangi type yaratadi. Bu `Array.map()`'ning type-level versiyasi.
+Mapped type — mavjud object type'ning har bir property'sini **transform** qilish mexanizmi. `{ [K in keyof T]: NewType }` — T'ning barcha key'larini iterate qiladi va har property uchun yangi type yaratadi. Bu `Array.prototype.map`'ning type-level versiyasi:
 
-```
-Oddiy map: [1, 2, 3].map(x => x * 2) = [2, 4, 6]
-Type map: { a: string; b: number } → { a: boolean; b: boolean }
+```text
+Value-level map: [1, 2, 3].map(x => x * 2) = [2, 4, 6]
+Type-level map:  { a: string; b: number } → { a: boolean; b: boolean }
 ```
 
 **Asosiy sintaksis:**
@@ -670,7 +670,7 @@ type Mapped<T> = {
 
 Kompilator mapped type'ni qayta ishlaganda, avval `keyof T` yoki `in` dan keyin kelgan type'ni resolve qilib, **string literal union** hosil qiladi. Keyin bu union'ning har bir member'i uchun yangi property yaratiladi.
 
-```
+```text
 Mapped type evaluation:
 
 type MyPartial<T> = { [K in keyof T]?: T[K] };
@@ -862,7 +862,7 @@ type ClassName = `${Color}-${Size}`;
 
 Kompilator template literal type'ni compile-time'da to'liq construct qiladi. Har `${X}` placeholder uchun kompilator X'ning type'ini resolve qiladi — agar X string literal union bo'lsa, barcha kombinatsiyalar hosil qilinadi (Cartesian product).
 
-```
+```text
 Template literal evaluation:
 
 type T = `${Color}-${Size}`;
@@ -1036,22 +1036,24 @@ type NonTail<T extends string> =
     ? [C, ...NonTail<Rest>]   // Recursive call [C, ...] ichida — tail emas
     : [];
 
-// ✅ Tail — recursive call to'g'ridan-to'g'ri return (accumulator pattern)
-type Tail<N extends number, Acc extends 0[] = []> =
+// ✅ Tail-recursive — recursive call to'g'ridan-to'g'ri return (accumulator pattern)
+// (NOMLASH: bu yerda BuildTuple — "tail position" tail-call optimization'ga ishora,
+//  variadic tuple bo'limidagi Tail<T> (tuple dekompozitsiya) bilan aralashtirmang)
+type BuildTuple<N extends number, Acc extends 0[] = []> =
   Acc["length"] extends N
-    ? Acc                           // Base case
-    : Tail<N, [...Acc, 0]>;          // Tail call — return pozitsiyasida
+    ? Acc                                  // Base case
+    : BuildTuple<N, [...Acc, 0]>;          // Tail call — return pozitsiyasida
 ```
 
 **Accumulator pattern** — functional programming'dan kelgan texnika. Recursive call har iteration'da javoni "to'playdi" va oxirgi iteration'da to'plangan natijani qaytaradi:
 
-```
-Tail<3> — accumulator pattern:
+```text
+BuildTuple<3> — accumulator pattern:
 
-Call 1: Tail<3, []>         → Acc.length (0) !== 3 → Tail<3, [0]>
-Call 2: Tail<3, [0]>        → Acc.length (1) !== 3 → Tail<3, [0, 0]>
-Call 3: Tail<3, [0, 0]>     → Acc.length (2) !== 3 → Tail<3, [0, 0, 0]>
-Call 4: Tail<3, [0, 0, 0]>  → Acc.length (3) === 3 → return [0, 0, 0]
+Call 1: BuildTuple<3, []>         → Acc.length (0) !== 3 → BuildTuple<3, [0]>
+Call 2: BuildTuple<3, [0]>        → Acc.length (1) !== 3 → BuildTuple<3, [0, 0]>
+Call 3: BuildTuple<3, [0, 0]>     → Acc.length (2) !== 3 → BuildTuple<3, [0, 0, 0]>
+Call 4: BuildTuple<3, [0, 0, 0]>  → Acc.length (3) === 3 → return [0, 0, 0]
 ```
 
 Har qadamda natija accumulator ichida saqlanadi. Kompilator tail call'ni optimize qilib, stack frame'ni qayta ishlatadi — depth limit 1000'ga oshadi.
@@ -1233,7 +1235,7 @@ type B = Concat<[string], [number, boolean]>;  // [string, number, boolean]
 
 Kompilator variadic tuple type'ni compile-time'da resolve qiladi. `[...T, ...U]` ko'rganda, kompilator T va U tuple type'larining element type'larini chiqarib, yangi birlashtirilgan tuple type yaratadi.
 
-```
+```text
 Variadic tuple evaluation:
 
 type Concat<T, U> = [...T, ...U];
@@ -1446,7 +1448,7 @@ function getProp<T, K extends keyof T>(obj: T, key: K): T[K] {
 
 `T` avval kelib, keyin `K`'ning constraint'ida ishlatiladi. Tartib muhim — `<K, T>`'da `K` uchun `T` hali mavjud emas.
 
-**Pedagogic xulosa:** Constraint qoidasi oddiy — faqat **ishlatadigan xususiyatlarni** talab qiling. Bu principle "minimum coupling" ga asoslanadi — funksiya nima kerak bo'lsa, faqat shuni so'raydi, ortiqchasini emas.
+**Asosiy qoida:** Constraint faqat **ishlatadigan xususiyatlarni** talab qilsin. Bu "minimum coupling" printsipiga asoslanadi — funksiya nima kerak bo'lsa, faqat shuni so'raydi, ortiqchasini emas.
 
 </details>
 
@@ -1568,7 +1570,7 @@ Bu pattern'lar ko'pincha **type-level** va **runtime-level** ni birlashtiradi �
 
 **Complex generic chain'larning cost'i:** Murakkab generic pattern'lar kompilator uchun **type instantiation cost** yaratadi. Har generic funksiya call'da kompilator yangi type instantiation yaratadi. Chuqur generic chain'larda (masalan, `api<Path, Method>` ichida nested conditional type'lar bilan) bu instantiation'lar ko'payib ketadi.
 
-```
+```text
 Type instantiation chain (API example):
 
 api("/users", "GET")
@@ -1581,7 +1583,7 @@ api("/users", "GET")
 Har qadam — yangi instantiation
 ```
 
-**Pedagogic xulosa:** Murakkab generic chain'lar compile vaqtini sekinlashtiradi. Katta loyihalarda `tsc --diagnostics` bilan `Type Count` va `Instantiation count` metric'larini kuzatish muhim. Agar compilation sekin bo'lsa:
+**Amaliy xulosa:** Murakkab generic chain'lar compile vaqtini sekinlashtiradi. Katta loyihalarda `tsc --diagnostics` bilan `Type Count` va `Instantiation count` metric'larini kuzatish muhim. Agar compilation sekin bo'lsa:
 
 1. **Simplify constraint'lar** — keraksiz extends'larni olib tashlash
 2. **Split types** — bir katta generic tiplagan o'rniga, bir nechta kichiklari
@@ -1771,7 +1773,7 @@ function object<T extends Record<string, Validator<unknown>>>(
     }
 
     return errors.length === 0
-      ? { valid: true, value: result as any }
+      ? { valid: true, value: result as { [K in keyof T]: T[K] extends Validator<infer U> ? U : never } }
       : { valid: false, errors };
   };
 }
@@ -2309,7 +2311,7 @@ type B = "a" | "b" | "c";
 // Natija: "a" | "b" | "c"
 
 type C = true;
-// string | number bilan ExcludE:
+// string | number bilan Exclude:
 // "a", "b", "c" string → never
 // 1, 2 number → never
 // true — string ham, number ham emas → true
@@ -2461,7 +2463,7 @@ Bu pattern React Router v6, Next.js, Remix kabi framework'larda ishlatiladi. Tem
 
 ## Xulosa
 
-Bu bo'limda TypeScript'ning advanced type-level programming imkoniyatlarini o'rgandik:
+Bu bo'limda TypeScript'ning advanced type-level programming imkoniyatlari ko'rib chiqildi:
 
 **Asosiy tushunchalar:**
 

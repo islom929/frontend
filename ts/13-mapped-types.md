@@ -81,7 +81,7 @@ T = { name: string; age: number; active: boolean }
 
 **Internal mexanizm:** Kompilator mapped type node'ni qayta ishlaganda, key source'ni union'ga resolve qiladi va har bir member uchun alohida property instantiation yaratadi. Har property uchun value type alohida evaluate bo'ladi — agar conditional type yoki generic ishlatilsa, har iteration'da mustaqil computation.
 
-**Homomorphic detection:** Kompilator mapped type'ni qayta ishlayotganda key source'ni tekshiradi. Agar key source aynan `keyof T` bo'lsa (T — qandaydir type parameter), mapped type homomorphic deb belgilanadi va T'dagi modifier'lar (readonly, optional) natijaga tarqatiladi. Agar key source boshqa narsa bo'lsa (string literal union, `keyof any`, etc.), non-homomorphic — modifier'lar yo'qoladi.
+**Homomorphic detection:** Kompilator mapped type'ni qayta ishlayotganda key source'ni tekshiradi. Agar key source aynan `keyof T` bo'lsa (T — qandaydir type parameter), mapped type homomorphic deb belgilanadi va T'dagi modifier'lar (readonly, optional) natijaga tarqatiladi. Agar key source boshqa narsa bo'lsa (string literal union, `keyof any`, va boshqalar), non-homomorphic — modifier'lar yo'qoladi.
 
 **Runtime'da iz yo'q:** Mapped types compile-time construct. JavaScript output'da hech qanday iz qolmaydi — barcha transform'lar type system ichida. Runtime immutability yoki validation uchun bu type'lar yaramaydi — faqat compile-time type safety.
 
@@ -212,11 +212,11 @@ type KeyOfType<T, V> = {
 type A = keyof { a: 1; b: 2 };          // "a" | "b"
 
 // Index signature bilan
-type B = keyof { [key: string]: any }; // string | number
-// ❗ string | number — JavaScript'da obj[0] === obj["0"]
+type B = keyof { [key: string]: unknown }; // string | number
+// Diqqat: string | number — JavaScript'da obj[0] === obj["0"]
 // Number index'lar ham string'ga aylanadi
 
-type C = keyof { [key: number]: any }; // number
+type C = keyof { [key: number]: unknown }; // number
 
 // Array
 type D = keyof string[]; // number | "length" | "toString" | ...
@@ -265,7 +265,7 @@ type First = Tuple[0];  // string
 type Second = Tuple[1]; // number
 ```
 
-Array'da aniq index ishlatilsa — `string` literal access ishlaydi, lekin runtime'da bu boshqa property (array[0] === array["0"]).
+Array'da aniq index ishlatilsa (`Arr[0]`) — element type qaytadi. Runtime'da `array[0]` va `array["0"]` aynan bir xil property — JavaScript number key'larni stringga aylantiradi. TypeScript bu equivalence'ni `string | number` qaytarish orqali aks ettiradi.
 
 </details>
 
@@ -1042,7 +1042,7 @@ type DeepReadonlyFixed<T> =
   T;
 ```
 
-**Nima uchun `Function` anti-pattern:** `Function` type `lib.es5.d.ts`'da `{ apply, call, bind, ... }` declare qilingan, lekin u `(...args: any[]) => any` callable signature'siz. Bu means `Function` type'i har qanday object'ga assignable (chunki har object `apply`, `call`, `bind` method'lariga ega bo'lishi mumkin). ESLint `@typescript-eslint/ban-types` rule'i `Function` type'dan voz kechishni tavsiya qiladi.
+**Nima uchun `Function` anti-pattern:** `Function` type `lib.es5.d.ts`'da `{ apply, call, bind, name, length, ... }` shape'ida declare qilingan, lekin **inferable callable signature**'ga ega emas — ya'ni parametr va return type'lari noma'lum. Shu sababli `Function` type'idagi qiymatni chaqirsangiz, kompilator argument'larni tekshira olmaydi va return `any` deb hisoblaydi, type safety yo'qoladi. ESLint `@typescript-eslint/no-unsafe-function-type` rule'i bu pattern'ni taqiqlaydi (v8+). Tavsiya: aniq `(...args: any[]) => any` (yoki yanada aniq signature) ishlatish.
 
 </details>
 
@@ -1797,9 +1797,9 @@ type NumberProps<T> = Pick<T, NumberKeys<T>>;
 Index signature bilan object'da `keyof` `string | number` qaytaradi (symbol emas, lekin number ham).
 
 ```typescript
-type IndexedObj = { [key: string]: any };
+type IndexedObj = { [key: string]: unknown };
 type Keys = keyof IndexedObj; // string | number
-// ❗ number ham keladi — nima uchun?
+// Diqqat: number ham keladi — nima uchun?
 ```
 
 **Sabab:** JavaScript'da object key'lar internal'da string'ga aylantiriladi — `obj[0]` va `obj["0"]` teng. TypeScript bu behavior'ni aks ettirish uchun `string | number` qaytaradi, developer number index ham ishlata olishi uchun.
@@ -1811,7 +1811,7 @@ obj["0"] = "b";  // ✅ string index (aynan bir xil property)
 console.log(obj[0]); // "b" — bir xil
 ```
 
-**`{ [key: number]: any }`** — faqat `number` qaytaradi. `{ [key: symbol]: any }` — faqat `symbol`.
+**`{ [key: number]: unknown }`** — faqat `number` qaytaradi. `{ [key: symbol]: unknown }` — faqat `symbol`.
 
 ### 2. `-?` `undefined` Olib Tashlaydi (TS 2.8+), Lekin Faqat Optional'da
 
@@ -1828,7 +1828,7 @@ type Req = Required<Example>;
 // {
 //   a: string;
 //   b: string;             // ✅ -? undefined ham olib tashladi
-//   c: string | undefined; // ❗ -? hech narsa qilmadi, | undefined qoldi
+//   c: string | undefined; // Diqqat: -? hech narsa qilmadi, | undefined qoldi
 // }
 ```
 
@@ -1941,7 +1941,7 @@ type SafeDeep<T> = {
 };
 ```
 
-**Nima uchun `Function` type ishlatmaslik:** `T[K] extends Function` TypeScript'da anti-pattern — `Function` type `{ apply, call, bind, ... }` ga ekvivalent, lekin callable signature yo'q. ESLint `@typescript-eslint/ban-types` rule'i buni taqiqlaydi. `(...args: any[]) => any` proper callable signature — aniqroq va tip-safe.
+**Nima uchun `Function` type ishlatmaslik:** `T[K] extends Function` TypeScript'da anti-pattern — `Function` type `{ apply, call, bind, ... }` ga ekvivalent, lekin callable signature yo'q. ESLint `@typescript-eslint/no-unsafe-function-type` rule'i buni taqiqlaydi (v8+; eski v7 da `ban-types` ichida edi). `(...args: any[]) => any` proper callable signature — aniqroq va tip-safe.
 
 ---
 
@@ -2056,7 +2056,7 @@ type FixedDeep<T> = {
 };
 ```
 
-**Nima uchun:** `Function extends object === true` — funksiya ham object. Function check'siz mapped type function ichiga ham kirib ketadi. `(...args: any[]) => any` proper callable signature.
+**Nima uchun:** `Function` `object` ga extends qiladi — funksiya ham object. Function check'siz mapped type function ichiga ham kirib ketadi. `(...args: any[]) => any` proper callable signature.
 
 ---
 

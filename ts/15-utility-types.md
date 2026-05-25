@@ -1,6 +1,6 @@
 # Bo'lim 15: Built-in Utility Types
 
-> Built-in utility types — TypeScript ning type tizimi uchun "standard library" si. Bular tayyor type transformation lar bo'lib, tez-tez uchraydigan type operatsiyalarini qisqacha yozish imkonini beradi. Barchasi oldingi bo'limlarda o'rganilgan tushunchalar asosida qurilgan: [mapped types](13-mapped-types.md) (`Partial`, `Required`, `Readonly`, `Record`, `Pick`, `Omit`), [conditional types](12-conditional-types.md) (`Exclude`, `Extract`, `NonNullable`, `ReturnType`, `Parameters`, `Awaited`), va [template literal types](14-template-literal-types.md) (`Uppercase`, `Lowercase`, `Capitalize`, `Uncapitalize` — [Bo'lim 14](14-template-literal-types.md#string-manipulation-types) da yoritilgan). Har bir utility type uchun: **nima qiladi**, **ichki implementatsiya**, **real-world use case**, va **gotchas**.
+> Built-in utility types — TypeScript type system'ning "standard library"'si. Bular tayyor type transformation'lar bo'lib, tez-tez uchraydigan type operatsiyalarini qisqacha yozish imkonini beradi. Barchasi oldingi bo'limlarda o'rganilgan tushunchalar asosida qurilgan: [mapped types](13-mapped-types.md) (`Partial`, `Required`, `Readonly`, `Record`, `Pick`, `Omit`), [conditional types](12-conditional-types.md) (`Exclude`, `Extract`, `NonNullable`, `ReturnType`, `Parameters`, `Awaited`), va [template literal types](14-template-literal-types.md) (`Uppercase`, `Lowercase`, `Capitalize`, `Uncapitalize` — [Bo'lim 14](14-template-literal-types.md#string-manipulation-types)'da yoritilgan). Har bir utility type uchun: **nima qiladi**, **ichki implementation**, **real-world use case**, va **gotchas**.
 
 ---
 
@@ -41,28 +41,28 @@
 
 ### Nazariya
 
-Bu guruh — [mapped types](13-mapped-types.md) asosida qurilgan utility type lar. Object type ning property larini transform qiladi: optional/required, readonly/mutable, key tanlash/olib tashlash. Barchasi [homomorphic mapped type](13-mapped-types.md) — original type ning modifier larini saqlab qoladi (`Record` bundan mustasno — u non-homomorphic).
+Bu guruh — [mapped types](13-mapped-types.md) asosida qurilgan utility type'lar. Object type'ning property'larini transform qiladi: optional/required, readonly/mutable, key tanlash/olib tashlash. Barchasi [homomorphic mapped type](13-mapped-types.md) — original type'ning modifier'larini saqlab qoladi (`Record` bundan mustasno — u non-homomorphic).
 
 ---
 
 ### `Partial<T>`
 
-`Partial<T>` — object type `T` ning **barcha property larini optional** (`?`) qiladi. Ya'ni har bir property berilmasligi mumkin.
+`Partial<T>` — object type `T`'ning **barcha property'larini optional** (`?`) qiladi. Ya'ni har bir property berilmasligi mumkin.
 
-**Qachon ishlatiladi:** Eng ko'p `update` funksiyalarda — faqat o'zgargan field larni berish uchun.
+**Qachon ishlatiladi:** Eng ko'p `update` funksiyalarda — faqat o'zgargan field'larni berish uchun.
 
 **Implementation:**
 
 ```typescript
-// lib.es5.d.ts da:
+// lib.es5.d.ts'da:
 type Partial<T> = {
   [P in keyof T]?: T[P];
 };
 ```
 
-Bu homomorphic mapped type — original type ning `readonly` modifier larini saqlab qoladi.
+Bu homomorphic mapped type — original type'ning `readonly` modifier'larini saqlab qoladi.
 
-**Gotcha:** Shallow — faqat top-level property lar optional. Nested object lar to'liq qoladi. Deep partial uchun custom type kerak ([Bo'lim 16](16-custom-utility-types.md)).
+**Gotcha:** Shallow — faqat top-level property'lar optional. Nested object'lar to'liq qoladi. Deep partial uchun custom type kerak ([Bo'lim 16](16-custom-utility-types.md)).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -75,7 +75,7 @@ interface User {
   age: number;
 }
 
-// Update funksiyasi — faqat o'zgargan field lar
+// Update funksiyasi — faqat o'zgargan field'lar
 function updateUser(id: number, updates: Partial<User>): User {
   const current = getUserById(id);
   return { ...current, ...updates };
@@ -85,11 +85,11 @@ updateUser(1, { name: "Ali" });         // ✅ faqat name
 updateUser(1, { age: 30, email: "a" }); // ✅ ikki field
 updateUser(1, {});                      // ✅ hech narsa
 
-// ❗ Partial barcha field larni optional qiladi, shu jumladan kerak bo'lganlarni
+// Diqqat: Partial barcha field'larni optional qiladi, shu jumladan kerak bo'lganlarni
 type PartialUser = Partial<User>;
 const user: PartialUser = {}; // ✅ — id ham yo'q! Xavfli bo'lishi mumkin
 
-// Yechim — ba'zi field larni required qoldirib, qolganini optional qilish:
+// Yechim — ba'zi field'larni required qoldirib, qolganini optional qilish:
 type UpdateUser = Partial<User> & Pick<User, "id">;
 // id majburiy, qolganlar optional
 
@@ -112,9 +112,9 @@ type PartialConfig = Partial<Config>;
 
 ### `Required<T>`
 
-`Required<T>` — `Partial` ning teskari amali. **Barcha optional property larni required** qiladi. `-?` modifier bilan optional marker ni olib tashlaydi.
+`Required<T>` — `Partial`'ning teskari amali. **Barcha optional property'larni required** qiladi. `-?` modifier bilan optional marker'ni olib tashlaydi.
 
-**Qachon ishlatiladi:** Default qiymatlar qo'yilgandan keyin, config object ning to'liq ekanini kafolatlash uchun.
+**Qachon ishlatiladi:** Default qiymatlar qo'yilgandan keyin, config object'ning to'liq ekanini kafolatlash uchun.
 
 **Implementation:**
 
@@ -124,9 +124,9 @@ type Required<T> = {
 };
 ```
 
-`-?` — optional marker ni olib tashlaydi. `readonly` modifier saqlanadi (homomorphic).
+`-?` — optional marker'ni olib tashlaydi. `readonly` modifier saqlanadi (homomorphic).
 
-**Gotcha:** `-?` faqat optional MARKER (`?`) ni olib tashlaydi — value type dagi `| undefined` ni OLIB TASHLAMAYDI.
+**Gotcha:** `-?` optional marker (`?`) tufayli implicit qo'shilgan `undefined`'ni olib tashlaydi (TS 2.8+), lekin **explicit `| undefined` union** value type'da yozilgan bo'lsa — uni olib tashlamaydi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -139,7 +139,7 @@ interface Options {
   baseUrl?: string;
 }
 
-// Default lar bilan merge qilgandan keyin — hammasi required
+// Default'lar bilan merge qilgandan keyin — hammasi required
 function createClient(opts: Options): Required<Options> {
   return {
     debug: false,
@@ -154,7 +154,7 @@ const client = createClient({ timeout: 10000 });
 client.debug;    // boolean — optional emas, aniq mavjud
 client.retries;  // number — aniq mavjud
 
-// ❗ -? va | undefined farqi
+// Diqqat: -? va | undefined farqi
 interface Form {
   name?: string;              // optional (? marker)
   phone: string | undefined;  // required lekin undefined bo'lishi mumkin
@@ -163,7 +163,7 @@ interface Form {
 type RequiredForm = Required<Form>;
 // {
 //   name: string;                // ✅ ? olib tashlandi, undefined ham ketdi
-//   phone: string | undefined;   // ❗ qoldi — | undefined union da edi, ? yo'q edi
+//   phone: string | undefined;   // Diqqat: qoldi — explicit | undefined union'da edi, ? yo'q edi
 // }
 ```
 
@@ -173,9 +173,9 @@ type RequiredForm = Required<Form>;
 
 ### `Readonly<T>`
 
-`Readonly<T>` — barcha property larga `readonly` modifier qo'shadi. Property qiymatlari faqat o'qilishi mumkin, o'zgartirib bo'lmaydi.
+`Readonly<T>` — barcha property'larga `readonly` modifier qo'shadi. Property qiymatlari faqat o'qilishi mumkin, o'zgartirib bo'lmaydi.
 
-**Qachon ishlatiladi:** Immutable data pattern larda, state management da (Redux store), config object larda.
+**Qachon ishlatiladi:** Immutable data pattern'larda, state management'da (Redux store), config object'larda.
 
 **Implementation:**
 
@@ -185,7 +185,7 @@ type Readonly<T> = {
 };
 ```
 
-**Gotcha:** Shallow — faqat top-level property lar readonly. Nested object va array lar mutable qoladi. Deep readonly uchun custom type kerak ([Bo'lim 16](16-custom-utility-types.md)).
+**Gotcha:** Shallow — faqat top-level property'lar readonly. Nested object va array'lar mutable qoladi. Deep readonly uchun custom type kerak ([Bo'lim 16](16-custom-utility-types.md)).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -196,10 +196,10 @@ type Readonly<T> = {
 |-----------|--------------|------------|
 | Depth | Shallow | Deep (recursive) |
 | Literal types | Saqlanmaydi | Saqlanadi |
-| Array | Property `readonly`, lekin element lar mutable | `readonly ["a", "b"]` tuple |
+| Array | Property `readonly`, lekin element'lar mutable | `readonly ["a", "b"]` tuple |
 | Runtime | ❌ | ❌ |
 
-`Readonly` compile-time construct — runtime da hech qanday himoya yo'q. `Object.freeze()` bilan birgalikda ishlatish runtime himoya beradi, lekin `Object.freeze` ham shallow.
+`Readonly` compile-time construct — runtime'da hech qanday himoya yo'q. `Object.freeze()` bilan birgalikda ishlatish runtime himoya beradi, lekin `Object.freeze` ham shallow.
 
 </details>
 
@@ -245,9 +245,9 @@ config.tags.push("staging");              // ⚠️ ✅ — array mutable!
 
 ### `Record<K, V>`
 
-`Record<K, V>` — berilgan key type (`K`) va value type (`V`) dan object type yaratadi. Bu mapped type, lekin **non-homomorphic** — ya'ni original type ning modifier larini saqlamaydi.
+`Record<K, V>` — berilgan key type (`K`) va value type (`V`)'dan object type yaratadi. Bu mapped type, lekin **non-homomorphic** — ya'ni original type'ning modifier'larini saqlamaydi.
 
-**Qachon ishlatiladi:** Dictionary/map yaratish, enum dan object yaratish, key-value mapping.
+**Qachon ishlatiladi:** Dictionary/map yaratish, enum'dan object yaratish, key-value mapping.
 
 **Implementation:**
 
@@ -258,7 +258,7 @@ type Record<K extends keyof any, T> = {
 // keyof any = string | number | symbol
 ```
 
-`keyof T` dan emas, mustaqil `K` dan key oladi — shuning uchun non-homomorphic.
+`keyof T`'dan emas, mustaqil `K`'dan key oladi — shuning uchun non-homomorphic.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -271,7 +271,7 @@ const users: UserMap = {
   "user-2": { id: 2, name: "Vali", email: "v@b.com", age: 30 },
 };
 
-// === Enum dan config ===
+// === Enum'dan config ===
 type Theme = "light" | "dark" | "system";
 type ThemeConfig = Record<Theme, { bg: string; fg: string }>;
 
@@ -280,7 +280,7 @@ const themes: ThemeConfig = {
   dark:   { bg: "#000", fg: "#fff" },
   system: { bg: "auto", fg: "auto" },
 };
-// ❗ Har bir Theme uchun config MAJBURIY — birini tushirib qoldirsa xato
+// Diqqat: Har bir Theme uchun config MAJBURIY — birini tushirib qoldirsa xato
 
 // === Status mapping ===
 type StatusCode = 200 | 404 | 500;
@@ -303,7 +303,7 @@ type Dict2 = Record<string, number>;
 // Lekin aniq union key bilan:
 type Specific = Record<"a" | "b" | "c", number>;
 // { a: number; b: number; c: number }
-// ❗ Barcha key lar MAJBURIY
+// Diqqat: Barcha key'lar MAJBURIY
 ```
 
 </details>
@@ -312,7 +312,7 @@ type Specific = Record<"a" | "b" | "c", number>;
 
 ### `Pick<T, K>`
 
-`Pick<T, K>` — object type `T` dan faqat tanlangan property larni (`K`) oladi. Yangi type faqat shu key larga ega.
+`Pick<T, K>` — object type `T`'dan faqat tanlangan property'larni (`K`) oladi. Yangi type faqat shu key'larga ega.
 
 **Implementation:**
 
@@ -322,7 +322,7 @@ type Pick<T, K extends keyof T> = {
 };
 ```
 
-`K extends keyof T` — faqat `T` da mavjud key larni qabul qiladi (strict).
+`K extends keyof T` — faqat `T`'da mavjud key'larni qabul qiladi (strict).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -336,11 +336,11 @@ interface User {
   createdAt: Date;
 }
 
-// API response dan password ni olib tashlash
+// API response'dan password'ni olib tashlash
 type PublicUser = Pick<User, "id" | "name" | "email">;
 // { id: number; name: string; email: string }
 
-// Form uchun kerakli field lar
+// Form uchun kerakli field'lar
 type LoginForm = Pick<User, "email" | "password">;
 // { email: string; password: string }
 
@@ -351,10 +351,10 @@ type UserCardProps = Pick<User, "name" | "email"> & {
 
 // === Pick vs Omit — Qachon Qaysi Biri ===
 
-// 10 ta field dan 2 tasini OLMOQCHI — Pick qulayroq
+// 10 ta field'dan 2 tasini OLMOQCHI — Pick qulayroq
 type Short = Pick<User, "id" | "name">;
 
-// 10 ta field dan 2 tasini OLIB TASHLAMOQCHI — Omit qulayroq
+// 10 ta field'dan 2 tasini OLIB TASHLAMOQCHI — Omit qulayroq
 type WithoutSensitive = Omit<User, "password" | "createdAt">;
 ```
 
@@ -364,7 +364,7 @@ type WithoutSensitive = Omit<User, "password" | "createdAt">;
 
 ### `Omit<T, K>`
 
-`Omit<T, K>` — `Pick` ning teskari amali. Object type dan tanlangan property larni **olib tashlaydi**. Qolgan barcha property lar saqlanadi.
+`Omit<T, K>` — `Pick`'ning teskari amali. Object type'dan tanlangan property'larni **olib tashlaydi**. Qolgan barcha property'lar saqlanadi.
 
 **Implementation:**
 
@@ -372,9 +372,9 @@ type WithoutSensitive = Omit<User, "password" | "createdAt">;
 type Omit<T, K extends keyof any> = Pick<T, Exclude<keyof T, K>>;
 ```
 
-Ichida `Pick` va `Exclude` ishlatiladi: avval `keyof T` dan `K` ni chiqaradi, keyin qolgan key lar bilan `Pick` qiladi.
+Ichida `Pick` va `Exclude` ishlatiladi: avval `keyof T`'dan `K`'ni chiqaradi, keyin qolgan key'lar bilan `Pick` qiladi.
 
-**Muhim farq:** `Pick` da `K extends keyof T` (faqat mavjud key lar), `Omit` da `K extends keyof any` (mavjud bo'lmagan key ham qabul qilinadi — typo tutmaydi!).
+**Muhim farq:** `Pick`'da `K extends keyof T` (faqat mavjud key'lar), `Omit`'da `K extends keyof any` (mavjud bo'lmagan key ham qabul qilinadi — typo tutmaydi!).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -388,21 +388,21 @@ interface User {
   createdAt: Date;
 }
 
-// Sensitive field larni olib tashlash
+// Sensitive field'larni olib tashlash
 type SafeUser = Omit<User, "password">;
 // { id: number; name: string; email: string; createdAt: Date }
 
-// Create uchun — id va createdAt server da yaratiladi
+// Create uchun — id va createdAt server'da yaratiladi
 type CreateUserDto = Omit<User, "id" | "createdAt">;
 // { name: string; email: string; password: string }
 
-// Extending — mavjud type ni kengaytirish
+// Extending — mavjud type'ni kengaytirish
 type Admin = Omit<User, "createdAt"> & {
   role: "admin" | "superadmin";
   permissions: string[];
 };
 
-// ❗ Omit mavjud bo'lmagan key ni ham qabul qiladi — typo xavfi
+// Diqqat: Omit mavjud bo'lmagan key'ni ham qabul qiladi — typo xavfi
 type Wrong = Omit<User, "pasword">;  // ✅ — xato bermaydi, lekin typo!
 
 // Yechim — strict Omit yaratish:
@@ -418,13 +418,13 @@ type StrictOmit<T, K extends keyof T> = Omit<T, K>;
 
 ### Nazariya
 
-Bu guruh — [conditional types](12-conditional-types.md) asosida qurilgan. Union type dan member larni filtrlash va chiqarish uchun ishlatiladi. Barchasi **distributive conditional type** — union ning har bir member i alohida tekshiriladi.
+Bu guruh — [conditional types](12-conditional-types.md) asosida qurilgan. Union type'dan member'larni filtrlash va chiqarish uchun ishlatiladi. Barchasi **distributive conditional type** — union'ning har bir member'i alohida tekshiriladi.
 
 ---
 
 ### `Exclude<T, U>`
 
-`Exclude<T, U>` — union type `T` dan `U` ga assignable bo'lgan member larni **chiqaradi** (olib tashlaydi). Qolgan member lar qoladi.
+`Exclude<T, U>` — union type `T`'dan `U`'ga assignable bo'lgan member'larni **chiqaradi** (olib tashlaydi). Qolgan member'lar qoladi.
 
 **Implementation:**
 
@@ -432,7 +432,7 @@ Bu guruh — [conditional types](12-conditional-types.md) asosida qurilgan. Unio
 type Exclude<T, U> = T extends U ? never : T;
 ```
 
-Distributive conditional type — union har bir member i alohida tekshiriladi. Agar member `U` ga extend qilsa → `never` (chiqariladi), aks holda → qoladi.
+Distributive conditional type — union har bir member'i alohida tekshiriladi. Agar member `U`'ga extend qilsa → `never` (chiqariladi), aks holda → qoladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -477,14 +477,14 @@ type T2 = Exclude<"a" | "b" | "c", "a" | "b">;
 type T3 = Exclude<string | number | boolean, string>;
 // number | boolean
 
-// === Real-world: mavjud event lardan ba'zilarini chiqarish ===
+// === Real-world: mavjud event'lardan ba'zilarini chiqarish ===
 type AllEvents = "click" | "scroll" | "keypress" | "mousemove" | "resize";
 type MouseEvents = "click" | "mousemove";
 
 type NonMouseEvents = Exclude<AllEvents, MouseEvents>;
 // "scroll" | "keypress" | "resize"
 
-// === Discriminated union da ===
+// === Discriminated union'da ===
 type Shape =
   | { kind: "circle"; radius: number }
   | { kind: "square"; side: number }
@@ -500,7 +500,7 @@ type NonCircle = Exclude<Shape, { kind: "circle" }>;
 
 ### `Extract<T, U>`
 
-`Extract<T, U>` — `Exclude` ning teskari amali. Union type `T` dan **faqat `U` ga assignable bo'lgan** member larni ajratib oladi.
+`Extract<T, U>` — `Exclude`'ning teskari amali. Union type `T`'dan **faqat `U`'ga assignable bo'lgan** member'larni ajratib oladi.
 
 **Implementation:**
 
@@ -518,7 +518,7 @@ type T1 = Extract<"a" | "b" | "c", "a" | "c">;
 type T2 = Extract<string | number | boolean, string | boolean>;
 // string | boolean
 
-// === Discriminated union da ma'lum shape larni olish ===
+// === Discriminated union'da ma'lum shape'larni olish ===
 type Shape =
   | { kind: "circle"; radius: number }
   | { kind: "square"; side: number }
@@ -527,7 +527,7 @@ type Shape =
 type RoundShapes = Extract<Shape, { kind: "circle" }>;
 // { kind: "circle"; radius: number }
 
-// === Function type larni ajratish ===
+// === Function type'larni ajratish ===
 type Mixed = string | number | (() => void) | ((x: number) => string);
 
 type Functions = Extract<Mixed, (...args: any[]) => any>;
@@ -540,19 +540,21 @@ type Functions = Extract<Mixed, (...args: any[]) => any>;
 
 ### `NonNullable<T>`
 
-`NonNullable<T>` — type dan `null` va `undefined` ni chiqaradi. Aslida `Exclude` ning maxsus holati.
+`NonNullable<T>` — type'dan `null` va `undefined`'ni chiqaradi. Aslida `Exclude`'ning maxsus holati.
 
 **Implementation:**
 
 ```typescript
-// TS 5.0+ da ichki optimizatsiya:
+// TS 4.9+ lib.es5.d.ts
 type NonNullable<T> = T & {};
 
-// Semantik ekvivalent:
-// type NonNullable<T> = Exclude<T, null | undefined>;
+// Eski versiyalarda (TS < 4.9):
+// type NonNullable<T> = T extends null | undefined ? never : T;
 ```
 
-**Qanday ishlaydi:** `T & {}` — `null` va `undefined` ni chiqaradi chunki ular `{}` ga assignable emas. `null & {}` → `never`, `undefined & {}` → `never`, `string & {}` → `string`.
+**Qanday ishlaydi:** `T & {}` — `null` va `undefined`'ni chiqaradi, chunki ular `{}`'ga assignable emas. `null & {}` → `never`, `undefined & {}` → `never`, `string & {}` → `string`.
+
+**Diqqat — `Exclude<T, null | undefined>` bilan teng emas:** Union T uchun ikkalasi bir xil natija beradi (intersection union bo'yicha distribute bo'ladi: `(A | B) & {} = (A & {}) | (B & {})`). Lekin **non-union** type'larda farq bor: `NonNullable<unknown>` natijasi `{}` (`unknown` emas), chunki `unknown & {}` `{}`'ga reduce bo'ladi. `Exclude<unknown, null | undefined>` esa `unknown` qaytaradi (chunki `unknown extends null | undefined` false).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -595,15 +597,15 @@ const clean: number[] = values.filter(
 
 ### Nazariya
 
-Bu guruh — [conditional types va `infer` keyword](12-conditional-types.md) asosida qurilgan. Function type dan turli qismlarni extract qiladi: return type, parametrlar, constructor parametrlari, instance type.
+Bu guruh — [conditional types va `infer` keyword](12-conditional-types.md) asosida qurilgan. Function type'dan turli qismlarni extract qiladi: return type, parametrlar, constructor parametrlari, instance type.
 
-**Muhim:** Bu utility type lar **`typeof`** bilan ishlatiladi — ular TYPE qabul qiladi, VALUE emas. Funksiya VALUE dan type olish uchun `typeof fn` kerak.
+**Muhim:** Bu utility type'lar **`typeof`** bilan ishlatiladi — ular TYPE qabul qiladi, VALUE emas. Funksiya VALUE'dan type olish uchun `typeof fn` kerak.
 
 ---
 
 ### `ReturnType<T>`
 
-`ReturnType<T>` — funksiya type dan **return type** ni extract qiladi.
+`ReturnType<T>` — funksiya type'dan **return type**'ni extract qiladi.
 
 **Implementation:**
 
@@ -617,10 +619,10 @@ type ReturnType<T extends (...args: any) => any> =
 
 `ReturnType` bilan ishlashda bilish kerak bo'lgan holatlar:
 
-1. **`typeof` kerak** — `ReturnType<typeof fn>` (fn value, typeof fn type)
-2. **Generic funksiya** — `ReturnType<typeof identity>` → `unknown` (generic T resolve bo'lmaydi)
+1. **`typeof` kerak** — `ReturnType<typeof fn>` (fn — value, typeof fn — type)
+2. **Generic funksiya** — `ReturnType<typeof identity>` → `unknown` (generic `T` resolve bo'lmaydi)
 3. **Async funksiya** — `ReturnType<typeof asyncFn>` → `Promise<T>` (unwrap QILMAYDI). Unwrap uchun: `Awaited<ReturnType<typeof asyncFn>>`
-4. **Overloaded funksiya** — faqat **oxirgi** overload ning return type i olinadi. Bu kutilmagan natija berishi mumkin.
+4. **Overloaded funksiya** — faqat **oxirgi** overload'ning return type'i olinadi. Bu kutilmagan natija berishi mumkin.
 
 </details>
 
@@ -635,7 +637,7 @@ function createUser(name: string, age: number) {
 type NewUser = ReturnType<typeof createUser>;
 // { id: number; name: string; age: number; createdAt: Date }
 
-// ❗ typeof kerak
+// Diqqat: typeof kerak
 // ReturnType<createUser>        // ❌ — value, type emas
 // ReturnType<typeof createUser> // ✅
 
@@ -656,7 +658,7 @@ type SyncReturn = Awaited<ReturnType<typeof fetchUser>>;
 declare function parse(input: string): string;
 declare function parse(input: number): number;
 type ParseReturn = ReturnType<typeof parse>;
-// number — OXIRGI overload ning return type i
+// number — OXIRGI overload'ning return type'i
 ```
 
 </details>
@@ -665,7 +667,7 @@ type ParseReturn = ReturnType<typeof parse>;
 
 ### `Parameters<T>`
 
-`Parameters<T>` — funksiya type dan **parametrlar tuple** ini extract qiladi.
+`Parameters<T>` — funksiya type'dan **parametrlar tuple**'ini extract qiladi.
 
 **Implementation:**
 
@@ -716,7 +718,7 @@ type ClickParams = Parameters<ClickHandler>;
 
 ### `ConstructorParameters<T>`
 
-`ConstructorParameters<T>` — class constructor ning parametrlari tuple ini extract qiladi. `Parameters` ning constructor versiyasi.
+`ConstructorParameters<T>` — class constructor'ning parametrlari tuple'ini extract qiladi. `Parameters`'ning constructor versiyasi.
 
 **Implementation:**
 
@@ -725,7 +727,7 @@ type ConstructorParameters<T extends abstract new (...args: any) => any> =
   T extends abstract new (...args: infer P) => any ? P : never;
 ```
 
-`abstract new (...)` — abstract class constructorlarni ham qabul qiladi.
+`abstract new (...)` — abstract class constructor'larini ham qabul qiladi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -753,8 +755,8 @@ function createInstance<T extends new (...args: any[]) => any>(
 const service = createInstance(UserService, db, cache, logger);
 // service: UserService — type-safe
 
-// === Built-in class lar ===
-// Overloaded constructor lar uchun faqat OXIRGI overload signature olinadi
+// === Built-in class'lar ===
+// Overloaded constructor'lar uchun faqat OXIRGI overload signature olinadi
 type DateParams = ConstructorParameters<typeof Date>;
 // [value: string | number | Date]
 
@@ -771,7 +773,7 @@ type RegExpParams = ConstructorParameters<typeof RegExp>;
 
 ### `InstanceType<T>`
 
-`InstanceType<T>` — constructor type dan **instance type** ini extract qiladi. Ya'ni `new` bilan yaratilgan object ning type i.
+`InstanceType<T>` — constructor type'dan **instance type**'ini extract qiladi. Ya'ni `new` bilan yaratilgan object'ning type'i.
 
 **Implementation:**
 
@@ -790,11 +792,11 @@ class User {
 }
 
 type UserInstance = InstanceType<typeof User>;
-// User — class ning instance type i
+// User — class'ning instance type'i
 
-// ❗ typeof kerak — InstanceType constructor TYPE qabul qiladi
+// Diqqat: typeof kerak — InstanceType constructor TYPE qabul qiladi
 // InstanceType<User>         — ❌ User bu instance type, constructor emas
-// InstanceType<typeof User>  — ✅ typeof User bu constructor type
+// InstanceType<typeof User>  — ✅ typeof User — bu constructor type
 
 // === Generic factory pattern ===
 function create<T extends new (...args: any[]) => any>(
@@ -829,13 +831,13 @@ type ShapeInstance = InstanceType<typeof Shape>;
 
 ### Nazariya
 
-`this` parameter bilan ishlovchi utility type lar. TypeScript da funksiya birinchi parametr sifatida `this` ni declare qilishi mumkin — bu runtime da mavjud emas, faqat type checking uchun.
+`this` parameter bilan ishlovchi utility type'lar. TypeScript'da funksiya birinchi parametr sifatida `this`'ni declare qilishi mumkin — bu runtime'da mavjud emas, faqat type checking uchun.
 
 ---
 
 ### `ThisParameterType<T>`
 
-`ThisParameterType<T>` — funksiya type dan `this` parameter ning type ini extract qiladi. Agar `this` parameter bo'lmasa — `unknown` qaytaradi.
+`ThisParameterType<T>` — funksiya type'dan `this` parameter'ning type'ini extract qiladi. Agar `this` parameter bo'lmasa — `unknown` qaytaradi.
 
 **Implementation:**
 
@@ -875,7 +877,7 @@ type HandlerThis = ThisParameterType<typeof handleClick>;
 
 ### `OmitThisParameter<T>`
 
-`OmitThisParameter<T>` — funksiya type dan `this` parameter ni **olib tashlaydi**. `this` siz yangi funksiya type qaytaradi.
+`OmitThisParameter<T>` — funksiya type'dan `this` parameter'ni **olib tashlaydi**. `this`'siz yangi funksiya type qaytaradi.
 
 **Implementation:**
 
@@ -888,7 +890,7 @@ type OmitThisParameter<T> =
       : T;
 ```
 
-Agar `this` parameter bo'lmasa — o'zgarishsiz qaytaradi. Aks holda — `this` siz yangi funksiya type yaratadi.
+Agar `this` parameter bo'lmasa — o'zgarishsiz qaytaradi. Aks holda — `this`'siz yangi funksiya type yaratadi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -902,7 +904,7 @@ type ToHexFn = typeof toHex;
 // (this: Number) => string
 
 type BoundToHex = OmitThisParameter<typeof toHex>;
-// () => string — this olib tashlandi
+// () => string — this'siz
 
 // Real-world: .bind() natijasi
 const boundHex: BoundToHex = toHex.bind(42 as Number);
@@ -931,7 +933,7 @@ Promise va async/await bilan ishlovchi utility type.
 
 ### `Awaited<T>`
 
-`Awaited<T>` — `Promise` (yoki nested Promise lar) ni **recursive unwrap** qiladi. `Promise<T>` dan `T` ni oladi. Nested `Promise<Promise<T>>` bo'lsa — to'liq unwrap qiladi. TS 4.5 da qo'shilgan.
+`Awaited<T>` — `Promise` (yoki nested Promise'lar)'ni **recursive unwrap** qiladi. `Promise<T>`'dan `T`'ni oladi. Nested `Promise<Promise<T>>` bo'lsa — to'liq unwrap qiladi. TS 4.5'da qo'shilgan.
 
 **Implementation:**
 
@@ -945,7 +947,7 @@ type Awaited<T> =
   T;
 ```
 
-Bu implementation thenable object larni ham qo'llab-quvvatlaydi — faqat native `Promise` emas, `then` methodi bor har qanday object.
+Bu implementation thenable object'larni ham qo'llab-quvvatlaydi — faqat native `Promise` emas, `then` method'i bor har qanday object.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -958,7 +960,7 @@ type B = Awaited<Promise<Promise<number>>>;
 // number — nested Promise to'liq unwrap
 
 type C = Awaited<boolean | Promise<string>>;
-// boolean | string — union da ham ishlaydi
+// boolean | string — union'da ham ishlaydi
 
 type D = Awaited<string>;
 // string — Promise emas, o'zgarishsiz
@@ -992,50 +994,50 @@ type SyncReturn = Awaited<ReturnType<typeof getUser>>;
 
 ### Nazariya
 
-`NoInfer<T>` — TypeScript ning **type inference** ni ma'lum pozitsiyada **to'xtatadi**. Ya'ni kompilator shu pozitsiyadagi qiymatdan type ni infer qilmasligi kerakligini bildiradi.
+`NoInfer<T>` — TypeScript'ning **type inference**'ini ma'lum pozitsiyada **to'xtatadi**. Ya'ni kompilator shu pozitsiyadagi qiymatdan type'ni infer qilmasligi kerakligini bildiradi.
 
-**Muammo:** Generic funksiyalarda ba'zan TypeScript noto'g'ri joydan type ni infer qiladi. Masalan, default qiymat dan infer qilish kerak emas — faqat asosiy argument dan.
+**Muammo:** Generic funksiyalarda ba'zan TypeScript noto'g'ri joydan type'ni infer qiladi. Masalan, default qiymatdan infer qilish kerak emas — faqat asosiy argument'dan.
 
 **Implementation:**
 
 ```typescript
-// lib.es5.d.ts da:
+// lib.es5.d.ts'da:
 type NoInfer<T> = intrinsic;
 ```
 
-Bu `Uppercase`/`Lowercase` kabi **intrinsic** type — kompilator ichida maxsus qayta ishlanadi. Runtime da hech qanday ta'siri yo'q (type erasure).
+Bu `Uppercase`/`Lowercase` kabi **intrinsic** type — kompilator ichida maxsus qayta ishlanadi. Runtime'da hech qanday ta'siri yo'q (type erasure).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`NoInfer` kompilator ning inference algoritmida qanday ishlaydi:
+`NoInfer` kompilator'ning inference algoritmida qanday ishlaydi:
 
 ```
 function createStore<T>(initial: T, defaultValue: NoInfer<T>): T
 
 Call: createStore(42, "fallback")
 
-NoInfer siz:
-1. T ni initial dan infer: T = number (42 dan)
-2. T ni defaultValue dan infer: T = string ("fallback" dan)
+NoInfer'siz:
+1. T'ni initial'dan infer: T = number (42'dan)
+2. T'ni defaultValue'dan infer: T = string ("fallback"'dan)
 3. Birlashtiriladi: T = number | string
 → Natija: string | number — KUTILMAGAN
 
 NoInfer bilan:
-1. T ni initial dan infer: T = number (42 dan)
+1. T'ni initial'dan infer: T = number (42'dan)
 2. defaultValue: NoInfer<T> — inference BLOKLANADI
-3. T = number (faqat initial dan)
+3. T = number (faqat initial'dan)
 4. defaultValue: number — "fallback" mos kelmaydi
 → ❌ Error — TO'G'RI XATO
 ```
 
 Qachon ishlatish kerak:
-- **Default/fallback qiymat** — asosiy argument dan infer bo'lsin
-- **Callback parametri** — funksiya signature dan infer bo'lsin
-- **Validation** — asosiy type dan infer, validator mos kelsin
+- **Default/fallback qiymat** — asosiy argument'dan infer bo'lsin
+- **Callback parametri** — funksiya signature'dan infer bo'lsin
+- **Validation** — asosiy type'dan infer, validator mos kelsin
 
 Qachon kerak EMAS:
-- Barcha argument lar teng darajada muhim va infer bo'lishi kerak bo'lsa
+- Barcha argument'lar teng darajada muhim va infer bo'lishi kerak bo'lsa
 
 </details>
 
@@ -1043,14 +1045,14 @@ Qachon kerak EMAS:
 <summary><strong>Kod Misollari</strong></summary>
 
 ```typescript
-// === Muammo — NoInfer siz ===
+// === Muammo — NoInfer'siz ===
 
 function createStoreLoose<T>(initial: T, defaultValue: T): T {
   return initial ?? defaultValue;
 }
 
 const looseStore = createStoreLoose(42, "fallback");
-// T = string | number — ikkala argument dan infer qildi!
+// T = string | number — ikkala argument'dan infer qildi!
 
 // === Yechim — NoInfer bilan ===
 
@@ -1101,7 +1103,7 @@ function createTheme<T extends Theme>(
 
 ### Nazariya
 
-Utility type larning haqiqiy kuchi — ularni **kombinatsiya** qilib ishlatishda. Bir nechta utility type ni birga qo'llab murakkab type transformatsiyalar yaratish mumkin.
+Utility type'larning haqiqiy kuchi — ularni **kombinatsiya** qilib ishlatishda. Bir nechta utility type'ni birga qo'llab murakkab type transformation'lar yaratish mumkin.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -1125,18 +1127,18 @@ type CreateUserDto = Omit<User, "id" | "createdAt" | "updatedAt">;
 type UpdateUserDto = Pick<User, "id"> & Partial<Omit<User, "id">>;
 // { id: number } & { name?: string; email?: string; ... }
 
-// === 3. Public User — sensitive field larsiz, readonly ===
+// === 3. Public User — sensitive field'larsiz, readonly ===
 type PublicUser = Readonly<Omit<User, "password">>;
 // { readonly id: number; readonly name: string; ... }
 
-// === 4. Faqat string field larni olish ===
+// === 4. Faqat string field'larni olish ===
 type StringFields<T> = {
   [K in keyof T as T[K] extends string ? K : never]: T[K];
 };
 type UserStrings = StringFields<User>;
 // { name: string; email: string; password: string }
 
-// === 5. Required faqat ma'lum field lar uchun ===
+// === 5. Required faqat ma'lum field'lar uchun ===
 type RequireFields<T, K extends keyof T> =
   Omit<T, K> & Required<Pick<T, K>>;
 
@@ -1149,14 +1151,14 @@ interface Options {
 type WithTimeout = RequireFields<Options, "timeout">;
 // { debug?: boolean; retries?: number; timeout: number }
 
-// === 6. Partial faqat ma'lum field lar uchun ===
+// === 6. Partial faqat ma'lum field'lar uchun ===
 type PartialFields<T, K extends keyof T> =
   Omit<T, K> & Partial<Pick<T, K>>;
 
 type FlexibleUser = PartialFields<User, "email" | "password">;
 // email va password optional, qolganlar required
 
-// === 7. Async versiya — barcha method lar Promise qaytaradi ===
+// === 7. Async versiya — barcha method'lar Promise qaytaradi ===
 type Async<T> = {
   [K in keyof T]: T[K] extends (...args: infer A) => infer R
     ? (...args: A) => Promise<Awaited<R>>
@@ -1185,13 +1187,13 @@ type AsyncUserRepo = Async<UserRepo>;
 
 ### Nazariya
 
-Utility type lar — kompilator type check jarayonida hisoblash talab qiladi. Chuqur nesting va murakkab kombinatsiyalar performance ga ta'sir qilishi mumkin.
+Utility type'lar — kompilator type check jarayonida hisoblash talab qiladi. Chuqur nesting va murakkab kombinatsiyalar performance'ga ta'sir qilishi mumkin.
 
 **Qoidalar:**
 
 1. **Intermediate type alias** ishlatish — chuqur nesting o'rniga bosqichma-bosqich
 2. **Generic constraints** ichida murakkab utility qo'ymaslik — type alias bilan ajratish
-3. **Recursive utility** da depth limit qo'shish
+3. **Recursive utility**'da depth limit qo'shish
 
 **Utility Type Tanlash Jadvali:**
 
@@ -1201,10 +1203,10 @@ Utility type lar — kompilator type check jarayonida hisoblash talab qiladi. Ch
 | Barcha required | `Required<T>` |
 | Barcha readonly | `Readonly<T>` |
 | Key-value map | `Record<K, V>` |
-| Ba'zi property lar | `Pick<T, K>` |
-| Ba'zi property larsiz | `Omit<T, K>` |
-| Union dan chiqarish | `Exclude<T, U>` |
-| Union dan ajratish | `Extract<T, U>` |
+| Ba'zi property'lar | `Pick<T, K>` |
+| Ba'zi property'larsiz | `Omit<T, K>` |
+| Union'dan chiqarish | `Exclude<T, U>` |
+| Union'dan ajratish | `Extract<T, U>` |
 | null/undefined chiqarish | `NonNullable<T>` |
 | Funksiya return type | `ReturnType<T>` |
 | Funksiya parametrlari | `Parameters<T>` |
@@ -1222,7 +1224,7 @@ Utility type lar — kompilator type check jarayonida hisoblash talab qiladi. Ch
 // ❌ Yomon — chuqur nesting
 type Bad = Partial<Required<Readonly<Omit<Pick<User, "id" | "name">, "id">>>>;
 
-// ✅ Yaxshi — intermediate type alias lar
+// ✅ Yaxshi — intermediate type alias'lar
 type PickedUser = Pick<User, "id" | "name">;
 type ReadonlyPicked = Readonly<PickedUser>;
 type Good = Partial<ReadonlyPicked>;
@@ -1236,7 +1238,7 @@ function good<T extends ProcessedType>() {}
 
 // ❌ Yomon — recursive utility types chuqur nesting
 type DeepPartial<T> = { [K in keyof T]?: DeepPartial<T[K]> };
-// 10+ level deep object da sekin bo'lishi mumkin
+// 10+ level deep object'da sekin bo'lishi mumkin
 
 // ✅ Yaxshi — depth limit qo'shish
 type BoundedDeepPartial<T, D extends unknown[] = []> =
@@ -1250,12 +1252,12 @@ type BoundedDeepPartial<T, D extends unknown[] = []> =
 
 ## Edge Cases va Gotchas
 
-### 1. `Exclude<never, T>` → `never` — bo'sh union dan chiqarish
+### 1. `Exclude<never, T>` → `never` — bo'sh union'dan chiqarish
 
 ```typescript
 type T1 = Exclude<never, string>;
 // never — never bo'sh union, hech qanday member yo'q
-// Distributive conditional type — bo'sh union da hech narsa iterate bo'lmaydi
+// Distributive conditional type — bo'sh union'da hech narsa iterate bo'lmaydi
 
 type T2 = Extract<never, string>;
 // never — xuddi shunday sabab
@@ -1281,7 +1283,7 @@ const user: PartialUser = { name: undefined };
 
 // exactOptionalPropertyTypes O'CHIRILGAN bo'lsa (default):
 const user2: PartialUser = { name: undefined };
-// ✅ — default da ? va | undefined bir xil
+// ✅ — default'da ? va | undefined bir xil
 ```
 
 ### 3. `Parameters` va `ReturnType` overloaded funksiya bilan — faqat oxirgi overload
@@ -1297,8 +1299,8 @@ type Params = Parameters<typeof parse>;
 type Return = ReturnType<typeof parse>;
 // boolean — OXIRGI overload!
 
-// ❗ Birinchi yoki ikkinchi overload kerak bo'lsa —
-// alohida type extraction yoki conditional type kerak
+// Diqqat: Birinchi yoki ikkinchi overload kerak bo'lsa —
+// alohida type extraction yoki custom conditional type kerak
 ```
 
 ### 4. `keyof Record<string, T>` → `string` (emas `string | number`)
@@ -1312,8 +1314,8 @@ type Keys2 = keyof { [key: string]: unknown };
 
 // Nima uchun farq? Record<string, T> mapped type:
 // { [P in string]: T } — bu index signature bilan bir xil EMAS
-// Record faqat string key lar, index signature esa
-// number key larni ham qabul qiladi (JS da obj[0] === obj["0"])
+// Record faqat string key'lar, index signature esa
+// number key'larni ham qabul qiladi (JS'da obj[0] === obj["0"])
 ```
 
 ### 5. `Readonly<T>` va array — `push`/`pop` hali ham ishlaydi
@@ -1329,7 +1331,7 @@ const state: Readonly<State> = { items: ["a", "b"] };
 state.items.push("c");      // ⚠️ ✅ — COMPILE BO'LADI!
 state.items[0] = "changed"; // ⚠️ ✅ — COMPILE BO'LADI!
 
-// Readonly faqat STATE.ITEMS reassign ni bloklaydi,
+// Readonly faqat state.items reassign'ni bloklaydi,
 // lekin items ICHIDAGI mutatsiyani YO'Q.
 // Yechim: ReadonlyArray<string> yoki readonly string[]
 interface SafeState {
@@ -1341,7 +1343,7 @@ interface SafeState {
 
 ## Common Mistakes
 
-### ❌ Xato 1: `Partial` va `Readonly` ning shallow ekanini unutish
+### ❌ Xato 1: `Partial` va `Readonly`'ning shallow ekanini unutish
 
 ```typescript
 interface Config {
@@ -1358,9 +1360,9 @@ config.db.host = "remote"; // ⚠️ ✅ — nested mutable!
 config.tags.push("dev");    // ⚠️ ✅ — array mutable!
 ```
 
-**Nima uchun:** `Readonly<T>` faqat top-level property larga `readonly` qo'shadi. Deep readonly uchun custom type kerak ([Bo'lim 16](16-custom-utility-types.md)).
+**Nima uchun:** `Readonly<T>` faqat top-level property'larga `readonly` qo'shadi. Deep readonly uchun custom type kerak ([Bo'lim 16](16-custom-utility-types.md)).
 
-### ❌ Xato 2: `Omit` da typo ni tutmaslik
+### ❌ Xato 2: `Omit`'da typo'ni tutmaslik
 
 ```typescript
 interface User { id: number; name: string; password: string; }
@@ -1373,9 +1375,9 @@ type StrictOmit<T, K extends keyof T> = Omit<T, K>;
 // StrictOmit<User, "pasword"> // ❌ Error — typo tutildi
 ```
 
-**Nima uchun:** `Omit` da `K extends keyof any` — har qanday string qabul qilinadi.
+**Nima uchun:** `Omit`'da `K extends keyof any` — har qanday string qabul qilinadi.
 
-### ❌ Xato 3: `ReturnType` ga value berish (`typeof` unutish)
+### ❌ Xato 3: `ReturnType`'ga value berish (`typeof` unutish)
 
 ```typescript
 function getUser() { return { id: 1, name: "Ali" }; }
@@ -1384,9 +1386,9 @@ function getUser() { return { id: 1, name: "Ali" }; }
 type T = ReturnType<typeof getUser>;     // ✅
 ```
 
-**Nima uchun:** `ReturnType<T>` type parameter qabul qiladi. `getUser` — runtime value. `typeof getUser` — shu value ning type i.
+**Nima uchun:** `ReturnType<T>` type parameter qabul qiladi. `getUser` — runtime value. `typeof getUser` — shu value'ning type'i.
 
-### ❌ Xato 4: `Required` `| undefined` ni olib tashlamaydi
+### ❌ Xato 4: `Required` explicit `| undefined` union'ni olib tashlamaydi
 
 ```typescript
 interface Form {
@@ -1396,10 +1398,12 @@ interface Form {
 
 type RequiredForm = Required<Form>;
 // { name: string; phone: string | undefined }
-// ❗ phone dagi | undefined QOLDI — -? faqat ? ni olib tashlaydi
+// Diqqat: phone'dagi explicit | undefined QOLDI — -? optional marker'dan
+// kelgan undefined'ni olib tashlaydi, lekin value type'da yozilgan
+// | undefined union'ni olib tashlamaydi
 ```
 
-### ❌ Xato 5: `Record` ning non-homomorphic ekanini bilmaslik
+### ❌ Xato 5: `Record`'ning non-homomorphic ekanini bilmaslik
 
 ```typescript
 interface Config {
@@ -1408,17 +1412,17 @@ interface Config {
   timeout?: number;
 }
 
-// ❌ Record bilan — modifier lar yo'qoladi
+// ❌ Record bilan — modifier'lar yo'qoladi
 type RecordConfig = Record<keyof Config, string>;
 // { host: string; port: string; timeout: string }
 // readonly YO'QOLDI, optional YO'QOLDI!
 
-// ✅ Mapped type bilan — modifier lar saqlanadi
+// ✅ Mapped type bilan — modifier'lar saqlanadi
 type MappedConfig = { [K in keyof Config]: string };
 // { readonly host: string; readonly port: string; timeout?: string }
 ```
 
-**Nima uchun:** `Record` — [non-homomorphic](13-mapped-types.md) mapped type. Key larni `keyof T` dan emas, mustaqil union dan oladi.
+**Nima uchun:** `Record` — [non-homomorphic](13-mapped-types.md) mapped type. Key'larni `keyof T`'dan emas, mustaqil union'dan oladi.
 
 ---
 
@@ -1426,7 +1430,7 @@ type MappedConfig = { [K in keyof Config]: string };
 
 ### Mashq 1: `PublicUser` type yarating (Oson)
 
-**Savol:** Quyidagi `User` type dan `password` va `secretKey` ni olib tashlab, qolganlarini `readonly` qiling.
+**Savol:** Quyidagi `User` type'dan `password` va `secretKey`'ni olib tashlab, qolganlarini `readonly` qiling.
 
 ```typescript
 interface User {
@@ -1454,7 +1458,7 @@ type PublicUser = Readonly<Omit<User, "password" | "secretKey">>;
 // }
 ```
 
-**Tushuntirish:** Avval `Omit` bilan sensitive field larni olib tashlash, keyin `Readonly` bilan barcha qolgan field larni immutable qilish.
+**Tushuntirish:** Avval `Omit` bilan sensitive field'larni olib tashlash, keyin `Readonly` bilan barcha qolgan field'larni immutable qilish.
 
 </details>
 
@@ -1462,7 +1466,7 @@ type PublicUser = Readonly<Omit<User, "password" | "secretKey">>;
 
 ### Mashq 2: `RequireFields` type yarating (O'rta)
 
-**Savol:** Faqat berilgan field larni required qilib, qolganlarini o'zgarishsiz qoldiradigan type yozing.
+**Savol:** Faqat berilgan field'larni required qilib, qolganlarini o'zgarishsiz qoldiradigan type yozing.
 
 ```typescript
 type RequireFields<T, K extends keyof T> = /* ? */;
@@ -1488,8 +1492,8 @@ type RequireFields<T, K extends keyof T> =
 ```
 
 **Tushuntirish:**
-1. `Omit<T, K>` — K field larni olib tashlash (ular optional qoladi)
-2. `Required<Pick<T, K>>` — K field larni olish va required qilish
+1. `Omit<T, K>` — K field'larni olib tashlash (ular optional qoladi)
+2. `Required<Pick<T, K>>` — K field'larni olish va required qilish
 3. `&` (intersection) — ikkalasini birlashtirish
 
 </details>
@@ -1498,7 +1502,7 @@ type RequireFields<T, K extends keyof T> =
 
 ### Mashq 3: `AsyncMethods<T>` type yarating (O'rta)
 
-**Savol:** Object type ning barcha method larini `Promise` qaytaradigan qilib, oddiy property larni o'zgarishsiz qoldiradigan type yozing.
+**Savol:** Object type'ning barcha method'larini `Promise` qaytaradigan qilib, oddiy property'larni o'zgarishsiz qoldiradigan type yozing.
 
 ```typescript
 type AsyncMethods<T> = /* ? */;
@@ -1534,8 +1538,8 @@ type AsyncMethods<T> = {
 ```
 
 **Tushuntirish:**
-1. Mapped type — har bir property ni iterate
-2. Conditional type — agar property funksiya bo'lsa: `infer A` (argument lar), `infer R` (return type), `Promise<Awaited<R>>` (Promise ga wrap, double wrap dan himoya)
+1. Mapped type — har bir property'ni iterate
+2. Conditional type — agar property funksiya bo'lsa: `infer A` (argument'lar), `infer R` (return type), `Promise<Awaited<R>>` (Promise'ga wrap, double wrap'dan himoya)
 3. Funksiya bo'lmasa — o'zgarishsiz (`T[K]`)
 
 </details>
@@ -1546,8 +1550,8 @@ type AsyncMethods<T> = {
 
 **Savol:**
 
-1. `StrictOmit<T, K>` — `Omit` ning strict versiyasi (faqat mavjud key larni qabul qiladi)
-2. `PickByType<T, ValueType>` — object type dan faqat ma'lum value type ga ega property larni oladi
+1. `StrictOmit<T, K>` — `Omit`'ning strict versiyasi (faqat mavjud key'larni qabul qiladi)
+2. `PickByType<T, ValueType>` — object type'dan faqat ma'lum value type'ga ega property'larni oladi
 
 ```typescript
 type StrictOmit<T, K extends keyof T> = /* ? */;
@@ -1586,7 +1590,7 @@ type PickByType<T, ValueType> = {
 
 **Tushuntirish:**
 - `StrictOmit` — `K extends keyof T` constraint qo'shildi. Mavjud bo'lmagan key berilsa compile-time xato.
-- `PickByType` — key remapping (`as`) bilan filtrlash: agar `T[K]` berilgan `ValueType` ga extend qilsa — key saqlanadi, aks holda `never`.
+- `PickByType` — key remapping (`as`) bilan filtrlash: agar `T[K]` berilgan `ValueType`'ga extend qilsa — key saqlanadi, aks holda `never`.
 
 </details>
 
@@ -1594,7 +1598,7 @@ type PickByType<T, ValueType> = {
 
 ### Mashq 5: `MergeTypes<T, U>` yozing (Qiyin)
 
-**Savol:** Ikki object type ni birlashtiruvchi type yozing. Agar ikkala type da bir xil key bo'lsa — `U` (ikkinchi) ning type i ustun bo'lsin.
+**Savol:** Ikki object type'ni birlashtiruvchi type yozing. Agar ikkala type'da bir xil key bo'lsa — `U` (ikkinchi)'ning type'i ustun bo'lsin.
 
 ```typescript
 type MergeTypes<T, U> = /* ? */;
@@ -1615,9 +1619,9 @@ interface Override {
 type Merged = MergeTypes<Base, Override>;
 // {
 //   id: number;
-//   name: string | null;     // U dan
-//   role: "admin" | "user";  // U dan
-//   permissions: string[];   // U dan
+//   name: string | null;     // U'dan
+//   role: "admin" | "user";  // U'dan
+//   permissions: string[];   // U'dan
 // }
 ```
 
@@ -1629,11 +1633,11 @@ type MergeTypes<T, U> = Omit<T, keyof U> & U;
 ```
 
 **Tushuntirish:**
-1. `Omit<T, keyof U>` — T dan U da mavjud key larni olib tashlash (conflict larni yo'q qilish)
-2. `& U` — U ni to'liq qo'shish
-3. Natija: T ning unique field lari + U ning barcha field lari (conflict da U ustun)
+1. `Omit<T, keyof U>` — T'dan U'da mavjud key'larni olib tashlash (conflict'larni yo'q qilish)
+2. `& U` — U'ni to'liq qo'shish
+3. Natija: T'ning unique field'lari + U'ning barcha field'lari (conflict'da U ustun)
 
-Bu JavaScript ning `{ ...base, ...override }` operatsiyasining type-level versiyasi.
+Bu JavaScript'ning `{ ...base, ...override }` operatsiyasining type-level versiyasi.
 
 </details>
 
@@ -1641,24 +1645,24 @@ Bu JavaScript ning `{ ...base, ...override }` operatsiyasining type-level versiy
 
 ## Xulosa
 
-Bu bo'limda TypeScript ning barcha built-in utility type lari chuqur o'rganildi:
+Bu bo'limda TypeScript'ning barcha built-in utility type'lari chuqur o'rganildi:
 
 **Object transformation (mapped types asosida):**
 - **`Partial<T>`** — barcha optional. Gotcha: shallow, nested to'liq qoladi.
-- **`Required<T>`** — barcha required (`-?`). Gotcha: `| undefined` union ni olib tashlamaydi.
+- **`Required<T>`** — barcha required (`-?`). `-?` modifier optional marker'dan kelgan `undefined`'ni olib tashlaydi, lekin explicit `| undefined` union'ni saqlaydi.
 - **`Readonly<T>`** — barcha readonly. Gotcha: shallow, nested mutation mumkin.
-- **`Record<K, V>`** — key-value map. Gotcha: non-homomorphic — modifier lar saqlanmaydi.
-- **`Pick<T, K>`** — tanlangan key lar. `K extends keyof T` — strict.
-- **`Omit<T, K>`** — key larni olib tashlash. `K extends keyof any` — typo tutmaydi.
+- **`Record<K, V>`** — key-value map. Gotcha: non-homomorphic — modifier'lar saqlanmaydi.
+- **`Pick<T, K>`** — tanlangan key'lar. `K extends keyof T` — strict.
+- **`Omit<T, K>`** — key'larni olib tashlash. `K extends keyof any` — typo tutmaydi.
 
 **Union transformation (conditional types asosida):**
-- **`Exclude<T, U>`** — union dan chiqarish. Distributive conditional type.
-- **`Extract<T, U>`** — union dan ajratish. `Exclude` ning teskari amali.
-- **`NonNullable<T>`** — `null | undefined` chiqarish. TS 5.0+ da `T & {}` bilan.
+- **`Exclude<T, U>`** — union'dan chiqarish. Distributive conditional type.
+- **`Extract<T, U>`** — union'dan ajratish. `Exclude`'ning teskari amali.
+- **`NonNullable<T>`** — `null | undefined` chiqarish. TS 4.9+'da `T & {}` bilan (distributive emas — `NonNullable<unknown>` = `{}`).
 
 **Function types (`infer` asosida):**
-- **`ReturnType<T>`** — return type. `typeof` kerak. Overload da oxirgi signature.
-- **`Parameters<T>`** — parametrlar tuple. Wrapper funksiya lar uchun.
+- **`ReturnType<T>`** — return type. `typeof` kerak. Overload'da oxirgi signature.
+- **`Parameters<T>`** — parametrlar tuple. Wrapper funksiyalar uchun.
 - **`ConstructorParameters<T>`** — constructor parametrlari. Factory pattern uchun.
 - **`InstanceType<T>`** — instance type. `typeof` kerak.
 
@@ -1668,13 +1672,13 @@ Bu bo'limda TypeScript ning barcha built-in utility type lari chuqur o'rganildi:
 - **`ThisParameterType<T>`** / **`OmitThisParameter<T>`** — `this` parameter bilan ishlash.
 
 **Bog'liq bo'limlar:**
-- [Bo'lim 12: Conditional Types](12-conditional-types.md) — `infer`, distributive behavior — utility type lar asosi
-- [Bo'lim 13: Mapped Types](13-mapped-types.md) — homomorphic/non-homomorphic, modifier lar
+- [Bo'lim 12: Conditional Types](12-conditional-types.md) — `infer`, distributive behavior — utility type'lar asosi
+- [Bo'lim 13: Mapped Types](13-mapped-types.md) — homomorphic/non-homomorphic, modifier'lar
 - [Bo'lim 14: Template Literal Types](14-template-literal-types.md) — `Uppercase`, `Lowercase`, `Capitalize`, `Uncapitalize`
 - [Bo'lim 16: Custom Utility Types](16-custom-utility-types.md) — `DeepPartial`, `DeepReadonly`, `Brand`, `PathKeys`
 
-Asosiy insight: barcha utility type lar — oldingi bo'limlardagi tushunchalar (mapped types, conditional types, `infer`, `keyof`) ning tayyor kombinatsiyalari. Ularning ichki implementatsiyasini tushunish — o'z custom utility type laringizni yaratish uchun asos.
+Asosiy insight: barcha utility type'lar — oldingi bo'limlardagi tushunchalar (mapped types, conditional types, `infer`, `keyof`)'ning tayyor kombinatsiyalari. Ularning ichki implementation'ini tushunish — o'z custom utility type'laringizni yaratish uchun asos.
 
 ---
 
-**Keyingi bo'lim:** [16-custom-utility-types.md](16-custom-utility-types.md) — O'z custom utility type laringizni yaratish: `DeepPartial`, `DeepReadonly`, `Mutable`, `Brand`/`Opaque` (nominal types), `PathKeys`/`PathValue` (dotted path), type-level programming patterns, va recursive type optimization.
+**Keyingi bo'lim:** [16-custom-utility-types.md](16-custom-utility-types.md) — O'z custom utility type'laringizni yaratish: `DeepPartial`, `DeepReadonly`, `Mutable`, `Brand`/`Opaque` (nominal types), `PathKeys`/`PathValue` (dotted path), type-level programming patterns, va recursive type optimization.

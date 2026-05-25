@@ -1,6 +1,6 @@
 # Bo'lim 20: Reflect Metadata va Dependency Injection
 
-> Reflect Metadata API — TypeScript da decorator lar bilan birgalikda metadata saqlash va o'qish mexanizmi. `reflect-metadata` package orqali class, method, property va parameter larga **runtime da** qo'shimcha ma'lumot biriktirish mumkin. `emitDecoratorMetadata` compiler option yoqilganda, TypeScript o'zi ham type ma'lumotlarini metadata sifatida emit qiladi (`design:type`, `design:paramtypes`, `design:returntype`). Bu metadata Dependency Injection (DI) pattern ning asosiy qismini tashkil etadi. Bu bo'limda Reflect Metadata API va DI pattern ning TypeScript dagi core tushunchalari o'rganiladi.
+> Reflect Metadata API — TypeScript da decorator lar bilan birgalikda metadata saqlash va o'qish mexanizmi. `reflect-metadata` package orqali class, method, property va parameter larga runtime da qo'shimcha ma'lumot biriktirish mumkin. `emitDecoratorMetadata` compiler option yoqilganda, TypeScript o'zi ham type ma'lumotlarini metadata sifatida emit qiladi (`design:type`, `design:paramtypes`, `design:returntype`). Bu metadata Dependency Injection (DI) pattern ning asosiy qismini tashkil etadi (Angular, NestJS, TypeORM).
 
 ---
 
@@ -24,9 +24,11 @@
 
 ### Nazariya
 
-Reflect Metadata API — `reflect-metadata` polyfill package orqali TypeScript/JavaScript da **arbitrary metadata** ni object larga biriktirish imkonini beruvchi API. Bu API ECMAScript proposal sifatida taklif qilingan, lekin hali standart emas — shuning uchun polyfill kerak.
+Reflect Metadata API — `reflect-metadata` polyfill package orqali JavaScript runtime'ga `Reflect.defineMetadata`/`Reflect.getMetadata` method'larini qo'shadigan API. Object'larga (class, prototype, method, property) arbitrary key-value metadata biriktirib, keyin runtime da o'qish imkonini beradi.
 
-Metadata — object haqida qo'shimcha ma'lumot: "bu method qaysi HTTP method ga to'g'ri keladi", "bu class singleton mi", "bu property qaysi type da". Bu ma'lumotlar runtime da o'qiladi.
+Metadata — object haqida qo'shimcha (assotsiativ) ma'lumot. Misol: "bu method qaysi HTTP method ga to'g'ri keladi", "bu class qaysi DI scope da", "bu constructor parameter qaysi class type da". Bu ma'lumotlar **runtime da** o'qiladi, shu sababli kompilatsiyadan keyin ham yo'qolmaydi.
+
+Tarixiy kontekst: original `Reflect.metadata` TC39 proposal Stage 0 ga tushib qoldi (aktiv emas). Uning o'rniga TC39 yangi yo'l sifatida Stage 3 decorators bilan `Symbol.metadata` (TS 5.2+) ni tanladi. Lekin Angular/NestJS/TypeORM ekosistemasi hali `experimentalDecorators` + `reflect-metadata` polyfill'iga asoslangan — shu sababli amaliyotda ikkala mexanizm parallel mavjud.
 
 ```bash
 npm install reflect-metadata
@@ -37,12 +39,51 @@ Asosiy API:
 | Method | Vazifasi |
 |--------|---------|
 | `Reflect.defineMetadata(key, value, target)` | Target ga metadata yozish |
-| `Reflect.defineMetadata(key, value, target, prop)` | Property ga metadata yozish |
-| `Reflect.getMetadata(key, target)` | Metadata o'qish |
-| `Reflect.hasMetadata(key, target)` | Metadata borligini tekshirish |
-| `Reflect.getOwnMetadata(key, target)` | Faqat o'z metadata (inherited emas) |
+| `Reflect.defineMetadata(key, value, target, propertyKey)` | Property/method ga metadata yozish |
+| `Reflect.getMetadata(key, target)` | Metadata o'qish (prototype chain bo'ylab) |
+| `Reflect.getOwnMetadata(key, target)` | Faqat o'z metadata (prototype chain ga qaramaydi) |
+| `Reflect.hasMetadata(key, target)` | Metadata borligini tekshirish (chain bo'ylab) |
+| `Reflect.hasOwnMetadata(key, target)` | Faqat o'z metadata borligi |
+| `Reflect.deleteMetadata(key, target)` | Metadata o'chirish |
+| `Reflect.getMetadataKeys(target)` | Barcha metadata key'lar (chain bilan) |
 
-Ichki implementatsiyasi **WeakMap** asosida ishlaydi — har bir target uchun alohida metadata Map saqlanadi.
+`getMetadata` vs `getOwnMetadata` — birinchisi prototype chain bo'ylab qidiradi (parent class metadata'sini ham topadi), ikkinchisi faqat o'z target'ni tekshiradi. DI container'da `getOwnMetadata` xavfsizroq — inheritance'dan kelgan metadata bilan adashish bo'lmaydi.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+Polyfill ichida WeakMap'lar hierarxiyasi:
+
+```text
+Metadata Storage:
+  WeakMap<target, Map<propertyKey | undefined, Map<metadataKey, value>>>
+   │           │                                  │
+   │           │                                  └─ key=value pair
+   │           └─ class/prototype/method aniqlovchisi
+   └─ class/prototype reference (GC qilinsa metadata ham GC bo'ladi)
+```
+
+**Nima uchun WeakMap:** target reference ushlanmaydi — target garbage collect bo'lganda metadata avtomatik bo'shaydi (memory leak yo'q).
+
+**`defineMetadata` algoritmi (soddalashtirilgan):**
+
+```text
+1. target uchun outer Map'ni ol (yoki yarat)
+2. propertyKey uchun inner Map'ni ol (yoki yarat); class darajasi uchun key = undefined
+3. inner Map'ga (metadataKey → value) yoz
+```
+
+**`getMetadata` prototype walk:**
+
+```text
+1. target'ning OwnMetadata'sini tekshir → topilsa qaytar
+2. Object.getPrototypeOf(target) → null bo'lsa undefined
+3. parent target uchun 1-qadamga qayt (rekursiv yuqoriga)
+```
+
+Bu sababli inheritance chain'da parent class'ga qo'yilgan `@injectable` metadata child class'da ham `getMetadata` orqali ko'rinadi — DI container avtomatik resolve qila oladi.
+
+</details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -106,17 +147,19 @@ for (const key of keys) {
 
 ### Nazariya
 
-`emitDecoratorMetadata: true` (`experimentalDecorators: true` bilan birga) — kompilator **avtomatik type metadata** emit qiladi:
+`emitDecoratorMetadata: true` (`experimentalDecorators: true` bilan birga) — kompilator har decorated element uchun **avtomatik type metadata** emit qiladi (`reflect-metadata` polyfill API'siga `__metadata(...)` chaqiruvi sifatida):
 
-| Key | Nima saqlaydi | Qayerda |
+| Key | Nima saqlaydi | Qachon emit qilinadi |
 |-----|---------------|---------|
-| `"design:type"` | Property/parameter type | Property decorator |
-| `"design:paramtypes"` | Constructor/method parameter type lar (array) | Class/method decorator |
-| `"design:returntype"` | Method return type | Method decorator |
+| `"design:type"` | Property/parameter type (class reference) | Property/accessor da decorator bo'lsa |
+| `"design:paramtypes"` | Constructor/method parameter type'lar massivi | Class yoki method'da decorator bo'lsa |
+| `"design:returntype"` | Method return type | Method'da decorator bo'lsa |
 
-**Muhim:** Faqat **legacy** decorator lar bilan ishlaydi. TC39 da `Symbol.metadata` ishlatiladi ([Bo'lim 19](19-decorators.md#decorator-metadata--symbolmetadata)).
+**Cheklov 1 — faqat legacy decorator:** `emitDecoratorMetadata` faqat `experimentalDecorators: true` (legacy Stage 2 decorator) bilan ishlaydi. TC39 Stage 3 decorator'lar bilan flag hech narsa qilmaydi — kompilator metadata emit qilmaydi. Zamonaviy yo'l — Stage 3 `Symbol.metadata` (TS 5.2+, [Bo'lim 19](19-decorators.md)).
 
-**Cheklov:** Interface lar compile-time da o'chiriladi — `design:paramtypes` da interface o'rniga `Object` yoziladi. Shuning uchun **token** system kerak.
+**Cheklov 2 — interface erasure:** Interface'lar compile paytida o'chiriladi (type-only) — `design:paramtypes` array'iga interface o'rniga `Object` constructor yoziladi. Misol: `constructor(private logger: ILogger)` kompilatsiyadan keyin `__metadata("design:paramtypes", [Object])` bo'ladi. Yechim — `@inject(LOGGER_TOKEN)` parameter decorator bilan explicit token berish (token system).
+
+**Cheklov 3 — kamida bitta decorator kerak:** Kompilator `__metadata` chaqiruvini faqat class/method/property'da kamida bitta decorator bo'lganda emit qiladi. Decorator'siz class'da `design:paramtypes` yo'q — DI container `undefined` oladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -180,32 +223,36 @@ console.log(paramTypes); // [class Logger, class Database]
 
 ### Nazariya
 
-**Dependency Injection (DI)** — class o'z dependency larini **o'zi yaratmaydi**, balki **tashqaridan oladi**. Bu **Inversion of Control (IoC)** prinsipining implementatsiyasi.
+**Dependency Injection (DI)** — class o'z dependency larini **o'zi yaratmaydi**, balki tashqaridan oladi (constructor, property yoki method orqali). DI — **Inversion of Control (IoC)** prinsipining konkret implementatsiyasi: dependency yaratish va ulash mas'uliyati class'dan tashqi kompozitsiya kod'iga ko'chiriladi.
+
+**IoC ma'nosi:** an'anaviy oqimda yuqori darajadagi module pastki module'ni `new` orqali yaratadi (control yuqoridan pastga). IoC oqimida control teskari — pastki abstraksiyalar tashqaridan in'eksiya qilinadi, yuqori module faqat interface'larga bog'liq bo'ladi.
 
 ```typescript
-// ❌ DI siz — tight coupling
+// ❌ DI siz — tight coupling, hard-coded dependency
 class UserService {
-  private logger = new ConsoleLogger(); // O'zi yaratdi
-  private db = new PostgresDB();        // O'zi yaratdi
+  private logger = new ConsoleLogger();   // Konkret class
+  private db = new PostgresDB("...");     // Konkret class + config
+  // Test da mock berish mumkin emas; PostgresDB ni MySQLDB ga almashtirish — kod o'zgaradi
 }
 
-// ✅ DI bilan — loose coupling
+// ✅ DI bilan — loose coupling, abstraction'ga bog'lanish
 class UserService {
   constructor(
-    private logger: ILogger,  // Tashqaridan berildi
-    private db: IDatabase     // Tashqaridan berildi
+    private logger: ILogger,    // Interface — har qanday implementation
+    private db: IDatabase       // Interface — runtime'da almashtirish mumkin
   ) {}
 }
 ```
 
-**DI ning afzalliklari:**
+**DI ning amaliy afzalliklari:**
 
-1. **Loose coupling** — class aniq implementatsiyaga bog'lanmaydi
-2. **Testability** — test da mock inject qilish oson
-3. **Configurability** — runtime da implementatsiyani almashtirish mumkin
-4. **Single Responsibility** — class faqat o'z ishini qiladi
+1. **Loose coupling** — class abstraksiyaga (interface) bog'lanadi, konkret class'ga emas
+2. **Testability** — unit test'da mock/stub inject qilish oson (real DB/HTTP kerakmas)
+3. **Configurability** — production'da `PostgresDB`, dev'da `InMemoryDB` — kod o'zgarmaydi, faqat container binding
+4. **Single Responsibility** — class faqat business logic'ni bajaradi, dependency lifecycle'ni emas
+5. **Composability** — dependency graph'i bitta joyda (composition root) tasvirlangan
 
-**DI Container** — dependency larni register, resolve, va lifecycle boshqaradigan markaziy object.
+**DI Container** — dependency larni register, resolve, va lifecycle (singleton/transient/request scope) boshqaradigan markaziy object. Container metadata'dan foydalanib (yoki explicit konfiguratsiyadan) dependency graph'ni avtomatik quradi.
 
 ---
 
@@ -213,47 +260,77 @@ class UserService {
 
 ### Nazariya
 
-DI ning uchta asosiy pattern i:
+DI'da dependency'larni class'ga "yetkazib berish"ning uchta usuli mavjud — har birining trade-off'lari farqli:
 
-1. **Constructor Injection** (eng ko'p ishlatiladi, tavsiya) — dependency lar constructor orqali
-2. **Property Injection** — dependency class property ga assign
-3. **Method Injection** — dependency method parameter orqali
+1. **Constructor Injection** — dependency lar constructor parameter orqali. Class instantiate qilinganda barcha dependency lar majburiy. Eng tavsiya etilgan.
+2. **Property Injection** (Setter Injection) — dependency lar public property/setter orqali, instantiate'dan keyin set qilinadi. Optional dependency yoki circular dependency'ni hal qilish uchun.
+3. **Method Injection** — dependency method'ning bir martalik parametri sifatida. Class'da saqlanmaydi, faqat shu method chaqirig'ida ishlatiladi.
+
+**Constructor injection nima uchun default tanlov:**
+- Dependency'lar `readonly` qilib markalanadi — immutability kafolati
+- Class yaratilgan paytda barcha dependency'lar mavjudligi compile-time'da tasdiqlanadi (no null state)
+- TypeScript `strictPropertyInitialization`'da `!` assertion kerak emas
+- Test'da mock berish — bitta `new Service(mock1, mock2)` chaqirig'i
+
+**Property injection kamchiligi:** instantiate va dependency set'i orasida class "yarim ishchi" holatda bo'ladi — bu vaqtda method chaqirilsa `undefined` access bo'lishi mumkin. `!` definite-assignment assertion compiler'ni jim qiladi, lekin runtime safety bermaydi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
 ```typescript
-// === 1. Constructor Injection (tavsiya) ===
+// === 1. Constructor Injection (default tanlov) ===
 class UserService {
   constructor(
     private readonly logger: ILogger,
     private readonly db: IDatabase
   ) {}
+
   getUsers() {
     this.logger.log("Getting users");
     return this.db.query("SELECT * FROM users");
   }
 }
 
+// Instantiate — barcha dependency lar majburiy
+const service = new UserService(new ConsoleLogger(), new PostgresDB());
+
 // === 2. Property Injection ===
-class UserService {
-  logger!: ILogger;   // Decorator yoki container orqali set
+class UserServiceProp {
+  // ! — definite assignment assertion (initializer bermayman, lekin set qilinadi)
+  logger!: ILogger;
   db!: IDatabase;
+
+  getUsers() {
+    this.logger.log("Getting users");
+    return this.db.query("SELECT * FROM users");
+  }
 }
+
+const propService = new UserServiceProp();
+propService.logger = new ConsoleLogger();   // Set qilish — alohida qadam
+propService.db = new PostgresDB();
+// Agar set qilishni unutsa — runtime'da `Cannot read property 'log' of undefined`
 
 // === 3. Method Injection ===
 class ReportGenerator {
-  generate(formatter: IFormatter, data: Data[]) {
+  // Dependency saqlanmaydi — har chaqiriqda berish
+  generate(formatter: IFormatter, data: ReportData[]) {
     return formatter.format(data);
   }
 }
+
+const generator = new ReportGenerator();
+generator.generate(new PdfFormatter(), data);    // Bir martalik formatter
+generator.generate(new HtmlFormatter(), data);   // Boshqa chaqiriqda boshqa
 ```
 
-**Constructor injection nima uchun yaxshiroq:**
-- Dependency lar **immutable** (`readonly`)
-- Class yaratilganda **barcha** dependency lar mavjud
-- Test da mock berish oson
-- `!` assertion kerak emas
+**Qachon qaysi pattern:**
+
+| Pattern | Qachon |
+|---------|--------|
+| Constructor | Default tanlov — required, instance lifetime davomida o'zgarmas dependency |
+| Property | Circular dependency, optional dependency, framework-managed (Angular `@Input`) |
+| Method | Per-call strategy (formatter, validator) — har chaqiriqda boshqa implementation |
 
 </details>
 
@@ -263,13 +340,43 @@ class ReportGenerator {
 
 ### Nazariya
 
-DI Container — dependency larni boshqaradigan markaziy class:
+DI Container — dependency'larni register qilib, resolve paytida graph'ni avtomatik quradigan markaziy class. Asosiy mas'uliyatlari:
 
-1. **Register** — class ni container ga ro'yxatga olish
-2. **Resolve** — class yaratish + dependency inject
-3. **Scope** — singleton (bitta), transient (har safar yangi)
+1. **Register** — token (class yoki Symbol) ga implementation bog'lash
+2. **Resolve** — token bo'yicha instance qaytarish, kerakli barcha dependency'larni rekursiv tarzda yaratish
+3. **Scope (lifecycle)** — `singleton` (bitta instance umrga), `transient` (har resolve'da yangi), `scoped` (request/session davomida bitta)
 
-Bu container `reflect-metadata` va `emitDecoratorMetadata` ga asoslangan — `design:paramtypes` orqali constructor parameter type larni avtomatik o'qiydi.
+Container `reflect-metadata` va `emitDecoratorMetadata` ga asoslanadi — TypeScript kompilator har decorated class uchun `design:paramtypes` metadata'ni emit qiladi, bunda constructor parameter'larining class reference'lari array tarzida saqlanadi. Container shu array'ni o'qib, har bir parametr uchun rekursiv `resolve` chaqiradi va konstruktor argumentlarini quradi.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+**Resolve algoritmi (rekursiv graph build):**
+
+```text
+resolve(Target):
+  1. Singleton cache da Target bormi? → bor bo'lsa qaytar
+  2. Reflect.getMetadata("design:paramtypes", Target) → [Dep1, Dep2, ...]
+     (emitDecoratorMetadata sababli kompilator bu array'ni emit qilgan)
+  3. Har bir Dep uchun rekursiv resolve(Dep)
+  4. new Target(...resolvedDeps) — instance yaratish
+  5. Scope = singleton bo'lsa, cache'ga saqlash
+  6. Instance'ni qaytarish
+```
+
+**Circular dependency muammosi:** A → B → A bo'lsa, 3-qadamda cheksiz rekursiya. Yechim — "resolving" set bilan tracking:
+
+```text
+resolving = Set<Target>
+if (resolving.has(Target)) throw CircularDependencyError
+resolving.add(Target)
+... resolve dependencies ...
+resolving.delete(Target)
+```
+
+NestJS, InversifyJS, tsyringe — bu detection'ni implement qilgan. Quyidagi misol oddiy variant, detection'siz.
+
+</details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -279,17 +386,26 @@ Bu container `reflect-metadata` va `emitDecoratorMetadata` ga asoslangan — `de
 ```typescript
 import "reflect-metadata";
 
-function injectable(constructor: new (...args: any[]) => any) {
+// @injectable — emitDecoratorMetadata ishlashi uchun class'ga decorator MAJBUR
+// (kamida bitta decorator bo'lmasa, kompilator design:paramtypes emit qilmaydi)
+function injectable<T extends new (...args: any[]) => any>(constructor: T): T {
   Reflect.defineMetadata("injectable", true, constructor);
+  return constructor;
 }
 
 class Container {
-  private singletons = new Map<any, any>();
+  private singletons = new Map<unknown, unknown>();
 
   resolve<T>(target: new (...args: any[]) => T): T {
-    if (this.singletons.has(target)) return this.singletons.get(target);
+    if (this.singletons.has(target)) return this.singletons.get(target) as T;
 
-    const paramTypes: any[] = Reflect.getMetadata("design:paramtypes", target) || [];
+    // @injectable bilan markalanganligini tekshirish (xato erta tutiladi)
+    if (!Reflect.getMetadata("injectable", target)) {
+      throw new Error(`${target.name} is not @injectable`);
+    }
+
+    const paramTypes: Array<new (...args: any[]) => unknown> =
+      Reflect.getMetadata("design:paramtypes", target) || [];
     const deps = paramTypes.map(dep => this.resolve(dep));
     const instance = new target(...deps);
 
@@ -376,7 +492,14 @@ class TokenContainer {
 
 ### Nazariya
 
-DI ning eng katta afzalligi — **testability**. Real dependency o'rniga mock inject qilib, tez va izolyatsiyalangan test yozish mumkin.
+DI ning eng katta amaliy afzalligi — **testability**. Class real dependency'larga emas, abstraksiyalarga (interface) bog'langanligi sababli, unit test'da real DB/HTTP/file system o'rniga mock implementation inject qilinadi. Bu uch foyda beradi: testlar **tez** (I/O yo'q), **deterministik** (tashqi state'ga bog'liq emas) va **izolyatsiyalangan** (faqat shu class logic'i test'da).
+
+Mocking strategiyalari:
+- **Manual mock** — interface'ni qo'lda implement qilish (jest yoki test framework'siz)
+- **`jest.Mocked<T>` / `vi.Mocked<T>`** — har method'ni avtomatik `jest.fn()`/`vi.fn()` qiladi, type-safe (interface'dan tashqari method qo'shilmaydi)
+- **Spy on real implementation** — real instance'da bir method'ni override qilish (kamroq DI, ko'proq overkill)
+
+Constructor injection bilan mock berish — bitta `new Service(mockA, mockB)` chaqirig'i. Container kerak emas, faqat type-compatible object yetarli.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -432,43 +555,71 @@ describe("UserService", () => {
 
 ### Nazariya
 
-**Decorator-based DI** — `@injectable`, `@inject`, `reflect-metadata`. Legacy decorator larga bog'liq.
+**Decorator-based DI** — `@injectable`/`@inject` decorator'lar va `reflect-metadata` polyfill'iga asoslangan yondashuv. Container `design:paramtypes` metadata'ni o'qib, constructor parameter'larini avtomatik resolve qiladi. Angular, NestJS, TypeORM, InversifyJS, tsyringe — barchasi shu modelda. Cheklov: `experimentalDecorators: true` + `emitDecoratorMetadata: true` (legacy decorator) shart, TC39 Stage 3 decorator'larda `emitDecoratorMetadata` umuman ishlamaydi va parameter decorator'lar Stage 3'ga kiritilmagan.
 
-**Function-based DI** — decorator va metadata kerak emas. Dependency lar explicit funksiya parameter lari orqali beriladi.
+**Function-based DI** — decorator/metadata umuman ishlatilmaydi. Dependency'lar oddiy funksiya parametr'lari yoki factory'lar orqali explicit beriladi. Composition root (`createApp` kabi funksiya) qo'lda yoziladi — kim kimga muhtoj ekanligi kodda ko'rinib turadi. Type system natural ishlaydi: interface'lar to'g'ridan-to'g'ri parametr type'i sifatida, token kerakmas.
 
 | Xususiyat | Decorator-based | Function-based |
 |-----------|----------------|----------------|
-| Runtime overhead | Metadata + polyfill | Yo'q |
-| TC39 mos | ❌ (legacy kerak) | ✅ |
-| Type safety | Token system kerak | Natural |
-| Tree-shaking | Qiyinroq | Osonroq |
+| Setup | `reflect-metadata` + tsconfig flag'lar | Hech narsa |
+| Runtime overhead | Polyfill + metadata lookup | Yo'q |
+| TC39 Stage 3 mos | Ishlamaydi (legacy kerak) | To'liq mos |
+| Interface support | Token system shart (interface'lar erase bo'ladi) | Natural — parametr type sifatida |
+| Bundle size | reflect-metadata ~50 KB minified | Yo'q qo'shimcha |
+| Tree-shaking | Qiyin (decorator side effect) | Tabiiy |
+| Magic darajasi | Yuqori (avtomatik graph) | Past (explicit) |
+| Framework mos | Angular/NestJS standart | React, plain TS |
 
-TC39 decorator larda `emitDecoratorMetadata` **ishlamaydi** va parameter decorator **yo'q**. Function-based DI TC39 bilan to'liq mos.
+TC39 Stage 3 decorator'lar 2025 da TypeScript 5.0+ da Stage 3'ni qabul qilgan; lekin `emitDecoratorMetadata` Stage 3 decorator'lar bilan **ishlamaydi** — `design:paramtypes` emit qilinmaydi. Parameter decorator (`@inject(token)` ko'rinishida) Stage 3'da yo'q. Shu sababli zamonaviy DI uchun `Symbol.metadata` (TS 5.2+) yoki function-based yondashuvga o'tish trend bo'lib boryapti.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
 ```typescript
+interface IDatabase { query(sql: string): unknown[]; }
+interface ILogger { log(msg: string): void; }
+
 // === Decorator-based (legacy) ===
 @injectable()
-class UserService {
+class UserServiceDecorated {
   constructor(@inject("DB") private db: IDatabase) {}
+  getUsers() { return this.db.query("SELECT * FROM users"); }
 }
-// Kerak: reflect-metadata, experimentalDecorators, emitDecoratorMetadata
+// Kerak: reflect-metadata, experimentalDecorators, emitDecoratorMetadata, @inject token
 
 // === Function-based (zamonaviy) ===
-function createUserService(db: IDatabase): UserService {
+interface IUserService {
+  getUsers(): unknown[];
+}
+
+function createUserService(db: IDatabase): IUserService {
   return { getUsers: () => db.query("SELECT * FROM users") };
 }
-// Kerak: hech narsa — oddiy funksiya
+// Kerak: hech narsa — oddiy funksiya, hech qanday metadata yo'q
 
-// === Factory pattern (DI siz ham ishlaydi) ===
+// === Composition root (DI container'siz ham ishlaydi) ===
+interface AppConfig { logLevel: "info" | "debug"; dbUrl: string; }
+
+class ConsoleLogger implements ILogger {
+  constructor(private level: AppConfig["logLevel"]) {}
+  log(msg: string) { console.log(`[${this.level}] ${msg}`); }
+}
+
+class PostgresDB implements IDatabase {
+  constructor(private url: string) {}
+  query(sql: string): unknown[] { /* real client */ return []; }
+}
+
 function createApp(config: AppConfig) {
+  // Dependency graph qo'lda quriladi — hech qanday magic yo'q
   const logger = new ConsoleLogger(config.logLevel);
   const db = new PostgresDB(config.dbUrl);
-  const userService = new UserService(logger, db);
-  return { userService };
+  const userService = createUserService(db);
+  return { userService, logger };
 }
+
+const app = createApp({ logLevel: "info", dbUrl: "postgres://localhost/app" });
+app.userService.getUsers();
 ```
 
 </details>
@@ -729,15 +880,16 @@ class FactoryContainer {
 <summary>Javob</summary>
 
 ```typescript
+interface User { id: string; name: string; email: string; }
 interface IEmailService { send(to: string, body: string): Promise<void>; }
-interface IUserRepo { save(user: any): Promise<void>; findByEmail(email: string): Promise<any>; }
+interface IUserRepo { save(user: User): Promise<void>; findByEmail(email: string): Promise<User | null>; }
 
 class UserService {
   constructor(private email: IEmailService, private repo: IUserRepo) {}
-  async register(name: string, email: string) {
+  async register(name: string, email: string): Promise<User> {
     const existing = await this.repo.findByEmail(email);
     if (existing) throw new Error("Email exists");
-    const user = { name, email };
+    const user: User = { id: crypto.randomUUID(), name, email };
     await this.repo.save(user);
     await this.email.send(email, `Welcome, ${name}!`);
     return user;
@@ -746,7 +898,10 @@ class UserService {
 
 // Test:
 const mockEmail: IEmailService = { send: jest.fn().mockResolvedValue(undefined) };
-const mockRepo: IUserRepo = { save: jest.fn().mockResolvedValue(undefined), findByEmail: jest.fn().mockResolvedValue(null) };
+const mockRepo: IUserRepo = {
+  save: jest.fn().mockResolvedValue(undefined),
+  findByEmail: jest.fn().mockResolvedValue(null),
+};
 const service = new UserService(mockEmail, mockRepo);
 
 await service.register("Ali", "ali@test.com");

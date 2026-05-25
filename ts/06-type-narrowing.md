@@ -2,7 +2,7 @@
 
 > Type narrowing — TypeScript'ning union type'ni aniqroq type'ga **toraytirish** mexanizmi. `string | number` tipidagi qiymatni runtime tekshiruvi orqali `string` yoki `number` ga toraytirish — bu narrowing. TS kompilatori bu ishni **Control Flow Analysis (CFA)** orqali bajaradi — kodning har bir nuqtasida o'zgaruvchining aniq type'ini hisoblaydi.
 >
-> Narrowing — TypeScript bilan ishlashning **asosiy ko'nikmasi**. Union type yaratish oson — uni to'g'ri narrow qilish qiyinroq. Bu bo'limda `typeof`, `instanceof`, `in`, custom type guards, assertion functions, `satisfies` va closure narrowing kabi barcha mexanizmlarni chuqur ko'ramiz.
+> Narrowing — TypeScript bilan ishlashning **asosiy ko'nikmasi**. Union type yaratish oson — uni to'g'ri narrow qilish qiyinroq. Bu bo'lim `typeof`, `instanceof`, `in`, custom type guards, assertion functions, `satisfies` va closure narrowing kabi barcha mexanizmlarni chuqur yoritadi.
 
 ---
 
@@ -241,7 +241,7 @@ CFA ikki yo'nalishda ishlaydi:
 
 `return`, `throw`, `break`, `continue` statement'lari **unreachable code** yaratadi — shu branch'dan chiqilganidan so'ng, qolgan kodda shu holat bo'lishi mumkin emas. Kompilator buni qayd etadi va keyingi kod uchun type'ni yangilaydi.
 
-CFA **intra-procedural** — faqat bitta funksiya ichidagi flow'ni tahlil qiladi. Funksiyalararo (`someFunction()` chaqiruvi ichida nima sodir bo'lishi) kuzatilmaydi — kompilator pessimistik yondashuv tanlaydi yoki property narrowing'ni invalidate qiladi (pastda ko'ramiz).
+CFA **intra-procedural** — faqat bitta funksiya ichidagi flow'ni tahlil qiladi. Funksiyalararo (`someFunction()` chaqiruvi ichida nima sodir bo'lishi) kuzatilmaydi — kompilator pessimistik yondashuv tanlaydi yoki property narrowing'ni invalidate qiladi (pastda batafsil yoritiladi).
 
 </details>
 
@@ -1262,7 +1262,7 @@ x = true;    // x: boolean (narrowed)
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Assignment narrowing `checker.ts` dagi `getAssignmentReducedType()` va `getNarrowedTypeByFlowType()` funksiyalari orqali ishlaydi. Har bir assignment'da kompilator ikkita type'ni solishtiradi:
+Assignment narrowing `checker.ts` dagi `getAssignmentReducedType()` va `getFlowTypeOfReference()` funksiyalari orqali ishlaydi. Har bir assignment'da kompilator ikkita type'ni solishtiradi:
 
 1. **Declared type** — o'zgaruvchining e'lon qilingan type'i (`let x: T`)
 2. **Assigned value type** — berilayotgan qiymatning inferred type'i
@@ -1527,8 +1527,8 @@ button.addEventListener("click", () => console.log("clicked"));
 
 // Agar "submit" id'si yo'q bo'lsa — runtime crash
 
-// 2. Test environment'da
-import { beforeEach } from "some-test-lib";
+// 2. Test environment'da (Jest, Vitest)
+declare function beforeEach(fn: () => void): void;
 
 let user: { name: string } | undefined;
 
@@ -1721,13 +1721,13 @@ function example(input: unknown): void {
 
 **Nima uchun bu cheklov?** Type guard'ning ichki mantiqini statik tahlil qilish — TS kompilatori uchun deyarli imkonsiz. Type guard murakkab runtime tekshiruvlar qila oladi (network, filesystem, crypto), va TS ularning barchasini tushunishi qiyin. Shuning uchun TS developer'ga ishonadi va type'ni taxmin qilmaydi.
 
-**Ishonchli type guard yozish uchun:**
+**Ishonchli type guard talablari:**
 
-1. Har tekshirilayotgan property'ni aniq tekshiring
-2. `typeof`, `instanceof`, `in` kabi operator'lardan foydalaning
-3. Nested object'lar uchun rekursiv tekshirish yozing
-4. `null`/`undefined` uchun alohida tekshirish qiling (`typeof null === "object"` bug'i)
-5. Test yozing — runtime xato'larni ushlash uchun
+1. Har tekshirilayotgan property aniq tekshirilishi shart
+2. `typeof`, `instanceof`, `in` kabi operator'lar bilan validation amalga oshiriladi
+3. Nested object'lar uchun rekursiv tekshirish yozilishi kerak
+4. `null`/`undefined` alohida tekshiriladi (`typeof null === "object"` legacy bug tufayli)
+5. Unit testlar yozilishi tavsiya etiladi — runtime xatolarni ushlash uchun
 
 **Generic type guard'lar:** Type guard generic ham bo'lishi mumkin:
 
@@ -2444,12 +2444,12 @@ function problematic(): void {
 }
 ```
 
-**Immutable reference qoidasi:** TS narrowing'ni saqlashi uchun o'zgaruvchi **immutable reference** bo'lishi kerak:
+**Immutable reference qoidasi:** TS closure ichida narrowing'ni saqlashi uchun o'zgaruvchi narrowing nuqtasidan keyin **qayta assign qilinmagan** bo'lishi kerak:
 
-- ✅ **Parameter** — funksiya parameter'lari reassign'ga chidamli
-- ✅ **`const`** — qayta assign qilinmaydi
-- ⚠️ **`let`** — reassign bo'lishi mumkin, CFA pessimistik
-- ⚠️ **Object property** — funksiya call'dan keyin invalidate bo'ladi
+- ✅ **`const`** — sintaktik jihatdan reassign mumkin emas, narrowing har doim (barcha TS versiyalarida) saqlanadi
+- ✅ **Parameter** — texnik jihatdan funksiya ichida reassign mumkin (`function f(x) { x = 5 }`); reassign yo'q bo'lsa, kompilator `const` kabi qabul qiladi va closure narrowing eski versiyalarda ham saqlanadi
+- ⚠️ **`let`** — reassign bo'lishi mumkin; TS 5.3 va oldingi versiyalar pessimistik (har doim invalidate qilardi); TS 5.4+ last-assignment analysis bilan saqlay oladi
+- ⚠️ **Object property** — funksiya call'dan keyin TS optimistik (narrowing saqlaydi, lekin mutation kuzatilmaydi — runtime risk)
 
 **TS 5.4 yaxshilanishi:** TypeScript 5.4 da "preserved narrowing in closures after last assignment" feature qo'shildi. Endi `let` o'zgaruvchi ham closure ichida narrowing'ni saqlaydi, agar narrowing'dan keyin o'zgaruvchi **qayta assign qilinmagan** bo'lsa. Kompilator last-assignment analysis qiladi va closure'ning ishlatilayotgan nuqtasida o'zgaruvchining mumkin bo'lgan qiymatlarini aniqlaydi.
 
@@ -2476,10 +2476,10 @@ Qaror berish qadamlari:
    TS 5.4+:         TEKSHIRADI    → assign yo'q → narrowing saqlanadi
 ```
 
-**"Immutable reference" tushunchasi:** Kompilator uchun o'zgaruvchi "immutable reference" bo'lsa, undagi narrowing istalgan closure'da saqlanadi. Immutable reference uchun shartlar:
+**"Immutable reference" tushunchasi:** Kompilator uchun o'zgaruvchi narrowing nuqtasidan keyin qayta assign qilinmagan bo'lsa, undagi narrowing istalgan closure'da saqlanadi:
 
-1. **Parameter** — har doim immutable (funksiya tashqarisidan reassign bo'la olmaydi)
-2. **`const` o'zgaruvchi** — har doim immutable
+1. **`const` o'zgaruvchi** — sintaktik jihatdan har doim immutable
+2. **Parameter** — funksiya tashqarisidan reassign mumkin emas, **lekin ichida** mumkin (`function f(x) { x = 5 }` valid). Agar funksiya tanasida parameter qayta assign qilinmagan bo'lsa, TS uni `const` kabi ishlatadi
 3. **`let` o'zgaruvchi TS 5.4+ bilan:**
    - Narrowing nuqtasidan keyin qayta assign YO'Q
    - Closure ichida ham qayta assign YO'Q
@@ -2597,15 +2597,14 @@ function iterate(items: (string | number)[]): void {
   });
 }
 
-// 7. Object property — funksiya call'dan keyin invalidate
+// 7. Object property — funksiya call'dan keyin TS optimistik
 function propertyNarrowing(obj: { value: string | null }): void {
   if (obj.value !== null) {
     // obj.value: string
 
     logMessage("checking"); // ⚠️ funksiya call
-    // TS pessimistik: obj.value narrowing saqlaymi?
-    // Ha, saqlaydi (TS ishonchlilik uchun pessimistik emas bu holatda)
-    // Lekin logMessage obj.value'ni null qilishi mumkin — runtime risk
+    // TS optimistik: obj.value narrowing'ni saqlaydi (intra-procedural cheklov)
+    // logMessage obj.value'ni null qilishi mumkin — lekin TS buni kuzatmaydi
 
     console.log(obj.value.toUpperCase()); // ✅ TS ruxsat, runtime risk bor
   }
@@ -2993,7 +2992,7 @@ Bu faqat `const` declaration'lar uchun ishlaydi, `let` uchun emas (chunki `let` 
 
 ### 5. Closure narrowing — TS 5.4+ da yaxshilandi
 
-Yuqorida ko'rdik: `let` o'zgaruvchi closure ichida narrowing'ni saqlash faqat TS 5.4 dan boshlab ishonchli (last-assignment analysis bilan).
+Yuqorida ko'rsatilganidek, `let` o'zgaruvchi closure ichida narrowing'ni saqlash faqat TS 5.4 dan boshlab ishonchli (last-assignment analysis bilan).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -3138,7 +3137,7 @@ function withClosure(getValue: () => string | number): void {
 
 ## Edge Cases va Gotchas
 
-Bu bo'limda TS narrowing'ning nozik holatlarini ko'ramiz — kod normal ishlayotgandek tuyuladi, lekin runtime yoki compile-time'da kutilmagan natija berish mumkin.
+Bu bo'lim TS narrowing'ning nozik holatlarini yoritadi — kod normal ishlayotgandek tuyuladi, lekin runtime yoki compile-time'da kutilmagan natija berishi mumkin.
 
 ### 1. `typeof null === "object"` — JS Legacy Bug
 
@@ -3223,21 +3222,21 @@ function example(): void {
 
 Loop boshida va oxirida kompilator o'zgaruvchi type'ni declared type'ga qaytaradi — aks holda loop body'ning birinchi va keyingi iteratsiyalari uchun turlicha narrowing bo'lishi kerak, bu algoritmni juda murakkablashtiradi.
 
-### 4. `in` Operator Optional Property'ni "Bor" Deb Hisoblaydi
+### 4. `in` Operator Optional Property bilan — Qiymat hali ham undefined bo'lishi mumkin
 
-`in` operator narrowing optional property'larni "bor" deb hisoblaydi — lekin runtime'da ularning qiymati `undefined` bo'lishi mumkin.
+`in` operator narrowing optional property'larni "deklaratsiyalangan" deb hisoblaydi — lekin qiymat tipi `T | undefined` bo'lib qoladi (default `exactOptionalPropertyTypes: false` rejimida). Runtime'da `obj.prop === undefined` bo'lishi mumkin, hatto `"prop" in obj` true qaytarsa ham.
 
 ```typescript
 interface User {
   name: string;
-  email?: string; // optional
+  email?: string; // optional → string | undefined
 }
 
 function processUser(user: User): void {
   if ("email" in user) {
-    // TS: user.email: string (optional bo'lsa ham "bor")
-    // ⚠️ Lekin runtime'da user.email === undefined bo'lishi mumkin
-    console.log(user.email.toUpperCase()); // Runtime error!
+    // user.email: string | undefined (optional tip saqlanadi)
+    // ❌ user.email.toUpperCase(); // TS xato: 'Object is possibly undefined'
+    // Hatto TS xato bermasa ham, runtime'da undefined bo'lishi mumkin
   }
 }
 
@@ -3249,7 +3248,7 @@ function processUserSafe(user: User): void {
 }
 ```
 
-Bu cheklov `strictNullChecks` rejimidan qat'iy nazar — TS'ning `in` operator narrowing algoritmi optional property'lar bilan nozik muammoga ega.
+`exactOptionalPropertyTypes: true` (TS 4.4+) bilan optional `email?: string` aniq `string` (undefined emas) bo'ladi — lekin property mavjud bo'lmasligi mumkin. Default rejimda esa optional = `T | undefined` bo'lganligi sababli, `in` check yetarli emas — qiymat undefined emasligini alohida tekshirish kerak.
 
 ### 5. Aliased Type Guard Faqat `const` Bilan
 
@@ -3736,7 +3735,7 @@ Real-world use case'lar:
 
 ## Xulosa
 
-Bu bo'limda TypeScript'ning type narrowing mexanizmini chuqur o'rgandik — CFA'dan boshlab, har bir narrowing turi va nozik holatigacha:
+Bu bo'lim TypeScript'ning type narrowing mexanizmini chuqur yoritdi — CFA'dan boshlab, har bir narrowing turi va nozik holatigacha:
 
 **Asosiy tushunchalar:**
 

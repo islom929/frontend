@@ -234,7 +234,7 @@ let dir: Direction = "up";
 // dir = "diagonal"; // ❌ "diagonal" union'da yo'q
 ```
 
-**Muhim cheklov:** Union tipida faqat **barcha member'larga umumiy** bo'lgan property va metod'larni ishlatish mumkin. Masalan, `string | number`'da faqat ikkalasida ham bor bo'lgan `.toString()`, `.valueOf()` ishlaydi. `.toUpperCase()` (faqat string) yoki `.toFixed()` (faqat number) — narrowing'siz ishlamaydi.
+**Muhim cheklov:** Union tipida faqat **barcha member'larga umumiy** bo'lgan property va method'larni ishlatish mumkin. Masalan, `string | number`'da faqat ikkalasida ham bor bo'lgan `.toString()`, `.valueOf()` ishlaydi. `.toUpperCase()` (faqat string) yoki `.toFixed()` (faqat number) — narrowing'siz ishlamaydi.
 
 ```typescript
 function printValue(value: string | number): void {
@@ -294,14 +294,14 @@ const id3 = "abc" as const; // type: "abc"
 
 **Property access'da common members:**
 
-Union'da property access'ida `checker.ts` `getPropertyOfUnionOrIntersectionType()` funksiyasini chaqiradi. Bu funksiya **barcha** member tiplarda mavjud bo'lgan property'lar topadi — faqat umumiy property'lar accessible.
+Union'da property access'da kompilator **barcha** member tiplarda mavjud bo'lgan property'lar topadi — faqat umumiy property'lar accessible.
 
 **Union size:**
 
-Union member'lar soni texnik jihatdan cheklanmagan, lekin amaliy cheklov bor:
-- Distribution paytida union size cheklanadi (taxminan 100'lar atrofida)
-- Juda katta union'lar performance'ga ta'sir qiladi — checker O(n) iteratsiya qiladi
-- TS team recommend: 100'dan kam member (lekin `tsc` ko'p ko'proq member'larni qo'llab-quvvatlaydi)
+Union member'lar soni texnik jihatdan cheklanmagan, lekin amaliy cheklovlar bor:
+- Distribution natijasi katta bo'lib ketishi mumkin — kompilator ichki kompleksitet limit'lariga (instantiation depth/count) yetganda xatolik beradi
+- Juda katta union'lar performance'ga ta'sir qiladi — checker member'lar bo'ylab iteratsiya qiladi
+- Amaliy tavsiya: union'ni keng emas, balki kichik discriminated union'larga bo'lib chiqish; juda katta enum'larga `as const` object yaxshiroq
 
 Runtime'da union type'ning izi yo'q — faqat `typeof`, `instanceof`, `in` kabi JS tekshiruvlar qoladi.
 
@@ -905,17 +905,25 @@ function handle(response: HttpResponse | HttpError): void {
 }
 ```
 
-**TS 4.9'gacha qat'iy cheklov:** `in` operator faqat **discriminating property** bo'lganda narrowing qilardi — ya'ni property faqat bitta union member'da bo'lsa. **TS 4.9+ dan boshlab** `in` operator yanada kuchli — object'ni narrow qilish uchun property mavjudligi yetarli, hatto discriminating bo'lmasa ham.
+**TS 4.9+ yaxshilanish:** Eski versiyalarda `in` operator faqat union member'larida deklaratsiya qilingan property bilan narrowing qilardi. **TS 4.9'dan boshlab** `in` operator hatto `unknown` yoki property hech bir variantda deklaratsiya qilinmagan holatda ham narrowing qiladi — natija `Record<"X", unknown>` bo'ladi.
 
 ```typescript
-// TS 4.9+ yaxshilanish
+// TS 4.9+ — unknown bilan ham narrowing
+function process(value: unknown): void {
+  if (typeof value === "object" && value !== null && "id" in value) {
+    // TS 4.9+: value: object & Record<"id", unknown>
+    // Eski TS: faqat `object` (id'siz)
+    console.log(value.id);
+  }
+}
+
+// Union'da ham — property faqat bitta variantda
 type A = { shared: string };
 type B = { shared: string; onlyB: boolean };
 
-function process(value: A | B): void {
+function process2(value: A | B): void {
   if ("onlyB" in value) {
-    // TS 4.9+: value: B (narrowed)
-    // Eski TS: narrowing ishlamas edi
+    // value: B (narrowed) — bu pattern eski versiyalarda ham ishlardi
     console.log(value.onlyB);
   }
 }
@@ -1177,7 +1185,7 @@ Intersection — ikki tip'ning "umumiy elementlari" to'plami. Agar:
 - `A = "a"` va `B = "a" | "b"` → `A & B = "a"`
 - `A = {name: string}` va `B = {age: number}` → `A & B = {name: string, age: number}` (har ikki property'ga ega bo'lgan object'lar)
 
-Object'larda intersection "property union" kabi ko'rinadi — chunki object'ning ikkala constraint'ga mos kelish uchun **har ikkala** property'ga ega bo'lishi kerak.
+Object'larda intersection — "property union" semantikasiga ega: object'ning ikkala constraint'ga mos kelish uchun **har ikkala** property'ga ega bo'lishi kerak.
 
 **`never` kengayishi:**
 
@@ -1379,7 +1387,7 @@ Tip'lar "qiymatlar to'plami" deb qaralsa:
 - `number` = barcha number qiymatlari
 - `string ∩ number` = ikkalasida ham bor bo'lgan qiymatlar = **bo'sh to'plam** = `never`
 
-`never` — **bottom type**. TypeScript type theory'da empty set'ni ifodalaydi. "Hech qanday qiymat mavjud emas" degan ma'noni beradi. Bu mantiqiy to'g'ri: hech qanday qiymat bir vaqtda string ham number ham bo'la olmaydi (bigint'dan tashqari — alohida primitive).
+`never` — **bottom type**. TypeScript type theory'da empty set'ni ifodalaydi. "Hech qanday qiymat mavjud emas" degan ma'noni beradi. Bu mantiqiy to'g'ri: hech qanday qiymat bir vaqtda string ham, number ham bo'la olmaydi — disjoint primitive'lar `never`'ga aylanadi (`string & boolean`, `number & bigint` ham bir xil natija beradi).
 
 **Real-world ogohlantiruvchi:**
 
@@ -1996,7 +2004,7 @@ function move(animal) {
 
 Exhaustive checking — union tipi'ning **barcha** member'lari handle qilinganligini **compile-time'da** tekshirish. `switch` yoki `if-else` zanjirida barcha holatlar ko'rib chiqilgandan keyin, qolgan tip `never` bo'lishi kerak. Agar yangi member qo'shilsa va handle qilinmasa — TypeScript **compile-time xato** beradi.
 
-Bu pattern production'da juda muhim: yangi variant qo'shganda, barcha ishlov beruvchi joylarni topib yangilash — **compiler** ta'minlaydi. Silent bug'lar o'rniga kompilyatsiya xatosi.
+Bu pattern production kodda asosiy safety mexanizmi: yangi variant qo'shilganda, barcha ishlov beruvchi joylarni topib yangilash — **compiler** ta'minlaydi. Silent bug'lar o'rniga kompilyatsiya xatosi.
 
 ```typescript
 type Shape =
@@ -2634,7 +2642,7 @@ function createElement(tag: string): HTMLElement {
 
 const div = createElement("div");    // HTMLDivElement
 const input = createElement("input"); // HTMLInputElement
-const custom = createElement("foo");  // HTMLElement (fallback)
+const custom = createElement("section");  // HTMLElement (fallback — overload mos kelmaydi)
 
 // Case 4: Generic conditional (advanced)
 type ParseResult<T> =
@@ -2689,7 +2697,7 @@ function parseInput(input) {
 
 ### Nazariya
 
-`satisfies` operator (TS 4.9+) — qiymatning tipini **tekshiradi**, lekin tipni **kengaytirmaydi**. Bu union va literal type'lar bilan ishlaganda juda foydali — har qiymatning aniq literal tipi saqlanadi.
+`satisfies` operator (TS 4.9+) — qiymatning tipini **tekshiradi**, lekin tipni **kengaytirmaydi**. Union va literal type'lar bilan ishlaganda har qiymatning aniq literal tipi saqlanadi — bu type annotation'dan farqli xulq.
 
 ```typescript
 type Color = "red" | "green" | "blue";
@@ -2925,20 +2933,24 @@ function check(val: string | object | null) {
 
 ---
 
-### 🕳 Gotcha 3: Intersection — primitive va object aralash
+### 🕳 Gotcha 3: Intersection — primitive va object
 
 ```typescript
-type A = string;
-type B = { length: number };
+// Primitive + uning shape'iga mos object — primitive'ga reduce
+type A = string & { length: number };
+const x: A = "hello"; // ✅ — string'da allaqachon length: number bor
 
-type AB = A & B;
-// Texnik jihatdan: string bilan { length: number }
-// string da length bor — compile qiladi
-// Lekin amalda object yaratib bo'lmaydi:
-// const x: AB = ??? // impossible
+// Primitive + disjoint object — intersection saqlanadi (never EMAS)
+type B = string & { customField: number };
+const y: B = "hello"; // ❌ "hello" — string, customField yo'q
+const z: B = "hello" as B; // ✅ assertion bilan mumkin (branded types pattern asosi)
+
+// Disjoint primitive — never
+type C = string & number; // never (ikki disjoint primitive)
+type D = "a" & "b"; // never (disjoint literal'lar)
 ```
 
-**Sabab:** Primitive va object'ni intersection qilish noaniq holat. `string` primitive, `{ length: number }` object — ikkalasi bir vaqtda bo'la olmaydi. Compiler bu narsa'ni "technically valid" deb qabul qiladi (chunki `string` o'zi `{ length: number }` shape'iga ega), lekin runtime'da hech qanday qiymat bunday tipda bo'lmaydi. Bu "unsoundness" holati.
+**Sabab:** Intersection ikkala tipga ham mos qiymatni talab qiladi. `string & { length: number }` — `length` allaqachon `string`'da bor, intersection valid (`"hello"` qabul qilinadi). `string & { customField: number }` — intersection **saqlanadi** (not collapsed to `never`), lekin oddiy string literal bilan inhabit qilib bo'lmaydi; faqat `as` assertion orqali yaratiladi. Bu **branded types** pattern'ining asosi: `type UserId = string & { __brand: "UserId" }`. **Disjoint primitive'lar** (`string & number`, `"a" & "b"`) esa `never` — bir vaqtda ikkala disjoint qiymat bo'la olmaydi.
 
 ---
 
@@ -3289,7 +3301,7 @@ const c2: C = { x: 1, y: 42, z: true };
 // ❌ y: string & number = never, 42 ham never'ga mos kelmaydi
 
 const c3: C = { x: 1, z: true };
-// ❌ y property majburiy (bor, lekin never type), va obyektda yo'q
+// ❌ y property majburiy (bor, lekin never type), va object'da yo'q
 
 // C = { x: number; y: never; z: boolean }
 // y property: string & number = never

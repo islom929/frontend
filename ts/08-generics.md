@@ -202,7 +202,7 @@ Function declaration, function expression va arrow funksiyalar — uchala shakld
 
 Kompilator generic funksiyani parse qilganda, `<T>` type parameter list `typeParameters` property'da saqlanadi — value parameter'lardan butunlay alohida AST branch.
 
-Har call site'da kompilator `checker.ts` ichida **type parameter instantiation** jarayonini boshlaydi. `identity<number>(42)` chaqirilganda yangi type scope yaratiladi va `T = number` binding qo'yiladi. Signature'dagi barcha `T` o'rniga `number` qo'yilib tekshiriladi — parameter type, return type, body ichidagi operatsiyalar.
+Har call site'da kompilator **type parameter instantiation** jarayonini boshlaydi. `identity<number>(42)` chaqirilganda yangi type scope yaratiladi va `T = number` binding qo'yiladi. Signature'dagi barcha `T` o'rniga `number` qo'yilib tekshiriladi — parameter type, return type, body ichidagi operatsiyalar.
 
 **Instantiation har call uchun alohida:** `identity<number>` va `identity<string>` — ikki mustaqil instantiation, bir-biriga ta'sir qilmaydi. Har chaqiriq o'z scope'ida T'ni boshqa type bilan bog'laydi.
 
@@ -284,7 +284,7 @@ function find<T>(arr: T[], predicate: (item: T) => boolean): T | undefined {
   return undefined;
 }
 
-const user = find([{ name: "Ali" }, { name: "Vali" }], u => u.name === "Ali");
+const user = find([{ name: "Ali" }, { name: "Vali" }], item => item.name === "Ali");
 // user: { name: string } | undefined
 ```
 
@@ -317,13 +317,17 @@ const b = identity(42);       // T = number (inference)
 **Inference ko'plab argumentlardan:** Agar bir nechta argument bo'lsa, kompilator har biridan type candidate yig'adi va **best common type** algoritmi bilan yakuniy type'ni tanlaydi.
 
 ```typescript
-function merge<T>(a: T, b: T): T {
+// `T extends object` — spread operatsiyasi unconstrained `T` ustida ishlamaydi
+function merge<T extends object, U extends object>(a: T, b: U): T & U {
   return { ...a, ...b };
 }
 
 merge({ x: 1 }, { y: "a" });
-// T = { x: number } | { y: string } — common type
+// T = { x: number }, U = { y: string }
+// natija type: { x: number } & { y: string }
 ```
+
+`merge<T>(a: T, b: T): T` versiyasi tanqidiy: bir `T` parameter ikkita disjoint object'ni qabul qila olmaydi — TS birinchi argumentdan T'ni fix qiladi va ikkinchisida xato beradi (best-common-type union faqat array literal yoki return contextda ishlaydi).
 
 **Contextual inference** — callback'da parameter type avtomatik infer bo'ladi:
 
@@ -415,14 +419,22 @@ function pair<T, U>(first: T, second: U): [T, U] {
 const p1 = pair("name", 25);          // [string, number]
 const p2 = pair(true, { id: 1 });     // [boolean, { id: number }]
 
-// 5. Best common type
+// 5. Best common type — array literal yoki return contextda
+const mixed = [1, "a", true];
+// `T = number | string | boolean` — array literal best-common-type
+
+// Diqqat — ikki parametrli inference:
 function mostSpecific<T>(a: T, b: T): T {
   return a;
 }
 
 mostSpecific(1, 2);                // T = number
 mostSpecific("a", "b");            // T = string
-mostSpecific({ a: 1 }, { b: 2 });  // T = { a: number } | { b: number }
+// mostSpecific({ a: 1 }, { b: 2 });
+// ❌ TS birinchi argumentdan T = { a: number } fix qiladi,
+// ikkinchisi unga assign bo'lmaydi:
+// "Argument of type '{ b: number; }' is not assignable to parameter of type '{ a: number; }'"
+// (best-common-type union ikki paired-parameter ustida ishlamaydi)
 
 // 6. Partial<T> bilan inference
 function update<T>(target: T, source: Partial<T>): T {
@@ -520,16 +532,16 @@ fn<boolean, string>(true, "a"); // Ikkalasi explicit
 
 ```typescript
 // 1. Argumentsiz funksiya — explicit shart
+interface User {
+  name: string;
+}
+
 function createEmptyArray<T>(): T[] {
   return [];
 }
 
 const strings = createEmptyArray<string>();  // string[]
 const users = createEmptyArray<User>();       // User[]
-
-interface User {
-  name: string;
-}
 
 // 2. JSON.parse pattern
 function parseJSON<T>(json: string): T {
@@ -832,7 +844,7 @@ Yechim: method'ni o'z type parameter'i bilan qilish (method-level generic, class
 
 **Constructor inference:** `new Stack<number>()` — explicit. Lekin agar constructor argument qabul qilsa, kompilator inference qiladi: `new Box(42)` → `Box<number>`. Bu TypeScript'ning uzoq vaqtdan beri qo'llab-quvvatlaydigan xususiyati.
 
-**Instantiation expressions** (TS 4.7+): `const NumStack = Stack<number>` — class tipini pre-binding qilish. Bu feature factory'larda va dependency injection'da foydali — siz bitta bog'langan class'ni variable sifatida yurita olasiz. Constructor inference (yuqoridagi `new Box(42)`)'dan farqli — bu yangi feature, 4.7 dan oldin yo'q edi.
+**Instantiation expressions** (TS 4.7+): `const NumStack = Stack<number>` — class tipini pre-binding qilish. Bu feature factory'larda va dependency injection'da foydali — bog'langan class variable sifatida uzatiladi. Constructor inference (yuqoridagi `new Box(42)`)'dan farqli — bu yangi feature, 4.7 dan oldin yo'q edi.
 
 **Private initializer emit:** `private items: T[] = []` emit qilinganida `items = []` bo'ladi — type annotation ketadi, lekin initialization expression saqlanadi. Runtime'da `items` oddiy array — hech qanday type enforcement yo'q.
 
@@ -932,16 +944,16 @@ strStack.push("hello");
 strStack.push("world");
 
 // Factory with instantiation expression
+interface Product extends Entity {
+  name: string;
+  price: number;
+}
+
 function createRepositoryFor<T extends Entity>(): Repository<T> {
   return new Repository<T>();
 }
 
 const productRepo = createRepositoryFor<Product>();
-
-interface Product extends Entity {
-  name: string;
-  price: number;
-}
 
 // 6. Multiple type parameters in class
 class KeyValueStore<K, V> {
@@ -1043,7 +1055,7 @@ Generic Constraint Checking Flow:
 
 1. `T` = berilgan argument type
 2. Constraint = `{ length: number }`
-3. `isTypeAssignableTo(T, Constraint)` tekshiradi:
+3. Kompilator `T`'ni `Constraint`'ga assignable ekanini tekshiradi:
    - Constraint'dagi har bir property `T`'da bormi?
    - Property type'lari mos keladimi?
 4. Agar `true` → instantiation davom etadi
@@ -1147,8 +1159,8 @@ function invoke<T extends () => unknown>(fn: T): ReturnType<T> {
   return fn() as ReturnType<T>;
 }
 
-invoke(() => 42);       // number
-invoke(() => "hello");  // string
+const n = invoke(() => 42);       // n: number, qaytadi 42
+const s = invoke(() => "hello");  // s: string, qaytadi "hello"
 ```
 
 </details>
@@ -1229,7 +1241,7 @@ type AccountKeys = keyof Account; // "name" (faqat public)
 - `protected` keyword bilan belgilangan member'lar — `keyof T`'da **yo'q**
 - `#field` (ECMAScript native private) — `keyof T`'da **yo'q**, chunki ular type system perspektivasidan oddiy property emas, balki maxsus syntactic construct
 
-Bu dizayn qarori pedagogik jihatdan muhim: generic funksiyalar faqat public API bilan ishlashi kerak. Agar siz generic'ga private member'larga access kerak bo'lsa, siz encapsulation'ni buzyapsiz — refactor kerak.
+Bu dizayn qarori pedagogik jihatdan muhim: generic funksiyalar faqat public API bilan ishlashi kerak. Generic'ga private member'larga access kerak bo'lsa — encapsulation buzilgan, refactor kerak.
 
 **Runtime'da iz yo'q:** Emit bosqichida `keyof`'ning hech qanday izi qolmaydi. `function getProperty<T, K extends keyof T>(obj: T, key: K): T[K]` → JS'da `function getProperty(obj, key) { return obj[key]; }`. Runtime'da `key`'ning valid ekanligi tekshirilmaydi — `obj[key]` noto'g'ri key bilan `undefined` qaytaradi. Type safety faqat compile-time'da amal qiladi.
 
@@ -2245,16 +2257,19 @@ const form = defineForm([
 // form[0].type: "text" (literal)
 // form[1].required: false (literal, not boolean)
 
-// 5. Enum-like pattern
-function enumOf<const T extends readonly string[]>(...values: T): Record<T[number], T[number]> {
+// 5. Enum-like pattern — mapped type bilan har key alohida literal value
+function enumOf<const T extends readonly string[]>(...values: T): { [K in T[number]]: K } {
   return values.reduce(
     (acc, value) => ({ ...acc, [value]: value }),
-    {} as Record<T[number], T[number]>
+    {} as { [K in T[number]]: K }
   );
 }
 
 const Color = enumOf("red", "green", "blue");
 // Color: { red: "red"; green: "green"; blue: "blue" }
+// MUHIM: Record<T[number], T[number]> ishlatilsa, har key value'si UNION bo'ladi
+// (Color.red: "red" | "green" | "blue") — mapped type { [K in T[number]]: K } esa
+// har key uchun aniq literal qaytaradi
 type ColorType = keyof typeof Color; // "red" | "green" | "blue"
 
 // 6. as const bilan taqqoslash
@@ -2479,6 +2494,9 @@ async function example(): Promise<void> {
 // 4. Factory Pattern
 // ═════════════════════════════════════════════
 
+// `any[]` — construct signature variadic argument'lar uchun zarur.
+// `unknown[]` ham mumkin, lekin Constructor parameter type'lariga assign'da xato beradi
+// (variance position). Bu factory pattern'ning standart implementatsiyasi.
 function createFactory<T>(
   Constructor: new (...args: any[]) => T,
   ...defaultArgs: any[]
@@ -3025,7 +3043,7 @@ memoized(10); // Console: "Computing..." → "10"
 
 **Tushuntirish:**
 
-- `T extends (...args: any[]) => any` — T istalgan funksiya bo'lishi kerak
+- `T extends (...args: any[]) => any` — T istalgan funksiya bo'lishi kerak (constraint pattern; `unknown[]` ishlatilsa, ba'zi funksiyalar variance sababli `T`'ga assign bo'lmaydi)
 - `Parameters<T>` — T'ning parameter type'larini tuple sifatida oladi
 - `ReturnType<T>` — T'ning return type'ini oladi
 - Cache key — `JSON.stringify(args)` (sodda, lekin object argument'larda circular reference bilan muammo bor)

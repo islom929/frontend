@@ -691,7 +691,7 @@ Har bir utility type uchun: nima qiladi + implementation ichidan + real-world us
   - `tsc --watch` — development workflow
   - Node.js `--experimental-strip-types` (22+) — native TS support
 - Tezkor transpilation:
-  - SWC — Rust-based, tsc dan 20x tez
+  - SWC — Rust-based, tsc dan sezilarli tezroq (native parser, type check YO'Q)
   - esbuild — Go-based, tezkor bundler
   - Faqat transpilation — type checking yo'q, `isolatedModules` kerak
 - Zamonaviy toollar:
@@ -816,4 +816,3 @@ Har bir feature uchun: nima, nima uchun, oldin qanday edi, endi qanday, code exa
 - Qaysi versiya qaysi project uchun mos
 - Breaking changes — versiyalar orasida
 - Migration tips — eski versiyadan yangisiga
-

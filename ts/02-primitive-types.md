@@ -324,7 +324,7 @@ Wrapper tiplar (`String`, `Number`, `Boolean`) esa `lib.es5.d.ts`'da `interface`
 
 `string` ni `String` ga assign qilish strukturaviy mos kelish orqali ishlaydi: `String` interface'ning barcha metod'lari (`charAt`, `slice`, `toUpperCase`, ...) `string` primitive'da ham mavjud. Lekin teskarisi ishlamaydi — `String` object qo'shimcha property'larga ega bo'lishi mumkin (masalan, boxed `valueOf` semantikasi).
 
-TypeScript linter qoidasi `@typescript-eslint/ban-types` yoki `tsc`'ning ichki ogohlantirishi `String`/`Number`/`Boolean` annotation'lar uchun "Don't use 'String' as a type" xabarini beradi. Bu checker'ning `checkTypeAnnotationAsExpression` funksiyasidagi maxsus tekshiruvi.
+TypeScript native ravishda wrapper tiplarni taqiqlamaydi — checker `String` ni oddiy interface deb qaraydi va xato bermaydi. ESLint qoidasi `@typescript-eslint/no-restricted-types` (avval `ban-types`, v8 dan beri split qilingan) va `@typescript-eslint/no-wrapper-object-types` `String`/`Number`/`Boolean` annotation'lar uchun "Don't use 'String' as a type" xabarini chiqaradi.
 
 `number` tipi uchun `NaN`, `Infinity`, `-Infinity` ham `TypeFlags.Number`'ga kiradi — checker ular uchun alohida tip yaratmaydi. Shuning uchun **TypeScript'da `NaN` literal type mavjud emas** — `type X = NaN` yozib bo'lmaydi.
 
@@ -457,11 +457,8 @@ TypeScript Type Hierarchy (strict mode):
 
                     ┌───────────┐
                     │  unknown  │  ← top type (TS 3.0+)
-                    └─────┬─────┘
-                          │
-                    ┌─────┴─────┐
-                    │    any    │  ← "opt-out" — har tomonga assign
-                    └─────┬─────┘
+                    └─────┬─────┘    (har qanday tip unknown'ga assign bo'ladi,
+                          │           lekin unknown'dan boshqa tipga — yo'q)
                           │
          ┌────────────────┼──────────────────┐
          ▼                ▼                  ▼
@@ -476,6 +473,11 @@ TypeScript Type Hierarchy (strict mode):
                    ┌──────────┐
                    │   never  │  ← bottom type
                    └──────────┘
+
+`any` — hierarchy'dan TASHQARIDA (special escape hatch):
+                   ┌──────────┐
+                   │   any    │  ← BIDIRECTIONAL: har tomonga va har tomondan
+                   └──────────┘    assign bo'ladi (type safety'ni o'chiradi)
 
 null va undefined strict mode'da — alohida, mustaqil tiplar
 (hech bir concrete tipning tarkibida emas)
@@ -621,7 +623,7 @@ Yangi kodda `any` deyarli hech qachon kerak emas. `unknown` ko'pgina holatlarda 
 `any` TypeScript'ning type checker'da **maxsus holat** — `TypeFlags.Any` flag bilan belgilanadi. Checker `any` tipli qiymatga deyarli barcha operatsiyalarni **tekshirmasdan** o'tkazib yuboradi:
 
 1. **Property access** — `any.foo.bar.baz` — checker `getPropertyOfType`'ni chaqirmaydi, har bir chain bosqichida natija `any` bo'ladi
-2. **Assignability** — `any` **har qanday** tipga assign mumkin (covariant), va **har qanday** tip `any`'ga assign mumkin (contravariant). Checker `isTypeAssignableTo`'da `any` uchun darhol `true` qaytaradi
+2. **Assignability** — `any` bidirectional assignability'ga ega: `any` har qanday tipga assign bo'ladi (`any → T`), shuningdek har qanday tip `any`'ga assign bo'ladi (`T → any`). Bu standart variance qoidalariga zid — `any` `isTypeAssignableTo` checker'da maxsus holat: ikki yo'nalishda ham darhol `true` qaytaradi
 3. **Infectious behavior** — `any` bilan ishlagan ifoda natijasi ham `any` bo'ladi. `checker.ts` dagi `getTypeOfExpression` har qanday operand `any` bo'lsa, natijani ham `any` qiladi
 
 `noImplicitAny: true` (strict'da yoqiq) bo'lganda, checker parameter yoki o'zgaruvchi uchun tipni aniqlay olmasa `TS7006` diagnostikasini beradi: `"Parameter 'x' implicitly has an 'any' type"`. `noImplicitAny: false` da esa jim'gina `any` tayinlaydi — bu yashirin xavf, chunki developer `any` borligini ko'rmaydi.
@@ -1260,11 +1262,13 @@ function run(): void {
   return 42;  // ❌ Type 'number' is not assignable to type 'void'
 }
 
-// Callback parameter'da — arrow/expression yumshoq, declaration qattiq
+// Callback parametr turida void — ikkala shaklda ham yumshoq
 function register(cb: () => void) { cb(); }
 
-register(function() { return 42; });  // ❌ function expression — qattiq
-register(() => 42);                     // ✅ arrow + implicit return — yumshoq
+register(function() { return 42; });  // ✅ function expression — return qiymat ignore
+register(() => 42);                    // ✅ arrow function — return qiymat ignore
+// Ikkalasi ham compile bo'ladi — "void return type" parametrning o'zi leniency beradi.
+// Declaration'da (function run(): void { return 42 }) ESA QATTIQ — qiymat qaytarib bo'lmaydi.
 ```
 
 `void` o'zgaruvchi — **ISHLATMANG**:
@@ -1364,7 +1368,7 @@ TypeScript checker'da `TypeFlags.BigInt` flag bilan ifodalanadi. Checker `bigint
 
 `bigint` literal type ham mavjud: `const x = 100n` → `x` tipi **`100n`** (literal), `let x = 100n` → `x` tipi **`bigint`** (widened). Bu xuddi `number` literal type'lariga o'xshash mexanizm.
 
-**TS 5.6'dan boshlab** `=== NaN` va `bigint === number` kabi "no-op" taqqoslashlar compile warning beradi: `"This comparison appears to be unintentional"`.
+**TS 5.6'dan boshlab** "Disallowed Nullish and Truthy Checks" tekshiruvi kiritildi — har doim true/false bo'ladigan taqqoslashlar uchun ogohlantirish chiqaradi. Bigint va number'ni `===` bilan taqqoslash semantik xato (har doim false), shuning uchun bunday kodlarni avoid qilish tavsiya etiladi.
 
 **symbol:**
 
@@ -1414,8 +1418,8 @@ console.log(big > 50n);  // ✅ true — bigint lar o'zaro taqqoslanadi
 console.log(big === 100n); // ✅ true — bir xil tip va qiymat
 
 // MUHIM: bigint va number'ni `===`/`==` bilan taqqoslash
-// TS 5.6'gacha: hech qanday xato yo'q
-// TS 5.6+: compile warning "This comparison appears to be unintentional"
+// `===` strict equality — turli tipdagi qiymatlar har doim teng emas
+// `==` loose equality — JavaScript runtime'da bigint'ni number'ga coerce qiladi
 console.log(big === 100);  // false — strict equality, turli tip
 console.log(big == 100);   // true — runtime'da loose equality coercion
 
@@ -2226,7 +2230,9 @@ if (value2 !== undefined) {
 
 // Array[index] — noUncheckedIndexedAccess: true bo'lsa T | undefined
 const arr: number[] = [1, 2, 3];
-const first = arr[0]!; // noUncheckedIndexedAccess: true'da T, false'da T
+const first = arr[0]!;
+// noUncheckedIndexedAccess: true  → arr[0]: number | undefined, `!` qo'shgach → number
+// noUncheckedIndexedAccess: false → arr[0]: number, `!` ta'sirsiz (lekin runtime'da undefined bo'lishi mumkin)
 ```
 
 </details>
@@ -2763,7 +2769,7 @@ function worse(a: any, b: any) {
 
 // any va never interaction
 type Impossible<T> = T extends string ? T : never;
-type Result = Impossible<any>;  // string | never = string | never
+type Result = Impossible<any>;  // string (any conditional'da ikkala branch'ni ham qaytaradi: any → string | never = string)
 
 // Ba'zi holatlarda
 type Weird = any & never;  // never (intersection'da never yutadi)
@@ -2802,7 +2808,7 @@ let k: {} = { x: 1 };          // ✅
 // - Record<string, unknown> — yaxshisi, aniq obyekt shape
 ```
 
-**Sabab:** `Object` va `{}` "deyarli hamma narsani qabul qiladi" — faqat `null`/`undefined` emas. Bu wide, noaniq type'lar. `object` esa aniq non-primitive (object, array, function). TypeScript team `@typescript-eslint/ban-types` orqali `Object`, `{}`, `Function`, `String`, `Number`, `Boolean` ishlatishni ogohlantiradi — ular "empty interface" yoki "wrapper object" bo'lib, kutilgan xulqdan farqli ishlaydi.
+**Sabab:** `Object` va `{}` "deyarli hamma narsani qabul qiladi" — faqat `null`/`undefined` emas. Bu wide, noaniq type'lar. `object` esa aniq non-primitive (object, array, function). `@typescript-eslint/eslint-plugin` v8'dan boshlab eski `ban-types` qoidasi `no-empty-object-type`, `no-restricted-types`, `no-wrapper-object-types` ga split qilingan — bu qoidalar `{}`, `Object`, `Function`, `String`, `Number`, `Boolean` annotation'lari uchun ogohlantirish chiqaradi (chunki ular "empty interface" yoki "wrapper object" bo'lib, kutilgan xulqdan farqli ishlaydi).
 
 ---
 

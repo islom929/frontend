@@ -328,10 +328,10 @@ TypeScript da bir nechta resolution strategiya bor:
 | Strategy | tsconfig value | Muhit | Xususiyat |
 |----------|---------------|-------|-----------|
 | **Classic** | `"classic"` | Legacy TS | Hech kim ishlatmaydi |
-| **Node** | `"node"` | Node.js CJS | `node_modules` lookup, `index.js` |
-| **Node16** | `"node16"` | Node.js ESM | `exports` field, `.js` extension kerak |
-| **NodeNext** | `"nodenext"` | Node.js ESM | `node16` bilan bir xil, keyingi versiyalarga moslashadi |
-| **Bundler** | `"bundler"` | Webpack/Vite | ESM + extension-less imports |
+| **Node** | `"node"` | Eski Node.js (CJS) | `node_modules` lookup, `index.js`, `exports` field'ni inkor qiladi |
+| **Node16** | `"node16"` | Modern Node.js (CJS + ESM) | Fayl format `package.json "type"` va kengaytmaga qarab; ESM uchun explicit kengaytma majburiy; `exports` field |
+| **NodeNext** | `"nodenext"` | Modern Node.js (CJS + ESM) | `node16` bilan bir xil semantika, keyingi Node versiyalariga moslashadi |
+| **Bundler** | `"bundler"` | Webpack/Vite/esbuild | ESM-style, extension-less imports, `exports` field |
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -385,7 +385,7 @@ import { User } from "./user"
 
 ```typescript
 import { User } from "./user.js";
-// ⚠️ .js kengaytma MAJBURIY (ESM da extension-less yo'q)
+// Diqqat: .js kengaytma MAJBURIY (ESM da extension-less yo'q)
 // Kompilator .js → .ts mapping qiladi
 ```
 
@@ -958,14 +958,16 @@ Import resolution da ham ta'sir qiladi: `import "./utils.mjs"` ko'rganda kompila
 ```typescript
 import type { UserService } from "./services";
 
-// ❌ — typeof VALUE position da — runtime da UserService ga reference kerak
-// type ServiceType = InstanceType<typeof UserService>;
+// ❌ — typeof operatorining operand'i value position
+type ServiceType = InstanceType<typeof UserService>;
+// Error: 'UserService' cannot be used as a value because it was imported using 'import type'
 
-// ✅ — import type VALUE position da ishlatib bo'lmaydi
-// Yechim: alohida import
-import { UserService } from "./services"; // value import
+// ✅ Yechim: value import qilish
+import { UserService } from "./services";
 type ServiceType = InstanceType<typeof UserService>; // ✅
 ```
+
+**Sabab:** `typeof X` syntax-jihatdan type pozitsiyada, lekin `X` o'zi value sifatida resolve qilinadi (qaysi runtime qiymat'ning type'ini olish kerakligini aniqlash uchun). `import type` bilan import qilingan nom **har qanday value position'da** — shu jumladan `typeof` operand sifatida — ishlatib bo'lmaydi.
 
 ### 2. `verbatimModuleSyntax` va side-effect import lar
 
@@ -999,15 +1001,18 @@ import "reflect-metadata"; // ✅ — side-effect import, qoladi
 declare module "express" {
   interface Request { userId: string; }
 }
-// Bu AMBIENT MODULE DECLARATION — yangi module yaratadi
-// Express ning mavjud Request ga QO'SHMAYDI — uni OVERRIDE qiladi!
+// Bu AMBIENT MODULE DECLARATION — fayl script kontekstda bo'lgani uchun
+// shu nomdagi mustaqil module e'lonini yaratadi. Mavjud Express moduliga
+// MERGE bo'lmaydi — natijada module resolution paytida kompilator boshqa
+// declaration'ni topishi mumkin va siz kutgan augmentation amalga oshmaydi.
 
-// FILE: types.d.ts (module — import bor)
+// FILE: types.d.ts (module — import yoki export bor)
 import "express";
 declare module "express" {
   interface Request { userId: string; }
 }
-// Bu MODULE AUGMENTATION — mavjud module ni kengaytiradi ✅
+// Fayl module kontekstida — bu MODULE AUGMENTATION:
+// mavjud Express modulidagi Request interface'iga merge bo'ladi ✅
 ```
 
 ### 5. `const enum` cross-file inline — `isolatedModules` da ishlamaydi
@@ -1081,19 +1086,21 @@ export type Color = "red" | "green" | "blue"; // ✅ union type
 ### ❌ Xato 5: Module augmentation da `import` ni unutish
 
 ```typescript
-// ❌ import yo'q — ambient declaration (yangi module yaratadi!)
+// ❌ import yo'q — fayl script kontekstida, declare module ambient
+//    module declaration sifatida ishlatiladi (augmentation EMAS)
 declare module "express" {
   interface Request { userId: string; }
 }
 
-// ✅ import bor — augmentation (mavjudni kengaytiradi)
+// ✅ import bor — fayl module kontekstida, declare module mavjud
+//    "express" modulni augmentation qiladi (interface merging)
 import "express";
 declare module "express" {
   interface Request { userId: string; }
 }
 ```
 
-**Nima uchun:** `declare module` script faylda — ambient declaration. Module faylda — augmentation. `import` faylni module qiladi.
+**Nima uchun:** Script faylda `declare module "X"` — ambient module declaration (mavjud module bilan birlashmaydi, alohida declaration sifatida ko'riladi va kutilgan augmentation samarasiz qoladi). Module faylda esa — module augmentation (interface declaration merging tufayli mavjud `Request` ga property qo'shiladi). `import` yoki top-level `export` faylni module kontekstiga o'tkazadi.
 
 ---
 
@@ -1109,6 +1116,7 @@ export interface User { id: number; name: string; }
 // models/product.ts
 export interface Product { id: number; price: number; }
 // models/order.ts
+import type { Product } from "./product";
 export interface Order { id: number; items: Product[]; }
 ```
 

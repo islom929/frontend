@@ -193,7 +193,7 @@ class User {
     return this.email;
   }
 }
-// ❗ private, protected, readonly, type annotations — hammasi yo'q
+// private, protected, readonly, type annotations — hammasi yo'q
 // Runtime'da this.email'ga tashqaridan kirishni hech narsa to'xtatmaydi
 ```
 
@@ -495,8 +495,8 @@ const s = new Secret();
 
 **Qachon qaysi biri?**
 
-- **`#` private** — security kerak bo'lganda (token'lar, secrets, internal state)
-- **TS `private`** — API design niyati bilan, performance muhim bo'lsa (`#` biroz sekinroq)
+- **`#` private** — security kerak bo'lganda (token'lar, secrets, internal state), runtime kafolat
+- **TS `private`** — API design niyati bilan, public API'da property'ni yashirish kifoya bo'lsa
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -532,7 +532,7 @@ Lekin `as any` cast orqali bypass qilish hali ham mumkin:
 
 JavaScript fayldan TypeScript class'ga kirilsa, hech qanday tekshiruv yo'q — JS type checker'ni bilmaydi.
 
-**ECMAScript `#` private mexanizmi:** `#field` sintaksisi ES2022'da standardlashtirilgan. ECMAScript engine runtime'da enforce qiladi — class tashqarisida `#field`'ga kirish **sintaksik xato** (parser bloklidi). Bracket notation ham ishlamaydi, chunki `#` oddiy identifier emas, balki private name.
+**ECMAScript `#` private mexanizmi:** `#field` sintaksisi ES2022'da standardlashtirilgan. ECMAScript engine runtime'da enforce qiladi — class tashqarisida `#field`'ga kirish **sintaksik xato** (parser bloklaydi). Bracket notation ham ishlamaydi, chunki `#` oddiy identifier emas, balki private name.
 
 **Compiled output (target'ga qarab):**
 
@@ -556,7 +556,7 @@ class Counter {
 // Real TypeScript emit biroz murakkab
 ```
 
-**Performance farqi:** `#` private bilan property access biroz sekinroq bo'lishi mumkin — chunki runtime check qiladi. Lekin modern engine'larda optimization bor, aksariyat use case'larda farq sezilmaydi.
+**Runtime mexanizmi:** `#` private bilan property access — runtime'da private name lookup (V8 hidden class slot orqali). TypeScript `private` — oddiy property access (direct slot lookup). Engine optimization farqlarni minimallashtiradi — amaliyotda performance tanlovga ta'sir qilmaydi, encapsulation talabiga qarab tanlanadi.
 
 **Encapsulation niyati:** TypeScript `private` — "public API'da bu property'ni ko'rsatma" degan signal. `#` — "runtime'da ham bu property'ga kirib bo'lmaydi" degan kafolat. Agar siz library yozayotgan bo'lsangiz va foydalanuvchilar JavaScript'dan sizning class'lardan foydalansa — `#` kerak.
 
@@ -983,7 +983,7 @@ class Product {
 2. Constructor body'ning **boshida** (boshqa kod'dan oldin) `this.param = param` assignment qo'shadi
 3. Modifier va type annotation'larni o'chiradi
 
-**Muhim — tartib:** Parameter property assignment'lar constructor body'ning eng boshida bajariladi. Agar super call bo'lsa, super'dan keyin. Bu nozik chekiniq — qo'shimcha logic parameter property'larga tayanishi mumkin:
+**Muhim — tartib:** Parameter property assignment'lar constructor body'ning eng boshida bajariladi. Agar super call bo'lsa, super'dan keyin. Bu nozik nuance — qo'shimcha logic parameter property'larga tayanishi mumkin:
 
 ```typescript
 class Logger {
@@ -1215,7 +1215,7 @@ Instance (new Counter())
 
 **Static member'lar prototype chain'da yo'q** — shuning uchun instance orqali kirib bo'lmaydi. Ular class constructor function'ga to'g'ridan-to'g'ri biriktirilgan.
 
-**Static va inheritance:** Subclass parent'ning static member'larini meros oladi — kompilator buni prototype chain emas, constructor function chain orqali qiladi:
+**Static va inheritance:** Subclass parent'ning static member'larini meros oladi. Bu **constructor object'ining `[[Prototype]]` zanjiri** orqali ishlaydi — `extends` orqasida `Object.setPrototypeOf(Child, Parent)` chaqiruv yotadi. Instance prototype chain `Child.prototype → Parent.prototype` o'zaro alohida (instance method'lar uchun); static lookup esa `Child → Parent` zanjiridan o'tadi:
 
 ```typescript
 class Base {
@@ -2202,13 +2202,16 @@ class Base {
 }
 
 class Derived extends Base {
-  constructor(x: number, public y: number) {
+  y: number;
+  constructor(x: number, y: number) {
     // this.y = y; // ❌ super'dan oldin this'ga kirib bo'lmaydi
     super(x);      // ✅ avval super
-    this.y = y;    // ✅ endi mumkin (parameter property avtomatik qo'shadi)
+    this.y = y;    // ✅ endi mumkin
   }
 }
 ```
+
+Parameter properties bilan yozilsa (`constructor(x: number, public y: number)`), `this.y = y` avtomatik super'dan keyin qo'shiladi — manual yozish shart emas.
 
 **`super.method()` dispatch:** `super.method()` parent class'ning method'ini to'g'ridan-to'g'ri chaqiradi — prototype chain'ni o'tkazib yuboradi. Bu override bo'lgan method'ning parent versiyasiga kirish uchun kerak:
 
@@ -2284,10 +2287,14 @@ class Child extends Base {
 }
 
 // 3. EventEmitter chain
-class EventEmitter {
-  protected listeners: Map<string, Function[]> = new Map();
+// `Function` type — anti-pattern: har qanday args qabul qiladi, return `any` (type safety yo'q),
+// shuningdek har qanday function shape'iga mos keladi. Aniq callable signature afzal.
+type Listener = (...args: unknown[]) => void;
 
-  on(event: string, callback: Function): void {
+class EventEmitter {
+  protected listeners: Map<string, Listener[]> = new Map();
+
+  on(event: string, callback: Listener): void {
     const list = this.listeners.get(event) ?? [];
     list.push(callback);
     this.listeners.set(event, list);
@@ -3168,8 +3175,8 @@ Decorator'ga `ClassAccessorDecoratorTarget` beriladi — original `get` va `set`
 |-----------|----------------|-------------|
 | Storage | Instance property | Private field (`#`) |
 | Runtime privacy | ❌ | ✅ |
-| Decorator intercept | Faqat `@observable` kabi eski API | Native TC39 |
-| Performance | Biroz tez | Biroz sekin (getter/setter overhead) |
+| Decorator intercept | Faqat eski experimental API | Native TC39 Stage 3 |
+| Property access | Direct property lookup | Getter/setter function call |
 | Bekor qilish | Oddiy property — hech narsa | Hech narsa (built-in) |
 
 **Qachon ishlatish:** `accessor` — agar siz decorator ishlatishingiz kerak bo'lsa (validation, reactivity, logging). Oddiy property — boshqa hamma holatlarda.

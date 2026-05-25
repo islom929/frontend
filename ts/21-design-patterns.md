@@ -1,6 +1,6 @@
 # Bo'lim 21: Design Patterns TypeScript da
 
-> Design pattern — takrorlanadigan muammolarga isbot qilingan yechim. TypeScript ning type system i (generics, interfaces, discriminated unions, conditional types) pattern larni **compile-time type safety** bilan kuchaytirib, runtime xatolarni deyarli yo'q qiladi. Har bir pattern TS-specific implementation bilan — type inference, generic constraints, va branded types yordamida — ancha kuchli va xavfsiz bo'ladi.
+> Design pattern — takrorlanadigan dasturlash muammolariga vaqt sinovidan o'tgan strukturali yechim (Gang of Four 1994 va keyingi evolyutsiyalar). TypeScript'ning type system'i (generics, discriminated unions, conditional types, mapped types) pattern'larni runtime'dan compile-time'ga ko'taradi — noto'g'ri foydalanish kompilator bosqichida tutiladi. Bu bo'lim Creational, Structural, Behavioral va Cross-cutting kategoriyalar bo'yicha pattern'larning idiomatik TS implementatsiyasini ko'rib chiqadi.
 
 ---
 
@@ -30,7 +30,31 @@
 
 ### Nazariya
 
-Factory pattern — object yaratish logikasini bir joyga to'plab, client koddan yashiradi. TypeScript da generic factory juda kuchli — type inference orqali har bir factory chaqiruvida to'g'ri type qaytariladi.
+Factory pattern — object yaratish logikasini alohida funksiya yoki method'ga to'plab, client koddan konkret class'ni yashiradi. Client `new ConcreteClass()` yozish o'rniga `factory.create(type)` chaqiradi — bu qaror'ni almashtirish (boshqa implementation'ga o'tish, configuration'ga qarab tanlash) faqat factory ichida amalga oshiriladi, client kod o'zgarmaydi.
+
+TypeScript'da factory ikki darajada kuchayadi:
+1. **Generic + key parameter** — `K extends keyof Map` orqali factory chaqirig'ida string literal'dan return type avtomatik tortib olinadi (type inference).
+2. **Discriminated union** — return type literal'lar bilan markalanadi (`type: "email"`), keyin downstream kod `switch`/narrowing bilan exhaustive ishlay oladi.
+
+<details>
+<summary><strong>Under the Hood</strong></summary>
+
+`createNotification<K extends keyof NotificationMap>(type: K): NotificationMap[K]` ifodasida nima sodir bo'ladi:
+
+```text
+1. Call site: createNotification("email")
+2. TS type checker K ni inference qiladi:
+     K = "email" (string literal type, kengaytirilmaydi)
+3. Return type evaluate qilinadi:
+     NotificationMap[K] = NotificationMap["email"] = EmailNotification
+4. Result type — EmailNotification (string emas, Notification umumiy ham emas)
+```
+
+Agar `K extends keyof NotificationMap` constraint'i bo'lmasa, K = `string` ga widen bo'lar edi va `NotificationMap[K]` indekslash xato bersa. `keyof` cheklov K'ni faqat ruxsat etilgan literal'lar bilan cheklab, indexed access type'ning to'g'ri ishlashini ta'minlaydi.
+
+Runtime'da `factories[type]()` — oddiy object property access + call. Hech qanday metadata, decorator, polyfill kerak emas — type safety to'liq compile-time'da, runtime kod minimum.
+
+</details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -74,7 +98,9 @@ sms.phone; // ✅
 
 ### Nazariya
 
-Abstract Factory — o'zaro bog'liq object larning **oilasini** yaratadi. Client concrete class larni bilmaydi — faqat interface orqali ishlaydi.
+Abstract Factory — bir-biriga bog'liq (oilaga tegishli) object'larni yaratish uchun interface. Oddiy Factory bitta product turini yaratsa, Abstract Factory **bir butun product family**'sini (`Button` + `Input` + `Modal` + ...) yaratadi. Client `UIFactory` interface'ga bog'lanadi, lekin `MaterialFactory` yoki `BootstrapFactory` instance'ini almashtirsa, butun UI uslubi consistent o'zgaradi — `Material Button` bilan `Bootstrap Input`'ni aralashtirib qo'yish ehtimoli yo'q.
+
+Nima muammoni hal qiladi: oilaviy mos kelmaslik. Agar client har bir komponentni alohida `new` orqali yaratsa, dasturchi tasodifan turli oilalardan komponent qo'shib yuborishi mumkin (Material + Bootstrap aralash UI). Abstract Factory butun oilani bitta source'dan oladi — mos kelish kompilator darajasida kafolatlanadi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -136,7 +162,11 @@ const bootstrapForm = createForm(new BootstrapFactory());
 
 ### Nazariya
 
-Singleton — class dan faqat **bitta instance** yaratilishini kafolatlaydi. TypeScript da `private constructor` + `static getInstance()` orqali. Module scope da oddiy variable bilan ham singleton yaratish mumkin (va bu ko'pincha yaxshiroq).
+Singleton — class'dan butun dastur davomida faqat bitta instance mavjud bo'lishini kafolatlaydi va shu instance'ga global access nuqtasini beradi. Klassik implementatsiya: `private constructor` orqali tashqi `new` taqiqlanadi, `static getInstance()` lazy yaratish va keshlashni boshqaradi.
+
+JavaScript/TypeScript ekosistemasida Singleton'ning **module-based** muqobili ko'p hollarda yaxshiroq: ES module bir marta yuklanadi va export qilingan qiymat module cache'da saqlanadi — har `import` BIR XIL reference qaytaradi. Bu Singleton'ning class boilerplate'isiz tabiiy implementatsiyasi. Class-based Singleton qaerda kerak: framework integration (Angular service), interface implementation talab qilinganda yoki polymorphism orqali test'da almashtirish kerak bo'lganda.
+
+**Anti-pattern ogohlantirishi:** Singleton — global mutable state demakdir. Test'lar orasida state leak, hidden dependency (qaysi modullar Singleton'ga bog'liq, kod'dan ko'rinmaydi) va concurrency muammolari uning kamchiligi. DI container bilan singleton scope ishlatish (lifecycle container boshqaradi, class o'zi emas) sof Singleton'dan xavfsizroq.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -168,10 +198,17 @@ console.log(db1 === db2); // true
 
 // === Module-based Singleton (oddiyroq) ===
 // db.ts
-const connection = new SomeDBDriver("postgres://localhost/db");
+class PostgresDriver {
+  constructor(private url: string) {}
+  query(sql: string) { /* ... */ return []; }
+}
+
+const connection = new PostgresDriver("postgres://localhost/db");
 export default connection;
 
-// Har joyda import qilganda BIR XIL instance qaytadi
+// app.ts
+// import db from "./db";   ← har import BIR XIL instance qaytaradi
+// import db from "./db";   ← module cache sababli ikkinchi `new` yo'q
 ```
 
 </details>
@@ -182,7 +219,15 @@ export default connection;
 
 ### Nazariya
 
-Builder pattern — murakkab object ni **bosqichma-bosqich** yaratish. TypeScript da **fluent API** (method chaining) va **step builder** (compile-time enforcement) bilan. Step builder — har bosqichda faqat ruxsat etilgan method lar ko'rinadi.
+Builder — ko'p parametrli murakkab object'ni bosqichma-bosqich quradigan pattern. Klassik muammo: constructor 8 ta parametr olsa (yarmi optional) — `new User(name, email, undefined, undefined, true, undefined, 18, null)` o'qib bo'lmaydigan kod. Builder har parametr uchun nomli method beradi (`b.email(...)`/`b.age(...)`), keyin oxirida `build()` chaqirilganda yakuniy object qaytadi.
+
+TypeScript'da builder ikki variantga ajraladi:
+
+1. **Fluent Builder** — har setter `this` qaytaradi, chaqiruv zanjir bo'ladi. Validation `build()` ichida runtime'da. Soddaroq, lekin majburiy maydonni unutgan o'rinda compile error yo'q.
+
+2. **Step Builder (Type-State pattern)** — har setter qaysi method'larni keyingisida chaqirish mumkinligini type bilan cheklaydi. Majburiy ketma-ketlik kompilator darajasida tasdiqlanadi: `request().method(...)` chaqirig'i mumkin emas, chunki `request()` `NeedsUrl` qaytaradi, unda `method` method'i yo'q. Bu — Rust'dagi typestate pattern'ning TS variant'i.
+
+Step Builder'ning kuchi: kod compilatsiyaga ulgursa, builder grammar'i to'g'ri ishlatilgan demakdir. Runtime check'lar yo'q.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -256,7 +301,13 @@ request().url("/api").method("GET").build(); // ✅
 
 ### Nazariya
 
-Adapter — **mos kelmaydigan interface** larni bir-biriga moslashtiradi. Old code va new code, yoki tashqi library va ichki system orasidagi ko'prik.
+Adapter — bir-biriga mos kelmaydigan interface'larni bog'lab beradigan oraliq qatlam. Maqsad: client kod yangi/idiomatik interface bilan ishlasin, tashqi (eski yoki third-party) implementation esa o'zining boshqacha shaklida qolaversin. Adapter ichida transformatsiya bo'ladi: client chaqirig'i tashqi API call'iga aylantiriladi (parametr'lar qayta tuziladi, payload format'i o'zgartiriladi, error model'i normallashtiriladi).
+
+Adapter ikki yondashuvda yoziladi:
+- **Object Adapter** (compozitsiya) — adapter tashqi object'ni `private` field'da saqlaydi. JS/TS'da deyarli har doim shu (multiple inheritance yo'q).
+- **Class Adapter** (inheritance) — adapter tashqi class'dan extend qiladi. JS'da kamroq ishlatiladi.
+
+Adapter'ning Facade va Proxy'dan farqi: Adapter **interface'ni o'zgartiradi** (signatura mos kelmaydi → moslashadi); Facade interface'ni o'zgartirmaydi, balki murakkablikni yashirib soddalashtiradi; Proxy bir xil interface'ni saqlab, behavior qo'shadi (caching, access control).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -297,7 +348,11 @@ logger.info("Application started"); // [0] Application started
 
 ### Nazariya
 
-Facade — murakkab subsystem ga **sodda interface** beradi. Client murakkab internal API larni bilmaydi — facade orqali ishlaydi.
+Facade — bir nechta murakkab subsystem'larni birlashtirib, client uchun yagona soddalashtirilgan interface beradigan pattern. Client ko'plab class/method'larni va ularning to'g'ri ketma-ketligini bilishi shart emas — facade'ning bitta high-level method'ini chaqiradi (`loginAndSetup`), facade ichida esa kerakli barcha kichik chaqiruv'lar to'g'ri tartibda amalga oshiriladi.
+
+Facade Adapter'dan farqi: Facade interface'ni transformatsiya qilmaydi, balki **sath darajasini** o'zgartiradi — ko'p kichik chaqiruvlar bittaga jamlanadi. Adapter mos kelmaslikni hal qiladi (signature mismatch), Facade murakkablikni yashiradi (low-level → high-level).
+
+Real misol: HTTP klient kutubxonalari (`fetch` o'rniga `axios`/`ky` — bularning ko'pi facade — XHR/fetch ustidan retry/interceptor/timeout boshqaruvini soddalashtirgan). NestJS'dagi `JwtService.signAsync()` — `node-jsonwebtoken`, kalit konfiguratsiyasi va promisify ustidan facade.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -340,7 +395,17 @@ facade.loginAndSetup("ali@test.com", "secret");
 
 ### Nazariya
 
-Proxy — object ga **qo'shimcha behavior** qo'shadi (caching, logging, access control, lazy loading) — original object ni o'zgartirmaydi.
+Proxy — original object bilan **bir xil interface**'ni saqlab, har chaqiruvni boshqarish (intercept) imkonini beradigan o'rin egasi. Client proxy'ni real object'dan ajratib bilmaydi — chaqiriqlar shaklan bir xil, lekin proxy ichida qo'shimcha behavior (caching, access control, lazy initialization, logging, remote call) bajariladi.
+
+Proxy variantlari:
+- **Caching Proxy** — bir xil so'rov natijasini eslab qoladi, takror chaqiriqda real service'ga bormaydi (memoization).
+- **Lazy Proxy** — haqiqiy object qimmat (DB connection, heavy resource) — proxy faqat birinchi murojaatda real object yaratadi.
+- **Protection Proxy** — chaqiriq'ni amalga oshirishdan oldin permission tekshiradi.
+- **Remote Proxy** — local object ko'rinishida tashqi xizmatga (gRPC, RPC, microservice) chaqiriq yuboradi.
+
+JavaScript'ning built-in `Proxy` global'i (ES2015) — pattern'ning til darajasidagi implementatsiyasi. Trap'lar (`get`, `set`, `apply`, `has`, ...) orqali har operatsiya intercept qilinadi. Lekin pattern sifatida proxy kerakmas — oddiy class wrapper ham yetadi va type safety yaxshi (Proxy global'ida type narrowing qiyinroq).
+
+Adapter'dan farqi: Adapter interface'ni o'zgartiradi, Proxy aynan o'sha interface'ni saqlaydi — client kod o'zgarmaydi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -396,7 +461,15 @@ await service.getUser(1); // (cache dan — DB query yo'q)
 
 ### Nazariya
 
-Observer — bir object (subject) holati o'zgarganda, barcha kuzatuvchilar (observer) **avtomatik xabar oladi**. TypeScript da **typed EventEmitter** pattern bilan type-safe qilinadi.
+Observer — bir object (subject/publisher) holati o'zgarganda, unga obuna bo'lgan barcha kuzatuvchilar (observer/subscriber) avtomatik xabar oladigan pattern. Publisher subscriber'lar haqida hech narsa bilmaydi (faqat ularning interface'ini biladi) — loose coupling. Bu — event-driven arxitekturaning poydevori.
+
+JavaScript ekosistemasida Observer turli ko'rinishlarda mavjud:
+- **Node.js `EventEmitter`** — built-in class, string event nomlar bilan ishlaydi (type-safe emas).
+- **DOM `addEventListener`** — browser API darajasidagi observer.
+- **RxJS `Observable`** — push-based async stream, operator pipeline bilan boyitilgan kengaytmasi.
+- **Vue/MobX reactivity** — observer Proxy/getter ostida yashiringan (avtomatik dependency tracking).
+
+TypeScript'da idiomatik yondashuv — **typed EventEmitter**: event nomlar va payload type'lari interface bilan markalaydi (`EventMap`). `on`/`emit` generic method'lar `keyof T` cheklov orqali noma'lum event yoki noto'g'ri argument'larni compile-time'da rad etadi. Bu Node `EventEmitter` API'sining type-safe variant'i.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -405,21 +478,22 @@ Observer — bir object (subject) holati o'zgarganda, barcha kuzatuvchilar (obse
 type EventMap = Record<string, (...args: any[]) => void>;
 
 class TypedEmitter<T extends EventMap> {
-  private listeners = new Map<keyof T, Set<T[keyof T]>>();
+  // Set value type — umumiy callable signature (har event uchun T[K] generic cast emas)
+  private listeners = new Map<keyof T, Set<(...args: any[]) => void>>();
 
   on<K extends keyof T>(event: K, listener: T[K]): this {
     if (!this.listeners.has(event)) this.listeners.set(event, new Set());
-    this.listeners.get(event)!.add(listener as any);
+    this.listeners.get(event)!.add(listener);
     return this;
   }
 
   off<K extends keyof T>(event: K, listener: T[K]): this {
-    this.listeners.get(event)?.delete(listener as any);
+    this.listeners.get(event)?.delete(listener);
     return this;
   }
 
   emit<K extends keyof T>(event: K, ...args: Parameters<T[K]>): void {
-    this.listeners.get(event)?.forEach(fn => (fn as any)(...args));
+    this.listeners.get(event)?.forEach(fn => fn(...args));
   }
 }
 
@@ -450,7 +524,15 @@ emitter.emit("userLoggedIn", "user-1", new Date()); // ✅
 
 ### Nazariya
 
-Strategy — algoritmni **almashtiriladigan** qiladi. Interface orqali turli strategiya lar yaratiladi, runtime da keraklisi tanlanadi.
+Strategy — algoritmni alohida obyektga (yoki funksiyaga) inkapsulyatsiya qilib, runtime'da almashtirish imkonini beradigan pattern. Context class strategy interface'iga bog'lanadi, konkret strategiya'ni faqat constructor yoki setter orqali oladi. Algoritm o'zgartirilganda context kod o'zgarmaydi — bu Open/Closed prinsipining amaliy ko'rinishi.
+
+Class-based vs Function-based Strategy:
+- **Class-based** — strategy interface implement qiluvchi class'lar (`RegularPricing`, `BulkPricing`). State (config, dependency) saqlash, polymorphism, OOP framework integration uchun mos.
+- **Function-based** — strategy oddiy funksiya signature'i. State'siz pure algoritm uchun yetarli, kamroq boilerplate, tree-shake oson. `type PricingStrategy = (price: number, qty: number) => number`.
+
+JavaScript ekosistemasida Strategy ko'pincha **higher-order function** sifatida tushuniladi: `array.sort(comparator)`'dagi `comparator` — strategy; `array.filter(predicate)`'dagi `predicate` — strategy. Class kerak emas, funksiya yetadi.
+
+Strategy va polymorphism farqi: oddiy polymorphism'da behavior class type'iga bog'liq (subclassing). Strategy'da behavior **inject qilingan obyekt**'ga bog'liq — bir xil class instance'i ham runtime'da strategy'ni almashtira oladi (`setStrategy()`).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -506,7 +588,16 @@ console.log(calc.getTotal(10, 5)); // 75 (1.5x)
 
 ### Nazariya
 
-Command — operatsiyani **object sifatida** encapsulate qiladi. Bu undo/redo, queue, va logging uchun ishlatiladi. TypeScript da generic command interface + typed command bus.
+Command — bajariladigan operatsiyani obyekt shaklida reifikatsiya qiladigan pattern. Operatsiya (action) bevosita funksiya chaqirig'i bo'lmasdan, `execute()` method'iga ega obyektga aylanadi — buni saqlash, navbatga qo'yish, log qilish, qaytarish (`undo`) yoki tarmoq orqali yuborish mumkin.
+
+Asosiy foydalanish holatlari:
+- **Undo/Redo** — har bajarilgan command stack'da saqlanadi; `undo()` orqali aksini bajarish (text editor, graphic tools, transaction managers).
+- **Command queue / job scheduling** — task'larni queue'ga qo'shib keyinroq bajarish (background worker, retry logic).
+- **Macro / batching** — bir nechta command'ni kompozit Command'ga birlashtirib bitta `execute()` chaqirig'i bilan amalga oshirish.
+- **Audit log / event sourcing** — har command serialize qilinib saqlanadi; system state qayta qurishda command'lar replay qilinadi.
+- **Remote execution** — command serialize bo'lib server'ga yuboriladi (RPC).
+
+TypeScript'da `Command<T>` generic interface (`execute(): T`, `undo(): void`) command'ning return type'ini saqlaydi — `CommandHistory.execute()` to'g'ri type qaytaradi. Bu CQRS arxitekturasidagi command bus'ning poydevori (NestJS `@nestjs/cqrs` modul'i ham aynan shu modelda).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -568,7 +659,15 @@ console.log(items); // []
 
 ### Nazariya
 
-State Machine — object ning mumkin bo'lgan holatlarini va ular orasidagi o'tishlarni boshqaradi. TypeScript da **discriminated unions** bilan compile-time da noto'g'ri transition larni oldini olish mumkin.
+Finite State Machine (FSM) — obyektning aniq sanab bo'lingan holatlari (`states`) va ular orasidagi ruxsat etilgan o'tishlar (`transitions`) to'plamini formal ravishda tasvirlovchi model. Har bir paytda obyekt aniq bitta state'da bo'ladi, transition esa "joriy state + event" juftligi orqali keyingi state'ni aniqlaydi.
+
+TypeScript'da idiomatik implementatsiya — **discriminated union**: har state alohida shape (faqat shu state'da mavjud field'lar bilan), `status` literal field discriminant rolida. Bu noto'g'ri kombinatsiyalarni compile-time'da rad etadi: `placed` state'ida `paymentId` mavjud emas, kompilator ushbu field'ga murojaatni xato deb belgilaydi.
+
+Transition funksiyalari `Extract<State, { status: "draft" }>` orqali input state'ni cheklab oladi — `payOrder` faqat `placed` state'ni qabul qiladi, `draft` state'ni berishga urinish kompilatsiya bosqichida tutiladi. Bu **type-state pattern** — invariant'lar runtime check o'rniga type system tomonidan kafolatlanadi.
+
+Alternativalar: `XState` kutubxonasi — JavaScript'da product-grade FSM/statecharts implementatsiyasi (hierarchical states, parallel states, history). Manual implementatsiya o'rganish va kichik holatlar uchun mos, lekin murakkab biznes flow'lar (10+ state, guard'lar, side effect'lar) `XState` darajasini talab qiladi.
+
+> **Eslatma:** Quyidagi misolda `as Extract<...>` cast'lar ishlatilgan, chunki yagona `order` o'zgaruvchisi ketma-ket turli state type'larga ega bo'ladi. Real kod'da har transition'dan keyingi qiymatni alohida `const` ga olish (yoki state machine'ni class ichida inkapsulyatsiya qilish) cast'larni yo'qotadi va type narrowing tabiiy bo'ladi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -615,7 +714,13 @@ order = payOrder(order as Extract<OrderState, { status: "placed" }>);
 
 ### Nazariya
 
-Repository — data access logic ni business logic dan ajratadi. TypeScript da **generic repository** — har qanday entity type bilan ishlaydigan type-safe CRUD interface.
+Repository — data access logic'ni business logic'dan ajratadigan abstraksiya qatlami. Domain qatlami (entity'lar, use case'lar) `IUserRepository` interface'ga bog'lanadi; konkret implementatsiya (`PostgresUserRepo`, `InMemoryUserRepo`, `MongoUserRepo`) infrastruktura qatlamida joylashadi. Bu Domain-Driven Design (Eric Evans) va Clean Architecture (Robert Martin)'ning markaziy konseptlaridan biri.
+
+Repository'ning Data Access Object (DAO)'dan farqi: DAO ko'pincha jadval/dokument bilan 1:1 mos keladi (CRUD'ning yupqa qatlami). Repository esa **aggregate**'lar bilan ishlaydi — bir nechta jadval/kolleksiyani birlashtirgan domain obyektni butun holida saqlaydi va o'qiydi. Repository client uchun "in-memory kolleksiya" illyuziyasini beradi (`repo.findById(id)` — DB query yashirin).
+
+TypeScript'da generic `Repository<T extends Entity>` har qanday entity type bilan ishlaydigan type-safe CRUD beradi. `Omit<T, "id" | "createdAt" | "updatedAt">` — `create()`'ga repository tomonidan boshqariladigan field'larni o'tkazishni taqiqlaydi; `Partial<Omit<T, "id">>` — `update()`'da id o'zgartirishni man qiladi. Bu invariant'lar interface darajasida kafolatlanadi.
+
+Testability nuqtai nazaridan: business logic `InMemoryRepo` bilan unit test'lanadi (DB kerakmas, tez), `PostgresRepo` esa alohida integration test bilan tekshiriladi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -644,7 +749,9 @@ class InMemoryRepo<T extends Entity> implements Repository<T> {
     const all = Array.from(this.store.values());
     if (!filter) return all;
     return all.filter(item =>
-      Object.entries(filter).every(([k, v]) => (item as any)[k] === v)
+      Object.entries(filter).every(
+        ([key, value]) => (item as Record<string, unknown>)[key] === value
+      )
     );
   }
 
@@ -685,7 +792,17 @@ const p = await repo.create({ name: "Laptop", price: 999 }); // ✅
 
 ### Nazariya
 
-Result/Either — **error handling** ning type-safe usuli. `throw` o'rniga `Ok<T> | Err<E>` qaytarish — caller xatoni handle qilishga **majbur bo'ladi** (compile-time).
+Result (Rust'da `Result<T, E>`, Haskell/F#'da `Either<L, R>`) — xatolarni return value sifatida explicit qaytaradigan pattern. Funksiya `throw` qilish o'rniga `{ ok: true, value: T } | { ok: false, error: E }` discriminated union qaytaradi. Caller `ok` flag'ni tekshirmasdan `value`'ga murojaat qila olmaydi — bu compile-time darajasida kafolatlanadi (TypeScript narrowing).
+
+`throw`'ga nisbatan asosiy farq'lar:
+- **Error type signature'da** — `function parseJSON<T>(json: string): Result<T, SyntaxError>` — qaysi xato turi bo'lishi mumkinligi return type'da ko'rinadi. `throw`'da bu signature'da yo'q (TS'da `throws` annotation yo'q), faqat hujjat orqali bilinadi.
+- **Forgetting impossible** — `ok` tekshirsiz `value`'ga kirib bo'lmaydi (compile error). `try/catch`'ni unutsa kod silently davom etadi.
+- **Performance** — `throw` stack unwind, V8 deoptimization kabi xarajatlar; Result oddiy object allocation.
+- **Composability** — `map`/`flatMap` (monad operatsiyalari) bilan chaining qulay.
+
+Kamchiliklari: JavaScript runtime'i va kutubxonalari `throw` ga asoslangan — `JSON.parse` exception qaytaradi, `fetch` reject Promise qaytaradi. Result pattern'ni qabul qilish — chegara qatlamida (`try/catch` ↔ `Result` konvertatsiya) wrapper yozish kerak. Aralash kod (bir joyda `throw`, boshqa joyda `Result`) chalkashlik beradi — bitta yondashuvga rioya qilish muhim.
+
+TypeScript ekosistemasida `neverthrow`, `ts-results`, `fp-ts` kutubxonalari product-grade Result/Either implementatsiyalarini taqdim etadi (monad method'lar, async variant, pipe utility'lar bilan).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>

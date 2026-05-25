@@ -51,4 +51,3 @@
 ### QISM 9: ADVANCED
 - [Bo'lim 25: Type Compatibility va Variance](25-type-compatibility.md)
 - [Bo'lim 26: TS 5.x Yangiliklari](26-ts-5x-features.md)
-
