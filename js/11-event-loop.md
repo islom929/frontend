@@ -388,10 +388,10 @@ HTML Living Standard (spec) bo'yicha Event Loop quyidagicha ishlaydi:
   │    │             ↓                            │
   │    │  ┌─────────────────────────────────┐     │
   │    │  │ 3. Rendering (agar kerak bo'lsa)│     │
-  │    │  │    - Style hisoblash            │     │
+  │    │  │    - requestAnimationFrame      │     │
   │    │  │    - Layout (reflow)            │     │
   │    │  │    - Paint                      │     │
-  │    │  │    - requestAnimationFrame      │     │
+  │    │  │    - Style hisoblash            │     │
   │    │  └──────────┬──────────────────────┘     │
   │    │             │                            │
   │    │             ↓                            │
