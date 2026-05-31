@@ -12,9 +12,9 @@
 - [**QISM D: React Compiler**](#qism-d) (savollar 12-14)
 - [**QISM E: Profiling**](#qism-e) (savollar 15-17)
 - [**QISM F: Code Splitting & Virtualization**](#qism-f) (savollar 18-22)
-- [**QISM G: Web Vitals & Compiler Status**](#qism-g) (savollar 23-27)
+- [**QISM G: Web Vitals**](#qism-g) (savollar 23-27)
 
-**Jami:** 27 savol — Junior+ (4), Middle (8), Middle+ (8), Senior (7)
+**Jami:** 27 savol — Junior+ (4), Middle (8), Middle+ (9), Senior (6)
 
 
 
@@ -241,7 +241,7 @@ Custom `compare` funksiya berilmagan bo'lsa, React `SimpleMemoComponent` tag'ini
 
 **Performance — shallowEqual murakkabligi:**
 
-`shallowEqual` O(n) — props key'lar soni bo'yicha. Tipik komponent ~5-10 props → mikrosaniyalarda. Lekin bu solishtirish har **render** da bajariladi (parent render bo'lganda) — minglab komponentlar uchun cumulative cost sezilarli bo'lishi mumkin.
+`shallowEqual` O(n) — props key'lar soni bo'yicha. Tipik komponentda key'lar soni kam, shuning uchun bitta solishtirish arzon. Lekin bu solishtirish har **render** da bajariladi (parent render bo'lganda) — minglab komponentlar uchun cumulative cost sezilarli bo'lishi mumkin.
 
 > **Performance note:** `React.memo` o'zi qo'shimcha overhead — har render'da shallow check + tag dispatch. Agar komponent kichkina bo'lsa (oddiy `<span>`) — `memo` qo'yish **zarar** keltirishi mumkin (memoization cost > render cost). Profiler bilan o'lchang.
 
@@ -270,7 +270,7 @@ Custom `compare` funksiya berilmagan bo'lsa, React `SimpleMemoComponent` tag'ini
 
 ### Qisqa javob
 
-`memo`'ning ikkinchi argumenti — `(prevProps, nextProps) => boolean` formatdagi custom comparator. Default `shallowEqual` yetmaganda yoziladi: nested object'lar (deep equality), props ichidan faqat ma'lum kalitlarni tekshirish, yoki konkretik field'ga selektiv solishtirish kerak bo'lganda. **Xulosa: `true` qaytarish — bailout (re-render YO'Q)**, `false` — render bajariladi. `===` qoidalariga teskari (e'tibor!).
+`memo`'ning ikkinchi argumenti — `(prevProps, nextProps) => boolean` formatdagi custom comparator. Default `shallowEqual` yetmaganda yoziladi: nested object'lar (deep equality), props ichidan faqat ma'lum kalitlarni tekshirish, yoki aniq field'ga selektiv solishtirish kerak bo'lganda. **Xulosa: `true` qaytarish — bailout (re-render YO'Q)**, `false` — render bajariladi. `===` qoidalariga teskari (e'tibor!).
 
 ### To'liq tushuntirish
 
@@ -1079,7 +1079,8 @@ function App() {
 
 ```typescript
 function useContext(Context) {
-  const dispatcher = ReactCurrentDispatcher.current;
+  // R19: dispatcher ReactSharedInternals.H orqali olinadi
+  const dispatcher = ReactSharedInternals.H;
   return dispatcher.useContext(Context);
 }
 
@@ -1374,8 +1375,8 @@ R18+ "lazy context propagation" — faqat haqiqatan ham consumer fiber'lar yangi
 ```typescript
 // Scheduler priority lanes (selected)
 SyncLane = 0b0000000000000000000000000000010;
-InputContinuousLane = 0b0000000000000000000000000000100;
-DefaultLane = 0b0000000000000000000000000010000;
+InputContinuousLane = 0b0000000000000000000000000001000;
+DefaultLane = 0b0000000000000000000000000100000;
 TransitionLane1 = 0b0000000000000000000000010000000;
 // ... up to TransitionLane16
 IdleLane = 0b0100000000000000000000000000000;
@@ -1389,7 +1390,7 @@ Har sabab uchun lane:
 
 **Re-render cascade — "render the world" mental model:**
 
-React'ning default holatida, parent re-render barcha child'larni qayta render qiladi. Bu qoida xulq-atvori `memo` bilan to'sib qo'yiladi, lekin React arxitekturasining asosi — **declarative paradigm**'ning tabiiy oqibati: parent o'z holatini elon qiladi, child'lar undan kelib chiqadi.
+React'ning default holatida, parent re-render barcha child'larni qayta render qiladi. Bu xulq `memo` bilan to'sib qo'yiladi, lekin u React'ning **declarative paradigm**'idan kelib chiqadigan tabiiy oqibat: parent o'z holatini elon qiladi, child'lar undan kelib chiqadi.
 
 **Profiler — re-render reasons:**
 
@@ -1892,7 +1893,7 @@ const Subtree = memo(function Subtree({ data }: { data: string[] }) {
 //    - return null  ← ENTIRE SUBTREE SKIPPED
 ```
 
-`childLanes` bo'sh bo'lganda, Reconciler descendant'larga descend qilmaydi — ENTIRE SUB-TREE skip. Bu eng samarali optimizatsiya — minglab Fiber'lar bypass qilinadi bir nechta nanosekundda.
+`childLanes` bo'sh bo'lganda, Reconciler descendant'larga descend qilmaydi — ENTIRE SUB-TREE skip. Bu eng samarali optimizatsiya — sub-tree'dagi barcha Fiber'lar bitta `includesSomeLane` bitwise tekshiruvi bilan bypass qilinadi (har birini alohida ko'rib chiqmasdan).
 
 **Context propagation va `childLanes`:**
 
@@ -2290,7 +2291,13 @@ function Parent() {
 // Post-Compiler (auto-memo)
 function Parent() {
   const $ = useMemoCache(1);
-  const config = $[0] ?? ($[0] = { theme: "dark" });
+  let config;
+  if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
+    config = { theme: "dark" };
+    $[0] = config;
+  } else {
+    config = $[0];
+  }
   return <Child config={config} />;
 }
 ```
@@ -2354,7 +2361,7 @@ function Parent() {
 
 ```
 useMemo/useCallback kerakmi?
-├── 1. Hisoblash qimmatmi (1ms+)?
+├── 1. Hisoblash sezilarli qimmatmi (katta dataset, murakkab transform)?
 │   ├── HA → useMemo
 │   └── YO'Q → keyingisiga
 ├── 2. Memo'langan child'ga uzatiladimi?
@@ -2372,7 +2379,7 @@ useMemo/useCallback kerakmi?
 function ProductList({ products }: { products: Product[] }) {
   const [filter, setFilter] = useState("");
 
-  // ✅ Filter + sort — katta dataset'lar (1K+) uchun sezilarli vaqt olishi mumkin
+  // ✅ Filter + sort — katta dataset'lar uchun sezilarli vaqt olishi mumkin
   const visibleProducts = useMemo(() => {
     return products
       .filter((p) => p.name.includes(filter))
@@ -2451,7 +2458,7 @@ function BadDashboard({ user }: { user: User }) {
   // ❌ Primitive — useMemo ortiqcha
   const isAdmin = useMemo(() => user.role === "admin", [user.role]);
 
-  // ❌ Inline JSX literal — render uchun nyu element baribir yaratiladi
+  // ❌ Inline JSX literal — render uchun yangi element baribir yaratiladi
   const header = useMemo(() => <h1>{greeting}</h1>, [greeting]);
 
   return (
@@ -2603,9 +2610,9 @@ Trivial computation uchun `useMemo` — performance LOSS bo'lishi mumkin. Profil
 
 | Foydali | Foydasiz |
 |---------|----------|
-| Filter/sort 1K+ elementlar | String concat |
+| Filter/sort katta ro'yxatlar | String concat |
 | Date formatting (Intl.DateTimeFormat) | Boolean check |
-| `JSON.parse` 10KB+ | Number arithmetic |
+| Katta JSON payload `JSON.parse` | Number arithmetic |
 | `crypto.subtle.digest` | Property access |
 | Regex compilation | Inline JSX (memo'lashtirilmagan child) |
 
@@ -2904,7 +2911,7 @@ const [id] = useState(generateId); // initializer
 
 ### Qisqa javob
 
-React Compiler — Babel'ga o'xshash build-time tool. Komponent kodini analyse qilib, har **derived value** va **callback** uchun avtomat memoization qo'shadi (cache slot + deps check). Natija: `useMemo`/`useCallback` qo'l bilan yozish kerak emas. Compiler "Rules of React" (purity, immutability) ga rioya qilingan kodni o'zgartiradi; qoidabuzar kod (mutation, side effects in render) — skip qiladi (graceful fallback). R19 da experimental → opt-in via `babel-plugin-react-compiler`.
+React Compiler — Babel'ga o'xshash build-time tool. Komponent kodini analyse qilib, har **derived value** va **callback** uchun avtomat memoization qo'shadi (cache slot + deps check). Natija: `useMemo`/`useCallback` qo'l bilan yozish kerak emas. Compiler "Rules of React" (purity, immutability) ga rioya qilingan kodni o'zgartiradi; qoidabuzar kod (mutation, side effects in render) — skip qiladi (graceful fallback). React Compiler 1.0 stable (2025-oktyabr) — `babel-plugin-react-compiler` orqali opt-in qo'shiladi.
 
 ### To'liq tushuntirish
 
@@ -2940,7 +2947,7 @@ function ProductList({ products, filter }: Props) {
 
   // Memoize handleClick (no deps — stable)
   let t1;
-  if ($[3] === undefined) {
+  if ($[3] === Symbol.for("react.memo_cache_sentinel")) {
     t1 = (id) => console.log(id);
     $[3] = t1;
   } else {
@@ -2957,20 +2964,40 @@ function ProductList({ products, filter }: Props) {
 ```typescript
 // React internal
 function useMemoCache(size: number): Array<unknown> {
-  const dispatcher = ReactCurrentDispatcher.current;
+  // R19: dispatcher ReactSharedInternals.H orqali olinadi
+  const dispatcher = ReactSharedInternals.H;
   return dispatcher.useMemoCache(size);
 }
 
-// Hook implementation:
-function mountUseMemoCache(size: number): Array<unknown> {
-  const hook = mountWorkInProgressHook();
-  const cache = new Array(size).fill(REACT_MEMO_CACHE_SENTINEL);
-  hook.memoizedState = cache;
-  return cache;
+// Hook implementation — cache hook slot'da EMAS, fiber.updateQueue.memoCache'da:
+function useMemoCacheImpl(size: number): Array<unknown> {
+  let memoCache = null;
+  let updateQueue = currentlyRenderingFiber.updateQueue;
+  if (updateQueue !== null) {
+    memoCache = updateQueue.memoCache;
+  }
+  if (memoCache === null) {
+    memoCache = { data: [], index: 0 };
+    if (updateQueue === null) {
+      updateQueue = createFunctionComponentUpdateQueue();
+      currentlyRenderingFiber.updateQueue = updateQueue;
+    }
+    updateQueue.memoCache = memoCache;
+  }
+
+  let data = memoCache.data[memoCache.index];
+  if (data === undefined) {
+    data = memoCache.data[memoCache.index] = new Array(size);
+    for (let i = 0; i < size; i++) {
+      data[i] = REACT_MEMO_CACHE_SENTINEL;
+    }
+  }
+  memoCache.index++;
+  return data;
 }
 ```
 
-Cache — array bilan slot'lar. Har slot uchun deps va value alternativ saqlanadi.
+Cache `fiber.updateQueue.memoCache`'da saqlanadi (oddiy hook slot emas). Har slot dastlab `REACT_MEMO_CACHE_SENTINEL` bilan to'ldiriladi — bu sentinel `null`/`undefined` qiymatlarni ham legitim cache deb tan oladi.
 
 **Compiler "Rules of React" talab qiladi:**
 
@@ -3023,7 +3050,7 @@ function Dashboard({ data, filter }: Props) {
 // Compiler avtomat: filtered, sortedFiltered, handleSelect, config — barchasi memoized
 ```
 
-**Setup (R19 experimental):**
+**Setup:**
 
 ```bash
 npm install babel-plugin-react-compiler
@@ -3148,21 +3175,20 @@ function Component({ user }: Props) {
 **Compiler bug detection — ESLint integration:**
 
 ```bash
-npm install eslint-plugin-react-compiler
+npm install -D eslint-plugin-react-hooks@latest
 ```
 
-`.eslintrc`:
+`eslint.config.js` (flat config):
 
 ```javascript
-{
-  "plugins": ["react-compiler"],
-  "rules": {
-    "react-compiler/react-compiler": "error",
-  },
-}
+import reactHooks from "eslint-plugin-react-hooks";
+
+export default [
+  reactHooks.configs["recommended-latest"],
+];
 ```
 
-Mutation, side effects, va Rules of React buzilishi linting orqali aniqlash imkonini beradi.
+Compiler 1.0 stable'dan boshlab Compiler diagnostics `eslint-plugin-react-hooks`'ga ko'chirilgan — alohida `eslint-plugin-react-compiler` paketi kerak emas. Mutation, side effects, va Rules of React buzilishi shu plugin orqali aniqlanadi.
 
 > **Performance reality:** Compiler manual memoization'dan tezroq emas — bir xil mexanizm (cache slots). Lekin developer ergonomics — `useMemo`/`useCallback` boilerplate yo'qoladi. Code review'da fokus business logic'ga.
 
@@ -3176,7 +3202,7 @@ Mutation, side effects, va Rules of React buzilishi linting orqali aniqlash imko
 
 ### Follow-up savollar
 
-- "Compiler R19 stable holatdami?" — R19 da `experimental` channel'da, production'da ishlatish boshlandi (Meta — Instagram, Facebook). Stable release — kelajakda.
+- "Compiler R19 stable holatdami?" — React Compiler 1.0 stable 2025-oktyabr-7 da chiqdi (beta 2024-oktyabr, RC 2025-aprel atrofida). Bundan oldin Meta production'da (Instagram, Facebook) sinab kelgan.
 - "Compiler vs `useMemo`/`useCallback` performance farqi bormi?" — Bir xil mexanizm — `useMemoCache`. Performance teng. Compiler — DX (developer experience) afzalligi.
 - "Migration strategy?" — (1) Compiler enable, (2) ESLint plugin enable, (3) Lint warnings fix, (4) Manual `useMemo`/`useCallback` ni asta-sekin olib tashlash.
 
@@ -3601,7 +3627,7 @@ Event handler'lar render'dan tashqari bajariladi — pure bo'lishi shart emas.
 // ❌ Read ref in render
 function Component() {
   const ref = useRef(0);
-  console.log(ref.current); // ❌ tearing risk in concurrent
+  console.log(ref.current); // ❌ ref render paytida mutable — purity buziladi
   return <p>Hi</p>;
 }
 
@@ -3691,16 +3717,17 @@ function BadComponent({ items, config }: Props) {
 
 **ESLint rules — automated detection:**
 
-```json
-{
-  "plugins": ["react-compiler", "react-hooks"],
-  "rules": {
-    "react-compiler/react-compiler": "error",
-    "react-hooks/rules-of-hooks": "error",
-    "react-hooks/exhaustive-deps": "warn"
-  }
-}
+```javascript
+// eslint.config.js (flat config)
+import reactHooks from "eslint-plugin-react-hooks";
+
+export default [
+  // recommended-latest — rules-of-hooks, exhaustive-deps va Compiler diagnostics'ni o'z ichiga oladi
+  reactHooks.configs["recommended-latest"],
+];
 ```
+
+Compiler 1.0 stable'dan boshlab Compiler diagnostics shu plugin'ga ko'chirilgan — `rules-of-hooks` va `exhaustive-deps` bilan bitta paket ichida.
 
 **Compiler skip behavior:**
 
@@ -3973,7 +4000,7 @@ test("Component memoization correctness", () => {
   );
 
   // Compiler bilan: ikkinchi render — minimal work
-  // Profiler onRender callback'da actualDuration ~0ms
+  // Profiler onRender callback'da actualDuration juda kichik (bailout — sub-tree qayta hisoblanmaydi)
 });
 ```
 
@@ -4155,18 +4182,12 @@ export default defineConfig({
 
 **Production profiling — opt-in:**
 
-```tsx
-// Production build with profiling
-// next.config.js
-module.exports = {
-  reactStrictMode: true,
-  compiler: {
-    reactProfiling: true, // Next.js 14+
-  },
-};
+```bash
+# Next.js — production profiling build (react-dom/profiling'ni o'rnatadi)
+next build --profile
 ```
 
-Yoki manual:
+Yoki Vite uchun manual alias:
 
 ```bash
 # Vite — react-dom/profiling alias
@@ -4241,7 +4262,7 @@ function commitRoot(root: FiberRoot) {
 
 1. **Production overhead**: Profiler instrumented build sekinroq (har Fiber uchun timer overhead). Faqat debugging uchun.
 2. **Concurrent rendering edge cases**: Aborted renders ham qayd qilinishi mumkin (DevTools indicator bor).
-3. **Sub-second granularity**: 0.1ms aniqlikda. Mikrosekund-darajadagi farqlar ko'rinmaydi.
+3. **Vaqt aniqligi**: `performance.now()`'ga tayanadi — brauzer xavfsizlik uchun bu qiymatni clamp qiladi (Spectre mitigatsiyasi), shu sababli mikrosekund-darajadagi farqlar ko'rinmaydi.
 
 **Filtering options:**
 
@@ -4690,10 +4711,10 @@ if (Math.random() < samplingRate) {
 **`web-vitals` integration:**
 
 ```tsx
-import { onLCP, onCLS, onINP, onFCP, onTTFB } from "web-vitals";
+import { onLCP, onCLS, onINP, onFCP, onTTFB, type Metric } from "web-vitals";
 import { sendToAnalytics } from "./analytics";
 
-function reportWebVitals(metric: any) {
+function reportWebVitals(metric: Metric) {
   // Send to backend
   sendToAnalytics({
     name: metric.name,
@@ -5343,16 +5364,16 @@ export default defineConfig({
 
 ```tsx
 // Heavy library — load on demand
-async function exportToPdf(data: any) {
+async function exportToPdf(report: { title: string; body: string }) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF();
-  doc.text(data.toString(), 10, 10);
+  doc.text(`${report.title}\n${report.body}`, 10, 10);
   doc.save("export.pdf");
 }
 
 // jsPDF katta library — initial bundle'da yo'q
-function ExportButton({ data }: Props) {
-  return <button onClick={() => exportToPdf(data)}>Export PDF</button>;
+function ExportButton({ report }: { report: { title: string; body: string } }) {
+  return <button onClick={() => exportToPdf(report)}>Export PDF</button>;
 }
 ```
 
@@ -5429,13 +5450,13 @@ import "lib"; // ← may have side effects
 
 **Brotli vs Gzip:**
 
-| Compression | Size | Time |
-|-------------|------|------|
-| None | 800KB | - |
-| Gzip | 250KB | Fast |
-| Brotli (level 11) | 200KB | Slow (build-time OK) |
+| Compression | Size | Compress time |
+|-------------|------|---------------|
+| None | Eng katta | — |
+| Gzip | Kichikroq | Tez |
+| Brotli (level 11) | Eng kichik | Sekin (build-time'da OK) |
 
-Brotli — better compression, supported in modern browsers.
+Brotli — gzip'dan zichroq siqadi, modern browser'larda qo'llab-quvvatlanadi. Build-time'da level 11 ishlatish maqbul (compress vaqti runtime'ga ta'sir qilmaydi).
 
 **Dynamic imports — webpack/vite differences:**
 
@@ -5832,9 +5853,9 @@ Prefetched but unused: wasted bandwidth
 Not prefetched: slow next navigation
 
 Strategy:
-- Hover: ~70% conversion (high benefit)
-- Idle: prefetch top-3 likely (50% conversion)
-- Aggressive (all links): low conversion, high waste
+- Hover: yuqori conversion (foydalanuvchi niyatini bildiradi) — kam waste
+- Idle: eng ehtimolli top-3 sahifani prefetch — o'rtacha conversion
+- Aggressive (barcha link): past conversion, ko'p waste
 ```
 
 **`requestIdleCallback` deadline:**
@@ -5885,8 +5906,8 @@ Virtualization — uzun list'lar (10K+ items) uchun render optimizatsiyasi. Faqa
 
 ```tsx
 // 10K items render — 10K Fiber, 10K DOM nodes
-// Initial render: 200-500ms
-// Scroll: jank (each scroll tick — 10K DOM hit-test)
+// Initial render uzoq cho'ziladi (main thread bloklanadi)
+// Scroll: jank (har scroll tick — 10K DOM hit-test)
 function Bad({ items }: { items: Item[] }) {
   return (
     <ul>
@@ -6162,7 +6183,7 @@ function ManualVirtual({ items }: Props) {
 }
 ```
 
-> **Performance reality:** Virtualization — necessary evil. Adds complexity (scroll position, focus, accessibility). Faqat haqiqatan kerak bo'lganda (1000+ items).
+> **Performance reality:** Virtualization murakkablik qo'shadi (scroll position, focus, accessibility). Faqat ro'yxat yetarlicha katta bo'lib, render yoki scroll performance haqiqatan muammo bo'lganda ishlating — breakeven'ni Profiler bilan aniqlang.
 
 </details>
 
@@ -6176,7 +6197,7 @@ function ManualVirtual({ items }: Props) {
 
 - "Virtualization vs pagination — qaysi qachon?" — Pagination — clear chunks (1-10, 11-20). Virtualization — seamless scroll. UX'ga bog'liq.
 - "Why doesn't React virtualize automatically?" — Generic component requirements (height measurement, scroll behavior) — domain-specific. Library shu uchun mavjud.
-- "Performance budget — virtualization qachon kerak?" — Initial render > 100ms or scroll FPS < 60. Profile va aniqlash.
+- "Performance budget — virtualization qachon kerak?" — Initial render sezilarli kechiksa yoki scroll FPS frame budget'dan (60fps) tushib ketsa. Profiler bilan o'lchab aniqlang.
 
 </details>
 
@@ -6524,14 +6545,13 @@ useLayoutEffect(() => {
 **Accessibility — ARIA roles:**
 
 ```tsx
-<div role="list" aria-label="User list" aria-rowcount={items.length}>
+<div role="list" aria-label="User list">
   {visibleItems.map((item, idx) => {
     const actualIndex = startIndex + idx;
     return (
       <div
         key={actualIndex}
         role="listitem"
-        aria-rowindex={actualIndex + 1}
         aria-posinset={actualIndex + 1}
         aria-setsize={items.length}
       >
@@ -6558,7 +6578,7 @@ useLayoutEffect(() => {
 
 | Feature | Pure React | `react-window` |
 |---------|-----------|----------------|
-| Bundle size | 0 | ~3KB |
+| Bundle size | 0 (qo'shimcha yo'q) | Kichik (bundlephobia.com'da tekshiring) |
 | API | Custom | Standard |
 | Variable size | Manual | `VariableSizeList` |
 | Grid | Manual | `FixedSizeGrid` |
@@ -6831,25 +6851,25 @@ Compiler auto-memoization → unnecessary re-renders kamayadi → CPU work kamay
 
 ---
 
-### 26. React Compiler beta status va `'use memo'` direktiv qanday ishlatiladi? [Middle+]
+### 26. React Compiler status va `'use memo'` direktiv qanday ishlatiladi? [Middle+]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-React Compiler 2026 boshida hali **rasman beta** statusda (production'da Meta'da ishlatiladi, lekin barcha React app'lar uchun stable e'lon qilinmagan). O'rnatish: `babel-plugin-react-compiler` Babel/Vite/Next.js'ga qo'shiladi va `eslint-plugin-react-compiler` Rules of React violations'ni dev'da warn qiladi. Default — **opt-in per directory yoki per file** (config'ga `compilationMode` orqali). File-level granular control uchun: `"use memo"` directive (yoqish), `"use no memo"` (o'chirish). Production'ga chiqarishdan oldin ESLint plugin clean bo'lishi va critical path'larni Profiler bilan tasdiqlash kerak.
+React Compiler 1.0 **stable** 2025-oktyabr-7 da chiqdi (beta 2024-oktyabr, RC 2025-aprel atrofida). O'rnatish: `babel-plugin-react-compiler` Babel/Vite/Next.js'ga qo'shiladi va `eslint-plugin-react-hooks` (Compiler qoidalari shu plugin'ga ko'chirilgan) Rules of React violations'ni dev'da warn qiladi. Default — **opt-in per directory yoki per file** (config'ga `compilationMode` orqali). File-level granular control uchun: `"use memo"` directive (yoqish), `"use no memo"` (o'chirish). Production'ga chiqarishdan oldin ESLint clean bo'lishi va critical path'larni Profiler bilan tasdiqlash kerak.
 
 ### To'liq tushuntirish
 
-**Beta status (2026):**
+**Status:**
 
-- Meta production'da (Instagram, Facebook) ishlatadi
-- Public release — Beta (stable e'lon qilinmagan)
-- ESLint plugin va Babel plugin npm'da mavjud: `babel-plugin-react-compiler`, `eslint-plugin-react-compiler`
-- React 19 minimum (yangi hook `useMemoCache` ishlatiladi)
+- React Compiler 1.0 stable — 2025-oktyabr-7 (beta 2024-oktyabr, RC 2025-aprel atrofida)
+- Meta production'da (Instagram, Facebook) stable'gacha sinab kelgan
+- Babel plugin npm'da: `babel-plugin-react-compiler`. Lint qoidalari `eslint-plugin-react-hooks`'ga integratsiya qilingan
+- React 19 minimum (yangi hook `useMemoCache` ishlatiladi); eski versiyalar uchun `react-compiler-runtime` polyfill
 
-> **Status tekshiruvi:** React rasmiy blog (`react.dev/blog`) yoki Compiler GitHub repo (`facebook/react`) status'ni doim aniqlang. Stable e'lon qilingan bo'lishi mumkin.
+> **Status tekshiruvi:** Aniq versiya holatini React rasmiy blog (`react.dev/blog`) yoki Compiler repo (`facebook/react`)'da tekshiring.
 
 **Setup (Babel):**
 
@@ -6869,9 +6889,9 @@ module.exports = {
 
 | Mode | Behavior |
 |------|----------|
-| `all` | Barcha komponent'lar/hook'lar compile qilinadi (default) |
-| `annotation` | Faqat `"use memo"` directive'li fayllar |
-| `infer` | Heuristic — komponent shaklini avtomat tan oladi |
+| `infer` | Heuristic — komponent/hook shaklini avtomat tan oladi (default) |
+| `annotation` | Faqat `"use memo"` directive'li komponent/hook |
+| `all` | Barcha komponent'lar va hook'lar compile qilinadi |
 
 **File-level directive — `"use memo"`:**
 
@@ -6913,9 +6933,7 @@ function SpecificComponent() {
 ```javascript
 // next.config.js
 const nextConfig = {
-  experimental: {
-    reactCompiler: true, // Built-in Next.js support
-  },
+  reactCompiler: true, // Next.js built-in support (stable — top-level option)
 };
 
 module.exports = nextConfig;
@@ -6941,17 +6959,21 @@ export default defineConfig({
 
 **ESLint plugin:**
 
-```javascript
-// .eslintrc.json
-{
-  "plugins": ["react-compiler"],
-  "rules": {
-    "react-compiler/react-compiler": "error"
-  }
-}
+```bash
+npm install -D eslint-plugin-react-hooks@latest
 ```
 
-ESLint Rules of React violations'ni warn qiladi:
+```javascript
+// eslint.config.js (flat config)
+import reactHooks from "eslint-plugin-react-hooks";
+
+export default [
+  reactHooks.configs["recommended-latest"],
+  // Compiler diagnostics shu plugin orqali avtomat chiqadi
+];
+```
+
+Compiler 1.0 stable'dan boshlab Compiler lint qoidalari `eslint-plugin-react-hooks`'ga ko'chirilgan — alohida `eslint-plugin-react-compiler` kerak emas (mavjud bo'lsa olib tashlash mumkin). ESLint Rules of React violations'ni warn qiladi:
 
 ```tsx
 function Component() {
@@ -6964,11 +6986,8 @@ function Component() {
 **Gradual adoption strategy:**
 
 ```javascript
-// 1. ESLint plugin avval — violations'ni topish
-{
-  "plugins": ["react-compiler"],
-  "rules": { "react-compiler/react-compiler": "warn" } // warn, not error
-}
+// 1. ESLint plugin avval (eslint-plugin-react-hooks) — violations'ni topish
+//    Compiler diagnostics avtomat chiqadi, compiler o'rnatilmagan bo'lsa ham
 
 // 2. Annotation mode — opt-in directorylar
 // babel.config.js
@@ -7081,7 +7100,7 @@ Compiler kod oshiradi (cache array, conditional checks). Lekin re-render kamayga
 
 - "Compiler ishlatsam manual `useMemo`/`useCallback` o'chirish kerakmi?" — Yo'q, majburiy emas. Compiler ularni "no-op" sifatida ko'radi. Yangi kod uchun manual hook'larni yozmaslik mumkin, lekin existing kod ishlaydi.
 - "Compiler buyruq beradigan API'lar bormi?" — `'use memo'`, `'use no memo'` directive'lar. Hozircha boshqa runtime API yo'q.
-- "Ish faoliyatim Compiler chiqishigacha — manual yozaverishim kerakmi?" — Ha, Profiler bilan critical path'larni manual memoize. Compiler stable bo'lgach migration.
+- "Compiler ishlatmasam — manual yozaverishim kerakmi?" — Ha, Profiler bilan critical path'larni manual memoize. Compiler stable bo'lgani uchun (1.0) yangi loyihada uni yoqib, manual hook'lardan voz kechish mumkin.
 
 </details>
 
@@ -7131,7 +7150,7 @@ npx bundle-phobia <package-name>
 **Common bundle bloat sources:**
 
 1. **Lodash** — full import vs `lodash-es` tree-shake
-2. **Moment.js** — 280kb. Replace with `date-fns` (modular) or `dayjs` (2kb)
+2. **Moment.js** — katta va tree-shakable emas. `date-fns` (modular) yoki `dayjs` (ancha kichik) bilan almashtiring
 3. **Polyfills** — bundle for old browsers
 4. **Source maps** — production should not include
 5. **Unused exports** — re-exports break tree-shake
@@ -7171,22 +7190,15 @@ module.exports = {
 
 ```tsx
 // Before:
-const Heavy = require("./Heavy");  // initial bundle +100kb
+const Heavy = require("./Heavy");  // initial bundle'ga to'g'ridan-to'g'ri qo'shiladi
 
 // After:
 const Heavy = lazy(() => import("./Heavy"));  // separate chunk
 ```
 
-**Real-world thresholds (2026):**
+**Bundle size va perceived performance:**
 
-| Size (gzipped) | Status |
-|----------------|--------|
-| <50kb | Fast |
-| 50-100kb | Moderate |
-| 100-200kb | Slow on 4G mobile |
-| 200kb+ | Very slow |
-
-LCP (Largest Contentful Paint) — directly impacted by initial bundle.
+Gzipped bundle qancha katta bo'lsa — yuklash, parse va execute vaqti shuncha uzoq, ayniqsa past tezlikdagi mobil tarmoqlarda. Initial bundle to'g'ridan-to'g'ri LCP (Largest Contentful Paint)'ga ta'sir qiladi. Aniq "good/bad" chegaralari ilova turi, target qurilma va tarmoqqa bog'liq — Lighthouse (target qurilma profili bilan) va performance budget orqali belgilang.
 
 **CI integration:**
 
@@ -7210,7 +7222,7 @@ LCP (Largest Contentful Paint) — directly impacted by initial bundle.
 
 ### Follow-up savollar
 
-- "When code-splitting hurts?" — Too aggressive — many small chunks, network overhead. Aim for 50-100kb chunks.
+- "When code-splitting hurts?" — Juda agressiv bo'lsa — ko'p kichik chunk, har biri uchun network round-trip overhead. Chunk'larni mantiqiy birlashtiring (route yoki feature darajasida), juda mayda bo'lakka bo'lmang.
 - "RSC bundle size?" — Server components — 0 bundle (server-only). Client components — bundled.
 
 </details>
@@ -7221,13 +7233,13 @@ LCP (Largest Contentful Paint) — directly impacted by initial bundle.
 
 Bu fayl React performance'ning to'liq spektrini qamrab oldi:
 
-- **QISM A — React.memo** (4 savol): Shallow comparison, custom comparators, `useCallback` paired, bypass scenarios
-- **QISM B — Re-render Mechanics** (4 savol): 4 ta render trigger, parent → child cascade, bailout algorithm, output trace
-- **QISM C — useMemo/useCallback** (3 savol): Decision tree, over-engineering, Compiler era
-- **QISM D — React Compiler** (3 savol): HIR + reactive scopes, Rules of React, limitations
-- **QISM E — Profiling** (3 savol): DevTools Profiler, programmatic `<Profiler>`, production monitoring
-- **QISM F — Code Splitting & Virtualization** (5 savol): `React.lazy`, bundle optimization, prefetching, virtualization concept va implementation
-- **QISM G — Web Vitals** (2 savol): Core Web Vitals (LCP/INP/CLS) va React optimizatsiya patterns, React Compiler beta status va directive'lar
+- **QISM A — React.memo** (savollar 1-4): Shallow comparison, custom comparators, `useCallback` paired, bypass scenarios
+- **QISM B — Re-render Mechanics** (savollar 5-8): `memo` + Context bypass, render trigger'lar, parent → child cascade, bailout algorithm
+- **QISM C — useMemo/useCallback** (savollar 9-11): Output trace, reference equality, decision tree
+- **QISM D — React Compiler** (savollar 12-14): Over-engineering, avtomat memoization, HIR + reactive scopes
+- **QISM E — Profiling** (savollar 15-17): Rules of React, Compiler limitations, DevTools Profiler
+- **QISM F — Code Splitting & Virtualization** (savollar 18-22): Programmatic `<Profiler>`, production monitoring, `React.lazy`, bundle optimization, prefetching
+- **QISM G — Web Vitals** (savollar 23-27): Virtualization concept va implementation, Core Web Vitals (LCP/INP/CLS), React Compiler 1.0 stable status va directive'lar, bundle analysis
 
 **Asosiy mental model'lar:**
 
@@ -7235,7 +7247,7 @@ Bu fayl React performance'ning to'liq spektrini qamrab oldi:
 2. **Memo + useCallback — paired juftlik** (props stability)
 3. **Compiler avtomat memoization** — manual ehtiyoji kamayadi
 4. **Profile avval, optimize keyin** — premature optimization xato
-5. **Virtualization faqat 1000+ items** uchun
+5. **Virtualization faqat katta ro'yxatlar** uchun (breakeven'ni Profiler bilan aniqlang)
 
 **Keyingi fayl:** `06-concurrent-suspense.md` — Concurrent React, startTransition, Suspense, Streaming SSR.
 

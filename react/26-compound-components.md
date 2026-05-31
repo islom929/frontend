@@ -1,6 +1,6 @@
 # Bo'lim 26: Compound Components
 
-> Compound Components — komponent guruhi bir **maxsus parent**ga bog'langan holda ishlaydigan pattern. Klassik HTML misol: `<select>` va `<option>` — `<option>` faqat `<select>` ichida ma'noga ega, parent state ni share qiladi. React'da bu pattern UI library'lari uchun (Tabs, Accordion, Select, Dialog) eng ko'p ishlatilgan dizayn pattern'i. Ikki implementation: **`React.Children` API + `cloneElement`** (legacy) va **Context-based** (modern). Bu fayl ikkalasini qamrab oladi va qachon qaysi tanlash kerakligini ko'rsatadi.
+> Compound Components — Component guruhi bir **maxsus parent**ga bog'langan holda ishlaydigan pattern. Klassik HTML misol: `<select>` va `<option>` — `<option>` faqat `<select>` ichida ma'noga ega, parent state ni share qiladi. React'da bu pattern UI library'lari uchun (Tabs, Accordion, Select, Dialog) eng ko'p ishlatilgan dizayn pattern'i. Ikki implementation: **`React.Children` API + `cloneElement`** (legacy) va **Context-based** (modern). Bu fayl ikkalasini qamrab oladi va qachon qaysi tanlash kerakligini ko'rsatadi.
 
 ---
 
@@ -30,7 +30,7 @@
 
 ### Nazariya
 
-**Compound Components** — bir nechta komponent **bitta logical unit** sifatida ishlaydigan pattern. Komponent'lar yakka holda ma'no bermaydi — ular **maxsus parent** bilan birga ishlatilishi shart. State va behavior parent tomonidan boshqariladi, children parent state'ni "consume" qiladi.
+**Compound Components** — bir nechta Component **bitta logical unit** sifatida ishlaydigan pattern. Component'lar yakka holda ma'no bermaydi — ular **maxsus parent** bilan birga ishlatilishi shart. State va behavior parent tomonidan belgilanadi, children parent state'ni "consume" qiladi.
 
 HTML'dan klassik misol:
 
@@ -126,7 +126,7 @@ Parent Provider, child'lar `useContext` orqali state'ga kiradi. **Har chuqurlikd
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-JSX'da Compound Components — komponent **static method/property** sifatida nested:
+JSX'da Compound Components — Component **static method/property** sifatida nested:
 
 ```tsx
 function Tabs(props: TabsProps) { /* ... */ }
@@ -154,7 +154,7 @@ React.createElement(Tabs.List, null, ...);
 React.createElement(TabsList, null, ...);
 ```
 
-Static property — `Tabs` namespace ostida child komponent'larni tashkil qiladi. Bu **API ergonomics**: `<Tabs.List>` (namespace clarity) vs alohida import (`<TabsList>`). Ikkalasi ham ishlaydi:
+Static property — `Tabs` namespace ostida child Component'larni tashkil qiladi. Bu **API ergonomics**: `<Tabs.List>` (namespace clarity) vs alohida import (`<TabsList>`). Ikkalasi ham ishlaydi:
 
 ```tsx
 // Namespace
@@ -315,7 +315,7 @@ Compound Components pattern'ining asosiy elementlari:
 </Card>
 ```
 
-`Card`, `Card.Header`, `Card.Body`, `Card.Footer` — har biri mustaqil komponent. Hech qanday state share qilinmaydi. Faqat **namespace organization** maqsadida birlashtirilgan.
+`Card`, `Card.Header`, `Card.Body`, `Card.Footer` — har biri mustaqil Component. Hech qanday state share qilinmaydi. Faqat **namespace organization** maqsadida birlashtirilgan.
 
 **Type 2: Stateful Compound** — state sharing bor, parent boshqaradi, child consume qiladi.
 
@@ -659,48 +659,48 @@ Recursive — bir necha daraja chuqurlik. Lekin **performance overhead** (har re
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`React.cloneElement` source code (simplified):
+`cloneElement` source mexanizmi (soddalashtirilgan, `react/src/jsx/ReactJSXElement.js`):
 
 ```javascript
-// react/src/ReactElement.js
 function cloneElement(element, config, children) {
-  // Original element copy
-  const props = Object.assign({}, element.props);
-  
+  // Original element props ni nusxalash
+  const props = assign({}, element.props);
+
   let key = element.key;
-  let ref = element.ref;
-  
-  // Override props from config
+
   if (config != null) {
-    if (hasValidRef(config)) {
-      ref = config.ref;
-    }
     if (hasValidKey(config)) {
       key = '' + config.key;
     }
-    
-    // Merge other props
+
+    // Qolgan prop'larni merge qilish — config element prop'larini override qiladi
     for (const propName in config) {
       if (
-        config.hasOwnProperty(propName) &&
-        propName !== 'key' && propName !== 'ref'
+        hasOwnProperty.call(config, propName) &&
+        propName !== 'key' &&
+        propName !== '__self' &&
+        propName !== '__source' &&
+        // R19: undefined ref e'tiborga olinmaydi
+        !(propName === 'ref' && config.ref === undefined)
       ) {
         props[propName] = config[propName];
       }
     }
   }
-  
-  // Override children
+
+  // children argumenti props.children ni override qiladi
   if (children) {
     props.children = children;
   }
-  
-  // Create new element with merged props
-  return ReactElement(element.type, key, ref, ..., props);
+
+  // R19: ReactElement(type, key, props, owner, ...) — ref alohida positional argument emas
+  return ReactElement(element.type, key, props, owner);
 }
 ```
 
-`cloneElement` **shallow merge** — config'dagi prop'lar element prop'larini override qiladi. Children explicit beriladi.
+`cloneElement` **shallow merge** — config'dagi prop'lar element prop'larini override qiladi (oxirgi yutadi). `children` argumenti `props.children` ni almashtiradi.
+
+R19'da `ref` alohida positional slot emas, balki oddiy prop — `props` obyekti ichida saqlanadi. `cloneElement` `config.ref` ni `props` ichiga ko'chiradi (faqat `config.ref === undefined` bo'lsa o'tkazib yuboradi). Shu sababli yuqoridagi `ReactElement` chaqirig'ida `ref` uchun alohida argument yo'q — u `props`'ning bir qismi. R19'gacha `ref` element'ning alohida positional maydoni edi.
 
 `cloneElement` faqat **React Element** (JSX'dan natija) bilan ishlaydi. Boshqa qiymatlar (string, number, null) — `isValidElement(child) === false`.
 
@@ -785,7 +785,7 @@ function PaymentForm() {
 }
 ```
 
-Bu yondashuv **direct children** uchun ishlaydi. Wrapper (`<div>`) qo'shilsa — sinmaydi.
+Bu yondashuv **faqat direct children** uchun ishlaydi. Wrapper (`<div>`) qo'shilsa, `cloneElement` `checked`/`onChange` prop'larni `<div>`'ga inject qiladi — bu ichidagi `<Radio>`'ga yetib bormaydi, va React DOM noma'lum attribute haqida ogohlantiradi. Nested struktura kerak bo'lsa, recursive `Children.map` yoki Context-based variant zarur.
 
 `cloneElement` o'rniga `Children.map` + manual element yaratish:
 
@@ -890,7 +890,7 @@ function map(children, fn) {
 }
 ```
 
-Auto-key — `$.0`, `$.1` prefix added to existing key (avoiding collision with user keys). Nested arrays flattened.
+Auto-key — har element uchun `getElementKey(element, index)`: element o'z `key`'iga ega bo'lsa `escape('' + key)` (`$`-prefiks, `=`/`:` belgilarni `=0`/`=2` ga almashtiradi), aks holda `index.toString(36)` (base-36 index). Bu kalit `SEPARATOR` (`.`) bilan boshlanadi (top-level uchun `'.' + getElementKey`), nested array'larda esa har daraja `SUBSEPARATOR` (`:`) bilan birlashtiriladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -964,7 +964,7 @@ function toArray(children) {
 }
 ```
 
-Performance — `Children.toArray` siz native `[].concat(children)` ishlatish mumkin (children'ni flatten qilmaydi). Lekin iterator/Symbol.iterator children bilan crash. `Children.toArray` xavfsiz.
+`Children.toArray` `Symbol.iterator` bilan iterable children'ni ham qo'llab-quvvatlaydi (`getIteratorFn` orqali iterator'ni topadi va `.next()` bilan aylanadi), nested array'larni flatten qiladi, `null`/`boolean` ni filtrlaydi va har element'ga barqaror auto-key beradi. Native `[].concat(children)` esa bularning hech birini qilmaydi — iterable'ni bitta element sifatida o'rab qo'yadi va kalit normalizatsiyasini bermaydi.
 
 </details>
 
@@ -1119,7 +1119,7 @@ const cloned = React.cloneElement(original, {
 
 NIMA UCHUN `cloneElement`:
 - **Props injection** — Compound Components parent → child state share.
-- **Behavior augmentation** — komponent atrofida wrapper logic (HOC alternative).
+- **Behavior augmentation** — Component atrofida wrapper logic (HOC alternative).
 - **Library API** — flexible component wrapping.
 
 QANDAY ISHLAYDI: `cloneElement` Element type'ni saqlaydi, faqat props ni `Object.assign`'lash. Original element o'zgarmaydi (immutable). Yangi element qaytariladi.
@@ -1363,7 +1363,7 @@ function Provider({ children }: { children: React.ReactElement }) {
   <Child1 />
   <Child2 />
 </Provider>
-// ❌ Error: React.Children.only expected to receive a single React element child
+// ❌ Error: React.Children.only expected to receive a single React element child.
 ```
 
 NIMA UCHUN: ba'zi pattern'lar bitta child shart — masalan `Tooltip` faqat bitta target element atrofida wrapper.
@@ -1371,7 +1371,7 @@ NIMA UCHUN: ba'zi pattern'lar bitta child shart — masalan `Tooltip` faqat bitt
 **`React.Children.count(children)`** — children sonini qaytaradi:
 
 ```tsx
-React.Children.count(<><a /><b /><c /></>); // 3
+React.Children.count(<><Tab /><Tab /><Tab /></>); // 3
 React.Children.count(null); // 0
 React.Children.count("hello"); // 1
 ```
@@ -1396,7 +1396,7 @@ QANDAY ISHLAYDI:
 // React.Children.only (simplified)
 function only(children) {
   if (!isValidElement(children)) {
-    throw new Error('React.Children.only expected to receive a single React element child');
+    throw new Error('React.Children.only expected to receive a single React element child.');
   }
   return children;
 }
@@ -1429,7 +1429,7 @@ function only(children) {
 
 `isValidElement` — `children.$$typeof === REACT_ELEMENT_TYPE`. Array — invalid (array `$$typeof` yo'q).
 
-`Children.count` — `mapChildren` orqali iterate qiladi va counter increment qiladi. `null`/`boolean`/`undefined` skip (mapChildren return false on those). Strings/numbers — count'da hisoblanadi:
+`Children.count` `mapChildren` orqali iterate qiladi va counter'ni oshiradi. `null`/`boolean`/`undefined` qiymatlar callback'ni chaqirmaydi (`mapIntoArray` ularni avval `null`'ga aylantiradi), shu sabab hisobga olinmaydi. String/number — bittadan hisoblanadi:
 
 ```javascript
 React.Children.count("hello"); // 1
@@ -1439,10 +1439,10 @@ React.Children.count(false); // 0
 React.Children.count(null); // 0
 ```
 
-R19+ nominal `null` count'da:
+Array ichidagi `null`/`boolean` ham hisobga olinmaydi (bu xulq R19'ga xos emas — barcha versiyalarda bir xil):
 
 ```javascript
-React.Children.count([null, <a />, null]); // 1 (only <a />)
+React.Children.count([null, <Tab />, null]); // 1 (faqat <Tab />)
 ```
 
 Test for "have any children":
@@ -1481,7 +1481,7 @@ function Tooltip({ message, children }: TooltipProps) {
 // ✅ OK
 <Tooltip message="Submit"><button>Submit</button></Tooltip>
 
-// ❌ Throws: React.Children.only expected to receive a single React element child
+// ❌ Throws: React.Children.only expected to receive a single React element child.
 <Tooltip message="Submit">
   <button>Submit</button>
   <button>Cancel</button>
@@ -1688,7 +1688,7 @@ function Tabs() {
 
 `setActive` `useState` setter — har render bir xil reference (cross-ref [`12-state-and-usestate.md`](12-state-and-usestate.md)). `value` faqat `active` o'zgarganda yangilanadi.
 
-React Compiler (1.0 stable, R19.1+ bilan 2025-aprel; R17/18/19 mos) — auto-memoization (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). Manual `useMemo` kerak emas (Compiler infer qiladi).
+React Compiler 1.0 stable 2025-yil 7-oktyabrda chiqdi (April 2025 — RC bosqichi edi). Opt-in `babel-plugin-react-compiler`, React 17/18/19 bilan mos — auto-memoization beradi (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). Compiler yoqilganda manual `useMemo`/`useCallback` kerak emas (Compiler memoization'ni o'zi infer qiladi).
 
 **Splitting Context** — performance optimization:
 
@@ -2694,13 +2694,16 @@ export function Accordion(props: AccordionProps) {
     props.defaultValue ?? (type === 'single' ? '' : [])
   );
   const isControlled = props.value !== undefined;
-  const value = isControlled ? props.value! : internalValue;
-  
+  const value = props.value !== undefined ? props.value : internalValue;
+
   const setValue = useCallback((newValue: string | string[]) => {
     if (!isControlled) setInternalValue(newValue);
-    if (type === 'single') (props as any).onChange?.(newValue as string);
-    else (props as any).onChange?.(newValue as string[]);
-  }, [isControlled, type, props]);
+    if (props.type === 'single') {
+      props.onChange?.(newValue as string);
+    } else {
+      props.onChange?.(newValue as string[]);
+    }
+  }, [isControlled, props]);
   
   const toggleItem = useCallback((itemValue: string) => {
     if (type === 'single') {
@@ -2897,7 +2900,7 @@ NIMA UCHUN Context default tanlov:
 - Modern React idiomatic
 - TypeScript inference yaxshi
 - DevTools clean
-- React Compiler optimization (1.0 stable, R19.1+ bilan 2025-aprel)
+- React Compiler optimization (1.0 stable 2025-yil 7-oktyabr; opt-in babel-plugin, R17/18/19 mos)
 - Custom hook composition
 
 NIMA UCHUN cloneElement hali kerak:
@@ -2944,7 +2947,7 @@ Re-render frequency:
 - `cloneElement`: All children re-render on parent state change
 - Context: Only consumers (and their descendants) re-render
 
-React Compiler (1.0 stable, R19.1+ bilan 2025-aprel; R17/18/19 mos):
+React Compiler (1.0 stable 2025-yil 7-oktyabr; opt-in `babel-plugin-react-compiler`, R17/18/19 mos):
 - Auto-memoizes Context value (no manual `useMemo`)
 - Inlines hook calls (less function overhead)
 - `cloneElement` patterns harder to optimize (dynamic element creation)
@@ -3424,7 +3427,7 @@ Compound Components — interactive UI primitive'lar (Tabs, Accordion, Select). 
 5. **Focus management** — visible focus, focus return, focus trap.
 6. **Screen reader announcements** — live regions, status updates.
 
-WAI-ARIA Authoring Practices Guide (APG) — har komponent uchun ARIA pattern'lari belgilangan:
+WAI-ARIA Authoring Practices Guide (APG) — har Component uchun ARIA pattern'lari belgilangan:
 
 | Component | WAI-ARIA Pattern |
 |-----------|------------------|
@@ -3434,7 +3437,7 @@ WAI-ARIA Authoring Practices Guide (APG) — har komponent uchun ARIA pattern'la
 | Dialog | https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/ |
 | Menu | https://www.w3.org/WAI/ARIA/apg/patterns/menubar/ |
 
-NIMA UCHUN: 15-20% foydalanuvchilar accessibility'ga muhtoj (vision impairment, motor impairment, cognitive). WCAG (Web Content Accessibility Guidelines) — legal requirement many countries.
+NIMA UCHUN: foydalanuvchilarning sezilarli qismi accessibility'ga tayanadi (vision impairment, motor impairment, cognitive). WCAG (Web Content Accessibility Guidelines) — ko'p mamlakatlarda legal requirement.
 
 QANDAY ISHLAYDI:
 
@@ -3560,7 +3563,7 @@ function handleKeyDown(e: KeyboardEvent) {
 }
 ```
 
-`e.preventDefault()` — default browser behavior block (Tab dan tashqari, Tab focus management browser default qoladi keyboard-only navigation uchun).
+Arrow/Home/End uchun `e.preventDefault()` chaqiriladi — sahifa scroll'i kabi default xulqni to'xtatadi. `Tab` esa preventDefault qilinmaydi: browser'ning native focus o'tkazish xulqi keyboard-only navigation uchun saqlanishi kerak.
 
 Live regions — dynamic content announcements:
 
@@ -3586,7 +3589,9 @@ function AccessibleTab({ value, children, disabled }: TabProps) {
   const isActive = active === value;
   
   const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    const values = getTabValues().filter(v => /* not disabled */ true);
+    // To'liq APG xulqi uchun disabled tab'larni shu yerda chiqarib tashlash kerak —
+    // buning uchun registry disabled holatni ham saqlashi shart (bu yerda soddalashtirilgan).
+    const values = getTabValues();
     const currentIdx = values.indexOf(value);
     
     let targetIdx = currentIdx;
@@ -3766,11 +3771,11 @@ const value = useMemo(() => ({ active, setActive }), [active]);
 
 `setActive` `useState` setter — bir xil reference (`useState` kafolati). `value` faqat `active` o'zgarganda yangilanadi.
 
-React Compiler (1.0 stable, R19.1+ bilan 2025-aprel) — auto-memoize (manual `useMemo` kerak emas).
+React Compiler (1.0 stable 2025-yil 7-oktyabr; opt-in babel-plugin, R17/18/19 mos) — auto-memoize (manual `useMemo` kerak emas).
 
 ### Gotcha 3: `Children.map` key generation — collision
 
-`Children.map` auto-key generates (`$.0`, `$.1`). Lekin user keys bilan combine bo'lganda silent collision:
+`Children.map` har natija element'iga avtomatik kalit beradi. Children array bo'lgani uchun kalit `SEPARATOR` (`.`) bilan boshlanadi, so'ng `getElementKey`: element o'z `key`'iga ega bo'lsa `escape(key)` (`$`-prefiks), aks holda `index.toString(36)`. Index faqat element'da o'z `key`'i yo'q bo'lganda fallback sifatida ishlatiladi:
 
 ```tsx
 <Tabs>
@@ -3778,18 +3783,17 @@ React Compiler (1.0 stable, R19.1+ bilan 2025-aprel) — auto-memoize (manual `u
   <Tab key="b" value="b">B</Tab>
 </Tabs>
 
-// Inside Tabs.Children.map:
-// - child[0]: key = "a" → cloned with key "$.0/.$a"
-// - child[1]: key = "b" → cloned with key "$.0/.$b"
+// Tabs ichidagi Children.map natijasi:
+// - child[0]: o'z key="a" bor → escape("a")="$a", SEPARATOR bilan → ".$a"
+// - child[1]: o'z key="b" bor → escape("b")="$b", SEPARATOR bilan → ".$b"
+// (key yo'q bo'lganda fallback: ".0", ".1" — index base-36)
 ```
 
-Auto-prefix `$.0/.$` — collision'ni oldini oladi. Ammo manual cloneElement bilan key override qilinsa:
+Auto-kalit collision'ni oldini oladi. Ammo `cloneElement`'da `key` qo'lda override qilinsa, original key yo'qoladi:
 
 ```tsx
-React.cloneElement(child, { key: 'custom' });  // ❌ user key override
+React.cloneElement(child, { key: 'custom' });  // ❌ original key o'rniga 'custom'
 ```
-
-Original key yo'qoladi.
 
 ### Gotcha 4: Strict Mode 2x cycle — Compound Component setup
 
@@ -4000,7 +4004,7 @@ export default Card;
 ```
 
 **Tushuntirish:**
-- Har komponent independent (state sharing yo'q).
+- Har Component independent (state sharing yo'q).
 - Static method attachment (`Card.Header = CardHeader`).
 - TypeScript `typeof CardRoot & {...}` — type-safe namespace.
 - Standard HTML attributes spread (`...rest`).
@@ -4606,12 +4610,12 @@ function FAQ() {
 
 Compound Components — UI library design'ning fundamental pattern'i. Hozirgi kunda ko'pchilik UI library (Radix UI, Headless UI, Material UI, shadcn/ui) shu pattern'da qurilgan. Asosiy fikrlar:
 
-- **Compound Components Nima** — bir nechta komponent **bitta logical unit** sifatida ishlaydi. State va behavior parent boshqaradi, children consume qiladi. HTML klassik analog: `<select>` + `<option>`. **Maqsad** flexible, declarative API + implicit state sharing + encapsulation.
+- **Compound Components Nima** — bir nechta Component **bitta logical unit** sifatida ishlaydi. State va behavior parent belgilaydi, children consume qiladi. HTML klassik analog: `<select>` + `<option>`. **Maqsad** flexible, declarative API + implicit state sharing + encapsulation.
 - **Ikki Implementation Strategy** — `React.Children` API + `cloneElement` (legacy, direct children only) yoki Context-based (modern, har chuqurlikda nested struktura).
 - **`React.Children` API** — `Children.map` (auto-key, skip null), `Children.toArray` (filter + flatten), `Children.count` (node count), `Children.only` (single child validation), `Children.forEach` (no return). Native `arr.map` va `Children.map` farq — `null`/`false` handling + auto-key.
 - **`cloneElement`** — Element kloni + qo'shimcha props inject. Shallow merge (last-wins). `key`/`ref` saqlanadi yoki override. **Cheklov'lar**: faqat React Element, direct children, props collision (event handler manual chain), ref re-attach.
 - **`Children.only` va `Children.count`** — validation va layout decisions. `Children.only` single child shart (Tooltip). `Children.count` `null`/`boolean`/`undefined` skip qiladi.
-- **Context-Based (Modern)** — Provider value + `useContext`. **Avantajlar:** har chuqurlikda nested, TypeScript inference, React Compiler optimization (1.0 stable, R19.1+ bilan 2025-aprel), custom hook integration, DevTools clean. Strict consumer hook (`useTabsContext` Provider'sini majbur qiladi).
+- **Context-Based (Modern)** — Provider value + `useContext`. **Avantajlar:** har chuqurlikda nested, TypeScript inference, React Compiler optimization (1.0 stable 2025-yil 7-oktyabr, opt-in babel-plugin), custom hook integration, DevTools clean. Strict consumer hook (`useTabsContext` Provider'sini majbur qiladi).
 - **Real-World Tabs** — `Tabs` + `Tabs.List` + `Tabs.Tab` + `Tabs.Panel`. Controlled/Uncontrolled, ARIA roles (`tablist`, `tab`, `tabpanel`), keyboard navigation (Arrow keys, Home/End), Roving tabindex pattern, `useId` SSR-safe IDs, Tab registry (focus next/prev).
 - **Real-World Select** — `Select` + `Trigger` + `Content` + `Item`. Dropdown ochish/yopish, click outside (`useOnClickOutside` cross-ref 24), Escape key close, Portal (cross-ref 28), position calculation, ARIA combobox/listbox/option.
 - **Real-World Accordion** — `Accordion` + `Item` + `Trigger` + `Content`. Two-level Context (root + item-level), single/multiple expansion (discriminated union props), CSS height animation, ARIA region.

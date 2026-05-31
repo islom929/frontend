@@ -18,23 +18,23 @@
 **HOCs va Class Patterns (8-10):**
 8. [HOC: withAuth](#8-hoc-withauth-middle)
 9. [HOC: withErrorBoundary](#9-hoc-witherrorboundary-middle)
-10. [ErrorBoundary class component](#10-errorboundary-class-middle)
+10. [ErrorBoundary class component](#10-errorboundary-class-component-middle)
 
 **Architectural Patterns (11-12):**
-11. [Compound Component pattern](#11-compound-component-senior)
-12. [useReducer + Context global state](#12-usereducer--context-middle)
+11. [Compound Component pattern](#11-compound-component-pattern-senior)
+12. [useReducer + Context global state](#12-usereducer--context-global-state-middle)
 
 **Performance va Library Patterns (13-17):**
-13. [React.memo + useCallback optimize](#13-memo--usecallback-middle)
-14. [Virtualized list (windowing)](#14-virtualized-list-senior)
-15. [useAsync — Promise hook](#15-useasync-middle)
-16. [Suspense + lazy code splitting](#16-suspense--lazy-middle)
-17. [Render Props pattern](#17-render-props-middle)
+13. [React.memo + useCallback optimize](#13-reactmemo--usecallback-optimize-middle)
+14. [Virtualized list (windowing)](#14-virtualized-list-windowing-senior)
+15. [useAsync — Promise hook](#15-useasync--promise-hook-middle)
+16. [Suspense + lazy code splitting](#16-suspense--lazy-code-splitting-middle)
+17. [Render Props pattern](#17-render-props-pattern-middle)
 
 **React 19 Features (18-20):**
-18. [R19 use() data fetching](#18-r19-use-data-middle)
-19. [useOptimistic optimistic UI](#19-useoptimistic-senior)
-20. [Custom forwardRef + useImperativeHandle](#20-forwardref--useimperativehandle-middle)
+18. [R19 use() data fetching](#18-r19-use-data-fetching-middle)
+19. [useOptimistic optimistic UI](#19-useoptimistic--optimistic-ui-senior)
+20. [Custom forwardRef + useImperativeHandle](#20-custom-forwardref--useimperativehandle-middle)
 
 **Utility Hooks (21-25):**
 21. [useToggle](#21-usetoggle-junior)
@@ -197,7 +197,7 @@ test("debounces value updates", () => {
 ### Common Mistakes
 
 - ❌ **`setTimeout` ID in `useState`**: Causes re-render — use `useRef`.
-- ❌ **Missing cleanup**: Pending timers fire after unmount → state update on unmounted component.
+- ❌ **Missing cleanup**: Pending timers fire after unmount → setState runs on a discarded Fiber (wasted work; no error in React 18+, but the stale timer can still overwrite fresh state in fast remounts).
 - ❌ **Stale callback**: Callback closes over stale state — use ref pattern (`callbackRef`).
 
 </details>
@@ -935,11 +935,17 @@ function useFetch<T>(url: string): UseFetchResultWithRefetch<T> {
         if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
         return r.json();
       })
-      .then(setData)
-      .catch((err) => {
-        if (err.name !== "AbortError") setError(err);
+      .then((result) => {
+        setData(result);
+        setLoading(false);
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        // AbortError holatida loading'ni o'zgartirmaymiz — yangi so'rov endigina boshlandi
+        if (err.name !== "AbortError") {
+          setError(err);
+          setLoading(false);
+        }
+      });
 
     return () => controller.abort();
   }, [url, trigger]);
@@ -958,7 +964,7 @@ For real apps — use `react-query`, `swr`, or `tanstack/query`. Custom cache im
 
 - ❌ **No abort**: Race conditions on rapid URL changes.
 - ❌ **No HTTP error check**: 4xx/5xx not caught (fetch only rejects on network error).
-- ❌ **State on unmounted component**: Setting state after unmount → React warning.
+- ❌ **State on unmounted component**: Setting state after unmount → wasted work on a discarded Fiber (React 18+ no longer logs the old "update on unmounted component" warning, but the abort still matters to avoid races and unnecessary work).
 - ❌ **`options` in deps**: Object literal changes every render → infinite loop.
 
 </details>
@@ -2255,7 +2261,7 @@ export function VirtualList<T>({
         position: "relative",
       }}
     >
-      <div style={{ height: totalHeight, position: "relative" }}>
+      <div style={{ height: totalHeight, position: "relative" }} role="list">
         {visibleItems.map((item, idx) => {
           const actualIndex = startIndex + idx;
           const style: CSSProperties = {
@@ -2595,7 +2601,7 @@ function useAsyncWithAbort<T>(
 
 ### Common Mistakes
 
-- ❌ **No mounted check**: Set state after unmount → React warning.
+- ❌ **No mounted check**: Set state after unmount → wasted work on a discarded Fiber (React 18+ no longer logs the old "update on unmounted component" warning, but the work is still unnecessary).
 - ❌ **No abort**: Race conditions with rapid execute.
 - ❌ **Resetting before async**: User sees flicker — set state only on completion.
 
@@ -3456,7 +3462,7 @@ function Dropdown() {
 
 ### Common Mistakes
 
-- ❌ Using `click` event (fires after mousedown — cleanup won't prevent).
+- ❌ Using `click` instead of `mousedown`: the same `click` that opens an element can immediately fire the outside-handler in one cycle and close it. `mousedown` fires earlier and avoids this self-cancel.
 - ❌ Forgetting `touchstart` for mobile.
 
 </details>

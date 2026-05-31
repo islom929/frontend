@@ -1,19 +1,19 @@
 # Bo'lim 22: Concurrent Hooks (R18)
 
-> R18 React'ga **Concurrent Mode** va u bilan bog'liq 4 ta yangi hook olib keldi: `useTransition` (non-urgent state update + isPending flag), `useDeferredValue` (defer expensive value), `useSyncExternalStore` (external store subscription tearing prevention library author'lar uchun), `useId` (SSR-safe deterministic unique ID generation). Bu hook'lar Concurrent rendering (Lanes priority, time slicing, render restart) bilan to'g'ridan-to'g'ri bog'lanadi (cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)). Bu bo'limda har hook'ning API, mexanizmi, use case'lari, decision tree va edge case'lari yoritiladi.
+> R18 React'ga **Concurrent rendering** (default, opt-in toggleable "Concurrent Mode" emas) va u bilan bog'liq 4 ta yangi hook olib keldi: `useTransition` (non-urgent state update + isPending flag), `useDeferredValue` (defer expensive value), `useSyncExternalStore` (external store subscription tearing prevention library author'lar uchun), `useId` (SSR-safe deterministic unique ID generation). Bu hook'lar Concurrent rendering (Lanes priority, time slicing, render restart) bilan to'g'ridan-to'g'ri bog'lanadi (cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)). Bu bo'limda har hook'ning API, mexanizmi, use case'lari, decision tree va edge case'lari yoritiladi.
 
 ---
 
 ## Mundarija
 
-- [Concurrent Mode Recap](#concurrent-mode-recap)
+- [Concurrent Rendering Recap](#concurrent-rendering-recap)
 - [`useTransition` API](#usetransition-api)
 - [`startTransition` Function](#starttransition-function)
 - [`isPending` Flag Pattern](#ispending-flag-pattern)
 - [`useDeferredValue` API](#usedeferredvalue-api)
 - [`useTransition` vs `useDeferredValue` — Decision](#usetransition-vs-usedeferredvalue--decision)
 - [`useSyncExternalStore` API](#usesyncexternalstore-api)
-- [Tearing Prevention — Concurrent Mode](#tearing-prevention--concurrent-mode)
+- [Tearing Prevention — Concurrent rendering](#tearing-prevention--concurrent-rendering)
 - [`useId` API](#useid-api)
 - [Hydration Mismatch Prevention](#hydration-mismatch-prevention)
 - [Decision Tree — Qaysi Hook Qachon](#decision-tree--qaysi-hook-qachon)
@@ -24,17 +24,19 @@
 
 ---
 
-## Concurrent Mode Recap
+## Concurrent Rendering Recap
 
 ### Nazariya
 
 R18'dan boshlab Concurrent rendering — **default** (`createRoot`). R16-R17'dagi Sync rendering R18'da legacy mode'ga ko'chgan (`ReactDOM.render` deprecated), R19'da `ReactDOM.render` va `ReactDOM.hydrate` butunlay olib tashlangan — faqat `createRoot`/`hydrateRoot` qoldi.
 
-**Concurrent Mode asosiy printsiplari** (cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)):
+**Terminologiya:** R16-R17 davridagi "Concurrent Mode" (yoqib-o'chiriladigan alohida rejim) tushunchasi R18'da bekor qilingan. R18 buning o'rniga "Concurrent rendering" / "Concurrent features" beradi: alohida rejim yo'q, `createRoot` bilan Concurrent rendering default yoqilgan, `useTransition`/`useDeferredValue` kabi feature'lar opt-in. Quyida "Concurrent rendering" shu ma'noda ishlatiladi.
+
+**Concurrent rendering asosiy printsiplari** (cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)):
 
 1. **Time slicing** — render katta ish bo'lsa kichik chunks'ga bo'linadi (~5ms har chunk), browser frame'lar orasida bajariladi
 2. **Interruptible rendering** — render davomida high-priority work (user input) kelsa, joriy render to'xtatiladi va high-priority ish birinchi bajariladi
-3. **Lanes** — har update priority lane'ga o'zlashtiriladi (SyncLane, InputContinuousLane, DefaultLane, TransitionLane×16, IdleLane)
+3. **Lanes** — har update priority lane'ga o'zlashtiriladi (SyncLane, InputContinuousLane, DefaultLane, TransitionLane×15, RetryLane×4, IdleLane)
 4. **Render restart** — render qaytarilishi mumkin (state o'zgarsa, priority interrupt bo'lsa)
 
 **Sync vs Concurrent farq:**
@@ -79,23 +81,25 @@ R19'da `createRoot` yagona entry point — Concurrent default. R18'da `ReactDOM.
 **Lanes va priority (cross-ref 05):**
 
 ```ts
-// React internal — Lanes bitmap (source: ReactFiberLane.js)
-const SyncHydrationLane         = 0b0000000000000000000000000000001;  // bit 0
-const SyncLane                  = 0b0000000000000000000000000000010;  // bit 1
+// React internal — Lanes bitmap (source: react-reconciler/src/ReactFiberLane.js, v19.0.0)
+const SyncHydrationLane            = 0b0000000000000000000000000000001;  // bit 0
+const SyncLane                     = 0b0000000000000000000000000000010;  // bit 1
 const InputContinuousHydrationLane = 0b0000000000000000000000000000100;  // bit 2
-const InputContinuousLane       = 0b0000000000000000000000000001000;  // bit 3
-const DefaultHydrationLane      = 0b0000000000000000000000000010000;  // bit 4
-const DefaultLane               = 0b0000000000000000000000000100000;  // bit 5
-const TransitionHydrationLane   = 0b0000000000000000000000001000000;  // bit 6
-const TransitionLane1           = 0b0000000000000000000000010000000;  // bit 7
-// ... TransitionLane2..16 — bits 8-22 (16 ones, 0b...11111111111111110000000) ...
-const IdleHydrationLane         = 0b0001000000000000000000000000000;  // bit 28
-const IdleLane                  = 0b0010000000000000000000000000000;  // bit 29
-const OffscreenLane             = 0b0100000000000000000000000000000;  // bit 30
-// Total: 31 lanes (V8 SMI range — Small Integer optimization)
+const InputContinuousLane          = 0b0000000000000000000000000001000;  // bit 3
+const DefaultHydrationLane         = 0b0000000000000000000000000010000;  // bit 4
+const DefaultLane                  = 0b0000000000000000000000000100000;  // bit 5
+const TransitionHydrationLane      = 0b0000000000000000000000001000000;  // bit 6
+const TransitionLane1              = 0b0000000000000000000000010000000;  // bit 7
+// ... TransitionLane2..15 — bits 8-21 (jami 15 transition lane, TransitionLane1..15) ...
+// RetryLane1..4 — bits 22-25, SelectiveHydrationLane — bit 26
+const IdleHydrationLane            = 0b0001000000000000000000000000000;  // bit 27
+const IdleLane                     = 0b0010000000000000000000000000000;  // bit 28
+const OffscreenLane                = 0b0100000000000000000000000000000;  // bit 29
+const DeferredLane                 = 0b1000000000000000000000000000000;  // bit 30
+// TotalLanes = 31 (bitmask 31 bitli butun son sifatida ifodalanadi)
 ```
 
-`useTransition` updates → TransitionLane (priority pastroq DefaultLane'dan).
+`useTransition` update'lari → TransitionLane (priority DefaultLane'dan pastroq).
 
 **Render restart:**
 
@@ -172,7 +176,7 @@ function App() {
   const [results, setResults] = useState<Item[]>([]);
   
   // Sync mode: setResults expensive bo'lsa — UI freeze
-  // Concurrent mode + useTransition: setResults non-urgent → render interruptible
+  // Concurrent rendering + useTransition: setResults non-urgent → render interruptible
   // (Render bloklashi mumkin, lekin urgent input kelsa to'xtatiladi va keyin davom ettiriladi)
   
   const [isPending, startTransition] = useTransition();
@@ -352,57 +356,43 @@ Bir `startTransition` ichidagi barcha updates bir transition lane'da batched.
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**`useTransition` implementation:**
+**`useTransition` implementation (soddalashtirilgan, v19.0.0):**
+
+`startTransition` transition flag'ni global `ReactSharedInternals.T`'ga o'rnatadi (R18'da bu joy `ReactCurrentBatchConfig.transition` deb nomlanardi). Flag o'rnatilganida callback ichidagi `setState` chaqiruvlari transition lane'ga o'zlashtiriladi:
 
 ```ts
-function mountTransition(): [boolean, (cb: () => void) => void] {
-  const [isPending, setPending] = mountState(false);
-  const start = startTransition.bind(null, setPending);
-  
-  // Hook chain'da slot
-  const hook = mountWorkInProgressHook();
-  hook.memoizedState = start;
-  
-  return [isPending, start];
-}
+// react/src/ReactStartTransition.js asosida
+function startTransition(scope, options) {
+  const prevTransition = ReactSharedInternals.T;
+  const currentTransition = {};
+  ReactSharedInternals.T = currentTransition;  // transition flag set
 
-function startTransition(setPending, callback) {
-  const previousTransition = ReactCurrentBatchConfig.transition;
-  
-  // Mark as transition
-  ReactCurrentBatchConfig.transition = { _callbacks: new Set() };
-  
-  // setPending(true) — high priority (visible darrov)
-  setPending(true);
-  
-  // Callback ichidagi setState'lar — TransitionLane
   try {
-    callback();
+    const returnValue = scope();  // callback ichidagi setState'lar — TransitionLane
+    // R19: scope async function qaytarsa, React promise'ni kutib turadi (Actions)
+    // ...
   } finally {
-    ReactCurrentBatchConfig.transition = previousTransition;
+    ReactSharedInternals.T = prevTransition;  // flag tiklanadi
   }
 }
 ```
 
-`ReactCurrentBatchConfig.transition` — global flag. Bu flag set bo'lganda `setState` chaqiruvlari TransitionLane'ga o'zlashtiriladi:
+`setPending(true)` startTransition ichida emas, `useTransition` hook tomonidan boshqariladi: hook avval `isPending` state'ini sync ravishda `true` qiladi (darrov ko'rinadi), so'ng transition tugaganda `false`'ga qaytaradi.
+
+`ReactSharedInternals.T` null bo'lmagan paytda `dispatchSetState` transition lane so'raydi:
 
 ```ts
+// react-reconciler/src/ReactFiberHooks.js asosida (soddalashtirilgan)
 function dispatchSetState(fiber, queue, action) {
-  const transition = ReactCurrentBatchConfig.transition;
-  let lane;
-  
-  if (transition !== null) {
-    lane = claimNextTransitionLane();  // TransitionLane
-  } else {
-    lane = requestUpdateLane(fiber);  // SyncLane / InputContinuousLane / DefaultLane
-  }
-  
-  // Update with selected lane
-  scheduleUpdateOnFiber(fiber, lane);
+  const lane = requestUpdateLane(fiber);
+  // requestUpdateLane ichida: ReactSharedInternals.T !== null bo'lsa →
+  //   requestTransitionLane() (TransitionLane), aks holda →
+  //   getCurrentUpdatePriority asosida SyncLane / InputContinuousLane / DefaultLane
+  scheduleUpdateOnFiber(root, fiber, lane);
 }
 ```
 
-`claimNextTransitionLane` — 16 ta TransitionLane'dan birini tanlaydi (round-robin).
+`claimNextTransitionLane` 15 ta TransitionLane'dan birini round-robin tartibida tanlaydi (`nextTransitionLane <<= 1`, oxiriga yetganda `TransitionLane1`'ga qaytadi).
 
 **Source citation:**
 
@@ -619,22 +609,29 @@ R18'da transition flag faqat **sinxron** callback execution davomida active. R19
 **Standalone vs hook:**
 
 ```ts
-// React export
-export function startTransition(scope: () => void) {
-  const prevTransition = ReactCurrentBatchConfig.transition;
-  ReactCurrentBatchConfig.transition = { ... };
-  
+// react/src/ReactStartTransition.js asosida (soddalashtirilgan, v19.0.0)
+export function startTransition(scope: () => void | Promise<void>) {
+  const prevTransition = ReactSharedInternals.T;  // R18: ReactCurrentBatchConfig.transition
+  const currentTransition = {};
+  ReactSharedInternals.T = currentTransition;
+
   try {
-    scope();  // Sync execution
+    const returnValue = scope();  // sync execution
+    // R19: scope async bo'lsa, reconciler set qilgan callback (ReactSharedInternals.S)
+    // returnValue (promise) bilan chaqiriladi — async action entangle qilinadi
+    const onStartTransitionFinish = ReactSharedInternals.S;
+    if (onStartTransitionFinish !== null) {
+      onStartTransitionFinish(currentTransition, returnValue);
+    }
   } finally {
-    ReactCurrentBatchConfig.transition = prevTransition;
+    ReactSharedInternals.T = prevTransition;  // flag sinxron tiklanadi
   }
 }
 
-// useTransition wraps standalone with isPending state
+// useTransition standalone'ni isPending state bilan o'raydi
 export function useTransition(): [boolean, typeof startTransition] {
   const [isPending, setPending] = useState(false);
-  
+
   // Real React: `start` Hook chain'da cache qilingan (komponent qaytadan render
   // bo'lsa ham bir xil reference). Soddalashtirilgan misol uchun har render'da
   // yangi qaytarilgandek ko'rsatilgan.
@@ -645,12 +642,12 @@ export function useTransition(): [boolean, typeof startTransition] {
       setPending(false);
     });
   };
-  
+
   return [isPending, start];
 }
 ```
 
-Standalone `startTransition` — base API. `useTransition` `isPending` state qo'shadi va `start` function'ni Hook chain ichida memoize qiladi (consumer'lar `useEffect` deps'ga ishlatishi mumkin).
+Standalone `startTransition` — base API. `useTransition` `isPending` state qo'shadi va `start` function'ni Hook chain ichida cache qiladi (consumer'lar `useEffect` deps'ga ishlatishi mumkin).
 
 **Async muammosi (R18) va yechim (R19):**
 
@@ -664,7 +661,7 @@ startTransition(async () => {
 });
 ```
 
-R18'da transition flag faqat sinxron execution davomida active edi. R19'da React Actions infrastructure'si async transition'ni qo'llab-quvvatlaydi: `startTransition` async scope qabul qiladi, internal'da React `await` davomida transition lane'ni tracking qiladi (ReactCurrentBatchConfig.transition har microtask boundary'da to'g'ri saqlanadi). Bu — `useActionState`/`<form action>` foundation.
+R18'da transition flag faqat sinxron execution davomida active edi: `await`'dan keyingi `setState` flag tiklangach ishga tushadi, shuning uchun transition lane'ni yo'qotadi. R19'da React Actions infrastructure'si async transition'ni qo'llab-quvvatlaydi. Mexanizm flag'ni "saqlab turish" emas: `ReactSharedInternals.T` baribir sinxron `finally`'da tiklanadi. Buning o'rniga `startTransition` scope'dan qaytgan promise'ni reconciler set qilgan callback'ga (`ReactSharedInternals.S`) uzatadi; reconciler bu async action'ni entangle qiladi (pending thenable'ni kuzatib turadi) va promise resolve bo'lguncha transition'ni tugatmaydi. Natijada `await`'dan keyingi `setState`'lar ham o'sha transition tarkibida qoladi. Bu — `useActionState`/`<form action>` foundation.
 
 **Source citation:**
 
@@ -1108,34 +1105,43 @@ R19'da qo'shilgan ikkinchi argument — initial value (kamdan-kam ishlatiladi, k
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**`useDeferredValue` implementation (soddalashtirilgan):**
+**`useDeferredValue` implementation (soddalashtirilgan, v19.0.0):**
 
 ```ts
-function useDeferredValue<T>(value: T): T {
-  const hook = updateWorkInProgressHook();
-  const prevValue = hook.memoizedState;
-  
-  if (Object.is(prevValue, value)) {
-    return value;  // O'zgarmagan
+// react-reconciler/src/ReactFiberHooks.js — updateDeferredValueImpl asosida
+function updateDeferredValueImpl<T>(hook, prevValue: T, value: T): T {
+  if (Object.is(value, prevValue)) {
+    return value;  // o'zgarmadi — bail out
   }
-  
-  // Schedule deferred update (transition-priority lane bilan o'xshash)
-  scheduleUpdateOnFiber(currentlyRenderingFiber, /* deferred lane */);
-  
-  // Hozircha eski qiymat qaytariladi
-  return prevValue;
+
+  // renderLanes urgent bo'lsa (faqat non-urgent lane'lardan iborat EMAS) →
+  // eski qiymatni qaytar va keyinroq deferred render rejalashtir
+  const shouldDeferValue = !includesOnlyNonUrgentLanes(renderLanes);
+  if (shouldDeferValue) {
+    const deferredLane = requestDeferredLane();  // DeferredLane
+    currentlyRenderingFiber.lanes = mergeLanes(
+      currentlyRenderingFiber.lanes,
+      deferredLane,
+    );
+    markSkippedUpdateLanes(deferredLane);
+    return prevValue;  // eski qiymat — keyin DeferredLane render'da yangilanadi
+  }
+
+  // render allaqachon non-urgent bo'lsa — defer qilish shart emas, yangi qiymat
+  hook.memoizedState = value;
+  return value;
 }
 ```
 
-`useDeferredValue` — value'ni "behind the scenes" yangilaydi. React urgent render'larda eski qiymat, keyin deferred render'da yangi qiymat.
+`useDeferredValue` `scheduleUpdateOnFiber`'ni o'zi chaqirmaydi. Buning o'rniga fiber'ning `lanes`'iga `DeferredLane` qo'shadi (`mergeLanes`) va `markSkippedUpdateLanes` bilan bu lane'ni skipped deb belgilaydi — natijada React keyin shu fiber uchun deferred render spawn qiladi.
 
 **Lanes:**
 
-`useDeferredValue` deferred update — urgent updates'dan pastroq priority lane'da (transition-priority bilan o'xshash). Aniq lane assignment React versiya'sida o'zgarishi mumkin (internal detail).
+`useDeferredValue` deferred render uchun alohida `DeferredLane`'dan foydalanadi (`requestDeferredLane`). Bu — urgent update'lardan past priority. Joriy render allaqachon non-urgent (`includesOnlyNonUrgentLanes`) bo'lsa, defer qilinmaydi — yangi qiymat darrov qaytariladi.
 
 **`useTransition` vs `useDeferredValue` lane:**
 
-Ikkalasi ham urgent updates'dan past priority lane'larda. Implementation darajasida transition mexanizm bilan integratsiyalashgan (deferred render, interruptible). API farq (write vs read), behavior'da o'xshash (low-priority deferred update).
+`useTransition` setState'larni TransitionLane'ga o'zlashtiradi (`claimNextTransitionLane`), `useDeferredValue` esa value o'zgarganda DeferredLane'da deferred render spawn qiladi. Ikkalasi ham urgent update'lardan past priority — API farq (write vs read), natija o'xshash (low-priority deferred render, interruptible).
 
 **Source citation:**
 
@@ -1374,35 +1380,39 @@ function Results({ filter, tab }: { filter: string; tab: string }) {
 // useTransition (soddalashtirilgan)
 function useTransition() {
   const [isPending, setPending] = useState(false);
-  
+
   const start = (callback) => {
-    setPending(true);
-    schedule(TransitionLane, () => {
+    setPending(true);  // urgent — darrov isPending = true
+    startTransition(() => {  // ReactSharedInternals.T set → ichidagi setState TransitionLane
       callback();
-      setPending(false);
+      setPending(false);  // TransitionLane — transition tugagach
     });
   };
-  
+
   return [isPending, start];
 }
 
-// useDeferredValue (soddalashtirilgan)
+// useDeferredValue (soddalashtirilgan — aniq mexanizm yuqorida "useDeferredValue API" UH'da)
 function useDeferredValue(value) {
   const hook = ...;
   const prevValue = hook.memoizedState;
-  
-  if (!Object.is(prevValue, value)) {
-    schedule(DeferredLane, () => {
-      hook.memoizedState = value;  // Update keyin
-    });
-    return prevValue;  // Hozir eski
+
+  // Render urgent (faqat non-urgent lane'lardan EMAS) va qiymat o'zgargan bo'lsa:
+  // fiber.lanes'ga DeferredLane qo'shiladi + markSkippedUpdateLanes — React keyin
+  // shu fiber uchun DeferredLane render spawn qiladi. Hook o'zi update SCHEDULE QILMAYDI.
+  if (!includesOnlyNonUrgentLanes(renderLanes) && !Object.is(prevValue, value)) {
+    const deferredLane = requestDeferredLane();
+    currentlyRenderingFiber.lanes = mergeLanes(currentlyRenderingFiber.lanes, deferredLane);
+    markSkippedUpdateLanes(deferredLane);
+    return prevValue;  // hozir eski; DeferredLane render'da yangi qiymat qaytadi
   }
-  
+
+  hook.memoizedState = value;
   return value;
 }
 ```
 
-Ikkala hook lower-priority lane'da update schedule qiladi.
+`useTransition` setState'larni TransitionLane'ga o'zlashtiradi, `useDeferredValue` esa fiber lanes'iga DeferredLane qo'shadi (o'zi update schedule qilmaydi). Ikkala holatda ham natija — urgent update'lardan past priority'da deferred render.
 
 **API farq sabab:**
 
@@ -1635,7 +1645,7 @@ function useSyncExternalStore<T>(
   // Render paytida snapshot
   const value = getSnapshot();
   
-  // SSR detect (real React: ReactCurrentDispatcher orqali)
+  // SSR detect (real React: server vs client dispatcher orqali — ReactSharedInternals.H)
   if (typeof window === 'undefined') {
     return getServerSnapshot ? getServerSnapshot() : value;
   }
@@ -1656,7 +1666,7 @@ function useSyncExternalStore<T>(
 }
 ```
 
-Real implementation murakkab: subscribe commit phase'da ulanadi (`useEffect` emas, internal commit hook), Concurrent Mode'da snapshot consistency render davomida tekshiriladi, tearing aniqlansa render restart. Bu pseudocode faqat foydalanish modelini tushuntirish uchun — internal API'lar (`scheduleRerender`, commit hook) public emas.
+Real implementation murakkab: render paytida `getSnapshot()` o'qiladi va `pushStoreConsistencyCheck` orqali snapshot consistency check ro'yxatga olinadi; subscribe esa commit phase'da ulanadi (`useEffect` emas, alohida internal effect). Bu pseudocode faqat foydalanish modelini tushuntirish uchun — internal API'lar public emas.
 
 **Tearing prevention:**
 
@@ -1669,7 +1679,7 @@ Component B render: store.value = 2
 → A va B teng emas (tearing)
 ```
 
-`useSyncExternalStore` Concurrent rendering bilan integratsiyalashgan: render davomida store snapshot bir xil bo'lib turadi (snapshot pinned), o'zgarsa render qaytadan boshlanadi.
+Mexanizm: har komponent render'da o'qigan snapshot'ni saqlab qo'yadi (`pushStoreConsistencyCheck`). Commit phase'dan oldin React `checkIfSnapshotChanged` bilan har bir saqlangan snapshot'ni yangi `getSnapshot()` natijasi bilan taqqoslaydi. Agar render va commit orasida store o'zgargan bo'lsa — React `forceStoreRerender` chaqiradi, bu esa **SyncLane**'da (sinxron, interruptible emas) yangi render rejalashtiradi. Sinxron re-render butun daraxtni yangi snapshot bilan bir xil holatda qayta render qiladi — shu tariqa tearing oldi olinadi.
 
 **Source citation:**
 
@@ -1836,7 +1846,7 @@ function ItemCount() {
 
 ---
 
-## Tearing Prevention — Concurrent Mode
+## Tearing Prevention — Concurrent rendering
 
 ### Nazariya
 
@@ -1910,17 +1920,17 @@ function CounterB() {
 }
 
 // Concurrent rendering:
-//   Render boshlandi (snapshot pinned to count=5):
-//   CounterA render: count=5
+//   Render boshlandi:
+//   CounterA render: count=5, snapshot saqlandi (consistency check)
 //   (increment → store o'zgardi)
-//   React: snapshot o'zgargan → render qaytadan boshlash
-//   Render restart:
-//   CounterA render: count=6
-//   CounterB render: count=6
+//   CounterB render: count=... (yangi getSnapshot)
+//   Commit'dan oldin React consistency check: render'dagi snapshot != joriy snapshot
+//   → forceStoreRerender (SyncLane, sinxron re-render)
+//   Sinxron re-render: CounterA=6, CounterB=6
 // → UI: A=6, B=6 (consistent, NO tearing)
 ```
 
-`useSyncExternalStore` snapshot consistency'ni kafolatlaydi — render davomida store o'zgarsa, render restart bo'ladi.
+`useSyncExternalStore` snapshot consistency'ni kafolatlaydi — render va commit orasida store o'zgarsa, React SyncLane'da sinxron re-render qiladi (butun daraxt yangi snapshot bilan bir xil holatda).
 
 **Why `useSyncExternalStore` library author'lar uchun:**
 
@@ -1961,31 +1971,26 @@ External store (Redux/Zustand/custom) — `useSyncExternalStore` migration teari
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Concurrent rendering snapshot pinning:**
+**Snapshot consistency check:**
 
 ```ts
-// React internal (taxminiy)
-function renderComponent(component) {
-  // Snapshot capture render boshida
-  const snapshot = getSnapshot();
-  
-  // Render with this snapshot
-  for (const fiber of fibers) {
-    renderFiber(fiber, snapshot);
-    
-    // Check if store changed during render
-    const currentSnapshot = getSnapshot();
-    if (!Object.is(snapshot, currentSnapshot)) {
-      // Tearing detected — restart render
-      throw RestartRender;
-    }
-  }
-  
-  commit(snapshot);
+// react-reconciler/src/ReactFiberHooks.js asosida (soddalashtirilgan, v19.0.0)
+function updateSyncExternalStore(subscribe, getSnapshot) {
+  const nextSnapshot = getSnapshot();  // render paytida o'qiladi
+
+  // render paytidagi snapshot consistency check'ga ro'yxatga olinadi
+  pushStoreConsistencyCheck(fiber, getSnapshot, nextSnapshot);
+
+  // commit phase'da (yoki passive effect'da):
+  //   checkIfSnapshotChanged(inst): Object.is(inst.value, getSnapshot()) === false bo'lsa
+  //   → forceStoreRerender(fiber) → enqueueConcurrentRenderForLane(fiber, SyncLane)
+  //   → scheduleUpdateOnFiber(root, fiber, SyncLane)  // sinxron re-render
+
+  return nextSnapshot;
 }
 ```
 
-React render davomida store snapshot consistency'ni tekshiradi.
+React render davomida o'qigan snapshot'ni saqlaydi (`pushStoreConsistencyCheck`), commit'dan oldin uni qayta `getSnapshot()` natijasi bilan taqqoslaydi (`checkIfSnapshotChanged`). Mos kelmasa — `forceStoreRerender` SyncLane'da sinxron re-render rejalashtiradi. Snapshot'ni butun render bo'yi "muzlatib" qo'yish emas — render'dan keyingi consistency check.
 
 **`useSyncExternalStore` SSR `getServerSnapshot`:**
 
@@ -2233,25 +2238,27 @@ function List({ items }: { items: Item[] }) {
 **`useId` ID generation:**
 
 ```ts
-function useId(): string {
+// react-reconciler/src/ReactFiberHooks.js — mountId asosida (soddalashtirilgan, v19.0.0)
+function mountId(): string {
   const hook = mountWorkInProgressHook();
-  
-  // Fiber tree path asosida deterministic ID
-  // Path: root → ... → currentlyRenderingFiber
-  const id = ':' + 'r' + getTreeId(currentlyRenderingFiber) + ':';
-  
+  const identifierPrefix = root.identifierPrefix;
+  let id;
+
+  if (getIsHydrating()) {
+    // Hydration/server path: Fiber tree path asosida deterministic
+    const treeId = getTreeId();  // ReactFiberTreeContext — daraxtdagi pozitsiya
+    id = ':' + identifierPrefix + 'R' + treeId + ':';  // uppercase R
+  } else {
+    // Client-only mount: global counter
+    id = ':' + identifierPrefix + 'r' + globalClientId.toString(32) + ':';  // lowercase r
+  }
+
   hook.memoizedState = id;
   return id;
 }
-
-function getTreeId(fiber: Fiber): string {
-  // DFS path — bit string
-  // E.g., '0' (root → first child), '01' (root → first → second child)
-  // ...
-}
 ```
 
-Tree path — server va client bir xil → bir xil ID.
+Hydration path'da (`R` prefix) ID Fiber tree pozitsiyasidan generatsiya qilinadi (`getTreeId`) — server va client bir xil pozitsiya → bir xil ID. Client-only mount'da (`r` prefix) global counter ishlatiladi.
 
 **Why `:` characters:**
 
@@ -2642,20 +2649,24 @@ function Timestamp() {
 **Misol 4 — `useSyncExternalStore` for browser API:**
 
 ```tsx
+// getSnapshot bir xil reference qaytarishi kerak — aks holda infinite re-render.
+// Shuning uchun viewport cache qilinadi, faqat resize'da yangilanadi.
+const serverViewport = { width: 1024, height: 768 };
+let cachedViewport = serverViewport;
+
 function useViewport() {
   return useSyncExternalStore(
     (cb) => {
-      window.addEventListener('resize', cb);
-      return () => window.removeEventListener('resize', cb);
+      const handler = () => {
+        cachedViewport = { width: window.innerWidth, height: window.innerHeight };
+        cb();
+      };
+      handler();  // initial client value
+      window.addEventListener('resize', handler);
+      return () => window.removeEventListener('resize', handler);
     },
-    () => ({
-      width: window.innerWidth,
-      height: window.innerHeight,
-    }),
-    () => ({
-      width: 1024,
-      height: 768,
-    })  // SSR deterministic
+    () => cachedViewport,        // cached reference (client)
+    () => serverViewport,        // SSR deterministic, barqaror reference
   );
 }
 ```
@@ -2984,12 +2995,19 @@ const value = useSyncExternalStore(
   () => store.items.map(transform)  // ❌ Har gal yangi array
 );
 
-// ✅ Memoize / cache
-let cached: Item[] = [];
-function getCachedItems() {
-  if (cached !== store.items) cached = store.items;
-  return cached;
+// ✅ Manba o'zgarmasa cache'langan natijani qaytaradi
+let cachedSource: Item[] | null = null;
+let cachedResult: TransformedItem[] = [];
+
+function getTransformedItems() {
+  if (cachedSource !== store.items) {
+    cachedSource = store.items;
+    cachedResult = store.items.map(transform);  // faqat manba o'zgarganda qayta hisoblanadi
+  }
+  return cachedResult;  // bir xil reference (Object.is barqaror)
 }
+
+const value = useSyncExternalStore(subscribe, getTransformedItems);
 ```
 
 ### ❌ Xato 3 — `useId` keys uchun
@@ -3008,16 +3026,19 @@ function getCachedItems() {
 ### ❌ Xato 4 — `useTransition` setState tashqarida
 
 ```tsx
-// ❌ Side effect transition'da
+// ❌ Side effect transition scope ichida
 startTransition(() => {
-  document.title = 'New';  // ❌ Side effect, transition affect emas
+  document.title = 'New';  // ❌ scope sinxron ishlaydi — DOM mutation darrov bo'ladi,
+                           //    transition commit'iga bog'lanmaydi (defer qilinmaydi)
   setState(value);
 });
 
-// ✅ Faqat state update
+// ✅ Faqat state update — side effect tashqarida
 document.title = 'New';
 startTransition(() => setState(value));
 ```
+
+`startTransition` scope'i sinxron, bir marta ishga tushadi: faqat ichidagi `setState` chaqiruvlari TransitionLane'ga o'zlashtiriladi. `document.title` kabi side effect darrov bajariladi va transition commit'i bilan muvofiqlashtirilmaydi — agar transition interrupt bo'lib commit qilinmasa ham, DOM mutation allaqachon yuz bergan bo'ladi. Side effect'ni scope tashqarisiga (yoki commit bilan bog'lash uchun `useEffect`'ga) qo'ying.
 
 ### ❌ Xato 5 — `useDeferredValue` setter o'rniga
 
@@ -3028,13 +3049,13 @@ function Component() {
   const deferred = useDeferredValue(query);
   
   // Setter sizda — useTransition cleaner
-  const handleChange = (e) => setQuery(e.target.value);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value);
   // ...
 }
 
 // ✅ useTransition (setter joyi)
 const [isPending, startTransition] = useTransition();
-const handleChange = (e) => {
+const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   startTransition(() => setQuery(e.target.value));
 };
 ```
@@ -3337,15 +3358,15 @@ function Layout() {
 
 R18+ Concurrent hooks — Concurrent rendering bilan birga keldi. Asosiy fikrlar:
 
-- **Concurrent Mode (R18+)** — default rendering. Time slicing, interruptible rendering, Lanes priority. Cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md).
+- **Concurrent rendering (R18+)** — default rendering (alohida "Concurrent Mode" rejimi emas). Time slicing, interruptible rendering, Lanes priority. Cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md).
 - **`useTransition`** — `[isPending, startTransition] = useTransition()`. State update'ni TransitionLane'ga (non-urgent priority). `isPending` UI feedback (spinner, opacity, disable). R18: `startTransition(callback)` sinxron only; R19+: async scope qo'llab-quvvatlanadi (Actions foundation).
 - **`startTransition` standalone** — `React.startTransition(cb)` hook tashqarida. `isPending` yo'q. Component tashqarida ham ishlatish mumkin.
 - **`isPending` flag pattern** — variants: spinner show, opacity + disable, skeleton, stale content + indicator. Multiple transitions overlap — `isPending` umumiy.
 - **`useDeferredValue`** — `useDeferredValue<T>(value)` value'ni defer qiladi (DeferredLane priority). Stale value detection (`oldValue !== newValue`). Initial render — `deferred === value` (sync).
 - **`useTransition` vs `useDeferredValue`** — bir xil maqsad, har xil API: `useTransition` setter joyida (write), `useDeferredValue` value joyida (read). `isPending` kerak — `useTransition`. Faqat props value — `useDeferredValue`.
 - **`useSyncExternalStore`** — `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot?)`. Library author'lar uchun (Redux, Zustand, Jotai, Recoil). `getSnapshot` har chaqiruvda **bir xil reference** qaytarish shart (yo'qsa infinite re-render). `getServerSnapshot` SSR uchun deterministic value.
-- **Tearing prevention** — Concurrent rendering paytida external state o'zgarsa, render davomida snapshot consistency. `useState + useEffect` manual subscription tearing-prone (R18+ Concurrent), `useSyncExternalStore` Concurrent-safe (snapshot pinned, render restart store o'zgarsa).
-- **`useId`** — `useId(): string`. Deterministik unique ID Fiber tree path asosida. SSR-safe (server va client bir xil ID). Format `:r0:`, `:r1:`. Multiple IDs single hook (suffix). Anti-pattern: keys uchun (Rules of Hooks buzilishi).
+- **Tearing prevention** — Concurrent rendering paytida external state o'zgarsa tearing yuz berishi mumkin. `useState + useEffect` manual subscription tearing-prone (R18+ Concurrent), `useSyncExternalStore` Concurrent-safe: render'da o'qilgan snapshot consistency check'ga olinadi (`pushStoreConsistencyCheck`), commit'dan oldin yangi `getSnapshot()` bilan taqqoslanadi (`checkIfSnapshotChanged`); mos kelmasa `forceStoreRerender` SyncLane'da sinxron re-render qiladi.
+- **`useId`** — `useId(): string`. Deterministic unique ID Fiber tree path asosida. SSR-safe (server va client bir xil ID). Format `:r0:`, `:r1:`. Multiple IDs single hook (suffix). Anti-pattern: keys uchun (Rules of Hooks buzilishi).
 - **Hydration mismatch prevention** — `useId` `Math.random`/`Date.now`/`window.*` patterns o'rniga. `useEffect` client-only state. `suppressHydrationWarning` aniq nuqta. `useSyncExternalStore` `getServerSnapshot` browser API'lar uchun.
 - **Decision Tree** — state setter + isPending → `useTransition`, faqat value props → `useDeferredValue`, external store → `useSyncExternalStore` (library), unique ID → `useId`. Sodda case'lar — `useState`/`useEffect`/`useReducer` (Concurrent hooks overkill).
 - **Modern state library'lar** `useSyncExternalStore` ishlatadi — Redux v8+, Zustand, Jotai, MobX, Recoil. Application code library API orqali.

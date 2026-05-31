@@ -379,21 +379,25 @@ function App() {
 }
 ```
 
-JSX transform:
+JSX transform (automatic runtime) — `App`'ning return qiymati shu chaqiruvga aylanadi:
 
 ```ts
-_jsx(App, {})
-  → returns _jsx(Card, { 
-      children: _jsx('h2', { children: 'Title' }) 
-    })
+// function App() { return <Card><h2>Title</h2></Card>; }
+function App() {
+  return _jsx(Card, {
+    children: _jsx('h2', { children: 'Title' }),
+  });
+}
 ```
+
+`<h2>` Element `App` ichida yaratiladi va `Card` Element'ining `children` slot'iga uzatiladi — `Card` chaqirilishidan oldin.
 
 Render Phase:
 
-1. App komponent chaqiriladi → Card Element qaytaradi
+1. App komponent chaqiriladi → Card Element qaytaradi (uning `props.children` ichida `<h2>` Element allaqachon mavjud)
 2. Reconciler Card Fiber yaratadi
 3. Card komponent chaqiriladi → `<div>{children}</div>` qaytaradi
-4. `children` — `<h2>` Element (App'da yaratilgan)
+4. `children` — `<h2>` Element (App'da yaratilgan, Card'ga tayyor holda kelgan)
 5. Reconciler `<h2>` Fiber yaratadi (Card'ning child sifatida)
 6. `<h2>` content render qilinadi
 
@@ -412,7 +416,7 @@ function App() {
 
 App re-render bo'lganida:
 - Card Element yangi (chunki `children` slot yangi `<h2>` Element)
-- Card komponent re-render qilinadi (props o'zgardi: `children` referenc'i yangi)
+- Card komponent re-render qilinadi (props o'zgardi: `children` reference'i yangi)
 - `<h2>` Fiber qayta ishlatiladi (type bir xil — `'h2'`)
 
 `React.memo(Card)` bilan ham yordam bermaydi — chunki `children` har render'da yangi reference. Optimization uchun `useMemo`:
@@ -441,7 +445,7 @@ Reconciler `children` ni alohida Element slot deb sanaydi (boshqa props bilan bi
 }
 ```
 
-Render paytida `Card({ children })` chaqirilganda — Card o'zining JSX tree'siga `{children}` curly braces orqali joylashtirishi kerak. Aks holda, Children rendered emas (Component children'ni "yutib qoladi").
+Render paytida `Card({ children })` chaqirilganda — Card o'zining JSX tree'siga `{children}` curly braces orqali joylashtirishi kerak. Aks holda children render qilinmaydi (Component children'ni "yutib qoladi").
 
 </details>
 
@@ -663,7 +667,7 @@ Slots — **explicit naming** (har slot prop nom bilan). Compound Components —
 | Slots | Aniq API, type-safe | JSX'da prop = JSX qo'pol ko'rinadi |
 | Compound | Idiomatic JSX | Context kerak, debugging biroz qiyin |
 
-Tanlash konteks'ga bog'liq. Slots — modal/layout kabi static structure'lar uchun. Compound — Tabs/Accordion kabi dynamic items uchun.
+Tanlash kontekstga bog'liq. Slots — modal/layout singari static structure'lar uchun. Compound — Tabs/Accordion singari dynamic items uchun.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -691,11 +695,11 @@ Har slot — alohida ReactNode reference. Slot o'zgarganda faqat o'sha joy re-re
 ```tsx
 function App() {
   const [headerText, setHeaderText] = useState('Title');
-  
+
   return (
     <Layout
       header={<h1>{headerText}</h1>}
-      sidebar={<Nav />}                  // stable reference (App render bo'lsa ham, lekin Element identity yangi)
+      sidebar={<Nav />}                  // har App render'da yangi Element
       main={<Dashboard />}
     />
   );
@@ -704,14 +708,16 @@ function App() {
 
 `headerText` o'zgarganda:
 - App re-render bo'ladi
-- `header` prop yangi Element (h1 with new text)
-- `sidebar`, `main` ham yangi Element (chunki har render JSX'da yangi `<Nav />`, `<Dashboard />` Element yaratiladi)
+- `header` prop yangi Element (h1 yangi text bilan)
+- `sidebar`, `main` ham yangi Element (har render JSX'da yangi `<Nav />`, `<Dashboard />` Element, ularning `props` object'i ham yangi reference)
 - Layout re-render qiladi
-- Reconciler har slot uchun children diff qiladi:
-  - h1: text content yangilanadi
-  - Nav, Dashboard: `type` bir xil, props bir xil → bailout (cross-ref [`04-reconciliation.md`](04-reconciliation.md))
+- Reconciler har slot uchun children'ni diff qiladi:
+  - h1: `type` bir xil (`'h1'`) → DOM qayta ishlatiladi, text content yangilanadi
+  - Nav, Dashboard: `type` bir xil → Fiber qayta ishlatiladi, **lekin re-render bo'ladi**. `updateFunctionComponent` `oldProps !== newProps` ni tekshiradi; har render'da `props` yangi object bo'lgani uchun bu shart `true` — `didReceiveUpdate = true` → Nav va Dashboard funksiyalari qayta chaqiriladi (cross-ref [`04-reconciliation.md`](04-reconciliation.md))
 
-`useMemo` bilan slot Element'larini stabilize qilish mumkin:
+Plain function component prop tengligi bo'yicha avtomatik bailout qilmaydi — bailout uchun yo `React.memo` (props shallow compare), yo bir xil Element reference kerak.
+
+Bir xil Element reference'ni `useMemo` bilan saqlash mumkin:
 
 ```tsx
 function App() {
@@ -720,6 +726,8 @@ function App() {
   // ...
 }
 ```
+
+Endi `sidebar` Element reference stable — uning `props` object'i ham o'zgarmaydi. Layout re-render bo'lganda ham, Nav Fiber'ga kelgan `newProps` eski `props` bilan bir xil reference (`oldProps === newProps`) → `didReceiveUpdate = false` → Nav re-render qilinmaydi (bailout). `React.memo(Nav)` ham ayni shu natijani prop shallow compare orqali beradi.
 
 **Type safety:**
 
@@ -1185,32 +1193,36 @@ Syntax: `children` (function-as-children) yoki maxsus prop nomi bilan (`render`,
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
+type User = { id: number; name: string };
+
 type Props = {
   url: string;
-  children: (state: { data: any; loading: boolean }) => ReactNode;
+  children: (state: { data: User | null; loading: boolean }) => ReactNode;
 };
 
 function DataFetcher({ url, children }: Props) {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
     fetch(url)
       .then((r) => r.json())
-      .then((d) => {
-        setData(d);
+      .then((user: User) => {
+        setData(user);
         setLoading(false);
       });
   }, [url]);
-  
+
   return <>{children({ data, loading })}</>;
 }
 
 // Ishlatish:
 <DataFetcher url="/api/user">
-  {({ data, loading }) =>
-    loading ? <p>Loading...</p> : <UserCard user={data} />
-  }
+  {({ data, loading }) => {
+    if (loading) return <p>Loading...</p>;
+    if (!data) return null;
+    return <UserCard user={data} />;
+  }}
 </DataFetcher>
 ```
 
@@ -1223,7 +1235,7 @@ R16.8 (2019) gacha — Hooks bo'lmagan — render props logic share uchun standa
 class MouseTracker extends React.Component {
   state = { x: 0, y: 0 };
   
-  handleMouseMove = (e) => {
+  handleMouseMove = (e: React.MouseEvent) => {
     this.setState({ x: e.clientX, y: e.clientY });
   };
   
@@ -1310,7 +1322,7 @@ Render props'da har Render — function reference yangi (chunki inline JSX expre
 function App() {
   return (
     <DataFetcher url="/api">
-      {({ data }) => <div>{data}</div>}
+      {({ data }) => <div>{data?.name}</div>}
       {/* har App render'da bu function yangi reference */}
     </DataFetcher>
   );
@@ -1323,9 +1335,11 @@ Bu — `children` prop reference o'zgaradi, lekin ko'pchilik holatda muammo emas
 
 ```tsx
 function App() {
-  const [data, setData] = useState(null);
-  const renderContent = useCallback(({ data }) => <div>{data}</div>, []);
-  
+  const renderContent = useCallback(
+    ({ data }: { data: User | null }) => <div>{data?.name}</div>,
+    [],
+  );
+
   return (
     <DataFetcher url="/api">
       {renderContent}
@@ -2045,7 +2059,7 @@ const renderItem = useCallback(
 <List items={filtered} renderItem={renderItem} />
 ```
 
-Yoki `<UserCard />` ni `React.memo`'qilish — har element shallowEqual'dan o'tadi.
+Yoki `UserCard`'ni `React.memo` bilan o'rash — har bir UserCard o'z props'i shallow equal bo'lsa re-render qilmaydi.
 
 **Hooks va IoC:**
 
@@ -2053,7 +2067,7 @@ Custom hook'lar IoC'ning kuchli vositasi. Komponent'ga `useFetch`, `useDebounce`
 
 ```tsx
 function useFetchUsers() {
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<User[]>([]);
   useEffect(() => {
     fetch('/api/users').then((r) => r.json()).then(setUsers);
   }, []);
@@ -2236,7 +2250,7 @@ function App() {
 **Foyda:**
 
 1. **Semantic flexibility** — bitta visual style, turli HTML semantikasi (heading vs paragraph vs link)
-2. **Reduced API surface** — `<Heading1>`, `<Heading2>`, `<Paragraph>` kabi alohida komponentlar yo'q
+2. **Reduced API surface** — `<Heading1>`, `<Heading2>`, `<Paragraph>` singari alohida komponentlar yo'q
 3. **Type-safe attributes** — `as="a"` bo'lsa `href` zaruriy va valid
 
 ```tsx
@@ -2280,10 +2294,10 @@ function Text<T extends ElementType = 'span'>({
 4. JSX: `<Component {...rest}>` — dynamic element
 
 > **🕐 Versiya evolyutsiyasi (`as` prop):**
-> - **Pre-Hooks era (R15-R16):** `as` prop yoki `component` prop ko'p UI library'larda (e.g. styled-components). TypeScript bilan polymorphic typing — `forwardRef` + complex generic.
-> - **R18 va undan oldin:** `forwardRef` zaruriy ref forwarding uchun, polymorphic typing — qo'shimcha utility types va boilerplate kerak.
-> - **R19+:** `ref` oddiy prop sifatida uzatilishi mumkin. `forwardRef` — soft-deprecated (hali ishlaydi, warning yo'q, lekin yangi kodda zarurat yo'q). Polymorphic typing soddalashdi — `forwardRef` HOC kerak emas, ref typing oson.
-> - **Sabab:** R19'da `ref` API restructuring — polymorphic component yozish ergonomikasi yaxshilangan.
+> - **Pre-Hooks era (R15-R16):** `as` prop yoki `component` prop ko'p UI library'larda (masalan styled-components). TypeScript bilan polymorphic typing — `forwardRef` + complex generic.
+> - **R18 va undan oldin:** ref forwarding uchun `forwardRef` zaruriy edi, polymorphic typing — qo'shimcha utility types va boilerplate kerak.
+> - **R19+:** function component'ga `ref` oddiy prop sifatida uzatilishi mumkin — `forwardRef` HOC siz. `forwardRef` deprecated EMAS, hali to'liq ishlaydi va warning chiqarmaydi; lekin yangi kodda `ref`-as-prop yondashuvi boilerplate'siz polymorphic typing'ni soddalashtiradi.
+> - **Sabab:** R19'da `ref` API qayta ishlangan — polymorphic component yozish ergonomikasi yaxshilangan.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2344,9 +2358,9 @@ function Text<T extends ElementType = 'span'>(...)
 `T extends ElementType` — T faqat valid React element type bo'lishi mumkin:
 
 ```ts
-// @types/react
-type ElementType<P = any> =
-  | { [K in keyof IntrinsicElements]: P extends IntrinsicElements[K] ? K : never }[keyof IntrinsicElements]
+// @types/react (soddalashtirilgan)
+type ElementType<P = any, Tag extends keyof JSX.IntrinsicElements = keyof JSX.IntrinsicElements> =
+  | { [K in Tag]: P extends JSX.IntrinsicElements[K] ? K : never }[Tag]
   | ComponentType<P>;
 ```
 
@@ -2354,9 +2368,9 @@ type ElementType<P = any> =
 
 **`ComponentPropsWithoutRef<T>` muhim sabab:**
 
-`ComponentProps<T>` — ref qoldirib qo'yadi (R18 forwardRef bilan ishlaydigan). `ComponentPropsWithoutRef<T>` — `ref` ni Omit qiladi, polymorphic typing'da circular reference muammosini hal qiladi.
+Host element uchun `ComponentProps<T>` (ya'ni `JSX.IntrinsicElements[T]`) `ref` ni ham o'z ichiga oladi. `@types/react`'da `ComponentPropsWithoutRef<T> = PropsWithoutRef<ComponentProps<T>>` — `ref`'ni olib tashlaydi.
 
-R19'da bu muammo soddalashgan, lekin convention saqlanadi.
+Polymorphic component'da `ref`'ni props spread ichiga qo'shish muammoli: `ref` oddiy prop emas, va uning tipi `as` qiymatiga qarab o'zgaradi. `ref`'ni props tipidan ajratib (`ComponentPropsWithoutRef`), keyin alohida boshqarish kerak (ref forwarding bo'limida — pastda). R19'da `ref`-as-prop bu boshqaruvni soddalashtirdi, lekin `ComponentPropsWithoutRef` convention'i o'rinli.
 
 **`Omit<..., 'as'>` muhim sabab:**
 
@@ -2525,17 +2539,17 @@ type ElementType<P = any> =
 **ElementType variantlari:**
 
 ```tsx
-import type { ElementType } from 'react';
+import type { ElementType, ComponentType } from 'react';
 
 // Faqat HTML element string
-type HTMLElement = keyof JSX.IntrinsicElements;
+type HostTag = keyof JSX.IntrinsicElements;
 // 'a' | 'abbr' | ... | 'h1' | ... | 'div' | ...
 
 // Faqat Component
-type Component = ComponentType<any>;
+type AnyComponent = ComponentType;
 
 // Ikkalasi — har qanday element type
-type AnyElement = ElementType;  // string | Component
+type AnyElement = ElementType;  // HostTag | AnyComponent
 ```
 
 **`as` prop tipini cheklash:**
@@ -2604,8 +2618,13 @@ type ElementType<P = any, Tag extends keyof JSX.IntrinsicElements = keyof JSX.In
 **Strict ElementType — element-specific props:**
 
 ```ts
+import type { ChangeEvent } from 'react';
+
 // Faqat input element'lar (textarea, input)
-type InputLike = ElementType<{ value: string; onChange: (e: any) => void }>;
+type InputLike = ElementType<{
+  value: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}>;
 
 // Bu tipga 'input', 'textarea' va Component'lar mos keladi
 // 'div' mos kelmaydi (chunki value/onChange yo'q)
@@ -2617,12 +2636,13 @@ type InputLike = ElementType<{ value: string; onChange: (e: any) => void }>;
 type ComponentType<P = {}> = ComponentClass<P> | FunctionComponent<P>;
 
 interface FunctionComponent<P = {}> {
-  (props: P): ReactElement | null;
+  (props: P): ReactNode;   // R18.3+/R19: ReactNode (avval ReactElement | null edi)
   displayName?: string;
 }
 
-interface ComponentClass<P = {}> extends React.Component<P> {
-  // class component
+interface ComponentClass<P = {}, S = ComponentState> {
+  new (props: P): Component<P, S>;   // constructor — class component
+  displayName?: string;
 }
 ```
 
@@ -2779,22 +2799,14 @@ To'liq generic polymorphic component — `ElementType` constraint, `Omit<Compone
 
 **To'liq pattern:**
 
+`PolymorphicProps` — qayta ishlatiladigan utility type: o'z props'i (`OwnProps`), `as` prop, va `as` qiymatiga mos native attributelar (`keyof OwnProps` va `'as'` chiqarib tashlangan, collision yo'q):
+
 ```tsx
 import type { ElementType, ComponentPropsWithoutRef, ReactNode } from 'react';
 
-type PolymorphicProps<T extends ElementType, P = {}> = P & {
+type PolymorphicProps<T extends ElementType, OwnProps = {}> = OwnProps & {
   as?: T;
-} & Omit<ComponentPropsWithoutRef<T>, keyof P | 'as'>;
-
-// Reusable utility type
-function makePolymorphic<P>(defaultAs: ElementType = 'div') {
-  return function Component<T extends ElementType = typeof defaultAs>(
-    { as, ...rest }: PolymorphicProps<T, P>
-  ) {
-    const Component = as ?? defaultAs;
-    return <Component {...(rest as any)} />;
-  };
-}
+} & Omit<ComponentPropsWithoutRef<T>, keyof OwnProps | 'as'>;
 ```
 
 **Real-world implementation:**
@@ -2926,7 +2938,7 @@ type PolymorphicComponentProps<T extends ElementType, OwnProps> = OwnProps &
 
 **Performance — TS check overhead:**
 
-Polymorphic generic — TypeScript checker uchun hisoblash murakkab (har component instantiation'da generic resolution, conditional types va `Omit<ComponentPropsWithoutRef<T>, ...>` kabi mapped types resolve qilinadi). Yirik loyihalarda compile time biroz oshishi mumkin, lekin sezilarli emas. Modern TS versiyalar (5.0+) bu sohani optimize qilmoqda.
+Polymorphic generic — TypeScript checker uchun hisoblash murakkab (har component instantiation'da generic resolution, conditional types va `Omit<ComponentPropsWithoutRef<T>, ...>` singari mapped types resolve qilinadi). Yirik loyihalarda type-check vaqti biroz oshishi mumkin, lekin runtime'ga ta'siri yo'q — bu faqat compile-time tahlil.
 
 </details>
 
@@ -3089,8 +3101,8 @@ Polymorphic component'ga ref forwarding qo'shish — eng murakkab pattern. R18 v
 
 > **🕐 Versiya evolyutsiyasi (`forwardRef` + Polymorphic):**
 > - **R18 va undan oldin:** `forwardRef<RefType, Props>` HOC bilan, polymorphic typing qo'shimcha utility'lar (`ComponentPropsWithRef<T>` + manual ref typing). Sezilarli boilerplate.
-> - **R19+:** `ref` oddiy prop sifatida uzatilishi mumkin. `forwardRef` — soft-deprecated (hali ishlaydi, warning yo'q, lekin yangi kodda zarurat yo'q). Polymorphic typing soddalashdi — `ComponentPropsWithoutRef<T>` + alohida `ref?: Ref<...>` prop bilan.
-> - **Sabab:** `forwardRef` API restructuring — pattern boilerplate kamaytirish, ergonomika yaxshilanishi.
+> - **R19+:** function component'ga `ref` oddiy prop sifatida uzatilishi mumkin. `forwardRef` deprecated EMAS, hali ishlaydi va warning chiqarmaydi; lekin yangi kodda HOC siz `ref`-as-prop yondashuvi polymorphic typing'ni soddalashtiradi — `ComponentPropsWithoutRef<T>` + alohida `ref?: Ref<...>` prop bilan.
+> - **Sabab:** R19'da `ref` API qayta ishlangan — pattern boilerplate kamaygan, ergonomika yaxshilangan.
 
 **R19+ pattern:**
 
@@ -3235,7 +3247,7 @@ function Button<T extends ElementType = 'button'>(
 ) { ... }
 ```
 
-Internal'da React Reconciler `props.ref` ni o'qib, alohida slot'ga (ref slot) joylashtiradi. Bu — backward-compatible refactoring.
+R19'gacha JSX runtime `ref` ni props'dan ajratib, ReactElement'ning alohida `element.ref` maydoniga joylashtirardi (`forwardRef` esa uni `render(props, ref)` ikkinchi argumenti sifatida olardi). R19'da function component uchun bu ajratish bekor qilindi — `ref` oddiy prop bo'lib props object ichida qoladi va komponent uni boshqa har qanday prop kabi destructure qiladi. `element.ref` ni alohida o'qish deprecated. Host element (`<div ref={...} />`) uchun esa `ref` hamon DOM node'ga biriktiriladi.
 
 **Type narrowing — ref by `as`:**
 
@@ -3286,6 +3298,7 @@ function Button<T extends ElementType = 'button'>({
   const Component = as ?? 'button';
   return (
     <Component
+      // dynamic Component'ning union ref tipi T'ga bog'lanmaydi — polymorphic ref TS cheklovi
       ref={ref as any}
       className={`btn btn-${variant} btn-${size}`}
       {...rest}
@@ -3496,7 +3509,7 @@ function App() {
 }
 
 // Runtime: useTabsContext() throw "Tabs.* must be inside <Tabs>"
-// Compile-time: TS compile qilinadi (TS bilan compile-time check yo'q)
+// Compile-time: TS xato bermaydi — Tab Tabs ichida ekanini tekshira olmaydi
 ```
 
 Compound components — runtime guard. Compile-time enforcement yo'q. Slots pattern (named props) — TS compile-time validatsiya beradi.
@@ -3901,6 +3914,7 @@ function Button<T extends ElementType = 'button'>({
   const Component = as ?? 'button';
   return (
     <Component
+      // dynamic Component'ning union ref tipi T'ga bog'lanmaydi — polymorphic ref TS cheklovi
       ref={ref as any}
       className={`btn btn-${variant} btn-${size} ${className}`}
       {...rest}
@@ -3942,7 +3956,7 @@ function FocusableExample() {
 1. **`ButtonRef<T>`** conditional type — `as` prop'iga qarab DOM element interface
 2. **R19 `ref` oddiy prop** — `forwardRef` HOC kerak emas
 3. **`Omit<..., 'ref'>`** — native ref'ni o'chirib, custom typing
-4. **`ref as any`** — runtime'da React internal handle qiladi (TS workaround)
+4. **`ref as any`** — `Component` runtime'da dynamic (`as ?? 'button'`), shuning uchun uning tipi `ElementType` union; TypeScript bu union'ning ref tipini `Ref<ButtonRef<T>>` ga tenglashtira olmaydi. Bu — polymorphic ref'ning irreducible TS cheklovi; production'da `react-polymorphic-types` kabi kutubxona aniqroq typing beradi
 
 R18 pattern — `forwardRef` HOC + complex generic typing. R19 — sodda.
 
@@ -4100,7 +4114,7 @@ function App() {
   - `ElementType` — element type generic constraint
   - `Omit<ComponentPropsWithoutRef<T>, 'as'>` — native HTML attributes inherit
   - PascalCase variable (`Component = as`) JSX transform talab qilinadi
-- **R19+ ref soddalashishi** — `ref` oddiy prop sifatida uzatiladi; `forwardRef` soft-deprecated (hali ishlaydi, warning yo'q); polymorphic + ref pattern sezilarli kamroq boilerplate
+- **R19+ ref soddalashishi** — function component'ga `ref` oddiy prop sifatida uzatiladi; `forwardRef` deprecated EMAS (hali ishlaydi, warning yo'q), lekin yangi kodda HOC siz `ref`-as-prop afzal; polymorphic + ref pattern sezilarli kamroq boilerplate
 - **Compile-time vs runtime validation:** Slots (TS compile-time), Compound components (Context throw runtime)
 
 Keyingi bo'limda State va useState — state mental model, useState API, functional updates, queueing, stale closure muammolari, immutable updates, va Fiber state queue internals chuqur yoritiladi.

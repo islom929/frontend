@@ -53,7 +53,7 @@ function ProductList({ products }: { products: Product[] }) {
 4. **Layout/Reflow** — brauzer 10,000 element o'lchami va position'ini hisoblaydi → layout phase katta.
 5. **Paint** — har element pixel'larga aylantiriladi → paint phase katta.
 6. **Memory** — har DOM node Fiber + DOM struct + layout object overhead beradi (aniq miqdor browser engine'ga bog'liq).
-7. **Initial scroll** — har scroll event'da layer compositing rebuild → janjitter.
+7. **Initial scroll** — har scroll event'da layer compositing rebuild → jank.
 
 **Real-world masala (sifat darajadagi taqqoslash — aniq raqamlar item complexity, browser, device'ga bog'liq):**
 
@@ -116,8 +116,10 @@ Memory tejash **order of magnitude** darajasida. Aniq raqamlar item komponent mu
 **Scroll handler invocation frequency:**
 
 ```
-Native scroll fires ~60-120 events/sec on desktop
-Mobile scroll fires ~30-60 events/sec
+Scroll event spec'da fixed rate yo'q — har scroll position
+o'zgarishida fire bo'ladi. Modern browser bu event'larni
+frame rate bilan coalesce qiladi (tez scroll'da bir frame
+ichida bir nechta o'zgarish bitta event'ga birlashadi).
 
 Scroll handler ish:
   1. Read scrollTop
@@ -202,7 +204,7 @@ function VirtualizedProductList({ products }: { products: Product[] }) {
 }
 
 // 10,000 products bilan:
-// - Initial render: ~50ms
+// - Initial render: frame ichida (faqat visible items)
 // - Memory: low (~12 DOM nodes)
 // - Scroll: smooth
 ```
@@ -455,12 +457,12 @@ Pure React implementation — library'siz, faqat React primitives bilan virtuali
 
 **Strict Mode 2x render impact:**
 
-R18+ Strict Mode dev'da `useState` + `useEffect` 2x cycle. Virtualization'da:
+R18+ Strict Mode dev'da render phase qayta chaqiriladi va har `useEffect` mount → cleanup → mount tsiklini bosib o'tadi. Virtualization'da:
 
-- `setScrollTop` 2x → calculate range 2x → render 2x
-- `useEffect` (resize listener) — mount → cleanup → mount
+- Bitta `setScrollTop` ham render phase'ni 2x ishga tushiradi → visible range calculation 2x.
+- `useEffect` (resize listener / observer setup) — mount → cleanup → mount.
 
-Bu development-only behavior. Lekin 10,000+ items + 2x render measurement haqiqiy emas. Production build profiling kerak (cross-ref `34-profiling.md`).
+Bu development-only behavior. 10,000+ items + 2x render measurement production xulqini aks ettirmaydi. Production build profiling kerak (cross-ref `34-profiling.md`).
 
 **Concurrent rendering bilan integration:**
 
@@ -485,7 +487,8 @@ scrollToIndex(index, align = 'start')
   → newScrollTop = align === 'start'   ? index × itemHeight
                  : align === 'center'  ? index × itemHeight - (containerHeight - itemHeight) / 2
                  : align === 'end'     ? (index + 1) × itemHeight - containerHeight
-                 : align === 'auto'    ? // nearest visible adjustment
+                 : index × itemHeight
+  → clamp [0, totalHeight - containerHeight]
   → containerRef.current.scrollTop = newScrollTop
   → Browser onScroll fires → setState → re-render
 ```
@@ -748,8 +751,8 @@ Linear: O(n) — sequential offsets check
 Binary search: O(log n) — sorted offsets
 
 10,000 items'da:
-  Linear: 10,000 comparison
-  Binary: 13 comparison
+  Linear: 10,000 comparison (worst case)
+  Binary: ⌈log₂(10000)⌉ = 14 comparison (worst case)
 ```
 
 <details>
@@ -835,7 +838,9 @@ Solution: estimateSize callback closer to real average
 const observer = new ResizeObserver((entries) => {
   // entries — barcha o'lchangan element'lar
   for (const entry of entries) {
-    const index = parseInt(entry.target.dataset.index!, 10);
+    const indexAttr = (entry.target as HTMLElement).dataset.index;
+    if (indexAttr === undefined) continue;
+    const index = parseInt(indexAttr, 10);
     const newHeight = entry.contentRect.height;
     cache.setHeight(index, newHeight);
   }
@@ -925,6 +930,10 @@ function VariableList<T>({
         >
           {Array.from({ length: endIndex - startIndex }, (_, i) => {
             const index = startIndex + i;
+            // Pre-known heights misolida soddalik uchun index key — production'da
+            // `renderItem` chiqargan element item'ning unique ID'si bilan key olishi
+            // kerak (state saqlanishi uchun). Stable key uchun `getItemKey` props
+            // qo'shing (`DynamicVirtualList` misolidagidek).
             return (
               <div key={index} style={{ height: itemHeights[index] }}>
                 {renderItem(items[index], index)}
@@ -1017,13 +1026,13 @@ new ResizeObserver((entries, observer) => {
 1. Layout phase complete (style + layout computed)
 2. Browser collects elements whose size changed
 3. "deliver resize loop notifications" step runs — alohida queue,
-   microtask queue YOK'O idle queue EMAS (spec'da maxsus step)
+   microtask queue ham idle queue ham EMAS (spec'da maxsus step)
 4. Callback fires synchronously in this step, before paint
 5. setState in callback → React schedules re-render (next frame)
 6. Next frame: new layout cycle
 ```
 
-**MUHIM:** Bu callback "microtask after layout" emas — bu rendering pipeline'da layout va paint orasida joylashgan **alohida bosqich** (CSS Resize Observer spec § 3.5 "Procedure"). Shu sababli ResizeObserver callback'da DOM read'lar (`getBoundingClientRect`) layout reflow keltirib chiqarmaydi — layout endigina hisoblangan.
+**MUHIM:** Bu callback "microtask after layout" emas — bu HTML "update the rendering" jarayonidagi "run the resize steps" bosqichida, layout hisoblangach ishlaydi (Resize Observer specification). Shu sababli ResizeObserver callback'da DOM read'lar (`getBoundingClientRect`) layout reflow keltirib chiqarmaydi — layout endigina hisoblangan.
 
 **Loop prevention:**
 
@@ -1115,7 +1124,7 @@ function DynamicVirtualList<T>({
   getItemKey,
 }: DynamicVirtualListProps<T>) {
   const [scrollTop, setScrollTop] = useState(0);
-  const [, forceUpdate] = useState(0);
+  const [measureVersion, setMeasureVersion] = useState(0);
 
   const heightsRef = useRef<Map<number, number>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1126,7 +1135,7 @@ function DynamicVirtualList<T>({
       total += heightsRef.current.get(i) ?? estimateSize(i);
     }
     return total;
-  }, [items.length, estimateSize]);
+  }, [items.length, estimateSize, measureVersion]);
 
   const findRange = useCallback(() => {
     let acc = 0;
@@ -1151,7 +1160,7 @@ function DynamicVirtualList<T>({
       start: Math.max(0, startIndex - overscan),
       end: Math.min(items.length, endIndex + overscan),
     };
-  }, [items.length, scrollTop, height, overscan, estimateSize]);
+  }, [items.length, scrollTop, height, overscan, estimateSize, measureVersion]);
 
   const { start, end } = findRange();
 
@@ -1161,13 +1170,13 @@ function DynamicVirtualList<T>({
       acc += heightsRef.current.get(i) ?? estimateSize(i);
     }
     return acc;
-  }, [start, estimateSize]);
+  }, [start, estimateSize, measureVersion]);
 
   const handleResize = useCallback((index: number, newHeight: number) => {
     const prevHeight = heightsRef.current.get(index);
     if (prevHeight !== newHeight) {
       heightsRef.current.set(index, newHeight);
-      forceUpdate((n) => n + 1);
+      setMeasureVersion((n) => n + 1);
     }
   }, []);
 
@@ -1241,57 +1250,53 @@ function ChatMessages({ messages }: { messages: ChatMessage[] }) {
 
 ### Nazariya
 
-`react-window` — Bvaughn (Brian Vaughn, ex-React core team) tomonidan yozilgan minimalistic virtualization library. `react-virtualized` o'rniga zamonaviy alternative.
+`react-window` — Brian Vaughn (ex-React core team) tomonidan yozilgan minimalistic virtualization library. `react-virtualized` o'rniga zamonaviy alternative.
 
-**Asosiy export'lar:**
+> **⚠️ Versiya:** v2 (2025) API'ni qayta ishlab chiqdi. v1'dagi `FixedSizeList` / `VariableSizeList` / `FixedSizeGrid` / `VariableSizeGrid` class component'lar va children render function pattern olib tashlandi. v2 yagona `List` (va `Grid`) komponent + hook'lar bilan ishlaydi. Quyidagi misollar v2 API'da. v1 hali npm'da mavjud (legacy), lekin yangi loyihalar v2'dan boshlashi tavsiya.
 
-- **`FixedSizeList`** — fixed item height, vertical yoki horizontal.
-- **`VariableSizeList`** — variable heights, har index uchun explicit `itemSize(index)` callback.
-- **`FixedSizeGrid`** — fixed cell size 2D grid.
-- **`VariableSizeGrid`** — variable cell sizes 2D grid.
-- **`areEqual`** — `React.memo` shallow comparison helper item komponent'i uchun.
+**v2 asosiy export'lar:**
+
+- **`List`** — vertical virtualized list. Required props: `rowComponent`, `rowCount`, `rowHeight`, `rowProps`.
+- **`Grid`** — 2D virtualized grid.
+- **`useListRef` / `useListCallbackRef`** — imperative API (scroll metodlari, outermost DOM element getter) uchun ref hook'lar.
+- **`useDynamicRowHeight`** — measure qilingan dynamic row height cache (pre-known emas variable case'lar uchun).
+- **`RowComponentProps`** — row komponent prop type.
+
+**`rowHeight` formatlari:** number (piksel), string (grid height foizi), function (`(index, rowProps) => number` — pre-known variable heights), yoki `useDynamicRowHeight` cache (measured dynamic; eng kam samarali).
+
+**A11y:** `List` outermost element'ga `role="list"`, har row'ga `role="listitem"` + avtomatik `aria-posinset` / `aria-setsize` qo'shadi (windowing native list semantikasini buzgani uchun — bu ARIA tiklaydi).
 
 **Bundle size:** Lightweight (kichik gzipped hajm — aniq raqam uchun `bundlephobia.com/package/react-window`).
 
-**Limitations:**
-
-- Variable heights uchun explicit `itemSize` kerak. Pre-known emas variable case'lar uchun manual measurement kerak.
-- 2D virtualization faqat grid (rows + cols), dynamic table layout cheklangan.
-- Fizikaviy DOM scroll, `scrollIntoView` API mavjud emas.
-
-**Anatomy of `FixedSizeList`:**
+**Anatomy of `List`:**
 
 ```tsx
-<FixedSizeList
-  height={500}        // Container height
-  width={300}         // Container width
-  itemCount={10000}   // Total items
-  itemSize={50}       // Each item height (or width if horizontal)
-  overscanCount={5}   // Render extra items above/below visible
-  layout="vertical"   // 'vertical' | 'horizontal'
->
-  {Row} {/* Children render function */}
-</FixedSizeList>
+<List
+  rowComponent={Row}     // Row-rendering component (index + style + rowProps oladi)
+  rowCount={10000}       // Total rows
+  rowHeight={50}         // number | string | (index, rowProps) => number | dynamic cache
+  rowProps={{ products }} // Har Row'ga forward qilinadigan props
+  overscanCount={5}      // Render extra rows above/below visible
+  style={{ height: 500 }} // Container — bounded height MAJBURIY (scroll uchun)
+/>
 ```
 
-`Row` komponenti `({ index, style })` props oladi va **`style`'ni o'z element'ga uzatishi MAJBURIY** (library transform translateY orqali position'ni belgilaydi).
+`Row` komponenti `index`, `style`, va `rowProps`'dagi qiymatlarni oladi va **`style`'ni o'z root element'iga uzatishi MAJBURIY** (library absolute positioning'ni shu style orqali belgilaydi).
 
-> **⚠️ MUHIM — Row komponentni module-level define qilish:** `<FixedSizeList>{({index, style}) => <div>...</div>}</FixedSizeList>` shaklida **inline arrow function** ishlatilsa, har parent render'da yangi component reference yaratiladi. Bu Reconciler uchun **yangi komponent turi** kabi ko'rinadi → barcha visible item'lar har render'da unmount/mount qilinadi (state lost, ResizeObserver attach/detach, DOM rebuild). To'g'ri pattern: alohida `const Row = memo(({...}: RowProps) => ...)` define qilib `{Row}` pass qilish. Quyidagi misollardagi inline'lar **soddalashtirilgan** — production'da har doim `Row` alohida.
+> **⚠️ MUHIM — `rowComponent` module-level define qilish:** `rowComponent` sifatida har render'da yangi inline arrow function uzatilsa, Reconciler uni **yangi komponent turi** sifatida ko'radi → barcha visible row'lar har render'da unmount/mount qilinadi (state lost, DOM rebuild). To'g'ri pattern: `Row`'ni komponent tashqarisida (module-level) yoki `useCallback`-stabil define qilib uzatish, item-specific ma'lumotni esa `rowProps` orqali berish.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-`FixedSizeList` minimal misol:
+`List` minimal misol (fixed row height):
 
 ```tsx
-import { FixedSizeList, type ListChildComponentProps } from 'react-window';
+import { List, type RowComponentProps } from 'react-window';
 
-interface RowProps extends ListChildComponentProps {
-  data: Product[];
-}
+type ProductRowProps = { products: Product[] };
 
-function Row({ index, style, data }: RowProps) {
-  const product = data[index];
+function ProductRow({ index, style, products }: RowComponentProps<ProductRowProps>) {
+  const product = products[index];
 
   return (
     <div style={style}>
@@ -1303,28 +1308,30 @@ function Row({ index, style, data }: RowProps) {
 
 function ProductsListVirtualized({ products }: { products: Product[] }) {
   return (
-    <FixedSizeList
-      height={600}
-      width="100%"
-      itemCount={products.length}
-      itemSize={80}
-      itemData={products}
+    <List
+      rowComponent={ProductRow}
+      rowCount={products.length}
+      rowHeight={80}
+      rowProps={{ products }}
       overscanCount={5}
-    >
-      {Row}
-    </FixedSizeList>
+      style={{ height: 600 }}
+    />
   );
 }
 ```
 
-`React.memo` + `areEqual` performance pattern:
+`memo` bilan row re-render minimallashtirish:
 
 ```tsx
-import { FixedSizeList, areEqual } from 'react-window';
+import { List, type RowComponentProps } from 'react-window';
 import { memo } from 'react';
 
-const Row = memo(({ index, style, data }: RowProps) => {
-  const product = data[index];
+const ProductRow = memo(function ProductRow({
+  index,
+  style,
+  products,
+}: RowComponentProps<{ products: Product[] }>) {
+  const product = products[index];
 
   return (
     <div style={style}>
@@ -1332,152 +1339,88 @@ const Row = memo(({ index, style, data }: RowProps) => {
       <p>${product.price}</p>
     </div>
   );
-}, areEqual);
+});
 
-// areEqual — shallow comparison + style reference check
-// React.memo default shallow comparison ham ishlaydi, lekin areEqual library-aware
+// List rowProps o'zgarganda row'larni re-render qiladi. memo bilan
+// faqat o'sha row'ga tegishli prop o'zgarsa re-render bo'ladi.
 ```
 
-`VariableSizeList` — explicit heights:
+Pre-known variable heights — `rowHeight` function:
 
 ```tsx
-import { VariableSizeList } from 'react-window';
-import { useRef } from 'react';
+import { List, type RowComponentProps } from 'react-window';
 
-function CommentsListVirtualized({ comments }: { comments: Comment[] }) {
-  const listRef = useRef<VariableSizeList>(null);
+type CommentRowProps = { comments: Comment[] };
 
-  const getItemSize = (index: number): number => {
-    const comment = comments[index];
-    const baseHeight = 60;
-    const lineHeight = 20;
-    const charsPerLine = 50;
-    const lines = Math.ceil(comment.text.length / charsPerLine);
-    return baseHeight + lines * lineHeight;
-  };
+function commentRowHeight(index: number, { comments }: CommentRowProps): number {
+  const baseHeight = 60;
+  const lineHeight = 20;
+  const charsPerLine = 50;
+  const lines = Math.ceil(comments[index].text.length / charsPerLine);
+  return baseHeight + lines * lineHeight;
+}
+
+function CommentRow({ index, style, comments }: RowComponentProps<CommentRowProps>) {
+  const comment = comments[index];
 
   return (
-    <VariableSizeList
-      ref={listRef}
-      height={500}
-      width="100%"
-      itemCount={comments.length}
-      itemSize={getItemSize}
-      itemData={comments}
+    <div style={style}>
+      <strong>{comment.author}</strong>
+      <p>{comment.text}</p>
+    </div>
+  );
+}
+
+function CommentsListVirtualized({ comments }: { comments: Comment[] }) {
+  return (
+    <List
+      rowComponent={CommentRow}
+      rowCount={comments.length}
+      rowHeight={commentRowHeight}
+      rowProps={{ comments }}
       overscanCount={3}
-    >
-      {({ index, style, data }) => (
-        <div style={style}>
-          <strong>{data[index].author}</strong>
-          <p>{data[index].text}</p>
-        </div>
-      )}
-    </VariableSizeList>
+      style={{ height: 500 }}
+    />
   );
 }
 ```
 
-`scrollToItem` programmatic API:
+Imperative scroll — `useListRef`:
 
 ```tsx
-import { FixedSizeList } from 'react-window';
-import { useRef } from 'react';
+import { List, useListRef, type RowComponentProps } from 'react-window';
+
+type MessageRowProps = { messages: Message[] };
+
+function MessageRow({ index, style, messages }: RowComponentProps<MessageRowProps>) {
+  return <div style={style}>{messages[index].text}</div>;
+}
 
 function ChatListWithScrollControl({ messages }: { messages: Message[] }) {
-  const listRef = useRef<FixedSizeList>(null);
+  const listRef = useListRef(null);
 
   const scrollToBottom = () => {
-    listRef.current?.scrollToItem(messages.length - 1, 'end');
-  };
-
-  const scrollToMessage = (id: string) => {
-    const index = messages.findIndex((m) => m.id === id);
-    if (index !== -1) {
-      listRef.current?.scrollToItem(index, 'center');
-    }
+    listRef.current?.scrollToRow({ index: messages.length - 1, align: 'end' });
   };
 
   return (
     <>
       <button onClick={scrollToBottom}>Pastga</button>
 
-      <FixedSizeList
-        ref={listRef}
-        height={500}
-        width="100%"
-        itemCount={messages.length}
-        itemSize={60}
-      >
-        {({ index, style }) => (
-          <div style={style}>{messages[index].text}</div>
-        )}
-      </FixedSizeList>
+      <List
+        listRef={listRef}
+        rowComponent={MessageRow}
+        rowCount={messages.length}
+        rowHeight={60}
+        rowProps={{ messages }}
+        style={{ height: 500 }}
+      />
     </>
   );
 }
 ```
 
-`FixedSizeGrid` — 2D grid (e.g. photo gallery):
-
-```tsx
-import { FixedSizeGrid, type GridChildComponentProps } from 'react-window';
-
-interface PhotoCellProps extends GridChildComponentProps {
-  data: Photo[][];
-}
-
-function PhotoCell({ columnIndex, rowIndex, style, data }: PhotoCellProps) {
-  const photo = data[rowIndex][columnIndex];
-  if (!photo) return <div style={style} />;
-
-  return (
-    <div style={style}>
-      <img src={photo.thumbnail} alt={photo.title} />
-    </div>
-  );
-}
-
-function PhotoGallery({ photos }: { photos: Photo[] }) {
-  const columnCount = 4;
-  const rows: Photo[][] = [];
-
-  for (let i = 0; i < photos.length; i += columnCount) {
-    rows.push(photos.slice(i, i + columnCount));
-  }
-
-  return (
-    <FixedSizeGrid
-      columnCount={columnCount}
-      columnWidth={200}
-      rowCount={rows.length}
-      rowHeight={200}
-      height={600}
-      width={800}
-      itemData={rows}
-    >
-      {PhotoCell}
-    </FixedSizeGrid>
-  );
-}
-```
-
-Horizontal layout:
-
-```tsx
-<FixedSizeList
-  layout="horizontal"
-  height={150}
-  width={800}
-  itemCount={50}
-  itemSize={120}
->
-  {({ index, style }) => (
-    <div style={style}>
-      <ImageCard imageId={index} />
-    </div>
-  )}
-</FixedSizeList>
-```
+> **Eslatma:** Imperative API metod nomlari (`scrollToRow` va uning parametrlari) library minor versiyalari orasida o'zgarishi mumkin — joriy holatni `react-window` README bilan tekshiring.
 
 </details>
 
@@ -1491,16 +1434,16 @@ Horizontal layout:
 
 **Asosiy farqlar `react-window`'dan:**
 
-| Aspect | react-window | @tanstack/react-virtual |
+| Aspect | react-window (v2) | @tanstack/react-virtual |
 |--------|--------------|-------------------------|
-| API style | Component-based | Hooks-based (headless) |
-| Variable heights | Explicit `itemSize(index)` | Automatic measurement (ResizeObserver) |
-| 2D support | Grid only | Full 2D (rows + cols mustaqil) |
+| API style | Component (`List` + ref hook'lar) | Hooks-based (headless) |
+| Variable heights | `rowHeight` function (pre-known) yoki `useDynamicRowHeight` | Automatic measurement (ResizeObserver) |
+| 2D support | `Grid` komponent | Full 2D (rows + cols mustaqil virtualizer) |
 | Bundle size | Lightweight (gzipped) | Lightweight (gzipped, biroz kattaroq) |
 | TypeScript | OK | First-class |
 | Framework support | React only | React, Vue, Svelte, Solid (core agnostic) |
-| Dynamic content | Manual `resetAfterIndex` | Automatic via ResizeObserver |
-| Scroll API | `scrollToItem` | `scrollToIndex`, `scrollToOffset` |
+| A11y | `role="list/listitem"` + ARIA avto | Manual (o'zingiz ARIA qo'shasiz) |
+| Scroll API | `listRef` imperative metodlari | `scrollToIndex`, `scrollToOffset`, `scrollBy` |
 
 **`useVirtualizer` hook** asosiy API:
 
@@ -1519,7 +1462,7 @@ const virtualizer = useVirtualizer({
 - `virtualizer.getTotalSize()` — total scroll height (px)
 - `virtualizer.scrollToIndex(index, options?): void` — programmatic scroll (sync, return value yo'q)
 - `virtualizer.measureElement` — **ref callback** (har item'ga `ref={virtualizer.measureElement}` ulanadi, library ResizeObserver attach qiladi)
-- `virtualizer.resizeItem(item: VirtualItem, size: number): void` — manual size override (VirtualItem object qabul qiladi, index emas)
+- `virtualizer.resizeItem(index: number, size: number): void` — manual size override (item index va yangi piksel size qabul qiladi)
 
 **Key benefit — automatic measurement:**
 
@@ -1557,30 +1500,38 @@ After measurement:
 
 ```typescript
 interface VirtualItem {
+  key: string | number | bigint; // Stable key (default — index, getItemKey bilan o'zgartiriladi)
   index: number;       // Original item index
   start: number;       // Top offset in pixels
-  size: number;        // Item height
   end: number;         // start + size
-  key: number | string; // Stable key
-  lane: number;        // Column index (for masonry/grid)
+  size: number;        // Estimated size measure'gacha, measured size keyin
+  lane: number;        // Lane index — oddiy list'da 0, masonry'da foydali
 }
 ```
 
-**Comparison: react-window auto-measurement workaround:**
+**Comparison: dynamic measurement ikki library'da:**
 
 ```tsx
-// react-window — manual workaround for auto-measure
-const sizeMap = useRef<Map<number, number>>(new Map());
+// react-window v2 — useDynamicRowHeight cache rowHeight sifatida uzatiladi
+import { List, useDynamicRowHeight } from 'react-window';
 
-const getSize = (index: number) => sizeMap.current.get(index) ?? 50;
+function DynamicList({ comments }: { comments: Comment[] }) {
+  const rowHeight = useDynamicRowHeight();
 
-const setSize = useCallback((index: number, size: number) => {
-  sizeMap.current.set(index, size);
-  listRef.current?.resetAfterIndex(index);
-}, []);
+  return (
+    <List
+      rowComponent={CommentRow}
+      rowCount={comments.length}
+      rowHeight={rowHeight}
+      rowProps={{ comments }}
+      style={{ height: 500 }}
+    />
+  );
+}
+// (hook'ning aniq option'lari uchun README — versiyaga qarab o'zgaradi)
 
-// Each item must measure itself and call setSize
-// Boilerplate vs @tanstack/react-virtual auto-handling
+// @tanstack/react-virtual — ref={virtualizer.measureElement} har item'ga,
+// boshqa setup kerak emas (ResizeObserver library ichida)
 ```
 
 </details>
@@ -1804,7 +1755,7 @@ Infinite scroll — foydalanuvchi pastga scroll qilganda keyingi sahifa ma'lumot
 
 **Trigger mexanizm — 2 variant:**
 
-1. **Library callback** — `onItemsRendered` (react-window) yoki `onChange` (TanStack Virtual):
+1. **Library callback** — `onRowsRendered` (react-window v2) yoki `onChange` (TanStack Virtual):
    - Visible range last index list count'ga yaqin bo'lsa next page yuklanadi
    - Threshold: `endIndex >= itemCount - prefetchDistance`
 
@@ -1989,68 +1940,75 @@ function EndOfListRow() {
 }
 ```
 
-`react-window` + `onItemsRendered`:
+`react-window` v2 + `onRowsRendered`:
 
 ```tsx
-import { FixedSizeList } from 'react-window';
-import { useState, useEffect } from 'react';
+import { List, type RowComponentProps } from 'react-window';
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+type ProductRowProps = { items: Product[]; hasMore: boolean };
+
+function ProductRow({ index, style, items, hasMore }: RowComponentProps<ProductRowProps>) {
+  if (index >= items.length) {
+    return <div style={style}>{hasMore ? 'Yuklanmoqda...' : 'Boshqa mahsulot yo\'q.'}</div>;
+  }
+  return (
+    <div style={style}>
+      <ProductCard product={items[index]} />
+    </div>
+  );
+}
 
 function InfiniteListReactWindow() {
   const [items, setItems] = useState<Product[]>([]);
   const [hasMore, setHasMore] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const loadingRef = useRef(false);
+  const cursorRef = useRef<string | null>(null);
+
+  const loadMore = useCallback(async () => {
+    if (loadingRef.current || !hasMore) return;
+    loadingRef.current = true;
+
+    try {
+      const page = await fetchProductsPage(cursorRef.current);
+      setItems((prev) => [...prev, ...page.items]);
+      cursorRef.current = page.nextCursor;
+      setHasMore(page.nextCursor !== null);
+    } finally {
+      loadingRef.current = false;
+    }
+  }, [hasMore]);
 
   useEffect(() => {
     loadMore();
-  }, []);
+  }, [loadMore]);
 
-  const loadMore = async () => {
-    if (isLoading || !hasMore) return;
-    setIsLoading(true);
+  type RenderedRange = { startIndex: number; stopIndex: number };
 
-    try {
-      const page = await fetchProductsPage(nextCursor);
-      setItems((prev) => [...prev, ...page.items]);
-      setNextCursor(page.nextCursor);
-      setHasMore(page.nextCursor !== null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleItemsRendered = ({
-    visibleStopIndex,
-  }: {
-    visibleStopIndex: number;
-  }) => {
-    if (visibleStopIndex >= items.length - 5 && hasMore && !isLoading) {
-      loadMore();
-    }
-  };
+  const handleRowsRendered = useCallback(
+    (visible: RenderedRange, _all: RenderedRange) => {
+      // visible — viewport ichidagi range; _all — visible + overscan buffer
+      if (visible.stopIndex >= items.length - 5) {
+        loadMore();
+      }
+    },
+    [items.length, loadMore]
+  );
 
   return (
-    <FixedSizeList
-      height={600}
-      width="100%"
-      itemCount={items.length + (hasMore ? 1 : 0)}
-      itemSize={80}
-      onItemsRendered={handleItemsRendered}
-    >
-      {({ index, style }) => {
-        if (index >= items.length) {
-          return <div style={style}>Yuklanmoqda...</div>;
-        }
-        return (
-          <div style={style}>
-            <ProductCard product={items[index]} />
-          </div>
-        );
-      }}
-    </FixedSizeList>
+    <List
+      rowComponent={ProductRow}
+      rowCount={items.length + (hasMore ? 1 : 0)}
+      rowHeight={80}
+      rowProps={{ items, hasMore }}
+      onRowsRendered={handleRowsRendered}
+      style={{ height: 600 }}
+    />
   );
 }
 ```
+
+> **Eslatma:** v2'da `onRowsRendered` callback ikki argument oladi — birinchisi viewport ichidagi `{ startIndex, stopIndex }`, ikkinchisi overscan buffer bilan birga to'liq render qilingan range. Infinite scroll trigger uchun viewport range'ning `stopIndex`'i ishlatiladi.
 
 </details>
 
@@ -2067,7 +2025,7 @@ Horizontal virtualization — gorizontal scroll bilan ishlash. Use case'lar:
 - **Timeline scrubber** — uzun video timeline frame'lar
 - **Calendar grid** — kun'lar gorizontal scroll
 
-**2D grid virtualization** — rows va cols mustaqil virtualization. `@tanstack/react-virtual` rows va cols uchun alohida `useVirtualizer` ishlatadi. `react-window` `FixedSizeGrid`/`VariableSizeGrid` qayta birlashtirilgan API beradi.
+**2D grid virtualization** — rows va cols mustaqil virtualization. `@tanstack/react-virtual` rows va cols uchun alohida `useVirtualizer` ishlatadi (biri vertical, biri `horizontal: true`). `react-window` v2'da bu uchun `Grid` komponent mavjud.
 
 **Layout considerations:**
 
@@ -2078,31 +2036,48 @@ Horizontal virtualization — gorizontal scroll bilan ishlash. Use case'lar:
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-Horizontal photo carousel (`react-window`):
+Horizontal photo carousel (`@tanstack/react-virtual`, `horizontal: true`):
 
 ```tsx
-import { FixedSizeList } from 'react-window';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useRef } from 'react';
 
 function PhotoCarousel({ photos }: { photos: Photo[] }) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    horizontal: true,
+    count: photos.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 250,
+    overscan: 3,
+  });
+
   return (
-    <FixedSizeList
-      layout="horizontal"
-      height={200}
-      width="100%"
-      itemCount={photos.length}
-      itemSize={250}
-      overscanCount={3}
-    >
-      {({ index, style }) => (
-        <div style={{ ...style, padding: 8 }}>
-          <img
-            src={photos[index].thumbnail}
-            alt={photos[index].title}
-            loading="lazy"
-          />
-        </div>
-      )}
-    </FixedSizeList>
+    <div ref={parentRef} style={{ height: 200, width: '100%', overflowX: 'auto' }}>
+      <div style={{ width: `${virtualizer.getTotalSize()}px`, height: '100%', position: 'relative' }}>
+        {virtualizer.getVirtualItems().map((virtualItem) => (
+          <div
+            key={virtualItem.key}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: `${virtualItem.size}px`,
+              height: '100%',
+              transform: `translateX(${virtualItem.start}px)`,
+              padding: 8,
+            }}
+          >
+            <img
+              src={photos[virtualItem.index].thumbnail}
+              alt={photos[virtualItem.index].title}
+              loading="lazy"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 ```
@@ -2208,21 +2183,23 @@ Sticky headers manual simulation:
 
 ```tsx
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 
-interface ListItem {
-  type: 'header' | 'item';
-  letter?: string;
-  contact?: Contact;
-}
+type ListItem =
+  | { type: 'header'; letter: string }
+  | { type: 'item'; contact: Contact };
 
 function ContactsListWithStickyHeaders({ contacts }: { contacts: Contact[] }) {
   const grouped = useMemo(() => {
     const groups = new Map<string, Contact[]>();
     for (const contact of contacts) {
       const letter = contact.name[0].toUpperCase();
-      if (!groups.has(letter)) groups.set(letter, []);
-      groups.get(letter)!.push(contact);
+      const group = groups.get(letter);
+      if (group) {
+        group.push(contact);
+      } else {
+        groups.set(letter, [contact]);
+      }
     }
     return Array.from(groups.entries())
       .sort(([a], [b]) => a.localeCompare(b))
@@ -2256,7 +2233,7 @@ function ContactsListWithStickyHeaders({ contacts }: { contacts: Contact[] }) {
     for (let i = firstVisibleIndex; i <= lastVisibleIndex && i < grouped.length; i++) {
       const item = grouped[i];
       if (item.type === 'header') {
-        activeHeader = item.letter ?? null;
+        activeHeader = item.letter;
       }
     }
 
@@ -2306,9 +2283,9 @@ function ContactsListWithStickyHeaders({ contacts }: { contacts: Contact[] }) {
               }}
             >
               {item.type === 'header' ? (
-                <SectionHeader letter={item.letter!} />
+                <SectionHeader letter={item.letter} />
               ) : (
-                <ContactRow contact={item.contact!} />
+                <ContactRow contact={item.contact} />
               )}
             </div>
           );
@@ -2564,7 +2541,7 @@ Virtualization performance ta'siri item count'ga proportional. Real measurement 
 - **100-1000 items:** Border zone — komponent murakkabligi muhim. Heavy items (rich content, charts) virtualization foydali, simple items (text) naive ham OK.
 - **> 1000 items:** Virtualization majburiy.
 
-> **Real measurements item complexity'ga bog'liq.** ProductCard 5 KB JSX, ChartItem 50 KB JSX (recharts) — initial render vaqti differ.
+> **Real measurements item complexity'ga bog'liq.** Oddiy text-only ProductCard va chart/grafik render qiluvchi item (recharts kabi) initial render vaqti bo'yicha sezilarli farq qiladi — shu sababli border zone'da (100-1000 items) qaror item murakkabligiga bog'liq.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -2650,12 +2627,12 @@ function BenchmarkPage() {
 
 ### Strict Mode 2x render impact
 
-R18+ Strict Mode dev'da `useState` setter va `useEffect` 2x sodir bo'ladi. Virtualization scroll handler'da:
+R18+ Strict Mode dev'da komponent funksiyasi qayta chaqiriladi va har `useEffect` mount → cleanup → mount tsiklini bosib o'tadi. Virtualization'da:
 
-- `setScrollTop` 2x → calculate range 2x → re-render 2x
-- ResizeObserver callback 2x → `setHeights` 2x
+- Render phase 2x → visible range calculation 2x (render phase pure, side-effect yo'q).
+- `observer.observe(element)` chaqiruvchi effect mount → cleanup (`unobserve`) → mount — demak element bir marta qo'shimcha observe/measure qilinadi. ResizeObserver callback'i layout o'zgarishiga qarab fire bo'ladi, React'ning double-render'i tufayli emas — lekin qo'shimcha mount development'da bitta ortiqcha measurement keltirib chiqaradi.
 
-Bu development-only behavior, lekin profiling natijalari noto'g'ri ko'rsatadi. Production build profile (cross-ref `34-profiling.md`) yoki Strict Mode olib tashlash development'da.
+Bu development-only behavior, lekin profiling natijalari noto'g'ri ko'rsatadi. Production build profile (cross-ref `34-profiling.md`).
 
 ### `key={index}` xato
 
@@ -2710,12 +2687,11 @@ Virtualization fundamental a11y muammosi: faqat visible items DOM'da → screen 
   </div>
 </div>
 
-// ✅ ARIA-aware virtualization
+// ✅ ARIA-aware virtualization (list model — setsize/posinset)
 <div
   ref={parentRef}
   role="list"
   aria-label="Mahsulotlar ro'yxati"
-  aria-rowcount={items.length}  // ← TOTAL count (visible emas)
   style={{ height: 600, overflow: 'auto' }}
 >
   <div style={{ height: virtualizer.getTotalSize() }}>
@@ -2723,9 +2699,8 @@ Virtualization fundamental a11y muammosi: faqat visible items DOM'da → screen 
       <div
         key={virtualItem.key}
         role="listitem"
-        aria-rowindex={virtualItem.index + 1}  // ← 1-based, real position
-        aria-setsize={items.length}              // ← total set size
-        aria-posinset={virtualItem.index + 1}    // ← position in set
+        aria-setsize={items.length}              // ← total set size (visible emas)
+        aria-posinset={virtualItem.index + 1}    // ← 1-based real position
       >
         {/* content */}
       </div>
@@ -2734,14 +2709,16 @@ Virtualization fundamental a11y muammosi: faqat visible items DOM'da → screen 
 </div>
 ```
 
-**ARIA atributlari semantikasi:**
+**ARIA atributlari semantikasi — model'iga e'tibor bering:**
 
-| Atribut | Maqsad | Misol qiymati |
-|---------|--------|---------------|
-| `aria-rowcount` | Total rows (grid/table'da) | `10000` |
-| `aria-rowindex` | Joriy item position (1-based) | `4523` |
-| `aria-setsize` | Total set size (listitem'da) | `10000` |
-| `aria-posinset` | Position in set (1-based) | `4523` |
+`aria-setsize` / `aria-posinset` — `role="list"` / `role="listitem"` (va `menu`, `tab`, `radiogroup` kabi) modeliga tegishli. `aria-rowcount` / `aria-rowindex` esa **grid/table** modeliga (`role="grid"` / `role="table"` + `role="row"`) tegishli — list'da ishlatilmaydi. Jadvalni virtualization qilsangiz grid atributlarini, oddiy ro'yxatda esa setsize/posinset'ni ishlating.
+
+| Atribut | Qaysi ARIA model | Maqsad |
+|---------|------------------|--------|
+| `aria-setsize` | list / listitem | Total set size (visible emas — to'liq son) |
+| `aria-posinset` | list / listitem | Position in set (1-based) |
+| `aria-rowcount` | grid / table | Total rows |
+| `aria-rowindex` | grid / row | Joriy row position (1-based) |
 
 **Keyboard navigation challenges:**
 
@@ -2781,7 +2758,7 @@ requestAnimationFrame(() => {
 });
 ```
 
-`react-window` `scrollToItem` ham sync (void qaytaradi); har ikkala library'da ResizeObserver callbacks browser pipeline bilan async — variable heights case'da scroll position'i layout'dan keyin to'g'irlanadi.
+`react-window` imperative scroll metodlari ham void qaytaradi; har ikkala library'da ResizeObserver callback'lari browser pipeline bilan async — variable heights case'da scroll position'i layout'dan keyin to'g'irlanadi.
 
 ---
 
@@ -2801,9 +2778,9 @@ requestAnimationFrame(() => {
   return <div key={item.id}>...</div>;
 })}
 
-// virtualItem.key TanStack Virtual default'da `index` — `key={virtualItem.key}`
-// stable EMAS (xuddi `key={index}` kabi). Stable key uchun `useVirtualizer`'ga
-// `getItemKey` callback uzatish:
+// virtualItem.key TanStack Virtual default'da `index` qiymatiga teng — demak
+// `key={virtualItem.key}` ham `key={index}` bilan bir xil natija: stable EMAS.
+// Stable key uchun `useVirtualizer`'ga `getItemKey` callback uzatish:
 const virtualizer = useVirtualizer({
   count: items.length,
   getScrollElement: () => parentRef.current,
@@ -2820,14 +2797,18 @@ const virtualizer = useVirtualizer({
 ### ❌ Xato 2: `style` prop'ni skip qilish (`react-window`)
 
 ```tsx
+import { type RowComponentProps } from 'react-window';
+
+type ProductRowProps = { products: Product[] };
+
 // ❌ Item position'ni saqlamaydi → barcha item'lar bir joyda overlap
-function Row({ index, style, data }: RowProps) {
-  return <div>{data[index].name}</div>;
+function ProductRow({ index, products }: RowComponentProps<ProductRowProps>) {
+  return <div>{products[index].name}</div>;
 }
 
-// ✅ TO'G'RI — style'ni element'ga uzatish
-function Row({ index, style, data }: RowProps) {
-  return <div style={style}>{data[index].name}</div>;
+// ✅ TO'G'RI — style'ni root element'ga uzatish
+function ProductRow({ index, style, products }: RowComponentProps<ProductRowProps>) {
+  return <div style={style}>{products[index].name}</div>;
 }
 ```
 
@@ -2971,15 +2952,15 @@ function VirtualList<T>({
 
 ---
 
-### Mashq 2: `react-window` FixedSizeList Bilan Product List (Oson)
+### Mashq 2: `react-window` v2 `List` Bilan Product List (Oson)
 
-`react-window` `FixedSizeList`'ni ishlatib 1000+ Product'ni virtualization qiling. `React.memo` + `areEqual` per-item.
+`react-window` v2 `List`'ni ishlatib 1000+ Product'ni virtualization qiling. Row komponent'ni `memo` bilan wrap qiling va item ma'lumotini `rowProps` orqali bering.
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ```tsx
-import { FixedSizeList, areEqual, type ListChildComponentProps } from 'react-window';
+import { List, type RowComponentProps } from 'react-window';
 import { memo } from 'react';
 
 interface Product {
@@ -2989,12 +2970,14 @@ interface Product {
   imageUrl: string;
 }
 
-interface RowProps extends ListChildComponentProps {
-  data: Product[];
-}
+type ProductRowProps = { products: Product[] };
 
-const Row = memo(({ index, style, data }: RowProps) => {
-  const product = data[index];
+const ProductRow = memo(function ProductRow({
+  index,
+  style,
+  products,
+}: RowComponentProps<ProductRowProps>) {
+  const product = products[index];
 
   return (
     <div
@@ -3017,30 +3000,28 @@ const Row = memo(({ index, style, data }: RowProps) => {
       </div>
     </div>
   );
-}, areEqual);
+});
 
 function ProductsList({ products }: { products: Product[] }) {
   return (
-    <FixedSizeList
-      height={600}
-      width="100%"
-      itemCount={products.length}
-      itemSize={72}
-      itemData={products}
+    <List
+      rowComponent={ProductRow}
+      rowCount={products.length}
+      rowHeight={72}
+      rowProps={{ products }}
       overscanCount={5}
-    >
-      {Row}
-    </FixedSizeList>
+      style={{ height: 600 }}
+    />
   );
 }
 ```
 
 **Tushuntirish:**
 
-- `Row` komponent `memo` + `areEqual` bilan wrap qilingan — props o'zgarmasa skip.
-- `style` prop majburiy — library `transform`'ga aylantiriladi.
-- `itemData={products}` — Row komponent'iga `data` prop sifatida uzatiladi.
-- `overscanCount={5}` — visible range tashqarida 5 ta qo'shimcha item.
+- `ProductRow` komponent `memo` bilan wrap qilingan — `rowProps` o'zgarmasa re-render skip.
+- `style` prop majburiy — library absolute positioning'ni shu orqali belgilaydi.
+- `rowProps={{ products }}` — Row komponent'iga `products` prop sifatida forward qilinadi.
+- `overscanCount={5}` — visible range tashqarida 5 ta qo'shimcha row.
 
 </details>
 
@@ -3297,12 +3278,9 @@ interface MessagesPage {
   nextCursor: string | null;
 }
 
-interface ListItem {
-  type: 'date' | 'message';
-  date?: string;
-  message?: ChatMessage;
-  key: string;
-}
+type ListItem =
+  | { type: 'date'; date: string; key: string }
+  | { type: 'message'; message: ChatMessage; key: string };
 
 function ChatRoom({
   messages,
@@ -3367,7 +3345,7 @@ function ChatRoom({
     for (const item of visible) {
       const flat = flattenedItems[item.index];
       if (flat.type === 'date' && flat.date !== 'Yuklanmoqda...') {
-        activeDate = flat.date ?? null;
+        activeDate = flat.date;
       }
     }
     setActiveStickyDate(activeDate);
@@ -3430,9 +3408,9 @@ function ChatRoom({
                 }}
               >
                 {item.type === 'date' ? (
-                  <DateBadge label={item.date!} />
+                  <DateBadge label={item.date} />
                 ) : (
-                  <MessageBubble message={item.message!} />
+                  <MessageBubble message={item.message} />
                 )}
               </div>
             );
@@ -3502,7 +3480,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 - **Pure React implementation** — `useRef` + `useState(scrollTop)` + visible range calc + `requestAnimationFrame` throttle. Generic typing va render prop pattern.
 - **Variable heights** — pre-known heights array yoki estimate-then-measure pattern. `ResizeObserver` automatic measurement, offset cache `Map<index, height>` yangilanadi.
 - **Single shared `ResizeObserver`** — har item uchun alohida observer overhead. Bitta observer + `dataset.index` map. Browser support Chrome 64+, Firefox 69+, Safari 13.1+.
-- **`react-window`** — Brian Vaughn library, lightweight, FixedSizeList/VariableSizeList/FixedSizeGrid. `style` prop majburiy, `React.memo` + `areEqual` per-item, `Row` komponentni module-level define qilish.
+- **`react-window`** — Brian Vaughn library, lightweight. v2 (2025) yagona `List` / `Grid` komponent + hook'lar (`useListRef`, `useDynamicRowHeight`); v1'dagi `FixedSizeList`/`VariableSizeList` class component'lar olib tashlandi. `style` prop majburiy, item ma'lumoti `rowProps` orqali, `rowComponent` module-level define. `List` ARIA roles + `aria-posinset`/`aria-setsize` avtomatik qo'shadi.
 - **`@tanstack/react-virtual`** — modern alternative, hooks-based headless API, automatic measurement (`measureElement` ref), 2D support (rows + cols mustaqil virtualizers), framework-agnostic core.
 - **Infinite scroll** — `useInfiniteQuery` (TanStack Query) + virtualization. `useEffect` last visible index list count'ga yaqin bo'lsa `fetchNextPage` trigger. Loader row va end row alohida states.
 - **Sticky headers** — section header virtualization'da `position: sticky` ishlamasligi mumkin (transform context). Manual sticky simulation: scroll listener active section'ni hisoblaydi va alohida fixed element render qiladi.

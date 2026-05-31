@@ -76,10 +76,11 @@ React Reconciler `beginWork` paytida Fiber tag'ni tekshiradi. Hoistable tag'lar 
 1. Reconciler Fiber tree traversal
 2. HostComponent tag detection — type === 'title' | 'meta' | 'link' | 'script'
 3. Hoistable check:
-   - <title>, <meta> → always hoist
-   - <link rel="..."> → hoist if rel ∈ {stylesheet, modulepreload, preload, ...}
+   - <title>, <meta> → hoist (itemProp bo'lsa — joyida render)
+   - <link> → hoist (itemProp/onLoad/onError/disabled bo'lsa — joyida);
+     rel="stylesheet" precedence bilan → managed Resource sifatida
    - <script async src="..."> → hoist if has src and async
-4. Fiber.flags |= HOSTABLE bit
+4. Fiber.tag = HostHoistable (hoistable resource tag)
 5. Commit phase:
    - Insert tag into <head> (not parent DOM node)
    - Track in HostRoot.resources Map
@@ -233,7 +234,7 @@ Bir xil tag bir nechta komponentlardan render qilinsa, React **bitta** instance 
 
 | Tag | Deduplication kaliti |
 |-----|---------------------|
-| `<title>` | React deduplikatsiya qilmaydi — barcha instance'lar `<head>` ga insert; HTML spec bo'yicha brauzer DOM tartibidagi **birinchi** `<title>` element'ini `document.title` uchun ishlatadi |
+| `<title>` | React deduplikatsiya qilmaydi — barcha instance'lar `<head>` ga insert; bir vaqtda bir nechta `<title>` bo'lsa, React doc'i bo'yicha brauzer/qidiruv tizimi xulqi undefined (faqat bitta render qilish kerak) |
 | `<meta name="...">` | React deduplikatsiya qilmaydi (rasmiy spec); barcha render qilinadi |
 | `<meta property="...">` | React deduplikatsiya qilmaydi; barcha render qilinadi |
 | `<meta charset>` | React deduplikatsiya qilmaydi (developer responsibility — bitta joyda yozish) |
@@ -245,7 +246,7 @@ Bir xil tag bir nechta komponentlardan render qilinsa, React **bitta** instance 
 
 Bir nechta komponent bir xil meta tag'ni turli value bilan render qilsa — qaysi instance "g'olib"?
 
-- **`<title>`** — React `<head>` ichiga **barcha** `<title>` instance'larini insert qiladi (deduplication `<title>` uchun avtomatik qo'llanmaydi). HTML spec'i bo'yicha brauzer `document.title` uchun **birinchi** `<title>` element'ini ishlatadi (boshqalari spec bo'yicha "no effect" — lekin DOM'da qoladi). Behavior'ni oldindan aytib bo'ladigan qilish uchun framework conventions (Next.js `metadata` API) yoki single-source-of-truth pattern qo'llaniladi.
+- **`<title>`** — React `<head>` ichiga **barcha** `<title>` instance'larini insert qiladi (deduplication `<title>` uchun avtomatik qo'llanmaydi). React rasmiy hujjati: bir vaqtda bir nechta `<title>` render qilinsa, brauzer va qidiruv tizimlari xulqi **undefined**. Shu sababli bir vaqtda faqat bitta `<title>` render qilish kerak — framework conventions (Next.js `metadata` API) yoki single-source-of-truth pattern qo'llaniladi.
 - **`<meta name="description">`** — React deduplikatsiya qilmaydi (rasmiy doc). Bir nechta render qilinsa, barchasi DOM'da bo'ladi; SEO crawler'lar odatda birinchisini hisobga oladi.
 - **Best practice** — bitta komponent metadata'ni boshqaradi (page-level component), child'larda override qilmaslik.
 
@@ -269,7 +270,7 @@ Fiber tree:
 
 Commit phase:
   - title.stateNode = <title> DOM element
-  - title.flags |= HostHoistable
+  - title.tag = HostHoistable (hoistable resource work tag)
   - Insert <title> into document.head (not Article's DOM parent)
   - h1 inserted normally into Article's container
 ```
@@ -281,8 +282,8 @@ Komponent unmount bo'lsa hoisted tag avtomatik `<head>`'dan o'chiriladi:
 ```
 1. Component unmount → Fiber.deletions
 2. Reconciler commitDeletion
-3. If Fiber.flags & HostHoistable:
-   - hostRoot.resources.title.delete(this)
+3. If Fiber.tag === HostHoistable:
+   - hostRoot.resources Map'idan resource'ni release (refCount--)
    - If refCount === 0 → document.head.removeChild(element)
 4. Otherwise: parent DOM removeChild
 ```
@@ -437,7 +438,7 @@ function BlogPostPage({ post }: { post: BlogPost }) {
 **`<title>` boshqarish qoidalari:**
 
 - Sahifaga aniq, foydali, unique title bering.
-- Ideal uzunlik: 50-60 belgi (qidiruv tizimi truncation oldini olish).
+- Title qisqa va aniq bo'lsin — qidiruv tizimlari natija ko'rsatishda uzun title'ni truncate qiladi.
 - Format: "Page Title — Site Name" yoki "Site Name | Page Title".
 - Conditional rendering bilan dynamic update.
 
@@ -451,7 +452,7 @@ function BlogPostPage({ post }: { post: BlogPost }) {
 
 **`charset` xususiyat:**
 
-`<meta charset="utf-8" />` HTML'ning birinchi 1024 byte ichida bo'lishi shart. R19 buni avtomatik ta'minlaydi (hoist priority).
+HTML spec'i bo'yicha `<meta charset="utf-8" />` document'ning birinchi 1024 byte ichida bo'lishi kerak. React `<meta charset>` ni boshqa `<meta>` tag'lar kabi `<head>`'ga hoist qiladi, lekin uni birinchi 1024 byte ichiga joylashtirishni alohida kafolatlamaydi. SSR'da `renderToPipeableStream` `<head>` strukturasini boshida emit qilgani uchun amalda charset erta chiqadi; aniq joylashuv kafolati kerak bo'lsa, charset'ni HTML shell template'iga (React render qilmaydigan static `<head>` qismiga) yozish ishonchli yo'l.
 
 **`viewport` mobile responsiveness:**
 
@@ -464,7 +465,7 @@ Mobile browser'larda CSS layout to'g'ri ishlashi uchun majburiy.
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-Site-level metadata App komponentida:
+Site-level metadata App komponentida. React `<title>`'ni override qilmagani uchun App o'z `<title>`'ini faqat hech qaysi page title bermaganda fallback sifatida render qiladi:
 
 ```tsx
 function App() {
@@ -478,15 +479,13 @@ function App() {
       <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
-      <title>MyShop — Online Store</title>
-
-      <Routes>{/* ... */}</Routes>
+      <Routes>{/* har route o'z <title>'ini render qiladi */}</Routes>
     </>
   );
 }
 ```
 
-Page-level title override:
+Page-level title (faol route'ning yagona `<title>` manbai):
 
 ```tsx
 function CategoryPage({ category }: { category: Category }) {
@@ -500,11 +499,11 @@ function CategoryPage({ category }: { category: Category }) {
   );
 }
 
-// HTML output (App + CategoryPage merge):
+// HTML output (faqat faol route render qilinadi):
 // <head>
 //   <meta charset="utf-8" />
 //   <meta name="viewport" content="..." />
-//   <title>Electronics Products — MyShop</title>  ← CategoryPage override
+//   <title>Electronics Products — MyShop</title>  ← CategoryPage'dan yagona title
 //   <meta name="description" content="Browse Electronics products" />
 //   ...
 // </head>
@@ -804,17 +803,17 @@ Unmount: refCount === 0
 
 **Suspense integration:**
 
-`<link rel="stylesheet" precedence>` Suspense throw mexanizmi'da ishtirok etadi:
+`<link rel="stylesheet" precedence>` commit fazasida kutiladi — host config commit'dan oldin resource ready bo'lishini tekshiradi:
 
 ```javascript
-// React internal (taxminiy):
-function commitStylesheet(resource) {
+// React DOM host config (taxminiy):
+function waitForCommitToBeReady(resource) {
   if (resource.state === 'loading') {
-    // Stylesheet hali yuklanmagan
-    throw resource.loadPromise; // ← Suspense fallback ko'rsatadi
+    // Stylesheet hali yuklanmagan — commit'ni kechiktirish uchun
+    // load promise qaytariladi (fiber qayta render qilinmaydi).
+    return resource.loadPromise;
   }
-
-  // Stylesheet ready — render davom etadi
+  return null; // ready — commit davom etadi
 }
 ```
 
@@ -905,24 +904,24 @@ function ProductInvoice({ invoice }: { invoice: Invoice }) {
 CSS-in-JS library integration (Linaria, vanilla-extract — build paytida external CSS emit qiladi):
 
 ```tsx
-// Vite/Webpack `?url` suffix bilan CSS faylining URL'ini olish:
-import productCardStylesUrl from './ProductCard.module.css?url';
-import styles from './ProductCard.module.css';
+// Vite/Webpack `?url` suffix CSS faylini auto-inject QILMASDAN faqat URL'ini qaytaradi.
+// Shu URL R19 <link>'iga uzatiladi — stylesheet'ni React boshqaradi (hoist + precedence).
+import productCardStylesUrl from './product-card.css?url';
 
 function ProductCard({ product }: { product: Product }) {
   return (
     <>
-      {/* CSS Module's default export — class name mapping (`styles.container`).
-          URL'ni olish uchun `?url` query bundler tomonidan resolve qilinadi. */}
       <link rel="stylesheet" href={productCardStylesUrl} precedence="default" />
 
-      <div className={styles.container}>
-        <h3 className={styles.name}>{product.name}</h3>
+      <div className="product-card">
+        <h3 className="product-card__name">{product.name}</h3>
       </div>
     </>
   );
 }
 ```
+
+> `?url` siz oddiy `import './product-card.css'` bundler tomonidan CSS'ni avtomatik inject qiladi — bunda React'ning `<link precedence>` boshqaruvi chetlab o'tiladi. Bitta faylni ikkala usulda import qilish stylesheet'ni ikki marta yuklaydi. R19 boshqaradigan stylesheet uchun faqat `?url` import ishlatiladi.
 
 Conditional stylesheet (admin user role):
 
@@ -1137,24 +1136,15 @@ Pre-R19'da:
 R19 yechim:
 
 1. Komponent render → JSX'da `<link rel="stylesheet" precedence>` mavjud
-2. React stylesheet hali ready emasligini detect qiladi
-3. Suspense throw → boundary fallback
-4. Browser stylesheet yuklaydi
-5. Stylesheet ready → komponent real render
+2. React stylesheet'ni managed resource sifatida ro'yxatga oladi va `<head>`'ga insert qiladi
+3. Stylesheet hali yuklanmagan bo'lsa, React shu subtree'ning **commit'ini kechiktiradi** — eng yaqin Suspense boundary fallback'da qoladi
+4. Browser stylesheet'ni fetch qiladi
+5. Stylesheet `load` event → React commit'ni davom ettiradi
 6. UI to'g'ri styled holatda paydo bo'ladi (no flash)
 
 **Mexanizm:**
 
-`<link rel="stylesheet" precedence>` rendering paytida quyidagi check:
-
-```javascript
-if (resource.state === 'loading') {
-  throw resource.loadPromise;
-}
-// stylesheet ready — continue render
-```
-
-Suspense boundary Promise'ni catch qilib, fallback render qiladi va Promise resolve bo'lishini kutadi.
+Stylesheet'ning yuklanishini kutish render fazasida emas, **commit fazasida** sodir bo'ladi. React DOM host config'i (`waitForCommitToBeReady`) commit'dan oldin stylesheet resource'ning `load` promise'ini tekshiradi: agar stylesheet hali `loading` bo'lsa, React shu boundary'ning commit'ini reveal qilmaydi va fallback'ni saqlaydi. Bu data Suspense'dagi render-fazadagi promise throw'dan farq qiladi — bu yerda fiber qayta render qilinmaydi, faqat commit (DOM'ga style apply qilib ko'rsatish) kechiktiriladi. `load` resolve bo'lgach, React boundary content'ini reveal qiladi.
 
 **Streaming SSR'da:**
 
@@ -1187,11 +1177,11 @@ function AdminRoute() {
 
 // Render flow:
 // 1. AdminRoute render → <link> + <AdminDashboard>
-// 2. <link rel="stylesheet"> stylesheet loading → throw
+// 2. <link rel="stylesheet"> loading → React commit'ni kechiktiradi
 // 3. Suspense fallback <PageSkeleton /> ko'rinadi
 // 4. Browser stylesheet yuklaydi (network bog'liq)
-// 5. Stylesheet 'load' event → throw resolve
-// 6. AdminDashboard render with style applied
+// 5. Stylesheet 'load' event → commit reveal qilinadi
+// 6. AdminDashboard style applied holatda commit qilinadi
 // 7. PageSkeleton → AdminDashboard transition (no FOUC)
 ```
 
@@ -1331,8 +1321,8 @@ Mount: <script async src="/analytics.js" />
 
 Unmount: refCount-- → 0
   1. Remove <script> from <head>
-  2. ! Already-executed code remains
-  3. Cleanup: developer responsible for global state
+  2. Diqqat: ijro etilgan kod o'z ta'sirini saqlaydi (window global o'zgarmaydi)
+  3. Cleanup: global state'ni tozalash developer mas'uliyati
 ```
 
 **Important: script side effects persist:**
@@ -2054,7 +2044,7 @@ Server-side rendering paytida R19 Document API'lari va Preloading API'lari **str
     <div>Header content</div>
     <!--/$-->
 
-    <!--$? --> <!-- Loading boundary -->
+    <!--$?--> <!-- Pending boundary marker -->
     <template id="B:0"></template>
 
     <!-- Resource hints chunk arrives later: -->
@@ -2264,7 +2254,7 @@ function AdminWrapper() {
 
 - **Conditional metadata** — pattern bir xil ishlaydi.
 - **Default title fallback** — manual implement qilish kerak.
-- **Reverse priority** — `react-helmet` deeper child wins, R19 first match wins (framework conventions farq qilishi mumkin).
+- **Priority model farqi** — `react-helmet` deeper child render qilingan tag oldingisini override qiladi (last-wins). R19 `<title>`/`<meta>`'ni deduplikatsiya/override qilmaydi — bir vaqtda bir nechta `<title>` bo'lsa xulq undefined, shuning uchun single-source pattern yoki framework convention (Next.js `metadata`) kerak. Stylesheet/`<link rel="stylesheet" precedence>` esa `href` bo'yicha dedup qilinadi, position first-occurrence precedence order asosida.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -2318,7 +2308,8 @@ const { pipe } = renderToPipeableStream(
   </HelmetProvider>,
   {
     onShellReady() {
-      const helmet = helmetContext.helmet!;
+      const { helmet } = helmetContext;
+      if (!helmet) throw new Error('Helmet context not populated');
 
       res.write(`<!DOCTYPE html>
 <html>
@@ -2477,7 +2468,7 @@ Yechim: `preload` ni faqat ishlatilishi aniq resource'lar uchun qo'llash.
 
 ### `<meta>` Charset Order
 
-`<meta charset>` HTML'ning birinchi 1024 byte ichida bo'lishi shart (HTML5 spec § 4.2.5.4). R19 `<meta charset>` uchun **maxsus charset prioritization mexanizmi yo'q** — boshqa `<meta>` tag'lar singari first-occurrence order asosida hoist qilinadi. SSR'da `<meta charset>` HTML stream'ning eng birinchi flush'iga tushishi uchun **App root komponentining eng birinchi child sifatida** yozish tavsiya etiladi:
+`<meta charset>` HTML spec'i bo'yicha document'ning birinchi 1024 byte ichida bo'lishi kerak ([HTML Living Standard — meta charset](https://html.spec.whatwg.org/multipage/semantics.html#charset)). R19 `<meta charset>` uchun **maxsus charset prioritization mexanizmi yo'q** — boshqa `<meta>` tag'lar singari first-occurrence order asosida hoist qilinadi. SSR'da `<meta charset>` HTML stream'ning eng birinchi flush'iga tushishi uchun **App root komponentining eng birinchi child sifatida** yozish tavsiya etiladi:
 
 ```tsx
 function App() {
@@ -2550,20 +2541,21 @@ preload('/font.woff2', {
 });
 ```
 
-### ❌ Xato 5: Render funksiyasi ichida har render `preload`
+### ❌ Xato 5: Resource hint'ni module top-level'da chaqirish
+
+React doc'i bo'yicha `preload`/`preinit` ni komponent render paytida (yoki event handler'da) chaqirish tavsiya etiladi — equivalent chaqiruvlar `href` (image uchun `href`+`imageSrcSet`+`imageSizes`) bo'yicha deduplikatsiya qilinadi, shuning uchun re-render'da takror chaqirish zararsiz. Module top-level chaqiruv import paytida ishlaydi va SSR/Server Component'da render kontekstidan tashqarida bo'lgani uchun **e'tiborga olinmaydi**.
 
 ```tsx
-// ❌ Har render'da preload chaqirish — internal dedup samarali, lekin signal noise
-function ProductPage() {
-  preload('/font.woff2', { as: 'font' });
-  // Component re-renders → preload re-called every time
-  return <ProductDetails />;
-}
-
-// ✅ TO'G'RI — render top-level once
+// ❌ Module top-level — import paytida ishlaydi, SSR'da render kontekstidan tashqari → ignore
 preload('/font.woff2', { as: 'font' });
 
 function App() {
+  return <Routes>{/* ... */}</Routes>;
+}
+
+// ✅ TO'G'RI — render paytida (dedup tufayli re-render'da takror chaqirish zararsiz)
+function App() {
+  preload('/font.woff2', { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' });
   return <Routes>{/* ... */}</Routes>;
 }
 ```
@@ -2661,11 +2653,17 @@ Theme tanlovi state'iga qarab `<link rel="stylesheet">` dynamic apply qiling. Lo
 import { useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark' | 'auto';
+type ResolvedTheme = 'light' | 'dark';
+
+function isTheme(value: string | null): value is Theme {
+  return value === 'light' || value === 'dark' || value === 'auto';
+}
 
 function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof localStorage === 'undefined') return 'auto';
-    return (localStorage.getItem('theme') as Theme) ?? 'auto';
+    const stored = localStorage.getItem('theme');
+    return isTheme(stored) ? stored : 'auto';
   });
 
   const [systemDark, setSystemDark] = useState(false);
@@ -2682,13 +2680,13 @@ function useTheme() {
     return () => mediaQuery.removeEventListener('change', listener);
   }, []);
 
-  const resolvedTheme = theme === 'auto' ? (systemDark ? 'dark' : 'light') : theme;
+  const resolvedTheme: ResolvedTheme = theme === 'auto' ? (systemDark ? 'dark' : 'light') : theme;
 
-  return [resolvedTheme, setTheme] as const;
+  return { theme, resolvedTheme, setTheme };
 }
 
 function ThemedApp() {
-  const [theme, setTheme] = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
 
   return (
     <>
@@ -2699,11 +2697,12 @@ function ThemedApp() {
       />
       <link
         rel="stylesheet"
-        href={`/themes/${theme}.css`}
+        href={`/themes/${resolvedTheme}.css`}
         precedence="theme"
       />
 
       <header>
+        {/* Selector foydalanuvchi tanlovi (theme) ko'rsatadi; stylesheet resolvedTheme'dan */}
         <ThemeSelector value={theme} onChange={setTheme} />
       </header>
 
@@ -2718,11 +2717,11 @@ function ThemeSelector({
   value,
   onChange,
 }: {
-  value: 'light' | 'dark';
-  onChange: (theme: 'light' | 'dark' | 'auto') => void;
+  value: Theme;
+  onChange: (theme: Theme) => void;
 }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value as 'light' | 'dark' | 'auto')}>
+    <select value={value} onChange={(e) => onChange(e.target.value as Theme)}>
       <option value="light">Light</option>
       <option value="dark">Dark</option>
       <option value="auto">Auto</option>
@@ -3093,10 +3092,10 @@ function useTheme(initial: 'light' | 'dark' | 'auto') {
 ## Xulosa
 
 - **R19 Document & Resource APIs** — komponent darajasidagi `<title>`, `<meta>`, `<link>`, `<script async>`, `<link rel="stylesheet">` va Preloading API'lar (`preload`, `preinit`, `prefetchDNS`, `preconnect`). `react-helmet` library kerak emas.
-- **Document Metadata hoisting** — JSX'ning istalgan joyida yozilgan tag'lar avtomatik `<head>`'ga ko'chiriladi. Reconciler `HostHoistable` flag bilan tagging qiladi.
-- **Deduplication** — bir xil meta/link/script tag'lar bir nechta komponentdan render qilinsa, faqat bitta instance qoladi (refCount).
+- **Document Metadata hoisting** — JSX'ning istalgan joyida yozilgan tag'lar avtomatik `<head>`'ga ko'chiriladi. Reconciler bu element'larni `HostHoistable` tag bilan belgilaydi.
+- **Deduplication** — React faqat managed resource'larni deduplikatsiya qiladi: `<link rel="stylesheet" precedence>` (`href` bo'yicha) va `<script async src>` (`src` bo'yicha), refCount orqali. `<title>` va `<meta>` deduplikatsiya **qilinmaydi** — barcha instance'lar `<head>`'ga insert qilinadi (single-source pattern developer mas'uliyati).
 - **Stylesheet `precedence` MAJBURIY** — `<link rel="stylesheet">` R19 features uchun (hoist, dedup, Suspense). Precedence — istalgan string, semantic priority emas; tartib `<head>` ichidagi first-occurrence order va CSS cascade qoidasi orqali aniqlanadi. Konvensional layering: reset → base → default → theme → high.
-- **Suspense + Stylesheet integration** — stylesheet yuklanmaguncha komponent render qilinmaydi (FOUC prevention).
+- **Suspense + Stylesheet integration** — stylesheet yuklanmaguncha React commit'ni (DOM'ga apply qilib reveal qilishni) kechiktiradi, render-faza throw emas (FOUC prevention).
 - **Async Scripts** — `<script async src>` deduplication via `src` key. Side effect window object'da qoladi unmount'dan keyin.
 - **Preloading API hierarchy:** `prefetchDNS` (lightweight) → `preconnect` (DNS+TCP+TLS) → `preload` (full fetch, no execute) → `preinit` (full + execute/apply).
 - **`as` prop majburiy** `preload`'da — brauzer'ga resource turi, priority, MIME validation.

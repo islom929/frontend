@@ -8,10 +8,10 @@
 
 ## Mundarija
 
-- [**QISM A: React Fundamentals** (savollar 1-9)](#qism-a)
-- [**QISM B: Rendering Pipeline** (savollar 10-19)](#qism-b)
-- [**QISM C: JSX va TSX** (savollar 20-30)](#qism-c)
-- [**QISM D: List Rendering va Keys** (savollar 31-36)](#qism-d)
+- [**QISM A: React Fundamentals** (savollar 1-15)](#qism-a)
+- [**QISM B: Rendering Pipeline** (savollar 16-30)](#qism-b)
+- [**QISM C: JSX va TSX** (savollar 31-48)](#qism-c)
+- [**QISM D: List Rendering va Keys** (savollar 49-59)](#qism-d)
 
 ---
 
@@ -85,9 +85,9 @@ JSX expression `<button>Count: {count}</button>` — bu **istalgan vaqtdagi UI t
    {
      $$typeof: Symbol(react.element),
      type: "button",
-     props: { onClick: handler, children: ["Count: ", count] },
      key: null,
-     ref: null
+     props: { onClick: handler, children: ["Count: ", count] }
+     // R19: ref alohida field emas — props ichida (agar berilgan bo'lsa)
    }
    ```
 
@@ -393,7 +393,7 @@ type Fiber = {
 
 ### To'liq tushuntirish
 
-React arxitekturasi 2 qatlamga ajraladi:
+React architecture 2 qatlamga ajraladi:
 
 1. **Reconciler** (`react-reconciler` package) — Fiber algoritmi, scheduling, hooks dispatcher. Platform haqida hech narsa bilmaydi.
 2. **Host config** — har renderer reconciler'ga "host platform"'ga qanday yozish kerakligini aytadi: `appendChild`, `removeChild`, `commitTextUpdate`, `prepareUpdate`, va h.k.
@@ -664,7 +664,7 @@ const [value, setValue] = useState("");
 
 ### Qisqa javob
 
-React 2013-yilda Facebook'da chiqdi. Asosiy bosqichlar: **R16 (2017)** Fiber arxitekturasi, **R16.8 (2019)** Hooks, **R17 (2020)** infrastructure (event delegation root'ga), **R18 (2022)** Concurrent rendering + automatic batching, **R19 (2024)** RSC API stable (framework-da ishlatish uchun), Document APIs, ref as prop, Compiler RC.
+React 2013-yilda Facebook'da chiqdi. Asosiy bosqichlar: **R16 (2017)** Fiber architecture, **R16.8 (2019)** Hooks, **R17 (2020)** infrastructure (event delegation root'ga), **R18 (2022)** Concurrent rendering + automatic batching, **R19 (2024-dek)** RSC API stable (framework-da ishlatish uchun), Document APIs, ref as prop. React Compiler — R19 chiqqan paytda hali beta edi; 1.0 stable alohida, keyinroq (2025) chiqdi.
 
 ### To'liq tushuntirish
 
@@ -675,12 +675,14 @@ React 2013-yilda Facebook'da chiqdi. Asosiy bosqichlar: **R16 (2017)** Fiber arx
 | 2013-may | 0.3 (open-source) | Facebook'dan chiqdi |
 | 2015 | 0.14 | `react-dom` ajratildi |
 | 2016 | 15 | Stack Reconciler oxirgi versiyasi |
-| 2017-sep | 16 | **Fiber arxitekturasi**, error boundaries, fragments, portals |
+| 2017-sep | 16 | **Fiber architecture**, error boundaries, fragments, portals |
 | 2018-mar | 16.3 | Modern Context API (`createContext`), `forwardRef`, lifecycle revamp |
 | 2019-feb | 16.8 | **Hooks** (`useState`, `useEffect`, `useContext`, ...) |
 | 2020-okt | 17 | Infrastructure release: event delegation `document` → root container, JSX automatic transform tayyorlandi |
 | 2022-mar | 18 | **Concurrent rendering** (`startTransition`, `useTransition`, `useDeferredValue`), automatic batching, Suspense for SSR, `useSyncExternalStore`, `useId`, Strict Mode 2x effect |
-| 2024-dek | 19 | **RSC stable** (framework'da), Server Actions, ref as prop, Document metadata APIs, Resource preloading, `use()` hook, `useActionState`, `useOptimistic`, `useFormStatus`, ref cleanup, `<Context value>` shorthand, React Compiler RC |
+| 2024-dek | 19 | **RSC stable** (framework'da), Server Actions, ref as prop, Document metadata APIs, Resource preloading, `use()` hook, `useActionState`, `useOptimistic`, `useFormStatus`, ref cleanup, `<Context value>` shorthand |
+| 2024-okt | React Compiler beta | Alohida package (`babel-plugin-react-compiler`), React'ga bundle qilinmagan |
+| 2025-okt | React Compiler 1.0 stable | RC ~2025-aprel, stable 2025-yil oktyabr |
 
 **Kelajak (post-R19):**
 - React Compiler stabilizatsiyasi
@@ -775,7 +777,7 @@ function ProductPage({ product }: { product: Product }) {
 - Document metadata — `react-helmet` kerak emas
 - Resource preloading — `preload`, `preinit`
 - DX: `forwardRef` ortiqcha, `Context.Provider` ortiqcha, ref cleanup
-- React Compiler RC — auto-memoization
+- React Compiler — R19 chiqqan vaqtda hali beta (auto-memoization); 1.0 stable 2025-yil oktyabrda
 
 **Hozirgi developer impact:**
 - Modern React = Function komponent + Hooks + R18+ features
@@ -850,10 +852,16 @@ function Parent() {
   const handler = () => console.log(count);
   return <Child items={items} onAction={handler} />;
 }
-// Compiler shu kodni quyidagicha optimallashtiradi:
-// const $ = useMemoCache(3);
-// const items = $[0] !== "init" ? ($[0] = "init", $[1] = [1, 2, 3]) : $[1];
-// const handler = $[2] !== count ? ($[2] = count, $[3] = () => ...) : $[3];
+// Compiler shu kodni quyidagicha optimallashtiradi (soddalashtirilgan):
+// const $ = useMemoCache(4);
+// // items — input yo'q, faqat bir marta yaratiladi (sentinel bilan tekshiriladi)
+// let items;
+// if ($[0] === Symbol.for("react.memo_cache_sentinel")) { items = [1, 2, 3]; $[0] = items; }
+// else { items = $[0]; }
+// // handler — count o'zgarsa qayta yaratiladi
+// let handler;
+// if ($[1] !== count) { handler = () => console.log(count); $[1] = count; $[2] = handler; }
+// else { handler = $[2]; }
 ```
 
 ### Kod misoli
@@ -925,7 +933,7 @@ function Component({ name }) {
 }
 ```
 
-`useMemoCache` — array per fiber, hooks'ga o'xshash linked list slotlardan foydalanadi.
+`useMemoCache(n)` — fiber uchun `n` slotli oddiy array qaytaradi. Bu array `fiber.updateQueue.memoCache`'da saqlanadi (hooks'ning `memoizedState` linked list'idan alohida). Boshlang'ich holatda har slot `react.memo_cache_sentinel` symbol bilan to'ldiriladi.
 
 **"Rules of React" — Compiler talablar:**
 
@@ -945,7 +953,7 @@ function Component({ name }) {
 - Manual memo eski kodbase'da o'qishga to'sqinlik qiladi (verbose)
 - React docs (2026): "Compiler ishlatilsa, manual memo yozmang"
 
-**Compiler limitations (2026 stable holati):**
+**Compiler limitations (1.0 stable, 2025-oktyabr):**
 - TypeScript tip ma'lumotlarini ishlatadi (untyped JS — kamroq optimization)
 - Mutable patterns (mutate then setState) — opt-out kerak
 - Refs read during render — warning
@@ -1300,8 +1308,6 @@ React design system'larda (MUI, Chakra, shadcn/ui) shu pattern qo'llanadi.
 </details>
 
 ---
-
-<a id="qism-b"></a>
 
 ### 10. `UI = f(state)` deganda nima ma'no? Pure function model qanday ishlaydi? [Middle]
 
@@ -1712,30 +1718,29 @@ function DynamicTag({ tag, children }: { tag: string; children: React.ReactNode 
 **`createElement` vs `_jsx` (R17+ Automatic):**
 
 ```typescript
-// react/jsx-runtime (Automatic transform)
-export function jsx(type, props, key) {
-  return {
-    $$typeof: REACT_ELEMENT_TYPE,
-    type,
-    key: key !== undefined ? "" + key : null,
-    ref: null,  // R19'da `ref` props ichida
-    props,
-  };
+// react/jsx-runtime (Automatic transform) — key alohida argument
+export function jsx(type, config, maybeKey) {
+  const key = maybeKey !== undefined ? "" + maybeKey : null;
+  const props = config;  // children allaqachon config.children ichida
+  // ReactElement factory chaqiriladi (R19: ref props ichida qoladi)
+  return ReactElement(type, key, props);
 }
 
-// react (Classic transform — backward compat)
+// react (Classic transform — backward compat) — key config ichida, children variadic
 export function createElement(type, config, ...children) {
-  let propsWithChildren = { ...config };
-  if (children.length === 1) {
-    propsWithChildren.children = children[0];
-  } else if (children.length > 1) {
-    propsWithChildren.children = children;
+  let key = null;
+  const props = {};
+  for (const propName in config) {
+    if (propName === "key") { key = "" + config[propName]; continue; }
+    props[propName] = config[propName];
   }
-  return jsx(type, propsWithChildren);
+  if (children.length === 1) props.children = children[0];
+  else if (children.length > 1) props.children = children;
+  return ReactElement(type, key, props);
 }
 ```
 
-`createElement` — variadic children API. `_jsx` — children property'da, simpler.
+`jsx` va `createElement` — ikki **mustaqil** funksiya. Ikkalasi ham bir xil ichki `ReactElement` factory'ni chaqiradi, lekin biri boshqasini chaqirmaydi. Asosiy farq: `jsx`'da `children` `config` ichida keladi va `key` alohida argument; `createElement`'da `children` variadic argument va `key` `config` ichida.
 
 **Babel transformation:**
 
@@ -1766,7 +1771,7 @@ export function createElement(type, config, ...children) {
 
 ```tsx
 /** @jsx h */
-import h from "preact";
+import { h } from "preact";
 
 function App() {
   return <button>Click</button>;
@@ -1809,8 +1814,7 @@ function App() {
   $$typeof: Symbol(react.element),
   type: "button",         // string yoki function
   key: null,
-  ref: null,
-  props: {
+  props: {                // R19: ref ham props ichida
     onClick: handler,
     className: "btn",
     children: "Click"
@@ -1859,7 +1863,7 @@ JSX'dan Hyperscript — kerak emas (back-step).
 
 ### Edge Cases
 
-- **`createElement(null)`**: TypeError — type required.
+- **`createElement(null)`**: `createElement` o'zi throw qilmaydi — `type: null` bilan element qaytaradi. Xato render paytida chiqadi: "Element type is invalid".
 - **`createElement("div", null, undefined)`**: `children: undefined` — skip render.
 - **JSX nested array**: `<div>{[<a />, <b />]}</div>` — keys warning. createElement: `createElement("div", null, [...])` — same.
 - **Component as string**: `createElement("MyComp")` — DOM tag deb interpret qilinadi (lowercase). Capitalized component `createElement(MyComp)` — function sifatida.
@@ -2064,9 +2068,9 @@ Compile-time'da `count` o'zgarganda nima update bo'lishi aniq. Virtual DOM yo'q,
 |--------|-------|-------|-------|--------|
 | Initial render | O'rta | O'rta-tez | Tez | Tez |
 | Single item update | Subtree diff overhead | Component-level | Minimal (signal-direct) | Minimal (compile-time) |
-| Bundle size (minimal) | ~45kb (gzipped ~15kb) | ~35kb (gzipped ~13kb) | ~8kb (gzipped ~3kb) | ~5kb (gzipped ~2kb) |
+| Runtime bundle | Eng katta (`react` + `react-dom`) | O'rta | Kichik (signal runtime) | Eng kichik (compile-time, deyarli runtime yo'q) |
 
-(Aniq raqamlar js-framework-benchmark repo'da — app complexity, browser, va hardware'ga bog'liq)
+(Aniq raqamlar versiyaga, build setup'ga, browser va hardware'ga bog'liq — js-framework-benchmark repo'da o'lchanadi. Tendentsiya: compile-first (Svelte) va signal-based (Solid) yondashuvlar VDOM'li framework'lardan kichikroq runtime'ga ega.)
 
 **Real-world differences:**
 
@@ -2084,13 +2088,18 @@ function Component() {
   return <div>{expensive}</div>;
 }
 
-// Post-Compiler (auto-memoization)
+// Post-Compiler (auto-memoization) — soddalashtirilgan
 function Component() {
   const $ = useMemoCache(2);
   const [count, setCount] = useState(0);
-  const expensive = $[0] !== count
-    ? ($[0] = count, $[1] = computeExpensive(count))
-    : $[1];  // cached if count unchanged
+  let expensive;
+  if ($[0] !== count) {
+    expensive = computeExpensive(count);
+    $[0] = count;
+    $[1] = expensive;
+  } else {
+    expensive = $[1];  // count o'zgarmagan — cache'dan
+  }
   return <div>{expensive}</div>;
 }
 ```
@@ -2323,8 +2332,8 @@ function MyComponent() {
   // ⚠️ Render'da ref.current read — usually anti-pattern
   console.log(ref.current);  // concurrent rendering'da non-deterministic
 
-  // ✅ Render'da ref.current write — TAQIQ
-  ref.current = 5;  // ❌ side effect
+  // ❌ Render'da ref.current write — TAQIQ
+  ref.current = 5;  // side effect (render body'da mutation)
 
   // ✅ Effect/handler ichida — OK
   useEffect(() => {
@@ -2756,7 +2765,7 @@ function Search({ items }: { items: Item[] }) {
     </div>
   );
 }
-// User type: each keystroke blocks UI ~100ms
+// User type: katta ro'yxatda har keystroke UI'ni bloklaydi (sezilarli kechikish)
 ```
 
 **Concurrent fix — `useTransition`:**
@@ -2820,13 +2829,13 @@ function Search({ items }: { items: Item[] }) {
 **Lanes model (R18+):**
 
 ```typescript
-// React lanes — priority bitmap
+// React lanes — priority bitmap (ReactFiberLane.js qiymatlari)
 const SyncLane              = 0b0000000000000000000000000000010;
-const InputContinuousLane   = 0b0000000000000000000000000000100;
-const DefaultLane           = 0b0000000000000000000000000010000;
+const InputContinuousLane   = 0b0000000000000000000000000001000;
+const DefaultLane           = 0b0000000000000000000000000100000;
 const TransitionLane1       = 0b0000000000000000000000001000000;
 const TransitionLane2       = 0b0000000000000000000000010000000;
-// ... up to 31 lanes
+// ... 31 lane'gacha (jami 31 bit, maxSigned31BitInt cheklovi)
 const IdleLane              = 0b0010000000000000000000000000000;
 ```
 
@@ -2979,6 +2988,8 @@ R19'gacha — `createRoot` concurrent enabled, lekin ko'p featurelar opt-in. R19
 
 ## QISM B: Rendering Pipeline
 
+<a id="qism-b"></a>
+
 ### 16. `createRoot` va `ReactDOM.render` — farqi nima va nima uchun yangi API? [Junior+]
 
 <details>
@@ -2986,7 +2997,7 @@ R19'gacha — `createRoot` concurrent enabled, lekin ko'p featurelar opt-in. R19
 
 ### Qisqa javob
 
-**`ReactDOM.render`** — eski (R17 va undan oldin) entry point, **legacy mode** — sync rendering. **`createRoot`** (R18+) — yangi entry point, **concurrent mode** — concurrent rendering features (priority lanes, time slicing, Suspense for SSR, automatic batching) yoqiladi. Modern React'da `createRoot` majburiy.
+**`ReactDOM.render`** — eski (R17 va undan oldin) entry point, **legacy mode** — sync rendering. **`createRoot`** (R18+) — yangi entry point, **concurrent rendering**'ni yoqadi (priority lanes, time slicing, Suspense for SSR, automatic batching). Modern React'da `createRoot` majburiy.
 
 ### To'liq tushuntirish
 
@@ -3138,8 +3149,7 @@ const root2 = createRoot(container); // ⚠️ warning: existing root
 
 **Render mode evolyutsiyasi:**
 - **Legacy mode** (R16-R17): Sync only — `ReactDOM.render`
-- **Blocking mode** (R18 deprecated proposal): Hybrid
-- **Concurrent mode** (R18+): Default for `createRoot`, opt-in for features
+- **Concurrent rendering** (R18+): `createRoot` standart yo'li; concurrent feature'lar (`useTransition`, `useDeferredValue`) opt-in. "Concurrent Mode" (alohida rejim sifatida) — eski/bekor qilingan termin, hozir "Concurrent rendering" deyiladi
 
 `useTransition`, `useDeferredValue` — concurrent rendering'siz ishlamaydi (legacy'da ham bor lekin no-op).
 
@@ -3362,7 +3372,7 @@ R19'gacha StrictMode + Suspense + lazy loading ba'zan duplicate suspends — fix
 
 ### Qisqa javob
 
-**Render Phase** — komponent function'larni chaqirish, Fiber tree quris, JSX'ni Element tree'ga aylantirish, oldingi tree bilan diff qilish. **Pure va interruptible**. **Commit Phase** — DOM mutation, ref attach/detach, effects ishga tushirish. **Sync va uninterruptible** — bir marta boshlangan, oxirigacha tugatadi.
+**Render Phase** — komponent function'larni chaqirish, Fiber tree qurish, JSX'ni Element tree'ga aylantirish, oldingi tree bilan diff qilish. **Pure va interruptible**. **Commit Phase** — DOM mutation, ref attach/detach, effects ishga tushirish. **Sync va uninterruptible** — bir marta boshlangan, oxirigacha tugatadi.
 
 ### To'liq tushuntirish
 
@@ -3566,7 +3576,7 @@ Render phase abort va restart qilinishi mumkin. Side effect (counter increment, 
 
 ### Follow-up savollar
 
-- "Reconciliation Render Phase'da-mi?" — Ha, `workInProgress` tree quris paytda. Diff algoritmi shu yerda ishlaydi.
+- "Reconciliation Render Phase'da-mi?" — Ha, `workInProgress` tree qurilayotgan paytda. Diff algoritmi shu yerda ishlaydi.
 - "Re-render hech narsani render qilmasa?" — Bailout: `Object.is` bilan props/state taqqoslab bir xil bo'lsa, child re-render'lar skip. Lekin parent render qilingan (function chaqirilgan).
 - "Effect Commit'dan oldin chaqirilishi mumkinmi?" — `useLayoutEffect` Layout sub-phase'da (sync, paint'dan oldin). `useInsertionEffect` undan ham oldin (CSS-in-JS uchun).
 
@@ -3789,8 +3799,6 @@ Concurrent rendering faqat Render Phase'da. Commit boshlangach — sync to oxirg
 
 ---
 
-<a id="qism-c"></a>
-
 ### 20. `useEffect` timing — passive effects qachon chaqiriladi? [Middle+]
 
 <details>
@@ -3929,7 +3937,7 @@ channel.port1.postMessage(null);
 
 **Concurrent rendering bilan effect:**
 
-R18+ concurrent mode'da:
+R18+ concurrent rendering'da:
 - Render abort qilinishi mumkin → effect chaqirilmaydi (commit bo'lmadi)
 - Commit faqat success'da bo'ladi → effect doim consistent state bilan
 - Strict Mode 2x — effect mount → cleanup → mount cycle (idempotent talab)
@@ -5049,7 +5057,7 @@ const root = createRoot(container, {
     // Boundary tutdi — handled error
     console.warn("Caught error:", error);
     Sentry.captureException(error, {
-      tags: { type: "caught", boundary: errorInfo.errorBoundary?.name },
+      tags: { type: "caught" },
       extra: { componentStack: errorInfo.componentStack },
     });
   },
@@ -5092,12 +5100,13 @@ const root = hydrateRoot(container, <App />, {
 **`errorInfo` shape:**
 
 ```typescript
+// R19 client-side error callback'larida errorInfo — faqat componentStack
 interface ErrorInfo {
-  componentStack: string;       // React component tree path
-  digest?: string;              // Production minified error digest
-  errorBoundary?: ComponentType; // Boundary that caught (if any)
+  componentStack?: string;  // React component tree path
 }
 ```
+
+R19'da `onCaughtError`/`onUncaughtError`/`onRecoverableError` ikkinchi argumenti faqat `componentStack` saqlaydi. Server'da throw bo'lgan va client'ga uzatilgan error'larda `error.digest` (production'da minified error'ni decode qilish uchun hash) — bu `error` ob'ektida, `errorInfo`'da emas.
 
 **Default behavior breakdown:**
 
@@ -5203,13 +5212,13 @@ const root = hydrateRoot(container, <App />, {
 **Production minified error digest:**
 
 ```tsx
-// errorInfo.digest — production-only short hash
+// error.digest — server'da throw bo'lgan error'da bo'ladi (production short hash)
 const root = createRoot(container, {
-  onUncaughtError: (error, errorInfo) => {
+  onUncaughtError: (error: Error & { digest?: string }, errorInfo) => {
     fetch("/api/errors", {
       method: "POST",
       body: JSON.stringify({
-        digest: errorInfo.digest,        // server'ga decode uchun
+        digest: error.digest,            // server'ga decode uchun (mavjud bo'lsa)
         message: error.message,
         stack: error.stack,
         componentStack: errorInfo.componentStack,
@@ -5219,7 +5228,7 @@ const root = createRoot(container, {
 });
 ```
 
-`digest` — minified production'da error message dropped, faqat hash. Server'da source maps bilan decode.
+`digest` — server tomonida throw bo'lgan error production'da minified bo'lsa, message o'rniga qisqa hash beradi. Server'da source map bilan decode qilinadi.
 
 **`onError` callback'larning chaqiruv tartibi:**
 
@@ -5461,10 +5470,10 @@ React render — JS execution ichida. `useLayoutEffect` — paint'dan oldin sync
 **Dropped frame:**
 
 ```
-Target: 60fps (16ms budget)
+Target: 60fps (~16.7ms budget)
 
-Frame 1: JS task 5ms + Layout 3ms + Paint 5ms = 13ms ✅
-Frame 2: JS task 25ms (long render) → 1 frame skipped (jank)
+Frame 1: JS task + Layout + Paint < budget → frame chiqadi ✅
+Frame 2: uzun sync render budget'dan oshadi → frame o'tkazib yuboriladi (jank)
 ```
 
 **Concurrent rendering — yield mexanizmi:**
@@ -5619,7 +5628,7 @@ function MeasuredRender() {
 
 - "Why useLayoutEffect blocks paint?" — Sync, paint'dan oldin chaqiriladi. Render → DOM mutation → useLayoutEffect → paint.
 - "How does React measure render time?" — `<Profiler>` component yoki DevTools Profiler. Internal `performance.now()` measurements.
-- "Can React render faster than 60fps?" — Ha, `120fps` device'larda. React Scheduler frame budget'ni dynamic adjust qiladi.
+- "Can React render faster than 60fps?" — Render tezligi browser paint'iga bog'liq (120Hz monitor'da paint tez-tez). Lekin React Scheduler'ning yield interval'i — sobit 5ms (`frameYieldMs`), refresh rate'ga qarab dynamic moslashmaydi. Har 5ms'da `shouldYield()` true bo'lib, browser'ga (paint, input) navbat beradi.
 
 </details>
 
@@ -5917,9 +5926,10 @@ const Context = createContext(0);
 function Parent() {
   const [value, setValue] = useState(0);
   return (
-    <Context value={value}>  {/* R19: Provider kerak emas; value change → all consumers re-render */}
+    // R19: Provider kerak emas; value o'zgarsa — barcha consumer re-render
+    <Context value={value}>
       <Child />
-    </Context.Provider>
+    </Context>
   );
 }
 
@@ -5942,11 +5952,23 @@ function Parent() {
   return <Child handler={handler} data={data} />;
 }
 
-// Compiler (auto-memo)
+// Compiler (auto-memo) — soddalashtirilgan
 function Parent() {
   const $ = useMemoCache(2);
-  const handler = $[0] ?? ($[0] = () => {});
-  const data = $[1] ?? ($[1] = [1, 2]);
+  let handler;
+  if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
+    handler = () => {};
+    $[0] = handler;
+  } else {
+    handler = $[0];
+  }
+  let data;
+  if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
+    data = [1, 2];
+    $[1] = data;
+  } else {
+    data = $[1];
+  }
   return <Child handler={handler} data={data} />;
 }
 ```
@@ -6066,8 +6088,7 @@ function App() {
   $$typeof: Symbol(react.element),
   type: "div",
   key: null,
-  ref: null,
-  props: {
+  props: {                // R19: ref props ichida
     className: "app",
     children: {
       $$typeof: Symbol(react.element),
@@ -6105,8 +6126,7 @@ interface ReactElement<P> {
   $$typeof: Symbol;          // REACT_ELEMENT_TYPE
   type: string | ComponentType<P>;
   key: string | null;
-  ref: Ref<unknown> | null;  // R19'da props ichida
-  props: P;
+  props: P;                  // R19: ref ham props ichida (alohida field emas)
 }
 ```
 
@@ -6467,11 +6487,11 @@ Unmount:
 **StrictMode dev — 2x render + cleanup-mount cycle:**
 
 ```
-Initial mount in StrictMode:
+Initial mount in StrictMode (dev):
   Parent render
-  Parent render (2x)
   Child render
-  Child render (2x)
+  Parent render   (2-pass: butun render qayta chaqiriladi)
+  Child render
   Child layout effect
   Parent layout effect
   Child layout cleanup (synthetic unmount)
@@ -6547,7 +6567,7 @@ function Component() {
 
 ## QISM C: JSX va TSX
 
-<a id="qism-d"></a>
+<a id="qism-c"></a>
 
 ### 31. JSX va TSX farqi nima? Runtime'da farq bormi? [Middle]
 
@@ -6803,7 +6823,7 @@ React.createElement("button", {
 
 ```tsx
 /** @jsx h */
-import h from "preact";
+import { h } from "preact";
 
 const el = <button>Click</button>;
 // Compile: h("button", null, "Click")
@@ -7230,13 +7250,12 @@ export function jsx(type, props, key) {
     $$typeof: REACT_ELEMENT_TYPE,
     type,
     key: key !== undefined ? "" + key : null,
-    ref: null,
-    props,
+    props,  // R19: ref props ichida qoladi (alohida field emas)
   };
 }
 
 export function jsxs(type, props, key) {
-  // Same as jsx, but for multiple children (validate array)
+  // jsx bilan bir xil — children static array ekanligini signal qiladi
   return jsx(type, props, key);
 }
 
@@ -7261,21 +7280,22 @@ export function jsxDEV(type, props, key, isStaticChildren, source, self) {
 
 ```typescript
 // React 19 — createElement (Classic compatibility)
-export function createElement(type, props, ...children) {
-  // ⚠️ Eskirgan signature — children variadic
-  // Babel/SWC'ga: ko'p parameter
-  let propsWithChildren = { ...props };
-  if (children.length === 1) {
-    propsWithChildren.children = children[0];
-  } else if (children.length > 1) {
-    propsWithChildren.children = children;
+export function createElement(type, config, ...children) {
+  // Signature — children variadic, key config ichida
+  let key = null;
+  const props = {};
+  for (const propName in config) {
+    if (propName === "key") { key = "" + config[propName]; continue; }
+    props[propName] = config[propName];
   }
-
-  return jsx(type, propsWithChildren);
+  if (children.length === 1) props.children = children[0];
+  else if (children.length > 1) props.children = children;
+  // jsx EMAS — ichki ReactElement factory chaqiriladi
+  return ReactElement(type, key, props);
 }
 ```
 
-`createElement` — signature `(type, props, child1, child2, ...)`. `_jsx` — `(type, propsWithChildren, key)`. `_jsx` better for static children (compiler aniq biladi).
+`createElement` — signature `(type, config, child1, child2, ...)`. `_jsx` — `(type, props, key)`. Ikkalasi mustaqil funksiya, lekin bir xil `ReactElement` factory'ni chaqiradi. `_jsx` static children uchun afzal (compiler array'ni aniq biladi, `_jsxs`).
 
 **Configuration:**
 
@@ -7554,13 +7574,13 @@ function Component({ user }) {
 }
 ```
 
-**Comma operator workaround:**
+**IIFE workaround (statement kerak bo'lsa):**
 
 ```tsx
 // ❌ Statement
 {const x = compute(); <p>{x}</p>}
 
-// ✅ Comma operator (expression)
+// ✅ IIFE — statement'larni function ichiga o'rab, expression qaytaradi
 {(() => { const x = compute(); return <p>{x}</p>; })()}
 
 // ✅ Helper function
@@ -8243,9 +8263,12 @@ const userInput = `<script>alert("XSS")</script>`;
 **`dangerouslySetInnerHTML` — escape bypass:**
 
 ```tsx
-// ❌ DANGEROUS — script execute bo'ladi
+// ❌ DANGEROUS — sanitize'siz user HTML DOM'ga
+const userInput = `<img src="x" onerror="alert('XSS')" />`;
 <div dangerouslySetInnerHTML={{ __html: userInput }} />
-// Browser: <div><script>alert("XSS")</script></div>
+// Browser: <div><img src="x" onerror="..."></div> — onerror ishga tushadi
+// Eslatma: innerHTML orqali qo'shilgan <script> tag o'zi ishlamaydi (HTML spec),
+// lekin onerror/onload kabi inline event handler'lar va javascript: URL — ishlaydi.
 // ⚠️ XSS attack succeed
 ```
 
@@ -9423,7 +9446,7 @@ function Component() {
   );
 }
 
-// ❌ Inside text
+// ✅ Text orasida — {/* */} ishlaydi
 <p>Some text {/* this OK */} more text</p>
 // Renders: "Some text  more text" (extra space possible)
 ```
@@ -9431,8 +9454,8 @@ function Component() {
 **Linting:**
 
 ```typescript
-// ESLint react/jsx-no-comments-in-strings — prevents comments inside strings
-{/* tip: don't write {`Hello /* note */ World`} — runs as expression */}
+// ESLint react/jsx-no-comment-textnodes — JSX text node ichida // yoki /* */
+// xato yozilganini aniqlaydi (comment o'rniga matn render bo'lishini ogohlantiradi)
 ```
 
 </details>
@@ -9599,14 +9622,12 @@ JSX — JS-friendly — value matters:
 ```tsx
 <input disabled={null} />       // attribute removed
 <input disabled={undefined} />  // attribute removed
-<input disabled={0} />          // attribute removed (0 is falsy in React)
-
-// ⚠️ Wait — 0 is falsy but not boolean. React DOM source:
-// Actually, only false/null/undefined remove attribute.
-// 0 — set as "0" (truthy in HTML).
+<input disabled={false} />      // attribute removed
+<input disabled={0} />          // ⚠️ NOT removed — boolean attribute uchun
+                                // faqat false/null/undefined olib tashlanadi
 ```
 
-Aniqroq:
+Boolean-typed attribute (`disabled`) uchun React faqat `false`, `null`, `undefined`'da attribute'ni olib tashlaydi. `0` — `false` emas, shuning uchun attribute qoladi (`disabled="0"`):
 
 ```typescript
 // React DOM (R19)
@@ -9703,7 +9724,7 @@ function Button({ primary, disabled }: ButtonProps) {
 
 - **`disabled={undefined}`**: Attribute removed. Same as `false`.
 - **`disabled={null}`**: Attribute removed.
-- **`disabled={0}`**: ⚠️ `0` falsy — but React docs imply only `false/null/undefined` remove. Actual behavior: numeric value sets attribute. Edge case.
+- **`disabled={0}`**: `0` falsy bo'lsa-da, boolean attribute uchun React faqat `false`/`null`/`undefined`'da attribute'ni olib tashlaydi. `0` — `false` emas, shuning uchun attribute qoladi (`disabled="0"`).
 - **String "" (empty)**: `disabled=""` → attribute set with empty value (HTML standard).
 
 ### Follow-up savollar
@@ -10277,8 +10298,8 @@ JSX whitespace **ba'zi joyda saqlanadi, ba'zi joyda olib tashlanadi**: tag bound
 | Pattern | Render |
 |---------|--------|
 | `<p>Hello World</p>` | "Hello World" (single space preserved) |
-| `<p>Hello\nWorld</p>` (newline) | "Hello World" (newline → space) |
-| `<p>Hello   World</p>` (multiple spaces) | "Hello World" (collapsed to single?) |
+| `<p>Hello\nWorld</p>` (bir qatorli source ichida newline) | "Hello World" (newline → space) |
+| `<p>Hello   World</p>` (bir qatorda ko'p space) | JSX literal space'larni saqlaydi; browser HTML render'da bittaga collapse qiladi |
 | `<p>{a}{b}</p>` | "AB" (no space) |
 | `<p>{a} {b}</p>` | "A B" |
 | `<p>{a}{" "}{b}</p>` | "A B" (explicit space) |
@@ -10334,18 +10355,18 @@ function Examples() {
 **JSX text node parsing:**
 
 ```typescript
-// JSX parser (sodda)
+// JSX parser whitespace qoidasi (sodda):
+// 1. Faqat whitespace'dan iborat va newline tutgan qatorlar olib tashlanadi
+// 2. Qator boshidagi/oxiridagi newline + indentation trim qilinadi
+// 3. So'zlar orasidagi newline (indentation bilan) bitta space'ga aylanadi
+// 4. Bitta qator ichidagi literal space'lar SAQLANADI (browser keyin collapse qiladi)
 function parseJSXText(text) {
-  // Trim leading/trailing whitespace at boundaries
-  text = text.replace(/^[\n\r]\s*/, "");  // start newline + whitespace
-  text = text.replace(/[\n\r]\s*$/, "");  // end newline + whitespace
-
-  // Collapse multiple whitespace to single space
-  text = text.replace(/\s+/g, " ");
-
-  // Empty after trim — skip
-  if (!text) return null;
-
+  // newline tutgan boundary whitespace trim
+  text = text.replace(/^\s*\n\s*/, "");  // boshidagi newline bloki
+  text = text.replace(/\s*\n\s*$/, "");  // oxiridagi newline bloki
+  // ichki newline + indent → bitta space
+  text = text.replace(/\s*\n\s*/g, " ");
+  if (!text) return null;  // bo'sh qolsa — skip
   return text;
 }
 ```
@@ -10404,14 +10425,14 @@ function parseJSXText(text) {
 <span>{[firstName, lastName].join(" ")}</span> // array join
 ```
 
-**Deliberate empty space — `&nbsp;` alternative:**
+**Non-breaking space variantlari:**
 
 ```tsx
 <span>Click&nbsp;here</span>
-// JSX: HTML entity OK in text
+// JSX: HTML entity OK in text — non-breaking space
 
-<span>Click{" "}here</span>  // explicit non-breaking space (Unicode)
-<span>Click{"\xA0"}here</span>     // alternative
+<span>Click{" "}here</span>      // oddiy (breaking) space
+<span>Click{"\xA0"}here</span>   // non-breaking space (Unicode U+00A0)
 ```
 
 **`&nbsp;` in JSX:**
@@ -11042,9 +11063,10 @@ const props = null;
 const props = undefined;
 <button {...props} />  // OK — same
 
-// ❌ Spread non-object
-<button {...123} />  // SyntaxError or TypeError
-<button {...{}} />  // OK — empty object
+// Spread primitive — JS object spread primitive'ni coerce qiladi, enumerable
+// own property yo'q → no-op (xato emas)
+<button {...123} />  // OK — {} ga teng (number'da enumerable prop yo'q)
+<button {...{}} />   // OK — empty object
 ```
 
 **Spread with conditional:**
@@ -11105,6 +11127,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 ---
 
 ## QISM D: List Rendering va Keys
+
+<a id="qism-d"></a>
 
 ### 49. `key` prop nima uchun kerak? Reconciler'dagi roli [Middle]
 
@@ -12208,7 +12232,7 @@ New elements:
 
 // Reconciler:
 // new[0] (key=2) → match oldFiber(key=2) which had Alice
-//   → MOVE fiber from position 1 to 0 (DOM moveBefore)
+//   → MOVE fiber from position 1 to 0 (DOM insertBefore — node qayta yaratilmaydi)
 //   → input value "Second" moves with it
 // new[1] (key=1) → match oldFiber(key=1) which had Bob
 //   → MOVE from position 0 to 1
@@ -12603,17 +12627,16 @@ function jsx(type, config, maybeKey) {
 
   const props = {};
   for (const propName in config) {
-    if (propName !== "key") {  // ← key skip qilinadi props'ga
-      props[propName] = config[propName];
+    if (propName !== "key") {  // ← faqat key skip qilinadi
+      props[propName] = config[propName];  // ref R19'da props ichida qoladi
     }
   }
 
   return {
     $$typeof: REACT_ELEMENT_TYPE,
     type,
-    key,         // ← Element'da alohida field
-    ref: props.ref ?? null,
-    props,       // ← key YO'Q bu yerda
+    key,         // ← Element'da alohida field (props'da YO'Q)
+    props,       // ← key YO'Q, lekin ref BOR (R19)
   };
 }
 ```
@@ -13500,12 +13523,12 @@ test("filters products correctly", () => {
 
 Bu faylda quyidagilar yoritildi:
 
-**QISM A — React Fundamentals (1-9)**: Declarative model, vanilla vs React, Virtual DOM va Fiber, renderer concept, one-way data flow, React tarixi, Compiler, RSC, component-based architecture.
+**QISM A — React Fundamentals (1-15)**: Declarative model, vanilla vs React, Virtual DOM va Fiber, renderer concept, one-way data flow, React tarixi, Compiler, RSC, component-based architecture, `UI = f(state)`, JSX shartmi, framework reactivity taqqoslash, render purity, RSC/SSR/CSR, Concurrent rendering.
 
-**QISM B — Rendering Pipeline (10-19)**: `createRoot` API, Strict Mode, Render/Commit phases, Commit Phase 3 sub-phases, useEffect timing, mount vs re-render, batching (R17 vs R18), `flushSync`, output savollar.
+**QISM B — Rendering Pipeline (16-30)**: `createRoot` API, Strict Mode, Render/Commit phases, Commit Phase 3 sub-phases, useEffect timing, mount vs re-render, batching (R17 vs R18), `flushSync`, error callback options, paint timing, bailout mexanikasi, DOM/Fiber/Element tree, output savollar.
 
-**QISM C — JSX va TSX (20-30)**: JSX/TSX farqi, syntax extension, JSX vs HTML, transform (Classic vs Automatic), expressions, single root va Fragment, spread attributes, `dangerouslySetInnerHTML`, 0 trap, conditional patterns, controlled inputs.
+**QISM C — JSX va TSX (31-48)**: JSX/TSX farqi, syntax extension, JSX vs HTML, transform (Classic vs Automatic), expressions, single root va Fragment, spread attributes, `dangerouslySetInnerHTML`, 0 trap, conditional patterns, controlled inputs, comments, boolean attributes, capitalization rule, child types, whitespace, SVG, spread order.
 
-**QISM D — List Rendering va Keys (31-36)**: Key prop roli, index as key xatosi, stable/unique/predictable rules, nested lists, output va bug fix.
+**QISM D — List Rendering va Keys (49-59)**: Key prop roli, index as key xatosi, stable/unique/predictable rules, nested lists, `props.key`, composite key, server-rendered list, `filter().map()` chain, output va bug fix.
 
 **Keyingi:** [02-internals.md](02-internals.md) — Fiber Architecture, Reconciliation Algorithm, Scheduler & Lanes, Hydration — kursning yuragi internals chuqur.

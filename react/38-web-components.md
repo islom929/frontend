@@ -1,6 +1,6 @@
 # Bo'lim 38: Web Components Interop
 
-> Web Components — brauzer-native komponent standarti to'plami: **Custom Elements** (`HTMLElement` extend), **Shadow DOM** (style va DOM isolation), **HTML Templates** (`<template>`/`<slot>` reusable markup), va **Custom Events** (`dispatchEvent` orqali DOM-level signal). Pre-R19'da React Custom Element'lar bilan muammo bor edi: barcha props HTML attribute sifatida string'ga conversion qilinardi va object/function/array `[object Object]` qilib pass qilinardi. **R19** real rule'ga o'tdi: client'da React `key in element` check qiladi (property class'da declared bo'lsa property assignment, aks holda attribute setAttribute); server SSR'da faqat primitive value'lar (string/number/`true`) attribute sifatida, non-primitive'lar rejected. Bu fayl Custom Elements API, Lifecycle Callbacks, Pre-R19 cheklovlar, R19 yechimi, Shadow DOM va Slots integration'i, Custom Events handling, TypeScript JSX intrinsic elements augmentation, va Web Component vs React Component Decision Guide'ni qamrab oladi.
+> Web Components — brauzer-native Component standarti to'plami: **Custom Elements** (`HTMLElement` extend), **Shadow DOM** (style va DOM isolation), **HTML Templates** (`<template>`/`<slot>` reusable markup), va **Custom Events** (`dispatchEvent` orqali DOM-level signal). Pre-R19'da React Custom Element'lar bilan muammo bor edi: barcha props HTML attribute sifatida string'ga conversion qilinardi va object/function/array `[object Object]` qilib pass qilinardi. **R19** real rule'ga o'tdi: client'da React `key in element` check qiladi (property class'da declared bo'lsa property assignment, aks holda attribute setAttribute); server SSR'da faqat primitive value'lar (string/number/`true`) attribute sifatida, non-primitive'lar rejected. Bu fayl Custom Elements API, Lifecycle Callbacks, Pre-R19 cheklovlar, R19 yechimi, Shadow DOM va Slots integration'i, Custom Events handling, TypeScript JSX intrinsic elements augmentation, va Web Component vs React Component Decision Guide'ni qamrab oladi.
 
 ---
 
@@ -34,9 +34,9 @@ Web Components — brauzer-native API'lar to'plami:
 1. **Custom Elements** — yangi HTML element'lar yaratish (`HTMLElement` extend).
 2. **Shadow DOM** — element'ning ichki DOM va CSS'ini tashqi document'dan isolation qilish.
 3. **HTML Templates** — `<template>` element reusable markup uchun, `<slot>` Shadow DOM ichida content projection uchun.
-4. **HTML Imports** — boshlang'ich Web Components spec'ining qismi edi, lekin standardization'dan chiqarilgan (Chrome'da deprecated). Bu rolni endi ESM (`import` statement) bajaradi — komponent kodi modul sifatida import qilinadi, registration `customElements.define` orqali.
+4. **HTML Imports** — boshlang'ich Web Components spec'ining qismi edi, lekin standardization'dan chiqarilgan (Chrome'da deprecated). Bu rolni endi ESM (`import` statement) bajaradi — Component kodi modul sifatida import qilinadi, registration `customElements.define` orqali.
 
-**Maqsad:** Framework-agnostic UI komponent'lar yaratish. Bir marta yozilgan Web Component React, Vue, Svelte, vanilla JS yoki hech qanday framework'siz ishlatilishi mumkin.
+**Maqsad:** Framework-agnostic UI Component'lar yaratish. Bir marta yozilgan Web Component React, Vue, Svelte, vanilla JS yoki hech qanday framework'siz ishlatilishi mumkin.
 
 **Brauzer support (Custom Elements v1):**
 
@@ -67,7 +67,7 @@ Web Components — brauzer-native API'lar to'plami:
 
 > **Versiya evolyutsiyasi (Web Components support):**
 > - **Pre-R19 (2018-2024):** React Custom Element'larga props'ni HTML attribute sifatida set qilardi. Object/Function/Array → string conversion → `[object Object]`. Workaround: `useEffect` + `ref.current.propName = value`. Custom event'lar har doim `addEventListener` orqali.
-> - **R19 (2024+):** React **client-side** (CSR/hydration)'da `key in element` check qiladi — Custom Element class'da property declared bo'lsa (Lit `@property`, native getter/setter) → `element[key] = value` (har qanday turdagi value, object/function/array uchun ham); declared bo'lmasa → `setAttribute(key, value)` (primitive string conversion). **Server-side** (SSR `renderToString`)'da faqat primitive value'lar (string/number/`true`) attribute sifatida render qilinadi; non-primitive (object/function/array) **rejected** (rendering'ga kirmaydi, client'da hydration vaqtida property assignment). Native Custom Element best practices'ni avtomatik qo'llaydi.
+> - **R19 (2024+):** React **client-side** (CSR/hydration)'da `key in element` check qiladi (instance + prototype chain) — property mavjud bo'lsa (Lit `@property`, native getter/setter, class field) → `element[key] = value` (har qanday turdagi value, object/function/array uchun ham); mavjud bo'lmasa attribute path (`setValueForAttribute`): string/number → `setAttribute`, object/array → `[object Object]`, function/symbol/null/boolean(data-/aria-'dan boshqa) → `removeAttribute`. **Server-side** (SSR `renderToString`)'da faqat primitive value'lar (string/number/`true`) attribute sifatida render qilinadi; non-primitive (object/function/array, `false`) **rejected** (rendering'ga kirmaydi, client'da hydration vaqtida property assignment). Native Custom Element best practices'ni avtomatik qo'llaydi.
 > - **Sabab:** Modern Web Component library'lar (Lit) reactive properties API ishlatadi → object/array binding kerak. React-WC interop muammolari developer experience'ni buzgan.
 
 <details>
@@ -295,18 +295,20 @@ Native autonomous element:
 ```typescript
 class CounterElement extends HTMLElement {
   private count = 0;
+  private readonly shadow: ShadowRoot;
 
   constructor() {
     super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    shadow.innerHTML = `
+    this.shadow = this.attachShadow({ mode: 'open' });
+    this.shadow.innerHTML = `
       <button>Click: <span>${this.count}</span></button>
     `;
   }
 
   connectedCallback() {
-    const button = this.shadowRoot!.querySelector('button')!;
-    const span = this.shadowRoot!.querySelector('span')!;
+    const button = this.shadow.querySelector('button');
+    const span = this.shadow.querySelector('span');
+    if (!button || !span) return;
 
     button.addEventListener('click', () => {
       this.count++;
@@ -342,7 +344,7 @@ async function setup() {
     customElements.whenDefined('rich-editor'),
   ]);
 
-  // Barcha komponentlar ready
+  // Barcha Component'lar ready
 }
 ```
 
@@ -407,6 +409,7 @@ class XCard extends HTMLElement {
 ```javascript
 class XCard extends HTMLElement {
   #abortController = new AbortController();
+  #interval = 0;
 
   connectedCallback() {
     document.addEventListener(
@@ -602,7 +605,7 @@ function MyCardWrapper({ user }: { user: User }) {
 
 Bu workaround quyidagi problemalarga olib keladi:
 
-- Boilerplate har komponent uchun.
+- Boilerplate har Component uchun.
 - TypeScript type lost — `as any`.
 - React state synchronization murakkab.
 - SSR'da effect ishlamaydi.
@@ -714,42 +717,63 @@ R19 React JSX prop'larni Custom Element'larga set qilish strategiyasini o'zgarti
 React 19 client'da (CSR/hydration) Custom Element prop'ini set qilish uchun **birinchi navbatda** `key in element` check qiladi. Bu check `Object.prototype.hasOwnProperty`'dan farqli — prototype chain bo'ylab ham qidiradi (Lit `@property` decorator'lar via prototype'ga property descriptor qo'shadi):
 
 ```javascript
-// React internal (taxminiy soddalashtirilgan):
-function setPropOnCustomElement(element, key, value) {
-  // Special keys (ref, key, children, style, className) alohida path
-  if (key === 'ref' || key === 'key' || key === 'children') return;
-  // ...
-
-  // ASOSIY RULE: property class'da declared bo'lsa property assignment
-  if (key in element) {
-    element[key] = value; // har qanday turdagi value — object, function, array, primitive
+// React internal (soddalashtirilgan — manba: setValueForPropertyOnCustomComponent)
+function setValueForPropertyOnCustomComponent(node, name, value) {
+  // Event handler'lar (on*) alohida path — addEventListener orqali
+  if (name[0] === 'o' && name[1] === 'n') {
+    // ... listener add/remove
     return;
   }
 
-  // Aks holda — attribute (primitive'lar uchun ishlaydi, object'lar string-cast'da fail)
-  if (value === true) {
-    element.setAttribute(key, '');
-  } else if (value === false || value == null) {
-    element.removeAttribute(key);
-  } else {
-    element.setAttribute(key, String(value)); // object → "[object Object]"!
+  // ASOSIY VA YAGONA property gate: name in node
+  if (name in node) {
+    node[name] = value; // har qanday turdagi value — object, function, array, primitive
+    return;
   }
+
+  // name node'da yo'q → attribute path (setValueForAttribute)
+  setValueForAttribute(node, name, value);
+}
+
+function setValueForAttribute(node, name, value) {
+  if (value === null) {
+    node.removeAttribute(name);
+    return;
+  }
+  switch (typeof value) {
+    case 'undefined':
+    case 'function':
+    case 'symbol':
+      node.removeAttribute(name);
+      return;
+    case 'boolean': {
+      // data-/aria-'dan boshqa boolean → removeAttribute (true bo'lsa ham!)
+      const prefix = name.toLowerCase().slice(0, 5);
+      if (prefix !== 'data-' && prefix !== 'aria-') {
+        node.removeAttribute(name);
+        return;
+      }
+    }
+  }
+  node.setAttribute(name, '' + value); // object → "[object Object]"!
 }
 ```
 
 **MUHIM teaching point — `key in element` muvaffaqiyatsiz bo'lsa**:
 
-Agar Custom Element class'da prop class field/getter sifatida declared **bo'lmasa**, React `setAttribute`'ga fallback qiladi. Object/function/array value'lar string-cast bo'ladi va `[object Object]` qaytaradi (xuddi Pre-R19 muammosi). Shu sababli Web Component author har bir public prop'ni class'da explicit declare qilishi shart (Lit `@property`, native `set foo(v) {...}`, yoki TypeScript class field).
+Agar prop `key in element` check'idan o'tmasa (instance'da yoki uning prototype chain'ida bunday property yo'q), React attribute path'ga (`setValueForAttribute`) fallback qiladi. Bu path'da `object`/`array` string-cast bo'ladi va `[object Object]` beradi — bu Pre-R19 muammosining aynan o'zi. `function`/`symbol`/`undefined`/`null` esa `removeAttribute` qiladi (attribute umuman set qilinmaydi). Shu sababli Web Component author har bir public prop'ni instance'da declare qilishi shart (Lit `@property`, native `set foo(v) {...}`, yoki TypeScript class field) — shunda `key in element === true` bo'ladi va property path ishlaydi.
 
 **Decision matrix:**
 
-| Class'da property declared? | Value type | Action |
-|------------------------------|------------|--------|
+| `key in element`? | Value type | Action |
+|-------------------|------------|--------|
 | ✅ Ha | har qanday | `element[key] = value` (property) |
-| ❌ Yo'q | `string`/`number` | `setAttribute(key, String(value))` (works) |
-| ❌ Yo'q | `true` | `setAttribute(key, '')` (presence) |
-| ❌ Yo'q | `false`/`null`/`undefined` | `removeAttribute` |
-| ❌ Yo'q | `object`/`function`/`array` | ⚠️ `setAttribute(key, "[object Object]")` — **fail** |
+| ❌ Yo'q | `string`/`number` | `setAttribute(key, '' + value)` (works) |
+| ❌ Yo'q | `boolean` (`data-`/`aria-` name) | `setAttribute(key, '' + value)` (`"true"`/`"false"`) |
+| ❌ Yo'q | `boolean` (boshqa name, `true` ham) | `removeAttribute` |
+| ❌ Yo'q | `null`/`undefined` | `removeAttribute` |
+| ❌ Yo'q | `function`/`symbol` | `removeAttribute` |
+| ❌ Yo'q | `object`/`array` | ⚠️ `setAttribute(key, "[object Object]")` — **fail** |
 
 **Lit reactive properties — automatic class declaration:**
 
@@ -782,52 +806,53 @@ R19 Custom Element prop'larida camelCase'ni `kebab-case`'ga aylantirmaydi (prop 
 // R19: prop name camelCase saqlanadi:
 //   - Agar 'userId' in element (class'da declared) → element.userId = 42 (property)
 //   - Aks holda → setAttribute('userId', '42') (camelCase attribute, lowercase'ga aylantirilmaydi)
-//   - 'firstName' uchun ham xuddi shu logic
+//   - 'firstName' uchun ham aynan shu logic
 ```
 
-**MUHIM:** Property path faqat property class'da declared bo'lganda ishlaydi (`'userId' in element === true`). Aks holda attribute path va attribute name camelCase saqlanadi (bu pre-R19'dan farq — pre-R19'da attribute lowercase'ga forced edi).
+**MUHIM:** Property path faqat property class'da declared bo'lganda ishlaydi (`'userId' in element === true`). Aks holda attribute path va React `setAttribute`'ga prop nomini as-is (camelCase) uzatadi — bu pre-R19'dan farq, pre-R19'da React nomni o'zi lowercase'ga forced qilardi.
+
+**DOM-darajadagi aniqlik:** React nomni o'zi lowercase'ga aylantirmasligi `setAttribute`'ga as-is uzatishni anglatadi, lekin HTML document'dagi HTML element uchun `setAttribute(name, ...)` saqlashda qualified name'ni o'zi lowercase qiladi (HTML attribute nomlari case-insensitive). Shu sababli `<my-card userId={42} />` natijada `element.getAttribute('userId')` ham, `element.getAttribute('userid')` ham bir xil qiymatni qaytaradi. R19 farqi React layer'da (nom transformatsiyasi yo'q), DOM storage normalizatsiyasi alohida bosqich.
 
 Lekin built-in HTML element'lar uchun React **eski mapping table'ni saqlaydi** (`className` → `class`, `htmlFor` → `for`, va h.k.). Bu mapping faqat React-specific built-in element prop'larga qo'llanadi, Custom Element'larga emas.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**R19 dispatcher logic (taxminiy):**
+**R19 dispatcher logic — manba: `ReactDOMComponent.js` `setProp` default case (soddalashtirilgan):**
+
+`setProp` element built-in yoki custom ekanini tagName'dagi defis bilan ajratadi. Custom Element uchun `style`, `dangerouslySetInnerHTML`, `children`, `is`, va event handler'lar maxsus path'da; qolgan barcha prop'lar `setValueForPropertyOnCustomComponent`'ga uzatiladi — bu yerda yagona qaror `key in node`:
 
 ```javascript
-function setProp(domElement, key, value, props) {
-  if (isCustomElement(domElement.tagName)) {
-    setPropForCustomElement(domElement, key, value);
-  } else {
-    setPropForBuiltinElement(domElement, key, value);
-  }
-}
-
-function setPropForCustomElement(element, key, value) {
-  if (key === 'children' || key === 'ref' || key === 'key') return;
-  if (key === 'className') {
-    if (value != null) element.className = String(value);
-    return;
-  }
-  if (key === 'style') {
-    setStyleProp(element, value);
-    return;
-  }
-
-  const isObjectType = typeof value === 'object' || typeof value === 'function';
-  const propExists = key in element;
-
-  if (isObjectType || (propExists && typeof value !== 'string')) {
-    element[key] = value;
-  } else if (typeof value === 'string' || typeof value === 'number') {
-    element.setAttribute(key, String(value));
-  } else if (value === true) {
-    element.setAttribute(key, '');
-  } else {
-    element.removeAttribute(key);
+// setProp — default (Custom Element) branch
+function setPropOnCustomElement(domElement, key, value) {
+  switch (key) {
+    case 'style':
+      setValueForStyles(domElement, value);
+      return;
+    case 'dangerouslySetInnerHTML':
+      if (value != null) domElement.innerHTML = value.__html;
+      return;
+    case 'children':
+      // string/number → textContent
+      return;
+    case 'ref':
+    case 'key':
+    case 'suppressContentEditableWarning':
+    case 'suppressHydrationWarning':
+      return;
+    default: {
+      if (registrationNameDependencies.hasOwnProperty(key)) {
+        // onClick/onScroll kabi React-known event'lar — listener path
+        return;
+      }
+      // Qolgan barchasi (object/function/string/boolean) — bitta gate orqali:
+      setValueForPropertyOnCustomComponent(domElement, key, value);
+    }
   }
 }
 ```
+
+`element[key] = value` faqat `key in element === true` bo'lganda yuz beradi (yuqoridagi `setValueForPropertyOnCustomComponent` ko'rinishida). Value turi (object/function/primitive) bu qarorga ta'sir qilmaydi — gate faqat `key in node`. Agar property instance'da yo'q bo'lsa, value turi qanday bo'lishidan qat'i nazar attribute path'ga (`setValueForAttribute`) o'tadi.
 
 **Performance considerations:**
 
@@ -856,15 +881,16 @@ function ProductPage({ product, currentUser }: { product: Product; currentUser: 
   );
 }
 
-// React behavior:
-// productId={product.id}            → number → setAttribute("productId", "42")
-// productName={product.name}        → string → setAttribute("productName", "iPhone 15")
-// product={product}                 → object → element.product = product (DOM property)
-// onPurchase={() => buyProduct(...)} → function → element.onPurchase = fn (DOM property)
-// currentUser={currentUser}         → object → element.currentUser = user
-// featured={true}                   → boolean true → setAttribute("featured", "")
-//                                      (Lit `@property({ type: Boolean, reflect: true })` kabi
-//                                       reactive properties attribute'dan o'qiladi)
+// React behavior (quyidagi ProductCard'da barcha prop @property bilan declared,
+// shu sababli hammasi 'key in element === true' — property path'ga tushadi):
+// productId={product.id}            → 'productId' in element → element.productId = 42 (property)
+// productName={product.name}        → 'productName' in element → element.productName = "iPhone 15"
+// product={product}                 → 'product' in element → element.product = product (object property)
+// currentUser={currentUser}         → 'currentUser' in element → element.currentUser = user
+// featured={true}                   → 'featured' in element → element.featured = true (boolean property)
+// onPurchase={...}                  → 'on' prefix → React buni event listener sifatida bog'laydi
+//                                      (property/attribute path'ga umuman kirmaydi — pastdagi
+//                                       Custom Events bo'limiga qarang)
 ```
 
 Lit Web Component (proper consume):
@@ -969,9 +995,7 @@ function MyComponent() {
   const buttonRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (buttonRef.current) {
-      (buttonRef.current as any).focus();
-    }
+    buttonRef.current?.focus();
   }, []);
 
   return <sl-button ref={buttonRef}>Submit</sl-button>;
@@ -1022,13 +1046,17 @@ function LoginForm({ onSubmit }: { onSubmit: (data: FormData) => void }) {
         label="Email"
         type="email"
         value={email}
-        onInput={(e: any) => setEmail(e.target.value)}
+        onInput={(e: React.FormEvent<HTMLElement>) =>
+          setEmail((e.target as HTMLInputElement).value)
+        }
         required
       />
 
       <md-checkbox
         checked={rememberMe}
-        onChange={(e: any) => setRememberMe(e.target.checked)}
+        onChange={(e: React.FormEvent<HTMLElement>) =>
+          setRememberMe((e.target as HTMLInputElement).checked)
+        }
       >
         Remember me
       </md-checkbox>
@@ -1127,25 +1155,39 @@ this.dispatchEvent(
 );
 ```
 
-**React `on*` props limitations:**
+**R19 `on*` props — Custom Element uchun event listener binding:**
 
-React'ning event delegation tizimi faqat ma'lum DOM event'lar uchun ishlaydi (`onClick`, `onChange`, `onInput`, `onKeyDown`, va h.k.). **Custom event'lar uchun ishlamaydi**:
+R19'da Custom Element'ga berilgan `on`-prefiksli prop (agar u React'ning o'z event'lari — `onClick`/`onChange`/`onInput`/`onKeyDown` — ro'yxatida bo'lmasa) `addEventListener` orqali bog'lanadi. Event nomi prop'dan `on` prefiksini olib tashlash bilan hosil bo'ladi — **case saqlanadi, kebab→camel konversiya yo'q** (`onspeak` → `speak`, `onMouseDown` → `MouseDown`, `onsay-hi` → `say-hi`; `Capture` suffiksli bo'lsa capture phase).
+
+Bu yerda asosiy tuzoq — nom mosligi. Web Component odatda kebab-case event dispatch qiladi (`item-select`), JSX'dagi camelCase prop esa boshqa nomga aylanadi:
 
 ```tsx
-// ❌ NOTO'G'RI — React onItemSelect Custom Event'ni eshitmaydi
+// ❌ ISHLAMAYDI — onItemSelect → addEventListener('ItemSelect', ...)
+//    lekin element 'item-select' dispatch qiladi → nom mos kelmaydi
 <my-list onItemSelect={handleSelect} />
 
-// ✅ TO'G'RI — useEffect + addEventListener
+// ⚠️ TEXNIK TO'G'RI lekin nostandart — JSX'da kebab prop
+//    onitem-select → addEventListener('item-select', ...)
+<my-list onitem-select={handleSelect} />
+```
+
+Kebab-case event nomlari uchun `on`-prefiks sintaksisi noqulay (JSX'da `onitem-select` g'alati ko'rinadi va TypeScript JSX type'lari uni qiyin ifodalaydi). Shu bois ko'pchilik kod'da ref + `addEventListener` pattern'i ishonchli va eng aniq:
+
+```tsx
+// ✅ ISHONCHLI — ref + addEventListener, event nomi aniq
 const ref = useRef<HTMLElement>(null);
 
 useEffect(() => {
+  const element = ref.current;
+  if (!element) return;
+
   const handler = (e: Event) => {
     const customEvent = e as CustomEvent<{ itemId: number; name: string }>;
     handleSelect(customEvent.detail.itemId);
   };
 
-  ref.current?.addEventListener('item-select', handler);
-  return () => ref.current?.removeEventListener('item-select', handler);
+  element.addEventListener('item-select', handler);
+  return () => element.removeEventListener('item-select', handler);
 }, [handleSelect]);
 
 return <my-list ref={ref} />;
@@ -1359,7 +1401,7 @@ Shadow DOM — Custom Element ichidagi DOM tree'ni asosiy document'dan **isolati
 
 - **CSS isolation** — tashqi style'lar ichkariga ta'sir qilmaydi (va aksincha).
 - **DOM isolation** — `document.querySelector` Shadow root ichini ko'rmaydi.
-- **Encapsulation** — komponent ichki strukturasi boshqa komponentlarga ta'sir qilmaydi.
+- **Encapsulation** — Component ichki strukturasi boshqa Component'larga ta'sir qilmaydi.
 
 **Mode:**
 
@@ -1400,7 +1442,7 @@ my-card { --primary-color: #1a1a1a; }
 :host { color: var(--primary-color, black); }
 ```
 
-CSS variables Shadow DOM boundary'ni kesib o'tadi — komponent author theme variable'larni accept qilishi mumkin.
+CSS variables Shadow DOM boundary'ni kesib o'tadi — Component author theme variable'larni accept qilishi mumkin.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -1450,7 +1492,7 @@ customElements.define('styled-card', StyledCard);
 ```tsx
 function App() {
   return (
-    <styled-card class="featured" style={{ '--primary-color': '#0066cc' } as any}>
+    <styled-card class="featured" style={{ '--primary-color': '#0066cc' } as React.CSSProperties}>
       <h2 slot="title">Featured Article</h2>
       <p>This card has shadow DOM with CSS isolation.</p>
     </styled-card>
@@ -1525,7 +1567,7 @@ function ThemedApp() {
 
 ### Nazariya
 
-`<slot>` elementi Custom Element'ning Shadow DOM'ida "joy" ochadi va Light DOM'dagi children'ni shu joyga "loy" qiladi. Bu pattern composition uchun foydali — komponent struktura'ni boshqaradi, foydalanuvchi content'ni.
+`<slot>` elementi Custom Element'ning Shadow DOM'ida "joy" ochadi va Light DOM'dagi children'ni shu joyga project qiladi. Bu pattern composition uchun foydali — Component struktura'ni belgilaydi, foydalanuvchi content'ni beradi.
 
 **Default slot:**
 
@@ -1645,16 +1687,21 @@ function TabsExample() {
 
   return (
     <tabs-container>
-      {/* Built-in <button> noma'lum attribute: boolean true → setAttribute("active", ""), false → removeAttribute (React umumiy unknown-attribute logic, R19'ga xos emas). `::slotted([slot="tab"][active])` selector ushbu attribute presence'iga reaksiya beradi. */}
-      <button slot="tab" active={activeTab === 'overview'}
+      {/* `active` — built-in <button>'da noma'lum attribute. DIQQAT: React boolean
+          value'ni (data-/aria-'dan boshqa nomda) attribute sifatida SET QILMAYDI —
+          setValueForAttribute boolean'ni removeAttribute qiladi. Shu bois presence
+          attribute uchun STRING ('') yoki undefined ishlatiladi: '' → setAttribute('active',''),
+          undefined → removeAttribute. `::slotted([slot="tab"][active])` selector shu
+          attribute presence'iga reaksiya beradi. */}
+      <button slot="tab" active={activeTab === 'overview' ? '' : undefined}
               onClick={() => setActiveTab('overview')}>
         Overview
       </button>
-      <button slot="tab" active={activeTab === 'specs'}
+      <button slot="tab" active={activeTab === 'specs' ? '' : undefined}
               onClick={() => setActiveTab('specs')}>
         Specs
       </button>
-      <button slot="tab" active={activeTab === 'reviews'}
+      <button slot="tab" active={activeTab === 'reviews' ? '' : undefined}
               onClick={() => setActiveTab('reviews')}>
         Reviews
       </button>
@@ -1758,7 +1805,7 @@ function ProductDetailsCard({ product, onBuy, onCancel }: {
 
 ### Nazariya
 
-Reverse pattern — Web Component ichida React komponent render qilish. Use case: existing Web Component ekosistemasi ichida React-specific feature'larni kiritish (chart library, complex form, AI assistant widget).
+Reverse pattern — Web Component ichida React Component render qilish. Use case: existing Web Component ekosistemasi ichida React-specific feature'larni kiritish (chart library, complex form, AI assistant widget).
 
 **Workflow:**
 
@@ -1769,7 +1816,7 @@ Reverse pattern — Web Component ichida React komponent render qilish. Use case
 
 **Issues:**
 
-- **Bundle size** — React + komponent har Web Component instance uchun bundle'da bo'lishi kerak.
+- **Bundle size** — React + Component har Web Component instance uchun bundle'da bo'lishi kerak.
 - **Multiple React versions** — host page React 17, Web Component React 19 bo'lsa konflikt.
 - **Shadow DOM events** — React event delegation Shadow DOM boundary bilan farqli ishlaydi.
 
@@ -1795,6 +1842,7 @@ class ChartWebComponent extends HTMLElement {
 
   private root: Root | null = null;
   private container: HTMLDivElement | null = null;
+  private _data: ChartData | null = null;
 
   connectedCallback() {
     if (!this.container) {
@@ -1825,17 +1873,17 @@ class ChartWebComponent extends HTMLElement {
   private render() {
     if (!this.root) return;
 
-    const data = (this as any)._data ?? this.chartData;
+    const data = this._data ?? this.chartData;
     this.root.render(<Chart data={data} />);
   }
 
   set data(value: ChartData) {
-    (this as any)._data = value;
+    this._data = value;
     this.render();
   }
 
   get data(): ChartData | null {
-    return (this as any)._data ?? null;
+    return this._data ?? null;
   }
 }
 
@@ -1852,7 +1900,7 @@ customElements.define('react-chart', ChartWebComponent);
 </script>
 ```
 
-Vue/Angular/vanilla project'da React komponentni kiritish:
+Vue/Angular/vanilla project'da React Component'ni kiritish:
 
 ```html
 <!-- Vue template: -->
@@ -1909,6 +1957,14 @@ customElements.define('isolated-react', IsolatedReactRoot);
 ### Nazariya
 
 Custom Element'larni JSX'da TypeScript bilan ishlatish uchun `IntrinsicElements` interface'ini kengaytirish kerak. Aks holda TS error: "Property 'my-element' does not exist on type 'JSX.IntrinsicElements'".
+
+R19'da `@types/react` global `JSX` namespace'ini olib tashladi va uni `React.JSX`'ga ko'chirdi (global type pollution'ni kamaytirish uchun). Shu sababli augmentation endi `declare module` ichida bo'lishi shart. Augmentatsiya qilinadigan modul nomi `tsconfig`'dagi `jsx` sozlamasiga bog'liq:
+
+- `"jsx": "react-jsx"` → `declare module 'react/jsx-runtime'`
+- `"jsx": "react-jsxdev"` → `declare module 'react/jsx-dev-runtime'`
+- `"jsx": "react"` yoki `"preserve"` → `declare module 'react'`
+
+Quyidagi misollar `declare module 'react'` shaklini ishlatadi; modern Vite + `react-jsx` setup'da uni `'react/jsx-runtime'`'ga almashtiring.
 
 **Module augmentation pattern:**
 
@@ -2085,6 +2141,13 @@ export type CustomElementProps<
   TEvents = Record<string, never>
 > = DetailedHTMLProps<
   HTMLAttributes<TElement> & Partial<TProperties> & {
+    // DIQQAT: bu mapping kebab event nomidan camelCase `on*` prop yasaydi
+    // ('item-select' → 'onItem-select'). Lekin R19 runtime `on` dan keyingi
+    // qismni case saqlab oladi → 'Item-select', dispatch'dagi 'item-select'ga
+    // mos kelmaydi → handler chaqirilmaydi. Bu mapping faqat TS autocomplete uchun;
+    // event'ni ishonchli tutish uchun ref + addEventListener('item-select') ishlatiladi
+    // (Custom Events bo'limiga qarang). Faqat property typing kerak bo'lsa TEvents'ni
+    // tashlab keting.
     [K in keyof TEvents as `on${Capitalize<string & K>}`]?: (e: TEvents[K]) => void;
   },
   TElement
@@ -2127,7 +2190,7 @@ Misol: Design system company-wide → Web Component (har jamoa har xil framework
 
 **2. Style isolation needs:**
 
-- **Web Component (Shadow DOM)** — strict CSS isolation. Bashar style'lari komponentga ta'sir qilmaydi.
+- **Web Component (Shadow DOM)** — strict CSS isolation. Tashqi document style'lari Component ichiga ta'sir qilmaydi.
 - **React Component** — CSS Modules / styled-components / Tailwind isolation, lekin global cascade ham mumkin.
 
 **3. State complexity:**
@@ -2137,7 +2200,7 @@ Misol: Design system company-wide → Web Component (har jamoa har xil framework
 
 **4. Type safety:**
 
-- **Web Component** — TS via decorators (Lit/Stencil), JSX types alohida deklaratsiya.
+- **Web Component** — TS via decorators (Lit/Stencil), JSX types alohida declaration.
 - **React Component** — TS first-class, props/state inference, end-to-end safety.
 
 **Decision matrix:**
@@ -2226,15 +2289,21 @@ function UserSettingsPage() {
           <sl-input
             label="Email"
             value={formData.email}
-            onInput={(e: any) =>
-              setFormData((prev) => ({ ...prev, email: e.target.value }))
+            onInput={(e: React.FormEvent<HTMLElement>) =>
+              setFormData((prev) => ({
+                ...prev,
+                email: (e.target as HTMLInputElement).value,
+              }))
             }
           />
           <sl-input
             label="Name"
             value={formData.name}
-            onInput={(e: any) =>
-              setFormData((prev) => ({ ...prev, name: e.target.value }))
+            onInput={(e: React.FormEvent<HTMLElement>) =>
+              setFormData((prev) => ({
+                ...prev,
+                name: (e.target as HTMLInputElement).value,
+              }))
             }
           />
 
@@ -2272,32 +2341,34 @@ export class UserSettings extends LitElement {
   `;
 
   render() {
-    if (!this.user) return html`<p>Loading...</p>`;
+    const user = this.user;
+    if (!user) return html`<p>Loading...</p>`;
 
     return this.editing
       ? this.renderEditForm()
-      : this.renderDisplay();
+      : this.renderDisplay(user);
   }
 
-  private renderDisplay() {
+  private renderDisplay(user: User) {
     return html`
       <h1>Profile Settings</h1>
-      <p>Email: ${this.user!.email}</p>
-      <p>Name: ${this.user!.name}</p>
-      <sl-button variant="primary" @click=${this.startEditing}>
+      <p>Email: ${user.email}</p>
+      <p>Name: ${user.name}</p>
+      <sl-button variant="primary" @click=${() => this.startEditing(user)}>
         Edit
       </sl-button>
     `;
   }
 
   private renderEditForm() {
+    const readValue = (e: Event) => (e.target as HTMLInputElement).value;
     return html`
       <form @submit=${this.handleSubmit}>
         <sl-input label="Email" .value=${this.formData.email}
-                  @input=${(e: any) => this.updateField('email', e.target.value)}>
+                  @input=${(e: Event) => this.updateField('email', readValue(e))}>
         </sl-input>
         <sl-input label="Name" .value=${this.formData.name}
-                  @input=${(e: any) => this.updateField('name', e.target.value)}>
+                  @input=${(e: Event) => this.updateField('name', readValue(e))}>
         </sl-input>
         <sl-button type="submit" variant="primary">Save</sl-button>
         <sl-button @click=${() => (this.editing = false)}>Cancel</sl-button>
@@ -2305,8 +2376,8 @@ export class UserSettings extends LitElement {
     `;
   }
 
-  private startEditing = () => {
-    this.formData = { email: this.user!.email, name: this.user!.name };
+  private startEditing = (user: User) => {
+    this.formData = { email: user.email, name: user.name };
     this.editing = true;
   };
 
@@ -2356,7 +2427,8 @@ font-face-format, font-face-name, missing-glyph
 class XCard extends HTMLElement {
   constructor() {
     super();
-    // ❌ TypeError: cannot manipulate before insertion
+    // ❌ DOMException (NotSupportedError): constructor element'ga attribute
+    //    yoki child qo'sha olmaydi
     // this.appendChild(...);
     // this.setAttribute('data-key', 'value');
   }
@@ -2383,7 +2455,7 @@ Closed mode testing va debugging'ni qiyinlashtiradi. Open mode afzal.
 
 ### React Synthetic Event vs Native Event Conflict
 
-React `on*` props faqat ma'lum standart DOM event'lar uchun ishlaydi (`onClick`, `onChange`, `onInput`, `onFocus`, va h.k.) — React event delegation orqali. Custom Event'lar (`item-select`, `user-edit`) `on*` orqali tutilmaydi — `addEventListener` kerak.
+React'ning o'z event'lari (`onClick`, `onChange`, `onInput`, `onFocus`, va h.k.) root-level delegation orqali ishlaydi. Custom Element'ga berilgan boshqa `on*` prop (React ro'yxatida yo'q) R19'da `addEventListener` bilan bog'lanadi, lekin event nomi prop'dan `on` olib tashlash bilan hosil bo'ladi va **case saqlanadi** — `onItemSelect` → `ItemSelect`. Element odatda kebab-case (`item-select`) dispatch qilgani uchun nom mos kelmaydi va handler chaqirilmaydi. Aniq nomlash uchun ref + `addEventListener('item-select', ...)` ishonchli.
 
 Standart DOM event'lar (masalan `click`) Shadow DOM ichidan emit qilinsa, `composed: true` bo'lsa Light DOM'gacha bubble qiladi va React handler chaqiriladi:
 
@@ -2398,7 +2470,7 @@ useEffect(() => {
 }, []);
 
 // Standard `click` event: ikkalasi ham trigger (React delegated + native listener)
-// Custom event (e.g. 'item-select'): faqat addEventListener trigger
+// Kebab custom event ('item-select'): onItemSelect MOS KELMAYDI; addEventListener kerak
 ```
 
 ### SSR va Custom Elements
@@ -2421,10 +2493,11 @@ if (!customElements.get('my-element')) {
 
 ## Common Mistakes
 
-### ❌ Xato 1: `onClick` o'rniga Custom Event handler
+### ❌ Xato 1: Kebab custom event'ni camelCase `on*` bilan tutish
 
 ```tsx
-// ❌ NOTO'G'RI — Custom event React on*'da ishlamaydi
+// ❌ NOTO'G'RI — onItemSelect → addEventListener('ItemSelect'), lekin element
+//    'item-select' dispatch qiladi → nom mos kelmaydi → handler chaqirilmaydi
 <my-list onItemSelect={handleSelect} />
 
 // ✅ TO'G'RI — useEffect + addEventListener
@@ -2485,7 +2558,7 @@ if (!customElements.get('my-element')) {
 ### ❌ Xato 5: Constructor'da DOM access
 
 ```typescript
-// ❌ TypeError
+// ❌ DOMException (NotSupportedError)
 class XCard extends HTMLElement {
   constructor() {
     super();
@@ -2682,7 +2755,7 @@ function UsersList({ users, onUserSelect }: {
 
 ### Mashq 3: Web Component Wrapper React Component (O'rta)
 
-`MyButton` React komponenti yarating, ichida Lit `<sl-button>` (Shoelace). Props pass qiling, click handler, loading state.
+`MyButton` React Component yarating, ichida Lit `<sl-button>` (Shoelace). Props pass qiling, click handler, loading state.
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -2774,7 +2847,7 @@ function CheckoutPage() {
 
 - `JSX.IntrinsicElements` augmentation — `<sl-button>` type safety.
 - `MyButton` props — restricted variant set (Shoelace'da ko'p, lekin app'da 3 ishlatamiz).
-- R19 React'da `loading`, `disabled` boolean prop'lar to'g'ri set qilinadi.
+- `loading`, `disabled` — Shoelace ularni Lit reactive property sifatida e'lon qiladi, shu bois `loading in element === true` → R19 boolean'ni property sifatida set qiladi (`element.loading = true`). E'lon qilinmagan custom element prop'da esa boolean attribute'ga aylanmasdi (`removeAttribute`).
 - `onClick` React synthetic event — Shoelace `<sl-button>` standard `click` event emit qiladi.
 - `children` Light DOM'ga inject qilinadi.
 
@@ -2886,7 +2959,7 @@ function ProductsListPage({ products }: { products: Product[] }) {
 
 - Generic `<T>` type parameter — DataList har turdagi item bilan ishlaydi.
 - `items` va `renderItem` Custom Element property assignment (R19 native).
-- `onItemSelect` Custom Event listener (React on* ishlamaydi).
+- `onItemSelect` kebab `item-select` event'iga nom bo'yicha mos kelmaydi, shu bois `addEventListener('item-select')` ishlatiladi.
 - `callbacksRef` latest closure pattern — re-attach kerak emas.
 - Optional `emptyState` React fallback content.
 
@@ -3163,18 +3236,18 @@ function UserDashboard() {
 
 ## Xulosa
 
-- **Web Components** — to'rtta brauzer-native API: Custom Elements, Shadow DOM, HTML Templates, Custom Events. Framework-agnostic UI komponent'lar yaratish.
+- **Web Components** — to'rtta brauzer-native API: Custom Elements, Shadow DOM, HTML Templates, Custom Events. Framework-agnostic UI Component'lar yaratish.
 - **Custom Element registration** — `customElements.define('name', Class)`. Tag name'da defis majburiy. Constructor'da DOM manipulation taqiq, `connectedCallback` ishlatish.
 - **Lifecycle callbacks** — `connectedCallback` (mount), `disconnectedCallback` (unmount), `attributeChangedCallback` (observed attribute), `adoptedCallback` (rare).
 - **Pre-R19 Properties vs Attributes muammo** — React har JSX prop'ni HTML attribute sifatida set qilardi → object/function/array `[object Object]` string'ga conversion. Manual `useEffect + ref` workaround.
-- **R19 yechimi** — client'da `key in element` primary check: property class'da declared bo'lsa (Lit `@property`, native getter/setter, class field) → `element[key] = value` (har qanday turdagi); declared bo'lmasa → `setAttribute` (primitive'lar uchun OK, object/function/array fail). SSR'da faqat primitives attribute, non-primitives rejected. Web Component author har public prop'ni class'da declare qilishi shart.
-- **Custom Events React'da** — `on*` props ishlamaydi (synthetic event tizimi faqat ma'lum DOM event'larni qo'llab-quvvatlaydi). `useEffect` + `addEventListener` pattern. Reusable `useCustomEvent` hook.
+- **R19 yechimi** — client'da yagona gate `key in element` (instance + prototype chain): property mavjud bo'lsa (Lit `@property`, native getter/setter, class field) → `element[key] = value` (har qanday turdagi). Mavjud bo'lmasa attribute path: `string`/`number` → `setAttribute`; `object`/`array` → `[object Object]` (fail); `function`/`symbol`/`null`/boolean (data-/aria-'dan boshqa) → `removeAttribute`. SSR'da faqat primitives (string/number/`true`) attribute, non-primitives rejected. Web Component author har public prop'ni instance'da declare qilishi shart.
+- **Custom Events React'da** — R19'da `on*` prop Custom Element'da `addEventListener` bilan bog'lanadi, lekin event nomi prop'dan `on` olib tashlangan, case saqlangan holda hosil bo'ladi (`onItemSelect` → `ItemSelect`), shu bois kebab `item-select`'ga mos kelmaydi. Aniq nomlash uchun `useEffect` + `addEventListener` pattern ishonchli. Reusable `useCustomEvent` hook.
 - **Shadow DOM** — CSS va DOM isolation. `:host`, `::slotted()`, `:host-context()` selectors. CSS variables Shadow DOM boundary'ni kesib o'tadi.
 - **Slots** — Light DOM children'ni Shadow DOM ichidagi `<slot>` joylariga inject. Default slot, named slots, fallback content.
 - **React Component Web Component ichida** — `createRoot` `connectedCallback`, `unmount` `disconnectedCallback`. Cross-framework integration uchun foydali.
 - **TypeScript JSX Intrinsic Elements** — `declare module 'react' { namespace JSX { interface IntrinsicElements {...} } }` augmentation. Library'lar (`@shoelace-style/shoelace`, `@material/web`) types ta'minlaydi.
 - **Decision Guide:** Cross-framework → Web Component; React-only app → React Component; Hybrid mature → atomic Web Component + React orchestration.
-- **Anti-pattern'lar:** `onClick` o'rniga Custom Event kutish, TS types yo'q, Pre-R19 workaround R19'da, `customElements.define` ikki marta, constructor'da DOM access.
+- **Anti-pattern'lar:** kebab custom event'ni camelCase `on*` bilan tutishga urinish (nom mos kelmaydi), TS types yo'q, Pre-R19 workaround R19'da, `customElements.define` ikki marta, constructor'da DOM access.
 
 ---
 

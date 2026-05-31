@@ -83,7 +83,7 @@ const UserCard = ({ user }: { user: User }) => {
 
 JSX transform `<Greeting name="Ali" />` ni `_jsx(Greeting, { name: 'Ali' })` ga aylantiradi. Reconciler bu chaqiruvni quyidagicha ishlov beradi:
 
-1. **Element yaratish:** `_jsx(Greeting, { name: 'Ali' })` qaytaradi `{ $$typeof: Symbol(react.element), type: Greeting, props: { name: 'Ali' }, key: null }`
+1. **Element yaratish:** `_jsx(Greeting, { name: 'Ali' })` qaytaradi `{ $$typeof: Symbol(react.transitional.element), type: Greeting, props: { name: 'Ali' }, key: null }` (R19'da `$$typeof` qiymati `Symbol.for('react.transitional.element')`; R18 va undan oldin `Symbol.for('react.element')` edi)
 2. **Fiber yaratish:** Element'dan Fiber yaratiladi, `tag: FunctionComponent` (cross-ref [`03-fiber-architecture.md`](03-fiber-architecture.md) — Fiber tag types)
 3. **Render:** Reconciler `Greeting(props)` ni chaqiradi va return qiymatini child JSX sifatida qabul qiladi
 4. **Recursion:** Qaytarilgan JSX ichidagi har element uchun yana shu jarayon takrorlanadi (DFS tree walk)
@@ -314,7 +314,7 @@ JSX transform qoidasi `@babel/plugin-transform-react-jsx` (yoki SWC, esbuild) to
    - `[a-z]` (lowercase) → string literal sifatida emit qilinadi
    - `[A-Z]` yoki `_` (uppercase yoki underscore) → identifier (variable reference) sifatida emit qilinadi
 3. **Dot mavjud bo'lsa** (`<obj.Prop />`) → har doim member expression (variable reference)
-4. **Underscore bilan boshlanadigan** (`<_Component />`) — ham capitalized deb sanaladi (kam uchraydi). **Raqam bilan boshlangan identifier'lar JavaScript'da haram** — `<1Title />` parse error; lekin `<H1Title />` (uppercase'dan boshlangan, ichida raqam) — to'g'ri, identifier sifatida qabul qilinadi
+4. **Underscore bilan boshlanadigan** (`<_Component />`) — ham capitalized deb sanaladi (kam uchraydi). **Raqam bilan boshlangan identifier'lar JavaScript'da ruxsat etilmaydi** — `<1Title />` parse error; lekin `<H1Title />` (uppercase'dan boshlangan, ichida raqam) — to'g'ri, identifier sifatida qabul qilinadi
 
 Babel compiler log:
 
@@ -464,13 +464,13 @@ function Greeting({ name }: { name: string }) {
 const element = <Greeting name="Alice" />;
 // Element (R19 default — ref endi props ichida, alohida slot yo'q):
 // {
-//   $$typeof: Symbol(react.element),
+//   $$typeof: Symbol(react.transitional.element),
 //   type: Greeting,
 //   key: null,
 //   props: { name: 'Alice' },   // ref bo'lsa, bu yerda: props.ref
 //   _owner: null
 // }
-// R18 va undan oldin esa element.ref alohida slot edi.
+// R18 va undan oldin: $$typeof = Symbol(react.element) va element.ref alohida slot edi.
 ```
 
 Element **immutable** — yaratilgandan keyin o'zgartirilmaydi. Har render Component qaytaradigan element'lar yangidan yaratiladi.
@@ -530,7 +530,7 @@ React Element internal structure:
 ```ts
 // R19 default (enableRefAsProp = true):
 type ReactElement<P = any> = {
-  $$typeof: Symbol;     // Symbol(react.element) — security marker (XSS prevention)
+  $$typeof: Symbol;     // R19: Symbol(react.transitional.element) — security marker (XSS prevention)
   type: string | ComponentType<P>; // 'div' yoki Greeting funksiyasi
   key: string | null;   // Reconciler identity uchun
   props: P;             // Komponentga uzatiladigan props (R19'da `ref` ham shu yerda)
@@ -547,7 +547,7 @@ type ReactElement<P = any> = {
 // };
 ```
 
-`$$typeof: Symbol(react.element)` — server'dan kelgan JSON ichida React Element bo'lib ko'rinishini bloklash uchun (chunki Symbol JSON'ga serialize qilinmaydi).
+`$$typeof` — server'dan kelgan JSON ichida React Element bo'lib ko'rinishini bloklash uchun (chunki Symbol JSON'ga serialize qilinmaydi). Qiymat R19'da `Symbol.for('react.transitional.element')`, R18 va undan oldin `Symbol.for('react.element')` edi (`react.element` endi `REACT_LEGACY_ELEMENT_TYPE` sifatida saqlangan).
 
 **Element yaratish:**
 
@@ -632,7 +632,7 @@ function App() {
   
   console.log(greetingElement.type);     // Greeting (function reference)
   console.log(greetingElement.props);    // { name: 'Alice' }
-  console.log(greetingElement.$$typeof); // Symbol(react.element)
+  console.log(greetingElement.$$typeof); // R19: Symbol(react.transitional.element)
   
   return <div>{greetingElement}</div>;
 }
@@ -781,28 +781,23 @@ Concurrent rendering jarayonida React quyidagi steps'ni bajaradi:
 1. **Render boshlash:** `beginWork(fiber)` — komponent funksiyasi chaqiriladi
 2. **Hooks dispatcher swap:** `mountIndeterminateComponent` (mount) yoki `updateFunctionComponent` (update)
 3. **Component chaqiruv:** `Component(props)` natijasi — children JSX
-4. **Yield check:** Har 5 ms (`frameYieldMs`, R16.5+ unchanged) — main thread bandmi tekshiriladi
+4. **Yield check:** Har bir ish bo'lagi orasida (`frameYieldMs = 5`, Scheduler'dagi default interval) — main thread bandmi tekshiriladi
 5. **Yield bo'lsa:** Render to'xtatiladi, brauzerga vaqt beriladi
 6. **Restart:** Yangi yuqori-priority update kelsa, render qayta boshlanadi (`workInProgress` reset, `current` o'zgarmagan)
 
 Restart paytida React komponent funksiyasini **yana chaqiradi**:
 
 ```ts
-// Pseudo-code
+// Pseudo-code (workLoopConcurrent soddalashtirilgan)
 let workInProgress = root.workInProgress;
-while (workInProgress !== null) {
-  if (shouldYield()) {
-    if (highPriorityUpdate) {
-      // Restart — workInProgress reset
-      workInProgress = createWorkInProgress(current);
-      continue;
-    }
-    return;
-  }
-  
-  performUnitOfWork(workInProgress); // beginWork → Component(props)
-  workInProgress = workInProgress.next;
+while (workInProgress !== null && !shouldYield()) {
+  // performUnitOfWork keyingi Fiber'ni qaytaradi (child → sibling → return),
+  // Fiber'da tree traversal uchun .child / .sibling / .return pointer'lari bor
+  workInProgress = performUnitOfWork(workInProgress); // beginWork → Component(props)
 }
+// shouldYield() true bo'lsa loop to'xtaydi va brauzerga vaqt beriladi.
+// Yuqori-priority update kelsa, render butunlay tashlanadi va yangi
+// workInProgress = createWorkInProgress(current) bilan qaytadan boshlanadi.
 ```
 
 `Component(props)` ikki marta chaqirilganda turli natija qaytarsa — restart paytidagi natija bilan birinchi render'dagi natija mos kelmaydi:
@@ -814,7 +809,7 @@ Restart:         Math.random() = 0.71 → JSX with id="id-0.71"
 
 Reconciler bu farqlarni "real update" deb sanab, DOM'ni yangilashga urinadi. Lekin foydalanuvchi nuqtai-nazaridan — hech qanday data o'zgarmagan, faqat `Math.random()` har chaqiruvda yangi qiymat berdi.
 
-**Strict Mode 2x render** ham shu invariantni tekshiradi (R16.3+ render 2x cycle, cross-ref [`02-rendering.md`](02-rendering.md)):
+**Strict Mode 2x render** ham shu invariantni tekshiradi (StrictMode R16.3'da qo'shilgan, lekin function component render'ini dev'da ikki marta chaqirish R18'da kiritildi; faqat `__DEV__`'da, production'da no-op — cross-ref [`02-rendering.md`](02-rendering.md)):
 
 ```ts
 function renderWithStrictMode() {
@@ -830,12 +825,14 @@ Ikkala chaqiruv natijalari pure component'da bir xil bo'lishi shart. `Math.rando
 
 **`useId` SSR-safe ID generation:**
 
-`useId` ID'ni Fiber tree position'idan hosil qiladi:
+`useId` ID'ni Fiber tree'dagi pozitsiya (tree path) asosida hosil qiladi — random emas, balki komponent tree ichidagi joylashuvdan deterministik tarzda:
 
 ```
 Fiber tree position: root → div → form → useId hook
-Generated ID: ":r0:" yoki ":R12pj:" (Fiber path hash)
+Generated ID: prefix + tree-path encoding
 ```
+
+ID format'i React versiyalari bo'yicha o'zgargan: R19.0'da `:r0:`, R19.1'da `«r0»`, R19.2'dan boshlab `_r_0_` (default prefix `view-transition-name` va XML name'lar uchun valid bo'lishi maqsadida o'zgartirildi). Prefix'ni `createRoot`/`hydrateRoot`'da `identifierPrefix` orqali o'zgartirish mumkin.
 
 Bu ID:
 - Server va client'da bir xil (SSR mismatch yo'q)
@@ -1043,7 +1040,7 @@ Concurrent rendering React'ga render'ni uzilishi va qayta boshlash imkonini bera
 - DOM mutation — restart paytida ikki marta sodir bo'ladi (Strict Mode 2x'da ham)
 - Network fetch — bir nechta marta start, race conditions
 
-Render — bu **diff hisoblash bosqichi**, "I/O" yoki "side effects" bosqichi emas. React arxitekturasi rendering'ni Commit Phase'dan ajratgan: render fazasida faqat **JSX hisoblash**, side effect'lar Commit Phase'dan keyin (cross-ref [`02-rendering.md`](02-rendering.md) — Commit Phase 3 sub-phases).
+Render — bu **diff hisoblash bosqichi**, "I/O" yoki "side effects" bosqichi emas. React rendering'ni Commit Phase'dan ajratadi: Render Phase'da faqat **JSX hisoblash**, side effect'lar Commit Phase'dan keyin (cross-ref [`02-rendering.md`](02-rendering.md) — Commit Phase 3 sub-phases).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1259,6 +1256,7 @@ function ConfigViewerWasteful({ rawData }: { rawData: string }) {
   const [parsed] = useState(JSON.parse(rawData));
   // ❌ JSON.parse har render'da hisoblanadi (lekin state value'ga ta'siri yo'q)
   // — performance waste, lekin pure (chunki side effect yo'q)
+  return <pre>{JSON.stringify(parsed, null, 2)}</pre>;
 }
 ```
 
@@ -1429,7 +1427,14 @@ function useWindowWidth() {
 function ResponsiveGrid({ children }: { children: React.ReactNode }) {
   const width = useWindowWidth();
   const columns = width < 600 ? 1 : width < 1024 ? 2 : 3;
-  return <div className={`grid grid-cols-${columns}`}>{children}</div>;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+      {children}
+    </div>
+  );
+  // Grid columns dinamik — inline style orqali (runtime'da o'zgaradigan qiymat
+  // uchun). Tailwind class nomi statik bo'lishi shart, shuning uchun bu yerda
+  // dinamik class emas, inline style ishlatildi.
 }
 ```
 
@@ -1530,7 +1535,7 @@ Greeting({ name: 'Alice' }); // <h1>Hello, Alice</h1> (bir xil)
 
 > **Eslatma:** `React.PureComponent` — alohida class API (`shouldComponentUpdate` shallow comparison bilan). Bu yerda "pure" so'zi function purity invariant'ini bildiradi, `PureComponent` class'iga aloqasi yo'q.
 
-**Strict Mode 2x render** — React'ning idempotency'ni dev mode'da tekshiruvchi mexanizmi (R16.3+ render 2x cycle). Komponent funksiyasi har render'da ikki marta chaqiriladi, va React natijalarni taqqoslaydi:
+**Strict Mode 2x render** — React'ning idempotency'ni dev mode'da tekshiruvchi mexanizmi. Function component funksiyasi har render'da ikki marta chaqiriladi (bu xulq R18'da kiritilgan; StrictMode'ning o'zi R16.3'da paydo bo'lgan, lekin o'shanda asosan class lifecycle'lar ikki marta chaqirilardi):
 
 ```ts
 // Pseudo-code (ReactFiberBeginWork dev branch)
@@ -1543,8 +1548,8 @@ if (__DEV__ && (workInProgress.mode & StrictMode)) {
 Agar ikki chaqiruv natijalari farq qilsa — render'da side effect yoki mutable read bor degan signal. React explicit warning chiqarmaydi (chunki natijalar taqqoslanmaydi), lekin foydalanuvchi `Math.random`, `Date.now` kabi qiymatlarning ikki marta hisoblanishi orqali muammoni aniqlay oladi.
 
 > **🕐 Versiya evolyutsiyasi (Strict Mode):**
-> - **R16.3 (2018):** Strict Mode joriy etildi — render 2x cycle (komponent funksiyasi ikki marta chaqiriladi).
-> - **R18 (2022):** Effect'lar uchun ham 2x cycle qo'shildi (`mount → cleanup → mount`). Bu — concurrent rendering invariant'larini dev'da topish uchun.
+> - **R16.3 (2018):** Strict Mode joriy etildi — deprecated lifecycle uchun warning, va class lifecycle'larni (constructor, render, `setState` updater) dev'da ikki marta chaqirish.
+> - **R18 (2022):** Function component render'i va `useState`/`useMemo`/`useReducer`'ga uzatilgan funksiyalar ham dev'da ikki marta chaqiriladigan bo'ldi; effect'lar uchun `mount → cleanup → mount` 2x cycle qo'shildi. Bu — concurrent rendering invariant'larini dev'da topish uchun.
 > - **R19+:** Bir xil — no behavior change.
 > - **Sabab:** Render purity invariants violations'ni dev paytida topish. Production'da Strict Mode'ning effect'i yo'q (kod o'zgarmaydi).
 
@@ -1593,10 +1598,10 @@ Bu — yangi kod uchun strict invariant'lar, eski kod uchun yumshoqlik (legacy m
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-R16.3+ render 2x cycle internal:
+Function component render 2x cycle internal (R18+, dev-only):
 
 ```ts
-// react-reconciler/ReactFiberBeginWork.js (soddalashtirilgan)
+// react-reconciler/ReactFiberHooks.js (soddalashtirilgan)
 function renderWithHooks(
   current: Fiber | null,
   workInProgress: Fiber,
@@ -1609,14 +1614,13 @@ function renderWithHooks(
   
   let children = Component(props, secondArg);
   
-  if (__DEV__) {
-    if (workInProgress.mode & StrictLegacyMode) {
-      disableLogs();
-      try {
-        children = Component(props, secondArg); // 2-marta chaqiriladi
-      } finally {
-        reenableLogs();
-      }
+  const shouldDoubleRenderDEV = __DEV__ && (workInProgress.mode & StrictLegacyMode) !== NoMode;
+  if (shouldDoubleRenderDEV) {
+    setIsStrictModeForDevtools(true);
+    try {
+      children = renderWithHooksAgain(workInProgress, Component, props, secondArg); // 2-marta
+    } finally {
+      setIsStrictModeForDevtools(false);
     }
   }
   
@@ -1624,7 +1628,7 @@ function renderWithHooks(
 }
 ```
 
-`disableLogs()` — React internal'ining 2-renderdagi `console.*` chaqiruvlari konsoldagi takrorlanuvchi noise'ini kamaytirish uchun ishlatadigan mexanizmi (`console.log = noop` kabi temporary patch). R18'gacha bu yondashuv 2-render log'larini to'liq yashirardi. R18+'dan boshlab React DevTools'ning browser integration'i bilan birga — log'lar yashirilmasdan, "duplicate render" indikatori bilan grouped/dim qilingan ko'rinishda chiqadi (eski versiyalarda — to'liq bostirilgan).
+`setIsStrictModeForDevtools(true)` — React 2-render boshlanishidan oldin React DevTools hook'iga (`__REACT_DEVTOOLS_GLOBAL_HOOK__`) "hozir Strict Mode 2-render'i" signalini yuboradi (`injectedHook.setStrictMode`). React core'ning o'zi `console`'ni patch qilmaydi va log'larni bostirmaydi — R18+'dan boshlab 2-render `console.*` chaqiruvlari konsolda to'liq ko'rinadi. Agar React DevTools extension'i o'rnatilgan bo'lsa, DevTools shu signalni olib, 2-renderdagi log'larni xira (dimmed) ko'rinishda chiqaradi (va ularni butunlay yashirish uchun opt-in sozlama beradi). Extension o'rnatilmagan bo'lsa — log'lar ikki marta, xiralashtirilmasdan ko'rinadi.
 
 R18+ effect 2x cycle:
 
@@ -1637,7 +1641,7 @@ if (strictMode) {
 }
 ```
 
-Bu — effect "qaytadan o'rnatilishga chidamli" bo'lishi kerak deb tekshiradi. Concurrent rendering paytida React komponent'ni unmount qilib, qayta mount qilishi mumkin (Reusable State R19+ kelajak feature uchun zamin).
+Bu — effect "qaytadan o'rnatilishga chidamli" bo'lishi kerak deb tekshiradi. Kelajakda React komponent'ni unmount qilib (DOM'dan vaqtincha olib tashlab), keyin oldingi state'i bilan qayta mount qilishi mumkin — masalan `<Activity>` (oldingi nomi Offscreen) komponenti orqali ko'rinmas tab'larni state'ini saqlagan holda DOM'dan chiqarib turish. Strict Mode'ning effect 2x cycle'i shu stsenariyga effect'larni tayyorlaydi.
 
 **Production vs Development:**
 
@@ -1777,14 +1781,14 @@ function LoggingComponent() {
 }
 
 // Strict Mode (Dev):
-// React 18+ — log 2-renderda ham ko'rinadi (browser DevTools'da
-// "duplicate" tag bilan grouped, dim qilingan ko'rinishda)
+// React 18+ — log 2-renderda ham to'liq ko'rinadi. React DevTools
+// extension'i o'rnatilgan bo'lsa, 2-render log'i xira (dimmed) ko'rinadi
 
 // Production:
 // Render (1-marta)
 ```
 
-> **Eslatma:** R18+'da Strict Mode 2-renderdagi `console.*` chaqiruvlari to'liq bostirilmaydi — ular qisqartirilgan/grouped formatda ko'rinadi. Eski versiyalardagi `disableLogs()` to'liq suppression yondashuvi ishlamayapti. User `console.log` har 2-renderda ham chiqishi mumkin (DevTools versiyasiga bog'liq).
+> **Eslatma:** R18+'da React core 2-renderdagi `console.*` chaqiruvlarini bostirmaydi — `console.log` har ikki render'da ham konsolda ko'rinadi. Xira (dimmed) ko'rinish — React DevTools extension'ining xulqi (React core emas): React DevTools'da "Hide logs during second render in Strict Mode" sozlamasi orqali 2-render log'larini butunlay yashirish ham mumkin.
 
 </details>
 
@@ -1814,7 +1818,7 @@ class Counter extends Component<{}, { count: number }> {
 
 **`super(props)` qachon zarur:**
 
-Yuqoridagi misol class field syntax (`state = { count: 0 }`) ishlatadi va explicit `constructor` yo'q — bunda `super(props)` chaqirilmaydi (TypeScript/Babel kompilyatsiyada avtomatik qo'shiladi). Lekin explicit `constructor` e'lon qilinsa, **`super(props)` birinchi statement bo'lishi shart**:
+Yuqoridagi misol class field syntax (`state = { count: 0 }`) ishlatadi va explicit `constructor` yo'q. Bunday holatda JavaScript derived class uchun default constructor beradi — u `constructor(...args) { super(...args); }` ko'rinishida bo'lib, qabul qilgan argument'larni (jumladan `props`'ni) `super`'ga uzatadi; shuning uchun `props` super'ga yetib boradi. Lekin explicit `constructor` e'lon qilinsa, default constructor o'rnini bosadi va **`super(props)` birinchi statement bo'lishi shart**:
 
 ```tsx
 class CounterExplicit extends Component<{ initial: number }, { count: number }> {
@@ -1829,7 +1833,7 @@ class CounterExplicit extends Component<{ initial: number }, { count: number }> 
 }
 ```
 
-`super()` (props'siz) ham JavaScript runtime'da ishlaydi (chunki React `Component` constructor `this.props = props` ni `componentMount` paytida o'rnatadi), lekin **`super(props)` afzal** — chunki `constructor` ichida `this.props` ni ishlatish kerak bo'lsa, undefined bo'lmaydi:
+`super()` (props'siz) chaqirilsa ham, `render` paytida `this.props` to'g'ri bo'ladi — chunki React class instance'ni yaratgandan keyin `instance.props`'ni o'zi o'rnatadi (reconciler'dagi `constructClassInstance`/`adoptClassInstance`). Lekin **`super(props)` afzal**: agar `constructor` ichida (React props'ni o'rnatishidan oldin) `this.props`'ga murojaat qilsangiz, props'siz `super()`'da u `undefined` bo'ladi:
 
 ```tsx
 class CounterBuggy extends Component<{ initial: number }, { count: number }> {
@@ -1849,7 +1853,7 @@ ES2015 class semantikasi: `super()` chaqirilmaguncha `this` ga murojaat qilish �
 |-----------|----------|-------|
 | State | `useState`, `useReducer` | `this.state`, `setState` |
 | Lifecycle | `useEffect`, `useLayoutEffect` | `componentDidMount`, `componentDidUpdate`, `componentWillUnmount` |
-| Refs | `useRef`, ref-as-prop (R19; `forwardRef` soft-deprecated — hali ham ishlaydi, warning yo'q) | `React.createRef`, instance refs |
+| Refs | `useRef`, ref-as-prop (R19'da `ref` oddiy prop sifatida uzatiladi; `forwardRef` hali ham to'liq qo'llab-quvvatlanadi, deprecated EMAS) | `React.createRef`, instance refs |
 | Context | `useContext` | `static contextType`, `Context.Consumer` |
 | Memoization | `useMemo`, `useCallback`, `React.memo` | `shouldComponentUpdate`, `PureComponent` |
 | Logic share | Custom hooks | HOC, Render props |
@@ -2060,9 +2064,9 @@ function UserProfile({ userId }: { userId: number }) {
           setLoading(false);
         }
       })
-      .catch((err: Error) => {
+      .catch((caught) => {
         if (!cancelled) {
-          setError(err);
+          setError(caught instanceof Error ? caught : new Error(String(caught)));
           setLoading(false);
         }
       });
@@ -2098,7 +2102,7 @@ const ItemRow = memo(function ItemRow({ item }: { item: Item }) {
 Error Boundary — hali class:
 
 ```tsx
-import { Component, ReactNode } from 'react';
+import { Component, type ReactNode, type ErrorInfo } from 'react';
 
 type Props = { fallback: ReactNode; children: ReactNode };
 type State = { hasError: boolean };
@@ -2110,7 +2114,7 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true };
   }
   
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
+  componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('Caught:', error, info);
   }
   
@@ -2396,7 +2400,7 @@ function Editor({ mode, content }: { mode: 'edit' | 'view'; content: string }) {
 Component'larni Map orqali — reference stable:
 
 ```tsx
-import { ComponentType } from 'react';
+import type { ComponentType } from 'react';
 
 const VIEW_MAP: Record<string, ComponentType> = {
   list: ListView,
@@ -2428,7 +2432,7 @@ async function ArticleViewerUnsafe() {
 }
 ```
 
-Client component bo'lsa — `async function` ReactElement emas, balki **Promise** qaytaradi. React Promise'ni Client Component'ning return value sifatida qabul qilmaydi: dev mode'da error chiqaradi (`A component suspended while rendering`, yoki Promise plain object sifatida ko'rilsa `Objects are not valid as a React child`). Async qaytarish faqat React Server Components (RSC) kontekstida qo'llab-quvvatlanadi.
+Client component bo'lsa — `async function` ReactElement emas, balki **Promise** qaytaradi. React bu Promise'ni child sifatida render qilishga urinadi va xato chiqaradi: `Objects are not valid as a React child (found: [object Promise])`. Async qaytarish faqat React Server Components (RSC) kontekstida qo'llab-quvvatlanadi.
 
 **Yechim:** `useEffect` + `useState`, yoki R19'dagi `use` hook (Suspense bilan), yoki Server Component (RSC, cross-ref [`39-rsc-server-actions.md`](39-rsc-server-actions.md)).
 
@@ -2545,26 +2549,40 @@ Render'da `throw` — texnik jihatdan **ruxsat etilgan** va Error Boundary'ga uz
 ### Gotcha 5: Component Funksiya Hoisting
 
 ```tsx
-// ✅ OK — function declaration hoisted
-function App() {
-  return <Inner />; // Inner pastda e'lon qilingan, lekin hoisting orqali OK
+// ✅ Function declaration — hoisted (faylda pastda e'lon qilinsa ham reference OK)
+function HoistedParent() {
+  return <HoistedInner />;
 }
 
-function Inner() {
+function HoistedInner() {
   return <span>Inner</span>;
 }
 
-// ❌ Arrow function — temporal dead zone
-function App() {
-  return <Inner />; // ❌ ReferenceError: Cannot access 'Inner' before initialization
+// ✅ Arrow function ham render paytida ishlaydi
+function ArrowParent() {
+  return <ArrowInner />; // render module yuklangach chaqiriladi — ArrowInner allaqachon tayyor
 }
 
-const Inner = () => <span>Inner</span>;
+const ArrowInner = () => <span>Inner</span>;
 ```
 
-Function declaration JavaScript hoisting bilan butun funksiya yuqoriga ko'tariladi (declaration + value). Arrow function — faqat declaration ko'tariladi, value (function expression) hali yaratilmagan.
+Ikkala variant ham **render paytida** ishlaydi: komponent funksiyasi faqat render chaqirig'ida bajariladi, u paytda module to'liq yuklangan va `const ArrowInner` allaqachon initialize qilingan. Reference body ichida ishlatilgani uchun (chaqiruv paytida o'qiladi) — TDZ render'ga ta'sir qilmaydi.
 
-**Yechim:** Arrow function ishlatsa — `const Inner = ...` ni `App` dan oldin yozish.
+Farq **module yuklanish vaqtidagi** to'g'ridan-to'g'ri reference'da seziladi. Function declaration to'liq hoist qilinadi (declaration + value yuqoriga ko'tariladi), shuning uchun module top-level'da undan oldin ishlatish mumkin. `const`/arrow esa Temporal Dead Zone'da — initialization satridan **oldin** o'qilsa `ReferenceError` beradi:
+
+```tsx
+// ❌ Module top-level'da TDZ — const initialize qilinishidan oldin o'qildi
+const earlyElement = <ArrowInner />; // ReferenceError: Cannot access 'ArrowInner' before initialization
+const ArrowInner = () => <span>Inner</span>;
+
+// ✅ Function declaration hoist qilingani uchun bu ishlaydi
+const okElement = <HoistedInner2 />;
+function HoistedInner2() {
+  return <span>Inner</span>;
+}
+```
+
+**Amaliy tavsiya:** arrow component ishlatsangiz — uni ishlatishdan oldin e'lon qiling; bu kodni o'qishni ham osonlashtiradi.
 
 ---
 
@@ -2737,7 +2755,7 @@ ES default parameter — JavaScript native. R19'dan boshlab `defaultProps` olib 
 
 ### Mashq 2: Render Purity Violation Topish (Oson)
 
-Quyidagi komponentdagi 3 ta purity violation'ni toping va tuzating.
+Quyidagi komponentdagi 4 ta purity violation'ni toping va tuzating.
 
 ```tsx
 import { useState } from 'react';
@@ -2954,9 +2972,13 @@ function DataFetcher({ url }: Props) {
     window.fetch(url, { signal: controller.signal })
       .then((res) => res.json())
       .then((d: Data) => setData(d))
-      .catch((err: Error) => {
-        if (err.name !== 'AbortError') {
-          setError(err);
+      .catch((caught) => {
+        if (!(caught instanceof Error)) {
+          setError(new Error(String(caught)));
+          return;
+        }
+        if (caught.name !== 'AbortError') {
+          setError(caught);
         }
       });
     
@@ -3087,7 +3109,7 @@ Sabab:
   - **No side effects** — render tanasida `setState`, DOM mutation, fetch, subscription yo'q
   - **No mutable reads** — `Date.now()`, `Math.random()`, `window.*` to'g'ridan-to'g'ri o'qish yo'q
   - **Idempotent** — funksiya bir nechta marta chaqirilsa bir xil natija beradi
-- **Strict Mode 2x render** (R16.3+) idempotency'ni dev mode'da tekshiradi; production'da overhead yo'q
+- **Strict Mode 2x render** — function component render'ini dev'da ikki marta chaqirib (bu xulq R18'da kiritilgan) idempotency'ni tekshiradi; production'da overhead yo'q
 - **Class component'lar** legacy — yangi kod uchun function + hooks; Error Boundary istisno (hozircha class)
 - **Component identity** — function reference Reconciler'ning `type` slot'i; nested component declaration anti-pattern
 - **Async function component** — faqat Server Component (RSC); client'da `useEffect` yoki R19 `use()` + Suspense

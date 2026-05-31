@@ -537,7 +537,7 @@ function Parent() {
   return <Child user={{ name: 'Alice' }} />;
 }
 
-function Child({ user }) { /* ... */ }
+function Child({ user }: { user: { name: string } }) { /* ... */ }
 ```
 
 Parent har render'da yangi `user` object yaratadi → `user` reference yangi → Child uchun props yangi (Object.is === false). Child har Parent render'da re-render qiladi.
@@ -714,7 +714,7 @@ setItems([...items, 4]);
 **Nima uchun React `Object.is` orqali tekshiradi?**
 
 1. **Performance:** Shallow equality — O(1), deep equality — O(n). Har state update'ida O(1) check tezroq.
-2. **Concurrent rendering:** State referensial taqqoslash — bailout aniq va deterministic. Deep equality — engine implementation'iga bog'liq, rezimlarda nomuvofiq.
+2. **Concurrent rendering:** reference equality — deterministik va arzon. React render'ni to'xtatib, qayta boshlashi mumkin (interruptible render); har safar deep equality hisoblash o'rniga reference taqqoslash bailout qarorini bir xil va tez beradi.
 3. **Functional purity:** Immutable updates funktsional dasturlash invariantlariga moslashadi. Har state — historical snapshot.
 
 **`Object.is` vs `===`:**
@@ -1026,7 +1026,8 @@ const [user, setUser] = useState({ name: 'Alice' });
 // TS infer: useState<{ name: string }>
 
 const [user, setUser] = useState<User | null>(null);
-// Explicit — chunki initial null bo'lsa, T = null bo'ladi (kerak emas)
+// Explicit kerak — initial null bo'lsa, TS T'ni faqat null deb infer qiladi,
+// keyin setUser(userObject) TS error beradi
 ```
 
 **Setter — ikki shakl:**
@@ -1104,10 +1105,8 @@ function useState<T>(
 
 ```ts
 // react-reconciler/ReactFiberHooks.js (soddalashtirilgan)
-let ReactCurrentDispatcher = {
-  current: null
-};
-
+// React 19'da dispatcher slot — ReactSharedInternals.H
+// (React 18 va undan oldin nomi ReactCurrentDispatcher.current edi)
 const HooksDispatcherOnMount = {
   useState: mountState,
   useEffect: mountEffect,
@@ -1122,19 +1121,19 @@ const HooksDispatcherOnUpdate = {
 
 function renderWithHooks(...) {
   // Mount yoki update'ga qarab dispatcher set
-  ReactCurrentDispatcher.current = current === null
+  ReactSharedInternals.H = current === null
     ? HooksDispatcherOnMount
     : HooksDispatcherOnUpdate;
   
   const children = Component(props);
   
-  ReactCurrentDispatcher.current = ContextOnlyDispatcher;
+  ReactSharedInternals.H = ContextOnlyDispatcher;
   
   return children;
 }
 ```
 
-Hook'lar (`useState`, `useEffect`, ...) `ReactCurrentDispatcher.current[hookName]` orqali joriy implementation'ni topadi.
+Hook'lar (`useState`, `useEffect`, ...) `ReactSharedInternals.H[hookName]` orqali joriy implementation'ni topadi.
 
 **`mountState` — birinchi render:**
 
@@ -1554,7 +1553,7 @@ const [val, setVal] = useState(() => {
 // StrictMode dev mount:
 // "lazy"
 // "lazy"  ← 2 marta (intentional double-invoke)
-// State qiymati — ikkinchi chaqiruvning natijasi ishlatiladi (birinchisi tashlanadi)
+// Initializer pure bo'lgani uchun ikkala chaqiruv bir xil qiymat qaytaradi — qaysi biri olinishi farq qilmaydi
 ```
 
 `StrictMode` komponenti dev mode'da function component'ni 2 marta render qiladi va lazy initializer ham 2 marta chaqiriladi — render purity invariantini (function bir xil input uchun bir xil output qaytarishi shart) tekshirish uchun. Bu — `StrictMode` o'rab olgan tree uchun. Production build'da — har biri 1 marta. Cross-ref [`09-component-basics.md`](09-component-basics.md) — Strict Mode.
@@ -1840,8 +1839,12 @@ function dispatchSetState<S>(fiber: Fiber, queue: UpdateQueue<S>, action: S | ((
     next: null,
   };
   
-  // Eager bailout — agar yangi qiymat eski bilan teng
-  if (queue.pending === null) {
+  // Eager bailout — faqat Fiber'da pending work yo'q bo'lganda xavfsiz
+  // (aks holda eski lastRenderedState noto'g'ri natija berishi mumkin)
+  if (
+    fiber.lanes === NoLanes &&
+    (fiber.alternate === null || fiber.alternate.lanes === NoLanes)
+  ) {
     const lastRenderedState = queue.lastRenderedState;
     const eagerState = basicStateReducer(lastRenderedState, action);
     update.eagerState = eagerState;
@@ -2236,8 +2239,8 @@ function dispatchSetState(fiber, queue, action) {
 }
 
 function scheduleUpdateOnFiber(fiber, lane) {
-  // Lane'ni Fiber tree'ga propagate qiladi
-  markUpdateLaneFromFiberToRoot(fiber, lane);
+  // Lane'ni Fiber tree'ga propagate qiladi va eng yaqin root'ni qaytaradi
+  const root = markUpdateLaneFromFiberToRoot(fiber, lane);
   
   // Render Scheduler orqali planlanadi (bitta event loop tick ichida
   // barcha setState'lar yig'iladi, bitta render trigger qilinadi)
@@ -2245,13 +2248,15 @@ function scheduleUpdateOnFiber(fiber, lane) {
 }
 
 function ensureRootIsScheduled(root) {
-  // Agar render allaqachon scheduled bo'lsa va bir xil priority — yangi schedule qilinmaydi
-  if (root.callbackNode !== null && root.callbackPriority === lane) {
+  const nextLane = getNextLanes(root); // root'dagi pending lanes'dan eng yuqori priority
+  
+  // Agar render allaqachon shu priority bilan scheduled bo'lsa — qaytadan schedule qilinmaydi
+  if (root.callbackNode !== null && root.callbackPriority === nextLane) {
     return;
   }
   
   // Scheduler — internal cooperative scheduler, lane priority asosida
-  scheduleCallback(schedulerPriorityFromLane(lane), performWorkOnRoot.bind(null, root));
+  scheduleCallback(schedulerPriorityFromLane(nextLane), performWorkOnRoot.bind(null, root));
 }
 ```
 
@@ -2278,12 +2283,13 @@ DOM yangilanadi
 ```ts
 function flushSync<T>(fn: () => T): T {
   const prevExecutionContext = executionContext;
-  executionContext |= LegacyUnbatchedContext;
+  executionContext |= BatchedContext;
   
   try {
     const result = fn();
     
-    // Pending update'larni darhol bajarish
+    // fn ichidagi setState'lar enqueue qilinadi;
+    // flushSyncCallbacks pending Sync work'ni darhol bajaradi
     flushSyncCallbacks();
     
     return result;
@@ -2463,9 +2469,9 @@ function BailoutDemo() {
     <Stack gap={8}>
       <p>Render count: {renderRef.current}</p>
       <button onClick={() => setCount(0)}>setCount(0) — bailout</button>
-      <button onClick={() => setCount(c => c)}>functional same — render trigger</button>
+      <button onClick={() => setCount(c => c)}>setCount(c =&gt; c) — bailout</button>
       {/* setCount(0) — eski 0 ga teng → bailout, render bo'lmaydi */}
-      {/* setCount(c => c) — function chaqiriladi, eager state hisoblash, c=0 → bailout */}
+      {/* setCount(c => c) — eager state hisoblanadi: c=0 qaytadi → Object.is(0, 0) true → bailout */}
     </Stack>
   );
 }
@@ -2676,11 +2682,11 @@ newItems[0].a = 99;  // ✅ items.a = 1 (mustaqil)
 
 ```ts
 const cloned = structuredClone(complexObject);
-// Recursive clone, including Date, Map, Set, ArrayBuffer, RegExp
-// Excludes: functions, DOM nodes, Error objects
+// Recursive clone: Date, Map, Set, ArrayBuffer, RegExp, Error subtypes
+// Throws DataCloneError: function, DOM node, Symbol, property descriptor (getter/setter clone qilinmaydi)
 ```
 
-HTML Living Standard'da definirlangan (Structured Clone Algorithm). React versiyasidan mustaqil — Node 17+, Chrome 98+, Firefox 94+, Safari 15.4+. React'ning o'zi ishlatmaydi, lekin user code'da deep clone kerak bo'lganda standart usul.
+HTML Living Standard'da ta'riflangan (Structured Clone Algorithm). React versiyasidan mustaqil — Node 17+, Chrome 98+, Firefox 94+, Safari 15.4+. React'ning o'zi ishlatmaydi, lekin user code'da deep clone kerak bo'lganda standart usul.
 
 **Performance — shallow vs deep:**
 
@@ -3013,9 +3019,9 @@ function NestedEditor() {
 
 **Cheklov:**
 
-- **Bundle size** — Immer ~12-15KB (gzipped)
+- **Bundle size** — qo'shimcha dependency (gzipped hajmi kichik, lekin nol emas)
 - **Learning curve** — Proxy semantikasi yangi paradigma
-- **Some patterns ishlamaydi** — Map/Set, Set delete (Immer 6+ qo'llab-quvvatlaydi)
+- **Map/Set** — default'da Proxy faqat oddiy object/array uchun; Map va Set'ni draft'da mutate qilish uchun `enableMapSet()` plugin'ini chaqirish kerak
 
 **Qachon Immer foydali:**
 
@@ -3113,7 +3119,7 @@ Immer bilan yangi memory allocation deyarli bir xil — lekin coding ergonomics 
 
 **Auto-freeze:**
 
-Immer dev mode'da output'ni `Object.freeze` qiladi (recursive). Mutation aniqlanadi:
+Immer default'da output'ni recursive `Object.freeze` qiladi (`setAutoFreeze(true)` — yoqilgan holatda). Keyingi mutation aniqlanadi:
 
 ```ts
 const next = produce(state, (draft) => { draft.user.name = 'Bob'; });
@@ -3122,7 +3128,7 @@ next.user.name = 'X';  // ❌ TypeError: Cannot assign to read-only property
 // Auto-freeze: kelajakdagi mutation'larga qarshi himoya
 ```
 
-Production'da auto-freeze o'chirilishi mumkin (performance).
+Auto-freeze barcha muhitlarda default yoqilgan. Yirik, o'zgarmaydigan state uchun freeze overhead'ini `setAutoFreeze(false)` bilan o'chirish mumkin.
 
 </details>
 
@@ -3339,9 +3345,10 @@ fiber.memoizedState
 Har update'ning `lane` field'i bor (cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)):
 
 ```ts
-update.lane = SyncLane;             // event handler — sync priority
-update.lane = DefaultLane;          // useEffect — default priority
-update.lane = TransitionLane1;      // useTransition — transition priority
+// Lane setState chaqirilgan kontekstdan kelib chiqadi (requestUpdateLane):
+update.lane = SyncLane;             // discrete event handler (click, input)
+update.lane = DefaultLane;          // event'dan tashqari setState (effect, timeout, fetch callback)
+update.lane = TransitionLane1;      // startTransition ichidagi setState
 ```
 
 Render Phase faqat **joriy lane'dagi update'larni** apply qiladi. Quyi priority update'lar keyingi render uchun saqlanadi (`baseQueue`).
@@ -3397,9 +3404,10 @@ function processUpdateQueue<S>(
     const firstPendingUpdate = lastPendingUpdate.next;
     lastPendingUpdate.next = null;  // break circle
     
-    // Append base queue
+    // Append base queue (soddalashtirilgan {head, tail} model —
+    // real React circular baseQueue ishlatadi)
     if (hook.baseQueue === null) {
-      hook.baseQueue = firstPendingUpdate;
+      hook.baseQueue = { head: firstPendingUpdate, tail: lastPendingUpdate };
     } else {
       hook.baseQueue.tail.next = firstPendingUpdate;
       hook.baseQueue.tail = lastPendingUpdate;
@@ -3607,7 +3615,8 @@ React state hook'lari **ikki implementation**'ga ega: mount paytida (`mountState
 Render boshlanganda dispatcher set qilinadi:
 
 ```ts
-ReactCurrentDispatcher.current = current === null
+// React 19: dispatcher slot — ReactSharedInternals.H
+ReactSharedInternals.H = current === null
   ? HooksDispatcherOnMount    // Birinchi render — mountState
   : HooksDispatcherOnUpdate;   // Keyingi render — updateState
 ```
@@ -3983,11 +3992,11 @@ setCount(c => c);  // Functional, eager: c=0, return 0, Object.is(0, 0) → bail
 ```tsx
 const [items, setItems] = useState([1, 2, 3]);
 
-setItems([1, 2, 3]);  // Yangi array reference → no bailout, render
-// (Lekin items value bir xil — Reconciler shallowEqual children re-render qiladi)
+setItems([1, 2, 3]);  // Yangi array reference → Object.is false → bailout yo'q, re-render
+// (Element'lar qiymati bir xil bo'lsa-da, reference yangi — React buni "o'zgardi" deb biladi)
 
 setItems(items);  // Bir xil reference → eager bailout
-// (Lekin sizda eski items reference yo'q odatda — re-render uchun yangi yarataasiz)
+// (Lekin immutable update'da har doim yangi reference yaratasiz — bu yo'l kamdan-kam uchraydi)
 ```
 
 Reference identity asosidagi bailout — performance optimization, lekin object/array state'da shubhali. `useMemo` bilan stabilize:
@@ -4016,12 +4025,13 @@ Functional update'da React function'ni eager hisoblaydi va natijani `lastRendere
 
 ```tsx
 setCount(c => Math.random());  // Har chaqiruv yangi qiymat
-// Eager bailout: function ikki marta chaqiriladi (eager + render Phase). Har safar
-// yangi Math.random() — ikki natija farqli bo'lsa render commit boshqa qiymat ko'rsatadi.
-// Bu — render purity invariantini buzadi: functional updater pure bo'lishi shart.
+// StrictMode dev'da functional updater 2 marta chaqiriladi (impurity'ni topish uchun).
+// Math.random() har safar boshqa natija beradi — bu render purity invariantini buzadi.
+// (Eager bailout yo'lida hisoblangan natija update.eagerState'da saqlanadi va
+//  render Phase'da qayta chaqirilmaydi — lekin updater baribir pure bo'lishi shart.)
 ```
 
-Functional updater'lar **pure** bo'lishi shart (cross-ref [`09-component-basics.md`](09-component-basics.md) — Render Purity). Side effects, random, Date.now — taqiqlanadi. Aks holda Strict Mode ham bu invariantni bezovta qiladi.
+Functional updater'lar **pure** bo'lishi shart (cross-ref [`09-component-basics.md`](09-component-basics.md) — Render Purity). Side effect, `Math.random()`, `Date.now()` — taqiqlanadi. StrictMode dev'da React updater'ni 2 marta chaqirib bu invariantni tekshiradi.
 
 **Bailout chain — nested components:**
 
@@ -4082,34 +4092,38 @@ function dispatchSetState(fiber, queue, action) {
 
 ```ts
 function bailoutOnAlreadyFinishedWork(current, workInProgress, renderLanes) {
-  if (current !== null) {
-    // Pending work tekshirish
-    if (!includesSomeLane(renderLanes, workInProgress.lanes)) {
-      // No pending work — bailout
-      return null;
-    }
+  // childLanes — subtree'da pending work bor-yo'qligini bildiradi
+  if (!includesSomeLane(renderLanes, workInProgress.childLanes)) {
+    // Children'da ham ish yo'q — butun subtree skip qilinadi
+    return null;
   }
   
-  // Otherwise — proceed with render
-  return cloneChildFibers(current, workInProgress);
+  // Fiber'ning o'zida ish yo'q, lekin subtree'da bor —
+  // child fiber'lar clone qilinib davom etiladi
+  cloneChildFibers(current, workInProgress);
+  return workInProgress.child;
 }
 ```
 
-Reconciler `current.memoizedProps === workInProgress.pendingProps` (Object.is) → bailout (cross-ref `04-reconciliation.md`).
+Reconciler `oldProps !== newProps` (reference `!==`, ya'ni `current.memoizedProps` va `workInProgress.pendingProps`) tekshiradi — teng bo'lsa va pending work yo'q bo'lsa bailout (cross-ref `04-reconciliation.md`). `React.memo` esa props uchun `shallowEqual` ishlatadi.
 
-**`Object.is` ECMAScript spec (SameValue, ECMA-262 §7.2.11):**
+**`Object.is` ECMAScript spec — `SameValue` abstract operation:**
 
 ```
 SameValue(x, y):
   1. If Type(x) is different from Type(y), return false.
-  2. If Type(x) is Number or BigInt, return SameValueNonNumber/SameValueZero variants:
+  2. If Type(x) is Number, return Number::sameValue(x, y):
      - If x is NaN and y is NaN, return true.
      - If x is +0 and y is -0 (or vice versa), return false.
      - If x and y are the same Number value, return true.
      - Return false.
-  3. If Type(x) is String, return true if same code unit sequence, else false.
-  4. If Type(x) is Boolean/Null/Undefined/Symbol/Object — standard equality rules.
+  3. Otherwise, return SameValueNonNumber(x, y):
+     - String — same code unit sequence
+     - Boolean/Null/Undefined — same value
+     - Symbol/Object — same identity (reference)
 ```
+
+`SameValue` `SameValueZero`'dan farq qiladi: `SameValueZero` `+0` va `-0`'ni teng deb biladi (`Array.prototype.includes`, `Map` kalitlari uchun), `SameValue` esa ularni farqlaydi.
 
 Tafovut'lar `===`'dan:
 - `Object.is(NaN, NaN)` → true (`===` false)
@@ -4757,6 +4771,10 @@ Custom hook pattern — useState + useCallback birikmasi. Closure trap'siz, type
 - **Fiber state queue** — circular linked list, har hook'ning o'z queue'si
 - **`mountState`** birinchi render'da (initial value hisoblash + queue yaratish), **`updateState`** keyingi render'larda (initialState e'tiborsiz, queue'dan latest state)
 - **Hooks linked list** — position muhim, conditional hook → Rules of Hooks violation
+
+---
+
+**Keyingi bo'lim:** [13-event-handling.md](13-event-handling.md) — Event handling: SyntheticEvent (cross-browser wrapper), event delegation root container'da (R17+ document emas), `onClick` kabi camelCase handler'lar, `e.preventDefault()` / `e.stopPropagation()`, va event pooling olib tashlanishi (R17+).
 - **Bailout** — `Object.is(eski, yangi) === true` → render skip (eager dispatchSetState'da, late Reconciliation'da)
 
 Keyingi bo'limda Event Handling — SyntheticEvent, event delegation history (R16 document → R17+ root container), event pooling olib tashlanishi (R17), R19 `<form action={fn}>`, va TypeScript event types yoritiladi.

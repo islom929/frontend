@@ -28,7 +28,7 @@
 
 ### Qisqa javob
 
-R19'da `<title>`, `<meta>`, `<link>` tag'larni komponent ichida har qayerda yozsangiz — React DOM ularni avtomat `<head>` ga ko'chiradi (hoist). Eski versiyalarda `react-helmet` library kerak bo'lardi. R19'da native, faqat React DOM bilan. **Muhim:** React `<title>` va `<meta>` tag'larni **deduplicate qilmaydi** — agar siz ikkita `<title>` render qilsangiz, ikkalasi ham `<head>` ga qo'shiladi va brauzer **birinchisini** tab title sifatida ishlatadi (DOM order bo'yicha birinchi `<title>`). Faqat `<link rel="stylesheet" precedence="...">` va `<script async src="...">` — `href`/`src` bo'yicha deduplicated. Komponent `useEffect`'siz, declarative tarzda metadata yozadi.
+R19'da `<title>`, `<meta>`, `<link>` tag'larni Component ichida har qayerda yozsangiz — React DOM ularni avtomat `<head>` ga ko'chiradi (hoist). Eski versiyalarda `react-helmet` library kerak bo'lardi. R19'da native, faqat React DOM bilan. **Muhim:** React `<title>` va `<meta>` tag'larni **deduplicate qilmaydi** — agar siz ikkita `<title>` render qilsangiz, ikkalasi ham `<head>` ga qo'shiladi va brauzer **birinchisini** tab title sifatida ishlatadi (DOM order bo'yicha birinchi `<title>`). Faqat `<link rel="stylesheet" precedence="...">` va `<script async src="...">` — `href`/`src` bo'yicha deduplicated. Component `useEffect`'siz, declarative tarzda metadata yozadi.
 
 ### To'liq tushuntirish
 
@@ -308,7 +308,7 @@ function Analytics() {
 - **Multiple `<title>`**: React ikkalasini ham `<head>` ga qo'shadi. Brauzer DOM order bo'yicha **birinchi** `<title>` ni ishlatadi (brauzer xatti-harakati, React policy emas). Bitta `<title>` xohlasangiz — JSX'da bittasini render qiling.
 - **`<meta>` bir xil `name` bilan**: Hammasi `<head>` ga qo'shiladi. SEO crawler'lari uchun semantika `<meta>` turiga bog'liq (og:image multi-value, description faqat 1 ta).
 - **`<title>` outside React (initial HTML)**: Brauzer index.html'dagi `<title>`'ni initial-render uchun ishlatadi; React mount bo'lib `<title>` chiqargach — yangi tag head'ga qo'shiladi va u DOM'da birinchi bo'lmaguncha tab title o'zgarmasligi mumkin.
-- **Conditional rendering**: Komponent unmount — element head'dan o'chiriladi.
+- **Conditional rendering**: Component unmount — element head'dan o'chiriladi.
 
 ### Follow-up savollar
 
@@ -328,7 +328,7 @@ function Analytics() {
 
 ### Qisqa javob
 
-R19'da `<link rel="stylesheet" href="..." precedence="...">` — komponent ichida declarative stylesheet load. `precedence` — JSX-level prop (DOM'ga `data-precedence` attribute'i sifatida render qilinadi). Bir xil precedence ichida render order saqlanadi, har xil precedence'lar — React emit qilgan tartibda joylashtiriladi. React stylesheet load'ini kuzatadi: agar component render'ida `<link rel="stylesheet" precedence>` topilsa va u hali yuklanmagan bo'lsa — React **commit'ni kechiktiradi** (yangi DOM hali insert qilinmaydi) va eng yaqin Suspense boundary'ning fallback'ini ko'rsatadi (FOUC oldini olish). Bir xil `href` — deduplicated.
+R19'da `<link rel="stylesheet" href="..." precedence="...">` — Component ichida declarative stylesheet load. `precedence` — JSX-level prop (DOM'ga `data-precedence` attribute'i sifatida render qilinadi). Bir xil precedence ichida render order saqlanadi, har xil precedence'lar — React emit qilgan tartibda joylashtiriladi. React stylesheet load'ini kuzatadi: agar component render'ida `<link rel="stylesheet" precedence>` topilsa va u hali yuklanmagan bo'lsa — React **commit'ni kechiktiradi** (yangi DOM hali insert qilinmaydi) va eng yaqin Suspense boundary'ning fallback'ini ko'rsatadi (FOUC oldini olish). Bir xil `href` — deduplicated.
 
 > **Nuance:** React render qadamini "block" qilmaydi — render davom etadi va RSC payload yoki HTML chunk emit bo'lishi mumkin, lekin client'da CSS yuklanmaguncha **commit phase** kechikadi.
 
@@ -369,7 +369,7 @@ function ProductPage() {
 
 **Why delay commit on stylesheet?**
 
-FOUC (Flash of Unstyled Content) — DOM content rendered before CSS loads → user sees unstyled flash. R19: yangi tree'ga `<link rel="stylesheet" precedence>` qo'shilsa, React commit'ni shu link'lar yuklanmaguncha kechiktiradi (Suspense fallback ko'rinadi yoki transition pending bo'lib turadi). Render davom etishi mumkin (ParentDOMHasNotMounted), faqat **commit** kechikadi.
+FOUC (Flash of Unstyled Content) — DOM content rendered before CSS loads → user sees unstyled flash. R19: yangi tree'ga `<link rel="stylesheet" precedence>` qo'shilsa, React commit'ni shu link'lar yuklanmaguncha kechiktiradi (Suspense fallback ko'rinadi yoki transition pending bo'lib turadi). Render phase davom etadi (yangi DOM hali insert qilinmaydi), faqat **commit phase** kechikadi.
 
 ### Kod misoli
 
@@ -517,7 +517,7 @@ function loadStylesheet(href: string): Promise<void> {
 
 ### Qisqa javob
 
-R19'da `<script async src="...">` — komponent ichida declarative async script load. React `src` bo'yicha **deduplicates** — bir xil src bilan multiple `<script>` instances bitta script tag'da hoist qilinadi. Synchronous va non-async scripts hoist qilinmaydi (chunki ular execution order critical). Async scripts — hoist + deduplicate. Use case: third-party (analytics, chat widgets, ads), feature flag scripts.
+R19'da `<script async src="...">` — Component ichida declarative async script load. React `src` bo'yicha **deduplicates** — bir xil src bilan multiple `<script>` instances bitta script tag'da hoist qilinadi. Synchronous va non-async scripts hoist qilinmaydi (chunki ular execution order critical). Async scripts — hoist + deduplicate. Use case: third-party (analytics, chat widgets, ads), feature flag scripts.
 
 ### To'liq tushuntirish
 
@@ -896,16 +896,16 @@ function ProductPage({ product }: Props) {
 
 ```tsx
 // Before — react-helmet-async
-import { HelmetProvider } from "react-helmet-async";
+import { HelmetProvider, type FilledContext } from "react-helmet-async";
 
 function renderApp(req: Request) {
-  const helmetContext = {};
+  const helmetContext: Partial<FilledContext> = {};
   const html = renderToString(
     <HelmetProvider context={helmetContext}>
       <App />
     </HelmetProvider>
   );
-  const { helmet } = helmetContext as any;
+  const { helmet } = helmetContext as FilledContext;
   return `<head>${helmet.title}${helmet.meta}</head><body>${html}</body>`;
 }
 
@@ -1200,7 +1200,7 @@ Server-side:
 
 ### Qisqa javob
 
-R18 va undan oldingi versiyalarda Web Components (Custom Elements) bilan interop muammolari bor edi: (1) **Props as attributes only** — React har props'ni HTML attribute deb hisoblardi (string only), JS property emas. (2) **Custom events** — `addEventListener` manual qilinardi (`onMyEvent` ishlamasdi). (3) **Boolean/object props** — string'ga aylantirildi. (4) **TypeScript types** — manual deklaratsiya. R19'da properties to'g'ri ishlaydi (type-based dispatch). Custom events uchun — React avtomat `addEventListener` QILMAYDI, lekin function prop'lar property sifatida set qilinadi (WC tomonida setter orqali event handler'ga aylantirish mumkin).
+R18 va undan oldingi versiyalarda Web Components (Custom Elements) bilan interop muammolari bor edi: (1) **Props as attributes only** — React har props'ni HTML attribute deb hisoblardi (string only), JS property emas. (2) **Custom events** — `addEventListener` manual qilinardi (`onMyEvent` ishlamasdi). (3) **Boolean/object props** — string'ga aylantirildi. (4) **TypeScript types** — manual deklaratsiya. R19'da React DOM custom element prop'larini quyidagicha route qiladi: `on` bilan boshlanadigan function prop (`onMyEvent`) → React `addEventListener(eventName, value)` chaqiradi — event name prop nomidan literal `on` prefiks olib tashlangani (`name.slice(2)`, harf registri o'zgartirilmaydi: `onMyEvent` → `MyEvent`, `onClick` → `Click`); boshqa prop'lar uchun — agar `name in element` (property mavjud) bo'lsa `element[name] = value` (property assignment, value type'idan qat'iy nazar), aks holda `value === true` bo'lsa `setAttribute(name, "")`, qolgan holatlarda `setAttribute` (yoki `null`/`undefined`/function/symbol uchun `removeAttribute`).
 
 ### To'liq tushuntirish
 
@@ -1235,12 +1235,12 @@ function App() {
 function App() {
   return (
     <my-button
-      color="red"  // ✅ Set as property if exists, else attribute
-      onMyClick={(e) => console.log(e)}  // ✅ Function → element.onMyClick = fn (property)
+      color="red"  // ✅ 'color' in element bo'lsa property, aks holda attribute
+      onMyClick={(e) => console.log(e)}  // ✅ React addEventListener('MyClick', fn) chaqiradi
     />
   );
 }
-// WC tomonida `set onMyClick(fn)` orqali addEventListener qilinishi kerak
+// 'on' prefiksli function prop — React avtomat addEventListener qiladi (eventName = 'MyClick')
 ```
 
 ### Kod misoli
@@ -1250,20 +1250,26 @@ function App() {
 ```tsx
 import { useRef, useEffect } from "react";
 
+interface MyButtonElement extends HTMLElement {
+  color: string;
+  config: { size: number };
+}
+
 function MyButtonWrapper({ color, config, onClick }: Props) {
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<MyButtonElement>(null);
 
   useEffect(() => {
     if (!ref.current) return;
-    (ref.current as any).color = color;
-    (ref.current as any).config = config;
+    ref.current.color = color;
+    ref.current.config = config;
   }, [color, config]);
 
   useEffect(() => {
-    if (!ref.current) return;
+    const element = ref.current;
+    if (!element) return;
     const handler = (e: Event) => onClick(e as CustomEvent);
-    ref.current.addEventListener("my-click", handler);
-    return () => ref.current?.removeEventListener("my-click", handler);
+    element.addEventListener("my-click", handler);
+    return () => element.removeEventListener("my-click", handler);
   }, [onClick]);
 
   return <my-button ref={ref} />;
@@ -1306,33 +1312,49 @@ React.createElement("my-button", { color: "red", config: {...} });
 // → element.setAttribute("config", "[object Object]") ← BUG
 ```
 
-**R19 behavior:**
+**R19 behavior (custom elements uchun `setValueForPropertyOnCustomComponent` mantiqi):**
 
 ```typescript
-function setProp(element: HTMLElement, name: string, value: any) {
-  if (isCustomElement(element)) {
-    if (name in element) {
-      (element as any)[name] = value;
-    } else {
-      element.setAttribute(name, String(value));
+function setValueForPropertyOnCustomComponent(
+  node: Element,
+  name: string,
+  value: unknown,
+) {
+  // 1. 'on' prefiksli prop → addEventListener
+  if (name[0] === "o" && name[1] === "n") {
+    const useCapture = name.endsWith("Capture");
+    const eventName = name.slice(2, useCapture ? name.length - 7 : undefined);
+    if (typeof value === "function") {
+      node.addEventListener(eventName, value as EventListener, useCapture);
+      return;
     }
-  } else {
-    element.setAttribute(name, String(value));
   }
+
+  // 2. property mavjud bo'lsa — property assignment (value type'idan qat'iy nazar)
+  if (name in (node as any)) {
+    (node as any)[name] = value;
+    return;
+  }
+
+  // 3. value === true → bo'sh attribute
+  if (value === true) {
+    node.setAttribute(name, "");
+    return;
+  }
+
+  // 4. qolgan holatlar — setAttribute (null/undefined/function/symbol → removeAttribute)
+  setValueForAttribute(node, name, value);
 }
 ```
 
-**Function prop handling (R19 custom elements):**
+**Event handler prop handling (R19 custom elements):**
 
 ```typescript
-// React custom element'lar uchun avtomat addEventListener QILMAYDI
-// Function prop → element property sifatida set qilinadi
-function setProp(element: HTMLElement, name: string, value: unknown) {
-  if (typeof value === "function" && isCustomElement(element)) {
-    (element as any)[name] = value; // property assignment
-    // WC tomonida setter orqali addEventListener qilish mumkin
-  }
-}
+// 'on' prefiksli function prop uchun React AVTOMAT addEventListener qiladi
+// onMyClick → addEventListener('MyClick', handler)
+// onMyClickCapture → addEventListener('MyClick', handler, true)
+// Event name — prop nomidan literal 'on' olib tashlangani (name.slice(2), harf registri
+// o'zgartirilmaydi: 'onMyClick' → 'MyClick'). WC custom event nomi shu pattern'ga mos kelishi kerak.
 ```
 
 </details>
@@ -1360,39 +1382,45 @@ function setProp(element: HTMLElement, name: string, value: unknown) {
 
 ### Qisqa javob
 
-R19 custom element'lar (tag nomida `-` bor) bilan ishlaganda — props **value type'iga qarab** property yoki attribute sifatida set qilinadi. Detection logic: **funksiya yoki object/array** → element property sifatida (`element[name] = value`); **string yoki number** → HTML attribute (`element.setAttribute(name, ...)`). Boolean — agar `name in element` bo'lsa property, aks holda attribute (`false` → removeAttribute, `true` → setAttribute("", "")). R18'da hammasi attribute deb hisoblanardi va object → `"[object Object]"` ga aylanardi.
+R19 custom element'lar (tag nomida `-` bor) bilan ishlaganda — props **`name in element`** tekshiruvi bo'yicha property yoki attribute sifatida set qilinadi (value type bo'yicha emas). Detection logic: (1) `on` prefiksli prop (`onMyEvent`) → `addEventListener`. (2) Agar `name in element` (element'da shu nomli property mavjud) → `element[name] = value` (value type — function, object, string, number, boolean — qat'iy nazar). (3) Aks holda `value === true` → `setAttribute(name, "")`. (4) Qolgan holatlar → `setAttribute` (`null`/`undefined`/function/symbol → `removeAttribute`). R18'da hammasi attribute deb hisoblanardi va object → `"[object Object]"` ga aylanardi.
 
 ### Detection logic (R19)
 
 ```typescript
-// React DOM (custom elements uchun)
-function setValueForCustomProperty(node: Element, name: string, value: unknown) {
-  if (value === null || value === undefined) {
-    node.removeAttribute(name);
-    return;
+// React DOM — setValueForPropertyOnCustomComponent
+function setValueForPropertyOnCustomComponent(
+  node: Element,
+  name: string,
+  value: unknown,
+) {
+  // 1. Event handler prop → addEventListener
+  if (name[0] === "o" && name[1] === "n") {
+    const useCapture = name.endsWith("Capture");
+    const eventName = name.slice(2, useCapture ? name.length - 7 : undefined);
+    if (typeof value === "function") {
+      node.addEventListener(eventName, value as EventListener, useCapture);
+      return;
+    }
   }
-  // Type-based routing
-  if (typeof value === "function" || typeof value === "object") {
-    // Property — object/function setAttribute orqali xavfli (string'ga aylanadi)
+
+  // 2. property mavjud → property assignment (value type'idan qat'iy nazar)
+  if (name in (node as any)) {
     (node as any)[name] = value;
     return;
   }
-  if (typeof value === "boolean") {
-    if (name in node) {
-      (node as any)[name] = value;
-    } else if (value) {
-      node.setAttribute(name, "");
-    } else {
-      node.removeAttribute(name);
-    }
+
+  // 3. value === true → bo'sh attribute
+  if (value === true) {
+    node.setAttribute(name, "");
     return;
   }
-  // string / number — attribute sifatida
-  node.setAttribute(name, String(value));
+
+  // 4. qolgan holatlar — setAttribute (null/undefined/function/symbol → removeAttribute)
+  setValueForAttribute(node, name, value);
 }
 ```
 
-> **Source:** React DOM client va server renderer kodi — type-based dispatch. String prop'lar attribute, lekin custom element'larda WC `attributeChangedCallback` orqali property'ga sync qilinishi mumkin (WC implementation'ga bog'liq).
+> **Source:** React DOM `DOMPropertyOperations.js` — `setValueForPropertyOnCustomComponent`. Asosiy tekshiruv — `name in node`, value type emas. Object yoki function prop property bo'lib set qilinishi uchun custom element'da shu nomli property (yoki setter) mavjud bo'lishi shart; aks holda u attribute sifatida set qilinadi va object `"[object Object]"` ga aylanadi.
 
 ### Kod misoli
 
@@ -1416,9 +1444,9 @@ function App() {
 
   return (
     <my-card
-      config={config}        // ✅ Object → property (element.config = config)
-      disabled={true}         // ✅ Boolean — agar 'disabled' in element → property; aks holda attribute=""
-      title="Hello"           // ✅ String → attribute (setAttribute('title', 'Hello'))
+      config={config}        // ✅ 'config' in element (setter mavjud) → property (element.config = config)
+      disabled={true}         // ✅ 'disabled' in element → property; aks holda value===true → setAttribute('disabled','')
+      title="Hello"           // ✅ 'title' HTMLElement'da mavjud → property (element.title = 'Hello')
     />
   );
 }
@@ -1445,32 +1473,37 @@ declare global {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Detection algorithm:**
+**Detection algorithm (`name in node` birinchi, value type emas):**
 
 ```typescript
-function setValueForCustomProperty(node: Element, name: string, value: any) {
-  if (typeof value === "function") {
-    setProperty(node, name, value);
-    return;
-  }
-  if (typeof value === "object" || Array.isArray(value)) {
-    setProperty(node, name, value);
-    return;
-  }
-  if (typeof value === "boolean") {
-    if (name in node) {
-      setProperty(node, name, value);
-    } else {
-      if (value) node.setAttribute(name, "");
-      else node.removeAttribute(name);
+function setValueForPropertyOnCustomComponent(
+  node: Element,
+  name: string,
+  value: any,
+) {
+  // Event handler prop → addEventListener
+  if (name[0] === "o" && name[1] === "n") {
+    const useCapture = name.endsWith("Capture");
+    const eventName = name.slice(2, useCapture ? name.length - 7 : undefined);
+    if (typeof value === "function") {
+      node.addEventListener(eventName, value, useCapture);
+      return;
     }
+  }
+
+  // property mavjud → assignment (function, object, string, number, boolean — barchasi)
+  if (name in node) {
+    (node as any)[name] = value;
     return;
   }
-  if (name in node) {
-    setProperty(node, name, value);
-  } else {
-    node.setAttribute(name, String(value));
+
+  if (value === true) {
+    node.setAttribute(name, "");
+    return;
   }
+
+  // null/undefined/function/symbol → removeAttribute; aks holda setAttribute
+  setValueForAttribute(node, name, value);
 }
 ```
 
@@ -1532,9 +1565,9 @@ class MyCard extends LitElement {
 
 ### Qisqa javob
 
-R19'da custom element'larning custom event'lari uchun `ref` + `useEffect` patterning'i hali ham eng aniq usul, lekin **funksiya prop'lari property sifatida set qilinadi** (R19'ning yangi xulq-atvori): agar `<my-form on-form-submit={fn}>` yozsangiz va WC `on-form-submit` property'sini ko'rsatsa — React `element['on-form-submit'] = fn` qiladi. JSX-da React **sintetik event sistemasi** standart HTML element'lar uchun ishlatiladi (`onClick`, `onChange` va h.k.); custom event nomlarini (`my-event`) React `onMyEvent` JSX prop'idan avtomat `addEventListener('my-event', ...)`'ga **konvertatsiya QILMAYDI** — bu rasmiy React DOM hech qachon va'da qilmagan xususiyat. Pattern: WC `event handler property` (`element.onmyEvent = fn`) qoidasiga rioya qilish yoki `ref`+`useEffect`.
+R19'da custom element'larda `on` prefiksli function prop — React `addEventListener` chaqiradi: `<my-form onMyEvent={fn}>` → `element.addEventListener("MyEvent", fn)`. **Muhim nuance:** event name — prop nomidan `on` olib tashlangani, **case o'zgartirilmaydi** (`onMyEvent` → `"MyEvent"`, `onmysubmit` → `"mysubmit"`). React kebab-case'ga (`my-event`) konvertatsiya QILMAYDI. Shu sababli WC tomoni `dispatchEvent(new CustomEvent("MyEvent"))` qilishi kerak — agar WC `"my-event"` (kebab) dispatch qilsa, `onMyEvent` prop ishlamaydi. Aynan shu case-mismatch tufayli `ref` + `useEffect` bilan aniq event name'ni qo'lda berish hali ham eng ishonchli usul (ayniqsa kebab-case yoki Lit'ning kebab-case event konvensiyasidagi WC'lar uchun).
 
-> **Nuance:** Internetdagi ko'pchilik makola "R19 custom events native support" deydi, lekin aslida bu — funksiya prop'larini property sifatida set qilish (general feature). WC tomonida `set onMyEvent(fn) { this.addEventListener('my-event', fn) }` qilingan bo'lsa — React `<my-elem onMyEvent={fn}>` bilan ishlaydi. Yoki Lit kabi library'lar buni avtomat qiladi.
+> **Nuance:** "R19 custom events native support" da'vosi to'g'ri, lekin event name mapping naive: `on` olib tashlanadi, case saqlanadi (`name.slice(2)`). Lit kabi library'lar event'larni odatda kebab-case (`my-event`) dispatch qiladi — bunda `onMyEvent` JSX prop mos kelmaydi, `ref` + `addEventListener("my-event")` kerak.
 
 ### Kod misoli
 
@@ -1561,25 +1594,24 @@ function App() {
 }
 ```
 
-**2) WC tomonida event handler property — ixtiyoriy R19 pattern:**
+**2) `on` prefiksli prop — React avtomat addEventListener (event name = prop minus `on`, case saqlanadi):**
 
 ```tsx
-// my-form WC ichida:
+// my-form WC ichida — event name 'FormSubmit' (case JSX prop bilan mos kelishi shart):
 class MyForm extends HTMLElement {
-  set onFormSubmit(fn: ((e: CustomEvent) => void) | null) {
-    if (this._handler) this.removeEventListener("form-submit", this._handler);
-    this._handler = fn ?? undefined;
-    if (fn) this.addEventListener("form-submit", fn);
+  connectedCallback() {
+    // dispatchEvent name React hisoblaydigan name bilan AYNAN mos:
+    // onFormSubmit → addEventListener('FormSubmit') → dispatchEvent(new CustomEvent('FormSubmit'))
+    this.dispatchEvent(new CustomEvent("FormSubmit", { detail: { value: "x" } }));
   }
-  // ... connectedCallback dispatches new CustomEvent("form-submit", ...)
 }
 customElements.define("my-form", MyForm);
 
 // React JSX:
 function App() {
   return <my-form onFormSubmit={(e) => console.log(e.detail)} />;
-  // R19: function prop → element.onFormSubmit = fn (property)
-  // WC setter manages addEventListener internally
+  // R19: 'on' prefiksli function prop → element.addEventListener('FormSubmit', fn)
+  // Agar WC 'form-submit' (kebab) dispatch qilsa — bu prop ISHLAMAYDI (case/format mismatch)
 }
 ```
 
@@ -1609,23 +1641,22 @@ declare global {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Reality check — React DOM xulq-atvori:**
+**Reality check — React DOM xulq-atvori (`setValueForPropertyOnCustomComponent`):**
 
 ```typescript
-// React DOM custom element handling (mental model):
-function setProp(node: Element, propName: string, value: unknown) {
-  const isCustomElement = node.localName.includes("-"); // localName — lowercase (React DOM ham shu)
-
-  // Standard HTML event'lar (onClick, onChange) — React synthetic events
-  // Custom event name'lar (`my-event`) avtomat camelCase JSX prop'iga MAP qilinmaydi
-
-  if (typeof value === "function" && isCustomElement) {
-    // R19: function prop → element.<propName> = value (property assignment)
-    // Aks holda — standart synthetic event sistemasi
-    (node as any)[propName] = value;
-    return;
+// React DOM custom element handling (haqiqiy mantiq):
+function setValueForPropertyOnCustomComponent(node: Element, name: string, value: unknown) {
+  // 'on' prefiksli function prop → addEventListener
+  if (name[0] === "o" && name[1] === "n") {
+    const useCapture = name.endsWith("Capture");
+    const eventName = name.slice(2, useCapture ? name.length - 7 : undefined);
+    // Diqqat: 'onMyEvent' → eventName = 'MyEvent' (lowercase QILINMAYDI, kebab QILINMAYDI)
+    if (typeof value === "function") {
+      node.addEventListener(eventName, value as EventListener, useCapture);
+      return;
+    }
   }
-  // ... type-based dispatch
+  // boshqa prop'lar: name in node → property; value===true → setAttribute(name,''); aks holda setAttribute
 }
 ```
 
@@ -1638,9 +1669,10 @@ function setProp(node: Element, propName: string, value: unknown) {
 // Custom element + standart event:
 <my-card onClick={...} />    // React synthetic event system (click bubbles through)
 
-// Custom element + WC's custom event ("my-event"):
-<my-card onMyEvent={...} />  // ❌ React buni avtomat addEventListener qilmaydi
-                              // ✅ ref + useEffect kerak, YOKI WC setter pattern
+// Custom element + WC's custom event:
+<my-card onMyEvent={...} />  // React addEventListener('MyEvent', fn) chaqiradi
+                              // ✅ WC AYNAN 'MyEvent' dispatch qilsa ishlaydi
+                              // ❌ WC 'my-event' (kebab) dispatch qilsa — mos kelmaydi → ref+useEffect kerak
 ```
 
 **`composed: true` Shadow DOM ichidan:**
@@ -1833,7 +1865,7 @@ class MyInput extends HTMLElement {
 
 ### Qisqa javob
 
-Web Component (WC) vs React Component tanlash 4 ta omilga bog'liq: (1) **Framework agnostic** — WC har joyda ishlaydi (React, Vue, vanilla, Angular). React component faqat React'da. (2) **Encapsulation** — Shadow DOM CSS isolation. (3) **Bundle size** — Lit/Stencil kichik runtime (aniq hajm versiyaga bog'liq — bundlephobia.com'da tekshiring). React komponentlar — React bundle ichida. (4) **Ecosystem** — React rich (state mgmt, routing).
+Web Component (WC) vs React Component tanlash 4 ta omilga bog'liq: (1) **Framework agnostic** — WC har joyda ishlaydi (React, Vue, vanilla, Angular). React Component faqat React'da. (2) **Encapsulation** — Shadow DOM CSS isolation. (3) **Bundle size** — Lit/Stencil kichik runtime (aniq hajm versiyaga bog'liq — bundlephobia.com'da tekshiring). React Component'lar — React bundle ichida. (4) **Ecosystem** — React rich (state mgmt, routing).
 
 ### Decision matrix
 
@@ -1871,7 +1903,7 @@ class MyButton extends LitElement {
 
 // Usage anywhere:
 // React:    <my-button variant="primary">Click</my-button>
-// Vue:      <my-button :variant="primary">Click</my-button>
+// Vue:       <my-button variant="primary">Click</my-button>
 // Vanilla:  <my-button variant="primary">Click</my-button>
 ```
 
@@ -2151,7 +2183,7 @@ export default async function ProductsPage() {
 ```text
 R18 SSR (full client hydration):
 - Server: full app HTML render
-- Client: barcha komponent kodi yuklanadi
+- Client: barcha Component kodi yuklanadi
 - Hydration: butun tree event binding
 
 R19 RSC (split server/client):
@@ -2430,9 +2462,9 @@ import { ... } from "...";
 **Framework requirements:**
 
 - **Next.js App Router**: Built-in support
-- **Remix**: Support coming
+- **React Router v7 / Remix**: RSC support (Remix React Router'ga birlashtirilgan)
 - **Astro**: Hybrid (Astro components are server-only, can use React Server Components)
-- **Vite**: Plugin needed
+- **Vite / Parcel**: plugin orqali (Parcel RSC'ni qo'llab-quvvatlaydi)
 
 </details>
 
@@ -2604,11 +2636,12 @@ async function ServerComponent() {
 ```
 
 ```
-0:["$","Form",null,{"action":"$F1"}]
-1:F"action_id_with_encrypted_userId"
+0:["$","Form",null,{"action":"$h1"}]
+1:"action_id_with_encrypted_bound_userId"
 
-// Client sends action_id + data to server endpoint
-// Server decrypts userId, executes function
+// "$h<id>" — Server Reference marker (Flight model string)
+// Client sends action id + bound args to server endpoint
+// Server decrypts bound userId, executes function
 ```
 
 **Performance — sifat tomon:**
@@ -2734,12 +2767,12 @@ async function DashboardPage() {
 import { Suspense } from "react";
 
 async function SlowComponent() {
-  const data = await fetchSlow(); // 2s
+  const data = await fetchSlow(); // sekin API
   return <div>{data}</div>;
 }
 
 async function FastComponent() {
-  const data = await fetchFast(); // 100ms
+  const data = await fetchFast(); // tez API
   return <div>{data}</div>;
 }
 
@@ -2757,10 +2790,10 @@ export default function Page() {
   );
 }
 
-// Client timeline:
-// 100ms: FastComponent shown
-// 2000ms: SlowComponent shown
-// Progressive UI delivery
+// Client timeline (xronologik tartib):
+// [1] FastComponent ko'rinadi (tez API tugaydi)
+// [2] SlowComponent ko'rinadi (sekin API tugaydi)
+// Progressive UI delivery — har boundary mustaqil
 ```
 
 **Error handling:**
@@ -2905,7 +2938,7 @@ interface Props {
 }
 
 // MUHIM: Promise — stable reference bo'lishi kerak
-// Komponent body ichida `const p = fetch(...)` qilmang — har render yangi Promise
+// Component body ichida `const p = fetch(...)` qilmang — har render yangi Promise
 // Promise'ni parent (Server Component yoki Context) yaratib, prop sifatida uzating
 export function UserProfile({ userPromise }: Props) {
   const user = use(userPromise); // Pending bo'lsa suspend, rejected bo'lsa throw
@@ -2973,7 +3006,7 @@ function ClientComponent({ dataPromise }: { dataPromise: Promise<Data> }) {
 
 ### Qisqa javob
 
-Server Component → Client Component prop'lari **RSC payload** orqali serialize qilinadi. Serializable: primitives, plain objects, arrays, Date, Promise (R19 yangi), Server Actions (special). NOT serializable: functions (except Server Actions), classes (instances), Symbols, DOM nodes, Maps/Sets (mostly), refs, callbacks. Boundary: `"use client"` directive — props o'tadigan joy. Best practice: serializable data only, computations server-side, callbacks via Server Actions.
+Server Component → Client Component prop'lari **RSC payload** orqali serialize qilinadi. Serializable: primitives (`BigInt` ham), plain objects, arrays, `Date`, `Map`, `Set`, `FormData`, typed arrays, Promise, React Elements, Server Action references, registered global symbols (`Symbol.for(...)`). NOT serializable: oddiy funksiyalar (Server Action emas), class instance'lar, anonymous `Symbol()`, DOM node'lar, refs, generator/iterator. Boundary: `"use client"` directive — props o'tadigan joy. Best practice: serializable data only, computations server-side, callbacks via Server Actions.
 
 ### Serialization rules:
 
@@ -3126,10 +3159,10 @@ async function action() {
   // ... server code
 }
 
-// Wire format: $F"action_id_<encrypted>"
-// Client receives reference, not code
-// Client invocation → POST /_actions/action_id
-// Server decrypts, executes, returns result
+// Wire format: "$h<id>" — Server Reference marker (Flight model string)
+// Client receives reference (action id + metadata), not code
+// Client invocation → POST endpoint, action id header bilan
+// Server decrypts bound args, executes, returns result
 ```
 
 **Closure encryption:**
@@ -3179,8 +3212,8 @@ const date = new Date(payload.date);
 **BigInt:**
 
 ```typescript
-// Wire format: "$N123n" (custom encoding)
-// Or as string with BigInt suffix
+// Wire format: "$n123" — Flight model string'da "$n" prefiks + qiymat
+// Client: BigInt("123") ga deserialize qilinadi
 ```
 
 **Map and Set:**
@@ -3261,7 +3294,7 @@ function ClientComponent({ data, tags }: { data: Map<string, number>; tags: Set<
 
 ### Qisqa javob
 
-RSC pure React'da ishlamaydi — framework support kerak. Sabab: bundling (server vs client split), routing (per-route Server Components), data fetching infrastructure, RSC streaming protocol implementation. Currently support: **Next.js App Router** (built-in, well-supported), **Remix** (in development), **Astro** (hybrid), **Waku** (lightweight). Custom setup mumkin (React Server DOM Webpack/Bun/Deno + manual bundling), lekin kompleks. Plain React app (Vite, CRA) — RSC support yo'q (yet).
+RSC pure React'da ishlamaydi — framework support kerak. Sabab: bundling (server vs client split), routing (per-route Server Components), data fetching infrastructure, RSC streaming protocol implementation. Currently support: **Next.js App Router** (built-in, well-supported), **React Router v7 / Remix** (RSC support), **Astro** (hybrid), **Waku** (lightweight), **Parcel** (built-in RSC). Custom setup mumkin (React Server DOM Webpack/Bun/Deno + manual bundling), lekin kompleks. Plain CSR app (Vite SPA, deprecated CRA) — RSC support faqat plugin orqali.
 
 ### Why framework needed
 
@@ -3295,11 +3328,12 @@ RSC requires:
 | Framework | RSC | Server Actions | Streaming |
 |-----------|-----|----------------|-----------|
 | Next.js (App Router) | ✅ Production | ✅ Production | ✅ |
-| Remix | 🔄 In progress | 🔄 In progress | ✅ (without RSC) |
+| React Router v7 / Remix | ✅ | ✅ | ✅ |
 | Astro | ✅ (via React integration) | Limited | ✅ |
 | Waku | ✅ Minimal RSC | ✅ | ✅ |
-| Vite + plugins | ⚠️ Experimental | ⚠️ | ⚠️ |
-| Create React App | ❌ | ❌ | ❌ (deprecated) |
+| Parcel | ✅ | ✅ | ✅ |
+| Vite SPA (plugin'siz) | ❌ | ❌ | SSR plugin orqali |
+| Create React App (deprecated) | ❌ | ❌ | ❌ |
 
 ### Kod misoli (Next.js App Router)
 
@@ -3678,7 +3712,7 @@ const createPost = registerServerReference(
 
 Network tab:
 POST /api/some-route
-X-Next-Action: <hash>
+Next-Action: <hash>
 [FormData]
 
 Bu URL'ni xohlagan kim curl/fetch orqali ham chaqirishi mumkin —
@@ -3864,8 +3898,8 @@ function ClientForm() {
 import { useFormStatus } from "react-dom"; // 'react-dom' — 'react' EMAS
 
 function SubmitButton() {
-  // useFormStatus — faqat parent <form>'ning DESCENDANT komponentida ishlaydi
-  // Form'ning O'ZI render qiladigan komponentda chaqirilsa — pending har doim false
+  // useFormStatus — faqat parent <form>'ning DESCENDANT Component'ida ishlaydi
+  // Form'ning O'ZI render qiladigan Component'da chaqirilsa — pending har doim false
   const { pending, data, method, action } = useFormStatus();
   return (
     <button type="submit" disabled={pending}>
@@ -3878,12 +3912,12 @@ function Form() {
   return (
     <form action={action}>
       <input name="data" />
-      <SubmitButton /> {/* ✅ <form> ichidagi child komponent */}
+      <SubmitButton /> {/* ✅ <form> ichidagi child Component */}
     </form>
   );
 }
 
-// ❌ Anti-pattern: useFormStatus formni render qiladigan komponentda
+// ❌ Anti-pattern: useFormStatus formni render qiladigan Component'da
 function BadForm() {
   const { pending } = useFormStatus(); // ❌ Doim { pending: false }
   return <form action={action}>...</form>;
@@ -4368,27 +4402,25 @@ Aniq raqamlar deployment platformasi, payload, va ish yukiga bog'liq (Vercel Edg
 // react-server-dom-webpack/server.browser — for tests/dev
 ```
 
-**Suspense streaming flow:**
+**Suspense streaming flow (hodisalar ketma-ketligi, vaqtlar illyustrativ):**
 
 ```
 Server timeline:
-0ms: Render starts
-50ms: Shell ready
-50ms: Stream begins, send shell HTML
-100ms: First Suspense boundary resolves
-100ms: Send chunk for that boundary
-2000ms: Second Suspense boundary resolves
-2000ms: Send second chunk
-2050ms: Stream ends
+[1] Render starts
+[2] Shell ready
+[3] Stream begins, send shell HTML
+[4] First Suspense boundary resolves → send chunk for that boundary
+[5] Second (slow) Suspense boundary resolves → send second chunk
+[6] Stream ends
 ```
 
-**Browser receiving:**
+**Browser receiving (xronologik tartib):**
 
 ```
-0ms: TTFB (50ms)
-100ms: First paint (shell visible)
-200ms: First Suspense replaced
-2100ms: Second Suspense replaced
+[1] TTFB — birinchi bayt keladi
+[2] First paint (shell visible)
+[3] First Suspense fallback'i real content'ga almashtiriladi
+[4] Second (slow) Suspense almashtiriladi
 ```
 
 </details>
@@ -4510,26 +4542,26 @@ async function Reviews({ productId }: { productId: string }) {
 export default ProductList;
 ```
 
-**Streaming timeline:**
+**Streaming timeline (hodisalar ketma-ketligi, vaqtlar illyustrativ):**
 
 ```
-0ms:    HTML shell streamed (header, footer, main skeleton)
-50ms:   Browser TTFB
-100ms:  Browser shows shell
-200ms:  Products fetched server-side, products list streamed
-        Browser replaces main skeleton with products
-500ms:  Reviews for product 1 fetched, streamed
-        Browser replaces reviews skeleton 1
-800ms:  Reviews for product 2 fetched, streamed
-1200ms: All reviews loaded
+[1] HTML shell streamed (header, footer, main skeleton)
+[2] Browser TTFB
+[3] Browser shows shell
+[4] Products fetched server-side, products list streamed
+    → Browser replaces main skeleton with products
+[5] Reviews for product 1 fetched, streamed
+    → Browser replaces reviews skeleton 1
+[6] Reviews for product 2 fetched, streamed
+[7] All reviews loaded
 ```
 
-**Hydration progression:**
+**Hydration progression (xronologik tartib):**
 
 ```
-100ms: Header hydrated (Client Component, eager)
-200ms: Main hydrates as content streams
-500ms: Reviews hydrate as they arrive
+[1] Header hydrated (Client Component, eager)
+[2] Main hydrates as content streams
+[3] Reviews hydrate as they arrive
 ```
 
 <details>
@@ -4619,7 +4651,7 @@ R17 SSR (full-page hydration):
 - TTFB — barcha server'side data fetch + full HTML render
 - FCP — TTFB'dan keyin paint
 - TTI — full JS bundle hydrate
-- JS bundle — barcha komponentlar client'da
+- JS bundle — barcha Component'lar client'da
 
 R19 RSC + Streaming:
 - TTFB — shell tezda emit (Suspense fallback ko'rinadi)
@@ -4749,18 +4781,19 @@ Real metric'lar production RUM (Vercel/Cloudflare Analytics) yoki Web Vitals lib
 
 ### Qisqa javob
 
-R19'da: (1) **`propTypes`** — function component'larda runtime check olib tashlandi (TypeScript bilan kerak emas). Class component'larda hali ham mavjud, lekin dev-only warning. (2) **`defaultProps`** — function component'larda deprecated (console warning beradi, hali olib tashlanmagan). Class component'lar uchun to'liq saqlanadi. (3) **String refs** (`ref="myRef"`) — olib tashlandi (allaqachon R16'da deprecated edi). (4) **`React.createFactory`** — olib tashlandi. (5) **Legacy Context** (`childContextTypes`, `getChildContext`) — olib tashlandi.
+R19'da: (1) **`propTypes`** — function component'larda olib tashlandi, ishlatilsa **silently ignored** (runtime check yo'q; TypeScript tavsiya qilinadi). Class component'lar ham `propTypes`'ni endi tekshirmaydi. (2) **`defaultProps`** — function component'larda **olib tashlandi** (default qiymat endi qo'llanmaydi; o'rniga ES default parameters). Class component'lar uchun esa to'liq saqlanadi (ES6 alternativasi yo'qligi sababli). (3) **String refs** (`ref="myRef"`) — olib tashlandi (allaqachon R16'da deprecated edi). (4) **`React.createFactory`** — olib tashlandi. (5) **Legacy Context** (`childContextTypes`, `getChildContext`) — olib tashlandi.
 
 ### Kod misoli
 
-**R19 dev warning — function component'da `defaultProps`:**
+**R19 — function component'da `defaultProps` qo'llanmaydi:**
 
 ```tsx
 function Greeting({ name }: { name: string }) {
   return <h1>Hello, {name}</h1>;
 }
 
-// ❌ R19 console warning
+// ❌ R19'da bu default qiymat QO'LLANMAYDI (function component'da defaultProps olib tashlangan)
+// <Greeting /> → name === undefined (oldingi "World" emas)
 Greeting.defaultProps = { name: "World" };
 ```
 
@@ -4802,8 +4835,8 @@ class Greeting extends React.Component<{ name?: string }> {
 |-----|--------|-------------|
 | `React.createFactory(Component)` | Removed | `React.createElement` / JSX |
 | String refs (`ref="name"`) | Removed | Object refs / callback refs |
-| Function component `defaultProps` | Warning → keyinroq removal | ES default parameters |
-| Function component `propTypes` | Removed (build warning) | TypeScript |
+| Function component `defaultProps` | Removed (default qo'llanmaydi) | ES default parameters |
+| Function component `propTypes` | Removed (silently ignored) | TypeScript |
 | Legacy Context (`getChildContext`) | Removed | `createContext` + `Provider` |
 | `ReactDOM.render` | Already removed in R18 | `createRoot` |
 | `ReactDOM.hydrate` | Already removed in R18 | `hydrateRoot` |
@@ -4840,8 +4873,8 @@ React jamoasi class component'larni hozircha rasman deprecate qilmagan, lekin ya
 ### Edge Cases
 
 - **`getDerivedStateFromProps` `defaultProps` bilan**: Class'da hali ishlaydi.
-- **`memo` + `defaultProps`**: `memo(FunctionComponent)` — `defaultProps` ishlamaydi.
-- **PropTypes runtime check'lari**: Class'da ishlaydi, function'da yo'q.
+- **`memo` + `defaultProps`**: `memo(FunctionComponent)` — `defaultProps` ishlamaydi (function component'da default qo'llanmaydi).
+- **PropTypes runtime check'lari**: R19'da `propType` check'lar React package'dan olib tashlandi — class va function component'larda ham silently ignored.
 
 ### Follow-up savollar
 
@@ -4859,7 +4892,7 @@ React jamoasi class component'larni hozircha rasman deprecate qilmagan, lekin ya
 
 ### Qisqa javob
 
-R19'da `startTransition` **async funksiyani** qabul qiladi — R18'da faqat sync edi va `await`'dan keyingi `setState`'lar transition'dan tashqarida qolardi. R19: `startTransition(async () => { ... await ... setState(...) ... })` ichidagi har bir `setState` (`await`'dan keyin ham) transition lane'da pastroq priority bilan ishlatiladi. `useTransition` Hook'ning `isPending` — async work tugaguncha `true`. Server Action (`<form action={fn}>`) — avtomat transition'da wrapped.
+R19'da `startTransition` **async funksiyani** qabul qiladi (Actions feature). `useTransition` Hook'ning `isPending` — async funksiya ichidagi awaited Promise'lar tugaguncha `true` bo'lib turadi. **MUHIM cheklov:** `startTransition` funksiyasi sinxron chaqiriladi va faqat **`await`'dan oldin** sinxron schedule qilingan `setState`'lar transition deb belgilanadi. **`await`'dan keyingi `setState`'lar avtomat transition EMAS** — ularni qo'shimcha `startTransition` ichiga o'rash kerak (`startTransition(() => setState(...))`). Bu React jamoasi tan olgan known limitation (kelajakda hal qilinadi). Server Action (`<form action={fn}>`, `useActionState`) — avtomat transition'da wrapped (`await` boundary'ni o'zi to'g'ri boshqaradi).
 
 ### Kod misoli
 
@@ -4887,12 +4920,17 @@ const [isPending, startTransition] = useTransition();
 
 const handleClick = () => {
   startTransition(async () => {
-    setLoading(true);
+    setLoading(true);                 // ✅ Transition (await'dan oldin, sinxron)
     const data = await fetchData();
-    setData(data);          // ✅ Transition (R19 yangi)
-    setLoading(false);      // ✅ Transition
+    // ❌ Quyidagi setState'lar await'dan KEYIN — avtomat transition EMAS:
+    // setData(data);   setLoading(false);   ← urgent bo'lib qoladi
+    // ✅ To'g'ri: await'dan keyingi setState'larni qayta startTransition'ga o'rash
+    startTransition(() => {
+      setData(data);                  // ✅ Transition
+      setLoading(false);              // ✅ Transition
+    });
   });
-  // isPending — async work tugaguncha true
+  // isPending — awaited Promise tugaguncha true
 };
 ```
 
@@ -4949,20 +4987,23 @@ function Form() {
 }
 ```
 
-**Error handling async transition'da:**
+**Error handling async transition'da (await'dan keyingi setState qayta o'raladi):**
 
 ```tsx
 const handleClick = () => {
   startTransition(async () => {
     try {
       const data = await fetchData();
-      setData(data);
+      // await'dan keyin — qo'shimcha startTransition kerak:
+      startTransition(() => setData(data));
     } catch (err) {
-      setError((err as Error).message);
+      startTransition(() => setError((err as Error).message));
     }
   });
 };
 ```
+
+> **Eslatma:** `useActionState`/`<form action>` ichida bu qo'lda o'rash kerak emas — React Action runtime `await` boundary'larini o'zi transition'da ushlab turadi. Qo'lda `startTransition(async ...)` ishlatganda esa `await`'dan keyingi har bir `setState`'ni qayta o'rash zarur.
 
 </details>
 
@@ -4975,7 +5016,7 @@ const handleClick = () => {
 ### Follow-up savollar
 
 - "`startTransition` async — qaysi versiyadan?" — R19.
-- "Pre-async qachon ishlatamiz?" — Sync setState bilan ham OK, lekin async bilan birga kuchli.
+- "`await`'dan keyingi setState transition'mi?" — Yo'q (qo'lda `startTransition(async)`'da). Qo'shimcha `startTransition` ichiga o'rash kerak — known limitation. `useActionState`/`<form action>` esa buni o'zi boshqaradi.
 
 </details>
 
@@ -5106,7 +5147,7 @@ const myFetch = cache(async (url: string) => fetch(url).then((r) => r.json()));
 
 | API | Scope | Mode |
 |-----|-------|------|
-| `useMemo` | Komponent instance, render bo'yicha | Client / Server |
+| `useMemo` | Component instance, render bo'yicha | Client / Server |
 | `cache` | Per-request | Server only |
 
 **Throw'lar ham cache:**
@@ -5151,7 +5192,7 @@ const fetchUser = cache(async (id: string) => {
 
 ### Qisqa javob
 
-`'use client'` va `'use server'` — **alohida fayllarda yashashi kerak** (bir faylda ikkalasi invalid). `'use client'` — fayl boshida (commentlardan keyin, import'dan oldin); fayl Client Boundary deb belgilanadi, har export — Client Component. `'use server'` — fayl boshida (har export — Server Action) yoki **function declaration ichida** birinchi statement (faqat shu funksiya Server Action). Arrow function body'sida ishlamaydi. Server Action **MAJBURIY `async function`**. Bundler (Webpack/Turbopack/Vite) directive'larni parse qilib, server/client split qiladi.
+`'use client'` va `'use server'` — **alohida fayllarda yashashi kerak** (bir faylda ikkalasi invalid). `'use client'` — fayl boshida (commentlardan keyin, import'dan oldin); fayl Client Boundary deb belgilanadi, har export — Client Component. `'use server'` — fayl boshida (har export — Server Action) yoki **funksiya body'sining birinchi statement'i** (faqat shu funksiya Server Action; block body'li arrow function ham ishlaydi, concise arrow body'da esa statement yo'qligi sababli joylanmaydi). Server Action **MAJBURIY `async function`**. Bundler (Webpack/Turbopack/Vite) directive'larni parse qilib, server/client split qiladi.
 
 ### Kod misoli
 
@@ -5186,12 +5227,12 @@ export async function deletePost(id: string) { /* ... */ }
 // Har export — async function bo'lishi MAJBURIY
 ```
 
-**`'use server'` inline — function declaration:**
+**`'use server'` inline — funksiya body'sining birinchi statement'i:**
 
 ```tsx
 // app/page.tsx — Server Component
 export default async function Page() {
-  // ✅ function declaration body birinchi statement
+  // ✅ funksiya body'sining birinchi statement'i
   async function handleSubmit(formData: FormData) {
     "use server";
     await db.save(formData.get("data"));
@@ -5200,13 +5241,18 @@ export default async function Page() {
   return <form action={handleSubmit}>...</form>;
 }
 
-// ❌ Arrow function — directive ishlamaydi
+// ✅ Block body'li arrow function ham ishlaydi (birinchi statement)
 async function Page2() {
   const handleSubmit = async (formData: FormData) => {
-    "use server"; // ❌ Arrow body'da invalid
+    "use server";
+    await db.save(formData.get("data"));
   };
   return <form action={handleSubmit}>...</form>;
 }
+
+// ❌ Concise arrow body — statement yo'q, directive joylanmaydi
+// const handleSubmit = async (fd: FormData) => db.save(fd.get("data"));
+//   → "use server" qo'shish uchun block body { } ga aylantirish kerak
 ```
 
 **Bir faylda ikkalasi — INVALID:**
@@ -5230,7 +5276,7 @@ export async function action() { /* ... */ }
 |-----------|-----------|--------|
 | `'use client'` | Fayl boshi (comment keyin, import oldin) | Faqat fayl-level; har export — Client |
 | `'use server'` (fayl) | Fayl boshi | Har export — Server Action |
-| `'use server'` (function) | `async function` declaration body birinchi statement | Faqat shu funksiya |
+| `'use server'` (function) | `async` funksiya body'sining (block body) birinchi statement'i | Faqat shu funksiya |
 
 **Bundler transformation:**
 
@@ -5334,7 +5380,7 @@ async function ServerComponent({ userId }: { userId: string }) {
 
 ### Follow-up savollar
 
-- "Directive arrow function'da nima uchun ishlamaydi?" — Bundler parser'i `async function declaration` body birinchi statement'ini izlaydi. Arrow body parse logic farqlanadi.
+- "Directive concise arrow body'da nega ishlamaydi?" — `"use server"` funksiya body'sining birinchi *statement*'i bo'lishi kerak. Concise arrow body (`=> expr`) statement saqlamaydi, shu sababli block body (`=> { "use server"; ... }`) ga aylantirish kerak.
 - "Test environment'lar?" — Vitest/Jest directive'larni ignore qiladi (faqat bundler uchun).
 
 </details>
@@ -5348,7 +5394,7 @@ async function ServerComponent({ userId }: { userId: string }) {
 
 ### Qisqa javob
 
-R19'da olib tashlangan: **`propTypes`** runtime check (function components), **String refs** (`ref="myInput"`), **Legacy Context API** (`childContextTypes`/`contextTypes`/`getChildContext`), **`React.createFactory`**. Deprecated (warning, hali mavjud): **`defaultProps`** (function components — class'da to'liq saqlanadi). Migration: TypeScript interfaces (propTypes), JS default params (defaultProps), `useRef`/callback refs (string refs), `createContext` (legacy Context).
+R19'da olib tashlangan: **`propTypes`** runtime check (React package'dan, silently ignored), **`defaultProps`** function component'lar uchun (default endi qo'llanmaydi — class component'larda saqlanadi), **String refs** (`ref="myInput"`), **Legacy Context API** (`childContextTypes`/`contextTypes`/`getChildContext`), **`React.createFactory`**. Migration: TypeScript interfaces (propTypes), JS default params (defaultProps), `useRef`/callback refs (string refs), `createContext` (legacy Context).
 
 ### Kod misoli
 
@@ -5499,7 +5545,7 @@ await act(async () => {
 ### Follow-up savollar
 
 - "What about `Suspense.hidden`?" — `<Activity>` (offscreen API) hali experimental. R19 stable'da mavjud emas, kelajak versiyalarda kutilmoqda.
-- "Will `forwardRef` be removed?" — Not yet. Phased out gradually (deprecated path, not removed).
+- "Will `forwardRef` be removed?" — R19'da deprecate qilinmagan va ishlaydi, lekin endi kerak emas — `ref` oddiy prop sifatida uzatiladi. Kelajak versiyada deprecate qilinishi rejalashtirilgan (R19'da emas).
 
 </details>
 
@@ -5510,7 +5556,7 @@ await act(async () => {
 Bu fayl React 19'ning to'liq spektrini qamrab oldi:
 
 - **QISM A — Document & Resource APIs** (6 savol): Hoisting (deduplikatsiya YO'Q `<title>`/`<meta>` uchun!), stylesheet/Suspense commit-delay, async script dedup, preload/preinit/prefetch `react-dom` orqali, react-helmet replacement, internal algorithm
-- **QISM B — Web Components Interop** (5 savol): Tarixiy muammolar, type-based property/attribute dispatch, custom events ref+effect pattern, slots/Shadow DOM, decision matrix
+- **QISM B — Web Components Interop** (5 savol): Tarixiy muammolar, `name in element` bo'yicha property/attribute dispatch, `on` prefiksli prop → `addEventListener` (event name = prop minus `on`, case saqlanadi), slots/Shadow DOM, decision matrix
 - **QISM C — RSC Concept** (6 savol): Server vs Client, directives, RSC payload (JSON-superset), async server components, serialization boundary, framework requirement
 - **QISM D — Server Actions** (2 savol): Concept (action ID public — auth majburiy), `<form action>`
 - **QISM E — Streaming & Architecture** (2 savol): renderToReadableStream/PipeableStream, RSC + Streaming + Suspense composition
@@ -5520,7 +5566,7 @@ Bu fayl React 19'ning to'liq spektrini qamrab oldi:
 
 1. **Server-first by default** — RSC reduces JS bundle dramatically
 2. **Document hoisting native** — react-helmet kerak emas, lekin `<title>`/`<meta>` deduplikatsiya YO'Q (brauzer birinchi `<title>`'ni oladi)
-3. **Web Components interop** — type-based dispatch (function/object → property, string → attribute), R19 custom events uchun ref+effect majburiy
+3. **Web Components interop** — `name in element` bo'lsa property, aks holda attribute (value type emas); `on` prefiksli function prop → `addEventListener('EventName')` (event name prop'dan `on` olib tashlangani, case saqlanadi). Kebab-case event'lar uchun ref+`addEventListener` ishonchliroq
 4. **Streaming + Suspense + RSC** — modern performance architecture
 5. **Server Actions** — declarative server mutations; action ID public → har action'da auth majburiy
 6. **`forwardRef` hali ham ishlaydi** — deprecated emas, lekin `ref` as prop tavsiya

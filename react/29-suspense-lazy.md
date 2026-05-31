@@ -79,7 +79,7 @@ QANDAY ISHLAYDI — "throwing promises" mexanizm:
 
 1. Komponent render paytida resource'ga muhtoj.
 2. Resource hali tayyor emas → komponent **Promise'ni throw qiladi**.
-3. React **eng yaqin Suspense boundary**'ni topadi (Fiber chain bo'ylab).
+3. React **eng yaqin Suspense boundary**'ni oladi (render davomida yuritilgan suspense handler stack'dan).
 4. Boundary `fallback` prop'ini render qiladi.
 5. Promise resolve bo'lganda — boundary qaytadan render qiladi.
 6. Komponent endi resource'ni `return` qiladi.
@@ -143,7 +143,8 @@ function performWork(workInProgress) {
       typeof thrownValue.then === 'function'
     ) {
       const wakeable = thrownValue;
-      const suspenseBoundary = findNearestSuspenseBoundary(workInProgress);
+      // Joriy boundary render davomida yuritilgan suspense handler stack'dan olinadi
+      const suspenseBoundary = getSuspenseHandler();
       
       if (suspenseBoundary) {
         // Mark boundary to show fallback
@@ -274,29 +275,35 @@ function App({ userId }: { userId: string }) {
 Custom thenable (rare):
 
 ```tsx
+type ResourceState<T> =
+  | { status: 'pending' }
+  | { status: 'fulfilled'; value: T }
+  | { status: 'rejected'; reason: Error };
+
 class CustomResource<T> {
-  status: 'pending' | 'fulfilled' | 'rejected' = 'pending';
-  value: T | null = null;
-  reason: Error | null = null;
-  promise: Promise<T>;
+  private state: ResourceState<T> = { status: 'pending' };
+  private promise: Promise<unknown>;
   
   constructor(loader: () => Promise<T>) {
     this.promise = loader().then(
       (value) => {
-        this.status = 'fulfilled';
-        this.value = value;
+        this.state = { status: 'fulfilled', value };
       },
-      (reason) => {
-        this.status = 'rejected';
-        this.reason = reason;
-      }
+      (reason: Error) => {
+        this.state = { status: 'rejected', reason };
+      },
     );
   }
   
   read(): T {
-    if (this.status === 'pending') throw this.promise;
-    if (this.status === 'rejected') throw this.reason;
-    return this.value!;
+    switch (this.state.status) {
+      case 'pending':
+        throw this.promise;       // Suspense ushlaydi
+      case 'rejected':
+        throw this.state.reason;  // Error Boundary ushlaydi
+      case 'fulfilled':
+        return this.state.value;  // discriminated union — non-null assertion kerak emas
+    }
   }
 }
 
@@ -360,7 +367,7 @@ QANDAY ISHLAYDI:
 
 1. Children render boshlanadi.
 2. Bir komponent Promise throw qiladi.
-3. React `findNearestSuspenseBoundary` chaqiradi.
+3. React `getSuspenseHandler()` orqali joriy (eng ichki) boundary'ni oladi.
 4. Boundary `flags |= ShowFallback` — fallback render trigger.
 5. `fallback` prop render qilinadi.
 6. Promise resolve → boundary "wake up" → children re-render.
@@ -390,14 +397,16 @@ const FiberTags = {
 Suspense Fiber memoizedState:
 
 ```javascript
-// Suspense state
+// SuspenseState — react-reconciler/src/ReactFiberSuspenseComponent.js
 {
-  dehydrated: null,           // for hydration
-  treeContext: null,           // tree state
-  retryLane: NoLane,           // retry priority
-  baseLanes: NoLanes,          // suspended lanes
+  dehydrated: null,            // SSR hydration uchun (SuspenseInstance yoki null)
+  treeContext: null,           // hydration tree state
+  retryLane: NoLane,           // retry priority lane
+  hydrationErrors: null,       // hydration paytidagi xatolar
 }
 ```
+
+Suspended primary tree'ning lanes'i Offscreen Fiber'ning state'ida (`baseLanes`) saqlanadi — SuspenseState'da emas.
 
 Reconciler Suspense handling:
 
@@ -410,9 +419,11 @@ function updateSuspenseComponent(workInProgress) {
     const fallbackChildren = workInProgress.pendingProps.fallback;
     const primaryChildren = workInProgress.pendingProps.children;
     
-    // Mount fallback fragment, suspend primary
+    // Fallback fragment ko'rsatiladi, primary Offscreen 'hidden' rejimda.
+    // Initial mount'da bu children DOM'ga commit qilinmaydi; allaqachon
+    // ko'rsatilgan content qayta suspend bo'lganda esa hidden holatda saqlanadi.
     const primaryFragment = createFiberFromOffscreenComponent({
-      mode: 'hidden',  // primary children rendered but hidden
+      mode: 'hidden',
       children: primaryChildren,
     });
     
@@ -433,7 +444,7 @@ Suspense ikki state:
 - **Primary** — children render.
 - **Fallback** — fallback render (Promise pending paytida).
 
-R18+ "offscreen" mode — primary children "hidden" rendered (DOM'da bor lekin ko'rinmaydi). Promise resolve paytida instant switch — UI flicker yo'q.
+R18+ primary children Offscreen Fiber (`mode: 'hidden'`) ichida saqlanadi. Initial mount paytida bu children'ning DOM'i hali commit qilinmaydi — faqat fallback ko'rinadi. Avval ko'rsatilgan content qayta suspend bo'lganda esa (transition) React eski DOM'ni saqlab turadi va fallback'ga sakramaydi — shu sababli flicker bo'lmaydi.
 
 </details>
 
@@ -544,7 +555,7 @@ QANDAY ISHLAYDI:
 
 NIMA UCHUN code splitting:
 
-1. **Bundle size** — initial bundle 200KB → 50KB (lazy chunks alohida).
+1. **Bundle size** — initial bundle kichrayadi (lazy chunk'lar alohida fayl, dastlabki yuklashda kelmaydi).
 2. **First Contentful Paint** — tezroq.
 3. **Route-based chunks** — har route alohida chunk (Next.js, React Router).
 4. **Conditional features** — admin panel faqat admin'lar uchun yuklash.
@@ -733,7 +744,7 @@ function App() {
 Per-feature lazy loading:
 
 ```tsx
-// HeavyEditor — large dependency (e.g., monaco-editor 2MB+)
+// HeavyEditor — og'ir dependency (masalan monaco-editor — katta bundle)
 const HeavyEditor = lazy(() => import('./HeavyEditor'));
 
 function ArticlePage() {
@@ -841,7 +852,7 @@ Hover'da chunk yuklash boshlanadi. User click qilganda — chunk allaqachon (yok
 R19 `use(promise)` (cross-ref [`23-r19-hooks.md`](23-r19-hooks.md)) — Suspense + Promise universal integration. R18'gacha `Suspense for data` faqat framework'larda (Next.js, Relay) ishlardi. R19'da vanilla React'da ham.
 
 ```tsx
-import { use, Suspense } from 'react';
+import { use, useMemo, Suspense } from 'react';
 
 function UserCard({ userPromise }: { userPromise: Promise<User> }) {
   const user = use(userPromise);  // throws Promise if pending
@@ -849,7 +860,10 @@ function UserCard({ userPromise }: { userPromise: Promise<User> }) {
 }
 
 function App({ userId }: { userId: string }) {
-  const userPromise = fetchUser(userId);
+  // Client Component'da Promise render ichida har gal qayta yaratiladi —
+  // useMemo bilan stable reference shart. Server Component'da Promise stable,
+  // useMemo kerak emas (RSC qayta render qilinmaydi).
+  const userPromise = useMemo(() => fetchUser(userId), [userId]);
   
   return (
     <Suspense fallback={<UserSkeleton />}>
@@ -907,10 +921,11 @@ Granular Suspense for data:
 
 ```tsx
 function Dashboard({ userId }: { userId: string }) {
-  // Parallel — har resource alohida promise
-  const userPromise = fetchUser(userId);
-  const postsPromise = fetchPosts(userId);
-  const friendsPromise = fetchFriends(userId);
+  // Parallel — har resource alohida promise. Client Component'da useMemo bilan
+  // stable reference (Server Component'da to'g'ridan-to'g'ri chaqirish ham xavfsiz).
+  const userPromise = useMemo(() => fetchUser(userId), [userId]);
+  const postsPromise = useMemo(() => fetchPosts(userId), [userId]);
+  const friendsPromise = useMemo(() => fetchFriends(userId), [userId]);
   
   return (
     <div className="dashboard">
@@ -942,7 +957,7 @@ function Dashboard({ userId }: { userId: string }) {
 `use(promise)` mexanizm:
 
 ```javascript
-// react-reconciler/src/ReactFiberThenable.js (simplified)
+// use() dispatcher: react-reconciler/src/ReactFiberHooks.js (simplified)
 function use(usable) {
   if (usable !== null && typeof usable === 'object') {
     if (typeof usable.then === 'function') {
@@ -955,6 +970,9 @@ function use(usable) {
   throw new Error('Invalid argument to use()');
 }
 
+// trackUsedThenable: react-reconciler/src/ReactFiberThenable.js (simplified —
+// real implementatsiyada pending holatda thenable emas, opaque SuspenseException
+// throw qilinadi; Reconciler uni Suspense signali sifatida ushlaydi)
 function trackUsedThenable(thenable) {
   switch (thenable.status) {
     case 'fulfilled':
@@ -1067,7 +1085,8 @@ function PostContent({ postPromise }: { postPromise: Promise<Post> }) {
 }
 
 function PostPage({ postId }: { postId: string }) {
-  const postPromise = fetchPost(postId);
+  // Client Component — useMemo bilan stable Promise (Server Component'da kerak emas)
+  const postPromise = useMemo(() => fetchPost(postId), [postId]);
   
   return (
     <Suspense fallback={<PostSkeleton />}>
@@ -1081,10 +1100,11 @@ Parallel data loading:
 
 ```tsx
 function UserDashboard({ userId }: { userId: string }) {
-  // All 3 promises start in parallel
-  const userPromise = fetchUser(userId);
-  const postsPromise = fetchUserPosts(userId);
-  const friendsPromise = fetchUserFriends(userId);
+  // 3 ta Promise parallel boshlanadi. Client Component'da har Promise useMemo bilan
+  // stable bo'lishi shart — aks holda re-render'da yangi Promise → Suspense flicker.
+  const userPromise = useMemo(() => fetchUser(userId), [userId]);
+  const postsPromise = useMemo(() => fetchUserPosts(userId), [userId]);
+  const friendsPromise = useMemo(() => fetchUserFriends(userId), [userId]);
   
   return (
     <div className="dashboard">
@@ -1118,11 +1138,12 @@ function UserPostsPage({ userId }: { userId: string }) {
 }
 
 function UserSection({ userId }: { userId: string }) {
-  const userPromise = fetchUser(userId);
+  const userPromise = useMemo(() => fetchUser(userId), [userId]);
   const user = use(userPromise);  // Wait for user
   
-  // Then fetch posts (depends on user)
-  const postsPromise = fetchPosts(user.posts);
+  // Then fetch posts (depends on user). use() resolve bo'lgach komponent re-render
+  // bo'ladi — postsPromise ham useMemo bilan stable, aks holda yangi fetch.
+  const postsPromise = useMemo(() => fetchPosts(user.posts), [user.posts]);
   
   return (
     <>
@@ -1135,17 +1156,22 @@ function UserSection({ userId }: { userId: string }) {
 }
 ```
 
-Sequential — user yuklanmagunchа posts boshlanmaydi (waterfall). Performance jihatdan **parallel afzal** (agar mumkin bo'lsa).
+Sequential — user yuklanmaguncha posts boshlanmaydi (waterfall). Performance jihatdan **parallel afzal** (agar mumkin bo'lsa).
 
 Conditional data fetching:
 
 ```tsx
 function ProductPage({ productId }: { productId: string | null }) {
-  if (!productId) {
+  // useMemo conditional return'dan oldin — Hook tartibi barqaror. productId null
+  // bo'lsa Promise yaratilmaydi (null qaytaradi).
+  const productPromise = useMemo(
+    () => (productId ? fetchProduct(productId) : null),
+    [productId],
+  );
+  
+  if (!productPromise) {
     return <p>Select a product</p>;
   }
-  
-  const productPromise = fetchProduct(productId);
   
   return (
     <Suspense fallback={<ProductSkeleton />}>
@@ -1229,11 +1255,11 @@ Bitta boundary vs nested:
 ```tsx
 // ❌ Single boundary — waterfall (eng sekin children butun render'ni bloklaydi)
 <Suspense fallback={<PageSkeleton />}>
-  <Header />          {/* Tayyor 100ms */}
-  <MainContent />     {/* Tayyor 500ms */}
-  <Sidebar />         {/* Tayyor 1000ms */}  ← Suspense waits for this
+  <Header />          {/* Tez tayyor */}
+  <MainContent />     {/* O'rtacha */}
+  <Sidebar />         {/* Eng sekin */}  ← Suspense shuni kutadi
 </Suspense>
-// PageSkeleton 1000ms ko'rinadi, keyin barchasi birga ko'rinadi
+// PageSkeleton eng sekin children tayyor bo'lguncha ko'rinadi, keyin barchasi birga
 
 // ✅ Nested boundaries — granular
 <>
@@ -1246,8 +1272,8 @@ Bitta boundary vs nested:
   </Suspense>
 </>
 // Header darrov ko'rinadi
-// MainContent 500ms da ko'rinadi
-// Sidebar 1000ms da ko'rinadi
+// MainContent o'z resource'i tayyor bo'lganda ko'rinadi
+// Sidebar o'z resource'i tayyor bo'lganda mustaqil ko'rinadi
 ```
 
 Better placement strategy: **boundary atomic UI sections atrofida**.
@@ -1283,41 +1309,46 @@ Reconciler render:
 
 Each Suspense boundary independent. Promise resolve paytida — only that boundary re-renders (children).
 
-`findNearestSuspenseBoundary` Fiber traversal:
+Eng yaqin boundary'ni topish — React throw paytida `fiber.return` zanjirini aylanib chiqmaydi. O'rniga render davomida **suspense handler stack** yuritiladi: Suspense Fiber'ga kirganda uning handler'i stack'ga push qilinadi, chiqishda pop qilinadi. Joriy (eng ichki) boundary cursor'ning yuqorisida turadi.
 
 ```javascript
-function findNearestSuspenseBoundary(fiber) {
-  let current = fiber.return;
-  while (current !== null) {
-    if (current.tag === SuspenseComponent) {
-      return current;  // Innermost boundary
-    }
-    current = current.return;
-  }
-  return null;
+// react-reconciler/src/ReactFiberSuspenseContext.js (simplified)
+const suspenseHandlerStackCursor = createCursor(null);
+
+function pushPrimaryTreeSuspenseHandler(handler) {
+  push(suspenseHandlerStackCursor, handler);  // Suspense Fiber'ga kirishda
+}
+
+function popSuspenseHandler(fiber) {
+  pop(suspenseHandlerStackCursor, fiber);      // chiqishda
+}
+
+function getSuspenseHandler() {
+  return suspenseHandlerStackCursor.current;   // joriy eng ichki boundary
 }
 ```
 
-Nested — `Fiber.return` chain bo'ylab eng yaqin boundary topiladi.
+Component throw qilganda React `getSuspenseHandler()` orqali joriy stack tepasidagi boundary'ni darrov oladi — zanjirni aylanib chiqish kerak emas. Nested boundaries'da inner boundary push'i outer'nikidan keyin keladi, shu sababli eng ichki boundary cursor tepasida bo'ladi.
 
 R18+ Concurrent rendering — boundaries parallel:
 
 ```
-Time 0ms: All boundaries fallback
-Time 100ms: Header ready (no Suspense)
-Time 500ms: Main ready → boundary commits MainContent
-Time 800ms: Sidebar ready → boundary commits Sidebar
-Time 1000ms: Chart ready → boundary commits RealtimeChart
+Boshlanish: All boundaries fallback
+Header ready (no Suspense)        → App-level boundary commits, Header visible
+Main resource ready               → boundary commits MainContent
+Sidebar resource ready            → boundary commits Sidebar
+Chart resource ready              → boundary commits RealtimeChart
 
-User sees:
-  0ms: AppSkeleton
-  100ms: Header + content fallbacks
-  500ms: Header + MainContent + ChartSkeleton + SidebarSkeleton
-  800ms: Header + MainContent + ChartSkeleton + Sidebar
-  1000ms: Everything visible
+User ko'radi (resource tayyorlik tartibida):
+  AppSkeleton
+  → Header + content fallbacks
+  → Header + MainContent + ChartSkeleton + SidebarSkeleton
+  → Header + MainContent + ChartSkeleton + Sidebar
+  → Everything visible
 ```
 
-Time slicing R18+ — render Phase ham concurrent. Boundary fallback transition smooth.
+Har boundary mustaqil — qaysi resource oldin tayyor bo'lsa, o'sha section oldin
+commit qilinadi. Tartib resource latency'siga bog'liq, bir-birini kutmaydi.
 
 </details>
 
@@ -1373,8 +1404,8 @@ Article page — content + comments:
 
 ```tsx
 function ArticlePage({ slug }: { slug: string }) {
-  // Article — primary content (priority)
-  const articlePromise = fetchArticle(slug);
+  // Article — primary content. Client Component'da useMemo bilan stable Promise.
+  const articlePromise = useMemo(() => fetchArticle(slug), [slug]);
   
   return (
     <Suspense fallback={<ArticleSkeleton />}>
@@ -1412,14 +1443,14 @@ function ProfilePage({ username }: { username: string }) {
     </Suspense>
   );
 }
-// 1500ms total (500 + 500 + 500)
+// Umumiy vaqt = uchta fetch ketma-ket (har biri oldingisini kutadi)
 
 // ✅ Parallel — all promises start immediately
 function ProfilePage({ username }: { username: string }) {
-  // Start ALL fetches in parallel
-  const userPromise = fetchUser(username);
-  const postsPromise = fetchPosts(username);
-  const commentsPromise = fetchComments(username);
+  // Barcha fetch'lar parallel boshlanadi. Client Component'da useMemo bilan stable.
+  const userPromise = useMemo(() => fetchUser(username), [username]);
+  const postsPromise = useMemo(() => fetchPosts(username), [username]);
+  const commentsPromise = useMemo(() => fetchComments(username), [username]);
   
   return (
     <>
@@ -1437,7 +1468,7 @@ function ProfilePage({ username }: { username: string }) {
     </>
   );
 }
-// Max 500ms (parallel)
+// Umumiy vaqt = eng sekin fetch (hammasi parallel boshlangani uchun)
 ```
 
 </details>
@@ -1575,7 +1606,7 @@ Production tavsiya — own skeleton komponentlari (design system bilan integrate
 
 Suspense fallback — React Element. Render ortiqcha overhead yo'q (oddiy komponent).
 
-Fallback transition — instant render (Suspense ichida primary children "hidden" mode'da rendered, fallback'ga switch instant).
+Initial mount paytida boundary suspend bo'lsa, primary children'ning DOM'i hali commit qilinmaydi — faqat fallback ko'rinadi. Primary children Offscreen Fiber (`mode: 'hidden'`) ichida saqlanadi, lekin DOM'ga qo'shilmaydi. Promise resolve bo'lganda children commit qilinadi va fallback olib tashlanadi. "Hidden lekin DOM'da turadi" holati boshqacha: avval ko'rsatilgan content qayta suspend bo'lganda (transition davomida) React eski content'ni DOM'da saqlab turadi, fallback'ga sakramaydi.
 
 R18+ `useTransition` + Suspense (cross-ref [`22-concurrent-hooks.md`](22-concurrent-hooks.md)):
 
@@ -1849,6 +1880,10 @@ NIMA UCHUN: error handling Suspense bilan birga shart. Promise reject bo'lsa:
 Reconciler error vs promise dispatching:
 
 ```javascript
+// react-reconciler/src/ReactFiberWorkLoop.js (simplified — real implementatsiyada
+// reject to'g'ridan-to'g'ri handleError chaqirmaydi: thenable reject bo'lganda retry
+// rejalashtiriladi va xato keyingi render'da trackUsedThenable thenable.reason'ni
+// qayta throw qilganda Error Boundary'ga yetadi)
 function performWork(workInProgress) {
   try {
     nextChildren = renderComponent(workInProgress);
@@ -1861,17 +1896,15 @@ function performWork(workInProgress) {
     ) {
       // Promise (thenable)
       const wakeable = thrownValue;
-      const suspenseBoundary = findNearestSuspenseBoundary(workInProgress);
+      // Joriy boundary render davomida yuritilgan suspense handler stack'dan olinadi
+      const suspenseBoundary = getSuspenseHandler();
       
       if (suspenseBoundary) {
         // Suspense handles
         suspenseBoundary.flags |= ShowFallback;
         wakeable.then(
           () => scheduleRetry(suspenseBoundary),
-          (rejectedReason) => {
-            // Promise rejected — propagate as Error
-            handleError(workInProgress, rejectedReason);
-          }
+          () => scheduleRetry(suspenseBoundary),  // reject ham retry — xato keyingi render'da throw bo'ladi
         );
       } else {
         throw thrownValue;
@@ -1900,7 +1933,7 @@ function handleError(workInProgress, error) {
 }
 ```
 
-Promise reject → `handleError` chaqiriladi → Error Boundary topiladi.
+Promise reject bo'lganda boundary retry rejalashtiriladi; keyingi render'da `use()` (yoki custom resource) `thenable.reason`'ni qayta throw qiladi — bu safar oddiy Error sifatida, shu sababli `handleError` chaqiriladi va Error Boundary topiladi.
 
 `ErrorBoundary > Suspense` order — error reject Suspense ichida bo'lsa, Error Boundary topiladi (ancestor).
 
@@ -1939,7 +1972,7 @@ export function AsyncBoundary({
 
 // Usage
 function ProductPage({ productId }: { productId: string }) {
-  const productPromise = fetchProduct(productId);
+  const productPromise = useMemo(() => fetchProduct(productId), [productId]);
   
   return (
     <AsyncBoundary
@@ -2060,14 +2093,14 @@ function App() {
   return (
     <html>
       <body>
-        <Header />              {/* Yuklash 100ms — instant chunk */}
+        <Header />              {/* Async data yo'q — initial chunk bilan keladi */}
         
         <Suspense fallback={<MainSkeleton />}>
-          <MainContent />       {/* Yuklash 500ms — stream when ready */}
+          <MainContent />       {/* Tayyor bo'lganda stream qilinadi */}
         </Suspense>
         
         <Suspense fallback={<SidebarSkeleton />}>
-          <Sidebar />           {/* Yuklash 800ms — stream when ready */}
+          <Sidebar />           {/* Mustaqil, tayyor bo'lganda stream qilinadi */}
         </Suspense>
       </body>
     </html>
@@ -2094,21 +2127,21 @@ Klassik SSR vs Streaming SSR:
 
 ```
 Klassik SSR:
-  Time 0:    Request
-  Time 1000: Server done (waited for slowest data)
-  Time 1100: Client receives full HTML
-  Time 1200: Client renders
-  Total: 1200ms before user sees anything
+  Request
+  Server eng sekin data'ni kutadi → butun HTML tayyor
+  Client to'liq HTML'ni oladi
+  Client render qiladi
+  User hech narsa ko'rmaydi — eng sekin data tayyor bo'lguncha
 
 Streaming SSR:
-  Time 0:    Request
-  Time 50:   Server starts streaming (first chunk: Header + skeletons)
-  Time 100:  Client renders Header + skeletons
-  Time 600:  Server streams MainContent chunk
-  Time 700:  Client replaces skeleton → MainContent
-  Time 900:  Server streams Sidebar chunk
-  Time 1000: Client replaces skeleton → Sidebar
-  User sees content from 100ms (vs 1200ms)
+  Request
+  Server darrov initial chunk yuboradi (Header + skeletons)
+  Client Header + skeletons'ni render qiladi
+  Server MainContent chunk'ni stream qiladi (tayyor bo'lganda)
+  Client skeleton → MainContent almashtiradi
+  Server Sidebar chunk'ni stream qiladi (mustaqil, tayyor bo'lganda)
+  Client skeleton → Sidebar almashtiradi
+  User content'ni dastlabki chunk'dan boshlab ko'radi (butun sahifani kutmaydi)
 ```
 
 Server API (Node.js + React):
@@ -2170,7 +2203,7 @@ Streaming SSR HTML format:
 </script>
 ```
 
-`$RC` — React'ning runtime function'i (resolveBoundary). Suspense placeholder'ni real content bilan almashtirish (DOM manipulation). Boshqa runtime function'lar: `$RM` (mounting), `$RX` (error).
+`$RC` — React'ning Fizz runtime function'i (`completeBoundary`). Suspense placeholder'ni hidden chunk ichidagi real content bilan almashtiradi (DOM manipulation). `$RX` (`clientRenderBoundary`) — boundary xato bo'lganda client'da error'ni belgilaydi. Bu function'lar HTML stream boshida inline `<script>` orqali yuboriladi.
 
 Suspense boundary marker'lari (comment node'lar — DOM'da ko'rinmaydi, lekin React tomonidan parsing'da ishlatiladi):
 - `<!--$-->` — resolved boundary (content tayyor, ko'rinadi)
@@ -2261,6 +2294,8 @@ async function fetchPosts(): Promise<Posts> {
 }
 
 export function App() {
+  // Server render entry — qayta render qilinmaydi, shu sababli Promise to'g'ridan-to'g'ri
+  // render ichida yaratilishi xavfsiz (useMemo kerak emas). Client Component'da bunday emas.
   const userPromise = fetchUser();
   const postsPromise = fetchPosts();
   
@@ -2275,11 +2310,11 @@ export function App() {
         </header>
         
         <Suspense fallback={<UserSkeleton />}>
-          <UserSection promise={userPromise} />  {/* Stream at 500ms */}
+          <UserSection promise={userPromise} />  {/* fetchUser tayyor bo'lganda stream */}
         </Suspense>
         
         <Suspense fallback={<PostsSkeleton />}>
-          <PostsSection promise={postsPromise} />  {/* Stream at 1500ms */}
+          <PostsSection promise={postsPromise} />  {/* fetchPosts tayyor bo'lganda stream */}
         </Suspense>
       </body>
     </html>
@@ -2301,12 +2336,12 @@ function PostsSection({ promise }: { promise: Promise<Posts> }) {
 }
 ```
 
-Browser experience:
-- 0ms: Request
-- 50ms: First byte received (`<html><head>...`)
-- 100ms: Header + skeletons rendered
-- 500ms: User section streams in
-- 1500ms: Posts section streams in
+Browser experience (yuqoridagi simulyatsiya delay'lariga mos):
+- Request yuboriladi
+- First byte tezda keladi (`<html><head>...`)
+- Header + skeletons render qilinadi
+- User section stream qilinadi (`fetchUser` delay'idan keyin)
+- Posts section stream qilinadi (`fetchPosts` ko'proq delay'idan keyin)
 
 Next.js App Router (built-in streaming):
 
@@ -2398,8 +2433,8 @@ Alternatives:
 QANDAY ISHLAYDI (experimental):
 
 ```javascript
-// react-reconciler/src/ReactFiberSuspenseList.js (simplified)
-function reconcileSuspenseList(workInProgress) {
+// react-reconciler/src/ReactFiberBeginWork.js — updateSuspenseListComponent (simplified)
+function updateSuspenseListComponent(workInProgress) {
   const revealOrder = workInProgress.pendingProps.revealOrder;
   const children = workInProgress.pendingProps.children;
   
@@ -2492,9 +2527,9 @@ const FiberTags = {
 };
 ```
 
-Reconciler manages reveal order via boundary state tracking.
+Reconciler reveal order'ni boundary state tracking orqali boshqaradi: `forwards`'da keyingi boundary o'zidan oldingisi resolve bo'lmaguncha fallback'da ushlab turiladi.
 
-R19 stable release skipped — community feedback "use case'lar limited", "performance overhead". Future RFC may revisit.
+R19'da ham stable'ga chiqarilmadi — API hali experimental kanalda. Production'da ishlatish tavsiya etilmaydi, chunki API o'zgarishi mumkin.
 
 </details>
 
@@ -2560,7 +2595,7 @@ function CombinedDashboard({ userId }: { userId: string }) {
 ```tsx
 // Alternative 2: Sequential — nested
 function SequentialDashboard({ userId }: { userId: string }) {
-  const userPromise = fetchUser(userId);
+  const userPromise = useMemo(() => fetchUser(userId), [userId]);
   
   return (
     <Suspense fallback={<UserSkeleton />}>
@@ -2685,18 +2720,18 @@ function Good({ promise }: { promise: Promise<Data> }) {
 ```tsx
 // ❌ Waterfall
 async function fetchAll() {
-  const user = await fetchUser();    // 500ms
-  const posts = await fetchPosts();  // 500ms (waits for user)
-  return { user, posts };            // Total: 1000ms
+  const user = await fetchUser();    // tugashini kutadi
+  const posts = await fetchPosts();  // user tugagandan keyin boshlanadi
+  return { user, posts };            // Umumiy = ikkalasi ketma-ket
 }
 
 // ✅ Parallel
 async function fetchAll() {
   const [user, posts] = await Promise.all([
-    fetchUser(),                       // 500ms (parallel)
-    fetchPosts(),                      // 500ms (parallel)
+    fetchUser(),                       // parallel boshlanadi
+    fetchPosts(),                      // parallel boshlanadi
   ]);
-  return { user, posts };              // Total: 500ms
+  return { user, posts };              // Umumiy = eng sekin so'rov
 }
 ```
 
@@ -2789,35 +2824,38 @@ function SearchPage() {
 Suspense Concurrent rendering integration:
 
 ```javascript
-// R18+ Lanes priority
-function scheduleWork(boundary) {
-  if (boundary.flags & ShowFallback) {
-    // High priority — fallback display
-    scheduleUpdate(boundary, SyncLane);
-  } else {
-    // Lower priority — primary content
-    scheduleUpdate(boundary, DefaultLane);
+// react-reconciler/src/ReactFiberLane.js (simplified)
+// Suspense retry'lar uchun alohida lane'lar: RetryLane1..RetryLane4
+let nextRetryLane = RetryLane1;
+
+function claimNextRetryLane() {
+  const lane = nextRetryLane;
+  nextRetryLane <<= 1;
+  if ((nextRetryLane & RetryLanes) === NoLanes) {
+    nextRetryLane = RetryLane1;  // to'rttasi tugasa qaytadan boshlanadi
   }
+  return lane;
 }
 ```
 
-Boundary fallback = high priority (instant render). Children = lower priority (concurrent).
+Boundary suspend bo'lib fallback ko'rsatilgani — render shu update qaysi lane'da boshlangan bo'lsa, o'shanda commit qilinadi. Promise resolve bo'lganda retry esa **alohida RetryLane**'da rejalashtiriladi (`claimNextRetryLane()`). RetryLane'lar past priority — yangi content kelishi boshqa muhimroq update'larni (masalan input typing) bloklamaydi.
 
 `useTransition` — Transition Lane (cross-ref [`05-scheduler-lanes.md`](05-scheduler-lanes.md)):
 
 ```javascript
+// react-reconciler/src/ReactFiberHooks.js (simplified)
 function startTransition(callback) {
-  const previousPriority = currentPriority;
-  currentPriority = TransitionLane;
+  const prevTransition = ReactSharedInternals.T;
+  ReactSharedInternals.T = {};  // transition context faol
   try {
-    callback();
+    callback();  // ichidagi setState'lar transition lane oladi
   } finally {
-    currentPriority = previousPriority;
+    ReactSharedInternals.T = prevTransition;
   }
 }
 ```
 
-Transition updates — Suspense doesn't show fallback for current display. Stale content remains visible until new ready.
+`startTransition` global Transition context'ni (`ReactSharedInternals.T`) callback davomida faol qiladi. Callback ichidagi setState'lar `requestUpdateLane` orqali Transition Lane oladi. Callback **sinxron va bir marta** ishlaydi — `await`'dan keyingi setState transition context'dan tashqarida qoladi (qayta o'rash kerak). Transition update'larda Suspense joriy ko'ringan content uchun fallback'ga sakramaydi — yangi content tayyor bo'lguncha eski content ko'rinib turadi.
 
 </details>
 
@@ -2917,17 +2955,17 @@ function Component({ promise }: { promise: Promise<Data> }) {
 
 Eng keng tarqalgan xato `use(promise)` bilan.
 
-### Gotcha 2: Suspense boundary primary children'ni "hidden" mode'da render qiladi
+### Gotcha 2: Initial mount suspend — children mount qilinmaydi, effect ishlamaydi
 
-R18+ Suspense ichidagi primary children **DOM'da rendered, hidden** (offscreen mode). Promise resolve paytida instant switch.
+Komponent **birinchi marta** mount paytida suspend bo'lsa, React uning subtree'sini saqlamaydi: children mount qilinmaydi, `useEffect`/`useLayoutEffect` ishlamaydi, DOM'ga qo'shilmaydi. Faqat fallback ko'rinadi. Promise resolve bo'lganda React subtree'ni **noldan qayta render qiladi**.
 
 ```tsx
 <Suspense fallback={<Skeleton />}>
-  <ExpensiveComponent />  {/* Renders in hidden mode while loading */}
+  <ExpensiveComponent />  {/* Initial suspend — mount BO'LMAYDI, effect yo'q */}
 </Suspense>
 ```
 
-`ExpensiveComponent` Suspense fallback paytida ham mount qilingan (hidden). Side effects, useEffect — runs.
+Boshqa holat — content allaqachon ko'rsatilgan bo'lib, keyin transition davomida **qayta** suspend bo'lsa, React eski DOM'ni saqlab turadi (yashiradi), lekin layout effect'larni tozalaydi va content qaytib ko'ringanda ularni qayta ishga tushiradi. Bu ikki holatni adashtirmaslik kerak: initial mount = mount yo'q; re-suspend (transition) = eski content DOM'da saqlanadi.
 
 ### Gotcha 3: `React.lazy` named exports
 
@@ -2962,9 +3000,9 @@ function ClientComponent({ promise }: { promise: Promise<Data> }) {
 
 Client'da `use()` R19+. Server'da async/await.
 
-### Gotcha 5: Suspense state preservation
+### Gotcha 5: Suspense state preservation (allaqachon mount qilingan content qayta suspend bo'lganda)
 
-R18+ Suspense fallback paytida primary tree saqlanadi (offscreen mode). Re-mount yo'q.
+Content bir marta ko'rsatilgandan keyin qayta suspend bo'lsa (yangi promise), R18+ primary tree'ni Offscreen Fiber ichida saqlaydi — re-mount yo'q, component state (`count`) saqlanadi. Layout effect'lar tozalanadi va content qaytib kelganda qayta ishlaydi. (Bu initial mount suspend'dan farq qiladi — Gotcha 2'ni ko'ring.)
 
 ```tsx
 function Counter({ dataPromise }: { dataPromise: Promise<string> }) {
@@ -3327,7 +3365,7 @@ export function Dashboard({ userId }: { userId: string }) {
 }
 ```
 
-User: 500ms, Friends: 800ms, Posts: 1000ms — parallel. Total visible: 500ms (User), then progressive.
+Uchala fetch parallel boshlanadi (yuqoridagi simulyatsiya delay'lari turlicha). Eng tez tayyor bo'lgan section (User) birinchi ko'rinadi, qolganlari mustaqil progressive ko'rinadi — bir-birini kutmaydi.
 
 </details>
 
@@ -3512,14 +3550,12 @@ function RouteBoundary({ children }: { children: React.ReactNode }) {
 // Idle preload (after main content loaded)
 function IdlePreloader() {
   React.useEffect(() => {
-    const win = window as any;
-    if ('requestIdleCallback' in win) {
-      const id = win.requestIdleCallback(() => {
-        // Preload all routes during idle
-        Object.values(preloadMap).forEach(preload => preload());
-      });
-      return () => win.cancelIdleCallback(id);
-    }
+    if (typeof requestIdleCallback !== 'function') return;
+    const id = requestIdleCallback(() => {
+      // Preload all routes during idle
+      Object.values(preloadMap).forEach(preload => preload());
+    });
+    return () => cancelIdleCallback(id);
   }, []);
   
   return null;
@@ -3573,7 +3609,7 @@ export function App() {
 Suspense + Lazy Loading — React'ning declarative async UI mexanizmi. Code splitting va data fetching uchun fundamental pattern. Asosiy fikrlar:
 
 - **Suspense Concept** — komponent render paytida resource yuklanmagan bo'lsa "throw promise" qiladi, eng yaqin `<Suspense fallback>` boundary fallback ko'rsatadi. Promise resolve bo'lganda — re-render. Universal pattern: `React.lazy`, `use(promise)`, framework data fetching. R16.6 introduced (code splitting only) → R18 framework data → R19 vanilla `use(promise)`.
-- **Suspense Boundary API** — `<Suspense fallback={...}>{children}</Suspense>`. Atomic unit — yoki butun children render, yoki butun fallback. Bir komponent Promise throw qilsa — butun boundary waterfall. R18+ Concurrent rendering ichida primary "hidden mode" rendered (DOM'da bor lekin ko'rinmaydi) — instant switch.
+- **Suspense Boundary API** — `<Suspense fallback={...}>{children}</Suspense>`. Atomic unit — yoki butun children render, yoki butun fallback. Bir komponent Promise throw qilsa — butun boundary waterfall. Eng yaqin boundary render davomida yuritilgan suspense handler stack'dan olinadi (`getSuspenseHandler`). Initial mount suspend'da primary children mount qilinmaydi (effect yo'q); allaqachon ko'rsatilgan content qayta suspend bo'lganda esa eski DOM saqlanadi (Offscreen).
 - **`React.lazy` Code Splitting** — `lazy(() => import('./Component'))` komponent dynamic yuklash. Bundle alohida chunk. Module `default` export shart (named export wrap). Route-based / feature-based / vendor split strategies. State machine (Uninitialized/Pending/Resolved/Rejected). Webpack magic comments (`webpackChunkName`, `webpackPrefetch`).
 - **R19 `use(promise)` + Suspense** — vanilla React'da Suspense for data. Promise stable reference shart (`useMemo`, prop, `cache()` RSC). Parallel data loading (har resource alohida promise + boundary). Sequential dependent (waterfall — slower). `cache(fn)` R19 RSC API per-request memoization.
 - **Nested Suspense Boundaries — Granular Loading** — UI sections bo'yicha alohida boundary. Header instant + MainContent + Sidebar — har biri parallel yuklanadi. **Better UX** (no waterfall) + **parallel rendering** + **streaming SSR friendly** + **avoid layout shift**. Optimal placement — atomic UI sections.
@@ -3582,7 +3618,7 @@ Suspense + Lazy Loading — React'ning declarative async UI mexanizmi. Code spli
 - **Streaming SSR — Progressive Rendering** — server progressive HTML chunks yuboradi. Initial chunk darrov + skeletons → server resources ready bo'lganda qo'shimcha chunks. **TTFB** instant + **FCP** instant + **TTI** progressive. Out-of-order rendering. `renderToPipeableStream` API (`onShellReady`, `onAllReady`). Next.js App Router built-in. Cross-ref [`39-rsc-server-actions.md`](39-rsc-server-actions.md) chuqurroq.
 - **`SuspenseList` Experimental** — multiple boundaries reveal order (`forwards`/`backwards`/`together`). R18 experimental, **R19 stable'ga chiqarilmadi**. Production'da TAQIQ. Alternatives: `Promise.all` (together), nested boundaries (sequential), manual orchestration.
 - **Performance Considerations** — promise stable reference (infinite Suspense oldini olish), boundary placement (too few/many), parallel data loading (`Promise.all`), `React.lazy` chunk optimization (route/feature/vendor), preloading (hover/focus/idle), R18+ `useTransition` smooth UX.
-- **Edge Cases** — Promise har render new infinite Suspense, primary children "hidden mode" rendered (useEffect runs), `React.lazy` named exports wrap, SSR `use(promise)` (server async + client `use()`), R18+ state preservation during fallback.
+- **Edge Cases** — Promise har render new infinite Suspense, initial mount suspend'da primary children mount qilinmaydi (effect ishlamaydi), `React.lazy` named exports wrap, SSR `use(promise)` (server async + client `use()`), allaqachon ko'rsatilgan content qayta suspend bo'lganda state saqlanadi (Offscreen).
 - **Common Mistakes** — single boundary waterfall, promise unstable reference, Error Boundary inside Suspense, `React.lazy` inside render, generic spinner instead of skeleton.
 
 Versiya evolyutsiyasi:

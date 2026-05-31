@@ -131,7 +131,7 @@ function isHookName(s) {
 
 Regex `/^use[A-Z0-9]/` — `use` keyin **uppercase yoki raqam** shart. `useState` ✓, `usercount` ✗ (lowercase u dan keyin), `useCounter` ✓, `use2FA` ✓ (raqam). Plain `use` identifier — R19 `use()` hook (eski plugin'da `__EXPERIMENTAL__` flag bilan, R19 stable bilan default tanib olinadi).
 
-React Compiler (1.0 stable, R19.1+ bilan birga 2025-aprel'da chiqdi; R17/18/19 mos) ham shu logic'ni ishlatadi (auto-memoization Rules of React asosida).
+React Compiler (1.0 stable 2025-oktyabr; React'ga bundle qilinmagan, alohida opt-in `babel-plugin-react-compiler`; React 17/18/19 mos) ham shu logic'ni ishlatadi (auto-memoization Rules of React asosida).
 
 </details>
 
@@ -234,9 +234,9 @@ Counter A va B'ning state'lari mustaqil — bir-biriga ta'sir qilmaydi.
 
 1. **ESLint plugin** (`eslint-plugin-react-hooks`) `use*` regex orqali function'ni hook deb identify qiladi va Rules of Hooks tekshiradi (top-level only, conditional taqiq).
 
-2. **React Compiler** (1.0 stable, R19.1+ bilan birga 2025-aprel'da chiqdi; R17/18/19 mos) `use*` function'larni hook deb tanib, auto-memoization va Rules of React tekshiradi.
+2. **React Compiler** (1.0 stable 2025-oktyabr; React'ga bundle qilinmagan, alohida opt-in `babel-plugin-react-compiler`; React 17/18/19 mos) `use*` function'larni hook deb tanib, auto-memoization va Rules of React tekshiradi.
 
-3. **Developer ergonomics** — kod o'qiganda `useFoo()` chaqiruv darrov hook ekanligi ma'lum. Komponent'larda `<Foo />` (PascalCase JSX), hook'larda `useFoo()` (camelCase function call).
+3. **Developer ergonomics** — kod o'qiganda `useCart()` chaqiruv darrov hook ekanligi ma'lum. Komponent'larda `<Cart />` (PascalCase JSX), hook'larda `useCart()` (camelCase function call).
 
 Konvensiya qoidalari:
 
@@ -285,7 +285,7 @@ NIMA UCHUN bu strict bo'lishi muhim: hook'lar va sodda function'lar React lifecy
 > **Versiya evolyutsiyasi (Naming convention):**
 > - **Pre-R16.8 (Hooks oldidan):** Konvensiya yo'q — function nomlari ixtiyoriy.
 > - **R16.8+:** `use*` konvensiya kiritildi (Hooks RFC), `eslint-plugin-react-hooks` qoida tekshiradi.
-> - **R19.1+ (2025-aprel, Compiler 1.0 stable):** React Compiler `use*` ga tayanib auto-memoization qiladi (R17/18/19 mos, opt-in Babel plugin). Konvensiya endi build behavior'ga ta'sir qiladi.
+> - **Compiler 1.0 stable (2025-oktyabr):** React Compiler `use*` ga tayanib auto-memoization qiladi (React 17/18/19 mos, alohida opt-in `babel-plugin-react-compiler`, React'ga bundle qilinmagan). Konvensiya endi build behavior'ga ta'sir qiladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -413,10 +413,9 @@ function formatDate(date: Date): string {
 Edge case — `use` keyin raqam yoki `_`:
 
 ```tsx
-// ESLint plugin newer versiyalarida raqam ham hook deb tanib olinishi mumkin
-// (`/^use[A-Z0-9]/` regex). Plugin versiyasiga qarab xulq-atvor.
-function use2FA() {}     // Plugin versiya'siga bog'liq — newer versiyalarda hook
-function use_state() {}  // ❌ underscore — hook deb tanilmaydi (uppercase yo'q)
+// Regex /^use[A-Z0-9]/ — `use` keyin uppercase harf yoki raqam.
+function use2FA() {}     // ✅ hook — `use` keyin raqam (`2`)
+function use_state() {}  // ❌ underscore — hook deb tanilmaydi (uppercase/raqam yo'q)
 function useID() {}      // ✅ uppercase ID
 ```
 
@@ -543,7 +542,7 @@ Extraction internal'da hech narsa o'zgartirmaydi — Hook linked list bir xil. L
 
 Custom hook'da `useEffect` chaqirilsa, parent komponent'ning effect list'iga qo'shiladi. Cleanup parent unmount paytida chaqiriladi (komponent'dagi `useEffect` bilan bir xil lifecycle).
 
-Memory cost — custom hook chaqiruv overhead ko'p emas (function call). Hook linked list strukturasi bir xil. React Compiler custom hook'ni inline expand qilishi mumkin (build-time optimization).
+Memory cost — custom hook chaqiruv overhead ko'p emas (function call). Hook linked list strukturasi bir xil. React Compiler custom hook'ni komponent kabi alohida unit sifatida memoize qiladi (`use*` nomi orqali tanib oladi) — inline expand qilmaydi, hook'ning o'z body'si o'z scope'ida optimallashtiriladi.
 
 </details>
 
@@ -793,7 +792,7 @@ Linked list flat — composition layer'lari React internal'da farqlanmaydi. Har 
 
 Performance jihatdan composition overhead minimal — function call'lar engine tomonidan inline'lanadi (V8 optimization). Memory cost custom hook'lar soniga emas, **built-in hook'lar soniga** bog'liq.
 
-React Compiler composition'ni inline expand qiladi (build-time optimization). Misol uchun, `useDashboard` ichidagi built-in hook'lar to'g'ridan-to'g'ri komponent function ichiga ko'chiriladi.
+React Compiler har custom hook'ni alohida unit sifatida memoize qiladi — `useDashboard`, `useCurrentUser`, `useFetch` har biri o'z body'sida optimallashtiriladi, komponent function ichiga ko'chirilmaydi. Composition tuzilishi build'dan keyin ham saqlanadi.
 
 </details>
 
@@ -1262,7 +1261,7 @@ ProfileCard
 
 NIMA UCHUN: complex custom hook'lar debug qilinishi qiyin. DevTools'da default'da `useState`, `useEffect` raw values ko'rinadi. `useDebugValue` bilan **semantic label** qo'shiladi.
 
-QANDAY ISHLAYDI: DEV renderer'da `useDebugValue` Hook linked list slot ishlatadi va label saqlaydi — DevTools "Components" panelida custom hook nomi yonida ko'rsatish uchun. Production renderer'da to'liq no-op (slot egallamaydi). Render natijasiga hech qaysi versiyada ta'sir qilmaydi.
+QANDAY ISHLAYDI: `useDebugValue` Hook linked list'ga slot qo'shmaydi va `fiber.memoizedState`'ni o'zgartirmaydi — boshqa hook'lardan farqli. Render natijasiga ta'sir qilmaydi. DEV build'da React DevTools custom hook'ni inspeksiya qilganda `useDebugValue`'ga uzatilgan qiymatni ushlab, "Components" panelida custom hook nomi yonida ko'rsatadi (mexanizm Under the Hood'da). Production build'da bo'sh function.
 
 Lazy formatter — production performance:
 
@@ -1300,46 +1299,25 @@ function useCounter(initial: number) {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`useDebugValue` source code (simplified):
+`react-reconciler/src/ReactFiberHooks.js`'da `mountDebugValue` (va unga teng `updateDebugValue`) bo'sh function — Hook linked list'ga slot **qo'shmaydi**, `fiber.memoizedState`'ni o'zgartirmaydi:
 
 ```javascript
-// react-reconciler/src/ReactFiberHooks.js
+// react-reconciler/src/ReactFiberHooks.js (soddalashtirilgan)
 function mountDebugValue(value, formatterFn) {
-  // No-op in production
-  if (!__DEV__) return;
-  
-  // Store formatter for DevTools
-  const hook = mountWorkInProgressHook();
-  hook.memoizedState = formatterFn ? () => formatterFn(value) : () => value;
+  // Bu hook odatda no-op — fiber state'ga hech narsa yozmaydi.
 }
-
-function updateDebugValue(value, formatterFn) {
-  if (!__DEV__) return;
-  
-  const hook = updateWorkInProgressHook();
-  hook.memoizedState = formatterFn ? () => formatterFn(value) : () => value;
-}
+const updateDebugValue = mountDebugValue;
 ```
 
-Production build'da `__DEV__` `false` — function early return. Compiler dead code elimination o'chiradi.
+`useState`/`useEffect` `mountWorkInProgressHook()` chaqirib yangi Hook obyekt yaratadi va linked list'ga ulaydi; `useDebugValue` esa bunday qilmaydi. Shu sababli `useDebugValue` chaqiruvi DEV va PROD'da Hook count'ni o'zgartirmaydi — boshqa hook'larning index'iga ta'sir qilmaydi.
+
+DEV build'da dispatcher (`HooksDispatcherOnMountInDEV` / `...OnUpdateInDEV`) `useDebugValue` ni yuqoridagi `mountDebugValue` / `updateDebugValue` ga map qiladi (DEV warning wrapper bilan). Bu base implementation argumentlarni saqlamaydi — DevTools qiymatni boshqa yo'l bilan oladi.
 
 DevTools integration:
 
-```javascript
-// React DevTools internal (simplified)
-function inspectHook(fiber, hookIndex) {
-  const hook = getHookAtIndex(fiber, hookIndex);
-  if (hook.tag === DebugValueHook) {
-    const value = hook.memoizedState();  // Lazy invocation
-    return { type: 'debug', value };
-  }
-  // ...
-}
-```
+React DevTools custom hook'lar tarkibini ko'rsatish uchun hook function'ni **o'zi qayta render qiladi** (`react-debug-tools` paketidagi `ReactDebugHooks`). Bu render paytida DevTools maxsus dispatcher o'rnatadi; `useDebugValue(value, format)` chaqirilganda dispatcher `value`'ni (DevTools ochiq bo'lsa `format(value)`) ushlab oladi va custom hook nomi yonida ko'rsatadi. Qiymat `fiber.memoizedState`'da emas, DevTools'ning inspeksiya o'tishida yig'iladi.
 
-DevTools "Components" tab ochiq bo'lsa — `memoizedState()` chaqiriladi va label render qilinadi.
-
-React production renderer'da `useDebugValue` true no-op (dispatcher map'da `noop` ga ishora qiladi) — Hook linked list slot egallamaydi. DEV renderer'da slot ishlatiladi (DevTools inspeksiya uchun). Praktik nuans: `useDebugValue` chaqiruvini conditional'da yozish DEV/PROD slot count farqi keltirib chiqarishi mumkin, shu sababli baribir top-level chaqirilishi tavsiya etiladi (ESLint Rules of Hooks `use*` regex bilan qo'llaydi).
+Production build'da `useDebugValue` bo'sh function — `babel-plugin-react-compiler` yoki bundler dead code elimination orqali chaqiruv olib tashlanishi mumkin. Format function DEV'da ham faqat DevTools panel ochiq bo'lsa chaqiriladi (lazy) — expensive serialization bekorga ishlamaydi.
 
 </details>
 
@@ -1769,7 +1747,7 @@ Effekt — `debounced` qiymat faqat foydalanuvchi to'xtagandan keyin yangilanadi
 function useDebouncedCallback<T extends (...args: any[]) => any>(
   callback: T,
   delay: number = 300
-): T {
+): (...args: Parameters<T>) => void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbackRef = useRef(callback);
   
@@ -1783,7 +1761,7 @@ function useDebouncedCallback<T extends (...args: any[]) => any>(
     timerRef.current = setTimeout(() => {
       callbackRef.current(...args);
     }, delay);
-  }, [delay]) as T;
+  }, [delay]);
 }
 ```
 
@@ -2137,14 +2115,15 @@ localStorage API bo'yicha cheklov'lar:
 | Quota exceeded | Catch qilinishi shart (Safari Private mode) |
 | Same-origin | Cross-domain access yo'q |
 
-Performance — localStorage sinxron API, har read/write main thread'ni bloklaydi. Kichik value'lar uchun OK (~1ms), katta value'lar (10+ KB) uchun sezilarli kechikish.
+Performance — localStorage sinxron API, har read/write main thread'ni bloklaydi. Kichik value'lar uchun sezilmas, katta value'lar (ko'p kilobaytli JSON) uchun read/write blocking sezilarli kechikish berishi mumkin.
 
 Modern alternative — **IndexedDB** (asynchronous, larger storage). Lekin API verbose — `idb-keyval` library yoki `Dexie.js` yordam beradi.
 
-`useLocalStorage` Concurrent rendering bilan moslashuv: `useSyncExternalStore` (R18+, cross-ref [`22-concurrent-hooks.md`](22-concurrent-hooks.md)) bilan tearing-safe yechim:
+`useLocalStorage` Concurrent rendering bilan moslashuv: `useSyncExternalStore` (R18+, cross-ref [`22-concurrent-hooks.md`](22-concurrent-hooks.md)) bilan tearing-safe yechim. Lekin `getSnapshot` reference barqarorligi kritik — quyidagi sodda variant object/array qiymatlarda **buziladi**:
 
 ```tsx
-function useLocalStorageSync<T>(key: string, initialValue: T): T {
+// ❌ Anti-pattern — getSnapshot har chaqiruvda yangi reference
+function useLocalStorageSyncNaive<T>(key: string, initialValue: T): T {
   const subscribe = useCallback((callback: () => void) => {
     const handler = (e: StorageEvent) => {
       if (e.key === key) callback();
@@ -2155,7 +2134,7 @@ function useLocalStorageSync<T>(key: string, initialValue: T): T {
   
   const getSnapshot = useCallback((): T => {
     const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : initialValue;
+    return item ? JSON.parse(item) : initialValue;  // ❌ har gal yangi object
   }, [key, initialValue]);
   
   const getServerSnapshot = useCallback(() => initialValue, [initialValue]);
@@ -2164,7 +2143,37 @@ function useLocalStorageSync<T>(key: string, initialValue: T): T {
 }
 ```
 
-Bu variant cross-tab sync'ni built-in qiladi. Cheklov — har read'da JSON.parse (cache yo'q).
+KRITIK muammo — `getSnapshot` har chaqiruvda `JSON.parse` qiladi, ya'ni saqlangan qiymat object/array bo'lsa har safar **yangi reference** qaytadi. `useSyncExternalStore` snapshot'ni `Object.is` bilan solishtiradi: har gal yangi reference → React "getSnapshot should be cached" warning beradi va render loop'iga tushishi mumkin. To'g'ri yechim — oxirgi raw string va parse qilingan natijani cache qilish, string o'zgarmasa eski reference'ni qaytarish (string primitive bo'lgani uchun `Object.is` barqaror):
+
+```tsx
+// ✅ getSnapshot raw string o'zgarmasa cache'langan reference qaytaradi
+function useLocalStorageSync<T>(key: string, initialValue: T): T {
+  const cacheRef = useRef<{ raw: string | null; parsed: T }>({
+    raw: null,
+    parsed: initialValue,
+  });
+
+  const subscribe = useCallback((callback: () => void) => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === key) callback();
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, [key]);
+
+  const getSnapshot = useCallback((): T => {
+    const raw = localStorage.getItem(key);
+    if (raw === cacheRef.current.raw) return cacheRef.current.parsed; // barqaror reference
+    const parsed = raw !== null ? (JSON.parse(raw) as T) : initialValue;
+    cacheRef.current = { raw, parsed };
+    return parsed;
+  }, [key, initialValue]);
+
+  const getServerSnapshot = useCallback(() => initialValue, [initialValue]);
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+```
 
 </details>
 
@@ -2676,7 +2685,7 @@ function ResizableBox() {
 
 `window.innerWidth` ko'pchilik holatda to'g'ri tanlov.
 
-`resize` event throttling browser tomonidan: Chrome'da `resize` har animation frame (60Hz) fire qiladi. Firefox/Safari'da ham shu xil xulq-atvor. Manual debounce/throttle qo'shimcha optimization.
+`resize` event window o'lcham o'zgarishi davomida ko'p marta fire qiladi — browser uni odatda repaint frame'lariga moslab yuboradi (drag paytida har frame atrofida). Har firing'da state update + re-render bo'lsa — jankiness. Manual debounce yoki throttle qo'shimcha optimization beradi.
 
 R18 Concurrent rendering — `useWindowSize` priority pastroq Lane'ga ko'chirish mumkin (cross-ref [`22-concurrent-hooks.md`](22-concurrent-hooks.md)):
 
@@ -2905,9 +2914,9 @@ useLayoutEffect(() => {
 });
 ```
 
-`useLayoutEffect` event handler uchun mantiqiy — event Render Phase'dan keyin firing bo'lishi mumkin (user click during render — rare). Lekin amaliy farq deyarli yo'q (`useEffect` ham aksariyat holatda yetadi).
+`useLayoutEffect` ref sync uchun ba'zan afzal — u Commit Phase'da paint'dan oldin sync ishlaydi, ya'ni handlerRef paint'dan oldin yangilanadi. Lekin amaliy farq deyarli yo'q (`useEffect` ham aksariyat holatda yetadi, chunki event'lar paint'dan keyin firing bo'ladi).
 
-`useInsertionEffect` (R18+, cross-ref [`17-uselayouteffect.md`](17-uselayouteffect.md)) ham variant — Mutation phase boshida sync. Lekin DOM access yo'q — event listener uchun overkill.
+`useInsertionEffect` (R18+, cross-ref [`17-uselayouteffect.md`](17-uselayouteffect.md)) — layout effect'lardan oldin ishlaydi va CSS-in-JS kutubxonalari uchun mo'ljallangan (`<style>` tag inject qilish). Bu hook ichida ref hali attach qilinmagan va state update taqiqlangan — event listener subscription uchun mos emas.
 
 </details>
 
@@ -3336,7 +3345,7 @@ Use case'lar:
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`IntersectionObserver` async — async callback'lar microtask queue'da. Bu sabab — sync `getBoundingClientRect()` bilan farq:
+`IntersectionObserver` async — callback'lar render pipeline'ida (layout'dan keyin) browser tomonidan asinxron yetkaziladi, sync emas. Bu sabab — sync `getBoundingClientRect()` bilan farq:
 
 | API | Sync/Async | Performance | Layout thrashing |
 |-----|-----------|-------------|------------------|
@@ -3367,9 +3376,7 @@ function useIntersectionObserverMulti<T extends Element>(
 }
 ```
 
-Bir observer 1000 ta element track qila oladi (faqat bir IntersectionObserver instance).
-
-R19+ Document Metadata API'lar lazy load uchun ham qulay (cross-ref [`37-react-19-document-apis.md`](37-react-19-document-apis.md)).
+Bir IntersectionObserver instance bir nechta element'ni kuzata oladi (har element uchun alohida observer yaratishdan ko'ra arzonroq) — uzun ro'yxatlarda (infinite scroll item'lari) bitta observer'ni qayta ishlatish tavsiya etiladi.
 
 </details>
 
@@ -3571,7 +3578,7 @@ NIMA UCHUN: react developerlar ko'pincha fetch logic'ni manual yozadi va race co
 | Optimistic updates | Manual | Built-in |
 | Window focus refetch | Manual | Built-in |
 | Pagination | Manual | Built-in |
-| Bundle size | ~50 lines | ~13 KB |
+| Bundle size | Minimal (faqat shu hook) | Library overhead (versiya bo'yicha o'zgaradi) |
 
 **Custom `useFetch`** — kichik proyektlar yoki learning uchun. Production'da TanStack Query yoki SWR ishlatish — wheel reinvent qilmaslik.
 
@@ -3619,7 +3626,7 @@ Slow A response after B — stale data overrides correct B. AbortController bila
 Implementation:
 
 ```tsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface UseFetchResult<T> {
   data: T | null;
@@ -3637,6 +3644,13 @@ export function useFetch<T>(
   const [error, setError] = useState<Error | null>(null);
   const [trigger, setTrigger] = useState(0);
   
+  // Caller inline `{}` uzatsa har render yangi reference bo'ladi.
+  // optionsRef latest options'ni dep'siz saqlaydi — infinite re-fetch yo'q.
+  const optionsRef = useRef(options);
+  useEffect(() => {
+    optionsRef.current = options;
+  });
+  
   useEffect(() => {
     if (!url) {
       setData(null);
@@ -3648,7 +3662,7 @@ export function useFetch<T>(
     setLoading(true);
     setError(null);
     
-    fetch(url, { ...options, signal: controller.signal })
+    fetch(url, { ...optionsRef.current, signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json() as Promise<T>;
@@ -3770,7 +3784,8 @@ Generic naming convention (cross-ref [`10-props.md`](10-props.md)):
 | `T` | Generic data | `useFetch<T>(url): T \| null` |
 | `K` | Key (object property) | `useField<T, K extends keyof T>(field: K)` |
 | `E` | Element type | `useEventListener<E extends HTMLElement>` |
-| `R` | Return type | `useReducer<S, A, R>` |
+| `S`, `A` | State, Action | `useReducer<S, A>(reducer, initial)` |
+| `R` | Return type | `useResource<T, R>(fetcher: () => T): R` |
 | `P` | Props | `withHook<P>(Component)` |
 
 **Generic constraints** — type narrowing:
@@ -3888,7 +3903,7 @@ const result = useFetchTyped('/api/user', (raw) => raw as User);
 // T = User (transform return type)
 ```
 
-React Compiler generic'lar bilan ishlashda — type information saqlanadi (preserve qilinadi build paytida).
+React Compiler runtime memoization kod'ini generatsiya qiladi, TypeScript type'lariga tegmaydi — type information build pipeline'da o'zgarmaydi.
 
 </details>
 
@@ -4205,10 +4220,10 @@ function useTimer(callback: () => void, delay: number) {
 
 // ❌ Anti-pattern — id ref'da
 function useTimerBad(callback: () => void, delay: number) {
-  const idRef = useRef<number | null>(null);
+  const idRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   useEffect(() => {
-    idRef.current = setTimeout(callback, delay) as unknown as number;
+    idRef.current = setTimeout(callback, delay);
     return () => {
       if (idRef.current) clearTimeout(idRef.current);  // ❌ old id race
     };
@@ -4827,7 +4842,7 @@ function UserCard({ userId }: { userId: string }) {
 Custom hooks — React'ning eng kuchli pattern'larini ifodalovchi konstruktsiya. Asosiy fikrlar:
 
 - **Custom hook = `use*` function** — boshqa hook'lar ichida chaqirilishi mumkin. React feature emas, **konvensiya**. Hech qanday "registratsiya" yo'q — function yozasiz va `use` prefix bilan nomlaysiz.
-- **`use*` prefix functional ahamiyatga ega** — ESLint plugin (`react-hooks/rules-of-hooks`) `/^use[A-Z0-9]/` regex orqali function'ni hook deb identify qiladi va Rules of Hooks tekshiradi. React Compiler (1.0 stable, R19.1+ bilan 2025-aprel; R17/18/19 mos) ham shu konvensiyaga tayanib auto-memoization qiladi.
+- **`use*` prefix functional ahamiyatga ega** — ESLint plugin (`react-hooks/rules-of-hooks`) `/^use[A-Z0-9]/` regex orqali function'ni hook deb identify qiladi va Rules of Hooks tekshiradi. React Compiler (1.0 stable 2025-oktyabr; React'ga bundle qilinmagan opt-in Babel plugin; React 17/18/19 mos) ham shu konvensiyaga tayanib auto-memoization qiladi.
 - **Logic extraction pattern** — komponent ichidagi takrorlanadigan logic'ni custom hook'ga ko'chirish. Single Responsibility, reusability, testability. Premature abstraction xavfi — faqat 2+ joyda ishlatilsa yoki concern alohida bo'lsa extract qilinadi.
 - **Hook composition** — custom hook'lar boshqa custom hook'lar ichida. Layered architecture (primitive → domain → feature → page). Hook linked list flat — composition layer'lari React internal'da farqlanmaydi.
 - **Parameters va Return Types** — single value (1) / tuple (2) / object (3+). Tuple — destructuring rename oson (`const [count, setCount]`). Object — partial destructuring + named property. `as const` tuple readonly type infer qiladi.

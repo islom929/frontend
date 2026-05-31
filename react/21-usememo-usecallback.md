@@ -1,6 +1,6 @@
 # Bo'lim 21: useMemo va useCallback
 
-> `useMemo` va `useCallback` — React'ning memoization hook'lari. `useMemo` computed value'ning **referential identity**'sini, `useCallback` esa function'ning identity'sini render orasida stabil tutadi. Texnik jihatdan ikki hook ekvivalent: `useCallback(fn, deps) ≡ useMemo(() => fn, deps)`. Bu bo'lim **mexanika va API**'ga fokus qilinadi — `Hook.memoizedState`'da deps + value tuple saqlash, `Object.is` deps comparison, `areHookInputsEqual` algorithm. **Real qo'llash patternlari [`33-optimization.md`](33-optimization.md)** da chuqur (React.memo bilan kombinatsiya, optimization strategiyalari). **React Compiler ta'siri** (stable 2026, React 17/18/19 bilan mos) — auto-memoization (manual `useMemo`/`useCallback` kerak emas bo'lib qolishi) [`31-react-compiler.md`](31-react-compiler.md) da batafsil.
+> `useMemo` va `useCallback` — React'ning memoization hook'lari. `useMemo` computed value'ning **referential identity**'sini, `useCallback` esa function'ning identity'sini render orasida stabil tutadi. Texnik jihatdan ikki hook ekvivalent: `useCallback(fn, deps) ≡ useMemo(() => fn, deps)`. Bu bo'lim **mexanika va API**'ga fokus qilinadi — `Hook.memoizedState`'da deps + value tuple saqlash, `Object.is` deps comparison, `areHookInputsEqual` algorithm. **Real qo'llash patternlari [`33-optimization.md`](33-optimization.md)** da chuqur (React.memo bilan kombinatsiya, optimization strategiyalari). **React Compiler ta'siri** (1.0 stable 2025, React 17 va undan yuqori versiyalar bilan mos) — auto-memoization (manual `useMemo`/`useCallback` kerak emas bo'lib qolishi) [`31-react-compiler.md`](31-react-compiler.md) da batafsil.
 
 ---
 
@@ -1058,7 +1058,7 @@ function Component() {
   
   // Render — counter o'zgarmaydi (fn hali chaqirilmadi)
   // Eslatma: console.log render ichida — concurrent rendering'da
-  // multiple times bo'lishi mumkin (Strict Mode 2x va boshqa stsenariylarda)
+  // multiple times bo'lishi mumkin (Strict Mode 2x va boshqa scenario'larda)
   
   // fn() chaqirilganda — counter increment bo'ladi
 }
@@ -1233,19 +1233,19 @@ Mount — yangi hook list quriladi. Update — har render'da yangi hook list qur
 
 ```
 Bir useMemo Hook overhead:
-- Hook obyekt: 5 fields × 8 bytes ≈ 40 bytes
-- memoizedState array: 2 elements
-- Deps array: deps.length elements
+- Hook obyekt: 5 ta field (memoizedState, baseState, baseQueue, queue, next)
+- memoizedState array: 2 element [value, deps]
+- Deps array: deps.length element
 - Saqlangan value (factory natijasi)
 
 Bir useCallback Hook overhead:
-- Hook obyekt: 40 bytes
-- memoizedState array: 2 elements
+- Hook obyekt: 5 ta field
+- memoizedState array: 2 element [callback, deps]
 - Deps array
 - Function reference
 ```
 
-Memoization — overhead bor. Har hook chain'da slot egallaydi.
+Memoization bepul emas — har hook chain'da yangi Hook obyekt, tuple va deps array allocate qilinadi. Aniq byte hajmi JS engine (V8 va boshqalar) object representation'iga bog'liq, lekin har bir memoized hook qo'shimcha allocation talab qiladi.
 
 **Source citation:**
 
@@ -1353,18 +1353,18 @@ function areHookInputsEqual(
     return false;
   }
   
-  if (nextDeps.length !== prevDeps.length) {
-    // Deps array uzunligi o'zgarsa — warning + treat as different
-    if (__DEV__) {
+  if (__DEV__) {
+    if (nextDeps.length !== prevDeps.length) {
+      // Deps array uzunligi o'zgarsa — faqat DEV warning (early return YO'Q)
       console.error(
         'The final argument passed to %s changed size between renders. ' +
         'Expected size: %s. Current size: %s.',
         hookName, prevDeps.length, nextDeps.length
       );
     }
-    return false;
   }
   
+  // Loop min(prevDeps.length, nextDeps.length) bo'yicha yuradi
   for (let i = 0; i < prevDeps.length && i < nextDeps.length; i++) {
     if (Object.is(nextDeps[i], prevDeps[i])) {
       continue;  // Bir xil — keyingi
@@ -1372,17 +1372,17 @@ function areHookInputsEqual(
     return false;  // O'zgargan — re-compute
   }
   
-  return true;  // Hammasi bir xil
+  return true;  // Solishtirilgan elementlar bir xil
 }
 ```
 
 Algoritm:
 
 1. Birinchi render — `prevDeps === null` → false (re-compute)
-2. Deps uzunligi farq → false (warning)
+2. Deps uzunligi farq — faqat DEV'da `console.error` warning, ammo funksiya darhol false qaytarmaydi: loop qisqaroq uzunlik bo'yicha yuradi
 3. Har dep `Object.is` comparison
 4. Birinchi farqda → false
-5. Hammasi bir xil → true (skip re-compute)
+5. Solishtirilgan elementlar bir xil → true (skip re-compute)
 
 **`Object.is` semantikasi:**
 
@@ -1463,7 +1463,7 @@ ECMAScript spec — `SameValue` algorithm:
 // 6. Else: return x === y
 ```
 
-`===` (Strict Equality) — `SameValueNonNumber` algorithm (ba'zi farqlar bilan).
+`===` (Strict Equality) — spec'dagi `IsStrictlyEqual` algorithm. `Object.is` (`SameValue`) bilan farq faqat Number qiymatlarida: `NaN` va signed zero (`+0`/`-0`). Non-Number qiymatlar uchun ikkalasi bir xil natija beradi (spec'da umumiy `SameValueNonNumber` operatsiyasiga tayanadi).
 
 **Why `Object.is` for deps:**
 
@@ -1588,13 +1588,16 @@ function Component({ flag }: { flag: boolean }) {
   // ❌ Deps array uzunligi conditional
   const value = useMemo(() => compute(), flag ? [1, 2] : [1]);
   
-  // Console: "The final argument passed to useMemo changed size between renders"
-  // React: treat as different → re-compute har render'da
+  // Console (DEV): "The final argument passed to useMemo changed size between renders"
+  // React early-return qilmaydi: areHookInputsEqual qisqaroq uzunlik bo'yicha
+  // solishtiradi → noaniq (kutilmagan) cache xulq-atvori
 }
 
-// ✅ Deps statik
+// ✅ Deps uzunligi statik — har render'da bir xil son element
 const value = useMemo(() => compute(), [1, flag ? 2 : 1]);
 ```
+
+Deps array uzunligi har render'da bir xil bo'lishi shart — bu Rules of Hooks invariant'i. Uzunlik o'zgarsa, comparison qisqaroq array bo'yicha yuradi va natija ishonchsiz bo'ladi.
 
 </details>
 
@@ -2156,13 +2159,13 @@ React docs (`react.dev`) ham aytadi:
 ```
 1. Komponent ishlaydi (functionality)
 2. DevTools Profiler bilan render measure
-3. Slow render aniqlash (>16ms — 60fps frame budget)
+3. Slow render aniqlash (60fps frame budget ≈ 1000/60 ≈ 16.7ms — undan oshsa frame tushib qoladi)
 4. Bottleneck topish
 5. Optimize (useMemo / useCallback / React.memo)
 6. Re-measure — improvement test
 ```
 
-Profiler'siz optimization — taxmin (kupincha noto'g'ri).
+Profiler'siz optimization — taxmin (ko'pincha noto'g'ri).
 
 **Memoization befoyda holatlar:**
 
@@ -2206,7 +2209,7 @@ function Component({ a, b }: { a: number; b: number }) {
 
 `useMemo`/`useCallback` har biri Hook slot, deps array, source code overhead beradi. Bundle'ga ta'siri React core'da included — qo'shimcha import yo'q. Asosiy cost — code complexity (deps to'g'ri saqlash, ESLint warning'lar, closure trap'lar).
 
-React Compiler (stable 2026, React 17/18/19 bilan mos) — bu manual maintenance'ni olib tashlaydi: build-time auto-memoization (Babel transform), runtime overhead qo'shmaydi.
+React Compiler (1.0 stable 2025, React 17 va undan yuqori versiyalar bilan mos) — bu manual maintenance'ni olib tashlaydi: build-time auto-memoization (Babel plugin), runtime overhead qo'shmaydi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2507,14 +2510,14 @@ const Aggregated = React.memo(function Aggregated({
 **Misol 2 — Profile result example:**
 
 ```
-DevTools Profiler:
+DevTools Profiler (nisbiy magnitude — aniq qiymatlar device/workload'ga bog'liq):
 
 Component       | Render Time | Self Time
-Dashboard       | 50ms        | 5ms
-├─ Header       | 1ms         | 1ms
-├─ Sidebar      | 3ms         | 3ms
-└─ ChartArea    | 41ms        | 1ms
-   └─ Chart     | 40ms        | 40ms     ← Bottleneck
+Dashboard       | dominant    | minor
+├─ Header       | negligible  | negligible
+├─ Sidebar      | minor       | minor
+└─ ChartArea    | dominant    | negligible
+   └─ Chart     | dominant    | dominant   ← Bottleneck (deyarli butun render vaqti)
 
 Optimization target: Chart component
 Strategy: useMemo for chart data, React.memo for Chart, useCallback for handlers
@@ -2578,7 +2581,7 @@ function Parent() {
 
 ### Nazariya
 
-React Compiler (avval "React Forget") — build-time tool. JSX va Hooks code'ini tahlil qilib **avtomatik memoization** qo'yadi. Manual `useMemo`/`useCallback` kerak emas bo'lib qolishi mumkin. 2024'da open-source release, **2026'da stable**. React 17/18/19 bilan mos (opt-in Babel plugin, R19'ga bog'lanmagan).
+React Compiler (avval "React Forget") — build-time tool. JSX va Hooks code'ini tahlil qilib **avtomatik memoization** qo'yadi. Manual `useMemo`/`useCallback` kerak emas bo'lib qolishi mumkin. 2024'da open-source release, **1.0 stable 2025**. React 17 va undan yuqori versiyalar bilan mos (opt-in Babel plugin, R19'ga bog'lanmagan).
 
 **Compiler nima qiladi:**
 
@@ -2591,9 +2594,9 @@ function Component({ items, filter }: Props) {
   return <List items={filtered} onClick={handler} />;
 }
 
-// Compiler output (taxminiy)
+// Compiler output (taxminiy — slot'lar boshida sentinel symbol bilan to'ldiriladi)
 function Component({ items, filter }: Props) {
-  const $ = _c(4);  // Memo cache
+  const $ = _c(4);  // Memo cache — har slot dastlab sentinel
   
   let filtered;
   if ($[0] !== items || $[1] !== filter) {
@@ -2606,7 +2609,7 @@ function Component({ items, filter }: Props) {
   }
   
   let handler;
-  if ($[3] === undefined) {
+  if ($[3] === Symbol.for('react.memo_cache_sentinel')) {
     handler = (id: string) => console.log(id);
     $[3] = handler;
   } else {
@@ -2742,7 +2745,7 @@ function Component({ items, filter, onSelect }: Props) {
   
   return <List items={filtered} onSelect={handleSelect} />;
 }
-// Compiler avtomatik memoizatsiya qo'shadi
+// Compiler avtomatik memoization qo'shadi
 // Code: clean, less boilerplate
 ```
 
@@ -2852,7 +2855,7 @@ function ProductList({ products, filter, onSelect }: Props) {
   
   return <List items={sortedFiltered} stats={stats} onSelect={handleSelect} />;
 }
-// Same performance, ~50% less code
+// Bir xil performance, sezilarli kamroq boilerplate (useMemo/useCallback wrapper'lar yo'q)
 ```
 
 </details>
@@ -2949,7 +2952,7 @@ Compiler enabled loyihalarda:
 
 > "You may rely on useMemo as a performance optimization, not as a semantic guarantee."
 
-React kelajakda cache'larni invalidatsiya qilishi mumkin (masalan, offscreen rendering yoki memory pressure stsenariylarida). Demak `useMemo` faqat performance optimization — semantic correctness uchun emas:
+React kelajakda cache'larni invalidate qilishi mumkin (masalan, offscreen rendering yoki memory pressure scenario'larida). Demak `useMemo` faqat performance optimization — semantic correctness uchun emas:
 
 ```tsx
 // ❌ Anti-pattern — useMemo'ga semantic guarantee deb ishonish
@@ -3078,19 +3081,19 @@ function ProductPage({ products, filter }: Props) {
      return <Display stats={stats} items={items} />;
    }
 
-2. DevTools Profiler:
-   - Component render: 50ms
-   - computeStats: 30ms ← bottleneck
-   - transformItems: 5ms
-   - Display render: 15ms
+2. DevTools Profiler (nisbiy magnitude):
+   - Component render: dominant
+   - computeStats: dominant ← bottleneck (render vaqtining katta qismi)
+   - transformItems: minor
+   - Display render: minor
 
 3. Optimize bottleneck:
    const stats = useMemo(() => computeStats(data), [data]);
    // transformItems va Display memoize qilmaymiz — fast enough
 
 4. Re-measure:
-   - Component render: 20ms (data o'zgarmaganda)
-   - 60% improvement
+   - data o'zgarmaganda computeStats skip qilinadi
+   - render time sezilarli kamayadi (faqat transformItems + Display qoladi)
 ```
 
 </details>
@@ -3170,11 +3173,11 @@ const value = useMemo(
   () => compute(),
   flag ? [a, b] : [a]  // ❌ Uzunlik conditional
 );
-// Console error: "deps changed size between renders"
-// React: treat as different → re-compute har gal
+// Console (DEV): "The final argument passed to useMemo changed size between renders"
+// React early-return qilmaydi: comparison qisqaroq uzunlik bo'yicha → noaniq cache
 ```
 
-Deps array uzunligi statik bo'lishi shart.
+Deps array uzunligi har render'da bir xil bo'lishi shart — bu Rules of Hooks invariant'i.
 
 ---
 
@@ -3309,7 +3312,7 @@ function useStableCallback<T extends (...args: any[]) => any>(callback: T): T {
 - `useCallback` empty deps — returned function stable
 - Wrapper function `ref.current(...args)` — har gal latest callback
 
-`useCallback` consumer's deps qoidalarini bypass qilish (R19 `useEffectEvent`'ga o'xshash, lekin manual).
+`useCallback` consumer's deps qoidalarini bypass qilish (React'ning experimental `useEffectEvent`'iga o'xshash, lekin manual).
 
 </details>
 
@@ -3338,10 +3341,12 @@ function deepEqual(a: unknown, b: unknown): boolean {
   }
   
   if (typeof a === 'object' && typeof b === 'object') {
-    const keysA = Object.keys(a as object);
-    const keysB = Object.keys(b as object);
+    const objA = a as Record<string, unknown>;
+    const objB = b as Record<string, unknown>;
+    const keysA = Object.keys(objA);
+    const keysB = Object.keys(objB);
     if (keysA.length !== keysB.length) return false;
-    return keysA.every(k => deepEqual((a as any)[k], (b as any)[k]));
+    return keysA.every(k => deepEqual(objA[k], objB[k]));
   }
   
   return false;
@@ -3392,7 +3397,7 @@ function useMemoizedFn<T extends (...args: any[]) => any>(fn: T): T {
 ```tsx
 function useMemoizedFn<T extends (...args: any[]) => any>(fn: T): T {
   const fnRef = useRef<T>(fn);
-  fnRef.current = useMemo(() => fn, [fn]);  // Yoki: fnRef.current = fn (render time'da)
+  fnRef.current = fn;  // Render paytida latest fn saqlanadi
   
   const memoizedFn = useRef<T | null>(null);
   if (memoizedFn.current === null) {
@@ -3529,12 +3534,12 @@ Hybrid pattern: `useMemo` (memoization) + `useRef` (latest closure) + `useEffect
 - **When to use** — `React.memo` bilan birga (props identity stabilize), useEffect/useCallback deps array (object/function deps), Context Provider value, expensive compute. Custom hook return (consumer deps'ga ishlatishi mumkin).
 - **When NOT to use** — primitive compute (overhead > benefit), single-use values, always-changing deps (memo befoyda), `React.memo`'siz child uchun callback, Context dep (memo context subscription'ni bloklamaydi).
 - **Cost vs benefit** — har memoization Hook chain slot, deps allocation, comparison overhead. Profile-driven (DevTools Profiler). "useMemo har joyda" — anti-pattern.
-- **React Compiler (stable 2026) — paradigmasi o'zgartiradi:** auto-memoization manual `useMemo`/`useCallback` o'rniga. Compiler Rules of React amal qilingan code uchun avtomatik cache infrastructure qo'yadi (build-time, Babel plugin). React 17/18/19 bilan mos. Manual hooks legacy code'da saqlanadi (backward compat). Cross-ref [`31-react-compiler.md`](31-react-compiler.md).
+- **React Compiler (1.0 stable 2025) — paradigmasi o'zgartiradi:** auto-memoization manual `useMemo`/`useCallback` o'rniga. Compiler Rules of React amal qilingan code uchun avtomatik cache infrastructure qo'yadi (build-time, Babel plugin). React 17 va undan yuqori versiyalar bilan mos. Manual hooks legacy code'da saqlanadi (backward compat). Cross-ref [`31-react-compiler.md`](31-react-compiler.md).
 - **`useMemo` semantic guarantee emas** — performance hint. React kelajakda cache "unutishi" mumkin. Semantic-critical (ID generation, instance identity) holatlarida `useState` lazy ishlatish kerak.
 - **`react-hooks/exhaustive-deps` linter** — barcha reactive deps majburlaydi. Stable references (`setState`, `dispatch`) deps'da kerak emas (linter biladi).
 - **Real qo'llash patternlari [`33-optimization.md`](33-optimization.md)** da chuqur — `React.memo` strategiyalari, custom comparator, key-based reset, profiling-driven optimization.
 
-Keyingi bo'lim: `useTransition`, `useDeferredValue`, `useSyncExternalStore`, `useId` — Concurrent Mode (R18) hooks. Non-urgent updates, deferred values, external store subscription (tearing-safe), SSR-safe ID generation.
+**Keyingi bo'lim:** [22-concurrent-hooks.md](22-concurrent-hooks.md) — `useTransition`, `useDeferredValue`, `useSyncExternalStore`, `useId` — Concurrent Mode (R18) hooks. Non-urgent updates, deferred values, external store subscription (tearing-safe), SSR-safe ID generation.
 
 ---
 

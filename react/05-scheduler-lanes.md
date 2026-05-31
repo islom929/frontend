@@ -126,7 +126,7 @@ React Scheduler **macrotask boshida** ishlaydi. Har 5ms ish qilgandan keyin:
 6. Browser rendering pipeline (rAF, style, layout, paint)
 7. Yangi macrotask boshida `port1.onmessage` chaqiriladi → React davom etadi
 
-**`shouldYield()` implementatsiyasi:**
+**`shouldYield()` implementation:**
 
 ```typescript
 // scheduler internal (soddalashtirilgan)
@@ -345,21 +345,25 @@ const task2 = scheduleCallback(UserBlockingPriority, () => {
   console.log('Urgent task');
 });
 
-// Task qaytadigan callback uziluvchi bo'lishi mumkin:
-const task3 = scheduleCallback(NormalPriority, (didTimeout) => {
+// Callback continuation function qaytarsa, scheduler uni qayta chaqiradi:
+function processQueue(didTimeout) {
   // Heavy work — qism-qism bajarish
   while (workQueue.length > 0 && !shouldYield()) {
     processItem(workQueue.shift());
   }
-  
+
   if (workQueue.length > 0) {
-    // Hali ish bor — qaytarib davom ettirish
-    return task3;  // Continuation function — qayta chaqiriladi
+    // Hali ish bor — continuation FUNCTION qaytariladi (task handle emas).
+    // workLoop `typeof result === 'function'` tekshiradi va shu funksiyani
+    // joriy task'ning callback'i sifatida qayta ishlatadi
+    return processQueue;
   }
-  
-  // Tugatdi
+
+  // Tugatdi — null qaytarsa task qatordan olib tashlanadi
   return null;
-});
+}
+
+const task3 = scheduleCallback(NormalPriority, processQueue);
 ```
 
 <details>
@@ -616,12 +620,12 @@ Misol:
 
 Har scheduling'da **default — Normal priority**. Lekin React boshqa priority'lardan ham foydalanadi:
 
-- **Click handler ichidagi setState** → `SyncLane` (Immediate ekvivalent)
-- **`useTransition` ichidagi setState** → `TransitionLane` (Normal ekvivalent)
-- **Scroll handler ichidagi setState** → `InputContinuousLane` (UserBlocking ekvivalent)
+- **Click handler ichidagi setState** → `SyncLane` (Immediate priority bilan birga)
+- **`useTransition` ichidagi setState** → `TransitionLane` (Normal priority bilan birga)
+- **Scroll handler ichidagi setState** → `InputContinuousLane` (UserBlocking priority bilan birga)
 - **`requestIdleCallback`-ga o'xshash** → `IdleLane`
 
-### Priority darajasi va Lane — IKKI ALOHIDA SISTEMA
+### Priority darajasi va Lane — IKKI ALOHIDA SYSTEM
 
 React'da priority'ning **ikki alohida systemsi** mavjud va ular tez-tez chalkashtiriladi:
 
@@ -655,7 +659,7 @@ Asosiy farqlar:
 **Priority constant qiymatlari:**
 
 ```typescript
-// scheduler/src/SchedulerPriorities.ts
+// scheduler/src/SchedulerPriorities.js
 export const NoPriority = 0;
 export const ImmediatePriority = 1;
 export const UserBlockingPriority = 2;
@@ -667,7 +671,7 @@ export const IdlePriority = 5;
 **Timeout konstanta'lari:**
 
 ```typescript
-// scheduler/src/forks/Scheduler.ts
+// scheduler/src/forks/Scheduler.js
 const IMMEDIATE_PRIORITY_TIMEOUT = -1;
 const USER_BLOCKING_PRIORITY_TIMEOUT = 250;
 const NORMAL_PRIORITY_TIMEOUT = 5000;
@@ -900,7 +904,7 @@ fiber.lanes = 0b0000000000000000000000000100010
             (sync va default — ikkalasi pending)
 ```
 
-### Lane operatsiyalari
+### Lane operations
 
 ```typescript
 // React lane utilities (R18-R19 source, mental model)
@@ -935,8 +939,9 @@ Reconciler `renderLanes` parametri bilan render qiladi — qaysi lane'lardagi up
 ```typescript
 // React internal
 function performWorkOnRoot(root) {
-  // Eng yuqori priority lane'lar tanlanadi
-  const lanes = getNextLanes(root, root.callbackPriority);
+  // Eng yuqori priority lane'lar tanlanadi (ikkinchi argument — joriy
+  // work-in-progress lanes, render davom etayotgan bo'lsa)
+  const lanes = getNextLanes(root, NoLanes);
   
   if (lanes === NoLanes) return;
   
@@ -966,8 +971,6 @@ function performWorkOnRoot(root) {
 **Lane utility funksiyalar:**
 
 ```typescript
-// React internal — react-reconciler/src/ReactFiberLane.ts
-
 // Manba: react-reconciler/src/ReactFiberLane.js (R18.3+/R19)
 export const NoLanes = 0;
 export const NoLane = 0;
@@ -1165,7 +1168,7 @@ function SearchInput() {
 //   - Transition render qayta boshlandi: yangi value bilan
 ```
 
-Idle priority misol:
+Background work — app level'da `IdleLane` to'g'ridan-to'g'ri ochilmagan:
 
 ```tsx
 function App() {
@@ -1403,7 +1406,7 @@ function getHighestPriorityLanes(lanes) {
 }
 ```
 
-Ko'p TransitionLane'lar **birga** rejalashtiriladi (group). Bu — bir nechta transition ekvivalent priority'da deb hisoblanadi.
+Ko'p TransitionLane'lar **birga** rejalashtiriladi (group). Bu — bir nechta transition bir xil priority darajasida deb hisoblanadi.
 
 </details>
 
@@ -1514,14 +1517,11 @@ function Demo() {
 
 **Frame budget:**
 
-Browser 60 fps'da har frame 16.67ms ichida tugashi kerak. Lekin frame ichidagi vaqt bo'linadi:
-- ~5-10ms — JavaScript (sizning kodingiz, React)
-- ~5-7ms — Style + Layout + Paint (browser)
-- Qolgan ~1-2ms — Composite, idle
+Browser 60 fps'da har frame 16.67ms ichida tugashi kerak. Bu vaqt JavaScript ijrosi (sizning kodingiz, React) va browser'ning o'z ishi (style recalculation, layout, paint, composite) orasida bo'linadi. JavaScript qancha uzoq ishlasa, browser'ga style/layout/paint uchun shuncha kam vaqt qoladi.
 
-React Scheduler **5ms ish budget**ni o'rnatadi (`frameYieldMs = 5`). Har 5ms ish qilgandan keyin yield qilinadi — browser'ga rendering ish uchun vaqt qoladi.
+React Scheduler **5ms ish budget**ni o'rnatadi (`frameYieldMs = 5`). Har 5ms ish qilgandan keyin yield qilinadi — browser'ga rendering ishi uchun vaqt qoladi. Bu 5ms — frame'dan ancha kichik, shuning uchun bitta frame ichida React bir necha marta yield qilib, browser bilan navbatlashishi mumkin.
 
-> **Eslatma:** Eski versiya React'da budget kattaroq edi; R18'da `frameYieldMs = 5` belgilandi (manba: `scheduler/src/forks/Scheduler.js`). Scheduler shu fayl ichida yana ikkita konstantani saqlaydi: `continuousInputInterval`/`continuousYieldMs = 50` (input bo'lmaganda budget'ni cho'zish chegarasi) va `maxYieldMs = 300` (yield qilishni hech qachon kechiktirib bo'lmaydigan absolyut chegara). Bular `isInputPending()`-based optimization uchun ishlatiladi.
+> **Eslatma:** Eski versiya React'da budget kattaroq edi; R18'da `frameYieldMs = 5` belgilandi (manba: `scheduler/src/forks/Scheduler.js`). Scheduler shu fayl ichida yana ikkita konstantani saqlaydi: `continuousYieldMs = 50` (input bo'lmaganda budget'ni cho'zish oraliq chegarasi) va `maxYieldMs = 300` (yield qilishni kechiktirib bo'lmaydigan absolyut chegara). Bular `isInputPending()`-based optimization uchun ishlatiladi.
 
 ### Time slicing mexanikasi
 
@@ -1565,6 +1565,7 @@ function workLoop(initialTime) {
     const callback = currentTask.callback;
     currentTask.callback = null;
     
+    const didTimeout = currentTask.expirationTime <= getCurrentTime();
     const continuation = callback(didTimeout);
     
     if (typeof continuation === 'function') {
@@ -1616,7 +1617,7 @@ Har macrotask orasida browser paint qila oladi — UI doim javob beradi.
 
 ### Time slicing va Strict Mode
 
-R18'da Strict Mode'da effects 2x cycle qilingani uchun, time slicing **dev mode'da** sezilarli sekinlashishi mumkin. Production'da bu cheklov yo'q.
+Strict Mode dev mode'da render funksiyasini va effect'larni ikki marta chaqiradi (purity va cleanup'ni tekshirish uchun). Shu sababli dev'da har update'da bajariladigan ish ikki barobar — bu time slicing ko'rsatkichlarini (chunk soni, jami render vaqti) sun'iy oshiradi. Production build'da Strict Mode no-op, bu ikki barobar ish yo'q, shuning uchun profiling production build'da o'tkazilishi kerak.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1625,8 +1626,8 @@ R18'da Strict Mode'da effects 2x cycle qilingani uchun, time slicing **dev mode'
 
 | React versiya | Yield budget | Eslatma |
 |---------------|--------------|---------|
-| R16.0–R16.4 | `activeFrameTime = 33ms` (30fps) | `ReactDOMFrameScheduling.js` ichida — eski model |
-| R16.5–R17.x | `yieldInterval = 5ms` | Scheduler paketga ko'chgan, 5ms budget |
+| R16.0–R16.4 | rAF-based, kattaroq frame budget | Dastlabki Fiber — `requestAnimationFrame` orqali frame deadline |
+| R16.5–R17.x | `yieldInterval = 5ms` | Scheduler alohida paketga ko'chgan, fixed 5ms budget |
 | R18+ | `frameYieldMs = 5ms` | Bir xil 5ms, lekin `isInputPending()` bilan kengaytirildi (continuousYieldMs=50ms, maxYieldMs=300ms — input yo'qsa cho'zish mumkin) |
 
 R18'da budget raqami **o'zgarmadi** (5ms qoldi); o'zgarish — `isInputPending` Chrome API bilan dynamic budget extension qo'shildi. Input yo'q vaqtda React yield qilmasdan ko'proq ishlay oladi (kerakmas yield kamaytirish).
@@ -1844,7 +1845,7 @@ Misol:
 ```
 Boshqa misol:
 1. useTransition setState chaqirildi → TransitionLane render boshlandi
-2. Render 10ms davom etdi (uziluvchi)
+2. Render bir necha chunk davom etdi (har 5ms da yield qildi)
 3. Foydalanuvchi click qildi → SyncLane (yuqori priority)
 4. TransitionLane render TASHLANADI
 5. Sync render boshlanadi (click handler ichidagi setState)
@@ -1856,7 +1857,7 @@ Boshqa misol:
 
 **Restart** — render TASHLANADI va qaytadan boshlanadi (yangi update sababli).
 
-**Suspend** — render To'XTATIDI va keyinroq DAVOM ettiriladi (resource yuklanguncha — Suspense bilan).
+**Suspend** — render TO'XTATILADI va keyinroq DAVOM ettiriladi (resource yuklanguncha — Suspense bilan).
 
 Bular bir-biridan farqli mexanizmlar:
 - Restart — yangi state bilan
@@ -1865,29 +1866,26 @@ Bular bir-biridan farqli mexanizmlar:
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Restart implementatsiyasi:**
+**Restart implementation:**
 
 ```typescript
-function performWorkOnRoot(root, lanes) {
-  let workInProgress = root.current.alternate;
-  
-  if (workInProgress === null || root.callbackPriority !== getCurrentPriority()) {
-    // Priority o'zgargan yoki yangi render — restart
-    workInProgress = createWorkInProgress(root.current, null);
-    workInProgress.lanes = lanes;
+// react-reconciler/src/ReactFiberWorkLoop.js (soddalashtirilgan)
+function renderRootConcurrent(root, lanes) {
+  // Davom etayotgan render boshqa root yoki boshqa lane'lar uchun bo'lsa —
+  // stack'ni tashlab, yangi workInProgress tree'dan boshlash
+  if (workInProgressRoot !== root || workInProgressRootRenderLanes !== lanes) {
+    prepareFreshStack(root, lanes);  // workInProgress = createWorkInProgress(root.current, null)
   }
-  
+
   // Render loop
   while (workInProgress !== null) {
     if (shouldYield()) break;
     workInProgress = performUnitOfWork(workInProgress);
   }
-  
-  // ... commit yoki davom
 }
 ```
 
-`createWorkInProgress` har **restart**'da yangi tree quradi (alternate orqali reuse). Eski workInProgress xotiradan **yo'qoladi** — alternate'lardan reuse qilinadi.
+`prepareFreshStack` har **restart**'da yangi workInProgress tree'ni `createWorkInProgress(root.current, null)` orqali quradi. Yangi tree alternate slot'ni qayta ishlatadi — oldingi yarim qurilgan workInProgress'ning natijasi tashlanadi, `current` tree esa tegilmaydi.
 
 **Restart sabab:**
 
@@ -1994,13 +1992,14 @@ function Better() {
   const [value, setValue] = useState('');
   const deferredValue = useDeferredValue(value);
   
-  // useMemo cache qiladi — har transition render'da heavyComputation bir marta
+  // useMemo cache qiladi — deferredValue o'zgarmaguncha heavyComputation
+  // qayta ishlamaydi (transition restart bo'lsa ham)
   const result = useMemo(
     () => heavyComputation(deferredValue),
     [deferredValue]
   );
-  
-  return <>{...}</>;
+
+  return <Result data={result} />;
 }
 ```
 
@@ -2022,29 +2021,31 @@ React Scheduler **expiration** mexanizmi orqali starvation'ni oldini oladi. Har 
 ### ExpirationTime hisob-kitobi
 
 ```typescript
-function computeExpirationForLane(lane) {
+// react-reconciler/src/ReactFiberLane.js (soddalashtirilgan)
+function computeExpirationTime(lane, currentTime) {
   switch (lane) {
     case SyncLane:
     case InputContinuousLane:
       // Yuqori priority — short timeout
-      return getCurrentTime() + 250;
-    
+      return currentTime + 250;
+
     case DefaultLane:
       // Normal priority — medium timeout
-      return getCurrentTime() + 5000;
-    
+      return currentTime + 5000;
+
     case TransitionLane1:
     case TransitionLane2:
     // ... barcha TransitionLane'lar
       // Past priority — long timeout
-      return getCurrentTime() + 5000;
-    
+      return currentTime + 5000;
+
     case IdleLane:
-      // Eng past priority — never expires (unless tree commit)
+    case OffscreenLane:
+      // Eng past priority — hech qachon expire bo'lmaydi
       return NoTimestamp;
-    
+
     default:
-      return getCurrentTime() + 5000;
+      return NoTimestamp;
   }
 }
 ```
@@ -2065,7 +2066,7 @@ Lane qancha vaqt kutsa — `expirationTime` yaqinlashadi. `getCurrentTime() >= e
 
 ```typescript
 function performWorkOnRoot(root) {
-  const lanes = getNextLanes(root, ...);
+  const lanes = getNextLanes(root, NoLanes);
   
   // Expired lane'larni tekshirish
   if (includesExpiredLane(root, lanes)) {
@@ -2118,7 +2119,7 @@ function App() {
   const [lowCount, setLowCount] = useState(0);
   const [, startTransition] = useTransition();
 
-  // Yuqori priority — har 100ms
+  // TransitionLane'dan yuqori priority — har 100ms
   useEffect(() => {
     const id = setInterval(() => {
       setHighCount(c => c + 1);  // DefaultLane (setInterval — React event handler emas)
@@ -2243,7 +2244,7 @@ function StarvationDemo() {
   const [, startTransition] = useTransition();
   const [tickCount, setTickCount] = useState(0);
 
-  // Sync update har 50ms — TransitionLane'ni starve qilishga harakat
+  // DefaultLane update har 50ms — TransitionLane'ni starve qilishga harakat
   useEffect(() => {
     const id = setInterval(() => {
       setTickCount(c => c + 1);  // DefaultLane (setInterval — React event handler emas)
@@ -2269,9 +2270,9 @@ function StarvationDemo() {
 
 // Foydalanuvchi "Search" bosadi:
 // 1. TransitionLane render boshlanadi
-// 2. Tick interval 50ms — sync update keladi
+// 2. Tick interval 50ms — DefaultLane update keladi (yuqori priority)
 // 3. TransitionLane render TASHLANADI
-// 4. Sync render → commit
+// 4. DefaultLane render → commit
 // 5. TransitionLane render qayta boshlanadi
 // 6. Yana 50ms — yana tashlanadi
 // 7. ... bu cycle davom etadi
@@ -2287,8 +2288,8 @@ function StarvationDemo() {
 Real-world starvation prevention:
 
 ```tsx
-// Banking app — har sekund balance update (sync)
-// Background — transaction history fetch (transition)
+// Banking app — har sekund balance update (DefaultLane)
+// Background — transaction history fetch (TransitionLane)
 function BankApp() {
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -2297,15 +2298,18 @@ function BankApp() {
   // Real-time balance polling
   useEffect(() => {
     const id = setInterval(() => {
-      fetchBalance().then(setBalance);  // Sync update on resolve
+      fetchBalance().then(setBalance);  // DefaultLane (promise callback ichida)
     }, 1000);
     return () => clearInterval(id);
   }, []);
 
   // Background transaction load
   useEffect(() => {
-    startTransition(() => {
-      fetchTransactions().then(t => {
+    fetchTransactions().then(t => {
+      // startTransition scope sync tugaydi; promise resolve bo'lganda
+      // transition flag o'chgan bo'ladi. Transition lane uchun setState
+      // aynan .then ichida startTransition bilan qayta o'ralishi kerak
+      startTransition(() => {
         setTransactions(t);  // TransitionLane
       });
     });
@@ -2319,11 +2323,13 @@ function BankApp() {
   );
 }
 
-// Balance update tez-tez (sync). Transactions transition.
-// Agar fetchTransactions sekin bo'lsa va balance updates rapid bo'lsa,
-// transactions render tashlanaverishi mumkin edi.
+// Balance update tez-tez (DefaultLane). Transactions — TransitionLane.
+// DefaultLane TransitionLane'dan yuqori priority, shuning uchun agar balance
+// updates juda tez-tez kelsa, transactions render takror restart bilan
+// tashlanishi mumkin edi.
 // 
-// Lekin starvation prevention bor — 5 sekund maksimal.
+// Lekin starvation prevention bor — TransitionLane expirationTime (5 sekund)
+// o'tgach expired deb belgilanadi va sync sifatida commit qilinadi.
 // Foydalanuvchi har holda transactions ko'radi.
 ```
 
@@ -2339,7 +2345,7 @@ React Scheduler yield mexanizmi sifatida **`MessageChannel`**'ni tanlagan. Eski 
 
 ### `requestIdleCallback` muammolari
 
-`requestIdleCallback` — browser'da yangi (2017-yilda Chrome'da chiqarilgan) API. Browser "idle" deb hisoblagan paytda callback chaqiradi:
+`requestIdleCallback` — Chrome 47'da (2015-yil dekabr) chiqarilgan API. Browser "idle" deb hisoblagan paytda callback chaqiradi:
 
 ```typescript
 window.requestIdleCallback((deadline) => {
@@ -2352,14 +2358,10 @@ window.requestIdleCallback((deadline) => {
 
 **Muammolari:**
 
-1. **Cross-browser support kech keldi** — Safari'da faqat 16.4'gacha yo'q edi (2023 mart). React Fiber dizayni bo'lib turgan paytda (2017) Safari'da umuman yo'q edi.
-2. **Frequency past** — browser "idle" deb hisoblamaguncha chaqirilmaydi. 50ms va undan ko'p kechikish bo'lishi mumkin. Ya'ni render har 50ms'dan tezroq ishlamaydi (60 fps uchun yetarli emas).
-3. **Deterministic emas** — browser "idle" deb hisoblagan vaqt implementation-defined.
-4. **Polyfill aniq emas** — yo'qligida nima bilan almashtirish noaniq.
-
-**Real-world ta'sir:**
-
-`requestIdleCallback` 50ms gap — bu 3 frame missed (60 fps'da har frame 16.67ms). Concurrent rendering uchun bu nojaiz.
+1. **Cross-browser support yo'q** — Safari `requestIdleCallback`'ni hech qachon shipped qilmagan (WebKit'da hali ham yo'q). React Fiber dizayni bo'lib turgan paytda (2017) ham yo'q edi.
+2. **Frequency past** — callback faqat browser "idle" deb hisoblagan paytda chaqiriladi. Idle period kelmaguncha kutiladi, shuning uchun chaqiruv chastotasi past va animation/responsiveness uchun yetarli emas.
+3. **Deterministic emas** — "idle" deb hisoblangan vaqt implementation-defined; React render boshlanishi browser ixtiyoriga bog'lanib qoladi.
+4. **Polyfill aniq emas** — yo'q browser'larda nima bilan almashtirish noaniq.
 
 ### `MessageChannel` afzalligi
 
@@ -2426,10 +2428,10 @@ Har macrotask orasida browser paint qiladi. Agar input keldi yoki animation rAF'
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Scheduler MessageChannel implementatsiyasi:**
+**Scheduler MessageChannel implementation:**
 
 ```typescript
-// scheduler/src/forks/SchedulerDOM.js  (R18-R19 manba; `SchedulerPostTask.js` alohida fork `scheduler.postTask()` API uchun)
+// scheduler/src/forks/Scheduler.js  (R18-R19 manba; `SchedulerPostTask.js` alohida fork `scheduler.postTask()` API uchun)
 let isMessageLoopRunning = false;
 let scheduledHostCallback = null;
 let taskTimeoutID = -1;
@@ -2482,16 +2484,22 @@ function requestHostCallback(callback) {
 
 **Server-side rendering (SSR) holati:**
 
-`MessageChannel` browser API — server'da yo'q. Node.js'da `setImmediate` (yoki `setTimeout(0)`) fallback ishlatiladi (`scheduler/src/forks/SchedulerDOM.js` ichida feature detection):
+`MessageChannel` browser'da asosiy yield mexanizmi, lekin scheduler avval `setImmediate`'ni tekshiradi. Node.js'da `setImmediate` mavjud, shuning uchun server'da o'sha ishlatiladi; MessageChannel ham, `setImmediate` ham bo'lmasa — `setTimeout(0)` (`scheduler/src/forks/Scheduler.js` ichida feature detection):
 
 ```typescript
-// Soddalashtirilgan fallback (real manba: `SchedulerDOM.js`)
-if (typeof setImmediate === 'function') {
-  // Node.js
-  schedulePerformWorkUntilDeadline = () => setImmediate(performWorkUntilDeadline);
+// Soddalashtirilgan feature detection (real manba: `scheduler/src/forks/Scheduler.js`)
+let schedulePerformWorkUntilDeadline;
+if (typeof localSetImmediate === 'function') {
+  // Node.js — MessageChannel yield qila olmaydi, setImmediate ishlatiladi
+  schedulePerformWorkUntilDeadline = () => localSetImmediate(performWorkUntilDeadline);
+} else if (typeof MessageChannel !== 'undefined') {
+  // Browser — asosiy yo'l
+  const channel = new MessageChannel();
+  channel.port1.onmessage = performWorkUntilDeadline;
+  schedulePerformWorkUntilDeadline = () => channel.port2.postMessage(null);
 } else {
-  // Browser fallback (MessageChannel yo'q bo'lsa)
-  schedulePerformWorkUntilDeadline = () => setTimeout(performWorkUntilDeadline, 0);
+  // Oxirgi fallback
+  schedulePerformWorkUntilDeadline = () => localSetTimeout(performWorkUntilDeadline, 0);
 }
 ```
 
@@ -2559,7 +2567,7 @@ function rICWork(deadline) {
 }
 
 requestIdleCallback(rICWork);
-// Frequency: 50ms gap minimum (Chrome)
+// Frequency: faqat idle period'da (past, deterministic emas)
 // Cross-browser: yo'q (Safari)
 
 // MessageChannel (React'ning yondashuvi)
@@ -2680,7 +2688,7 @@ function HighFrequencyApp() {
   const [data, setData] = useState({});
   const [, startTransition] = useTransition();
 
-  // Har 50ms sync update
+  // Har 50ms DefaultLane update (setInterval — React event handler emas)
   useEffect(() => {
     const id = setInterval(() => {
       setData(d => ({ ...d, tick: Date.now() }));
@@ -2695,11 +2703,12 @@ function HighFrequencyApp() {
   }
 }
 
-// Heavy transition har safar restart qilinadi (50ms da yangi sync update)
+// Heavy transition har safar restart qilinadi (50ms da yangi DefaultLane update,
+// u TransitionLane'dan yuqori priority)
 // 5 sekund o'tgach — expired → sync sifatida bajariladi
 // 5 sekund foydalanuvchi kutadi (transition commit bo'lmagan)
 //
-// To'g'rilash: sync update'larni kamaytirish, yoki heavy computation'ni splitting
+// To'g'rilash: DefaultLane update'larni kamaytirish, yoki heavy computation'ni splitting
 ```
 
 ---
@@ -2746,7 +2755,7 @@ function Search() {
   );
 }
 
-// useDeferredValue — startTransition'ga ekvivalent (implicit)
+// useDeferredValue — startTransition bilan birga (implicit)
 // Lekin alohida lane ishlatadi (TransitionLane)
 ```
 
@@ -2830,17 +2839,19 @@ function Bad() {
     startTransition(() => {
       setSearchResults([]);
       
-      // ❌ Side effect — render davomida bo'lmaydi
+      // ❌ Side effect startTransition callback ichida
       analytics.track('search', query);
       fetch('/api/log');
     });
   }
 }
 
-// Transition ichida side effect:
-// - Render restart bo'lganda side effect har safar ishlaydi (multiple track/fetch)
-// - "Wasted work" muammosi
-// - Network requests qaytarilishi mumkin
+// startTransition callback'i SINXRON ishlaydi — side effect darhol, render
+// boshlanmasdan oldin bajariladi. Bu side effect transition render commit
+// bo'lishidan mustaqil:
+// - Transition keyin yangi update bilan supersede bo'lsa ham track/fetch
+//   allaqachon yuborilgan (commit bo'lmagan natija uchun ham network request)
+// - "Transition muvaffaqiyatli yakunlandi" hodisasiga bog'lab bo'lmaydi
 ```
 
 ```tsx
@@ -2926,7 +2937,7 @@ function handleClick() {
 ```tsx
 // ✅ React'ning rasmiy API'i
 function handleClick() {
-  startTransition(() => {  // TransitionLane (low priority ekvivalent)
+  startTransition(() => {  // TransitionLane (low priority bilan birga)
     setCount(c => c + 1);
   });
 }
@@ -3087,10 +3098,10 @@ function App() {
   const [counter, setCounter] = useState(0);
   const [transitionState, setTransitionState] = useState('initial');
 
-  // Sync update har 100ms
+  // DefaultLane update har 100ms (setInterval — React event handler emas)
   useEffect(() => {
     const id = setInterval(() => {
-      setCounter(c => c + 1);  // SyncLane
+      setCounter(c => c + 1);  // DefaultLane
     }, 100);
     return () => clearInterval(id);
   }, []);
@@ -3121,20 +3132,20 @@ function App() {
 T=0: Mount commit (counter=0, transitionState="initial")
 T=0: Transition setState → TransitionLane register (expirationTime = T+5000)
 T=0: TransitionLane render boshlanadi
-T=100ms: Sync update — counter=1
-  - Sync render → commit (counter=1, transitionState="initial")
+T=100ms: DefaultLane update — counter=1
+  - DefaultLane render → commit (counter=1, transitionState="initial")
   - Transition render TASHLANADI (restart)
   - Yangi transition render boshlanadi
-T=200ms: Sync update — counter=2
-  - Sync render → commit (counter=2)
+T=200ms: DefaultLane update — counter=2
+  - DefaultLane render → commit (counter=2)
   - Transition render TASHLANADI yana
 T=300ms: counter=3, transition tashlanadi
 T=400ms: counter=4, transition tashlanadi
 ...
 T=4900ms: counter=49, transition tashlanadi
 T=5000ms: TransitionLane EXPIRED!
-T=5000ms: Sync update — counter=50
-  - Sync render boshlanadi
+T=5000ms: DefaultLane update — counter=50
+  - Render boshlanadi
   - Lekin TransitionLane ham expired — sync sifatida ishlanadi
   - Render: counter=50, transitionState="updated"
   - Commit
@@ -3228,7 +3239,7 @@ Scheduler React'ga maxsus emas — bu **umumiy purpose** task scheduling library
 
 **2. Independent Versioning:**
 
-Scheduler API barqaror — React Reconciler ko'p o'zgarishlar qilsa-da, scheduler interfeysi stable qoladi. R16+ versiyalar barcha bir xil scheduler bilan ishlaydi. Yangi React versiyasi yangi scheduler talab qilmaydi (semver).
+Scheduler API barqaror — React Reconciler ko'p o'zgarishlar qilsa-da, scheduler interface'i stable qoladi. R16+ versiyalar barcha bir xil scheduler bilan ishlaydi. Yangi React versiyasi yangi scheduler talab qilmaydi (semver).
 
 **3. Custom Renderer'lar:**
 

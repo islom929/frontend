@@ -288,27 +288,37 @@ function Logger({ message }: { message: string }) {
 
 ### Nazariya
 
-`useRef` signature:
+`useRef` signature `@types/react` versiyasiga qarab farq qiladi.
+
+**`@types/react` 18** — 3 ta overload, ikki xil return type:
 
 ```tsx
 function useRef<T>(initialValue: T): React.MutableRefObject<T>;
 function useRef<T>(initialValue: T | null): React.RefObject<T>;
 function useRef<T = undefined>(): React.MutableRefObject<T | undefined>;
-```
 
-3 ta TypeScript overload — initial value va `null` semantikasiga qarab. Returned obyekt:
-
-```tsx
 interface MutableRefObject<T> {
   current: T;
 }
 
 interface RefObject<T> {
-  readonly current: T | null;  // ← readonly!
+  readonly current: T | null;  // ← readonly
 }
 ```
 
-`React.RefObject` `current` `readonly` — DOM ref'lar uchun (React mutation qiladi, kod o'qiydi). `MutableRefObject` esa to'liq mutable — mutable values uchun.
+R18'da `RefObject` `current` `readonly` — DOM ref'lar uchun (React mutation qiladi, kod o'qiydi). `MutableRefObject` esa to'liq mutable — mutable values uchun.
+
+**`@types/react` 19** — argumentsiz overload olib tashlandi, `MutableRefObject` deprecated, ikkala interface bitta `RefObject<T>` ga birlashdi:
+
+```tsx
+function useRef<T>(initialValue: T): React.RefObject<T>;
+
+interface RefObject<T> {
+  current: T;  // readonly emas, T | null emas
+}
+```
+
+R19'da `current` mutable (`readonly` yo'qoldi). Nullable holat initial value type'idan keladi: `useRef<HTMLInputElement>(null)` → `RefObject<HTMLInputElement | null>`, ya'ni `current: HTMLInputElement | null`.
 
 **3 ta tipik initialization pattern:**
 
@@ -394,7 +404,7 @@ DOM ref'lar mount'dan oldin `null` (component yangi render'da DOM hali yo'q). Op
 **TypeScript overload tafsilotlari:**
 
 ```ts
-// @types/react ≥ 18 (R18 davrida — 3 ta overload)
+// @types/react 18 (R18 davrida — 3 ta overload)
 function useRef<T>(initialValue: T): MutableRefObject<T>;
 function useRef<T>(initialValue: T | null): RefObject<T>;
 function useRef<T = undefined>(): MutableRefObject<T | undefined>;
@@ -410,8 +420,8 @@ interface RefObject<T> {
 
 > **🕐 Versiya evolyutsiyasi (`useRef` types):**
 > - **`@types/react` < 19:** uchchala overload mavjud — argumentsiz `useRef<T>()` ishlardi.
-> - **`@types/react` ≥ 19:** argumentsiz overload **olib tashlandi**. Har chaqiruv uchun explicit initial qiymat (`undefined` yoki `null`) shart. R19 docs ham `RefObject` ni `current: T | null` (mutable, no readonly) qilib soddalashtirdi.
-> - **Sabab:** Argumentsiz forma noaniq edi — kompiler initial value yo'qligini bilmasdi, runtime'da `current === undefined` holatlari kutilmagan bug'larga olib kelardi.
+> - **`@types/react` ≥ 19:** argumentsiz overload **olib tashlandi**. Har chaqiruv uchun explicit initial qiymat (`undefined` yoki `null`) shart. R19 `@types/react` `RefObject` ni `interface RefObject<T> { current: T }` qilib soddalashtirdi — `current` endi `readonly` emas va `MutableRefObject` deprecated (ikki interface bitta `RefObject<T>` ga birlashdi). `null` semantikasi initial value type'idan kelib chiqadi: `useRef<HTMLInputElement>(null)` → `RefObject<HTMLInputElement | null>`.
+> - **Sabab:** Argumentsiz forma noaniq edi — TypeScript initial value yo'qligini hisobga olmasdi, runtime'da `current === undefined` holatlari kutilmagan bug'larga olib kelardi.
 
 Overload tartib muhim — TypeScript birinchi mos overload'ni tanlaydi:
 
@@ -751,14 +761,19 @@ Detach Mutation sub-phase'da, attach Layout sub-phase'da. Tartib: detach old →
 const ref = useRef<HTMLInputElement>(null);
 
 useEffect(() => {
+  const element = ref.current;  // Setup paytida capture qilinadi
+  if (!element) return;
+
   const handler = () => console.log('input!');
-  ref.current?.addEventListener('input', handler);
-  
+  element.addEventListener('input', handler);
+
   return () => {
-    ref.current?.removeEventListener('input', handler);
+    element.removeEventListener('input', handler);  // Captured element ishlatiladi
   };
 }, []);
 ```
+
+Cleanup ichida `ref.current` o'qish o'rniga setup paytida `element` o'zgaruvchisiga capture qilinadi. Sabab: unmount'da ref detach Mutation sub-phase'da `ref.current = null` qiladi, passive cleanup esa keyinroq ishlaydi — shu paytda `ref.current` allaqachon `null` bo'lib, `removeEventListener` listener'ni olib tashlamay qoladi (leak).
 
 `ref.current` orqali native event listener qo'shish — React event system'dan tashqarida. Foydali ba'zi cases:
 
@@ -1493,7 +1508,7 @@ useEffect(() => {
 
 **Mental model — concurrency:**
 
-`useState` Concurrent Mode'da safe — render restart bo'lsa state to'g'ri qiymat ko'radi. `useRef` esa **mutation darrov** — concurrent rendering paytida tearing potensial.
+`useState` Concurrent rendering'da safe — render restart bo'lsa state to'g'ri qiymat ko'radi. `useRef` esa **mutation darrov va qaytarib bo'lmaydi** — render paytida `ref.current` mutate qilinsa, render restart yoki abandon bo'lganda mutation orqaga qaytarilmaydi, natijada `ref.current` "fantom" qiymatga ega bo'ladi.
 
 ```tsx
 // ⚠️ Concurrent rendering xavfli
@@ -1665,8 +1680,8 @@ function WorkingToggle() {
 > **🕐 Versiya evolyutsiyasi (Refs API):**
 > - **Pre-R16 (legacy):** String refs — `<input ref="myInput" />` + `this.refs.myInput`. Class component'da only.
 > - **R16+ (modern):** `React.createRef()` (class) yoki `useRef` (function). Object refs.
-> - **R19:** String refs **to'liq olib tashlandi** — compilation xatosi yoki runtime warning.
-> - **Sabab:** String refs Concurrent Mode'da broken (bir xil string component bir necha marta render bo'lsa, `this.refs` qaysi instance'ni saqlaydi noaniq), type-unsafe (TypeScript inferensiya yo'q), hidden state (component'ning `this.refs` namespace'ida implicit).
+> - **R19:** String refs **to'liq olib tashlandi** — `ref="myInput"` endi ishlamaydi, migration shart (R16.3'da, 2018-yil mart, deprecated qilingan edi).
+> - **Sabab:** String refs Concurrent rendering'da ishonchsiz (bir xil string component bir necha marta render bo'lsa, `this.refs` qaysi instance'ni saqlaydi noaniq), type-unsafe (TypeScript type inference yo'q), hidden state (component'ning `this.refs` namespace'ida implicit).
 
 **Eski API (Pre-R16):**
 
@@ -1713,8 +1728,8 @@ function FunctionComponent() {
 
 **Nima uchun string refs olib tashlandi:**
 
-1. **Concurrent Mode incompatible** — bir xil string ref ko'p instance'ga ulanishi mumkin, qaysi instance saqlanadi noaniq
-2. **Type unsafe** — `this.refs.myInput` har doim `any` (TypeScript inferensiya yo'q)
+1. **Concurrent rendering bilan mos kelmaydi** — bir xil string ref ko'p instance'ga ulanishi mumkin, qaysi instance saqlanadi noaniq
+2. **Type unsafe** — `this.refs.myInput` har doim `any` (TypeScript type inference yo'q)
 3. **Hidden state** — `this.refs` "magic" namespace, compiler analiz qila olmaydi
 4. **Bundle size** — string refs uchun React internal lookup mexanizmi
 5. **Performance** — string lookup vs object reference
@@ -1730,7 +1745,7 @@ const inputRef = useRef(null);
 <input ref={inputRef} />
 ```
 
-Codemod mavjud (`codemod@latest react/19/...` yoki `react-codemod`) — string refs'ni avtomatik o'zgartiradi.
+Codemod mavjud — `npx codemod@latest react/19/replace-string-ref` string refs'ni callback ref'larga avtomatik o'zgartiradi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1751,7 +1766,7 @@ class Component {
 }
 ```
 
-Bu pattern internal "ResolveRef" funksiyasi orqali ishlardi. R16'da deprecated, R17-R18'da warning, R19'da olib tashlandi.
+Bu pattern internal ref-resolution mexanizmi orqali ishlardi. R16.3'da (2018-yil mart) deprecated, keyingi versiyalarda console warning, R19'da to'liq olib tashlandi.
 
 **`createRef` vs `useRef`:**
 
@@ -1838,10 +1853,10 @@ function FunctionForm() {
 }
 ```
 
-**Misol 2 — Concurrent Mode incompatibility:**
+**Misol 2 — Concurrent rendering bilan mos kelmaslik:**
 
 ```tsx
-// ❌ String ref Concurrent'da broken
+// ❌ String ref Concurrent rendering'da ishonchsiz
 class Tabs extends React.Component {
   componentDidUpdate() {
     // this.refs.activeTab — qaysi tab? Render restart bo'lsa noaniq
@@ -1900,7 +1915,7 @@ class TabsModern extends React.Component {
 > **🕐 Versiya evolyutsiyasi (`forwardRef` → ref as prop):**
 > - **Pre-R16.3:** Function component'lar ref qabul qila olmaydi — class component yoki ref forwarding HOC manual implement qilingan.
 > - **R16.3 (`forwardRef`):** `React.forwardRef(...)` wrapper introduced — function component'da ref qabul qilish.
-> - **R19:** `ref` oddiy prop bo'ldi — `forwardRef` wrapper kerak emas. `forwardRef` esa **soft-deprecated** (hali ishlaydi, warning yo'q, lekin yangi kod uchun tavsiya etilmaydi).
+> - **R19:** `ref` oddiy prop bo'ldi — `forwardRef` wrapper kerak emas. `forwardRef` hozir deprecated **emas** (hali ishlaydi, warning yo'q), lekin kelajakda deprecate qilish rejalashtirilgan — yangi kod uchun ref oddiy prop tavsiya etiladi.
 > - **Sabab:** `forwardRef` API ortiqcha boilerplate edi (har component uchun wrapper). R19'da JSX transform ref'ni avtomatik prop sifatida o'tkazadi. Yagona qoida — function component'lar ref qabul qiladi.
 
 **Pre-R16.3 muammo:**
@@ -1965,7 +1980,7 @@ R19'da JSX transform ref'ni avtomatik prop sifatida o'tkazadi. `forwardRef` wrap
 
 **Backward compatibility:**
 
-R19'da `forwardRef` hali ham ishlaydi (soft-deprecated — warning yo'q). Mavjud kod o'zgartirish shart emas. Yangi kod uchun ref oddiy prop afzal:
+R19'da `forwardRef` hali ham ishlaydi (deprecated emas, warning yo'q). Mavjud kod o'zgartirish shart emas. Yangi kod uchun ref oddiy prop afzal:
 
 ```tsx
 // ✅ R19'da ham ishlaydi (legacy)
@@ -2035,14 +2050,11 @@ type RefObject<T> = { readonly current: T | null };
 **Migration codemod:**
 
 ```bash
-# R19 migration recipe (barcha tuzatishlar)
+# R19 migration recipe — barcha R19 codemod'larni ishga tushiradi
 npx codemod@latest react/19/migration-recipe
-
-# Yoki specific codemod (faqat forwardRef → ref prop):
-npx codemod@latest react/19/replace-forward-ref-with-ref-prop
 ```
 
-Codemod `forwardRef` wrapper'ni olib tashlaydi va ref'ni prop sifatida qayta yozadi. R19 migration uchun (manba: react.dev/blog/2024/04/25/react-19-upgrade-guide).
+`migration-recipe` `forwardRef` wrapper'ni olib tashlaydi va ref'ni prop sifatida qayta yozadi (boshqa R19 migration qadamlari bilan birga). React jamoasi `forwardRef` uchun avtomatik codemod chiqarishini e'lon qildi (manba: react.dev/blog/2024/12/05/react-19).
 
 **Source citation:**
 
@@ -2191,15 +2203,17 @@ function MyInput({ ref, ...props }: React.ComponentProps<'input'>) {
 **`ComponentProps<E>` vs `ComponentPropsWithRef<E>` vs `ComponentPropsWithoutRef<E>`:**
 
 ```ts
-// R19+
-type ComponentProps<E> = ComponentPropsWithRef<E>;  // Default — ref bilan
+// @types/react — soddalashtirilgan
+type ComponentProps<E> =
+  E extends JSXElementConstructor<infer P> ? P                 // custom component → uning props'i
+  : E extends keyof JSX.IntrinsicElements ? JSX.IntrinsicElements[E]  // intrinsic → to'liq attribute'lar
+  : {};
 
-// Backward compat (R18 bilan moslashish)
-type ComponentPropsWithRef<E> = ...;     // ref ichida
-type ComponentPropsWithoutRef<E> = ...;  // ref ichida emas
+type ComponentPropsWithRef<E> = ...;     // ref maydoni bilan kafolatlangan
+type ComponentPropsWithoutRef<E> = ...;  // ref maydoni olib tashlangan
 ```
 
-R19'dan boshlab `ComponentProps` default ref bilan keladi. R18'da `ComponentProps` ref'siz edi (ref'ni alohida `forwardRef` qabul qilardi).
+`ComponentProps<'input'>` kabi intrinsic element uchun `ref` har doim (R18'da ham) ichida bo'lgan — chunki `JSX.IntrinsicElements['input']` `DetailedHTMLProps` orqali `ref`'ni o'z ichiga oladi. Farq custom component'larda: R18'da function component props'ida `ref` bo'lmasdi (ref'ni `forwardRef` alohida qabul qilardi), R19'da esa function component `ref`'ni oddiy prop sifatida e'lon qiladi, shuning uchun `ComponentProps<typeof MyComponent>` natijasiga `ref` ham kiradi. `ComponentPropsWithRef` ref maydonini har doim kafolatlaydi, `ComponentPropsWithoutRef` esa uni chiqarib tashlaydi.
 
 **Polymorphic component'lar:**
 
@@ -2238,7 +2252,7 @@ type ComponentRef<E> = E extends React.ElementType
   : never;
 ```
 
-JSX intrinsic element'lar uchun ref tipini olish:
+`@types/react` 19'da `ElementRef` deprecated, o'rniga `ComponentRef` tavsiya etiladi (`ElementRef` hali ishlaydi — olib tashlanmagan). JSX intrinsic element'lar uchun ref tipini olish:
 
 ```tsx
 type InputRef = ComponentRef<'input'>;     // HTMLInputElement
@@ -2249,8 +2263,8 @@ type CustomRef = ComponentRef<typeof MyComponent>;  // Component'ning ref tipi
 **Migration script:**
 
 ```bash
-# Codemod — forwardRef → ref as prop
-npx codemod@latest react/19/replace-forward-ref-with-ref-prop
+# Codemod — R19 migration recipe forwardRef migratsiyasini ham qamrab oladi
+npx codemod@latest react/19/migration-recipe
 
 # Manual migration:
 # 1. forwardRef wrapper olib tashlash
@@ -2295,7 +2309,7 @@ type DivRef = ElementRef<'div'>;     // HTMLDivElement
 type InputRef = ElementRef<'input'>; // HTMLInputElement
 ```
 
-`ElementRef<E>` — element ref tipi. Polymorphic component'lar uchun foydali.
+`ElementRef<E>` — element ref tipi. Polymorphic component'lar uchun foydali. `@types/react` 19'da `ElementRef` deprecated bo'ldi — yangi kod uchun `ComponentRef` ishlatiladi (yuqoridagi misollar `ElementRef` ishlatadi, chunki u hali olib tashlanmagan va R18 kod bilan ham mos).
 
 **`useImperativeHandle` bilan kombinatsiya:**
 
@@ -3606,24 +3620,24 @@ function ResizeHandler({ onResize, ref }: ResizeHandlerProps) {
 
 ```tsx
 function DivSize() {
-  const [size, setSize] = useState<DOMRect | null>(null);
-  
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  const setRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const { width, height } = node.getBoundingClientRect();
+    setSize(prev =>
+      prev && prev.width === width && prev.height === height ? prev : { width, height }
+    );
+  }, []);
+
   return (
-    <div
-      ref={(node) => {
-        if (node) {
-          setSize(node.getBoundingClientRect());
-        }
-      }}
-      style={{ padding: 20, border: '1px solid' }}
-    >
+    <div ref={setRef} style={{ padding: 20, border: '1px solid' }}>
       Size: {size?.width}x{size?.height}
     </div>
   );
 }
 ```
 
-setState ref callback ichidan — Strict Mode'da 2x trigger bo'lishi mumkin. Idempotent setter (`setSize(...)` bir xil rect bilan) ehtiyot bo'lish.
+Ikkita ehtiyot: (1) `useCallback` bilan ref identity'ni barqaror qilish — aks holda inline callback har render'da yangi function bo'lib, detach→attach takrorlanadi va `setSize` qayta chaqiriladi; (2) `getBoundingClientRect()` har chaqiruvda **yangi `DOMRect` obyekt** qaytaradi, shuning uchun primitiv `width`/`height` ni solishtirib, qiymat o'zgarmagan bo'lsa eski state'ni qaytarish (`prev`) — Object.is bailout ishlasin va render loop yuzaga kelmasin. To'g'ri yondashuv: o'lcham kuzatish uchun `ResizeObserver` (Misol 4).
 
 </details>
 
@@ -4603,8 +4617,8 @@ Production'da Pointer Events (touch + mouse + pen) afzal — `pointerdown`, `poi
 - **`useRef` `{ current: T }` qaytaradi** — re-render orasida saqlanadi (bir xil reference), `current` mutation re-render trigger qilmaydi.
 - **Ikki katta use case:** (1) DOM refs — element'larga imperative kirish (focus, scroll, measurement, video controls), (2) Mutable values — timer ID, latest closure, prev value, singleton, mount tracker.
 - **`ref` vs `state` Decision Guide:** UI'da ko'rsatiladi yoki state mutation re-render trigger qilishi kerak — `useState`. Re-render trigger qilmaydigan, internal mutable qiymat — `useRef`.
-- **String refs versiya tarixi** (Versiya callout): Pre-R16 `<input ref="myInput" />` + `this.refs.myInput` → R16+ `createRef`/`useRef` modern → R19'da string refs to'liq olib tashlandi. Sabab: Concurrent Mode incompatible, type-unsafe, hidden state.
-- **`forwardRef` evolyutsiyasi** (Versiya callout): Pre-R16.3 function component'lar ref qabul qilmasdi → R16.3 `forwardRef(...)` wrapper introduced → R19 `ref` oddiy prop, `forwardRef` soft-deprecated (hali ishlaydi, warning yo'q). Sabab: ortiqcha boilerplate, JSX transform avtomatik.
+- **String refs versiya tarixi** (Versiya callout): Pre-R16 `<input ref="myInput" />` + `this.refs.myInput` → R16+ `createRef`/`useRef` modern → R19'da string refs to'liq olib tashlandi. Sabab: Concurrent rendering bilan mos kelmaslik, type-unsafe, hidden state.
+- **`forwardRef` evolyutsiyasi** (Versiya callout): Pre-R16.3 function component'lar ref qabul qilmasdi → R16.3 `forwardRef(...)` wrapper introduced → R19 `ref` oddiy prop, `forwardRef` hozir deprecated emas (hali ishlaydi, warning yo'q), lekin kelajakda deprecate rejalashtirilgan. Sabab: ortiqcha boilerplate, JSX transform avtomatik.
 - **R19 ref oddiy prop** — function component'lar `props.ref`'ni qabul qiladi, JSX transform ref'ni boshqa props bilan birga o'tkazadi. `React.ComponentProps<E>` R19'da ref ham ichkariga kiritilgan.
 - **Ref cleanup functions (R19)** (Versiya callout): Pre-R19 callback ref `null` argument bilan unmount paytida → R19 callback **cleanup function qaytarishi mumkin** (DOM node o'chirilganda). `useEffect` cleanup pattern bilan teng. Backward compat — legacy callback hali ishlaydi.
 - **`useImperativeHandle`** — ref orqali parent'ga ixtiyoriy imperative API ekspoz qilish. Use case'lar: Modal open/close, video player play/pause/seek, form submit/reset/validate, animation. Anti-pattern: declarative bilan hal qilinishi mumkin bo'lgan narsalarga ishlatmaslik. Deps array har doim explicit.

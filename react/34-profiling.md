@@ -69,7 +69,7 @@ NIMA UCHUN production monitoring kerak:
 - Development build'da profile development behavior (Strict Mode 2x, DEV warning'lar overhead).
 - Production build'da real user environment (low-end devices, network throttling, real data scale).
 - Trend analysis — regression early detection.
-- Alert thresholds — p95 commit duration > 50ms warning.
+- Alert thresholds — p95 commit duration belgilangan budget'dan oshsa warning.
 
 > **Eslatma:** Profile **continuous activity**, one-time emas. Performance budget va monitoring trend'ni tracking qilish — production app'larda essential.
 
@@ -398,7 +398,7 @@ Slider'ni o'ngga/chap'ga yurgizib, har commit'ni ko'rish.
 ### Recording Limits
 
 - **Memory cost** — har commit DevTools heap'ga saqlanadi. Uzun recording'da (yuzlab–minglab commits) heap sezilarli darajada o'sadi; DevTools chegaraga yetganda warning ko'rsatadi va eski commit'larni truncate qiladi.
-- **Time limit** — 30+ second recording'lar DevTools'da slowness keltirib chiqaradi.
+- **Time limit** — uzun recording'lar (ko'p commit to'plangan) DevTools'da slowness keltirib chiqaradi.
 - **Tab switch** — recording paytida tab switch qilinmaydi (data loss).
 
 Tavsiya: 5-10 second recording'lar, fokuslangan reproduce.
@@ -1291,7 +1291,7 @@ Production build:
 
 `<Profiler>` — **measurement tool**, mo'ljallanadi production'da minimal overhead bilan.
 
-> **Eslatma:** `<Profiler>` R16.5 (2018-09) DevTools integration uchun joriy etilgan, R16.9 (2019-08) `react` package'dan rasmiy export sifatida stable. R18+'da `nested-update` phase qiymati qo'shildi (`useLayoutEffect`/`useEffect` ichidagi `setState` natijasidagi commit'lar).
+> **Eslatma:** `<Profiler>` R16.4'da `unstable_Profiler` sifatida joriy etilgan, keyinroq R16.x line'da `unstable_` prefiks olib tashlanib `react` package'dan stable `Profiler` export bo'lgan. R18'da `nested-update` phase qiymati qo'shildi (`useLayoutEffect`/`useEffect` ichidagi `setState` natijasidagi commit'lar).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1404,7 +1404,14 @@ function App(): ReactElement {
 Conditional profiling:
 
 ```tsx
-import { Profiler, type ReactNode } from 'react';
+import { Profiler } from 'react';
+import type { ReactElement, ReactNode } from 'react';
+
+declare global {
+  interface Window {
+    __PROFILE_ENABLED__?: boolean;
+  }
+}
 
 const PROFILING_ENABLED = process.env.NODE_ENV !== 'production' || window.__PROFILE_ENABLED__;
 
@@ -1535,12 +1542,11 @@ Commit Phase boshlangan vaqt:
 commitTime: 12356.89
 ```
 
-Render → Commit gap:
+`commitTime - startTime` — render boshlanishidan commit'gacha o'tgan **wall-clock** vaqt. Bu `actualDuration`'dan katta bo'lishi mumkin: Concurrent rendering'da render bo'linib, oralarda Scheduler boshqa ishni bajaradi yoki browser'ga yield qiladi, shu sababli ikki timestamp orasidagi farq sof render ishidan ko'p bo'ladi:
 
 ```typescript
-const renderToCommitGap = commitTime - startTime - actualDuration;
-// Time between render done and commit start
-// Usually < 1ms (Scheduler overhead)
+const wallClockSpan = commitTime - startTime;
+// actualDuration <= wallClockSpan: orasidagi farq — yield + boshqa Scheduler ishi
 ```
 
 ### Real-World Patterns
@@ -1554,14 +1560,18 @@ const onRender: ProfilerOnRenderCallback = (
   startTime,
   commitTime
 ) => {
-  // 1. Slow render detection
-  if (actualDuration > 50) {
-    console.warn(`[Slow] ${id} ${phase}: ${actualDuration}ms`);
+  // 1. Slow render detection — 60fps frame budget ~16.7ms (1000/60)
+  const frameBudget = 1000 / 60;
+  if (actualDuration > frameBudget) {
+    console.warn(`[Slow] ${id} ${phase}: ${actualDuration.toFixed(2)}ms`);
   }
   
-  // 2. Memoization efficiency
-  const efficiency = ((baseDuration - actualDuration) / baseDuration) * 100;
-  if (efficiency < 30) {
+  // 2. Memoization efficiency — pastki chegara app-specific (bu yerda misol uchun 30%)
+  const lowMemoBudget = 30;
+  const efficiency = baseDuration > 0
+    ? ((baseDuration - actualDuration) / baseDuration) * 100
+    : 0;
+  if (efficiency < lowMemoBudget) {
     console.warn(`[Low memo] ${id}: ${efficiency.toFixed(0)}% bailout`);
   }
   
@@ -1604,47 +1614,45 @@ function commitWork(workInProgress) {
 }
 ```
 
-`actualDuration` Reconciler tomonidan accumulated:
+`actualDuration` ikki bosqichda hisoblanadi (real React: `ReactProfilerTimer.js` + `ReactFiberCompleteWork.js`). Birinchi — har fiber o'zining render vaqtini **faqat o'ziga** yozadi:
 
 ```javascript
-function performUnitOfWork(workInProgress) {
-  const startTime = now();
-  const next = beginWork(workInProgress);
-  const elapsed = now() - startTime;
-  
-  workInProgress.actualDuration += elapsed;
-  
-  // Propagate to ancestors
-  let parent = workInProgress.return;
-  while (parent !== null) {
-    if (parent.tag === Profiler) {
-      parent.actualDuration += elapsed;
-    }
-    parent = parent.return;
+// ReactProfilerTimer.js (oddiylashtirilgan)
+function stopProfilerTimerIfRunningAndRecordDuration(fiber) {
+  if (profilerStartTime >= 0) {
+    const elapsedTime = now() - profilerStartTime;
+    profilerStartTime = -1;
+    fiber.actualDuration += elapsedTime; // faqat shu fiber
+    fiber.selfBaseDuration = elapsedTime;
   }
-  
-  return next;
 }
 ```
 
-`treeBaseDuration` — subtree'dagi har fiber'ning `selfBaseDuration` qiymatini yig'ish (oxirgi render'dan o'lchangan). Bashorat emas, balki memoization olib tashlangan holatdagi nazariy tree render vaqti:
+Ikkinchi — `completeWork` paytida `bubbleProperties` har fiber'da farzandlarining `actualDuration`'ini **bittagina yuqori darajaga** yig'adi (har ancestor'ga `elapsed` qayta qo'shilmaydi — aks holda nested Profiler'larda double-count bo'lardi):
 
 ```javascript
-function completeWork(workInProgress) {
-  // ...
-  // Har fiber'ning oxirgi render'da o'lchangan o'z selfBaseDuration'idan boshlanadi
-  workInProgress.treeBaseDuration = workInProgress.selfBaseDuration;
+// ReactFiberCompleteWork.js — bubbleProperties (oddiylashtirilgan)
+function bubbleProperties(completedWork) {
+  let actualDuration = completedWork.actualDuration; // fiber o'z vaqti
+  let treeBaseDuration = completedWork.selfBaseDuration;
   
-  // Children'ning aggregat treeBaseDuration'i qo'shiladi
-  let child = workInProgress.child;
+  let child = completedWork.child;
   while (child !== null) {
-    workInProgress.treeBaseDuration += child.treeBaseDuration;
+    actualDuration += child.actualDuration;       // farzandlarni yig'ish
+    treeBaseDuration += child.treeBaseDuration;
     child = child.sibling;
   }
+  
+  completedWork.actualDuration = actualDuration;
+  completedWork.treeBaseDuration = treeBaseDuration;
 }
 ```
 
-`selfBaseDuration` — har fiber render qilinganda update qilinadi (memoization bailout bo'lsa, oldingi qiymat reused). Shu sababli `treeBaseDuration` bailout fiber'larni ham hisobga oladi (eski o'lchov qiymati bilan) — bu "no-memo" baseline.
+Natijada `Profiler` fiber `completeWork`'ga yetganda, uning `actualDuration`'i butun subtree bo'ylab pastdan-yuqoriga yig'ilgan bo'ladi. Clone paytida fiber `actualDuration` 0 ga reset qilinadi, shu sababli faqat shu commit'da bajarilgan ish hisoblanadi.
+
+`treeBaseDuration` yuqoridagi `bubbleProperties` ichida `actualDuration` bilan bir vaqtda hisoblanadi: har fiber o'z `selfBaseDuration`'idan boshlab farzandlarining `treeBaseDuration`'ini yig'adi. Bu bashorat emas, balki memoization olib tashlangan holatdagi nazariy tree render vaqti.
+
+`selfBaseDuration` — har fiber render qilinganda yangilanadi (memoization bailout bo'lsa, oldingi qiymat saqlanib qoladi). Shu sababli `treeBaseDuration` bailout fiber'larni ham hisobga oladi (eski o'lchov qiymati bilan) — bu "no-memo" baseline.
 
 </details>
 
@@ -1977,15 +1985,10 @@ upstream backend_profiling { server app-profiling:3001; }
 
 server {
   location / {
-    set $sample 1;
-    if ($cookie_user_id ~ "^[0-9]") {
-      # User ID ends with 0-9 — 10% chance
-      set $first_digit $1;
-      if ($first_digit ~ "[0]") {
-        # 1% sample — profiling build
-        proxy_pass http://backend_profiling;
-        break;
-      }
+    # cookie'dagi user id'ning oxirgi raqami 0 bo'lsa — taxminan 10% sample
+    if ($cookie_user_id ~ "0$") {
+      proxy_pass http://backend_profiling;
+      break;
     }
     proxy_pass http://backend_normal;
   }
@@ -2049,12 +2052,20 @@ Web Vitals (browser-level) va React Profiler (component-level) data'sini birga a
 
 ```typescript
 import { Profiler } from 'react';
+import type { ProfilerOnRenderCallback } from 'react';
 import { onINP } from 'web-vitals';
 
-// React render data
-const reactMetrics: any[] = [];
+interface ReactRenderMetric {
+  id: string;
+  phase: string;
+  actualDuration: number;
+  timestamp: number;
+}
 
-const onRender = (id, phase, actualDuration) => {
+// React render data
+const reactMetrics: ReactRenderMetric[] = [];
+
+const onRender: ProfilerOnRenderCallback = (id, phase, actualDuration) => {
   reactMetrics.push({ id, phase, actualDuration, timestamp: performance.now() });
 };
 
@@ -2299,11 +2310,12 @@ onINP((metric) => {
     const interactionStart = metric.entries[0]?.startTime ?? 0;
     const interactionEnd = interactionStart + metric.value;
     
+    const frameBudget = 1000 / 60; // ~16.7ms — 60fps frame budget
     const slowReactRenders = renderHistory.filter(
       (r) =>
         r.timestamp >= interactionStart &&
         r.timestamp <= interactionEnd &&
-        r.duration > 50
+        r.duration > frameBudget
     );
     
     if (slowReactRenders.length > 0) {
@@ -2421,11 +2433,11 @@ Profile qaytadan, improvement aniqlash:
 
 ```
 Before:
-   ItemList: 50ms (red, slow)
+   ItemList: sekin render (red)
    Why: Props changed (items)
 
 After:
-   ItemList: 0.5ms (green, fast)
+   ItemList: tez render (green)
    Why: Props changed (items)  ← still, but bailout in children
    ItemList children: bailout
 ```
@@ -2435,14 +2447,18 @@ After:
 Deploy va monitoring:
 
 ```typescript
-// Production telemetry
-const onRender = (id, phase, actualDuration) => {
-  if (actualDuration > 50) {
+import type { ProfilerOnRenderCallback } from 'react';
+
+// Production telemetry — slow render budget (app tomonidan belgilanadi)
+const SLOW_RENDER_BUDGET = 1000 / 60; // ~16.7ms — 60fps frame
+
+const onRender: ProfilerOnRenderCallback = (id, phase, actualDuration) => {
+  if (actualDuration > SLOW_RENDER_BUDGET) {
     monitoring.send({ type: 'slow-react', id, duration: actualDuration });
   }
 };
 
-// Web Vitals
+// Web Vitals — INP "poor" chegarasi Google bo'yicha 200ms
 onINP((metric) => {
   if (metric.value > 200) {
     monitoring.send({ type: 'slow-inp', value: metric.value });
@@ -2458,8 +2474,8 @@ Trend monitoring:
 
 Alert:
 
-- p95 > 50ms → PagerDuty notify.
-- INP > 200ms for 10%+ users → Slack alert.
+- p95 commit duration app budget'idan oshsa → PagerDuty notify.
+- INP "poor" chegarasidan (Google bo'yicha 200ms) oshgan user ulushi belgilangan foizdan katta bo'lsa → Slack alert.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2482,9 +2498,9 @@ Optimization workflow as DAG:
 
 Iteration cycle:
 
-- 1 hypothesis: ~30-60 min profile + apply + re-profile.
-- 3-5 iterations typical for complex bug.
-- Don't apply 5 changes at once — measure each individually.
+- Har hypothesis bitta profile + apply + re-profile sikli.
+- Murakkab bug bir nechta iteratsiya talab qiladi.
+- Bir vaqtda bir nechta o'zgarish qo'llanmaydi — har birini alohida o'lchash kerak (qaysi o'zgarish ta'sir berganini ajratish uchun).
 
 </details>
 
@@ -2537,9 +2553,9 @@ function ProductList({ items }: { items: Product[] }): ReactElement {
 // === Step 3-4: Profile ===
 // User report: typing laggy with 1000+ products
 // Profile shows:
-//   ProductList: 30-50ms per keystroke
+//   ProductList: har keystroke'da sezilarli render vaqti (red/slow)
 //   Why: Props changed (items)
-//   Bottleneck: filter executes per render, then map 1000 items
+//   Bottleneck: filter har render'da ishlaydi, keyin 1000 item map
 
 // === Step 5-6: Apply optimization ===
 const ProductListMemo = memo(function ProductList({ items }: { items: Product[] }): ReactElement {
@@ -2577,9 +2593,9 @@ function SearchBoxAfter({ products }: { products: Product[] }): ReactElement {
 }
 
 // === Step 7: Re-profile ===
-// SearchBox: 1ms (input update)
-// ProductListMemo: 8-15ms (still render, but only when filter changes)
-// Better, but still slow with 1000 items
+// SearchBox: arzon (faqat input update)
+// ProductListMemo: faqat filter o'zgarganda render (har keystroke'da emas)
+// Yaxshilandi, lekin 1000 item map hali ham sezilarli — keyingi qadam kerak
 
 // === Step 8: Further optimization — useTransition ===
 import { useTransition } from 'react';
@@ -2620,7 +2636,8 @@ function SearchBoxFinal({ products }: { products: Product[] }): ReactElement {
 
 // === Step 8 continued: Production monitoring ===
 const onRender: ProfilerOnRenderCallback = (id, phase, actualDuration) => {
-  if (actualDuration > 50) {
+  // Slow render budget: 60fps frame (~16.7ms)
+  if (actualDuration > 1000 / 60) {
     fetch('/api/monitoring/slow-render', {
       method: 'POST',
       body: JSON.stringify({ id, phase, actualDuration, timestamp: Date.now() }),
@@ -2841,11 +2858,11 @@ Production:
 Development profile:
 
 ```
-Component render: 5ms (Strict Mode 2x = 2.5ms × 2)
-Real production: 2.5ms
+Component render (DEV, Strict Mode): ikki render pass'ning yig'indisi
+Real production: bir render pass
 ```
 
-Profile data **Strict Mode bilan ~2x kattaroq** — actualDuration overestimate.
+Profiler timer `beginWork` chaqirig'ini to'liq o'raydi, Strict Mode'ning DEV ikkinchi render pass'i esa `beginWork` **ichida** sodir bo'ladi — shu sababli ikkinchi pass ham `actualDuration`'ga qo'shiladi. Natijada DEV `actualDuration` production'ga nisbatan **taxminan ikki barobar** (sof render-bound komponent uchun) overestimate beradi.
 
 ### Accurate Production Profile
 
@@ -2872,16 +2889,18 @@ Lekin Strict Mode bug surface qiladi — production deployment'gacha qaytarish.
 Development data'ni 2'ga bo'lish:
 
 ```typescript
-const onRender = (id, phase, actualDuration) => {
+import type { ProfilerOnRenderCallback } from 'react';
+
+const onRender: ProfilerOnRenderCallback = (id, phase, actualDuration) => {
   const productionEstimate = process.env.NODE_ENV === 'development'
-    ? actualDuration / 2 // Strict Mode tax
+    ? actualDuration / 2 // Strict Mode'ning ikkinchi render pass'ini chiqarib tashlash
     : actualDuration;
   
   console.log(id, phase, productionEstimate);
 };
 ```
 
-Bu approximation — Strict Mode'ning real overhead production'dan slightly farq qiladi.
+Bu faqat taxminiy — komponent ichida memo bailout, effect duration yoki render-bo'lmagan ish bo'lsa, ikki pass aniq teng emas. Aniq production o'lchov uchun — `react-dom/profiling` build (Option 2).
 
 ### Strict Mode Render Count
 
@@ -3061,13 +3080,18 @@ PROFILING=true npm run build && npm run preview
 
 #### React-Specific
 
+Budget qiymatlari **app tomonidan belgilanadi** — quyidagilar boshlang'ich misol, jamoa baseline o'lchovga qarab sozlaydi. Yagona spec'dan kelib chiqadigan qiymat — `componentRenderP95: 16` (60fps frame budget, `1000/60 ≈ 16.7`); qolganlari illustrative.
+
 ```typescript
+const FRAME_BUDGET = 1000 / 60; // ~16.7ms — 60fps frame (yagona derived qiymat)
+
 const reactBudget = {
-  componentRenderP50: 5,    // ms (median)
-  componentRenderP95: 16,   // ms (95th percentile, 1 frame)
-  componentRenderP99: 50,   // ms (slow but acceptable)
-  totalCommitP95: 30,       // ms
-  reRenderFrequencyMax: 10, // per second
+  componentRenderP95: FRAME_BUDGET, // bir frame ichida render
+  // Quyidagilar — app baseline'iga qarab sozlanadigan misol qiymatlar:
+  componentRenderP50: FRAME_BUDGET / 3, // median maqsadi (frame'ning bir qismi)
+  componentRenderP99: FRAME_BUDGET * 3, // tail render uchun yumshoqroq chegara
+  totalCommitP95: FRAME_BUDGET * 2,     // butun commit uchun
+  reRenderFrequencyMax: 10,             // sekundiga (animation/churn signal)
 };
 ```
 
@@ -3099,7 +3123,9 @@ const bundleBudget = {
 #### Real-Time Alerts
 
 ```typescript
-const onRender = (id, phase, actualDuration) => {
+import type { ProfilerOnRenderCallback } from 'react';
+
+const onRender: ProfilerOnRenderCallback = (id, phase, actualDuration) => {
   if (actualDuration > reactBudget.componentRenderP99) {
     monitoring.send({
       type: 'budget-violation',
@@ -3248,10 +3274,10 @@ interface PerformanceBudget {
 }
 
 const BUDGET: PerformanceBudget = {
-  reactRenderP99: 50,
-  webVitalsLCP: 2500,
-  webVitalsINP: 200,
-  webVitalsCLS: 0.1,
+  reactRenderP99: (1000 / 60) * 3, // app misol budget: ~3 frame tail render
+  webVitalsLCP: 2500, // Google "good" chegarasi (ms)
+  webVitalsINP: 200,  // Google "good" chegarasi (ms)
+  webVitalsCLS: 0.1,  // Google "good" chegarasi (unitless)
 };
 
 interface BudgetViolation {
@@ -3326,11 +3352,17 @@ interface MonitoredAppProps {
   children: ReactNode;
 }
 
+declare global {
+  interface Window {
+    __VITALS_INIT__?: boolean;
+  }
+}
+
 function MonitoredApp({ children }: MonitoredAppProps): ReactElement {
   // Setup once
-  if (typeof window !== 'undefined' && !(window as any).__VITALS_INIT__) {
+  if (typeof window !== 'undefined' && !window.__VITALS_INIT__) {
     setupVitalsMonitoring();
-    (window as any).__VITALS_INIT__ = true;
+    window.__VITALS_INIT__ = true;
   }
   
   return (
@@ -3371,10 +3403,19 @@ Rare bug — DevTools `actualDuration < 0` ko'rsatadi.
 `<Profiler>` har commit'da `onRender` chaqiradi. Closure'da existing state'ga reference ushlash o'z-o'zidan leak emas (data baribir App state'da bor). Real leak — `onRender` ichida boundsiz buffer'ga push qilish:
 
 ```tsx
-// ❌ Real leak — har commit'da metrics array o'sadi
-const metrics: any[] = [];
+import type { ProfilerOnRenderCallback } from 'react';
 
-const onRender = (id, phase, duration) => {
+interface RenderSample {
+  id: string;
+  phase: string;
+  duration: number;
+  timestamp: number;
+}
+
+// ❌ Real leak — har commit'da metrics array o'sadi
+const metrics: RenderSample[] = [];
+
+const onRender: ProfilerOnRenderCallback = (id, phase, duration) => {
   metrics.push({ id, phase, duration, timestamp: Date.now() });
   // Hech qachon flush yoki bound yo'q → heap o'sadi
 };
@@ -3386,10 +3427,10 @@ return <Profiler id="App" onRender={onRender}>...</Profiler>;
 
 ```tsx
 const MAX_BUFFER = 100;
-const metrics: any[] = [];
+const metrics: RenderSample[] = [];
 
-const onRender = (id, phase, duration) => {
-  metrics.push({ id, phase, duration });
+const onRender: ProfilerOnRenderCallback = (id, phase, duration) => {
+  metrics.push({ id, phase, duration, timestamp: Date.now() });
   if (metrics.length >= MAX_BUFFER) {
     navigator.sendBeacon('/api/metrics', JSON.stringify(metrics));
     metrics.length = 0;
@@ -3422,9 +3463,9 @@ function reportVital(metric) {
 ### ❌ Xato 1: Development Build Profile Production Hisoblash
 
 ```tsx
-// Development profile: 50ms
-// Conclusion: production ham 50ms — NOTO'G'RI
-// Production: 25ms (Strict Mode 2x dev only)
+// Development profile: actualDuration ikki render pass'ni o'z ichiga oladi
+// Conclusion: production ham shu qiymat — NOTO'G'RI
+// Production: bir render pass (Strict Mode faqat DEV)
 ```
 
 **Yechim:** Production build profile (`react-dom/profiling`).
@@ -3539,7 +3580,7 @@ Expected results:
   - Counter: re-render — Hooks changed (`count` state)
   - App: **bailout** — App'da state/props o'zgarmagan, App funksiyasi qaytadan chaqirilmaydi
   - Sidebar: **bailout (skipped)** — App re-render bo'lmagani uchun Sidebar reconcile qilinmaydi (sibling lanes ham mos kelmaydi)
-  - HeavyList: **bailout (skipped)** — xuddi Sidebar kabi, React faqat update lane bor bo'lgan subtree'ga kiradi
+  - HeavyList: **bailout (skipped)** — Sidebar bilan bir xil sabab, React faqat update lane bor bo'lgan subtree'ga kiradi
 
 > **MUHIM:** Counter'ning setState'i Counter Fiber'iga lane mark qiladi. Reconciler root'dan boshlanadi: App'ning `lanes` o'zida update yo'q, lekin `childLanes` mavjud → React App'ni bailout qilib, lekin childLanes bor bo'lgan child'ga (Counter) kiradi. Sidebar va HeavyList esa o'z `childLanes`'ida update yo'q — React ularga umuman kirmaydi. Demak "Parent rendered" sababi bu yerda **qo'llanmaydi** — sibling state update top-down propagation keltirib chiqarmaydi.
 
@@ -3819,10 +3860,14 @@ Profiling build user'lardan data yig'ish:
 
 ```tsx
 import { Profiler } from 'react';
+import type { ReactElement, ProfilerOnRenderCallback } from 'react';
 
-const isProfilingBuild = (window as any).__PROFILING__;
+// Vite define() orqali kiritilgan compile-time const
+declare const __PROFILING__: boolean;
 
-const onRender = (id, phase, actualDuration, baseDuration) => {
+const isProfilingBuild = __PROFILING__;
+
+const onRender: ProfilerOnRenderCallback = (id, phase, actualDuration, baseDuration) => {
   if (!isProfilingBuild) return;
   
   navigator.sendBeacon(
@@ -3896,7 +3941,7 @@ function setupINPCorrelation(): void {
     // Sort by duration descending
     relatedRenders.sort((a, b) => b.duration - a.duration);
     
-    const slowRenders = relatedRenders.filter((r) => r.duration > 16);
+    const slowRenders = relatedRenders.filter((r) => r.duration > 1000 / 60); // 60fps frame budget
     
     if (slowRenders.length > 0) {
       console.warn(`[Slow INP ${metric.value}ms] React renders:`);
@@ -3923,11 +3968,17 @@ interface MonitoredAppProps {
   children: ReactNode;
 }
 
+declare global {
+  interface Window {
+    __INP_INIT__?: boolean;
+  }
+}
+
 function MonitoredApp({ children }: MonitoredAppProps): ReactElement {
   // Setup once
-  if (typeof window !== 'undefined' && !(window as any).__INP_INIT__) {
+  if (typeof window !== 'undefined' && !window.__INP_INIT__) {
     setupINPCorrelation();
-    (window as any).__INP_INIT__ = true;
+    window.__INP_INIT__ = true;
   }
   
   return (
@@ -3937,30 +3988,25 @@ function MonitoredApp({ children }: MonitoredAppProps): ReactElement {
   );
 }
 
-// Real-world test:
-// User clicks "Submit" button
-// Heavy validation + API call
-// INP = 350ms (over budget)
+// Real-world test (gipotetik scenario — data shape namunasi):
+// User clicks "Submit" button → og'ir validation + API call → INP budget'dan oshadi
 //
-// Console:
-// [Slow INP 350ms] React renders:
-//   ValidationPanel: 120ms
-//   FormSummary: 80ms
-//   App: 50ms
+// Console (eng sekin render'lar tartiblangan):
+// [Slow INP <value>ms] React renders:
+//   ValidationPanel: <duration>ms  ← eng sekin
+//   FormSummary:     <duration>ms
+//   App:             <duration>ms
 //
-// Monitoring data:
+// Monitoring payload:
 // {
-//   inp: 350,
-//   renders: [
-//     { id: 'ValidationPanel', duration: 120 },
-//     { id: 'FormSummary', duration: 80 },
-//     ...
-//   ],
-//   totalRenderTime: 250
+//   inp: <inp value>,
+//   renders: [ { id: 'ValidationPanel', duration }, { id: 'FormSummary', duration }, ... ],
+//   totalRenderTime: <renderlar yig'indisi>
 // }
 //
-// Conclusion: 250ms of 350ms INP is React render time
-// Optimization target: ValidationPanel (120ms)
+// Tahlil: agar totalRenderTime INP'ning katta qismini tashkil etsa — bottleneck React render
+//         (bu yerda ValidationPanel); aks holda — network yoki input delay
+// Optimization target: ro'yxatdagi eng sekin komponent (ValidationPanel)
 ```
 
 </details>
@@ -4054,8 +4100,8 @@ DevTools Profiler:
 - Stop record.
 
 Flame chart shows:
-- SearchPage: ~80ms per keystroke
-- ArticleRow × 1000: each ~0.05ms (total 50ms)
+- SearchPage: har keystroke'da sezilarli render vaqti (commit bottleneck)
+- ArticleRow × 1000: har biri kichik, lekin yig'indida SearchPage tree time'ning katta qismi
 
 "Why did this render?":
 - SearchPage: Hooks changed (query)
@@ -4201,27 +4247,28 @@ function SearchPageVirtualized({ articles }: { articles: Article[] }): ReactElem
 After optimizations:
 
 - Type "react":
-  - SearchPage: ~2ms (input update only)
+  - SearchPage: arzon (faqat input update)
   - ArticleRow re-render: faqat selectedId match'ga tegishli row
   - Filter: deferred (Transition Lane)
 
 Flame chart:
-- SearchPage: 2ms
-- ArticleRow (selected): 0.5ms
+- SearchPage: kichik render
+- ArticleRow (selected): kichik render
 - Other ArticleRows: bailout (memo)
 
 Improvement:
-- Before: ~80ms per keystroke
-- After: ~2ms input + ~10-30ms filter (Transition Lane, interruptible)
-- INP: < 100ms (target met)
+- Before: har keystroke'da sinxron filter + sort + 1000 row render — sezilarli lag
+- After: input darhol javob beradi; og'ir filter Transition Lane'da, interruptible — input bloklanmaydi
+- INP: budget ichiga tushadi (input responsiveness tiklandi)
 
 ### Step 5: Production Monitoring
 
 ```tsx
 import { Profiler } from 'react';
+import type { ProfilerOnRenderCallback } from 'react';
 
-const onRender = (id, phase, actualDuration) => {
-  if (actualDuration > 50) {
+const onRender: ProfilerOnRenderCallback = (id, phase, actualDuration) => {
+  if (actualDuration > 1000 / 60) { // 60fps frame budget
     monitoring.send({ type: 'slow-react', id, duration: actualDuration });
   }
 };
@@ -4282,7 +4329,7 @@ Bu fayl React profiling'ning to'liq spectrum'ini o'rgandi:
 - **Web Vitals Integration** — Core Web Vitals (LCP, INP, CLS), 2024-yil mart oyida FID o'rniga INP qo'shildi (FID → INP transition March 2024 — Google Web Vitals, React'dan mustaqil), `web-vitals` package, INP correlation with React renders.
 - **Real-World Workflow** — 8-step (symptom → reproduce → local repro → profile → analyze → hypothesis+optimize → re-profile → deploy+monitor).
 - **Highlight Updates** — visual debug, rang **frequency-based** (cool yashil — kam-uchraydigan / sariq — moderate / qizil — hot spot, tez-tez re-render). Production'da yo'q. Strict Mode 2x bitta commit ichida ikki function call (alohida highlight signal emas).
-- **Strict Mode Profile Impact** — development 2x render, profile data ~2x kattaroq. Production build profile yoki conditional StrictMode.
+- **Strict Mode Profile Impact** — DEV'da render funksiyasi `beginWork` ichida 2x chaqiriladi, ikkala pass ham `actualDuration`'ga kiradi → sof render-bound komponent uchun taxminan ikki barobar overestimate (memo bailout/effect aralashganda pass'lar teng emas). Aniq o'lchov uchun production build profile yoki conditional StrictMode.
 - **Performance Budget** — React-specific (component render p99, total commit p95), Web Vitals (LCP/INP/CLS), bundle size. Real-time + aggregated alerting, CI/CD integration (Lighthouse CI).
 
 QISM 8 (Performance & Compiler) — 4/6 yozildi. Keyingi fayl `35-code-splitting.md` — `React.lazy` chuqur, route-based splitting, prefetching strategies (hover/idle/viewport), R19 Preloading APIs (`preload`, `preinit`, `prefetchDNS`, `preconnect`).
