@@ -468,13 +468,13 @@ Natija: Square | Triangle
 
 ```typescript
 // === Asosiy ishlatish ===
-type T1 = Exclude<"a" | "b" | "c", "a">;
-// "b" | "c"
+type WithoutAdmin = Exclude<"admin" | "user" | "guest", "admin">;
+// "user" | "guest"
 
-type T2 = Exclude<"a" | "b" | "c", "a" | "b">;
-// "c"
+type GuestOnly = Exclude<"admin" | "user" | "guest", "admin" | "user">;
+// "guest"
 
-type T3 = Exclude<string | number | boolean, string>;
+type NonStringPrimitive = Exclude<string | number | boolean, string>;
 // number | boolean
 
 // === Real-world: mavjud event'lardan ba'zilarini chiqarish ===
@@ -512,10 +512,10 @@ type Extract<T, U> = T extends U ? T : never;
 <summary><strong>Kod Misollari</strong></summary>
 
 ```typescript
-type T1 = Extract<"a" | "b" | "c", "a" | "c">;
-// "a" | "c"
+type EditableRoles = Extract<"admin" | "user" | "guest", "admin" | "guest">;
+// "admin" | "guest"
 
-type T2 = Extract<string | number | boolean, string | boolean>;
+type NonNumericPrimitive = Extract<string | number | boolean, string | boolean>;
 // string | boolean
 
 // === Discriminated union'da ma'lum shape'larni olish ===
@@ -545,10 +545,10 @@ type Functions = Extract<Mixed, (...args: any[]) => any>;
 **Implementation:**
 
 ```typescript
-// TS 4.9+ lib.es5.d.ts
+// TS 4.8+ lib.es5.d.ts
 type NonNullable<T> = T & {};
 
-// Eski versiyalarda (TS < 4.9):
+// Eski versiyalarda (TS < 4.8):
 // type NonNullable<T> = T extends null | undefined ? never : T;
 ```
 
@@ -560,10 +560,10 @@ type NonNullable<T> = T & {};
 <summary><strong>Kod Misollari</strong></summary>
 
 ```typescript
-type T1 = NonNullable<string | null | undefined>;
+type CleanName = NonNullable<string | null | undefined>;
 // string
 
-type T2 = NonNullable<number | null>;
+type CleanCount = NonNullable<number | null>;
 // number
 
 // === Real-world: optional chaining natijasini kafolatlash ===
@@ -756,15 +756,18 @@ const service = createInstance(UserService, db, cache, logger);
 // service: UserService — type-safe
 
 // === Built-in class'lar ===
-// Overloaded constructor'lar uchun faqat OXIRGI overload signature olinadi
+// Overloaded constructor'lar uchun faqat OXIRGI overload signature olinadi.
+// DateConstructor'ning oxirgi overload'i — komponentli (year, monthIndex, ...),
+// shu sabab natija [value: ...] EMAS, balki quyidagi tuple:
 type DateParams = ConstructorParameters<typeof Date>;
-// [value: string | number | Date]
+// [year: number, monthIndex: number, date?: number, hours?: number,
+//  minutes?: number, seconds?: number, ms?: number]
 
 type ErrorParams = ConstructorParameters<typeof Error>;
 // [message?: string, options?: ErrorOptions]
 
 type RegExpParams = ConstructorParameters<typeof RegExp>;
-// [pattern: string | RegExp, flags?: string]
+// [pattern: string, flags?: string] — oxirgi overload pattern: string (RegExp emas)
 ```
 
 </details>
@@ -994,7 +997,7 @@ type SyncReturn = Awaited<ReturnType<typeof getUser>>;
 
 ### Nazariya
 
-`NoInfer<T>` — TypeScript'ning **type inference**'ini ma'lum pozitsiyada **to'xtatadi**. Ya'ni kompilator shu pozitsiyadagi qiymatdan type'ni infer qilmasligi kerakligini bildiradi.
+`NoInfer<T>` — TypeScript'ning **type inference**'ini ma'lum pozitsiyada **to'xtatadi**. Ya'ni compiler shu pozitsiyadagi qiymatdan type'ni infer qilmasligi kerakligini bildiradi.
 
 **Muammo:** Generic funksiyalarda ba'zan TypeScript noto'g'ri joydan type'ni infer qiladi. Masalan, default qiymatdan infer qilish kerak emas — faqat asosiy argument'dan.
 
@@ -1005,12 +1008,12 @@ type SyncReturn = Awaited<ReturnType<typeof getUser>>;
 type NoInfer<T> = intrinsic;
 ```
 
-Bu `Uppercase`/`Lowercase` kabi **intrinsic** type — kompilator ichida maxsus qayta ishlanadi. Runtime'da hech qanday ta'siri yo'q (type erasure).
+Bu `Uppercase`/`Lowercase` bilan bir guruhdagi **intrinsic** type — compiler ichida maxsus qayta ishlanadi. Runtime'da hech qanday ta'siri yo'q (type erasure).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`NoInfer` kompilator'ning inference algoritmida qanday ishlaydi:
+`NoInfer` compiler'ning inference algoritmida qanday ishlaydi:
 
 ```
 function createStore<T>(initial: T, defaultValue: NoInfer<T>): T
@@ -1187,7 +1190,7 @@ type AsyncUserRepo = Async<UserRepo>;
 
 ### Nazariya
 
-Utility type'lar — kompilator type check jarayonida hisoblash talab qiladi. Chuqur nesting va murakkab kombinatsiyalar performance'ga ta'sir qilishi mumkin.
+Utility type'lar — compiler type check jarayonida hisoblash talab qiladi. Chuqur nesting va murakkab kombinatsiyalar performance'ga ta'sir qilishi mumkin.
 
 **Qoidalar:**
 
@@ -1222,23 +1225,23 @@ Utility type'lar — kompilator type check jarayonida hisoblash talab qiladi. Ch
 
 ```typescript
 // ❌ Yomon — chuqur nesting
-type Bad = Partial<Required<Readonly<Omit<Pick<User, "id" | "name">, "id">>>>;
+type NestedUserView = Partial<Required<Readonly<Omit<Pick<User, "id" | "name">, "id">>>>;
 
 // ✅ Yaxshi — intermediate type alias'lar
 type PickedUser = Pick<User, "id" | "name">;
 type ReadonlyPicked = Readonly<PickedUser>;
-type Good = Partial<ReadonlyPicked>;
+type StagedUserView = Partial<ReadonlyPicked>;
 
 // ❌ Yomon — generic constraints ichida murakkab utility
-function bad<T extends Partial<Required<Readonly<SomeType>>>>() {}
+function processConfig<T extends Partial<Required<Readonly<OrderConfig>>>>() {}
 
 // ✅ Yaxshi — type alias bilan
-type ProcessedType = Partial<Required<Readonly<SomeType>>>;
-function good<T extends ProcessedType>() {}
+type ProcessedConfig = Partial<Required<Readonly<OrderConfig>>>;
+function validateConfig<T extends ProcessedConfig>() {}
 
 // ❌ Yomon — recursive utility types chuqur nesting
 type DeepPartial<T> = { [K in keyof T]?: DeepPartial<T[K]> };
-// 10+ level deep object'da sekin bo'lishi mumkin
+// Juda chuqur nested object'da har level instantiation talab qiladi — sekinlashtiradi
 
 // ✅ Yaxshi — depth limit qo'shish
 type BoundedDeepPartial<T, D extends unknown[] = []> =
@@ -1255,12 +1258,12 @@ type BoundedDeepPartial<T, D extends unknown[] = []> =
 ### 1. `Exclude<never, T>` → `never` — bo'sh union'dan chiqarish
 
 ```typescript
-type T1 = Exclude<never, string>;
+type ExcludeFromEmpty = Exclude<never, string>;
 // never — never bo'sh union, hech qanday member yo'q
 // Distributive conditional type — bo'sh union'da hech narsa iterate bo'lmaydi
 
-type T2 = Extract<never, string>;
-// never — xuddi shunday sabab
+type ExtractFromEmpty = Extract<never, string>;
+// never — aynan shu sabab
 ```
 
 ### 2. `Partial<T>` + `exactOptionalPropertyTypes` — `undefined` assignability o'zgaradi
@@ -1312,10 +1315,12 @@ type Keys1 = keyof Record<string, unknown>;
 type Keys2 = keyof { [key: string]: unknown };
 // string | number — index signature!
 
-// Nima uchun farq? Record<string, T> mapped type:
-// { [P in string]: T } — bu index signature bilan bir xil EMAS
-// Record faqat string key'lar, index signature esa
-// number key'larni ham qabul qiladi (JS'da obj[0] === obj["0"])
+// Nima uchun farq? Farq faqat keyof natijasida, kalit qabul qilishda emas —
+// ikkala type ham qiymat darajasida obj[0] (obj["0"]) access'ga ruxsat beradi.
+// Explicit [key: string] index signature uchun keyof ataylab string | number
+// qaytaradi (JS number kalitni string'ga coerce qiladi, shuning uchun [key: string]
+// keyof bo'yicha [key: string | number] sifatida qaraladi). Record<string, T> esa
+// { [P in string]: T } mapped type — bunda keyof faqat string'ni beradi.
 ```
 
 ### 5. `Readonly<T>` va array — `push`/`pop` hali ham ishlaydi
@@ -1382,8 +1387,8 @@ type StrictOmit<T, K extends keyof T> = Omit<T, K>;
 ```typescript
 function getUser() { return { id: 1, name: "Ali" }; }
 
-// type T = ReturnType<getUser>;         // ❌ — value, type emas
-type T = ReturnType<typeof getUser>;     // ✅
+// type UserResult = ReturnType<getUser>;        // ❌ — value, type emas
+type UserResult = ReturnType<typeof getUser>;    // ✅
 ```
 
 **Nima uchun:** `ReturnType<T>` type parameter qabul qiladi. `getUser` — runtime value. `typeof getUser` — shu value'ning type'i.
@@ -1658,7 +1663,7 @@ Bu bo'limda TypeScript'ning barcha built-in utility type'lari chuqur o'rganildi:
 **Union transformation (conditional types asosida):**
 - **`Exclude<T, U>`** — union'dan chiqarish. Distributive conditional type.
 - **`Extract<T, U>`** — union'dan ajratish. `Exclude`'ning teskari amali.
-- **`NonNullable<T>`** — `null | undefined` chiqarish. TS 4.9+'da `T & {}` bilan (distributive emas — `NonNullable<unknown>` = `{}`).
+- **`NonNullable<T>`** — `null | undefined` chiqarish. TS 4.8+'da `T & {}` bilan (distributive emas — `NonNullable<unknown>` = `{}`).
 
 **Function types (`infer` asosida):**
 - **`ReturnType<T>`** — return type. `typeof` kerak. Overload'da oxirgi signature.

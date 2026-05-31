@@ -2,7 +2,7 @@
 
 > Generics — TypeScript'da type-level abstraction mexanizmi. Funksiya, interface yoki class yaratishda aniq type o'rniga **type parameter** qo'yiladi va u faqat ishlatilgan paytda aniq type'ga aylanadi. Bu compile-time'da to'liq type safety'ni saqlab, reusable kod yozish imkonini beradi.
 >
-> Generics — TypeScript type system'ning **fundamenti**. Keyingi bo'limlardagi Conditional Types, Mapped Types, Utility Types — barchasi generics ustiga quriladi. Bu bo'limda generic'larning asosiy konseptsiyalarini, built-in operator'larni (`keyof`, `typeof`, index access), va real-world pattern'larni ko'ramiz.
+> Generics — TypeScript type system'ning **fundamenti**. Keyingi bo'limlardagi Conditional Types, Mapped Types, Utility Types — barchasi generics ustiga quriladi. Bu bo'lim generic'larning asosiy concept'larini, built-in operator'larni (`keyof`, `typeof`, index access), va real-world pattern'larni qamrab oladi.
 
 ---
 
@@ -33,7 +33,7 @@
 
 ### Nazariya
 
-Generics — type system'da **parametrizatsiya** mexanizmi. Oddiy funksiya qiymat (value) bilan ishlaydi — generics esa **type** bilan ishlaydi. `<T>` — bu type parameter, ya'ni "qaysi type kelishini hali bilmaymiz, lekin u kelganda barcha joyda bir xil type ishlatiladi" degan ma'no beradi.
+Generics — type system'ni parameter bilan boshqarish mexanizmi. Oddiy funksiya value bilan ishlaydi — generics esa **type** bilan ishlaydi. `<T>` — type parameter: qaysi type kelishi declaration paytida noma'lum, lekin chaqiruv paytida aniqlangan type signature'dagi barcha `T` o'rniga bir xil qo'yiladi.
 
 Generics ikkita muammoni hal qiladi:
 
@@ -75,10 +75,10 @@ Bitta funksiya — barcha type'lar uchun — to'liq type safety bilan.
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-TypeScript kompilatori generic'larni quyidagi bosqichlarda qayta ishlaydi:
+TypeScript compiler generic'larni quyidagi bosqichlarda qayta ishlaydi:
 
 1. **Parsing** — `<T>` type parameter sifatida AST'ga qo'shiladi (`TypeParameterDeclaration` node)
-2. **Type checking** — har chaqiruv joyida `T`'ning aniq type'ga **instantiation** qilinadi, argumentlardan inference yoki explicit berilgan type ishlatiladi
+2. **Type checking** — har chaqiruv joyida `T`'ning aniq type'ga **instantiation** qilinadi, argument'lardan inference yoki explicit berilgan type ishlatiladi
 3. **Erasure** — JS'ga compile paytida `<T>` va barcha type annotation'lar butunlay o'chiriladi
 
 ```
@@ -118,7 +118,7 @@ Generic Instantiation Flow:
              ← runtime'da generic iz yo'q
 ```
 
-**Instantiation lazy**: kompilator barcha mumkin bo'lgan `T`'lar uchun oldindan tekshirmaydi — faqat haqiqiy call site'lardagi aniq type'lar uchun. Shuning uchun `id<number>` va `id<string>` ikki mustaqil instantiation — bir-biriga ta'sir qilmaydi.
+**Instantiation lazy**: compiler barcha mumkin bo'lgan `T`'lar uchun oldindan tekshirmaydi — faqat haqiqiy call site'lardagi aniq type'lar uchun. Shuning uchun `id<number>` va `id<string>` ikki mustaqil instantiation — bir-biriga ta'sir qilmaydi.
 
 **Runtime'da farq yo'q:** Generic funksiya compiled JS'da oddiy funksiya bo'lib qoladi. `instanceof`, `typeof`, reflect — hech biri type parameter'ni ko'ra olmaydi. Type safety faqat compile-time'da amal qiladi — shuning uchun external data (API response, JSON) bilan ishlashda runtime validation kerak bo'ladi.
 
@@ -200,9 +200,9 @@ Function declaration, function expression va arrow funksiyalar — uchala shakld
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator generic funksiyani parse qilganda, `<T>` type parameter list `typeParameters` property'da saqlanadi — value parameter'lardan butunlay alohida AST branch.
+Compiler generic funksiyani parse qilganda, `<T>` type parameter list `typeParameters` property'da saqlanadi — value parameter'lardan butunlay alohida AST branch.
 
-Har call site'da kompilator **type parameter instantiation** jarayonini boshlaydi. `identity<number>(42)` chaqirilganda yangi type scope yaratiladi va `T = number` binding qo'yiladi. Signature'dagi barcha `T` o'rniga `number` qo'yilib tekshiriladi — parameter type, return type, body ichidagi operatsiyalar.
+Har call site'da compiler **type parameter instantiation** jarayonini boshlaydi. `identity<number>(42)` chaqirilganda yangi type scope yaratiladi va `T = number` binding qo'yiladi. Signature'dagi barcha `T` o'rniga `number` qo'yilib tekshiriladi — parameter type, return type, body ichidagi operation'lar.
 
 **Instantiation har call uchun alohida:** `identity<number>` va `identity<string>` — ikki mustaqil instantiation, bir-biriga ta'sir qilmaydi. Har chaqiriq o'z scope'ida T'ni boshqa type bilan bog'laydi.
 
@@ -296,12 +296,12 @@ const user = find([{ name: "Ali" }, { name: "Vali" }], item => item.name === "Al
 
 ### Nazariya
 
-TypeScript ko'pincha type parameter'ni **o'zi aniqlaydi** — explicit berish shart emas. Inference argument'lardan amalga oshadi: kompilator argument'ning type'iga qarab `T`'ni aniqlaydi.
+TypeScript ko'pincha type parameter'ni **o'zi aniqlaydi** — explicit berish shart emas. Inference argument'lardan amalga oshadi: compiler argument'ning type'iga qarab `T`'ni aniqlaydi.
 
 **Inference jarayoni:**
 
 1. Funksiya chaqiriladi — `identity("hello")`
-2. Kompilator argument type'ini aniqlaydi — `"hello"` → `string`
+2. Compiler argument type'ini aniqlaydi — `"hello"` → `string`
 3. `T = string` deb belgilaydi
 4. Barcha `T` ishlatilgan joylarni shu type bilan tekshiradi — return type ham `string`
 
@@ -314,10 +314,10 @@ const a = identity("hello"); // T = string (inference)
 const b = identity(42);       // T = number (inference)
 ```
 
-**Inference ko'plab argumentlardan:** Agar bir nechta argument bo'lsa, kompilator har biridan type candidate yig'adi va **best common type** algoritmi bilan yakuniy type'ni tanlaydi.
+**Inference ko'plab argument'lardan:** Agar bir nechta argument bo'lsa, compiler har biridan type candidate yig'adi va **best common type** algoritmi bilan yakuniy type'ni tanlaydi.
 
 ```typescript
-// `T extends object` — spread operatsiyasi unconstrained `T` ustida ishlamaydi
+// `T extends object` — spread operation unconstrained `T` ustida ishlamaydi
 function merge<T extends object, U extends object>(a: T, b: U): T & U {
   return { ...a, ...b };
 }
@@ -327,7 +327,7 @@ merge({ x: 1 }, { y: "a" });
 // natija type: { x: number } & { y: string }
 ```
 
-`merge<T>(a: T, b: T): T` versiyasi tanqidiy: bir `T` parameter ikkita disjoint object'ni qabul qila olmaydi — TS birinchi argumentdan T'ni fix qiladi va ikkinchisida xato beradi (best-common-type union faqat array literal yoki return contextda ishlaydi).
+`merge<T>(a: T, b: T): T` versiyasi `T`'ni ikki argument'dan birga infer qiladi. Object literal'lar bo'lganda compiler ularni **union** qiladi: `merge({ x: 1 }, { y: "a" })` → `T = { x: number } | { y: string }`, natija type ham union (intersection emas). Shuning uchun ikki object'ni birlashtirib `T & U` olish kerak bo'lsa, ikkita alohida type parameter (`<T, U>`) zarur — bitta `T` union beradi, intersection emas.
 
 **Contextual inference** — callback'da parameter type avtomatik infer bo'ladi:
 
@@ -344,7 +344,7 @@ const result = map([1, 2, 3], (n) => n.toString());
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Type inference — kompilatorning eng murakkab algoritmlaridan biri. Umumiy jarayon:
+Type inference — compiler'ning eng murakkab algoritmlaridan biri. Umumiy jarayon:
 
 ```
 Inference Pipeline:
@@ -355,11 +355,11 @@ Inference Pipeline:
 2. Type parameter'ga candidate qo'shish:
    T ← string (from argument 1)
 
-3. Bir nechta candidate bo'lsa — best common type:
-   merge({x: 1}, {y: "a"}) →
+3. Bitta T ikki argument'dan candidate yig'sa — best common type:
+   pickFirst<T>(a: T, b: T) — pickFirst({x: 1}, {y: "a"}) →
      T candidate 1: { x: number }
      T candidate 2: { y: string }
-     Best common: { x: number } | { y: string }
+     Best common: { x: number } | { y: string }   (object literal → union)
 
 4. Contextual inference (callback'lar uchun):
    map([1,2,3], (n) => ...) →
@@ -369,13 +369,13 @@ Inference Pipeline:
      callback return `n.toString()` → U = string
 ```
 
-**Best common type** algoritmi: kompilator candidate'lar orasidan eng keng type'ni tanlaydi. Agar ular hierarchy'da bog'liq bo'lsa — eng pastki ota tanlanadi (masalan, ikkala candidate `Dog` va `Cat` bo'lsa → `Dog | Cat` yoki `Animal` parent type mavjud bo'lsa).
+**Best common type** algoritmi: compiler candidate'lar orasidan biri qolganlarining hammasini o'z ichiga oladimi (supertype) deb tekshiradi. Agar shunday candidate topilsa — o'sha tanlanadi. Compiler `Animal` kabi umumiy ota type'ni avtomatik qidirmaydi — faqat candidate'lar ichidan tanlaydi. Supertype topilmasa, natija candidate turiga bog'liq: **object literal** candidate'lar union'ga birlashtiriladi (`{ x: number } | { y: string }`), **primitive literal** candidate'lar esa birlashmaydi — compiler birinchi argument'dan `T`'ni fix qiladi va keyingi mos kelmagan argument'da xato beradi (`pickFirst(1, "a")` → T birinchidan `1`, ikkinchisida `"a"` is not assignable). Mixed primitive uchun union kerak bo'lsa explicit `pickFirst<string | number>(1, "a")` ishlatiladi.
 
-**Contextual typing** (bidirectional type flow): Type ma'lumot tashqi funksiyadan ichki callback'ga oqadi. Kompilator callback parameter'larning type'ini tashqi signature'dan oladi — bu inline callback'larda parameter type yozmaslik imkonini beradi.
+**Contextual typing** (bidirectional type flow): type ma'lumot tashqi funksiyadan ichki callback'ga oqadi. Compiler callback parameter'larning type'ini tashqi signature'dan oladi — bu inline callback'larda parameter type yozmaslik imkonini beradi.
 
-**Variance positions va inference:** Parameter position'da (contra-variant) inference boshqacha natija berishi mumkin. Kompilator buni internal priority flag'lari orqali boshqaradi.
+**Variance positions va inference:** parameter position'da (contravariant) inference boshqacha natija berishi mumkin. Compiler buni internal priority orqali boshqaradi.
 
-**Inference muvaffaqiyatsiz:** Agar kompilator hech qanday candidate topa olmasa, `T = unknown` bo'ladi — xato emas, lekin foydali emas. Shuning uchun argumentsiz generic funksiyalarda explicit type berish tavsiya etiladi.
+**Inference muvaffaqiyatsiz:** agar compiler hech qanday candidate topa olmasa, `T = unknown` bo'ladi — xato emas, lekin foydali emas. Shuning uchun argumentsiz generic funksiyalarda explicit type berish tavsiya etiladi.
 
 Runtime'da inference natijasi hech qanday iz qoldirmaydi — hammasi compile-time computation.
 
@@ -419,22 +419,27 @@ function pair<T, U>(first: T, second: U): [T, U] {
 const p1 = pair("name", 25);          // [string, number]
 const p2 = pair(true, { id: 1 });     // [boolean, { id: number }]
 
-// 5. Best common type — array literal yoki return contextda
+// 5. Best common type — array literal yoki return context'da
 const mixed = [1, "a", true];
-// `T = number | string | boolean` — array literal best-common-type
+// mixed: (string | number | boolean)[] — array literal best-common-type
 
-// Diqqat — ikki parametrli inference:
-function mostSpecific<T>(a: T, b: T): T {
+// Diqqat — ikki parametrli inference (bitta T, ikki argument):
+function pickFirst<T>(a: T, b: T): T {
   return a;
 }
 
-mostSpecific(1, 2);                // T = number
-mostSpecific("a", "b");            // T = string
-// mostSpecific({ a: 1 }, { b: 2 });
-// ❌ TS birinchi argumentdan T = { a: number } fix qiladi,
-// ikkinchisi unga assign bo'lmaydi:
-// "Argument of type '{ b: number; }' is not assignable to parameter of type '{ a: number; }'"
-// (best-common-type union ikki paired-parameter ustida ishlamaydi)
+pickFirst(1, 2);                // T = number
+pickFirst("a", "b");            // T = string
+
+// Object literal candidate'lar — union:
+const merged = pickFirst({ a: 1 }, { b: 2 });
+// T = { a: number; b?: undefined } | { b: number; a?: undefined } — xato emas, union
+
+// Primitive literal candidate'lar — birinchidan fix, mosligmasa xato:
+// pickFirst(1, "a");
+// ❌ TS birinchi argumentdan T = 1 fix qiladi, ikkinchisi mos kelmaydi:
+// "Argument of type '\"a\"' is not assignable to parameter of type '1'"
+const u = pickFirst<string | number>(1, "a"); // ✅ explicit union: string | number
 
 // 6. Partial<T> bilan inference
 function update<T>(target: T, source: Partial<T>): T {
@@ -476,7 +481,7 @@ const result = numbers
 
 Explicit type argument — chaqiruv paytida `<Type>`'ni qo'lda ko'rsatish. Uchta holatda kerak:
 
-1. **Inference imkonsiz** — argumentlardan type aniqlanmaydi (argumentsiz funksiya)
+1. **Inference imkonsiz** — argument'lardan type aniqlanmaydi (argumentsiz funksiya)
 2. **Inference noto'g'ri** — TypeScript kengroq type infer qiladi, torroq kerak
 3. **Aniqlik uchun** — murakkab chaqiruvlarda o'qilishni yaxshilash
 
@@ -504,11 +509,11 @@ const data = parseJSON<{ name: string }>('{"name":"Ali"}');
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator `identity<number>(42)` yozilganda inference bosqichini butunlay o'tkazib yuboradi. Funksiya chaqiruv resolver'i avval explicit type argument'lar borligini tekshiradi — agar bor bo'lsa, inference ishga tushmaydi, to'g'ridan-to'g'ri berilgan type'lar ishlatiladi.
+Compiler `identity<number>(42)` yozilganda inference bosqichini butunlay o'tkazib yuboradi. Funksiya chaqiruv resolver'i avval explicit type argument'lar borligini tekshiradi — agar bor bo'lsa, inference ishga tushmaydi, to'g'ridan-to'g'ri berilgan type'lar ishlatiladi.
 
 Angle bracket sintaksisi `<number>` faqat TypeScript parser uchun mavjud. AST'da `TypeArguments` node sifatida saqlanadi. Emit bosqichida bu node butunlay skip qilinadi — `identity<number>(42)` JS'da `identity(42)` bo'ladi. Ya'ni explicit yoki inferred — JS output **aynan bir xil**.
 
-**Constraint tekshirish:** Kompilator explicit type'ni constraint'ga tekshiradi. `function fn<T extends string>(x: T)`'da `fn<number>(42)` yozilsa — `number extends string` false, compile error.
+**Constraint tekshirish:** compiler explicit type'ni constraint'ga tekshiradi. `function fn<T extends string>(x: T)`'da `fn<number>(42)` yozilsa — `number extends string` false, compile error.
 
 **Partial type argument cheklovi:** Bu TypeScript'ning hozirgi cheklovi — GitHub'da yillar davomida muhokama qilinmoqda. Yagona yechim — **default type parameter** ishlatish:
 
@@ -553,9 +558,9 @@ const config = parseJSON<{ host: string; port: number }>(
 );
 // config: { host: string; port: number }
 
-// ⚠️ MUHIM: parseJSON runtime'da tekshirmaydi!
-// Agar JSON noto'g'ri bo'lsa — TS bilmaydi, runtime xato yuzaga keladi
-// Production'da zod/io-ts kabi validator ishlatish kerak
+// Diqqat: parseJSON runtime'da tekshirmaydi.
+// Agar JSON noto'g'ri bo'lsa — TS bilmaydi, runtime xato yuzaga keladi.
+// Production'da zod/io-ts kabi validator ishlatish kerak.
 
 // 3. Factory pattern — type explicit
 function createContainer<T>(initialValue: T): { get: () => T; set: (v: T) => void } {
@@ -662,11 +667,11 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Generic interface — butunlay compile-time konstruksiya. JavaScript'da `interface` tushunchasi mavjud emas, shuning uchun generic interface emit bosqichida **to'liq o'chiriladi** — hech qanday runtime kod qolmaydi.
+Generic interface — butunlay compile-time tuzilma. JavaScript'da `interface` tushunchasi mavjud emas, shuning uchun generic interface emit bosqichida **to'liq o'chiriladi** — hech qanday runtime kod qolmaydi.
 
-`interface Box<T> { value: T }` declaration qilinganda, kompilator `InterfaceDeclaration` node yaratadi va type parameter `T`'ni scope'ga qo'shadi. Bu faqat type checker uchun — emitter bu node'ni butunlay ignore qiladi. `Box<number>` ishlatilganda kompilator **type instantiation** qiladi — yangi type yaratadi va `T` o'rniga `number` qo'yadi. Bu instantiated type faqat checker memory'da yashaydi.
+`interface Box<T> { value: T }` declaration qilinganda, compiler `InterfaceDeclaration` node yaratadi va type parameter `T`'ni scope'ga qo'shadi. Bu faqat type checker uchun — emitter bu node'ni butunlay ignore qiladi. `Box<number>` ishlatilganda compiler **type instantiation** qiladi — yangi type yaratadi va `T` o'rniga `number` qo'yadi. Bu instantiated type faqat checker memory'da yashaydi.
 
-**Interface extends propagation:** `PaginatedResponse<T> extends ApiResponse<T[]>`'da kompilator parent interface'ning type parameter'larini child'ga propagate qiladi. `T` child'da `T[]`'ga map qilinadi. Bu mapping compile-time'da amalga oshadi.
+**Interface extends propagation:** `PaginatedResponse<T> extends ApiResponse<T[]>`'da compiler parent interface'ning type parameter'larini child'ga propagate qiladi. `T` child'da `T[]`'ga map qilinadi. Bu mapping compile-time'da amalga oshadi.
 
 **Declaration merging va generics:** Generic interface'lar merge qilish (declaration merging)'ni qo'llab-quvvatlaydi — lekin faqat **bir xil type parameter count** bo'lganda. Ikki `Box<T>` va `Box<T, U>` merge bo'lmaydi.
 
@@ -818,7 +823,7 @@ stringStack.push("hello");
 **Instantiation expression** (TS 4.7+) — generic class'ni "pre-bind" qilish:
 
 ```typescript
-const NumStack = Stack<number>; // Type — class constructor bilan T = number
+const NumStack = Stack<number>; // T = number bilan bog'langan constructor
 const stack = new NumStack();   // Stack<number>
 ```
 
@@ -829,9 +834,9 @@ Bu pattern factory yoki dependency injection'da foydali.
 
 Generic class — interface'dan farqli ravishda, **class o'zi runtime'da saqlanadi**, lekin type parameter o'chiriladi. `class Stack<T>` → JS'da `class Stack` bo'ladi. Class body — constructor, method'lar, property'lar — hammasi qoladi, faqat type annotation'lar ketadi.
 
-**Bitta class emit:** Kompilator `Stack<number>` va `Stack<string>` uchun **bitta class** emit qiladi. Java yoki C# dan farqli ravishda, TypeScript'da **type erasure** modeli ishlatiladi — runtime'da `Stack<number>` va `Stack<string>` orasida hech qanday farq yo'q. `new Stack<number>()` va `new Stack<string>()` bir xil constructor chaqiradi. `instanceof Stack` ikkala instance uchun `true` qaytaradi — generic parameter ko'rinmaydi.
+**Bitta class emit:** compiler `Stack<number>` va `Stack<string>` uchun **bitta class** emit qiladi. Java yoki C# dan farqli ravishda, TypeScript'da **type erasure** modeli ishlatiladi — runtime'da `Stack<number>` va `Stack<string>` orasida hech qanday farq yo'q. `new Stack<number>()` va `new Stack<string>()` bir xil constructor chaqiradi. `instanceof Stack` ikkala instance uchun `true` qaytaradi — generic parameter ko'rinmaydi.
 
-**Static member'larda type parameter ishlatib bo'lmaydi:** Static member'lar class'ning o'ziga tegishli (prototype'ga emas), lekin type parameter instance-level concept. Kompilator bu cheklov'ni enforce qiladi:
+**Static member'larda type parameter ishlatib bo'lmaydi:** static member'lar class'ning o'ziga tegishli (prototype'ga emas), lekin type parameter instance-level concept. Compiler bu cheklovni enforce qiladi:
 
 ```typescript
 class Container<T> {
@@ -842,7 +847,7 @@ class Container<T> {
 
 Yechim: method'ni o'z type parameter'i bilan qilish (method-level generic, class'ning T'sidan mustaqil).
 
-**Constructor inference:** `new Stack<number>()` — explicit. Lekin agar constructor argument qabul qilsa, kompilator inference qiladi: `new Box(42)` → `Box<number>`. Bu TypeScript'ning uzoq vaqtdan beri qo'llab-quvvatlaydigan xususiyati.
+**Constructor inference:** `new Stack<number>()` — explicit. Lekin agar constructor argument qabul qilsa, compiler inference qiladi: `new Box(42)` → `Box<number>`. Bu TypeScript'ning uzoq vaqtdan beri qo'llab-quvvatlaydigan xususiyati.
 
 **Instantiation expressions** (TS 4.7+): `const NumStack = Stack<number>` — class tipini pre-binding qilish. Bu feature factory'larda va dependency injection'da foydali — bog'langan class variable sifatida uzatiladi. Constructor inference (yuqoridagi `new Box(42)`)'dan farqli — bu yangi feature, 4.7 dan oldin yo'q edi.
 
@@ -1035,7 +1040,7 @@ getLength({ length: 10 });   // ✅ object'da length bor
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Constraint tekshiruvi compile-time'da amalga oshadi. Kompilator type parameter instantiate bo'lganda, berilgan type constraint'ga mos kelishini tekshiradi — structural typing qoidalari bo'yicha.
+Constraint tekshiruvi compile-time'da amalga oshadi. Compiler type parameter instantiate bo'lganda, berilgan type constraint'ga mos kelishini tekshiradi — structural typing qoidalari bo'yicha.
 
 ```
 Generic Constraint Checking Flow:
@@ -1055,15 +1060,15 @@ Generic Constraint Checking Flow:
 
 1. `T` = berilgan argument type
 2. Constraint = `{ length: number }`
-3. Kompilator `T`'ni `Constraint`'ga assignable ekanini tekshiradi:
+3. Compiler `T`'ni `Constraint`'ga assignable ekanini tekshiradi:
    - Constraint'dagi har bir property `T`'da bormi?
    - Property type'lari mos keladimi?
 4. Agar `true` → instantiation davom etadi
 5. Agar `false` → compile error
 
-**Constraint va narrowing:** Constraint type parameter'ning "pastki chegarasi"ni belgilaydi — `T`'ning value'si har doim constraint'ga mos keladi. Lekin `T` o'zi keng bo'lishi mumkin. `<T extends string>` — `T` `string`, yoki `"hello"`, yoki `string | "other"` bo'lishi mumkin.
+**Constraint va narrowing:** constraint type parameter'ning yuqori chegarasini belgilaydi — `T`'ga assign qilinadigan har qanday type constraint'ga mos kelishi shart. `<T extends string>`'da `T` `string`'ning o'zi yoki uning subtype'i (`"hello"`, `"idle" | "ready"`) bo'lishi mumkin, lekin `number` bo'la olmaydi.
 
-**Constraint bilan generic constraint'ni hosil qilish:** Type parameter constraint'da boshqa type parameter'ni ishlatish mumkin:
+**Constraint'da boshqa type parameter:** type parameter constraint'da boshqa type parameter'ni ishlatish mumkin:
 
 ```typescript
 function prop<T, K extends keyof T>(obj: T, key: K): T[K] {
@@ -1071,7 +1076,7 @@ function prop<T, K extends keyof T>(obj: T, key: K): T[K] {
 }
 ```
 
-Bu yerda `K`'ning constraint'i `T`'ga bog'liq. Kompilator avval `T`'ni infer qiladi, keyin `keyof T`'ni hisoblaydi, keyin `K`'ni shu constraint'ga tekshiradi. Dependency order muhim — `T` avval bo'lishi kerak.
+Bu yerda `K`'ning constraint'i `T`'ga bog'liq. Compiler avval `T`'ni infer qiladi, keyin `keyof T`'ni hisoblaydi, keyin `K`'ni shu constraint'ga tekshiradi. Dependency order muhim — `T` avval bo'lishi kerak.
 
 </details>
 
@@ -1216,9 +1221,9 @@ type AccountKeys = keyof Account; // "name" (faqat public)
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`keyof` — compile-time operator, runtime'da mavjud emas. `keyof T` yozilganda kompilator `T`'ning barcha public property key'larini **string/number/symbol literal union** type sifatida hisoblaydi.
+`keyof` — compile-time operator, runtime'da mavjud emas. `keyof T` yozilganda compiler `T`'ning barcha public property key'larini **string/number/symbol literal union** type sifatida hisoblaydi.
 
-**Generic kontekstda `keyof T` deferred bo'ladi:** `T` hali aniq bo'lmaganda kompilator `keyof T`'ni evaluate qilmaydi, balki saqlab qo'yadi. Faqat `T` aniq type'ga instantiate bo'lganda (masalan, `T = User`), kompilator `keyof User`'ni `"name" | "age" | "email"`'ga resolve qiladi.
+**Generic context'da `keyof T` deferred bo'ladi:** `T` hali aniq bo'lmaganda compiler `keyof T`'ni evaluate qilmaydi, balki saqlab qo'yadi. Faqat `T` aniq type'ga instantiate bo'lganda (masalan, `T = User`), compiler `keyof User`'ni `"name" | "age" | "email"`'ga resolve qiladi.
 
 ```
 <T, K extends keyof T> pattern'ning ikki bosqichi:
@@ -1239,9 +1244,9 @@ type AccountKeys = keyof Account; // "name" (faqat public)
 - `public` member'lar — `keyof T`'da bor
 - `private` keyword bilan belgilangan member'lar — `keyof T`'da **yo'q**
 - `protected` keyword bilan belgilangan member'lar — `keyof T`'da **yo'q**
-- `#field` (ECMAScript native private) — `keyof T`'da **yo'q**, chunki ular type system perspektivasidan oddiy property emas, balki maxsus syntactic construct
+- `#field` (ECMAScript native private) — `keyof T`'da **yo'q**, chunki type system nuqtai nazaridan ular oddiy property emas, balki alohida syntactic construct
 
-Bu dizayn qarori pedagogik jihatdan muhim: generic funksiyalar faqat public API bilan ishlashi kerak. Generic'ga private member'larga access kerak bo'lsa — encapsulation buzilgan, refactor kerak.
+Natija: generic funksiyalar faqat public API bilan ishlaydi. Generic'ga private member'ga access kerak bo'lsa — encapsulation buzilgan, refactor kerak.
 
 **Runtime'da iz yo'q:** Emit bosqichida `keyof`'ning hech qanday izi qolmaydi. `function getProperty<T, K extends keyof T>(obj: T, key: K): T[K]` → JS'da `function getProperty(obj, key) { return obj[key]; }`. Runtime'da `key`'ning valid ekanligi tekshirilmaydi — `obj[key]` noto'g'ri key bilan `undefined` qaytaradi. Type safety faqat compile-time'da amal qiladi.
 
@@ -1398,18 +1403,18 @@ type NameOrAge = User["name" | "age"];
 
 - `T[keyof T]` — T'ning barcha value type'larining union
 - `T[number]` — array/tuple element type
-- `T[K]` generic kontekstda — property type'ni dynamically olish
+- `T[K]` generic context'da — property type'ni dynamically olish
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`T[K]` — kompilator ichida index access type node sifatida represent qilinadi. Bu node ikki qismdan iborat: objectType (`T`) va indexType (`K`). Kompilator `T` type'dagi `K` key'ning type'ini resolve qiladi.
+`T[K]` — compiler ichida index access type node sifatida represent qilinadi. Bu node ikki qismdan iborat: objectType (`T`) va indexType (`K`). Compiler `T` type'dagi `K` key'ning type'ini resolve qiladi.
 
-**Non-generic holatda** — `User["name"]` — kompilator darhol resolve qiladi: `User` type'da `name` property'ni topadi va uning type'ini (`string`) qaytaradi. Bu compile-time lookup — JavaScript'dagi `user["name"]`'dan butunlay farqli. JS'da runtime'da object property'ga access bo'ladi, TS'da esa type system ichida type'ga access bo'ladi.
+**Non-generic holatda** — `User["name"]` — compiler darhol resolve qiladi: `User` type'da `name` property'ni topadi va uning type'ini (`string`) qaytaradi. Bu compile-time lookup — JavaScript'dagi `user["name"]`'dan butunlay farqli. JS'da runtime'da object property'ga access bo'ladi, TS'da esa type system ichida type'ga access bo'ladi.
 
-**Generic holatda** — `T[K]` — kompilator **deferred evaluation** qiladi. `T` va `K` hali aniq bo'lmaganda, index access type o'zgarishsiz saqlanadi. Faqat `T` va `K` aniq type'larga instantiate bo'lganda (masalan, `T = User`, `K = "name"`), kompilator `User["name"]` → `string` deb resolve qiladi.
+**Generic holatda** — `T[K]` — compiler **deferred evaluation** qiladi. `T` va `K` hali aniq bo'lmaganda, index access type o'zgarishsiz saqlanadi. Faqat `T` va `K` aniq type'larga instantiate bo'lganda (masalan, `T = User`, `K = "name"`), compiler `User["name"]` → `string` deb resolve qiladi.
 
-**Distributive behavior — `T[K1 | K2]`:** Kompilator avval `K1 | K2` union'ni ko'radi va **har bir union member uchun alohida** `T[member]`'ni hisoblaydi, keyin natijalarni union qiladi:
+**Distributive behavior — `T[K1 | K2]`:** compiler avval `K1 | K2` union'ni ko'radi va **har bir union member uchun alohida** `T[member]`'ni hisoblaydi, keyin natijalarni union qiladi:
 
 ```
 User["name" | "age"]
@@ -1428,7 +1433,7 @@ Config[keyof Config] = Config["host"] | Config["port"] | Config["debug"]
                      = string | number | boolean
 ```
 
-**`T[number]` array/tuple'da:** Kompilator array type'ning element type'ini oladi. Tuple bilan esa ikki variant:
+**`T[number]` array/tuple'da:** compiler array type'ning element type'ini oladi. Tuple bilan esa ikki variant:
 - `[string, number][number]` → `string | number` (union of all elements)
 - `[string, number][0]` → `string` (literal index)
 - `[string, number][1]` → `number`
@@ -1563,7 +1568,7 @@ request("GET", "/api/users");  // ✅
 
 `typeof` — **type context**'da ishlatilganda **qiymatdan type olish** operatori. Bu JavaScript'ning runtime `typeof` operatoridan **butunlay farqli** — TypeScript'ning `typeof` compile-time'da ishlaydi va to'liq TS type qaytaradi.
 
-**Ikki kontekst:**
+**Ikki context:**
 
 - **Expression context** (JS): `typeof x === "string"` — runtime type check, `"string" | "number" | ...` qaytaradi
 - **Type context** (TS): `type T = typeof x` — compile-time type extraction, to'liq TypeScript type qaytaradi
@@ -1590,9 +1595,9 @@ if (typeof config === "object") {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-TypeScript'dagi type-level `typeof` va JavaScript'dagi runtime `typeof` — **butunlay ikki xil operator**. Parser ularni kontekst bo'yicha farqlaydi: type position'da (`: typeof x`, `type T = typeof x`) — TypeScript operator; expression position'da (`if (typeof x === "string")`) — JavaScript operator.
+TypeScript'dagi type-level `typeof` va JavaScript'dagi runtime `typeof` — **butunlay ikki xil operator**. Parser ularni context bo'yicha farqlaydi: type position'da (`: typeof x`, `type T = typeof x`) — TypeScript operator; expression position'da (`if (typeof x === "string")`) — JavaScript operator.
 
-Type-level `typeof x` kompilator ichida type query node sifatida represent qilinadi. Kompilator `x` variable'ning type'ini oladi — bu variable'ga assign qilingan qiymatning to'liq inferred type'ini qaytaradi. `typeof config` → `{ host: string; port: number; endpoints: string[] }`. Bu oddiy `string` yoki `number` qaytaruvchi JS `typeof`'dan ancha batafsil.
+Type-level `typeof x` compiler ichida type query node sifatida represent qilinadi. Compiler `x` variable'ning type'ini oladi — bu variable'ga assign qilingan qiymatning to'liq inferred type'ini qaytaradi. `typeof config` → `{ host: string; port: number; endpoints: string[] }`. Bu oddiy `string` yoki `number` qaytaruvchi JS `typeof`'dan ancha batafsil.
 
 **Cheklov — faqat identifier'larga:** Type-level `typeof` faqat **identifier** (variable, property) larga qo'llaniladi, arbitrary expression'larga emas. `type T = typeof fn()` yozib bo'lmaydi — buning uchun `ReturnType<typeof fn>` ishlatiladi.
 
@@ -1608,7 +1613,7 @@ typeof STATUS → { readonly OK: 200; readonly NOT_FOUND: 404 } (literal)
 
 **Emit bosqichida yo'qoladi:** `type Config = typeof config` → JavaScript'da **hech narsa**. `const x: typeof config = ...` → JavaScript'da `const x = ...`. Lekin runtime `typeof` (expression context) saqlanadi — `if (typeof x === "string")` JS'da aynan shundayligicha qoladi.
 
-**`keyof typeof X` pattern:** `typeof` va `keyof`'ni kombinatsiya qilib, object'ning key'larini union type sifatida olish mumkin. Bu ayniqsa `as const` bilan mashhur pattern — literal qiymat'lardan type yaratish:
+**`keyof typeof X` pattern:** `typeof` va `keyof`'ni birga ishlatib, object'ning key'larini union type sifatida olish mumkin. Bu ayniqsa `as const` bilan mashhur pattern — literal qiymatlardan type yaratish:
 
 ```typescript
 const STATUS = { OK: 200, NOT_FOUND: 404 } as const;
@@ -1669,7 +1674,8 @@ function sendRequest(url: string, method: "GET" | "POST", data?: unknown): void 
 }
 
 type SendRequestParams = Parameters<typeof sendRequest>;
-// [string, "GET" | "POST", unknown | undefined]
+// [url: string, method: "GET" | "POST", data?: unknown]
+// data optional bo'lgani uchun tuple'da `data?` — `unknown | undefined` emas
 
 // 4. as const bilan literal type'lar
 const STATUS = {
@@ -1712,7 +1718,7 @@ type AddFn = typeof add; // (a: number, b: number) => number
 const multiply: AddFn = (a, b) => a * b;
 // AddFn type'ga mos keladi
 
-// 7. Complex object — type inferance
+// 7. Complex object — type inference
 const formConfig = {
   fields: [
     { name: "username", type: "text", required: true },
@@ -1764,11 +1770,11 @@ function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Bir nechta type parameter bo'lganda kompilator har birini **mustaqil** inference qiladi. `pair<T, U>(first: T, second: U)`'da `pair("hello", 42)` chaqirilganda kompilator birinchi argument'dan `T = string`, ikkinchi argument'dan `U = number` deb alohida infer qiladi.
+Bir nechta type parameter bo'lganda compiler har birini **mustaqil** inference qiladi. `pair<T, U>(first: T, second: U)`'da `pair("hello", 42)` chaqirilganda compiler birinchi argument'dan `T = string`, ikkinchi argument'dan `U = number` deb alohida infer qiladi.
 
 Inference'lar parallel emas, **sequential** — chapdan o'ngga argument tartibida. AST'da `<T, U>` bitta type parameter list node ichida ikki type parameter declaration child sifatida saqlanadi. Har type parameter o'zining scope binding'iga ega — `T` va `U` bir-biridan mustaqil symbol'lar.
 
-**Bog'liq type parameter'larda dependency order:** `<T, K extends keyof T>`'da kompilator **dependency order**'ni hisobga oladi:
+**Bog'liq type parameter'larda dependency order:** `<T, K extends keyof T>`'da compiler **dependency order**'ni hisobga oladi:
 
 ```
 1. T infer bo'ladi (birinchi argument'dan)
@@ -1788,7 +1794,7 @@ Agar T infer bo'lmasa, K'ning constraint'ini ham evaluate qilib bo'lmaydi
 
 **Emit bosqichida hammasi o'chiriladi:** `function pair<T, U>(first: T, second: U): [T, U]` → `function pair(first, second) { return [first, second]; }`. Nechta type parameter bo'lishidan qat'iy nazar, JavaScript output'da hech biri qolmaydi.
 
-**Unused type parameter:** Kompilator keraksiz type parameter'larni aniqlamaydi — `<T, U>`'da `U` hech qayerda ishlatilmasa ham error bermaydi. Lekin ESLint'ning `no-unnecessary-type-parameters` rule'si buni aniqlaydi. Unused type parameter — type safety'ga hissa qo'shmaydi va faqat kodni murakkablashtiradi.
+**Unused type parameter:** compiler keraksiz type parameter'larni aniqlamaydi — `<T, U>`'da `U` hech qayerda ishlatilmasa ham error bermaydi. Lekin `@typescript-eslint`'ning `no-unnecessary-type-parameters` rule'si buni aniqlaydi (v8 strict-type-checked preset'ida yoqilgan). Unused yoki bir marta ishlatilgan type parameter type safety'ga hissa qo'shmaydi va faqat kodni murakkablashtiradi.
 
 </details>
 
@@ -1934,7 +1940,7 @@ const userResponse: ApiResponse<User> = {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Default type parameter — kompilator type parameter'ni resolve qilayotganda uch bosqichli fallback ketma-ketligi:
+Default type parameter — compiler type parameter'ni resolve qilayotganda uch bosqichli fallback ketma-ketligi:
 
 1. **Explicit type argument** berilganmi? — uni ishlatadi
 2. **Inference** mumkinmi argument'lardan? — inferred type'ni ishlatadi
@@ -1969,7 +1975,7 @@ function merge<T, U = T>(a: T, b: U): T & U { ... }
 
 **Interface va class larda ayniqsa muhim:** Funksiyada inference mavjud, shuning uchun default kam kerak bo'ladi. Lekin interface/class'da inference yo'q — har chaqiriqda type argument talab qilinadi. Default bo'lsa — argument'siz ishlatish imkoniyati paydo bo'ladi.
 
-**Emit bosqichida yo'qoladi:** `interface ApiResponse<T = unknown>` → JS'da hech narsa. `class EventEmitter<E = Record<string, any[]>>` → JS'da `class EventEmitter`. Default mechanism faqat compile-time type resolution uchun xizmat qiladi.
+**Emit bosqichida yo'qoladi:** `interface ApiResponse<T = unknown>` → JS'da hech narsa. `class EventEmitter<E = Record<string, unknown[]>>` → JS'da `class EventEmitter`. Default mechanism faqat compile-time type resolution uchun xizmat qiladi.
 
 </details>
 
@@ -2031,17 +2037,23 @@ const userCache = new Cache<number, User>();
 // Cache<number, User>
 
 // 4. Event emitter with default
+type AnyHandler = (...args: never[]) => void;
+
 class EventEmitter<Events extends Record<string, unknown[]> = Record<string, unknown[]>> {
-  private handlers = new Map<keyof Events, Array<(...args: any[]) => void>>();
+  // Internal storage barcha event handler'larini bitta AnyHandler type ostida saqlaydi.
+  // Public API (on/emit) Events[K] orqali to'liq type-safe; storage'ga yozish/o'qishda
+  // generic Events[K] va AnyHandler bir-biriga to'g'ridan-to'g'ri assign bo'lmaydi, shuning uchun
+  // `as unknown as` orqali cast qilinadi — type safety method signature darajasida saqlanadi.
+  private handlers = new Map<keyof Events, AnyHandler[]>();
 
   on<K extends keyof Events>(event: K, handler: (...args: Events[K]) => void): void {
     const list = this.handlers.get(event) ?? [];
-    list.push(handler as (...args: any[]) => void);
+    list.push(handler as unknown as AnyHandler);
     this.handlers.set(event, list);
   }
 
   emit<K extends keyof Events>(event: K, ...args: Events[K]): void {
-    this.handlers.get(event)?.forEach((fn) => fn(...args));
+    this.handlers.get(event)?.forEach((fn) => (fn as unknown as (...args: Events[K]) => void)(...args));
   }
 }
 
@@ -2143,11 +2155,11 @@ const r2 = routesConst(["home", "about", "contact"]);
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`const` modifier type parameter declaration'da internal flag o'rnatadi. Bu flag kompilatorning **type widening** algoritmini o'zgartiradi.
+`const` modifier type parameter declaration'da internal flag o'rnatadi. Bu flag compiler'ning **type widening** algoritmini o'zgartiradi.
 
-**Oddiy `<T>` da:** `routes(["home", "about"])` chaqirilganda kompilator `T = string[]` deb infer qiladi — literal `"home"` va `"about"` `string`'ga widen bo'ladi. Array ham `string[]` bo'ladi, `readonly` emas.
+**Oddiy `<T>` da:** `routes(["home", "about"])` chaqirilganda compiler `T = string[]` deb infer qiladi — literal `"home"` va `"about"` `string`'ga widen bo'ladi. Array ham `string[]` bo'ladi, `readonly` emas.
 
-**`<const T>` da:** Widening butunlay o'chiriladi — kompilator `T = readonly ["home", "about"]` deb infer qiladi. Bundan tashqari, array literal'lar `readonly tuple`'ga aylanadi — `string[]` emas, `readonly ["home", "about"]` bo'ladi.
+**`<const T>` da:** widening butunlay o'chiriladi — compiler `T = readonly ["home", "about"]` deb infer qiladi. Bundan tashqari, array literal'lar `readonly tuple`'ga aylanadi — `string[]` emas, `readonly ["home", "about"]` bo'ladi.
 
 ```
 Widening Behavior:
@@ -2163,7 +2175,7 @@ const <T>:
   42 → 42 (literal)
 ```
 
-**`const` va constraint alohida mexanizm'lar:** `<const T extends readonly string[]>` ikkita alohida narsa:
+**`const` va constraint alohida mexanizmlar:** `<const T extends readonly string[]>` ikkita alohida narsa:
 - `const` — inference behavior'ni o'zgartiradi (widening off)
 - `extends readonly string[]` — constraint (T'ning upper bound)
 
@@ -2318,13 +2330,13 @@ Generic'larning asl kuchi — real-world'da qayta ishlatiladigan (reusable) patt
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Result pattern discriminated union sifatida:** `Result<T, E>` discriminated union (yoki "tagged union") — har variant `ok` field bilan farqlanadi. Kompilator `ok` field'ni discriminant sifatida taniydi va narrowing qiladi. `if (result.ok)` yozilganda TypeScript narrowing orqali `result.value` yoki `result.error`'ga aniq type beradi.
+**Result pattern discriminated union sifatida:** `Result<T, E>` discriminated union (yoki "tagged union") — har variant `ok` field bilan farqlanadi. Compiler `ok` field'ni discriminant sifatida taniydi va narrowing qiladi. `if (result.ok)` yozilganda TypeScript narrowing orqali `result.value` yoki `result.error`'ga aniq type beradi.
 
 **Nested generic method'lar:** `Collection<T>`'da `map<U>(fn: (item: T) => U): Collection<U>` — method-level type parameter `U` class-level `T`'dan mustaqil. Har chaqiriqda `U` alohida infer bo'ladi. Bu pattern TypeScript'ning eng foydali xususiyatlaridan biri — input type'dan boshqa output type'ga transform qilish.
 
-**Repository constraint propagation:** `Repository<T extends { id: string }>`'da constraint class bo'ylab tarqaladi — barcha method'larda `T`'ning `id` property'si borligi kafolatlangan. `create(data: Omit<T, "id">)` yaratganda, kompilator `Omit` utility type'ni ishlatib `id`'ni chiqarib tashlaydi va qolgan property'larni talab qiladi.
+**Repository constraint propagation:** `Repository<T extends { id: string }>`'da constraint class bo'ylab tarqaladi — barcha method'larda `T`'ning `id` property'si borligi kafolatlangan. `create(data: Omit<T, "id">)` yaratganda, compiler `Omit` utility type'ni ishlatib `id`'ni chiqarib tashlaydi va qolgan property'larni talab qiladi.
 
-**Factory va construct signature:** `new (...args: any[]) => T` — construct signature. Kompilator `new Ctor(...)` call'da `T`'ni infer qiladi. Bu pattern `typeof SomeClass` bilan teng — class'ning constructor type'i.
+**Factory va construct signature:** `new (...args: A) => T` — construct signature (`A extends unknown[]` constructor argument'larining tuple'i). Compiler `createFactory(SomeClass, ...args)` call'da `T`'ni class instance type'idan, `A`'ni constructor parameter'laridan infer qiladi — `defaultArgs` constructor signature'ga aniq mos kelishi compile-time'da tekshiriladi. Bu pattern argument type'ini `any[]` qilmasdan to'liq type-safe saqlaydi.
 
 **Barcha pattern'larda bir xil qoida:** generic type parameter faqat compile-time'da mavjud — runtime'da `Result<User, ApiError>` va `Result<Product, string>` orasida hech qanday farq yo'q. Discriminated union narrowing JavaScript'da oddiy property check sifatida ishlaydi.
 
@@ -2494,12 +2506,11 @@ async function example(): Promise<void> {
 // 4. Factory Pattern
 // ═════════════════════════════════════════════
 
-// `any[]` — construct signature variadic argument'lar uchun zarur.
-// `unknown[]` ham mumkin, lekin Constructor parameter type'lariga assign'da xato beradi
-// (variance position). Bu factory pattern'ning standart implementatsiyasi.
-function createFactory<T>(
-  Constructor: new (...args: any[]) => T,
-  ...defaultArgs: any[]
+// A type parameter constructor argument'larini infer qiladi — `any[]` kerak emas.
+// `defaultArgs: A` constructor parameter'lariga aniq mos kelishi compile-time'da tekshiriladi.
+function createFactory<T, A extends unknown[]>(
+  Constructor: new (...args: A) => T,
+  ...defaultArgs: A
 ): () => T {
   return () => new Constructor(...defaultArgs);
 }
@@ -3014,15 +3025,16 @@ memoized(42); // "42" (cache'dan)
 <summary>Javob</summary>
 
 ```typescript
-function memoize<T extends (...args: any[]) => any>(
-  fn: T
-): (...args: Parameters<T>) => ReturnType<T> {
-  const cache = new Map<string, ReturnType<T>>();
+function memoize<A extends unknown[], R>(
+  fn: (...args: A) => R
+): (...args: A) => R {
+  const cache = new Map<string, R>();
 
-  return (...args: Parameters<T>): ReturnType<T> => {
+  return (...args: A): R => {
     const key = JSON.stringify(args);
-    if (cache.has(key)) {
-      return cache.get(key)!;
+    const cached = cache.get(key);
+    if (cached !== undefined || cache.has(key)) {
+      return cached as R;
     }
     const result = fn(...args);
     cache.set(key, result);
@@ -3043,12 +3055,12 @@ memoized(10); // Console: "Computing..." → "10"
 
 **Tushuntirish:**
 
-- `T extends (...args: any[]) => any` — T istalgan funksiya bo'lishi kerak (constraint pattern; `unknown[]` ishlatilsa, ba'zi funksiyalar variance sababli `T`'ga assign bo'lmaydi)
-- `Parameters<T>` — T'ning parameter type'larini tuple sifatida oladi
-- `ReturnType<T>` — T'ning return type'ini oladi
+- `A extends unknown[]` — argument tuple'ni, `R` — return type'ni alohida infer qiladi; `any` ishlatilmaydi
+- `(...args: A) => R` — original funksiyaning parameter va return type'lari to'liq saqlanadi
 - Cache key — `JSON.stringify(args)` (sodda, lekin object argument'larda circular reference bilan muammo bor)
+- `cached !== undefined || cache.has(key)` — `undefined` qaytaradigan funksiyalarni ham to'g'ri cache qiladi (`has` bilan kalit borligini tekshiradi)
 
-Bu pattern `lodash.memoize`, React'ning `useMemo` kabi library'larda ishlatiladi.
+Bu pattern `lodash.memoize`, React'ning `useMemo` kabi library'larida ishlatiladi.
 
 </details>
 
@@ -3125,7 +3137,7 @@ Bu pattern JavaScript'dagi `Array.prototype.map`, `Promise.prototype.then`, RxJS
 **Savol:** `EventEmitter<Events>` class yozing — events map type sifatida berilsin. `on` va `emit` method'lar faqat belgilangan event'larga ruxsat bersin, va callback parameter'lari avtomatik infer bo'lsin.
 
 ```typescript
-interface AppEvents {
+interface AppEvents extends Record<string, unknown[]> {
   login: [username: string];
   logout: [];
   error: [code: number, message: string];
@@ -3143,16 +3155,20 @@ emitter.emit("error", 500, "Server error");                 // ✅
 
 ```typescript
 type EventMap = Record<string, unknown[]>;
+type AnyHandler = (...args: never[]) => void;
 
 class EventEmitter<Events extends EventMap> {
-  private handlers = new Map<keyof Events, Array<(...args: any[]) => void>>();
+  // Storage barcha handler'larni bitta AnyHandler ostida saqlaydi; generic Events[K] bilan
+  // to'g'ridan-to'g'ri assign bo'lmagani uchun yozish/o'qishda `as unknown as` cast qilinadi.
+  // Type safety on/emit method signature'larida (Events[K]) to'liq saqlanadi.
+  private handlers = new Map<keyof Events, AnyHandler[]>();
 
   on<K extends keyof Events>(
     event: K,
     handler: (...args: Events[K]) => void
   ): void {
     const list = this.handlers.get(event) ?? [];
-    list.push(handler as (...args: any[]) => void);
+    list.push(handler as unknown as AnyHandler);
     this.handlers.set(event, list);
   }
 
@@ -3161,7 +3177,7 @@ class EventEmitter<Events extends EventMap> {
     ...args: Events[K]
   ): void {
     const list = this.handlers.get(event);
-    list?.forEach((fn) => fn(...args));
+    list?.forEach((fn) => (fn as unknown as (...args: Events[K]) => void)(...args));
   }
 
   off<K extends keyof Events>(event: K): void {
@@ -3169,7 +3185,7 @@ class EventEmitter<Events extends EventMap> {
   }
 }
 
-interface AppEvents {
+interface AppEvents extends Record<string, unknown[]> {
   login: [username: string];
   logout: [];
   error: [code: number, message: string];

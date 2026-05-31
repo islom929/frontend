@@ -22,13 +22,13 @@
 
 ### Qisqa javob
 
-Structural typing — TypeScript ikki type ni **shape** (property to'plami) bo'yicha taqqoslaydi, nomi muhim emas. Java va C# nominal typing — type nomi mos kelishi shart.
+Structural typing — TypeScript ikki type'ni **shape** (property to'plami) bo'yicha taqqoslaydi, nomi muhim emas. Java va C# nominal typing — type nomi mos kelishi shart.
 
 ### To'liq tushuntirish
 
-TypeScript da type identity **shape** bilan aniqlanadi. A type B ga **assignable** bo'lishi uchun A B ning barcha required member larini taklif qilishi shart (member nom va type'i mos kelishi bilan). A qo'shimcha member'larga ega bo'lishi mumkin — bu mos kelishni buzmaydi (lekin fresh object literal'da excess property check alohida qoida). Duck typing printsipiga asoslangan: agar u o'rdakdek yursa va o'rdakdek qichqirsa — u o'rdak deb tan olinadi.
+TypeScript da type identity **shape** bilan aniqlanadi. A type B ga **assignable** bo'lishi uchun A B ning barcha required member'larini taklif qilishi shart (member nomi va type'i mos kelishi bilan). A qo'shimcha member'larga ega bo'lishi mumkin — bu mos kelishni buzmaydi (lekin fresh object literal'da excess property check alohida qoida). Duck typing printsipiga asoslangan: type'ning identity'si nomi bilan emas, balki taklif qiladigan member to'plami bilan aniqlanadi.
 
-Nominal typing (Java, C#, Rust) — type identity nom orqali aniqlanadi. `class Point` va `class Coordinate` bir xil maydonlarga ega bo'lsa ham — bir-biriga mos emas, chunki nomi farqli. TypeScript bu yondashuvni faqat `private`/`protected` member li class lar uchun simulyatsiya qiladi.
+Nominal typing (Java, C#, Rust) — type identity nom orqali aniqlanadi. `class Point` va `class Coordinate` bir xil maydonlarga ega bo'lsa ham — bir-biriga mos emas, chunki nomi farqli. TypeScript bu yondashuvni faqat `private`/`protected` member'li class'lar uchun simulyatsiya qiladi.
 
 Structural typing — interface va `type` alias uchun farq yo'q. Ikkalasi shape orqali tekshiriladi. Qachon class structural emas — `private`/`protected` member bor bo'lganda. Bunda compiler member origin (qaysi class declaration'dan kelgan) ni tekshiradi.
 
@@ -54,16 +54,16 @@ class SecureB { private token = ""; }
 
 ### Edge Cases
 
-- **`private` member lar nominal behavior beradi** — bir xil nomli private maydon turli class declaration'lardan kelganda compatible emas
+- **`private` member'lar nominal behavior beradi** — bir xil nomli private maydon turli class declaration'lardan kelganda compatible emas
 - **`protected` member** ham nominal behavior keltiradi (lekin inheritance ichida ishlaydi)
-- **Empty type `{}`** — har qanday non-null value ga assign bo'ladi (faqat `null` va `undefined` rad etiladi)
+- **Empty type `{}`** — har qanday non-null value'ga assign bo'ladi (faqat `null` va `undefined` rad etiladi)
 - **Object literal** — fresh literal excess property check'ka uchraydi, lekin variable orqali bypass bo'ladi
 - **Type alias vs interface** — assignability uchun farq yo'q, lekin declaration merging faqat interface uchun
 
 ### Follow-up savollar
 
 1. **"Branding (nominal type emulation) qanday qilinadi?"** — `type UserId = string & { __brand: "UserId" }` — intersection bilan unique tag qo'shish, runtime'da bo'sh, compile-time'da nominal behavior beradi.
-2. **"Empty interface `{}` nima ma'noni anglatadi?"** — har qanday non-null/non-undefined value ga assign bo'ladi. `Object` type bilan deyarli ekvivalent, lekin primitiv'lar ham mos keladi.
+2. **"Empty interface `{}` nima ma'noni anglatadi?"** — har qanday non-null/non-undefined value'ga assign bo'ladi. `Object` type bilan deyarli ekvivalent, lekin primitive'lar ham mos keladi.
 
 </details>
 
@@ -76,11 +76,11 @@ class SecureB { private token = ""; }
 
 ### Qisqa javob
 
-Excess property check — **fresh object literal** target type da mavjud bo'lmagan property qo'shganda compile error. Faqat to'g'ridan-to'g'ri literal assignment'da ishlaydi, variable orqali bypass bo'ladi.
+Excess property check — **fresh object literal** target type'da mavjud bo'lmagan property qo'shganda compile error. Faqat to'g'ridan-to'g'ri literal assignment'da ishlaydi, variable orqali bypass bo'ladi.
 
 ### To'liq tushuntirish
 
-Structural typing'da "ko'proq property" odatda mos keladi (Dog → Animal). Lekin bu typo'larni yashiradi: `{ name: "Ali", emial: "a@b.com" }` — `emial` typo, TS struktural qoida bo'yicha rad etmaydi. Buni oldini olish uchun TS **fresh object literal** uchun qat'iyroq qoida qo'llaydi — target type da yo'q property — error.
+Structural typing'da "ko'proq property" odatda mos keladi (Dog → Animal). Lekin bu typo'larni yashiradi: `{ name: "Ali", emial: "a@b.com" }` — `emial` typo, TS struktural qoida bo'yicha rad etmaydi. Buni oldini olish uchun TS **fresh object literal** uchun qat'iyroq qoida qo'llaydi — target type'da yo'q property — error.
 
 Fresh literal — to'g'ridan-to'g'ri yozilgan `{...}` (variable'ga bog'lanmagan). Variable'ga assign qilingach, "freshness" yo'qoladi va oddiy structural compatibility ishlaydi.
 
@@ -116,7 +116,7 @@ function process(cfg: UserConfig) {}
 ### Edge Cases
 
 - **Spread operator** — `{ ...other, extra: 1 }` natijasi fresh, lekin spread qismi widened
-- **Return type** — function return da fresh literal qaytarilsa check ishlaydi
+- **Return type** — function return'da fresh literal qaytarilsa check ishlaydi
 - **Array of objects** — har element fresh literal sifatida tekshiriladi
 - **Conditional/ternary** — `cond ? {...} : {...}` natijasi union, fresh saqlanadi
 - **Optional property typo** — `{ nme?: string }` — nominal name mos kelmasa, target type'da ham yo'q, error
@@ -143,7 +143,7 @@ Function parameter type **contravariant** — agar `Dog <: Animal`, unda `(a: An
 
 Contravariance soundness uchun zarur: agar `DogHandler` (faqat Dog ni biluvchi) `AnimalHandler` o'rnida ishlatilsa, callee Animal yuborishi mumkin — DogHandler `breed` ga qaraydi, Animal'da yo'q → crash. Aksincha, `AnimalHandler` `DogHandler` o'rnida — callee Dog yuboradi, Animal handler faqat `name` ishlatadi (Dog'da bor) → xavfsiz.
 
-`strictFunctionTypes: true` — function type literal va function signature lar uchun contravariance majburlanadi. **Method shorthand** (`foo(x: T): void`) bundan istisno — bivariant qoladi. Sabab: legacy DOM/Node.js API'lar bivariant method larga tayanadi.
+`strictFunctionTypes: true` — function type literal va function signature'lar uchun contravariance majburlanadi. **Method shorthand** (`handle(x: T): void`) bundan istisno — bivariant qoladi. Sabab: legacy DOM/Node.js API'lar bivariant method'larga tayanadi.
 
 Soundness vs ergonomics trade-off: TS pragmatik tanlov qildi — `Array<Dog>` `Array<Animal>` ga mos (covariant, lekin mutable array'da unsound), method bivariant (legacy compat).
 
@@ -173,9 +173,9 @@ const handler1: DogConsumer = consumeAnimal;
 
 ### Edge Cases
 
-- **Method shorthand istisno** — `interface I { foo(x: Dog): void }` bivariant qoladi `strictFunctionTypes` da ham
+- **Method shorthand istisno** — `interface EventTarget { handle(event: Dog): void }` bivariant qoladi `strictFunctionTypes` da ham
 - **Constructor parameter** — class constructor parameter ham bivariant (method bilan bir xil sabab)
-- **Optional parameter** — kamroq parametr ko'proqga mos (parameter count covariant, soni emas type'i)
+- **Parameter count** — kamroq parametrli function ko'proq kutadigan type'ga mos (qolgan argument'lar ignore qilinadi); teskari emas. Bu count qoidasi, har bir parametr type'i esa contravariant tekshiriladi
 - **Rest parameter** — `(...args: T[])` array contravariance qoidalari
 - **`this` parameter** — alohida contravariance check'ka uchraydi
 
@@ -204,13 +204,13 @@ Bivariance — soundness buzilgan, lekin pragmatik. `interface H { on(e: Event):
 Invariance — type parameter T ham covariant ham contravariant position'da bo'lganda paydo bo'ladi. Read+write data (mutable container) invariant bo'lishi shart, aks holda runtime crash bo'ladi:
 
 ```
-MutableBox<T> { get(): T; set(v: T): void }
-- get(): T — covariant position
-- set(v: T): void — contravariant position
-- Birga — INVARIANT
+MutableBox<T> { get(): T; set: (v: T) => void }
+- get(): T          — covariant position (output)
+- set: (v: T)=>void — contravariant position (input, function property)
+- Birga             — INVARIANT
 ```
 
-Agar `MutableBox<Dog>` `MutableBox<Animal>` ga assign bo'lsa, set(Cat) chaqirib, get() da Dog kutiladi — crash.
+`set` **function property** bo'lishi muhim: method shorthand (`set(v: T): void`) bo'lsa parameter bivariant o'lchanadi va container invariant emas, covariant bo'lib qoladi. Agar `MutableBox<Dog>` `MutableBox<Animal>`'ga assign bo'lsa, `set(new Cat())` chaqirib, `get()`'da Dog kutiladi — runtime crash.
 
 ### Kod misol
 
@@ -234,10 +234,12 @@ interface SafeHandler {
 }
 // const safe: SafeHandler = dogOnly;  // ❌ contravariant — Dog → Animal yo'q
 
-// Invariant — read+write
+// Invariant — read+write. set FUNCTION PROPERTY bo'lishi shart:
+// method shorthand (set(value: T)) bo'lsa parameter bivariant o'lchanadi va
+// container invariant emas, covariant'ga aylanib qoladi (soundness hole)
 interface MutableContainer<T> {
   get(): T;
-  set(value: T): void;
+  set: (value: T) => void;  // function property — contravariant param
 }
 declare const dogContainer: MutableContainer<Dog>;
 // const animalContainer: MutableContainer<Animal> = dogContainer;  // ❌ INVARIANT
@@ -249,7 +251,7 @@ declare const dogContainer: MutableContainer<Dog>;
 - **Constructor signature** — class constructor parameter bivariant qoladi
 - **JSX prop callback** — React event handler'lar ko'pincha method shorthand orqali bivariance ga tayanadi
 - **Invariance + generic constraint** — `<T extends U>` da T va U variance position'lariga qarab tekshiriladi
-- **Promise<T>** — covariant qaytarish uchun, lekin Promise reject path bilan murakkab
+- **Promise<T>** — T bo'yicha covariant (faqat `then`/`await` orqali o'qiladi); reject reason T emas, shuning uchun variance'ga ta'sir qilmaydi
 
 ### Follow-up savollar
 
@@ -271,15 +273,15 @@ declare const dogContainer: MutableContainer<Dog>;
 
 ### To'liq tushuntirish
 
-Modifier qo'yilmagan generic — TS variance'ni tip ichidagi position'lardan inference qiladi (har use site uchun). Katta loyihalarda bu compile time'ga ta'sir qiladi. Modifier qo'yilganda compiler T ning bo'shliklardagi position'larini tekshiradi va modifier'ga zid bo'lsa error beradi.
+Modifier qo'yilmagan generic — TS variance'ni tip ichidagi position'lardan inference qiladi (har instantiation uchun). Modifier qo'yilganda compiler bu inference'ni skip qilib, assignability'ni to'g'ridan-to'g'ri annotation bo'yicha o'lchaydi (recursive generic'da compile speed yaxshilanadi). Lekin annotation **tekshiriladi**, ko'r-ko'rona qabul qilinmaydi: compiler annotated variance'ni T ning struktural usage'idan kelib chiqadigan variance bilan solishtiradi, va ular zid bo'lsa **declaration site'ning o'zida** `TS2636` beradi.
 
-**`out T`** — T faqat covariant position'da (output, return type, readonly property). Input position'da ishlatilsa error.
+**`out T`** — covariant deb e'lon qiladi (`Box<Dog>` `Box<Animal>`'ga subtype). T faqat output position'da bo'lishi kerak (return type, readonly property).
 
-**`in T`** — T faqat contravariant position'da (input, function parameter, write-only). Output position'da error.
+**`in T`** — contravariant deb e'lon qiladi (`Box<Animal>` `Box<Dog>`'ga subtype). T faqat input position'da bo'lishi kerak (function parameter).
 
-**`in out T`** — T ikkala position'da ham bo'lishi mumkin (invariant). Mutable container uchun aniq belgilash.
+**`in out T`** — invariant deb e'lon qiladi. T ikkala position'da bo'lganda (mutable container) to'g'ri tanlov.
 
-Bu modifier'lar runtime'ga ta'sir qilmaydi — faqat type checker uchun belgi. Self-documenting kod, va circular type'lar yoki recursive generic'lar uchun compile speed yaxshilanishi.
+T ning struktural variance'i annotation'dan torroq bo'lsa — real contravariant usage `out` ostida, yoki real covariant usage `in` ostida — error **declaration'da** chiqadi: `"Type 'X<sub-T>' is not assignable to type 'X<super-T>' as implied by variance annotation"`. Diqqat: **method shorthand parameter bivariant o'lchanadi**, shuning uchun `out T` interface'ida `consume(value: T): void` method-shorthand'i contravariant usage sifatida hisoblanmaydi va declaration error bermaydi — xato faqat parametr **function property** (`consume: (value: T) => void`) bo'lganda yuzaga keladi. Modifier'lar runtime'ga ta'sir qilmaydi — faqat type checker uchun belgi, hamda self-documenting kod.
 
 ### Kod misol
 
@@ -289,14 +291,16 @@ class Dog extends Animal { breed = ""; }
 
 // out — covariant
 interface Producer<out T> {
-  produce(): T;
-  // consume(value: T): void;  // ❌ Error: 'out' T input position'da
+  produce(): T;          // ✅ output position — annotation'ga mos
+  // consume(value: T): void;     // method shorthand — param bivariant o'lchanadi,
+  //                              // contravariant usage emas → declaration error YO'Q
+  // consume: (value: T) => void; // function property — real contravariant usage,
+  //                              // 'out'ga zid → declaration'da TS2636
 }
 
 // in — contravariant
 interface Consumer<in T> {
-  consume(value: T): void;
-  // produce(): T;  // ❌ Error: 'in' T output position'da
+  consume(value: T): void;  // ✅ input position — annotation'ga mos
 }
 
 // in out — invariant
@@ -316,7 +320,9 @@ const dc: Consumer<Dog> = animalConsumer;  // ✅ contravariant
 
 ### Edge Cases
 
-- **Modifier inference bilan zid kelsa** — error: "Variance annotations are only supported in interfaces and type aliases"
+- **Annotation real usage'ga zid kelsa** — `TS2636` "...as implied by variance annotation" **declaration site'da** chiqadi (T struktural variance'i annotation'dan torroq bo'lganda). Method-shorthand parameter bivariant o'lchanib zid usage hisoblanmaydi; function-property parameter esa real contravariant usage
+- **Invariant container assignment** — `in out T` da unsound assignment plain `TS2322` beradi (struktural check buziladi), `TS2636` emas; `TS2636` faqat annotation type'ni struktura ruxsat bergandan kengroq qilganda chiqadi
+- **Variance annotation faqat class/interface/type alias'da** — boshqa joyda (masalan generic function'da) yozilsa `TS1274` "'in'/'out' modifier can only appear on a type parameter of a class, interface or type alias"
 - **Type parameter constraint bilan birga** — `<in T extends Comparable>` ruxsat
 - **Implicit variance to'g'ri bo'lsa** — modifier qo'yish majburi emas, lekin loyiha standart sifatida foydali
 - **Nested generic** — `Producer<Producer<T>>` da inner va outer variance alohida hisoblanadi
@@ -325,7 +331,7 @@ const dc: Consumer<Dog> = animalConsumer;  // ✅ contravariant
 ### Follow-up savollar
 
 1. **"`in out T` va modifier yo'q — farqi nima?"** — Modifier yo'q — TS inference qiladi, ko'pincha `in out`'ga ekvivalent. Lekin explicit aniqroq error msg va tezroq compile.
-2. **"Lib.d.ts type'lariga qachon modifier qo'shildi?"** — TS 4.7 release'da `ReadonlyArray<out T>`, `Promise<T>` kabi lib type'larga modifier qo'shilgan.
+2. **"Standart lib type'larining variance'i annotation bilanmi yoki inference bilanmi aniqlanadi?"** — Inference bilan. `Array`/`ReadonlyArray`/`Promise` lib declaration'larida explicit `in`/`out` yozilmagan; compiler ularning position usage'idan variance'ni o'zi chiqaradi. TS 4.7 release'da `ReadonlyArray<out T>` faqat illustrativ misol edi.
 
 </details>
 
@@ -350,7 +356,7 @@ Soundness — agar type checker xato bermasa, runtime ham xato bermaslik kafolat
 
 Array covariance ergonomics uchun saqlanadi — ko'p kod `Animal[]` qabul qiladigan funksiyaga `Dog[]` yuboradi, agar bu ishlamasa har joyda generic kerak bo'ladi.
 
-Xavfsiz yechim: **`readonly T[]`** covariant va sound — push/pop yo'q, faqat o'qish. `ReadonlyArray<T>` (lib type) ham xuddi shu.
+Xavfsiz yechim: **`readonly T[]`** covariant va sound — push/pop yo'q, faqat o'qish. `ReadonlyArray<T>` (lib type) ham aynan shu type.
 
 ### Kod misol
 
@@ -380,10 +386,10 @@ logNames(dogs);  // ✅ Dog[] readonly Animal[] ga mos
 
 ### Edge Cases
 
-- **`as readonly`** — `[1, 2, 3] as const` literal readonly tuple beradi
+- **`as const`** — `[1, 2, 3] as const` literal `readonly [1, 2, 3]` tuple beradi (covariant va sound)
 - **Tuple covariance** — `[Dog, Dog]` `[Animal, Animal]` ga mos, lekin element soni shart
-- **Map<K, V>** — V covariant (read), lekin set() invariant — soundness hole bu yerda ham
-- **Set<T>** — invariant deklaratsiya (lib.d.ts da)
+- **Map<K, V>** — V Array bilan bir xil **covariant soundness hole**: lib'da `set(key: K, value: V): this` method-shorthand bo'lgani uchun `value` parametri bivariant o'lchanadi, V esa effektiv covariant chiqadi. `Map<string, Dog>` `Map<string, Animal>`'ga **assignable** (keyin `animalMap.set("x", new Cat())` orqali dog map'ni buzish mumkin)
+- **Set<T>** — T ham covariant soundness hole: `add(value: T): this` method-shorthand → bivariant param. `Set<Dog>` `Set<Animal>`'ga assignable (`animalSet.add(new Cat())` unsound)
 - **Generic constraint** — `<T extends readonly Animal[]>` covariant input
 
 ### Follow-up savollar
@@ -402,7 +408,7 @@ logNames(dogs);  // ✅ Dog[] readonly Animal[] ga mos
 
 ### Qisqa javob
 
-**Class** odatda structural, lekin `private`/`protected` member borligi nominal behavior keltiradi. **Numeric enum** number ga va aksincha mos, lekin turli numeric enum lar bir-biriga mos emas. **String enum** to'liq nominal — faqat enum member orqali assign.
+**Class** odatda structural, lekin `private`/`protected` member borligi nominal behavior keltiradi. **Numeric enum** number'ga va aksincha mos, lekin turli numeric enum'lar bir-biriga mos emas. **String enum** to'liq nominal — faqat enum member orqali assign.
 
 ### To'liq tushuntirish
 
@@ -445,17 +451,19 @@ s = 0;                  // ✅ number → numeric enum
 // String enum — to'liq nominal
 enum Color { Red = "RED", Green = "GREEN" }
 let c: Color = Color.Red;
-// c = "RED";           // ❌ string literal mos emas
-// c = "blue" as Color; // assertion bilan ruxsat (xavfli)
+// c = "RED";           // ❌ string literal string enum'ga mos emas
+declare const raw: string;
+// c = raw;             // ❌ string string enum'ga mos emas
+c = raw as Color;       // assertion bilan ruxsat (runtime'da xavfli)
 ```
 
 ### Edge Cases
 
 - **Abstract class** — instance'ga mos kelmaydi, faqat concrete subclass instance'lari
 - **Static side compatibility** — `typeof MyClass` orqali constructor signature tekshiriladi
-- **Mixin pattern** — structural type kompozitsiya, runtime'da prototype zanjir
+- **Mixin pattern** — structural type composition, runtime'da prototype zanjir
 - **`declare class`** — faqat type info, runtime kod yo'q (lib type'lar uchun)
-- **Const enum erasure** — `as const` bilan obyekt enum o'rniga, runtime kod kichikroq
+- **Const enum erasure** — `const enum` member'lari compile-time'da literal qiymatga inline qilinadi, runtime'da enum object emit qilinmaydi (kichikroq output). `isolatedModules` ostida ambient `const enum` (`declare const enum`) ishlatilsa `TS2748` chiqadi
 
 ### Follow-up savollar
 
@@ -502,8 +510,9 @@ const items = [1, 2, 3];
 items.forEach(x => x);  // callback `void` kutadi, lekin `x` return — OK
 
 // addEventListener
-element.addEventListener("click", (e) => {
-  return false;  // ✅ — handler void kutadi, false ignore
+declare const button: HTMLButtonElement;
+button.addEventListener("click", (e) => {
+  return false;  // ✅ — handler void kutadi, false ignore qilinadi
 });
 
 // Maxsus istisno faqat return position'da
@@ -513,7 +522,7 @@ type VoidArg = (v: void) => void;
 
 ### Edge Cases
 
-- **Promise<void>** — `Promise<undefined>` bilan deyarli ekvivalent, lekin TS ergonomics uchun farqlaydi
+- **`Promise<void>` void special'dan tashqari** — void return istisnosi `Promise<>` ichiga kirmaydi: `() => Promise<number>` `() => Promise<void>`'ga **assignable emas** (TS#49755). Bu floating-promise xatolarini ushlash uchun ataylab
 - **Generator function** — `Generator<T, void, U>` — return type void, lekin yield T
 - **Method override** — parent void return, child non-void return — TS ruxsat (return widening)
 - **Type predicate** — `(x): x is T` return type void emas, narrowing predicate
@@ -555,7 +564,7 @@ A: ✅, B: ❌, C: ✅, D: ❌
 
 ### To'liq tushuntirish
 
-- **A: ✅** — `employee` da `id` va `name` bor, `User` shape ni qondiradi. Qo'shimcha `department` strukturalashda muammo emas (variable orqali — excess check yo'q).
+- **A: ✅** — `employee`da `id` va `name` bor, `User` shape'ni qondiradi. Qo'shimcha `department` structural mosligida muammo emas (variable orqali — excess check yo'q).
 - **B: ❌** — fresh object literal, `User` da `role` yo'q — excess property check error.
 - **C: ✅** — variable `data` orqali assignment, fresh emas — excess check bypass.
 - **D: ❌** — `User` da `department` yo'q, `Employee` shape qondirilmaydi.
@@ -661,7 +670,7 @@ ESLint `@typescript-eslint/method-signature-style: ["error", "property"]` qoidas
 
 ### To'liq tushuntirish
 
-Har modifier ma'lum position'ni cheklaydi. `out T` — faqat covariant position (return type), `in T` — faqat contravariant position (parameter), `in out T` — ikkalasi.
+Har modifier kutilgan variance'ni e'lon qiladi. `out T` — covariant (T output position'da: return type), `in T` — contravariant (T input position'da: parameter), `in out T` — invariant (ikkala position'da). Compiler annotation'ni T ning struktural usage'i bilan solishtiradi: zid bo'lsa (real contravariant usage `out` ostida yoki real covariant usage `in` ostida) `TS2636` declaration site'da chiqadi.
 
 ### Kod misol
 
@@ -670,17 +679,15 @@ class Animal { name = ""; }
 class Dog extends Animal { breed = ""; }
 
 interface Producer<out T> {
-  produce(): T;
-  // consume(value: T): void;  // ❌ 'out' T input position'da bo'lolmaydi
+  produce(): T;          // output position — 'out'ga mos (covariant)
 }
 
 interface Consumer<in T> {
-  consume(value: T): void;
-  // produce(): T;  // ❌ 'in' T output position'da bo'lolmaydi
+  consume(value: T): void;  // input position — 'in'ga mos (contravariant)
 }
 
 interface Processor<in out T> {
-  process(value: T): T;  // ✅ ikki position'da
+  process(value: T): T;  // ikki position'da — 'in out' (invariant)
 }
 
 declare const dogProducer: Producer<Dog>;
@@ -710,11 +717,11 @@ const dc: Consumer<Dog> = animalConsumer;       // ✅
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Compiler internal: variance modifiers'siz TS har generic instantiation'da position analysis qiladi (T qaerda — covariant/contravariant/invariant?). Bu recursive type'lar va katta loyihalarda compile time'ni oshiradi. Modifier qo'yilganda compiler bu analysis'ni skip qiladi va deklarativ qoidaga ishonadi. Agar T deklaratsiya bilan zid position'da ishlatilsa — error.
+Modifier'siz TS har generic instantiation'da position analysis qiladi (T qaerda — covariant/contravariant/invariant?). Recursive type'lar va katta loyihalarda bu compile time'ni oshiradi. Modifier qo'yilganda compiler assignability'ni to'g'ridan-to'g'ri annotation bo'yicha o'lchaydi va bu analysis'ni qisqartiradi. Lekin annotation tekshiriladi: agar T ning struktural usage'i annotation'dan torroq variance talab qilsa (masalan `out T` ostida function-property parameter — real contravariant usage), compiler `TS2636`'ni **declaration site'da** beradi. Method-shorthand parameter bivariant o'lchangani uchun zid usage hisoblanmaydi.
 
-Lib.d.ts'da `ReadonlyArray<out T>`, `Promise<T>` (default invariant lekin maxsus assignability), `Map<K, V>` (V invariant) — variance modifier'lar TS 4.7'da qo'shilgan.
+Standart lib type'larining variance'i compiler tomonidan inference qilinadi — TS 4.7 annotation'i `Array`/`ReadonlyArray`/`Promise`'ga explicit yozilmagan. `ReadonlyArray<T>` covariant (T faqat o'qiladi, shuning uchun 4.7 release'da `<out T>` illustrativ misol sifatida keltirildi). `Promise<T>` covariant (T `then` natijasida o'qiladi). `Array<T>` esa position bo'yicha invariant bo'lishi kerak edi (T `push`'da input, indexing'da output), lekin TS ataylab uni covariant deb belgilab, mashhur soundness hole'ni qoldirgan (Savol 6'dagi `Dog[]` → `Animal[]`).
 
-`out` va `in` keyword'lari `extends`'dan oldin yoziladi: `<out T extends Animal>`. `default` bilan birga ham: `<out T = Animal>`.
+`out` va `in` keyword'lari type parameter nomidan oldin yoziladi, `extends`'dan ham oldin: `<out T extends Animal>`. `default` bilan birga ham: `<out T = Animal>`.
 
 </details>
 
@@ -826,7 +833,7 @@ const bus: EventBus = {
   on(handler: (t: Truck) => void) { handler({ speed: 0, capacity: 100 } as Truck); }
 };
 
-bus.emit(new Truck());  // runtime xato kutilmoqda
+bus.emit(new Truck());  // compile OK, lekin runtime'da c.wheels → undefined
 ```
 
 <details>
@@ -834,13 +841,15 @@ bus.emit(new Truck());  // runtime xato kutilmoqda
 
 ### Qisqa javob
 
-`emit` method shorthand — bivariant ruxsat, lekin xavfli. `on` parameter contravariance buzuvchi — `(t: Truck) => void` `(v: Vehicle) => void` ga mos emas (`Truck`'ga toraytirilgan, Vehicle kutilgan joyda). Tuzatish: function property syntax + to'g'ri variance.
+Hech qaerda compile error **yo'q** — aynan shu muammo. `EventBus.emit` va `on` ikkalasi ham **method shorthand** (`emit(...)`, `on(...)`), shuning uchun parameter'lari **bivariant** tekshiriladi (`strictFunctionTypes`'da ham). Xavfli `emit(c: Car)` va `on(handler: (t: Truck) => void)` bivariance hole tufayli o'tib ketadi. Tuzatish: ikkala member'ni **function property** syntax'iga aylantirish — shunda parameter contravariance majburlanadi va xavfli implementation'lar compile'da rad etiladi.
 
 ### To'liq tushuntirish
 
-`emit(c: Car)` method shorthand'da bivariant qoidasi tufayli ruxsat berildi — `Car` `Vehicle`'ga subtype, va shorthand bivariant. Lekin `bus.emit(new Truck())` runtime'da `c.wheels` `undefined` beradi (Truck'da `wheels` yo'q).
+`emit(c: Car)` method shorthand bivariance tufayli ruxsat oladi — type checker xato bermaydi. Lekin `bus.emit(new Truck())` runtime'da `c.wheels`'ni o'qiydi, Truck'da `wheels` yo'q → `undefined`.
 
-`on(handler: (t: Truck) => void)` — function property syntax, contravariant. `(t: Truck) => void` `(v: Vehicle) => void` ga mos kelmaydi — handler Truck specific (`capacity` ishlatadi), Vehicle kutilgan joyda Cat/Bike kelsa crash. **Compile error**.
+`on(handler: (t: Truck) => void)` ham aynan shu hole'dan o'tadi: `on` method shorthand bo'lgani uchun uning `handler` parameter'i bivariant tekshiriladi, shuning uchun `(t: Truck) => void` `(v: Vehicle) => void` o'rnida qabul qilinadi. Lekin implementation `handler`'ni `{ ... } as Truck` bilan chaqiradi — `as` assertion soundness'ni majburan buzadi. Real callee oddiy `Vehicle` (masalan `Car`) yuborsa, `handler` `capacity`'ga qaraydi → `undefined`.
+
+Demak xato — "qayerda compile error?" emas, balki "nega compile error YO'Q?": method shorthand bivariance hole ikkala unsound assignment'ni yashiradi. Yechim quyida.
 
 ### Kod misol
 
@@ -853,7 +862,7 @@ interface EventBus {
 }
 
 const bus: EventBus = {
-  // ✅ — Animal handler Dog ni ham handle qiladi
+  // ✅ — Vehicle handler har qanday subclass'ni (Car/Truck) ham qabul qiladi
   emit(vehicle: Vehicle) { console.log(vehicle.speed); },
   on(handler) { handler(new Car()); }
 };
@@ -875,8 +884,8 @@ Method shorthand'dan function property'ga o'tish — bivariance hole'dan himoyal
 **Savol:**
 
 ```typescript
-class Bird { fly() { return "flying"; } }
-class Penguin extends Bird { fly() { throw new Error("Penguins can't fly!"); } }
+class Bird { fly(): string { return "flying"; } }
+class Penguin extends Bird { fly(): string { throw new Error("Penguins can't fly!"); } }
 
 function letBirdsFly(birds: Bird[]) {
   birds.forEach(b => b.fly());
@@ -885,6 +894,8 @@ function letBirdsFly(birds: Bird[]) {
 const penguins: Penguin[] = [new Penguin()];
 letBirdsFly(penguins);  // ?
 ```
+
+> `fly()`'da explicit `: string` return type yozilgan. Aks holda faqat `throw` qiluvchi method body return type'ni `void` deb inference qiladi, bu base'ning `() => string`'iga mos kelmaydi (`TS2416`) va kod umuman compile bo'lmaydi — demak bu yerda compile error variance'dan emas, override return type'idan kelib chiqardi.
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -932,7 +943,7 @@ class Penguin2 implements SwimmingBird { swim() { return "swimming"; } }
 - **Excess property check** — fresh object literal'ga maxsus qoida (target type'da yo'q property error). Variable orqali bypass
 - **Variance qoidalari**: return type covariant, function parameter contravariant (`strictFunctionTypes: true`), method shorthand bivariant (legacy compat), mutable container invariant
 - **Bivariance hole** — method shorthand syntax `(x: Sub) => void` ↔ `(x: Super) => void` ikkala yo'nalishda mos. ESLint `@typescript-eslint/method-signature-style` himoya
-- **`in`/`out` modifiers (TS 4.7+)** — generic variance'ni explicit deklaratsiya. Compile speed va niyatni hujjatlash
+- **`in`/`out` modifiers (TS 4.7+)** — generic variance'ni explicit declaration. Compiler annotation'ni T struktural usage'i bilan tekshiradi; zid bo'lsa (real contravariant usage `out` ostida) `TS2636` declaration site'da chiqadi. Compile speed va niyatni hujjatlash
 - **Array covariance soundness hole** — `Dog[]` `Animal[]` ga mos, `push` invariant kerak — TS pragmatik tanlov. `readonly T[]` xavfsiz
 - **`void` return special** — har qanday return value ignore qilinadi callback ergonomics uchun (`forEach`, `addEventListener`)
 - **Class compatibility** — public structural, private/protected origin-based nominal. Numeric enum number'ga mos, string enum to'liq nominal

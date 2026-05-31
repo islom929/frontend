@@ -91,7 +91,7 @@ let userId: string;          // keyinroq assign bo'ladi
 // ... biror logic ...
 userId = fetchUserId();      // ✅ string assign qilinadi
 
-// ⚠️ Annotation TAVSIYA — bo'sh array'da "evolving array" pattern'ni oldini olish
+// Diqqat: Annotation TAVSIYA — bo'sh array'da "evolving array" pattern'ni oldini olish
 let scores: number[] = [];   // aniq number[] — faqat number qabul qiladi
 scores.push(95);             // ✅
 // scores.push("hello");     // ❌ Argument of type 'string'...
@@ -445,7 +445,7 @@ TypeScript'da `strictNullChecks` flag bu ikki tipning xulqini tubdan o'zgartirad
 **`strictNullChecks: true`** (`strict: true` ichida, majburiy tavsiya):
 `null` va `undefined` alohida tip'lar — faqat `| null` yoki `| undefined` bilan birga yozilgan bo'lsa assign mumkin. Ularni ishlatishdan oldin narrowing orqali tekshirish majburiy.
 
-Bu flag'ning ahamiyati juda katta: `strictNullChecks` — TypeScript'ning eng muhim xavfsizlik mexanizmi. `undefined is not a function`, `Cannot read property 'x' of null` kabi klassik JavaScript xatolari compile-time'da ushlab qolinadi.
+`strictNullChecks` — TypeScript'ning asosiy null-safety mexanizmi: `undefined is not a function`, `Cannot read property 'x' of null` klassik JavaScript runtime xatolari compile-time'da ushlab qolinadi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -497,15 +497,15 @@ Narrowing mexanizmi ham shu flag'ga bog'liq — `if (str !== null) { str.length 
 `strictNullChecks: true` xavfsizligi:
 
 ```typescript
-// ❌ strict: false — xavfli
-let name: string = null;      // Hech qanday xato
-let age: number = undefined;  // Hech qanday xato
-name.toUpperCase();            // 💥 Runtime crash
+// ❌ strict: false — xavfli (annotation type'ga null/undefined sig'adi)
+let title: string = null;       // Hech qanday xato
+let count: number = undefined;  // Hech qanday xato
+title.toUpperCase();            // Runtime'da: Cannot read properties of null
 
-// ✅ strict: true — xavfsiz
-let name: string = null;      // ❌ Type 'null' is not assignable to type 'string'
-let name2: string | null = null;   // ✅ Aniq ko'rsatilgan
-let age: number | undefined;       // ✅ undefined bo'lishi mumkin
+// ✅ strict: true — xavfsiz (alohida tip bo'lib qoladi)
+let label: string = null;            // ❌ Type 'null' is not assignable to type 'string'
+let label2: string | null = null;   // ✅ Aniq ko'rsatilgan
+let amount: number | undefined;      // ✅ undefined bo'lishi mumkin
 
 // Ishlatishdan oldin narrowing majburiy
 function getLength(str: string | null): number {
@@ -622,7 +622,7 @@ Yangi kodda `any` deyarli hech qachon kerak emas. `unknown` ko'pgina holatlarda 
 
 `any` TypeScript'ning type checker'da **maxsus holat** — `TypeFlags.Any` flag bilan belgilanadi. Checker `any` tipli qiymatga deyarli barcha operatsiyalarni **tekshirmasdan** o'tkazib yuboradi:
 
-1. **Property access** — `any.foo.bar.baz` — checker `getPropertyOfType`'ni chaqirmaydi, har bir chain bosqichida natija `any` bo'ladi
+1. **Property access** — `payload.user.profile.settings` (`payload: any`) — checker `getPropertyOfType`'ni chaqirmaydi, har bir chain bosqichida natija `any` bo'ladi
 2. **Assignability** — `any` bidirectional assignability'ga ega: `any` har qanday tipga assign bo'ladi (`any → T`), shuningdek har qanday tip `any`'ga assign bo'ladi (`T → any`). Bu standart variance qoidalariga zid — `any` `isTypeAssignableTo` checker'da maxsus holat: ikki yo'nalishda ham darhol `true` qaytaradi
 3. **Infectious behavior** — `any` bilan ishlagan ifoda natijasi ham `any` bo'ladi. `checker.ts` dagi `getTypeOfExpression` har qanday operand `any` bo'lsa, natijani ham `any` qiladi
 
@@ -674,8 +674,8 @@ To'g'ri yondashuvlar:
 
 ```typescript
 // ❌ Yangi kodda any ishlatmang
-function processData(data: any) {
-  return data.users.map((u: any) => u.name);
+function processDataLoose(data: any) {
+  return data.users.map((user: any) => user.name);
   // Hech qanday type safety — runtime crash xavfi
 }
 
@@ -684,8 +684,8 @@ interface ApiResponse {
   users: { name: string }[];
 }
 
-function processData(data: ApiResponse) {
-  return data.users.map(u => u.name);
+function processDataTyped(data: ApiResponse) {
+  return data.users.map(user => user.name);
   // ✅ To'liq type safety + autocomplete
 }
 
@@ -701,7 +701,7 @@ function isApiResponse(x: unknown): x is ApiResponse {
   return typeof x === "object" && x !== null && "users" in x;
 }
 
-// ⚠️ Migration'da vaqtincha any — TODO bilan
+// Diqqat: Migration'da vaqtincha any — TODO bilan
 function legacyFunction(data: any /* TODO: type this */) {
   // JS → TS migration paytida vaqtincha
 }
@@ -728,7 +728,7 @@ data.process();
 data + 1;
 ```
 
-TypeScript faqat compile-time'da tekshirishni o'chirdi — JavaScript bu haqda bilmaydi, xuddi oddiy variable kabi ishlaydi.
+TypeScript faqat compile-time'da tekshirishni o'chirdi — JavaScript bu haqda hech narsa bilmaydi, qiymat oddiy variable sifatida ishlaydi.
 
 </details>
 
@@ -1088,6 +1088,7 @@ function throwError(msg: string): never {
 // Agar funksiya normal code path bo'ylab o'tsa — never EMAS
 function logAndReturn(msg: string): never { // ❌ NOTO'G'RI
   console.log(msg);
+  // ❌ A function returning 'never' cannot have a reachable end point.
   // Funksiya tugaydi (undefined qaytaradi) — bu void, never emas
 }
 ```
@@ -1200,9 +1201,11 @@ Bu maxsus holat `Array.prototype.forEach` kabi API'lar uchun zarur:
 
 ```typescript
 // forEach signature: (callback: (value: T, ...) => void) => void
-[1, 2, 3].forEach(n => console.log(n).doSomething());
-// console.log void qaytaradi, lekin biz zanjir ishlatsak —
-// agar void qattiq bo'lganda, bu kod compile bo'lmas edi
+const log: number[] = [];
+[1, 2, 3].forEach(n => log.push(n));
+// log.push(n) `number` qaytaradi (yangi length), lekin forEach callback `void` kutadi.
+// "void return type" leniency tufayli return qiymat ignore qilinadi — kod compile bo'ladi.
+// Agar void qattiq tekshirilganda, bu keng tarqalgan pattern compile bo'lmas edi.
 ```
 
 Runtime'da `void` butunlay yo'qoladi. JavaScript'da `void` annotated funksiya oddiy `undefined` qaytaradi (hech qanday runtime farq yo'q).
@@ -1366,9 +1369,9 @@ Symbol'lar asosan **yashirin object property key** sifatida ishlatiladi — ular
 
 TypeScript checker'da `TypeFlags.BigInt` flag bilan ifodalanadi. Checker `bigint` va `number` orasidagi operatsiyalarni **qat'iy taqiqlaydi** — `checkBinaryExpression`'da ikkala operand'ning tip flag'lari tekshiriladi. Agar biri `BigInt`, ikkinchisi `Number` bo'lsa — `TS2365` xatosi chiqadi (`"Operator '+' cannot be applied to types 'bigint' and 'number'"`). Bu JavaScript runtime xatosini compile-time'da ushlab olish uchun.
 
-`bigint` literal type ham mavjud: `const x = 100n` → `x` tipi **`100n`** (literal), `let x = 100n` → `x` tipi **`bigint`** (widened). Bu xuddi `number` literal type'lariga o'xshash mexanizm.
+`bigint` literal type ham mavjud: `const balance = 100n` → tipi **`100n`** (literal), `let balance = 100n` → tipi **`bigint`** (widened). Bu `number` literal type'lari bilan bir xil widening mexanizmi.
 
-**TS 5.6'dan boshlab** "Disallowed Nullish and Truthy Checks" tekshiruvi kiritildi — har doim true/false bo'ladigan taqqoslashlar uchun ogohlantirish chiqaradi. Bigint va number'ni `===` bilan taqqoslash semantik xato (har doim false), shuning uchun bunday kodlarni avoid qilish tavsiya etiladi.
+`bigint` va `number`'ni `===` yoki `==` bilan taqqoslash compile-time'da xato beradi: checker `bigint` va `number` tip'lari overlap qilmasligini aniqlaydi va `TS2367` diagnostikasini chiqaradi — "This comparison appears to be unintentional because the types 'bigint' and 'number' have no overlap." Runtime'da `==` aslida `1n == 1` ni `true` qiladi (JavaScript loose equality bigint'ni number qiymatiga keltiradi), lekin TypeScript bu narrowing'ni hisobga olmaydi va taqqoslashni xato deb belgilaydi. To'g'ri yondashuv — bir tipga keltirib taqqoslash (`Number(balance) === 100`).
 
 **symbol:**
 
@@ -1412,20 +1415,20 @@ const b: bigint = BigInt(100);  // ✅ number → bigint
 `bigint` va `number` taqqoslash — gotcha:
 
 ```typescript
-const big = 100n;
+const balance = 100n;
 
-console.log(big > 50n);  // ✅ true — bigint lar o'zaro taqqoslanadi
-console.log(big === 100n); // ✅ true — bir xil tip va qiymat
+console.log(balance > 50n);    // ✅ true — bigint lar o'zaro taqqoslanadi
+console.log(balance === 100n); // ✅ true — bir xil tip va qiymat
 
-// MUHIM: bigint va number'ni `===`/`==` bilan taqqoslash
-// `===` strict equality — turli tipdagi qiymatlar har doim teng emas
-// `==` loose equality — JavaScript runtime'da bigint'ni number'ga coerce qiladi
-console.log(big === 100);  // false — strict equality, turli tip
-console.log(big == 100);   // true — runtime'da loose equality coercion
+// MUHIM: bigint va number'ni `===`/`==` bilan taqqoslash compile error beradi
+// console.log(balance === 100);  // ❌ This comparison appears to be unintentional
+//                                 //    because the types 'bigint' and 'number' have no overlap
+// console.log(balance == 100);   // ❌ Shu xato (TS2367)
+// Runtime'da `100n == 100` aslida true bo'lardi, lekin TS bu taqqoslashni bloklaydi
 
-// Eng xavfsiz: har doim aniq tipda ishlating
-if (big === 100n) { /* ... */ }        // ✅
-if (Number(big) === 100) { /* ... */ } // ✅ aniq konversiya
+// Eng xavfsiz: har doim bir tipga keltirib taqqoslang
+if (balance === 100n) { /* ... */ }        // ✅
+if (Number(balance) === 100) { /* ... */ } // ✅ aniq konversiya
 ```
 
 Katta sonlar misoli (kriptografiya, moliya):
@@ -1680,7 +1683,7 @@ function createElement(tag: string): HTMLElement {
 
 const div = createElement("div");      // HTMLDivElement
 const input = createElement("input");  // HTMLInputElement
-const custom = createElement("foo");   // HTMLElement (fallback)
+const custom = createElement("section"); // HTMLElement (string overload — fallback)
 ```
 
 Template literal types (TS 4.1+) — literal'lardan yangi tip yaratish:
@@ -1774,11 +1777,11 @@ Literal types — butunlay compile-time concept. Runtime'da hech qanday tekshiru
 
 **2. Readonly modifier qo'shish** — object va array tiplarga rekursiv `ReadonlyModifier` qo'shiladi. Object property'lari `readonly` bo'ladi, array esa `readonly T[]` (aslida `readonly [T1, T2, T3]` tuple).
 
-**3. Tuple inference** — `as const` bo'lganda array literal `number[]` emas, `readonly [elem1, elem2, ...]` tuple type bo'ladi. Har element o'z literal tipida saqlanadi. Checker `getArrayLiteralTupleTypeIfApplicable`'da `as const` flag'ni tekshiradi.
+**3. Tuple inference** — `as const` bo'lganda array literal `number[]` emas, `readonly [elem1, elem2, ...]` tuple type bo'ladi. Har element o'z literal tipida saqlanadi. Checker array literal'ni tip qilish bosqichida `const` context flag'ni tekshiradi va widen qilingan array o'rniga readonly tuple yaratadi.
 
-Bu jarayon **recursive** — nested object va array'lar ham bir xil qoidalarga bo'ysunadi. Checker `getTypeOfExpression`'da `as const` flag'ni child expression'larga propagate qiladi.
+Bu jarayon **recursive** — nested object va array'lar ham bir xil qoidalarga bo'ysunadi. Checker expression tipini hisoblashda `const` context'ni child expression'larga propagate qiladi.
 
-Runtime'da `as const` to'liq o'chiriladi. `Object.freeze()`'dan farqi: `as const` faqat compile-time tushuncha, runtime'da object mutable qoladi. Kompile'dan keyin siz JS'da object'ni o'zgartirish mumkin (lekin TS uni compile-time'da bloklab qo'ygan edi).
+Runtime'da `as const` to'liq o'chiriladi. `Object.freeze()`'dan farqi: `as const` faqat compile-time tushuncha, runtime'da object mutable qoladi. Compile'dan keyin JS'da object'ni o'zgartirish mumkin (lekin TS uni compile-time'da bloklab qo'ygan edi).
 
 </details>
 
@@ -1988,7 +1991,7 @@ DOM element assertion:
 const canvas = document.getElementById("myCanvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");  // ✅ HTMLCanvasElement method'lari
 
-// ⚠️ Xavfli — element mavjud bo'lmasligi yoki boshqa tip bo'lishi mumkin
+// Diqqat: Xavfli — element mavjud bo'lmasligi yoki boshqa tip bo'lishi mumkin
 // Xavfsizroq — type guard bilan narrowing
 const el = document.getElementById("myCanvas");
 if (el instanceof HTMLCanvasElement) {
@@ -2020,7 +2023,7 @@ interface User {
 const data = {} as User;
 console.log(data.name);     // undefined — runtime da xato
 console.log(data.age);      // undefined
-data.name.toUpperCase();    // 💥 TypeError: Cannot read properties of undefined
+data.name.toUpperCase();    // Runtime'da: Cannot read properties of undefined
 
 // TS compile-time'da xato bermadi — siz "men bilaman" dedingiz
 ```
@@ -2118,7 +2121,7 @@ HTMLElement | null        → HTMLElement
 Array<T> | undefined      → Array<T>
 ```
 
-Checker `checkNonNullExpression`'da `!` operatorni ko'rganda, expression tipidan `TypeFlags.Null` va `TypeFlags.Undefined` flag'li tiplarni filter qiladi. Natija `NonNullable<T>` utility type bilan bir xil.
+Checker `!` operatorni ko'rganda, expression tipidan `TypeFlags.Null` va `TypeFlags.Undefined` flag'li tiplarni filter qiladi. Natija `NonNullable<T>` utility type bilan bir xil.
 
 Muhim: `!` **runtime'da to'liq o'chiriladi**. Emitter `!` postfix operator'ni JS output'ga yozmaydi. Shuning uchun bu "compiler'ni jim qilish" — agar qiymat aslida `null` bo'lsa, JS'da `TypeError: Cannot read property ... of null` chiqadi.
 
@@ -2187,7 +2190,7 @@ Xavfsiz va xavfli pattern'lar:
 const body = document.body; // Document object'da doim body bor
 body.style.margin = "0";
 
-// ⚠️ O'rinli — HTML template'da doim bor
+// Diqqat: O'rinli — HTML template'da doim bor
 const app = document.getElementById("app")!; // #app doim bor
 
 // ❌ Xavfli — user ma'lumoti noma'lum
@@ -2221,7 +2224,7 @@ const map = new Map<string, number>();
 map.set("a", 1);
 
 // map.get() → number | undefined
-const value = map.get("a")!;  // ⚠️ agar key mavjud bo'lmasa — runtime xato
+const value = map.get("a")!;  // Diqqat: agar key mavjud bo'lmasa — runtime xato
 // Xavfsiz:
 const value2 = map.get("a");
 if (value2 !== undefined) {
@@ -2300,7 +2303,7 @@ Double assertion checker'da ikki ketma-ket `checkAssertionExpression` chaqiruvi 
 
 **Ikkinchi assertion** (`as TargetType`) — checker `unknown`'dan target tipga assign qilishni tekshiradi. `unknown` top type bo'lgani uchun, undan **har qanday** tipga assertion mumkin — overlap har doim mavjud deb hisoblanadi.
 
-Checker `checkTypeAssertionWorker`'da ikki tip orasida overlap borligini tekshiradi:
+Checker assertion'ni tekshirishda ikki tip orasida overlap borligini aniqlaydi:
 - `string` va `number` orasida overlap yo'q → to'g'ridan-to'g'ri assertion xato
 - `unknown` va `number` orasida overlap bor (`unknown` "har narsa bo'lishi mumkin") → assertion OK
 
@@ -2381,16 +2384,16 @@ Alternativalar (aksariyat holatlarda yaxshiroq):
 
 ```typescript
 // ❌ Double assertion
-const data = response as unknown as ApiResponse;
+const unsafeData = response as unknown as ApiResponse;
 
 // ✅ Runtime validation (Zod)
 import { z } from "zod";
 const schema = z.object({ /* ... */ });
-const data = schema.parse(response);
+const validatedData = schema.parse(response);
 
 // ✅ Type guard
-function isApiResponse(x: unknown): x is ApiResponse {
-  return /* tekshirish */;
+function isApiResponse(value: unknown): value is ApiResponse {
+  return /* shape tekshiruvi */;
 }
 if (isApiResponse(response)) {
   // response: ApiResponse
@@ -2529,22 +2532,35 @@ function takeLiteral(s: "a" | "b") { /* ... */ }
 takeLiteral("a"); // "a" literal — widening yo'q kontekstda
 ```
 
-`let nothing = null` — nozik gotcha:
+`let value = null` — flag'larga bog'liq inference:
 
 ```typescript
-// let + null/undefined — har doim `any`'ga widen bo'ladi
-// strict mode'dan qat'iy nazar
-let a = null;      // type: any
-let u = undefined; // type: any
+// strict: true (strictNullChecks + noImplicitAny — kursning standart rejimi)
+// null/undefined bilan boshlangan `let` → EVOLVING `any` tip
+let emptyValue = null;        // declared type: any (evolving)
+emptyValue = "Ali";           // shu nuqtada: string (CFA evolving narrowing)
+emptyValue.toUpperCase();     // ✅ string method
 
-// Const'da esa literal tip saqlanadi
-const b = null;    // type: null
-const v = undefined; // type: undefined
+let missingValue = undefined; // declared type: any (evolving)
+missingValue = 42;            // shu nuqtada: number
 
-// null type'ni saqlash uchun explicit annotation kerak
-let c: null = null;           // type: null
-let d: null | string = null;  // type: null | string
+// FAQAT strictNullChecks (noImplicitAny: false) — bu holda evolving emas
+// let emptyValue = null;     // type: null (literal saqlanadi)
+// let missingValue = undefined; // type: undefined
+
+// strictNullChecks: false (non-strict) — null/undefined `any`'ga widen bo'ladi
+// let emptyValue = null;     // type: any
+
+// const'da har doim literal tip saqlanadi (evolving yo'q — qayta assign mumkin emas)
+const fixedNull = null;       // type: null
+const fixedUndef = undefined; // type: undefined
+
+// Aniq, evolving'siz tip uchun explicit annotation
+let nullableId: null = null;            // type: null
+let optionalName: string | null = null; // type: string | null
 ```
+
+`noImplicitAny` `let x = null` ni `any`'ga aylantirishi paradoksal: u qat'iylikni oshirish uchun qo'shilgan, lekin bu holatda literal `null`'ni evolving `any`'ga kengaytiradi. Shuning uchun null/undefined bilan boshlanadigan o'zgaruvchilarga explicit annotation yozish ishonchli.
 
 Narrowing — barcha asosiy usullar:
 
@@ -2682,7 +2698,7 @@ function format(val) {
 
 Primitive tiplar bilan ishlashda uchraydigan nozik xatolar va gotcha'lar. Bular `tsc`'ning xulqini chuqur bilmaslik sabab paydo bo'ladi.
 
-### 🕳 Gotcha 1: `typeof null === "object"` — JS legacy bug TS'da ham saqlangan
+### Gotcha 1: `typeof null === "object"` — JS legacy bug TS'da ham saqlangan
 
 ```typescript
 function check(val: unknown) {
@@ -2705,7 +2721,7 @@ function checkFixed(val: unknown) {
 
 ---
 
-### 🕳 Gotcha 2: `JSON.stringify(bigint)` — TypeError
+### Gotcha 2: `JSON.stringify(bigint)` — TypeError
 
 ```typescript
 const big = 100n;
@@ -2729,7 +2745,7 @@ const json2 = JSON.stringify(
 
 ---
 
-### 🕳 Gotcha 3: `Object.keys()` symbol'larni ko'rmaydi
+### Gotcha 3: `Object.keys()` symbol'larni ko'rmaydi
 
 ```typescript
 const SECRET = Symbol("secret");
@@ -2756,50 +2772,52 @@ JSON.stringify(obj);  // {"name":"Ali","age":25} — SECRET yo'q
 
 ---
 
-### 🕳 Gotcha 4: `any` arithmetic'da operator natijasi kutilmagan tip
+### Gotcha 4: `any` arithmetic'da operator natijasi kutilmagan tip
 
 ```typescript
-function bad(a: any, b: any) {
-  return a - b;  // a - b: number ('-' har doim number, hatto any'da ham)
+function subtract(left: any, right: any) {
+  return left - right;  // natija: number ('-' har doim number, hatto any'da ham)
 }
 
-function worse(a: any, b: any) {
-  return a + b;  // a + b: any (chunki '+' string concat ham mumkin)
+function addValues(left: any, right: any) {
+  return left + right;  // natija: any ('+' string concat ham bo'lishi mumkin)
 }
 
-// any va never interaction
-type Impossible<T> = T extends string ? T : never;
-type Result = Impossible<any>;  // string (any conditional'da ikkala branch'ni ham qaytaradi: any → string | never = string)
+// any distributive conditional'da ikkala branch'ni ham qaytaradi
+type IsString<T> = T extends string ? "yes" : "no";
+type FromAny = IsString<any>;     // "yes" | "no" — har ikki branch union'i
+type FromString = IsString<string>; // "yes"
+type FromNumber = IsString<number>; // "no"
 
-// Ba'zi holatlarda
-type Weird = any & never;  // never (intersection'da never yutadi)
-type Weird2 = any | never; // any (union'da any yutadi)
+// any type algebra
+type AndNever = any & never;  // never (intersection'da never yutadi)
+type OrNever = any | never;   // any (union'da any yutadi)
 ```
 
 **Sabab:** `any` ko'p joyda "yutuvchi" (`any & T = any`, `any | T = any`), lekin intersection'da `never` g'olib (`any & never = never`). Shuningdek, ba'zi operatorlar (`-`, `*`, `/`) har doim `number` qaytaradi — hatto operand'lar `any` bo'lsa ham. Bu nozik: `any` operatsiyalarida natija kutilmagan tipda bo'lishi mumkin.
 
 ---
 
-### 🕳 Gotcha 5: `Object` vs `object` vs `{}` — uch xil tip
+### Gotcha 5: `Object` vs `object` vs `{}` — uch xil tip
 
 ```typescript
 // Object (katta harf) — deyarli har qanday qiymat, `null`/`undefined`'dan boshqa
-let a: Object = "hello";     // ✅ string primitive (boxed)
-let b: Object = 42;           // ✅
-let c: Object = { x: 1 };     // ✅
-let d: Object = () => {};     // ✅
+let bigObjStr: Object = "hello";    // ✅ string primitive (boxed)
+let bigObjNum: Object = 42;          // ✅
+let bigObjRec: Object = { x: 1 };    // ✅
+let bigObjFn: Object = () => {};     // ✅
 
 // object (kichik harf) — faqat non-primitive
-let e: object = { x: 1 };     // ✅
-let f: object = [1, 2, 3];    // ✅
-// let g: object = "hello";   // ❌ string primitive, non-object emas
-// let h: object = 42;        // ❌
+let smallObjRec: object = { x: 1 };  // ✅
+let smallObjArr: object = [1, 2, 3]; // ✅
+// let smallObjStr: object = "hello"; // ❌ string primitive, non-object emas
+// let smallObjNum: object = 42;      // ❌
 
-// {} (bo'sh interface) — deyarli Object kabi (non-null/undefined)
-let i: {} = "hello";          // ✅
-let j: {} = 42;                // ✅
-let k: {} = { x: 1 };          // ✅
-// let l: {} = null;          // ❌ null/undefined emas
+// {} (bo'sh interface) — Object bilan deyarli bir xil (non-null/undefined)
+let emptyStr: {} = "hello";          // ✅
+let emptyNum: {} = 42;                // ✅
+let emptyRec: {} = { x: 1 };          // ✅
+// let emptyNull: {} = null;          // ❌ null/undefined emas
 
 // Tavsiya:
 // - Object (katta harf) — ishlatmang
@@ -2818,7 +2836,7 @@ let k: {} = { x: 1 };          // ✅
 
 ```typescript
 // ❌ Wrapper object tipi ishlatish
-function greet(name: String): String {
+function greetWrapper(name: String): String {
   return `Hello, ${name}`;
 }
 // ESLint: "Don't use 'String' as a type. Use 'string' instead"
@@ -2837,7 +2855,7 @@ function greet(name: string): string {
 
 ```typescript
 // ❌ unknown'ni tekshirmay ishlatish
-function handleError(error: unknown) {
+function handleErrorBad(error: unknown) {
   console.log(error.message); // ❌ 'error' is of type 'unknown'
 }
 
@@ -2863,7 +2881,8 @@ function handleError(error: unknown) {
 // ❌ void o'rniga never
 function logAndReturn(msg: string): never {
   console.log(msg);
-  // ❌ Funksiya normal tugayapti — never emas, void
+  // ❌ A function returning 'never' cannot have a reachable end point.
+  // Funksiya normal tugayapti — never emas, void
 }
 
 // ✅ void — normal return, qiymat yo'q
@@ -2909,16 +2928,16 @@ function getUser(id: number): User | null {
   return db.find(id);
 }
 
-const user = getUser(999)!;
-console.log(user.name); // 💥 Runtime crash — user null bo'lishi mumkin
+const unsafeUser = getUser(999)!;
+console.log(unsafeUser.name); // Runtime crash — user null bo'lishi mumkin
 
 // ✅ Null check bilan xavfsiz yondashuv
-const user = getUser(999);
-if (user === null) {
+const safeUser = getUser(999);
+if (safeUser === null) {
   console.log("User not found");
   return;
 }
-console.log(user.name); // ✅ user: User (narrowed)
+console.log(safeUser.name); // ✅ safeUser: User (narrowed)
 ```
 
 **Nima uchun:** `!` runtime'da hech narsa qilmaydi — u faqat compiler'ni "jim" qilish. Agar qiymat aslida `null` bo'lsa, runtime'da crash bo'ladi. `!` faqat mavjudlik **kafolatlangan** joylarda (class definite assignment, `<div id="root">` kabi) mos. Noma'lum manbalar bilan — type guard (`if (x !== null)`) yoki optional chaining (`x?.prop`) ishlatish kerak.
@@ -2951,12 +2970,14 @@ const isAdmin = false;        // type: false (const = literal)
 let scores = [90, 85, 95];   // type: number[]
 const user = { name: "Ali", age: 25 };
 // type: { name: string; age: number }
-// ⚠️ const object'da property'lar widened — "Ali" → string, 25 → number
+// Diqqat: const object'da property'lar widened — "Ali" → string, 25 → number
 // const faqat variable binding'ni qotiradi, property'larni emas
 
-let nothing = null;           // type: any — strictNullChecks'dan QAT'IY NAZAR
-                              // let + null har doim any'ga widen bo'ladi
-                              // null saqlash uchun: let nothing: null = null
+let nothing = null;           // type: any (evolving) — strict: true (strictNullChecks
+                              //   + noImplicitAny) da `let x = null` `any`'ga aylanadi va
+                              //   keyingi assign'larda CFA orqali evolve qiladi.
+                              //   FAQAT strictNullChecks (noImplicitAny: false) bo'lsa → null.
+                              //   Aniq tip uchun: let nothing: string | null = null
 
 const tuple = [1, "hello", true];
 // type: (string | number | boolean)[] — TUPLE EMAS, union array
@@ -2975,13 +2996,13 @@ const tuple = [1, "hello", true];
 **Savol:** Quyidagi funksiyalar uchun to'g'ri return tipni yozing:
 
 ```typescript
-function a() { console.log("hello"); }
-function b() { throw new Error("crash"); }
-function c() { while (true) {} }
-function d() { return JSON.parse('{"a":1}'); }
-function e(x: string | number) {
-  if (typeof x === "string") return x;
-  if (typeof x === "number") return x;
+function logHello() { console.log("hello"); }
+function crash() { throw new Error("crash"); }
+function loopForever() { while (true) {} }
+function parseConfig() { return JSON.parse('{"a":1}'); }
+function identity(value: string | number) {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value;
 }
 ```
 
@@ -2989,24 +3010,38 @@ function e(x: string | number) {
 <summary>Javob</summary>
 
 ```typescript
-function a(): void { console.log("hello"); }
+function logHello(): void { console.log("hello"); }
 // void — hech narsa qaytarmaydi (implicit undefined)
 
-function b(): never { throw new Error("crash"); }
+function crash(): never { throw new Error("crash"); }
 // never — throw, hech qachon normal return yo'q
 
-function c(): never { while (true) {} }
+function loopForever(): never { while (true) {} }
 // never — cheksiz loop
 
-function d(): any { return JSON.parse('{"a":1}'); }
+function parseConfig(): any { return JSON.parse('{"a":1}'); }
 // any — JSON.parse'ning standart return tipi any
-// Yaxshiroq: return'ni unknown'ga assert qilish, keyin validate
+// Yaxshiroq: return'ni unknown'ga assign qilish, keyin validate
 
-function e(x: string | number): string | number {
-  if (typeof x === "string") return x;  // string
-  if (typeof x === "number") return x;  // number
-  // TS CFA orqali barcha holatlar qamrab olinganini biladi
-  // Inferred return type: string | number
+// E'TIBOR: if-chain (switch EMAS) — TS uni exhaustive deb HISOBLAMAYDI
+function identity(value: string | number) {
+  if (typeof value === "string") return value;  // string
+  if (typeof value === "number") return value;  // number
+  // Bu nuqta TS uchun "reachable" — implicit `return undefined` yo'li bor
+  // Inferred return type: string | number | undefined
+}
+
+// Agar `: string | number` deb annotate qilsangiz — TS2366 xato:
+// "Function lacks ending return statement and return type does not include 'undefined'"
+// Sabab: if-chain endpoint'i reachable, lekin return type'da undefined yo'q
+
+// To'g'ri: switch + default assertNever EXHAUSTIVE bo'ladi
+function identityExhaustive(value: string | number): string | number {
+  switch (typeof value) {
+    case "string": return value;
+    case "number": return value;
+    default: throw new Error("unreachable");
+  }
 }
 ```
 
@@ -3014,7 +3049,7 @@ function e(x: string | number): string | number {
 - `void` — normal tugaydi, qiymat qaytarmaydi
 - `never` — hech qachon normal tugamaydi (`throw`, `while(true)`)
 - `any` — `JSON.parse`'ning legacy type definition tufayli
-- Narrowing'dan keyin TS har branch'ni kuzatadi — `string | number` union natijasi
+- if-chain TS'da exhaustive emas — endpoint reachable hisoblanadi, shuning uchun inferred return type'ga `undefined` qo'shiladi. `switch` yoki final `throw` bilan bu hal qilinadi
 
 </details>
 

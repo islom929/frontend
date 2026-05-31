@@ -1,6 +1,6 @@
 # Bo'lim 26: TypeScript 5.x Yangiliklari
 
-> TypeScript 5.x seriyasi — tilning eng tez rivojlangan davri. Har bir minor release yangi type-level imkoniyatlar, developer experience yaxshilanishlar, va runtime standartlariga moslashish olib keldi. Har feature uchun: nima o'zgardi, oldin qanday edi, hozir qanday, va amaliy misollar. Ba'zi feature lar boshqa bo'limlarda chuqur yoritilgan — ular uchun qisqacha recap va cross-reference beriladi.
+> TypeScript 5.x seriyasi har minor release'da yangi type-level imkoniyatlar, developer experience yaxshilanishlar va runtime standartlariga moslashish olib keldi. Har feature uchun: nima o'zgardi, oldin qanday edi, hozir qanday va amaliy misollar. Ba'zi feature'lar boshqa bo'limlarda chuqur yoritilgan — ular uchun qisqacha recap va cross-reference beriladi.
 
 ---
 
@@ -31,25 +31,25 @@ TS 5.0 — TC39 decorators, `const` type parameters, va bundler-friendly module 
 
 **TC39 Stage 3 Decorators** — yangi ECMAScript standart. `experimentalDecorators` kerak emas. Batafsil [Bo'lim 19](19-decorators.md).
 
-**`const` type parameters** — generic da `as const` behavior:
+**`const` type parameters** — generic'da `as const` behavior:
 
 ```typescript
 function routes<const T extends readonly { path: string }[]>(r: T) { return r; }
 const r = routes([{ path: "/" }, { path: "/about" }]);
 // r: readonly [{ readonly path: "/" }, { readonly path: "/about" }]
-// const keyword siz: { path: string }[]
+// const keyword'siz: { path: string }[]
 ```
 
 **`moduleResolution: "bundler"`** — Vite/Webpack muhiti uchun. Extension-less imports + `exports` field support. Batafsil [Bo'lim 17](17-modules.md).
 
 **`verbatimModuleSyntax`** — `import type` majburiy, predictable emit. Batafsil [Bo'lim 17](17-modules.md#verbatimmodulesyntax).
 
-**All enums are union enums** — TS 5.0 dan oldin `enum`'lar ikki xil edi: literal enum (har member literal type) va computed enum (har member `number`/`string` umumiy type). TS 5.0 da har enum **union type** sifatida ko'riladi:
+**All enums are union enums** — TS 5.0'gacha `enum`'lar ikki xil edi: literal enum (har member o'z literal type'iga ega) va computed enum (har member umumiy `number`/`string` type'ga ega). TS 5.0 da har enum **union type** sifatida ishlanadi va har member uchun alohida literal type hisoblanadi:
 
 ```typescript
 enum Status {
-  Active = "active",
-  Banned = computeStatus(), // computed
+  Active = 1,
+  Banned = 1 << 1, // computed (constant expression)
 }
 
 function check(s: Status) {
@@ -60,7 +60,7 @@ function check(s: Status) {
 }
 ```
 
-Bu narrowing va exhaustiveness check'larni yaxshilaydi.
+Bu narrowing va exhaustiveness check'ni aniqroq qiladi.
 
 ---
 
@@ -126,7 +126,7 @@ const c: number = t.value; // ✅ number output
 
 ### Nazariya
 
-**`using` / `await using` — Explicit Resource Management** (TC39). Resource larni avtomatik tozalash — `try/finally` o'rniga `using` keyword.
+**`using` / `await using` — Explicit Resource Management** (TC39). Resource'larni avtomatik tozalash — `try/finally` o'rniga `using` keyword.
 
 ```typescript
 // TS 5.2+ — auto cleanup
@@ -182,11 +182,11 @@ function openFile(path: string): FileHandle {
 
 ### Nazariya
 
-**Import Attributes** — import da metadata berish:
+**Import Attributes** — import'da metadata berish:
 
 ```typescript
 import config from "./config.json" with { type: "json" };
-// Runtime ga bu JSON ekanini aytadi
+// Runtime'ga bu JSON ekanini aytadi
 ```
 
 **`switch(true)` narrowing** — `switch(true)` pattern'da har `case` expression discriminant sifatida type narrowing'ga sabab bo'ladi:
@@ -206,7 +206,7 @@ function classify(x: string | number | boolean) {
 
 **TS 5.3'gacha** `switch(true)` ishlatish mumkin edi, lekin narrowing ishlamasdi (har `case`'da `x: string | number | boolean`). 5.3'da checker `case` expression'larni type guard sifatida tan oladi.
 
-**`if/else if` muqobil:** xuddi shu narrowing `if/else if` zanjirida ham ishlaydi. `switch(true)` — pattern matching ko'rinishidagi muqobil sintaksis.
+**`if/else if` muqobil:** aynan shu narrowing `if/else if` zanjirida ham ishlaydi. `switch(true)` — pattern matching ko'rinishidagi muqobil sintaksis.
 
 ---
 
@@ -221,25 +221,25 @@ function createStore<T>(initial: T, fallback: NoInfer<T>): T {
   return initial ?? fallback;
 }
 
-createStore(42, "hello"); // ❌ — T faqat 42 dan infer (number), "hello" mos emas
+createStore(42, "hello"); // ❌ — T faqat 42'dan infer (number), "hello" mos emas
 createStore(42, 0);       // ✅ — T = number
 ```
 
 **Preserved narrowing in closures** — closure ichida **last assignment** dan keyin narrowing saqlanadi:
 
 ```typescript
-function example() {
-  let value: string | number;
+function scheduleGreeting() {
+  let message: string | number;
 
-  value = "hello"; // last assignment
+  message = "hello"; // last assignment
   setTimeout(() => {
-    console.log(value.toUpperCase()); // ✅ TS 5.4+ da: string
+    console.log(message.toUpperCase()); // ✅ TS 5.4+ da: string
     // TS 5.3 da: string | number (narrowing yo'qolardi)
   }, 100);
 }
 ```
 
-**`Object.groupBy` va `Map.groupBy`** — ES2024 type lar:
+**`Object.groupBy` va `Map.groupBy`** — ES2024 type'lar:
 
 ```typescript
 const users = [
@@ -249,7 +249,11 @@ const users = [
 ];
 
 const grouped = Object.groupBy(users, u => u.role);
-// { admin: [Ali, Gani], user: [Vali] }
+// {
+//   admin: [{ name: "Ali", role: "admin" }, { name: "Gani", role: "admin" }],
+//   user:  [{ name: "Vali", role: "user" }]
+// }
+// grouped type: Partial<Record<string, { name: string; role: string }[]>>
 ```
 
 ---
@@ -274,7 +278,7 @@ const nums2 = values2.filter(v => v != null);
 // nums2: number[] — TS avtomatik type predicate infer qildi
 ```
 
-**Mexanizm:** checker callback'ning return expression'ini control flow analysis bilan tekshiradi. Agar `return` true bo'lganda parameter'ning type'i narrowed bo'lsa, predicate sifatida inference qiladi. Bu faqat oddiy expression'lar (`!= null`, `typeof x === "string"`) uchun ishonchli ishlaydi.
+**Mexanizm:** checker predicate'ni infer qilishi uchun to'rt shart bajarilishi kerak: (1) funksiyada explicit return type yoki predicate annotation yo'q; (2) bitta `return` statement, implicit return yo'q; (3) parameter mutatsiya qilinmaydi; (4) qaytarilgan boolean expression aynan parameter narrowing'iga bog'liq. Shu sababli `!= null` va `typeof x === "string"` infer bo'ladi, lekin `!!value` kabi truthiness check infer bo'lmaydi — `false` bo'lganda `value` `undefined` ham, `0` ham bo'lishi mumkin, ya'ni "if and only if" semantikasi buziladi.
 
 ---
 
@@ -282,31 +286,30 @@ const nums2 = values2.filter(v => v != null);
 
 ### Nazariya
 
-**Always-truthy/nullish checks** — TS 5.6 doim truthy yoki doim nullish bo'lgan expression'lar uchun xato beradi (bug guard):
+**Always-truthy/nullish checks** — TS 5.6 condition ichida **syntaktik tarzda** doim truthy yoki erishib bo'lmaydigan (unreachable) deb aniqlangan expression'lar uchun xato beradi (bug guard):
 
 ```typescript
-// ❌ TS 5.6 — Regex literal doim truthy (object)
+// ❌ TS 5.6 — Regex literal condition'da doim truthy (object)
 function isValid(input: string) {
-  if (/^[a-z]+$/) { // ❌ "This kind of expression is always truthy"
+  if (/^[a-z]+$/) { // ❌ "This kind of expression is always truthy."
     return true;
   }
   return false;
   // Programmer ehtimol input.match(/^[a-z]+$/) yozmoqchi edi
 }
 
-// ❌ Function reference doim truthy
-function callIfDefined(callback?: () => void) {
-  if (callback) callback();         // ✅ optional check OK
-  if (callIfDefined) { /* ... */ }  // ❌ function reference doim truthy
+// ❌ Condition ichidagi arrow function literal doim truthy
+function check(count: number) {
+  if (count => 0) { /* ... */ } // ❌ "always truthy" — `>=` yozmoqchi edi
 }
 
-// ❌ Class instance doim truthy
-class Logger { log(msg: string) {} }
-const logger = new Logger();
-if (logger) { /* ... */ } // ❌ instance doim truthy
+// ❌ ?? ning chap operandi hech qachon nullish bo'lmasa, o'ng operand unreachable
+function getLabel(name: string) {
+  return name ?? "anonymous"; // ❌ "right operand is unreachable" — name hech qachon nullish emas
+}
 ```
 
-**Diqqat:** check faqat **aniq truthy** expression'lar uchun (literal regex, function, class instance, har doim object qaytaruvchi expression). `string`, `number` kabi type'lar uchun emas — chunki ular falsy value'larga ega bo'lishi mumkin (`""`, `0`).
+**Diqqat:** check **syntaktik aniqlik** talab qiladi — regex/arrow function literal, yoki type'i hech qachon nullish bo'lmaydigan `??` chap operandi. `true`, `false`, `0`, `1` literal'lari (`while (true)` kabi idiomatik kod uchun) bu tekshiruvdan ozod.
 
 **Iterator helpers** — ECMAScript Iterator Helpers proposal (Stage 4, ES2025) uchun TS type'lar. `Iterator.prototype.filter`, `map`, `take`, `toArray` lazy iteration imkonini beradi (infinite generator'lar bilan ham ishlaydi):
 
@@ -331,7 +334,7 @@ const first10Even = numbers()
 
 ### Nazariya
 
-**Path rewriting** — `rewriteRelativeImportExtensions: true` flag bilan compiler `.ts`/`.tsx`/`.mts`/`.cts` extension'lardan `.js`/`.jsx`/`.mjs`/`.cjs` ga avtomatik rewrite qiladi. Bu Node.js ESM (extension majburiy) va `--allowImportingTsExtensions` bilan birgalikda ishlaydi:
+**Path rewriting** — `rewriteRelativeImportExtensions: true` flag bilan compiler `.ts`/`.tsx`/`.mts`/`.cts` extension'lardan `.js`/`.jsx`/`.mjs`/`.cjs`'ga avtomatik rewrite qiladi. Bu Node.js ESM (extension majburiy) va `--allowImportingTsExtensions` bilan birgalikda ishlaydi:
 
 ```jsonc
 {
@@ -359,14 +362,14 @@ import { utils } from "./utils.ts";
 
 ### Nazariya
 
-**`erasableSyntaxOnly`** — faqat **type erasure** bilan o'chiriladigan syntax ruxsat. `enum`, `namespace`, `parameter properties` — TAQIQLANADI. Node.js ning `--experimental-strip-types` flag iga mo'ljallangan.
+**`erasableSyntaxOnly`** — faqat **type erasure** bilan o'chiriladigan syntax'ga ruxsat. `enum`, `namespace`, `parameter properties` — TAQIQLANADI. Node.js'ning `--experimental-strip-types` flag'iga mo'ljallangan.
 
 ```json
 { "compilerOptions": { "erasableSyntaxOnly": true } }
 ```
 
 ```typescript
-// ❌ — erasableSyntaxOnly da TAQIQLANADI:
+// ❌ — erasableSyntaxOnly'da TAQIQLANADI:
 enum Color { Red, Green }           // ❌ — runtime kod hosil qiladi
 namespace Utils { export const x = 1; } // ❌ — runtime IIFE hosil qiladi
 class A { constructor(public name: string) {} } // ❌ — parameter property
@@ -377,7 +380,19 @@ const Utils = { x: 1 };             // ✅ — oddiy JS
 class A { name: string; constructor(name: string) { this.name = name; } } // ✅
 ```
 
-**Granular branch checks** — `if/else` branch larda aniqroq type narrowing.
+**Granular Checks for Branches in Return Expressions** — `return` statement ichida to'g'ridan-to'g'ri yozilgan conditional expression (`cond ? a : b`) har bir branch'i funksiyaning declared return type'iga **alohida** tekshiriladi. Muammo `any` aralashganda kelib chiqardi: `any | string` union'i `any`'ga sodda­lashadi, shu sababli checker butun ternary natijasini tekshirganda branch'ning xato type'i `any` ichida yo'qolib ketardi. TS 5.8 har branch'ni mustaqil tekshirib bu bo'shliqni yopadi:
+
+```typescript
+declare const untypedCache: Map<any, any>;
+
+function getUrlObject(urlString: string): URL {
+  return untypedCache.has(urlString)
+    ? untypedCache.get(urlString) // any
+    : urlString;                  // ❌ TS 5.8 — 'string' 'URL' ga assignable emas
+}
+```
+
+`untypedCache.get()` `any` qaytaradi, `any | string` union esa `any`'ga soddalashadi — TS 5.8'gacha checker butun ternary natijasini `any` deb ko'rib `string` branch'idagi xatoni o'tkazib yuborardi. TS 5.8 har branch'ni alohida `URL`'ga solishtirib xatoni ushlaydi. Generic conditional va indexed access return type'lar bilan kengaytirilgan tekshiruv esa TS 5.9'ga qoldirildi.
 
 ---
 
@@ -387,18 +402,18 @@ class A { name: string; constructor(name: string) { this.name = name; } } // ✅
 
 | Loyiha turi | Tavsiya etilgan TS versiya | Sabab |
 |-------------|--------------------------|-------|
-| Yangi loyiha | **5.7+** | Eng so'nggi feature lar |
-| Node.js 22+ (native TS) | **5.8+** | `erasableSyntaxOnly` |
-| Angular | **5.4-5.6** | Angular TS versiya cheklovi |
-| Legacy maintenance | **5.0+** | Minimal yangilash |
+| Yangi loyiha | **5.8** (eng so'nggi stable) | To'liq feature set + bug fix |
+| Node.js native TS run | **5.8** | `erasableSyntaxOnly` + `--experimental-strip-types` |
+| Angular / Vue / framework | framework `peerDependencies` ko'rsatgan range | Har framework qo'llab-quvvatlangan TS range'ni e'lon qiladi |
+| Legacy maintenance | mavjud major'da eng so'nggi minor | Minimal breaking risk |
 
-**Migration qoida:** Har 2-3 oyda minor versiya yangilash. Major breaking change lar kam — odatda smooth upgrade.
+**Migration qoida:** minor versiyani muntazam yangilab borish. Minor release'lar orasida breaking change kam, lekin har release notes'dagi "Breaking Changes" bo'limini o'qib chiqish kerak.
 
 ---
 
 ## Edge Cases va Gotchas
 
-### 1. `const` type parameter — inference `as const` ga teng
+### 1. `const` type parameter — inference `as const`'ga teng
 
 `<const T>` modifier'i type parameter inference'iga `as const` semantikasini qo'shadi: object literal'lar `readonly`, string literal'lar narrow type, array'lar tuple bo'ladi.
 
@@ -423,17 +438,17 @@ const r2 = withConst([{ path: "/" }]);
 
 **Qachon kerak:** routing config, state machine, schema definition — call site'da `as const` yozmasdan literal inference.
 
-**Qachon kerak emas:** numeric/general computation — `<const T extends number>` da `T = 42` infer bo'ladi va arithmetic foydasiz (`a + b` baribir `number`).
+**Qachon kerak emas:** numeric/general computation — `<const T extends number>`'da `T = 42` infer bo'ladi, lekin arithmetic foydasiz (`a + b` baribir `number`).
 
-### 2. `using` — faqat `Symbol.dispose` implement qilingan object lar bilan
+### 2. `using` — faqat `Symbol.dispose` implement qilingan object'lar bilan
 
 ```typescript
 // ❌ — Symbol.dispose yo'q
-using x = { value: 42 };
-// Error: Type '{ value: number }' is not assignable to 'Disposable'
+using resource = { value: 42 };
+// Error: Type '{ value: number; }' must have a '[Symbol.dispose]()' method.
 
 // ✅ — Disposable implement qilish
-using x = { value: 42, [Symbol.dispose]() { console.log("disposed"); } };
+using resource = { value: 42, [Symbol.dispose]() { console.log("disposed"); } };
 ```
 
 ### 3. `erasableSyntaxOnly` — `enum` va `namespace` TAQIQ
@@ -463,7 +478,7 @@ const filtered = items.filter(x => {
   return false;
 });
 // filtered: (number | string | null | boolean)[] — narrow EMAS
-// Sabab: checker bir nechta return path'larni unified predicate'ga reduce qila olmaydi
+// Sabab: infer sharti — bitta `return` statement; bu callback'da uchta `return` bor
 ```
 
 **Yechim:** Murakkab logic uchun explicit type predicate:
@@ -478,30 +493,36 @@ const filtered = items.filter((x): x is string | number =>
 ### 5. `NoInfer` — faqat inference bloklaydi, type check YO'Q
 
 ```typescript
-function fn<T>(a: T, b: NoInfer<T>): T { return a; }
+function pickFirst<T>(primary: T, fallback: NoInfer<T>): T { return primary; }
 
-// NoInfer T ni b dan infer qilmaslikni aytadi
-// Lekin b ning type i T ga mos kelishi KERAK (type check bor)
-fn(42, "hello"); // ❌ — string ≠ number (type check ishlaydi)
-fn(42, 0);       // ✅
+// NoInfer fallback'dan T'ni infer qilmaslikni aytadi
+// Lekin fallback type'i T'ga mos kelishi KERAK (type check bor)
+pickFirst(42, "hello"); // ❌ — string ≠ number (type check ishlaydi)
+pickFirst(42, 0);       // ✅
 ```
 
 ---
 
 ## Common Mistakes
 
-### ❌ Xato 1: `using` ni `Symbol.dispose` siz ishlatish
+### ❌ Xato 1: `using`'ni `Symbol.dispose`'siz ishlatish
 
 ```typescript
-// ❌ — Disposable implement qilinmagan
-using conn = createConnection();
-// Error agar createConnection Disposable qaytarmasa
+// ❌ — qaytarilgan object Disposable emas
+function createConnection(): { query(sql: string): unknown[] } {
+  return { query: () => [] };
+}
+using connection = createConnection();
+// Error: ... must have a '[Symbol.dispose]()' method.
 
 // ✅ — Disposable qaytarish
-function createConnection(): Disposable { /* ... */ }
+function createDisposableConnection(): Disposable & { query(sql: string): unknown[] } {
+  return { query: () => [], [Symbol.dispose]() { /* close */ } };
+}
+using connection = createDisposableConnection();
 ```
 
-### ❌ Xato 2: `erasableSyntaxOnly` da enum ishlatish
+### ❌ Xato 2: `erasableSyntaxOnly`'da enum ishlatish
 
 ```typescript
 // ❌ — Node.js --experimental-strip-types bilan CRASH
@@ -512,7 +533,7 @@ const Color = { Red: 0, Green: 1, Blue: 2 } as const;
 type Color = (typeof Color)[keyof typeof Color];
 ```
 
-### ❌ Xato 3: `const` type parameter ni haddan tashqari ishlatish
+### ❌ Xato 3: `const` type parameter'ni haddan tashqari ishlatish
 
 ```typescript
 // ❌ — hamma joyda const kerak emas
@@ -523,10 +544,10 @@ function add<const T extends number>(a: T, b: T): number { return a + b; }
 function defineRoutes<const T extends string[]>(routes: T) { return routes; }
 ```
 
-### ❌ Xato 4: TS 5.5 inferred predicates ga haddan tashqari ishonish
+### ❌ Xato 4: TS 5.5 inferred predicates'ga haddan tashqari ishonish
 
 ```typescript
-// ❌ — murakkab callback da infer ishlamasligi mumkin
+// ❌ — murakkab callback'da infer ishlamasligi mumkin
 const filtered = items.filter(item => {
   // Murakkab logic — TS infer qilolmasligi mumkin
   return someComplexCheck(item);
@@ -539,7 +560,7 @@ const filtered = items.filter((item): item is ValidItem => someComplexCheck(item
 ### ❌ Xato 5: `verbatimModuleSyntax` qo'ymaslik (yangi loyihada)
 
 ```json
-// ❌ — kompilator heuristic bilan import o'chiradi (unpredictable)
+// ❌ — compiler heuristic bilan import o'chiradi (unpredictable)
 { "compilerOptions": { } }
 
 // ✅ — explicit, predictable
@@ -580,7 +601,7 @@ processData();
 
 ### Mashq 2: `NoInfer` Pattern (O'rta)
 
-**Savol:** `createStore<T>(initial, fallback)` — fallback dan infer qilmaslik.
+**Savol:** `createStore<T>(initial, fallback)` — fallback'dan infer qilmaslik.
 
 <details>
 <summary>Javob</summary>
@@ -599,25 +620,30 @@ createStore("hello", ""); // ✅ T = string
 
 ### Mashq 3: Inferred Type Predicates (O'rta)
 
-**Savol:** TS 5.5 da `.filter()` bilan null/undefined olib tashlash — explicit predicate KERAK EMAS.
+**Savol:** TS 5.5 da `.filter()` bilan `null`/`undefined` olib tashlash — explicit predicate KERAK EMAS. Inference faqat parameter'ning **o'ziga** narrowing qilinganda ishlaydi, parameter property'siga emas.
 
 <details>
 <summary>Javob</summary>
 
 ```typescript
-interface RawItem { id: string | null; value: string | number | undefined; label?: string; }
+const ids: (string | null)[] = ["a", null, "b", null, "c"];
 
-function processItems(raw: RawItem[]) {
-  return raw
-    .filter(item => item.id !== null)
-    .filter(item => item.value !== undefined)
-    .map(item => ({
-      id: item.id, // string (null filtered)
-      numValue: typeof item.value === "string" ? parseFloat(item.value) : item.value,
-      label: item.label ?? `Item ${item.id}`,
-    }))
-    .filter(item => !isNaN(item.numValue));
-}
+// ✅ check parameter'ning o'ziga — TS 5.5 type predicate infer qiladi
+const validIds = ids.filter(id => id !== null);
+// validIds: string[]
+
+const values: (number | undefined)[] = [1, undefined, 2, 3, undefined];
+const validValues = values.filter(value => value !== undefined);
+// validValues: number[]
+
+// ⚠️ property check — inference ISHLAMAYDI (parameter o'zi narrow bo'lmaydi):
+interface RawItem { id: string | null; }
+const items: RawItem[] = [{ id: "a" }, { id: null }];
+const kept = items.filter(item => item.id !== null);
+// kept: RawItem[] — item.id hali ham string | null
+// Bunday holatda explicit predicate kerak:
+const kept2 = items.filter((item): item is RawItem & { id: string } => item.id !== null);
+// kept2: (RawItem & { id: string })[]
 ```
 
 </details>
@@ -626,7 +652,7 @@ function processItems(raw: RawItem[]) {
 
 ### Mashq 4: `erasableSyntaxOnly` Migration (O'rta)
 
-**Savol:** `enum`, `namespace`, `parameter property` ni `erasableSyntaxOnly` bilan mos qiling.
+**Savol:** `enum`, `namespace`, `parameter property`'ni `erasableSyntaxOnly` bilan mos qiling.
 
 <details>
 <summary>Javob</summary>
@@ -706,12 +732,12 @@ async function getActiveUsers() {
 | **5.2** | `using`/`await using` (Explicit Resource Management) | **Runtime** |
 | **5.3** | Import Attributes, `switch(true)` narrowing | Modules, Narrowing |
 | **5.4** | `NoInfer<T>`, closure narrowing | Inference |
-| **5.5** | `isolatedDeclarations`, inferred type predicates | **Performance** |
+| **5.5** | `isolatedDeclarations`, inferred type predicates | Build, Inference |
 | **5.6** | Always-truthy checks, iterator helpers | Safety |
 | **5.7** | Path rewriting, `es2024` target | Build |
-| **5.8** | `erasableSyntaxOnly`, granular branch checks | **Node.js** |
+| **5.8** | `erasableSyntaxOnly`, return branch granular checks | **Node.js** |
 
-**Trendlar:** JS standartlariga moslashish, DX yaxshilanish, build performance, Node.js ecosystem integratsiya.
+**Trendlar:** JS standartlariga moslashish, DX yaxshilanish, build performance, Node.js ecosystem integration.
 
 **Bog'liq bo'limlar:**
 - [Bo'lim 15: Utility Types](15-utility-types.md) — `NoInfer<T>`, `Awaited<T>`

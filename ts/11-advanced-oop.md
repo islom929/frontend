@@ -64,7 +64,7 @@ TypeScript buni type system'da quyidagicha ko'radi:
 2. Mixin function takes Constructor<T>
    returns Constructor<T & MixinInterface>
 
-3. Kompilator type'larni stack qiladi:
+3. Compiler type'larni stack qiladi:
    Base                     → { baseMethod() }
    + Mixin1(Base)           → { baseMethod(), mixin1Method() }
    + Mixin2(Mixin1(Base))   → { baseMethod(), mixin1Method(), mixin2Method() }
@@ -201,23 +201,32 @@ const PrintableUser = Printable(User);       // ✅ name bor
 const pUser = new PrintableUser("Ali", 25);
 pUser.print(); // "[Ali]"
 
-// 8. Generic mixin bilan type inference
-function Observable<TBase extends GConstructor, T>(Base: TBase) {
-  return class extends Base {
-    private observers: ((value: T) => void)[] = [];
+// 8. Generic mixin — event type'i explicit beriladi (Base'dan infer bo'lmaydi)
+function Observable<T>() {
+  return function <TBase extends GConstructor>(Base: TBase) {
+    return class extends Base {
+      private observers: ((value: T) => void)[] = [];
 
-    subscribe(observer: (value: T) => void): () => void {
-      this.observers.push(observer);
-      return () => {
-        this.observers = this.observers.filter(o => o !== observer);
-      };
-    }
+      subscribe(observer: (value: T) => void): () => void {
+        this.observers.push(observer);
+        return () => {
+          this.observers = this.observers.filter(o => o !== observer);
+        };
+      }
 
-    notify(value: T): void {
-      this.observers.forEach(o => o(value));
-    }
+      notify(value: T): void {
+        this.observers.forEach(o => o(value));
+      }
+    };
   };
 }
+
+// Ishlatish — T'ni currying orqali beramiz, Base esa infer bo'ladi
+class PriceFeed {}
+const ObservablePrice = Observable<number>()(PriceFeed);
+const feed = new ObservablePrice();
+feed.subscribe(price => console.log(`Yangi narx: ${price}`));
+feed.notify(42);
 
 // 9. Mixin bilan method override
 function Loggable<TBase extends GConstructor>(Base: TBase) {
@@ -276,7 +285,7 @@ const TimestampedUser = Timestamped(User);
 // Oddiy class inheritance — hech qanday TypeScript magic yo'q
 ```
 
-Mixin — sof TypeScript type system pattern. Runtime'da oddiy class inheritance chain. Kompilator har class'ga avtomatik `constructor(...args) { super(...args); }` qo'shadi.
+Mixin — sof TypeScript type system pattern. Runtime'da oddiy class inheritance chain. Compiler har class'ga avtomatik `constructor(...args) { super(...args); }` qo'shadi.
 
 </details>
 
@@ -540,7 +549,7 @@ class DatabaseConnection {
 
 JavaScript va TypeScript'da class yaratishning ikki yo'li bor:
 
-1. **Class declaration** — `class User { ... }` — nomli, hoisted emas (TDZ'da)
+1. **Class declaration** — `class User { ... }` — nomli, binding hoist bo'ladi lekin evaluation'gacha TDZ'da (declaration'dan oldin ishlatib bo'lmaydi)
 2. **Class expression** — `const User = class { ... }` — o'zgaruvchiga assign qilinadigan
 
 Class expression class'ni **qiymat sifatida** ishlatish imkonini beradi — funksiya expression'ga o'xshash. Class ham first-class value.
@@ -720,18 +729,20 @@ function withTimestamp<T extends new (...args: any[]) => {}>(Base: T) {
 
 // 7. IIFE bilan module pattern (eski approach)
 const Singleton = (() => {
-  let instance: unknown = null;
+  let instance: SingletonImpl | null = null;
 
-  return class SingletonImpl {
+  class SingletonImpl {
     private constructor() {}
 
     static getInstance(): SingletonImpl {
-      if (!instance) {
+      if (instance === null) {
         instance = new SingletonImpl();
       }
-      return instance as SingletonImpl;
+      return instance;
     }
-  };
+  }
+
+  return SingletonImpl;
 })();
 ```
 
@@ -785,7 +796,7 @@ class Product implements Serializable, Comparable<Product>, Printable {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Method signature compatibility:** Class bir nechta interface'ni implement qilganda, kompilator har method'ni barcha interface'larga tekshiradi. Bir xil method turli interface'larda farqli return type bilan bo'lsa, class return type'i ikkala interface'ga mos kelishi kerak:
+**Method signature compatibility:** Class bir nechta interface'ni implement qilganda, compiler har method'ni barcha interface'larga tekshiradi. Bir xil method turli interface'larda farqli return type bilan bo'lsa, class return type'i ikkala interface'ga mos kelishi kerak:
 
 ```typescript
 interface A { get(): string | number; }
@@ -1014,8 +1025,8 @@ Abstract factory — bir nechta tegishli (related) object'larni yaratishni abstr
 
 - **Cross-platform UI** — iOS/Android/Web uchun bir xil interface, lekin turli implementation
 - **Theme switching** — Light/Dark theme uchun Button, Input, Modal birga
-- **Test doubles** — production factory + test factory (mock komponentlar)
-- **Environment-based** — development/production/staging konfiguratsiyasi
+- **Test doubles** — production factory + test factory (mock component'lar)
+- **Environment-based** — development/production/staging configuration'i
 
 Masalan: UI component factory har xil theme (Light, Dark) uchun Button, Input, Modal yaratadi — lekin barcha component'lar o'zaro mos bo'lishi kerak (Light Button Light Input bilan ishlashi kerak, aralash bo'lmasligi kerak).
 
@@ -1038,9 +1049,9 @@ AbstractFactory (abstract class)
         └── createInput()  → new DarkInput()
 ```
 
-**Type safety kafolati:** Abstract factory pattern type system orqali **aralash komponentlar**'ni oldini oladi. Agar foydalanuvchi `LightFactory.createButton()` chaqirsa, natija `LightButton` bo'ladi — `DarkButton` bilan aralashtirilmaydi. Kompilator bu muvofiqlikni tekshiradi.
+**Type safety kafolati:** Abstract factory pattern type system orqali **aralash component'lar**ni oldini oladi. Agar foydalanuvchi `LightFactory.createButton()` chaqirsa, natija `LightButton` bo'ladi — `DarkButton` bilan aralashtirilmaydi. Compiler bu muvofiqlikni tekshiradi.
 
-**Runtime cost:** Har method chaqiruv — yangi instance. Lekin kompilator buni optimize qila olmaydi (runtime state). Katta masshtablarda object pooling yoki cache ishlatiladi.
+**Runtime cost:** Har method chaqiruv — yangi instance. Lekin compiler buni optimize qila olmaydi (runtime state). Katta scale'da object pooling yoki cache ishlatiladi.
 
 **Generic factory alternative:** Simpler case'lar uchun generic function yetarli:
 
@@ -1217,7 +1228,7 @@ Initial: Builder<Empty>
       .build() → User  ← faqat ikkala required set bo'lganda
 ```
 
-Kompilator har step'ni tekshiradi va faqat required field'lar set bo'lganda `build()` method'ni expose qiladi.
+Compiler har step'ni tekshiradi va faqat required field'lar set bo'lganda `build()` method'ni expose qiladi.
 
 **CRTP (Curiously Recurring Template Pattern):** C++'dagi pattern — base class subclass type'ni parameter sifatida oladi. TypeScript'da bu to'g'ridan-to'g'ri yo'q, lekin `this` type bilan simulate qilinadi:
 
@@ -1240,7 +1251,7 @@ new FluentChild()
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**`this` type resolution mexanizmi:** Kompilator `this` return type'ni **chaqiruv kontekstida** resolve qiladi. Har class uchun alohida `this` type mavjud, va shu class'da method chaqirilsa, `this` o'sha class'ga aylanadi.
+**`this` type resolution mexanizmi:** Compiler `this` return type'ni **chaqiruv kontekstida** resolve qiladi. Har class uchun alohida `this` type mavjud, va shu class'da method chaqirilsa, `this` o'sha class'ga aylanadi.
 
 ```
 class A { method(): this }   // A'da chaqirilsa — A qaytaradi
@@ -1257,11 +1268,11 @@ Har chaqiriqda:
 
 ```typescript
 class Builder<State extends Record<string, boolean>> {
-  private _state: Partial<Record<string, unknown>> = {};
+  private state: Record<string, unknown> = {};
 
   withName(name: string): Builder<State & { name: true }> {
-    this._state.name = name;
-    return this as any; // Type cast — runtime bitta object
+    this.state.name = name;
+    return this as unknown as Builder<State & { name: true }>;
   }
 }
 ```
@@ -1366,42 +1377,50 @@ interface User {
   age?: number;
 }
 
-class UserBuilder implements NeedsName {
-  private data: Partial<User> = {};
+class UserBuilder implements NeedsName, NeedsEmail, OptionalAge {
+  private name = "";
+  private email = "";
+  private age: number | undefined;
+
+  // Entry point — NeedsName qaytaradi, shu sababli boshlang'ich type'da
+  // faqat withName ko'rinadi (build, withEmail yashirin)
+  static start(): NeedsName {
+    return new UserBuilder();
+  }
 
   withName(name: string): NeedsEmail {
-    this.data.name = name;
-    return this as unknown as NeedsEmail;
+    this.name = name;
+    return this;
   }
 
   withEmail(email: string): OptionalAge {
-    this.data.email = email;
-    return this as unknown as OptionalAge;
+    this.email = email;
+    return this;
   }
 
   withAge(age: number): OptionalAge {
-    this.data.age = age;
-    return this as unknown as OptionalAge;
+    this.age = age;
+    return this;
   }
 
   build(): User {
     return {
-      name: this.data.name!,
-      email: this.data.email!,
-      age: this.data.age,
+      name: this.name,
+      email: this.email,
+      age: this.age,
     };
   }
 }
 
 // Ishlatish — tartib majburiy
-const user = new UserBuilder()
+const user = UserBuilder.start()
   .withName("Ali")    // NeedsName → NeedsEmail
   .withEmail("ali@test.com") // NeedsEmail → OptionalAge
   .withAge(25)        // OptionalAge
   .build();           // User
 
-// new UserBuilder().build();            // ❌ NeedsName'da build yo'q
-// new UserBuilder().withName("Ali").build(); // ❌ NeedsEmail'da build yo'q
+// UserBuilder.start().build();            // ❌ NeedsName'da build yo'q
+// UserBuilder.start().withName("Ali").build(); // ❌ NeedsEmail'da build yo'q
 
 // 3. CRTP simulation — subclass fluent
 class BaseRequest {
@@ -1556,7 +1575,7 @@ Initial: Builder<Empty>
 .build() — faqat type { port: true; host: true } bo'lganda expose qilinadi
 ```
 
-**Runtime'da** bitta object mutation bor. **Type-level'da** har step yangi interface. Kompilator state progression'ni kuzatadi va `build()` method'ni faqat to'g'ri state'da expose qiladi.
+**Runtime'da** bitta object mutation bor. **Type-level'da** har step yangi interface. Compiler state progression'ni kuzatadi va `build()` method'ni faqat to'g'ri state'da expose qiladi.
 
 **Implementation strategiyalari:**
 
@@ -1566,7 +1585,7 @@ Initial: Builder<Empty>
 
 Step interface'lar oddiy, generic state ancha flexible. Real library'lar (Zod, Prisma) generic state tracking ishlatadi.
 
-**`this as unknown as NewType` cast:** Step interface pattern'da `return this as unknown as NewType` ishlatiladi. Bu type-level cast — runtime'da hech narsa o'zgarmaydi, faqat TypeScript type'ni keyingi interface sifatida ko'radi. Bu "safe" cast chunki runtime object bir xil, faqat type perspective o'zgaradi.
+**Cast kerakmi:** Step interface pattern'da class barcha step interface'larni implement qilsa (`implements NeedsPort, NeedsHost, OptionalConfig`), `return this` cast'siz ishlaydi — `this` har bir interface'ga assignable. Entry point esa boshlang'ich interface'ni qaytaradi (static factory `start(): NeedsPort`), shu sababli boshida faqat birinchi step ko'rinadi. Generic state tracking pattern'da (`Builder<State>`) esa `return this as unknown as Builder<NewState>` kerak, chunki bir xil instance turli `State` type argument bilan ko'rsatiladi — bu type-level cast, runtime'da object o'zgarmaydi.
 
 **Immutable vs mutable builder:** Ikki variant:
 
@@ -1621,9 +1640,13 @@ class ServerConfigBuilder {
   }
 
   build(): ServerConfig {
+    const { port, host } = this.config;
+    if (port === undefined || host === undefined) {
+      throw new Error("port va host majburiy");
+    }
     return {
-      port: this.config.port!,
-      host: this.config.host!,
+      port,
+      host,
       enableCors: this.config.enableCors ?? false,
       maxConnections: this.config.maxConnections ?? 100,
       timeout: this.config.timeout ?? 30000,
@@ -1647,38 +1670,53 @@ interface OptionalConfig {
   build(): ServerConfig;
 }
 
-class StrictServerConfigBuilder implements NeedsPort {
+class StrictServerConfigBuilder implements NeedsPort, NeedsHost, OptionalConfig {
   private config: Partial<ServerConfig> = {};
 
+  // Entry point — NeedsPort qaytaradi. Class barcha step interface'larni
+  // implement qiladi, lekin boshlang'ich type NeedsPort bo'lgani uchun
+  // faqat port() ko'rinadi (build, host yashirin)
+  static start(): NeedsPort {
+    return new StrictServerConfigBuilder();
+  }
+
   port(port: number): NeedsHost {
-    this.config.port = port;
-    return this as unknown as NeedsHost;
+    // config — Partial<ServerConfig>; ServerConfig field'lari readonly,
+    // shuning uchun field mutation emas, butun object reassignment
+    this.config = { ...this.config, port };
+    return this;
   }
 
   host(host: string): OptionalConfig {
-    this.config.host = host;
-    return this as unknown as OptionalConfig;
+    this.config = { ...this.config, host };
+    return this;
   }
 
   enableCors(enable: boolean): OptionalConfig {
-    this.config.enableCors = enable;
-    return this as unknown as OptionalConfig;
+    this.config = { ...this.config, enableCors: enable };
+    return this;
   }
 
   timeout(ms: number): OptionalConfig {
-    this.config.timeout = ms;
-    return this as unknown as OptionalConfig;
+    this.config = { ...this.config, timeout: ms };
+    return this;
   }
 
   maxConnections(max: number): OptionalConfig {
-    this.config.maxConnections = max;
-    return this as unknown as OptionalConfig;
+    this.config = { ...this.config, maxConnections: max };
+    return this;
   }
 
   build(): ServerConfig {
+    const { port, host } = this.config;
+    if (port === undefined || host === undefined) {
+      // Type-state chain bu holatni compile-time'da bloklaydi;
+      // guard runtime field type'i (Partial) tufayli kerak
+      throw new Error("port va host majburiy");
+    }
     return {
-      port: this.config.port!,
-      host: this.config.host!,
+      port,
+      host,
       enableCors: this.config.enableCors ?? false,
       maxConnections: this.config.maxConnections ?? 100,
       timeout: this.config.timeout ?? 30000,
@@ -1687,21 +1725,28 @@ class StrictServerConfigBuilder implements NeedsPort {
 }
 
 // Ishlatish — tartib majburiy
-const config = new StrictServerConfigBuilder()
+const config = StrictServerConfigBuilder.start()
   .port(3000)        // ✅ NeedsPort → NeedsHost
   .host("localhost") // ✅ NeedsHost → OptionalConfig
   .enableCors(true)  // ✅ OptionalConfig
   .build();          // ✅ build() faqat OptionalConfig'da
 
-// new StrictServerConfigBuilder().build();
+// StrictServerConfigBuilder.start().build();
 // ❌ Property 'build' does not exist on type 'NeedsPort'
 
 // 3. Generic state tracking Builder
-type BuilderState = "empty" | "hasName" | "hasEmail" | "complete";
+type BuilderState = "empty" | "hasName" | "complete";
 
 class GenericBuilder<State extends BuilderState = "empty"> {
-  private name?: string;
-  private email?: string;
+  private name = "";
+  private email = "";
+
+  // Phantom marker — State'ni member position'da ishlatadi. Busiz State
+  // hech bir member type'da uchramaydi, shu sababli GenericBuilder<"empty">
+  // va GenericBuilder<"complete"> structural jihatdan bir xil bo'lib qoladi
+  // va `this: GenericBuilder<"complete">` gating ishlamaydi. `declare` —
+  // runtime'da field emit qilinmaydi, faqat compile-time tracking.
+  declare private readonly __state: State;
 
   withName(name: string): GenericBuilder<"hasName"> {
     this.name = name;
@@ -1712,20 +1757,24 @@ class GenericBuilder<State extends BuilderState = "empty"> {
     this: GenericBuilder<"hasName">,
     email: string
   ): GenericBuilder<"complete"> {
-    (this as GenericBuilder<BuilderState> & { email?: string }).email = email;
+    this.email = email;
     return this as unknown as GenericBuilder<"complete">;
   }
 
   build(this: GenericBuilder<"complete">): { name: string; email: string } {
-    return {
-      name: (this as GenericBuilder<BuilderState> & { name: string }).name,
-      email: (this as GenericBuilder<BuilderState> & { email: string }).email,
-    };
+    return { name: this.name, email: this.email };
   }
 }
 
-// const b1 = new GenericBuilder().build();
+const okUser = new GenericBuilder()
+  .withName("Ali")
+  .withEmail("ali@test.com")
+  .build();         // { name: "Ali", email: "ali@test.com" }
+
+// new GenericBuilder().build();
 // ❌ this: GenericBuilder<"complete"> expected, got GenericBuilder<"empty">
+// new GenericBuilder().withEmail("x");
+// ❌ withEmail this: GenericBuilder<"hasName"> talab qiladi
 
 // 4. Immutable Builder
 class ImmutableBuilder<T> {
@@ -1824,7 +1873,7 @@ Car instance
   └── prototype chain: Car → Object (flat)
 ```
 
-Inheritance'da method'lar prototype chain orqali topiladi. Composition'da method chaqiruvlari delegation orqali — `this.component.method()`. Performance farqi amalda sezilmas.
+Inheritance'da method'lar prototype chain orqali topiladi (engine prototype lookup qiladi). Composition'da method chaqiruvlari delegation orqali — `this.component.method()` (qo'shimcha bitta property access + method call).
 
 **Favor composition pragmatic guide:**
 
@@ -2042,7 +2091,7 @@ const testService = new UserService(new MockUserRepo(), mockLogger);
 // mockLogger.logs — assert qilish mumkin
 
 // 5. Simple composition with delegation
-class User {
+class Customer {
   constructor(public name: string, public email: string) {}
 }
 
@@ -2055,13 +2104,13 @@ class EmailService {
 class NotificationService {
   constructor(private emailService: EmailService) {}
 
-  notifyUser(user: User, message: string): void {
-    this.emailService.send(user.email, message);
+  notifyCustomer(customer: Customer, message: string): void {
+    this.emailService.send(customer.email, message);
   }
 }
 
 const notifier = new NotificationService(new EmailService());
-notifier.notifyUser(new User("Ali", "ali@test.com"), "Welcome!");
+notifier.notifyCustomer(new Customer("Ali", "ali@test.com"), "Welcome!");
 ```
 
 </details>
@@ -2112,16 +2161,16 @@ Type B = { email: string; role: string }
 A & B = { name: string; age: number; email: string; role: string }
 ```
 
-**Property conflict:** Agar ikki type'da bir xil nomli property turli type bilan bo'lsa, intersection `never`'ga aylanadi:
+**Property conflict:** Agar ikki type'da bir xil nomli property turli primitive type bilan bo'lsa, o'sha **property** `never`'ga aylanadi — butun object type emas, faqat shu key:
 
 ```typescript
 type A = { value: string };
 type B = { value: number };
 type C = A & B;
-// C["value"] = string & number = never
+// C o'zi valid object type, lekin C["value"] = string & number = never
 ```
 
-`string & number` = hech qanday qiymat ham string, ham number bo'la olmaydi → `never`.
+`string & number` = hech qanday qiymat ham string, ham number bo'la olmaydi → `never`. Natijada `C` type'iga object yaratish mumkin emas (`value`'ga `never` qiymat berib bo'lmaydi), lekin `C` o'zi `never` emas.
 
 **Class type + property intersection:** Class type'ni intersection bilan kengaytirish mumkin, lekin natija **class instance emas**:
 
@@ -2164,7 +2213,10 @@ const copy = Object.assign({}, instance);
 3. **Proxy pattern — dynamic delegation:**
    ```typescript
    const proxy = new Proxy({} as Logger, {
-     get(_, prop) { return (instance as any)[prop]?.bind(instance); }
+     get(_target, prop) {
+       const value = Reflect.get(instance, prop);
+       return typeof value === "function" ? value.bind(instance) : value;
+     },
    });
    ```
 
@@ -2235,8 +2287,14 @@ function createSerializableLogger(): SerializableLogger {
 
   return new Proxy({} as SerializableLogger, {
     get(_target, prop) {
-      if (prop in logger) return (logger as any)[prop].bind(logger);
-      if (prop in serializer) return (serializer as any)[prop].bind(serializer);
+      if (prop in logger) {
+        const method = Reflect.get(logger, prop);
+        return typeof method === "function" ? method.bind(logger) : method;
+      }
+      if (prop in serializer) {
+        const method = Reflect.get(serializer, prop);
+        return typeof method === "function" ? method.bind(serializer) : method;
+      }
       return undefined;
     },
   });
@@ -2328,7 +2386,7 @@ function enhance(api: ExternalAPI): ExtendedAPI {
 
 ### Nazariya
 
-`satisfies` operator (TypeScript 4.9+) — qiymatning ma'lum type'ga mos kelishini tekshiradi, lekin qiymatning **aniq (literal) type'ini** saqlab qoladi. Class kontekstida bu operator static property'lar yoki class bilan bog'liq config object'larni validatsiya qilish uchun ishlatiladi.
+`satisfies` operator (TypeScript 4.9+) — qiymatning ma'lum type'ga mos kelishini tekshiradi, lekin qiymatning **aniq (literal) type'ini** saqlab qoladi. Class kontekstida bu operator static property'lar yoki class bilan bog'liq config object'larni validation qilish uchun ishlatiladi.
 
 **`satisfies` vs type annotation farqi:**
 
@@ -2390,7 +2448,7 @@ const routes = [
 // readonly array
 ```
 
-**Class static property'lar:** `satisfies` class static property'larga qo'llanganda, autocomplete va type narrowing uchun foydali. Literal type'larni saqlash uchun `as const satisfies` kombinatsiyasi kerak — yolg'iz `satisfies` property type'larini target type'ga widen qiladi:
+**Class static property'lar:** `satisfies` class static property'larga qo'llanganda, autocomplete va type narrowing uchun foydali. Literal type'larni saqlash uchun `as const satisfies` kombinatsiyasi kerak. `satisfies` qiymatning **o'z inferred type'ini** saqlaydi, target type'ni emas — object literal esa default inference'da numeric/string literal'larni keng type'ga (`number`, `string`) widen qiladi. Shuning uchun yolg'iz `satisfies` bilan `pending: 1` → `number` bo'ladi; literal'ni pin qilish uchun `as const` kerak:
 
 ```typescript
 class Status {
@@ -2745,21 +2803,22 @@ copy.level; // "info" — own property ko'chdi
 
 Bu gotcha'ning sababi — JavaScript class syntax'ning prototype chain'ga asoslanganligi. Method'lar `Class.prototype`'da, instance'da faqat property'lar. Clone qilish uchun prototype saqlash kerak.
 
-### 5. Intersection Method Signature Conflict → `never`
+### 5. Intersection Method Signature Conflict — Overload Set
 
-Ikki interface'da bir xil nomli method turli signature bilan bo'lsa, intersection method return type `string & number = never` ga aylanadi:
+Ikki interface'da bir xil nomli method turli signature bilan bo'lsa, **function type'larning intersection'i** hosil bo'ladi. Bu data property'dagi `string & number = never` holatidan **farq qiladi**: function type intersection return type'ni `never`'ga collapse qilmaydi — u **overloaded function** signature'i hosil qiladi:
 
 ```typescript
 type A = { getValue(): string };
 type B = { getValue(): number };
 
 type C = A & B;
-// C.getValue: (() => string) & (() => number)
-// Return type: string & number = never
-// Implement qilib bo'lmaydi — return qiymat yo'q mumkin
+// C["getValue"]: (() => string) & (() => number)
+// Bu overload set — call qilinganda birinchi signature'ga resolve bo'ladi:
+declare const c: C;
+const value = c.getValue(); // value: string (birinchi overload)
 ```
 
-**Nima uchun `never`:** `string & number` "string VA number bo'lgan qiymat" ma'nosini beradi. Lekin hech qaysi qiymat bir vaqtda ham string, ham number bo'la olmaydi → `never`.
+`C` type'ining o'zi `never` emas, `getValue` ham `never` qaytarmaydi. Muammo **implementation'da**: bitta method ham `(): string`, ham `(): number` signature'ga assignable bo'lishi kerak. Bu uchun return type bir vaqtda `string`'ga ham, `number`'ga ham assignable bo'lishi kerak — ya'ni `string & number` (= `never`). Hech qanday qiymat ikkala primitive ham bo'la olmaydi, shuning uchun **bitta concrete implementation** bu intersection'ni qondira olmaydi.
 
 **Yechim'lar:**
 
@@ -2943,11 +3002,12 @@ type A = { getValue(): string };
 type B = { getValue(): number };
 
 type C = A & B;
-// C["getValue"] = (() => string) & (() => number)
-// Implement qilib bo'lmaydi
+// C["getValue"] = (() => string) & (() => number) — overload set
+// Bitta concrete method bilan implement qilib bo'lmaydi:
 
 // class Impl implements C {
-//   getValue(): ??? // Return type: string & number = never
+//   getValue() { ... } // return type bir vaqtda string ham, number ham
+//                      // bo'la olmaydi (string & number = never)
 // }
 ```
 
@@ -2969,7 +3029,7 @@ class Flexible {
 }
 ```
 
-**Nima uchun:** `string & number = never` — disjoint type'lar. Return type conflict implement qilib bo'lmaydi.
+**Nima uchun:** Function type intersection overload set hosil qiladi. Bitta concrete implementation'ning return type'i ham `string`'ga, ham `number`'ga assignable bo'lishi kerak — bu `string & number` (= `never`), shuning uchun mumkin emas.
 
 ---
 
@@ -3159,43 +3219,50 @@ interface EmailOptionals {
   build(): EmailMessage;
 }
 
-class EmailBuilder implements NeedsTo {
+class EmailBuilder implements NeedsTo, NeedsSubject, EmailOptionals {
+  private toAddress = "";
+  private subjectText = "";
   private data: Partial<EmailMessage> = {};
 
+  // Entry point — NeedsTo qaytaradi, boshlang'ich type'da faqat to() ko'rinadi
+  static start(): NeedsTo {
+    return new EmailBuilder();
+  }
+
   to(address: string): NeedsSubject {
-    this.data.to = address;
-    return this as unknown as NeedsSubject;
+    this.toAddress = address;
+    return this;
   }
 
   subject(text: string): EmailOptionals {
-    this.data.subject = text;
-    return this as unknown as EmailOptionals;
+    this.subjectText = text;
+    return this;
   }
 
   cc(addresses: string[]): EmailOptionals {
     this.data.cc = addresses;
-    return this as unknown as EmailOptionals;
+    return this;
   }
 
   bcc(addresses: string[]): EmailOptionals {
     this.data.bcc = addresses;
-    return this as unknown as EmailOptionals;
+    return this;
   }
 
   body(text: string): EmailOptionals {
     this.data.body = text;
-    return this as unknown as EmailOptionals;
+    return this;
   }
 
   attachments(files: string[]): EmailOptionals {
     this.data.attachments = files;
-    return this as unknown as EmailOptionals;
+    return this;
   }
 
   build(): EmailMessage {
     return {
-      to: this.data.to!,
-      subject: this.data.subject!,
+      to: this.toAddress,
+      subject: this.subjectText,
       ...(this.data.cc && { cc: this.data.cc }),
       ...(this.data.bcc && { bcc: this.data.bcc }),
       ...(this.data.body && { body: this.data.body }),
@@ -3204,22 +3271,22 @@ class EmailBuilder implements NeedsTo {
   }
 }
 
-const email = new EmailBuilder()
+const email = EmailBuilder.start()
   .to("ali@test.com")
   .subject("Hello")
   .body("Hi Ali!")
   .cc(["bob@test.com"])
   .build();
 
-// new EmailBuilder().build(); // ❌ NeedsTo'da build yo'q
-// new EmailBuilder().to("a@b.com").build(); // ❌ NeedsSubject'da build yo'q
+// EmailBuilder.start().build(); // ❌ NeedsTo'da build yo'q
+// EmailBuilder.start().to("a@b.com").build(); // ❌ NeedsSubject'da build yo'q
 ```
 
 **Tushuntirish:**
 - `NeedsTo` → `NeedsSubject` → `EmailOptionals` — step interfaces
+- Entry point `start(): NeedsTo` boshlang'ich type'ni cheklaydi; class barcha step interface'larni implement qilgani uchun har method `return this` (cast'siz)
 - `build()` faqat `EmailOptionals`'da — `to` va `subject` set bo'lgandan keyin
-- Runtime'da bitta object, type system har step'da turli interface ko'rsatadi
-- Phantom types pattern — compile-time state machine
+- Runtime'da bitta object, type system har step'da turli interface ko'rsatadi — compile-time state machine
 
 </details>
 
@@ -3416,17 +3483,17 @@ Bu bo'limda TypeScript'dagi advanced OOP pattern'larni o'rgandik:
 - **`this` Type Advanced** — type-state pattern, CRTP simulation, multi-level fluent chain
 - **Builder Pattern Type-State** — phantom types bilan compile-time required field tracking
 - **Composition vs Inheritance** — "Favor composition over inheritance", DI pattern, strategy pattern
-- **Intersection Types va Classes** — class type'ni kengaytirish, method conflict → `never`, Proxy delegation
+- **Intersection Types va Classes** — class type'ni kengaytirish, method signature conflict → overload set (bitta implementation mumkin emas), Proxy delegation
 - **`satisfies`** — class property validation + literal type preservation
 
 **Umumiy takeaway'lar:**
 
 1. **Mixin constructor `new (...args: any[])`.** Majburiy pattern — base class parameter'larini qo'llab-quvvatlash uchun.
-2. **`#` brand check class scope.** Only inside class, static methods included. Outside class — SyntaxError.
+2. **`#` brand check class scope.** Faqat class ichida — method, static method, getter/setter, static block. Class tashqarisida `#field` token — SyntaxError.
 3. **Composition > Inheritance.** Flexibility, testability, DI — composition'ning asosiy afzalliklari.
 4. **Type-state pattern**. Phantom types bilan compile-time state machine — builder'lar va DSL'lar uchun.
 5. **`Object.assign` class instance.** Method'lar prototype'da, clone uchun `new Ctor()` yoki `Object.create(prototype)`.
-6. **Intersection method conflict → `never`.** Signature mos kelmaslik implement qilib bo'lmaydi.
+6. **Intersection method conflict → overload set.** Function type intersection overloaded signature hosil qiladi; bitta concrete implementation ikki disjoint return type'ni qondira olmaydi (`string & number` = `never`).
 7. **`satisfies` + `as const`.** Literal type preservation + type check — config va enum-like constant'lar uchun.
 
 **Cross-references:**

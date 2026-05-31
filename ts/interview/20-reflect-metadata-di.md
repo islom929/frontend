@@ -53,9 +53,9 @@ Reflect Metadata API — `reflect-metadata` polyfill orqali object lar va class 
 TypeScript type information compile-time da o'chiriladi (type erasure). Lekin DI container, ORM, validation library lar runtime da type ma'lumotini bilishi kerak — masalan, `UserService` constructor `Logger` va `Database` ga muhtoj ekanini. Reflect Metadata bu ma'lumotni runtime ga ko'chirish imkonini beradi.
 
 **Tarixiy holat:**
-- TC39 ga `Reflect.Metadata` proposal taklif qilingan (Stage 2 da to'xtab qolgan)
-- Standartlashtirish jarayoni TC39 Decorator Metadata (`Symbol.metadata`, Stage 3) bilan almashtirilgan
-- `reflect-metadata` package — legacy decorator + `emitDecoratorMetadata` uchun de-facto polyfill
+- `reflect-metadata` (Ron Buckton) — Metadata Reflection API ning prototype i. Bu API hech qachon TC39 stage jarayonidan o'tmagan va standartlashtirish uchun ko'rib chiqilmaydi
+- O'rniga TC39 Decorator Metadata (`Symbol.metadata`, Stage 3) keldi — metadata decorator ning `context.metadata` object i orqali yoziladi
+- `reflect-metadata` package — legacy decorator (`experimentalDecorators`) + `emitDecoratorMetadata` uchun de-facto polyfill bo'lib qoladi
 
 **Asosiy API:**
 
@@ -69,7 +69,7 @@ TypeScript type information compile-time da o'chiriladi (type erasure). Lekin DI
 | `Reflect.deleteMetadata(key, target)` | Metadata o'chirish |
 | `Reflect.getMetadataKeys(target)` | Barcha metadata key larni olish |
 
-**Ichki implementatsiya:**
+**Ichki implementation:**
 Global `WeakMap<target, Map<propertyKey, Map<metadataKey, value>>>` strukturasi. Har target uchun alohida metadata Map saqlanadi. WeakMap — class garbage collect bo'lganda metadata avtomatik tozalanadi.
 
 ### Kod misol
@@ -126,7 +126,7 @@ console.log(prefix); // "/api/users"
 - **`reflect-metadata` import — app entry da bir marta** — har faylda import qilish kerak emas, lekin barcha kod dan oldin chaqirilishi shart
 - **Inheritance:** child class ga metadata yozsa, parent metadata override qilinmaydi (alohida storage). Lekin `getMetadata` parent dan ham o'qiy oladi
 - **WeakMap auto-cleanup** — class reference yo'qolsa, metadata garbage collect. Lekin `target.prototype` reference bo'lsa, qoladi
-- **Browser ga deployment:** `reflect-metadata` (~10 KB minified) bundle ga qo'shiladi — production size impact
+- **Browser ga deployment:** `reflect-metadata` polyfill bundle ga qo'shiladi — production size impact
 
 ### Follow-up savollar
 
@@ -188,7 +188,7 @@ var UserService = __decorate([
 | `Promise<T>` | `Promise` (generic argument yo'qoladi) |
 | `Map<K, V>`, `Set<T>` | `Map`, `Set` (generic argument yo'qoladi) |
 | `interface I {}` | `Object` (interface JS da yo'q) |
-| `T1 \| T2` (union) | `Object` |
+| `A \| B` (union) | `Object` |
 | `any`, `unknown` | `Object` |
 | `void`, `undefined` | `undefined` |
 | Class reference | Class constructor |
@@ -200,6 +200,7 @@ var UserService = __decorate([
 ```typescript
 import "reflect-metadata";
 
+// Class decorator — design:paramtypes emit qiladi
 function injectable(constructor: new (...args: any[]) => any) {}
 
 class Logger { log(msg: string) { console.log(msg); } }
@@ -220,31 +221,41 @@ console.log(paramTypes.map((t: any) => t.name));
 
 
 // === Method-level metadata ===
+// Method decorator bo'lishi shart — class decorator method ga emit qilmaydi
+function traceMethod(
+  target: any,
+  propertyKey: string,
+  descriptor: PropertyDescriptor
+) {}
+
 class ApiController {
-  @injectable
+  @traceMethod
   getUser(id: number): Promise<{ name: string }> {
     return Promise.resolve({ name: "Ali" });
   }
 }
 
 Reflect.getMetadata("design:type", ApiController.prototype, "getUser");
-// [Function: Function] — method type
+// Function — method ning o'zi Function constructor ga map qilinadi
 
 Reflect.getMetadata("design:paramtypes", ApiController.prototype, "getUser");
-// [Number]
+// [Number] — bitta parameter type li array (id: number)
 
 Reflect.getMetadata("design:returntype", ApiController.prototype, "getUser");
-// [Function: Promise]
+// Promise — Promise<T> dan generic argument yo'qoladi
 
 
 // === Property metadata ===
+// Property decorator bo'lishi shart
+function traceProp(target: any, propertyKey: string) {}
+
 class Config {
-  @injectable
+  @traceProp
   apiUrl: string = "";
 }
 
 Reflect.getMetadata("design:type", Config.prototype, "apiUrl");
-// [Function: String]
+// String — apiUrl: string ning single constructor reference i
 ```
 
 ### Edge Cases
@@ -272,7 +283,7 @@ Reflect.getMetadata("design:type", Config.prototype, "apiUrl");
 
 ### Qisqa javob
 
-**DI (Dependency Injection)** — class o'z dependency larini **o'zi yaratmaydi**, **tashqaridan oladi**. **IoC (Inversion of Control)** — control oqimi teskari: object lifecycle ni class emas, framework yoki container boshqaradi. DI — IoC ning implementatsiyalaridan biri.
+**DI (Dependency Injection)** — class o'z dependency larini **o'zi yaratmaydi**, **tashqaridan oladi**. **IoC (Inversion of Control)** — control oqimi teskari: object lifecycle ni class emas, framework yoki container boshqaradi. DI — IoC ning implementation laridan biri.
 
 ### To'liq tushuntirish
 
@@ -331,7 +342,7 @@ new UserService(new InMemoryUserRepository(), new SilentLogger());
 Klassik dasturlash: application kodi library function larini imperative chaqiradi (`library.call()`).
 IoC: control oqimi teskari — framework user code ni callback sifatida chaqiradi (Hollywood Principle: "don't call us, we'll call you").
 
-DI — IoC ning bir implementatsiyasi. Object creation va dependency wiring ni framework (DI container) boshqaradi, application kod faqat dependency ni declare qiladi.
+DI — IoC ning bir implementation i. Object creation va dependency wiring ni framework (DI container) bajaradi, application kod faqat dependency ni declare qiladi.
 
 ### Kod misol
 
@@ -667,7 +678,7 @@ const paramTypes = Reflect.getMetadata("design:paramtypes", AppService);
 console.log(paramTypes); // [Object] — ILogger emas!
 ```
 
-`ILogger` JS ga compile bo'lganda o'chiriladi. `design:paramtypes` da uning o'rniga `Object` (yoki `Function` constructor) yoziladi. DI container `Object` ga qarab qaysi implementation kerakligini bilmaydi.
+`ILogger` JS ga compile bo'lganda o'chiriladi. `design:paramtypes` da uning o'rniga `Object` yoziladi — compiler runtime da topib bo'lmaydigan type uchun `Object` ni fallback sifatida emit qiladi. DI container `Object` ga qarab qaysi implementation kerakligini bilmaydi.
 
 **Yechim 1: Class ishlatish (interface o'rniga abstract class):**
 
@@ -861,7 +872,7 @@ await service.welcome(1);
 | Xususiyat | Decorator-based | Function-based |
 |-----------|----------------|----------------|
 | Decorator kerak | `@injectable`, `@inject` | Yo'q |
-| Runtime overhead | `reflect-metadata` polyfill (~10 KB) | Yo'q |
+| Runtime overhead | `reflect-metadata` polyfill | Yo'q |
 | TC39 mos | Yo'q (legacy faqat) | Ha |
 | Type safety | Token-based partial | Natural (TS type system) |
 | Tree-shaking | Qiyinroq | Osonroq |
@@ -933,14 +944,14 @@ Effect.runPromise(program.pipe(Effect.provide(Layer.merge(ConsoleLogger, RealDb)
 **Trade-off analizi:**
 
 **Decorator-based afzalliklari:**
-- Declarative — class ichida deklaratsiya
+- Declarative — class ichida declaration
 - Framework integration (NestJS, Angular) bilan mukammal
 - Metadata orqali advanced feature lar (auto-routing, validation)
 
 **Decorator-based kamchiliklari:**
 - `reflect-metadata` polyfill majburiy (production size)
 - Tree-shaking qiyinroq (decorator side-effect heavy)
-- TC39 ga migratsiya complex
+- TC39 ga migration complex
 - Magic — debugging qiyinroq
 
 **Function-based afzalliklari:**
@@ -1027,7 +1038,7 @@ await testApp.userService.welcome(1);
 - **Function-based + class:** ikkalasi aralash bo'lishi mumkin — class instance ni factory dan qaytarish
 - **Lazy initialization:** function-based da Lazy evaluator (`() => expensive()`) bilan natural
 - **Cyclic deps:** function-based da explicit — bir factory boshqaning natijasiga muhtoj bo'lsa, oddiy issue ko'rinadi
-- **Plugin architecture:** decorator-based ko'pincha qulayroq — `@Module({ imports: [...], providers: [...] })` deklarativ
+- **Plugin architecture:** decorator-based ko'pincha qulayroq — `@Module({ imports: [...], providers: [...] })` declarative
 - **Effect/IO monad:** functional pure DI (Effect, fp-ts) — pure function lar uchun ideal, lekin learning curve katta
 
 ### Follow-up savollar
@@ -1335,7 +1346,7 @@ Container bu algorithm orqali resolve order topadi yoki cycle aniqlaydi.
 
 ### To'liq tushuntirish
 
-**Provider turlari (NestJS/InversifyJS konvensiya):**
+**Provider turlari (NestJS/InversifyJS convention):**
 
 | Provider | Vazifasi | Use case |
 |----------|---------|----------|
@@ -1481,7 +1492,7 @@ class ProductionLogger { log(msg: string) { console.log(msg); } }
 
 - **Async factory:** factory `Promise` qaytarishi mumkin — caller resolve da `await` kerak. NestJS `useFactory` async supported
 - **Factory ichida circular dependency:** factory `container.resolve(...)` chaqirsa va o'sha token o'zi bo'lsa — infinite loop
-- **Factory side effect:** factory side effect berishi xavfli — har resolve da takrorlanadi (transient bo'lsa). Side effect ni `addInitializer` ga ko'chiring
+- **Factory side effect:** factory side effect berishi xavfli — transient da har resolve da takrorlanadi. Bir martalik side effect uchun `singleton` scope ishlatib, factory ni faqat bir marta chaqirtirish kerak
 - **Factory return type:** runtime tekshirish yo'q — yashirin bug source. Type assertion kerak
 - **`useExisting` alias:** ikkita token bir xil instance — yangi instance yaratmaydi
 
@@ -1559,7 +1570,7 @@ items:     Map         (generic argument yo'qoladi)
 | Union `A \| B` | `Object` | Common parent |
 | Intersection `A & B` | `Object` | Common parent |
 | `any`, `unknown` | `Object` | Generic placeholder |
-| `void`, `undefined`, `never` | `undefined` | Metadata emit qilinmaydi |
+| `void`, `undefined`, `never` | `undefined` | Constructor reference yo'q — metadata qiymati `undefined` |
 
 **Generic erasure:** `string[]` → `Array` (element type qoldirilmaydi). DI uchun bu cheklov — `T[]` dan `T` ni topib bo'lmaydi.
 
@@ -1658,7 +1669,7 @@ Output:
    - DI container `Object` orqali qaysi logger ekanini bilmaydi → **token kerak**
 
 2. **`repo: BaseRepo`** → `BaseRepo`
-   - Abstract class — JS da **class deklaratsiyasi sifatida saqlanadi** (abstract methodlar runtime check yo'q)
+   - Abstract class — JS da **class declaration sifatida saqlanadi** (abstract method lar runtime check yo'q)
    - Class reference metadata da saqlanadi
    - DI container `BaseRepo` token sifatida ishlatishi mumkin
 
@@ -2105,7 +2116,7 @@ class AdvancedContainer extends Container {
 
   async dispose() {
     for (const instance of this.singletons.values()) {
-      if (typeof (instance as any)?.dispose === "function") {
+      if (typeof instance?.dispose === "function") {
         await (instance as IDisposable).dispose();
       }
     }
@@ -2162,7 +2173,7 @@ class AdvancedContainer extends Container {
    - Singleton + cached emas → yarat va cache ga
    - Transient → har safar yarat (cache yo'q)
 
-**Default scope tanlash:** ko'p framework — singleton (NestJS default), boshqalari — transient. Container API da `register` da default value: konvensiya bo'yicha `singleton` ko'proq xavfsiz (resource sharing).
+**Default scope tanlash:** ko'p framework — singleton (NestJS default), boshqalari — transient. Container API da `register` da default value: convention bo'yicha `singleton` ko'proq xavfsiz (resource sharing).
 
 ### Kod misol
 
@@ -2606,14 +2617,14 @@ describe("UserService", () => {
     expect(sendWelcomeSpy).not.toHaveBeenCalled();
   });
 
-  it("user created even if email fails", async () => {
+  it("propagates email error after user is saved", async () => {
     sendWelcomeSpy.mockRejectedValue(new Error("SMTP down"));
 
     await expect(
       service.createUser("Ali", "ali@example.com")
     ).rejects.toThrow("SMTP down");
 
-    // Lekin save chaqirilgan
+    // save sendWelcome dan oldin chaqirilgan — user yozilgan, lekin email xatosi propagate bo'ladi
     expect(saveSpy).toHaveBeenCalled();
   });
 });
@@ -2791,7 +2802,7 @@ bootstrap();
 - **Test setup:** `vitest.config` yoki `jest.setup.ts` da `reflect-metadata` global import qilinadi
 - **Multiple imports:** `reflect-metadata` ni har faylda import qilish kerakmi — yo'q, bir marta yetarli (global `Reflect` ga patch)
 - **Decorator usage bo'lmasa:** `reflect-metadata` import qilmaslik mumkin. Lekin decorator + `emitDecoratorMetadata` true bo'lsa — `__metadata` chaqiruvi compiled code da bo'ladi → kerak
-- **Browser bundle:** `reflect-metadata` ~10 KB minified. Production bundle ga qo'shiladi
+- **Browser bundle:** `reflect-metadata` polyfill production bundle ga qo'shiladi — size impact
 
 ### Follow-up savollar
 
@@ -2873,7 +2884,7 @@ this.cache.set(token, instance);  // ❌ Scope check yo'q — transient ham cach
 
 Cache ikkita scope uchun ham ishlatilmoqda. Transient ning ta'rifi — **har `resolve` da yangi instance** — buzilgan.
 
-**To'g'ri implementatsiya:**
+**To'g'ri implementation:**
 
 ```typescript
 resolve<T>(token: any): T {
@@ -3044,7 +3055,7 @@ constructor(
 Final: { 0: "CONFIG" } — LOGGER_TOKEN yo'qoldi
 ```
 
-**To'g'ri implementatsiya:**
+**To'g'ri implementation:**
 
 ```typescript
 function inject(token: any) {
@@ -3110,7 +3121,7 @@ console.log(tokens.get(2) === TOKENS.Database);  // true
 
 - **Inheritance va `getOwnMetadata`:** child class o'z `inject:tokens` ga ega — parent ga tegmaydi. Container child + parent metadata ni alohida o'qishi kerak
 - **Partial injection:** ba'zi parameter decorate qilinmagan — `tokens.get(i)` undefined, container `design:paramtypes` dan oladi
-- **Method-level injection:** method parameter ga `@inject` — `propertyKey` mavjud. Konstruktorda `propertyKey === undefined`
+- **Method-level injection:** method parameter ga `@inject` — `propertyKey` mavjud. Constructor da `propertyKey === undefined`
 - **Mutation across instances:** `Map` reference metadata da — agar inherit qilingan tokens ni mutate qilsangiz, parent ham o'zgaradi. Har class o'z `Map` ini saqlashi kerak
 
 ### Follow-up savollar

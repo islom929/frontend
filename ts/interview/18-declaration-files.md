@@ -22,7 +22,7 @@
 
 ### Qisqa javob
 
-`.d.ts` — JavaScript kodiga **type information** beradigan fayl. Faqat type lar, signature lar — implementation (function body, class method logic) **yo'q**. TypeScript bu fayllarni JS code'ga type safety qo'shish uchun o'qiydi.
+`.d.ts` — JavaScript kodiga **type information** beradigan fayl. Faqat type'lar, signature'lar — implementation (function body, class method logic) **yo'q**. TypeScript bu fayllarni JS code'ga type safety qo'shish uchun o'qiydi.
 
 ### To'liq tushuntirish
 
@@ -50,7 +50,7 @@ External package:
 
 **Kompilatorda behavior:**
 
-`.d.ts` fayllar JS ga **compile qilinmaydi** — allaqachon faqat type ma'lumot. Kompilator ularni faqat type-checking va inference uchun o'qiydi.
+`.d.ts` fayllar JS'ga **compile qilinmaydi** — allaqachon faqat type ma'lumot. Kompilator ularni faqat type-checking va inference uchun o'qiydi.
 
 **Qachon kerak:**
 
@@ -136,7 +136,7 @@ declare module "analytics-lib" {
 
 ### Qisqa javob
 
-`declare` — "bu narsa boshqa joyda mavjud, men faqat type ini aytayapman" signal. JS ga emit qilinmaydi. `const`, `let`, `var`, `function`, `class`, `module`, `namespace`, `global`, `enum` bilan ishlatiladi.
+`declare` — "bu narsa boshqa joyda mavjud, men faqat type'ini aytayapman" signal. JS'ga emit qilinmaydi. `const`, `let`, `var`, `function`, `class`, `module`, `namespace`, `global`, `enum` bilan ishlatiladi.
 
 ### To'liq tushuntirish
 
@@ -349,7 +349,7 @@ Kerak holatlar:
 3. **Non-standard module** — CSS, image, font fayllar
 4. **Type augmentation** — mavjud library type'larini kengaytirish
 
-**Qo'lda yozilgan `.d.ts` runtime API ga mosligi compiler tomonidan tekshirilmaydi.** Noto'g'ri type → runtime error.
+**Qo'lda yozilgan `.d.ts` runtime API'ga mosligi compiler tomonidan tekshirilmaydi.** Noto'g'ri type → runtime error.
 
 ### Kod misol
 
@@ -480,7 +480,7 @@ declare const dataLayer: Array<Record<string, unknown>>;
 
 ### Qisqa javob
 
-`isolatedDeclarations` — har fayl declaration ni boshqa fayllar type ma'lumotisiz generate qilishni majburlaydi. Tezkor tool'lar (esbuild, SWC) parallel `.d.ts` emit qilish imkonini beradi. Exported function/variable'larda **explicit type** majburiy.
+`isolatedDeclarations` — har fayl declaration'ni boshqa fayllar type ma'lumotisiz generate qilishni majburlaydi. Tezkor tool'lar (esbuild, SWC) parallel `.d.ts` emit qilish imkonini beradi. Exported function/variable'larda **explicit type** majburiy.
 
 ### To'liq tushuntirish
 
@@ -613,12 +613,12 @@ export class Calculator {
 - **Implicit `any` return** — `function f() {}` `void` deb infer qilinadi. `isolatedDeclarations`'da explicit `: void` kerak.
 - **Class private member type** — `private password: string` — explicit yozish, lekin `.d.ts`'da nom faqat ko'rinadi.
 - **Re-export** — `export { X } from "./mod"` — `X` original module'da explicit bo'lishi kerak.
-- **Generic constraint inference** — `function f<T>(x: T) { ... }` return type i `T` bo'lsa, kerak: `: T`.
+- **Generic constraint inference** — `function f<T>(x: T) { ... }` return type'i `T` bo'lsa, kerak: `: T`.
 
 ### Follow-up savollar
 
-1. **"esbuild `isolatedDeclarations` qo'llab-quvvatlaydi?"** — Hozircha experimental. SWC va Babel ham work in progress. TS o'zi `tsc --isolatedDeclarations`'ni reference implementation.
-2. **"Codebase'ni `isolatedDeclarations` ga migration qanday?"** — `tsc --noEmit` bilan birinchi error'larni topish. ESLint rule `consistent-return-type` qo'shish. Bosqichma-bosqich fayllar.
+1. **"Qaysi tool `isolatedDeclarations` bilan `.d.ts` emit qiladi?"** — `tsc --isolatedDeclarations` reference implementation. SWC (`fast_dts`) va OXC type-checker'siz, per-file `.d.ts` emit qiladi. esbuild o'zi `.d.ts` chiqarmaydi — plugin yoki alohida `tsc`/`tsgo` qadami orqali generate qilinadi.
+2. **"Codebase'ni `isolatedDeclarations` ga migration qanday?"** — `tsc --isolatedDeclarations --noEmit` bilan birinchi error'larni topish. `@typescript-eslint/explicit-module-boundary-types` rule bilan exported declaration'larda explicit type'ni enforce qilish. Bosqichma-bosqich fayllar.
 
 </details>
 
@@ -660,11 +660,11 @@ Kompilator import statement uchun bu tartibni tekshiradi. Birinchi mos keladigan
 
 **Versioning:**
 
-`@types/` package versiyasi library major.minor versiyasiga moslab boshqariladi:
-- `express@^4.18.0` → `@types/express@^4.17.0`
+DefinitelyTyped konvensiyasi: `@types/<pkg>` ning major.minor versiyasi u type qilayotgan library major.minor'iga moslashtiriladi. Lekin har minor bump'da yangilanishi shart emas — `@types` library'dan orqada qolishi mumkin:
+- `express@^4.18.0` → `@types/express@^4.17.0` (`@types` 4.17 versiyaga yozilgan, lekin 4.18 API'ni qamrab oladi)
 - `react@^18.2.0` → `@types/react@^18.2.0`
 
-Patch versiya har xil bo'lishi mumkin.
+`@types` ning patch versiyasi mustaqil — type fix'lar uchun ko'tariladi.
 
 **`@types` kerak emas, agar:**
 - Library o'zida type'lar bor (`package.json "types"` field)
@@ -751,7 +751,7 @@ declare module "express-serve-static-core" {
 
 ### Follow-up savollar
 
-1. **"`@types/foo` qanday yaratiladi?"** — DefinitelyTyped repository'ga PR. `types/foo/index.d.ts`, `types/foo/foo-tests.ts`, `types/foo/tsconfig.json` kabi struktura.
+1. **"`@types/<library>` qanday yaratiladi?"** — DefinitelyTyped repository'ga PR. Masalan `lodash` uchun: `types/lodash/index.d.ts`, `types/lodash/lodash-tests.ts`, `types/lodash/tsconfig.json` kabi struktura.
 2. **"Library `@types` o'rniga bundle qilinishi kerakmi?"** — Modern best practice — library o'zi `.d.ts` qo'shish. `@types` external nightly maintenance — versiya drift xavfi.
 
 </details>
@@ -802,7 +802,7 @@ Faqat belgilangan aniq package'lar avtomatik include qilinadi:
 ```
 
 Behavior:
-- Faqat `@types/node` va `@types/vitest/globals` include
+- Faqat `@types/node` va `vitest/globals` include. `types` entry — `@types/<name>` package yoki package'ning o'zi (`vitest/globals` — `vitest` package ichidagi global declaration subpath, `@types`'da emas)
 - Boshqa `@types/*` ignore (tsconfig perspective'dan)
 - Lekin `import` statement orqali ishlatib bo'ladi
 
@@ -921,7 +921,7 @@ DOM type'lar (Window, Document, fetch) include qilinmaydi.
 
 ### Qisqa javob
 
-`package.json` `exports` ichida `"types"` conditional **birinchi** bo'lishi kerak. Compiler birinchi mos keladigan condition'ni oladi — agar `"types"` oxirida bo'lsa, kompilator `.mjs`/`.cjs` faylni o'qishga urinadi va type topa olmaydi.
+`package.json` `exports` ichida `"types"` conditional **birinchi** bo'lishi kerak. Compiler har condition uchun match qilingan JS faylning type-equivalent declaration'ini qidiradi (`.mjs` → `.d.mts`). `"types"` oxirida bo'lsa, type ko'pincha fallback orqali topiladi — lekin noto'g'ri format declaration ishlatilib qoladi (Masquerading), `@arethetypeswrong/cli` `FallbackCondition` warning beradi.
 
 ### To'liq tushuntirish
 
@@ -966,8 +966,8 @@ Conditional'lar:
 ```
 
 TypeScript compiler:
-1. `"import"` ni topadi → `.mjs` ga point qiladi
-2. `.mjs` da type yo'q → error
+1. `"import"` → `.mjs` → yonida `.d.mts` qidiradi → topilmasa, keyingi condition'larga fallback qiladi
+2. Oxirida `"types"` (`.d.ts`) ga fallback orqali yetadi — type topiladi, lekin `.d.ts` ESM `.mjs` uchun ishlatiladi (Masquerading). `@arethetypeswrong/cli` buni `FallbackCondition` deb belgilaydi
 
 **To'g'ri tartib:**
 
@@ -1354,7 +1354,8 @@ export {};
 
 ```typescript
 // types/google-analytics.d.ts
-/// <reference types="@types/gtag.js" />
+/// <reference types="gtag.js" />
+// "gtag.js" — bare nom, compiler @types/gtag.js paketiga resolve qiladi
 
 declare global {
   interface Window {
@@ -1515,8 +1516,8 @@ expectAssignable<Admin | undefined>(adminColl.find(a => a.role === "admin"));
 expectNotAssignable<User>(adminColl.find(a => a.role === "admin")); // undefined ham qaytishi mumkin
 
 // Constraint check
-interface NotUser { foo: string }
-expectError(new UserCollection<NotUser>()); // ❌ NotUser extends User emas
+interface Product { sku: string }
+expectError(new UserCollection<Product>()); // ❌ Product User'ni extend qilmaydi
 ```
 
 **`package.json` setup:**
@@ -1580,7 +1581,7 @@ my-lib v1.0.0
 
 ### Qisqa javob
 
-`declarationMap: true` — `.d.ts.map` source map fayllar generate qiladi. IDE "Go to Definition" da `.d.ts` o'rniga original `.ts` source ga olib boradi. Library development va monorepo'da foydali.
+`declarationMap: true` — `.d.ts.map` source map fayllar generate qiladi. IDE "Go to Definition" da `.d.ts` o'rniga original `.ts` source'ga olib boradi. Library development va monorepo'da foydali.
 
 ### To'liq tushuntirish
 
@@ -2030,7 +2031,7 @@ export declare class Database {
    - `public` — default, kompilator olib tashlaydi
    - `readonly` saqlanadi
    - Default value olib tashlanadi
-   - Literal type "1.0" — `string` ga widen qilinmaydi default'siz (lekin inferred type `string`)
+   - Type `string` — explicit annotation'dan olinadi. (Annotation bo'lmaganda `readonly version = "1.0"` literal type `"1.0"` ni saqlardi — `readonly` property literal'ni widen qilmaydi)
 
 5. **`private reconnect(): void`** → `private reconnect;`
    - Return type yo'q (private method nomi faqat structural)
@@ -2076,28 +2077,31 @@ TypeScript class member'lar default `public`. `.d.ts` generation'da explicit `pu
 
 ### Qisqa javob
 
-TypeScript `"import"` ni topadi (birinchi mos condition) → `./dist/index.mjs` ga point qiladi. `.mjs` da type yo'q → **error: Cannot find module 'my-lib' or its corresponding type declarations**.
+TypeScript `"import"` condition'iga mos kelib `./dist/index.mjs` ga point qiladi, yonida `index.d.mts` qidiradi — topa olmaydi. Keyin `"types"` condition'iga "fallback" qilib `./dist/index.d.ts` ni oladi (resolution buzilmaydi, lekin bu fragile fallback). `@arethetypeswrong/cli` buni `FallbackCondition` muammosi deb belgilaydi.
 
 ### To'liq tushuntirish
 
-**Conditional exports resolution tartibi:**
+**Type resolution mexanizmi:**
 
-Compiler `exports` ichidagi conditional'larni **yuqoridan pastga** tekshiradi. Birinchi mos keladigan condition'ni oladi.
+Compiler `exports` ichidagi conditional'larni **yuqoridan pastga** tekshiradi. Type uchun har condition'da match qilingan JS fayl yonidan type-equivalent declaration qidiradi (`.mjs` → `.d.mts`, `.cjs` → `.d.cts`, `.js` → `.d.ts`).
 
 **Bu misolda (`moduleResolution: "node16"`, ESM context):**
 
-1. `"import"` → match (ESM context) → `./dist/index.mjs` ✅
-2. `"types"` ga yetib bormaydi
+1. `"import"` → match → `./dist/index.mjs` → yonida `./dist/index.d.mts` qidiradi → **topilmadi**
+2. Node algoritmi bo'yicha resolution shu yerda to'xtashi kerak edi, lekin TypeScript keyingi condition'ga o'tadi (bu TS bug — `FallbackCondition`)
+3. `"require"` → `./dist/index.cjs` → `./dist/index.d.cts` → topilmadi
+4. `"types"` → `./dist/index.d.ts` → **topildi**
 
-Compiler `.mjs` faylni resolve qiladi, lekin u JS fayl (type yo'q):
+Natijada type'lar topiladi, hard `Cannot find module` error chiqmaydi. Lekin bu fallback ishonchsiz:
 
-```
-error TS2307: Cannot find module 'my-lib' or its corresponding type declarations.
-```
+- `.d.ts` ESM `.mjs` uchun ishlatildi — `.d.ts` format'i nearest `package.json` bo'yicha aniqlanadi (ko'pincha CommonJS), runtime esa ESM (Masquerading).
+- Fallback TS bug'iga tayanadi — kelajakda yo'qolishi mumkin.
 
-**`bundler` resolution farqi:**
+**`@arethetypeswrong/cli` buni `FallbackCondition` deb belgilaydi:** type faqat keyingi condition'ga fallback orqali topildi, runtime resolution'i bilan mos kelmasligi mumkin.
 
-`moduleResolution: "bundler"` da behavior bir xil — `"import"` birinchi mos. Lekin TypeScript "types fallback" qiladi: agar match qilingan fayl JS bo'lsa, kompilator yonida `.d.ts` qidiradi (`./dist/index.d.mts` yoki `./dist/index.d.ts`). Aniqligi consumer'ning tsconfig'iga bog'liq.
+**`bundler` resolution:**
+
+`moduleResolution: "bundler"` da type-equivalent sibling lookup bir xil ishlaydi (`.mjs` → `.d.mts`). Sibling topilmasa, aynan shu fallback yuzaga keladi. Farq — `bundler` runtime format'ni Node algoritmidagidek qattiq enforce qilmaydi.
 
 **To'g'ri konfiguratsiya:**
 
@@ -2124,7 +2128,7 @@ Endi:
 npx @arethetypeswrong/cli --pack .
 ```
 
-Wrong order: `❌ Resolution failed`. Correct order: `🟢 OK`.
+Wrong order: type fallback orqali topiladi, lekin `FallbackCondition` warning chiqadi (`.mjs` uchun `.d.ts` ishlatildi — Masquerading xavfi). Correct order: `🟢 OK`, har bir resolution context'da to'g'ri declaration.
 
 ### Edge Cases
 
@@ -2725,10 +2729,12 @@ class TypedEmitterImpl {
   private listeners = new Map<string, Set<Function>>();
   
   on(event: string, listener: Function): this {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set());
+    let set = this.listeners.get(event);
+    if (!set) {
+      set = new Set();
+      this.listeners.set(event, set);
     }
-    this.listeners.get(event)!.add(listener);
+    set.add(listener);
     return this;
   }
   
@@ -2743,7 +2749,7 @@ class TypedEmitterImpl {
 
 **`EventMap` `(...args: any[])` shubhasi:**
 
-`any[]` bu yerda generic boundary uchun — har xil signature'lar `EventMap` constraint'iga mos kelishi kerak. Real call site'da `Parameters<Events[K]>` aniq tuple bo'ladi, `any` consumer kodga tarqalmaydi. Bu DefinitelyTyped'da standart pattern (`@types/node` `EventEmitter`).
+`any[]` bu yerda generic boundary uchun — har xil signature'lar `EventMap` constraint'iga mos kelishi kerak. Real call site'da `Parameters<Events[K]>` aniq tuple bo'ladi, `any` consumer kodga tarqalmaydi. Bu typed event emitter library'larda (`typed-emitter` kabi) keng tarqalgan constraint pattern.
 
 **`unknown[]` o'rniga `any[]`?**
 
@@ -2899,9 +2905,9 @@ export class Pipeline<T = unknown> {
 4. **`requestHandler`** — function type alias
 5. **`Pipeline`** — generic `<T>` (`any` o'rniga), explicit return types
 
-**Inferred `any` ni eliminate qilish:**
+**`isolatedDeclarations` aslida nimani majburlaydi:**
 
-Original kodda `(req: any)`, `(data: any) => any`, `steps = []` — `isolatedDeclarations` da explicit kerak. Generic'lar yoki specific interface'lar.
+Trigger — **exported** declaration'ning emit qilinadigan type'i inference'siz topilmasligi: `createServer` return type yo'q, `requestHandler` exported arrow const annotation'siz, `Pipeline.add`/`run` method return type yo'q. Bularning hammasiga explicit type qo'shildi. `private steps = []` (private field) `.d.ts`'da type'siz emit qilinadi, shuning uchun `isolatedDeclarations` uni majburlamaydi — lekin `(data: any) => any`'ni `(data: T) => T` ga aylantirish type safety uchun alohida yaxshilanish.
 
 ### Edge Cases
 
@@ -2917,7 +2923,7 @@ Original kodda `(req: any)`, `(data: any) => any`, `steps = []` — `isolatedDec
 
 ### Savol 22: `package.json` types tartib bug [Middle+]
 
-**Savol:** Quyidagi `package.json` bilan TypeScript foydalanuvchilar `"Cannot find module"` error oladi. Toping va tuzating:
+**Savol:** Quyidagi `package.json` `@arethetypeswrong/cli` da `FallbackCondition` warning beradi — type'lar faqat fragile fallback orqali topiladi va ESM consumer'larda noto'g'ri format declaration ishlatiladi. Bug'ni toping va tuzating:
 
 ```json
 {
@@ -2943,17 +2949,13 @@ Original kodda `(req: any)`, `(data: any) => any`, `steps = []` — `isolatedDec
 
 **Muammo:**
 
-`exports` da TypeScript birinchi mos keladigan condition'ni oladi. Hozirgi tartib:
+TypeScript type uchun har condition'da match qilingan JS faylning type-equivalent declaration'ini qidiradi. Hozirgi tartib (ESM consumer):
 
-1. `"import"` → match (ESM) → `./dist/index.mjs` ← TS bu yerda to'xtaydi
-2. `"require"` ham mos, lekin `"import"` priority
-3. `"types"` ga yetib bormaydi
+1. `"import"` → `./dist/index.mjs` → yonida `./dist/index.d.mts` qidiradi → topilmadi
+2. Node algoritmi shu yerda to'xtashi kerak, lekin TS keyingi condition'ga fallback qiladi (`FallbackCondition` bug)
+3. `"types"` → `./dist/index.d.ts` topiladi — lekin `.d.ts` ESM `.mjs` uchun ishlatildi: `.d.ts` format'i nearest `package.json` bo'yicha aniqlanadi (bu yerda CommonJS), runtime esa ESM (Masquerading)
 
-TypeScript `.mjs` faylni resolve qiladi, lekin u JavaScript (type yo'q):
-
-```
-error TS2307: Cannot find module 'my-lib' or its corresponding type declarations.
-```
+Type'lar topiladi, hard module error chiqmaydi. Lekin fallback ishonchsiz va format mos kelmasligi mumkin — `@arethetypeswrong/cli` `FallbackCondition` deb belgilaydi.
 
 **Fix:**
 
@@ -3007,7 +3009,7 @@ npx @arethetypeswrong/cli --pack .
 Wrong order:
 ```
 node16 (from CJS) → 🟢
-node16 (from ESM) → ❌ Resolution failed
+node16 (from ESM) → FallbackCondition (type fallback orqali topildi)
 ```
 
 Correct order:
@@ -3035,52 +3037,56 @@ bundler           → 🟢
 // types/api-client.d.ts
 declare module "api-client" {
   // Bug A
-  declare function get(url: string): Promise<any>;
-  declare function get(url: string, params: object): Promise<any>;
+  function get(url: string, options?: Record<string, unknown>): Promise<unknown>;
+  function get(url: string, options: { responseType: "json" }): Promise<object>;
   
   // Bug B
-  declare class Builder {
+  class Builder {
     setName(name: string): Builder;
     setAge(age: number): Builder;
   }
   
   // Bug C
-  declare function transform<T>(input: T, fn: (x: any) => any): any;
+  function transform<T>(input: T, fn: (x: any) => any): any;
   
   export { get, Builder, transform };
 }
 ```
+
+> `declare module "..."` body allaqachon ambient context — ichidagi declaration'lar oldidan `declare` yozish kerak emas (yozilsa `error TS1038: A 'declare' modifier cannot be used in an already ambient context`).
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-**Bug A:** Overload tartibi noto'g'ri (specific birinchi). **Bug B:** Method chaining `Builder` o'rniga `this` qaytarish kerak. **Bug C:** Generic constraint juda keng — `any` type safety yo'q.
+**Bug A:** Overload tartibi noto'g'ri — umumiy (keng) signature birinchi, aniqroq signature'ni shadow qiladi. **Bug B:** Method chaining `Builder` o'rniga `this` qaytarish kerak. **Bug C:** Generic constraint juda keng — `any` type safety yo'q.
 
 ### To'liq tushuntirish
 
 **Bug A — Overload tartibi:**
 
 ```typescript
-// ❌ — umumiy birinchi
-declare function get(url: string): Promise<any>;
-declare function get(url: string, params: object): Promise<any>;
+// ❌ — umumiy (keng) birinchi (declare module ichida)
+function get(url: string, options?: Record<string, unknown>): Promise<unknown>;
+function get(url: string, options: { responseType: "json" }): Promise<object>;
 ```
 
-TypeScript overload resolution birinchi mos keladigan signature'ni oladi. Birinchi signature (`url` only) — har qanday call'ga mos keladi. Ikkinchi (`url, params`) hech qachon tanlanmaydi.
+TypeScript overload resolution birinchi mos keladigan signature'ni oladi. Birinchi signature `options` ni optional `Record<string, unknown>` qiladi — `{ responseType: "json" }` argument ham, hech argument ham unga mos keladi. Ikkinchi (aniqroq `{ responseType: "json" }`, `Promise<object>` qaytaradi) hech qachon tanlanmaydi — `get(url, { responseType: "json" })` ham birinchi overload'ni oladi, return `Promise<unknown>`.
 
 ```typescript
-// ✅ — aniqroq birinchi
-declare function get(url: string, params: object): Promise<any>;
-declare function get(url: string): Promise<any>;
+// ✅ — aniqroq birinchi (declare module ichida)
+function get(url: string, options: { responseType: "json" }): Promise<object>;
+function get(url: string, options?: Record<string, unknown>): Promise<unknown>;
 ```
+
+Endi `get(url, { responseType: "json" })` aniq overload'ni tanlaydi (`Promise<object>`), boshqa call'lar umumiy overload'ga tushadi.
 
 **Bug B — Method chaining (`this` return type):**
 
 ```typescript
-// ❌ — `Builder` qaytaradi
-declare class Builder {
+// ❌ — `Builder` qaytaradi (declare module ichida)
+class Builder {
   setName(name: string): Builder;
   setAge(age: number): Builder;
 }
@@ -3100,8 +3106,8 @@ ab.setName("Ali").setExtra();  // ❌ — setName Builder qaytaradi, AdvancedBui
 **Fix:**
 
 ```typescript
-// ✅ — `this` qaytaradi
-declare class Builder {
+// ✅ — `this` qaytaradi (declare module ichida)
+class Builder {
   setName(name: string): this;
   setAge(age: number): this;
 }
@@ -3116,8 +3122,8 @@ ab.setName("Ali").setExtra(); // ✅ — setName `AdvancedBuilder` qaytaradi
 **Bug C — Generic constraint juda keng:**
 
 ```typescript
-// ❌ — any type safety yo'q
-declare function transform<T>(input: T, fn: (x: any) => any): any;
+// ❌ — any type safety yo'q (declare module ichida)
+function transform<T>(input: T, fn: (x: any) => any): any;
 ```
 
 - `fn` parameter `any` qabul qiladi — input type `T` ga bog'lanmagan
@@ -3127,8 +3133,8 @@ declare function transform<T>(input: T, fn: (x: any) => any): any;
 **Fix:**
 
 ```typescript
-// ✅ — generic constraint
-declare function transform<T, R>(input: T, fn: (x: T) => R): R;
+// ✅ — generic constraint (declare module ichida)
+function transform<T, R>(input: T, fn: (x: T) => R): R;
 ```
 
 Endi:

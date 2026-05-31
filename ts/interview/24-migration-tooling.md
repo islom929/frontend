@@ -120,7 +120,7 @@ function formatDate(date) {
 - **Third-party untyped library**: `@types/library` yo'q bo'lsa — `declare module "library";` quick fix, keyin community types yoki manual `.d.ts`.
 - **Test fayllar**: `*.test.js` ham migrate kerak. Jest `ts-jest` yoki Vitest (native TS).
 - **Generated kod (Prisma, GraphQL)**: codegen'dan `.ts` generate qilish — manual o'zgartirish kerak emas.
-- **Mixed `.js` va `.ts` import**: `import { x } from "./foo"` `foo.ts` ni topadi (extension yo'q), `foo.js` ham. `moduleResolution: "Node16"` da explicit extension majburiy.
+- **Mixed `.js` va `.ts` import**: `import { createUser } from "./user"` `user.ts` ni topadi (extension yo'q), `user.js` ham. `moduleResolution: "Node16"`/`NodeNext` da ESM uchun explicit `.js` extension majburiy.
 
 ### Follow-up savollar
 
@@ -387,7 +387,7 @@ console.log(getUserById(1));
 
 `@ts-expect-error` (TS 3.9+) yechimi:
 
-- Xato bo'lsa — yashiradi (xuddi `@ts-ignore`).
+- Xato bo'lsa — yashiradi (`@ts-ignore` bilan bir xil).
 - Xato yo'q bo'lsa — yangi error: "Unused '@ts-expect-error' directive".
 - Code tuzatilganda — TS o'zi eslatadi, suppress'ni olib tashlash kerak.
 
@@ -568,7 +568,7 @@ add("1", "2"); // ❌ TS error
 
 ### Edge Cases
 
-- **Decorator metadata** (NestJS, Angular): `decoratorMetadata: true` SWC config'da. esbuild legacy decorator'ni qo'llab-quvvatlamaydi (TC39 modern only).
+- **Decorator metadata** (NestJS, Angular): `decoratorMetadata: true` SWC config'da. esbuild legacy decorator transform'ni `experimentalDecorators` bilan qo'llab-quvvatlaydi, ammo `emitDecoratorMetadata`'ni emit qila olmaydi (type system yo'q) — shuning uchun NestJS DI uchun yaramaydi.
 - **`const enum` cross-file**: SWC va esbuild ham qo'llab-quvvatlamaydi (`isolatedModules` cheklov). `enum` (non-const) ishlaydi.
 - **Source map**: production debugging uchun majburiy. SWC `sourceMaps: true`, esbuild `--sourcemap`.
 - **Path alias (`paths`)**: SWC va esbuild ham `tsconfig.json` `paths`'ni avtomatik o'qimaydi — plugin (`tsconfig-paths-webpack-plugin`, `esbuild-plugin-tsc`) yoki manual config.
@@ -612,8 +612,8 @@ TS faylni to'g'ridan-to'g'ri Node.js'da run qilish — bundle'siz development.
 
 - Type annotation'larni native parser bilan strip (transpile yo'q).
 - `enum`, `namespace`, parameter property qo'llab-quvvatlamaydi (`erasableSyntaxOnly` mos).
-- Initial qo'llab-quvvatlash Node 22.6'da flag bilan keldi.
-- Keyingi Node versiyalari (22 LTS va 23.x) flag'siz default'ga aylantirgan.
+- Initial qo'llab-quvvatlash Node 22.6'da `--experimental-strip-types` flag bilan keldi.
+- Node 23.6'da flag'siz default'ga aylandi; keyin 22 LTS line'iga ham backport qilindi (22.18+).
 
 | Tool | Type check | Speed | Mechanism |
 |------|:----------:|--------|-----------|
@@ -797,7 +797,7 @@ let currentProduct;
 
 // === Inline cast ===
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("game"));
-const ctx = canvas.getContext("2d"); // ✅ CanvasRenderingContext2D inferred
+const ctx = canvas.getContext("2d"); // ✅ CanvasRenderingContext2D | null inferred
 
 // === Type guard ===
 /**
@@ -841,7 +841,7 @@ class UserService {
 const service = new UserService();
 const user = service.create({ name: "Ali", email: "ali@test.com" });
 // user: User ✅
-console.log(user.role); // ✅ "admin" | "user" narrowed
+console.log(user.role); // ✅ "admin" | "user" (User.role type)
 ```
 
 ### Edge Cases
@@ -1103,19 +1103,26 @@ export function move(dir: Direction): string {
 ```
 
 ```json
-// === tsconfig.json — isolatedModules majburiy ===
+// === tsconfig.json — single-file transpiler'lar uchun ===
 {
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
-    "isolatedModules": true,     // ← const enum'ni TS o'zi tutsin
+    "isolatedModules": true,     // ← single-file emit constraint'larini tutadi
     "verbatimModuleSyntax": true
   }
 }
-// isolatedModules: true yoqilganda const enum TS error beradi:
-// "'const' enums are not supported with 'isolatedModules'"
+// Diqqat: isolatedModules LOKAL const enum declaration'iga xato bermaydi —
+// lokal const enum tsc emit'ida baribir inline bo'ladi.
+// Xato faqat AMBIENT const enum (`declare const enum`, yoki .d.ts) bilan:
+//   - declaration: TS1209 "Ambient const enums are not allowed when the
+//     '--isolatedModules' flag is provided."
+//   - boshqa fayldan access: TS2748 "Cannot access ambient const enums when
+//     the '--isolatedModules' flag is provided."
+// SWC/esbuild cross-file muammosi (Muammo 1) bundan ALOHIDA: ular lokal
+// const enum'ni ham fayl-by-fayl ko'rgani uchun inline qila olmaydi.
 ```
 
 ### Edge Cases
@@ -1156,7 +1163,7 @@ Foydali metric'lar:
 
 - **Overall coverage**: butun loyiha bo'yicha.
 - **Detailed report**: qaysi fayl/qator `any` ekanligini ko'rsatadi.
-- **Strict mode**: generic `<T>` ham `any` deb hisoblaydi (`function id<T>(x: T): T` da `T` baribir `any` runtime'da).
+- **Strict mode**: type argument'da `any` bo'lsa, identifier'ni `any` deb hisoblaydi — `any[]`, `Promise<any>`, `Map<string, any>`. Default mode faqat to'g'ridan-to'g'ri `any`'ni sanaydi.
 
 CI integration:
 
@@ -1192,8 +1199,8 @@ npx type-coverage --strict
 # CI threshold
 npx type-coverage --at-least 90
 
-# JSON output (programmatic)
-npx type-coverage --reportSemanticError
+# JSON output (programmatic, machine-readable)
+npx type-coverage --json-output
 ```
 
 ```json
@@ -1269,7 +1276,7 @@ function parse<T extends z.ZodTypeAny>(
 
 ### Edge Cases
 
-- **Generic `any` strict mode**: `function id<T>(x: T): T` — `T` runtime'da `any`. `--strict` mode buni `any` deb hisoblaydi. Loose mode'da typed.
+- **Type argument'dagi `any` (strict mode)**: `getUsers(): Promise<any>` yoki `Map<string, any>` — type argument ichidagi `any` `--strict` mode'da identifier'ni `any` deb sanaydi. Default mode buni o'tkazib yuboradi.
 - **Third-party untyped library**: `@types/x` yo'q paket — har import `any` cascade. `declare module "x";` quick fix yoki `@types/x` qo'shish.
 - **`any` cast (`as any`)**: type-coverage tutadi. Lint rule (`@typescript-eslint/no-explicit-any`) ham ishlatish.
 - **JSON.parse natural `any`**: built-in API. Zod/Valibot bilan parse — typed.
@@ -1298,10 +1305,10 @@ Ikki flag — turli emit fazasiga ta'sir qiladi, lekin printsip bir xil (file is
 
 **`isolatedModules`** cheklovlari:
 
-- `const enum` cross-file inline talab qiladi → taqiq.
-- Ambiguous re-export (`export { X } from "./mod"`) — X type yoki value bo'lishi noma'lum → `export type` majburiy.
+- Ambient `const enum` access (`declare const enum`, yoki `.d.ts`'dan import) — single-file transpiler qiymatni inline qila olmaydi → TS xato beradi (TS1209 declaration'da, TS2748 access'da). Lokal `const enum` declaration'i o'zi xato bermaydi, lekin SWC/esbuild uni ham cross-file inline qila olmaydi.
+- Ambiguous re-export (`export { User } from "./mod"`) — `User` type yoki value bo'lishi noma'lum → `export type` majburiy (`verbatimModuleSyntax` bilan).
 - `export = X` legacy CJS → taqiq.
-- Non-module fayl (`import`/`export`'siz) → error.
+- Non-module fayl (`import`/`export`'siz, global script) → error.
 
 **`isolatedDeclarations`** cheklovlari:
 
@@ -1320,19 +1327,21 @@ Birga ishlatish — SWC/esbuild parallel build:
 ```typescript
 // === isolatedModules cheklovi ===
 
-// ❌ const enum cross-file
-export const enum Status { Active = "A", Inactive = "I" }
-// → 'const' enums are not supported with 'isolatedModules'
+// ❌ Ambient const enum'ni boshqa fayldan ishlatish (single-file transpiler inline qila olmaydi)
+// status.d.ts: declare const enum Status { Active = "A", Inactive = "I" }
+import { Status } from "./status";
+console.log(Status.Active);
+// → TS2748: Cannot access ambient const enums when the '--isolatedModules' flag is provided.
 
 // ❌ Ambiguous re-export
 export { User } from "./types";
-// User type yoki value? Bundler bitta faylda bilmaydi
+// User type yoki value? Single-file transpiler bitta faylda bilmaydi
 // → 'isolatedModules' bilan 'export type' majburiy
 
 // ❌ export =
-class Foo {}
-export = Foo;
-// → 'export =' bilan isolatedModules mos kelmaydi
+class UserService {}
+export = UserService;
+// → 'export =' bilan isolatedModules mos kelmaydi (verbatimModuleSyntax)
 
 // ✅ To'g'rilangan
 export const Status = { Active: "A", Inactive: "I" } as const;
@@ -1340,7 +1349,7 @@ export type Status = typeof Status[keyof typeof Status];
 
 export type { User } from "./types";
 
-export default class Foo {}
+export default class UserService {}
 
 // === isolatedDeclarations cheklovi ===
 
@@ -1625,7 +1634,7 @@ try {
 ### Follow-up savollar
 
 1. "Migration vaqtida feature work to'xtatiladimi?" — Yo'q. Parallel: feature team `.ts` yangi kodda, migration team mavjud kod bilan. Har sprint 5-10% coverage o'sishi target.
-2. "Roll-back stratery?" — Har bosqich alohida PR + revert imkoniyat. CI baseline'i — har sub-flag yoqilgandan keyin team bir-ikki kun stabilize qiladi.
+2. "Roll-back strategiyasi?" — Har bosqich alohida PR + revert imkoniyat. CI baseline'i — har sub-flag yoqilgandan keyin team bir-ikki kun stabilize qiladi.
 
 </details>
 
@@ -1665,7 +1674,7 @@ NestJS DI mexanizmi:
 
 `design:paramtypes` metadata — TypeScript compiler tomonidan emit qilinadi `emitDecoratorMetadata: true` flag bilan. SWC default'da bu metadata'ni emit qilmaydi — alohida config kerak.
 
-NestJS legacy decorator spec'ni (TC39 stage 2, "experimentalDecorators") ishlatadi. Yangi TC39 stage 3 decorator API mos kelmaydi — `legacyDecorator: true` zarur.
+NestJS TypeScript'ning legacy decorator implementation'ini (`experimentalDecorators` flag, 2014-era proposal'ga asoslangan, hozirgi Stage 3 spec'idan ajralib chiqqan) ishlatadi. Stage 3 standard decorator API mos kelmaydi (decorator signature boshqacha, `emitDecoratorMetadata` yo'q) — SWC'da `legacyDecorator: true` zarur.
 
 ### Kod misol
 
@@ -1775,11 +1784,11 @@ console.log(paramTypes); // [class UserRepository] ✅
 - **TS 5.0+ native decorator (TC39 stage 3)**: NestJS hozircha legacy decorator ishlatadi. Migration uchun NestJS major version kutilmoqda (`experimentalDecorators: false` mos kelmaydi).
 - **Circular dependency**: `Reflect.metadata` parameter type'larini saqlaydi. Class A → B → A circular bo'lsa, metadata `undefined` bo'lishi mumkin. NestJS `@Inject(forwardRef(() => B))` yechimi.
 - **Multiple emit pipeline'lar**: TypeScript tsc + SWC bir vaqtda — config'lar mos kelishi kerak (`emitDecoratorMetadata`/`decoratorMetadata` ikkalasi).
-- **esbuild decorator support**: esbuild legacy decorator'ni qo'llab-quvvatlamaydi (TC39 modern only). NestJS uchun SWC tavsiya.
+- **esbuild decorator support**: esbuild legacy decorator transform'ni `experimentalDecorators` bilan bajaradi, lekin `emitDecoratorMetadata`'ni qo'llab-quvvatlamaydi (type system yo'q, `design:paramtypes` emit qila olmaydi). NestJS DI metadata'ga tayanadi → esbuild yaramaydi, SWC (`decoratorMetadata: true`) tavsiya.
 
 ### Follow-up savollar
 
-1. "`reflect-metadata` polyfill nima uchun kerak?" — `Reflect.metadata` API standartning bir qismi emas (TC39 stage 1 proposal). Polyfill `reflect-metadata` paket'i `Reflect`'ga metadata API qo'shadi.
+1. "`reflect-metadata` polyfill nima uchun kerak?" — `Reflect.metadata`/`Reflect.getMetadata` ECMAScript standartining bir qismi emas. `reflect-metadata` — rbuckton'ning prototype paket'i, hech qachon TC39 bosqichlaridan o'tmagan (legacy polyfill); standartlashtirilgan yo'l endi Stage 3 Decorator Metadata (`Symbol.metadata`). NestJS legacy DI `emitDecoratorMetadata` emit'iga tayanadi, shuning uchun bu polyfill'ni `Reflect`'ga metadata API qo'shish uchun import qiladi.
 2. "NestJS production'da SWC vs tsc?" — SWC sezilarli tez build (CI'da). NestJS team SWC'ni rasmiy qo'llab-quvvatlaydi. tsc fallback uchun saqlash mumkin.
 
 <details>
@@ -1797,26 +1806,24 @@ Emit qilingan kod:
 
 ```javascript
 // constructor(private repo: UserRepository) {}
-// emitDecoratorMetadata: true bilan
-__decorate([
-  Injectable()
-], UserService);
-__decorate([
+// emitDecoratorMetadata: true bilan — bitta __decorate chaqiruvi
+UserService = __decorate([
+  Injectable(),
   __metadata("design:paramtypes", [UserRepository])  // ← class reference array
 ], UserService);
 ```
 
 `UserRepository` class reference'i runtime'da DI container'ga "qaysi instance kerak" deb javob beradi.
 
-**SWC implementatsiyasi**
+**SWC implementation'i**
 
 SWC `decoratorMetadata: true` config bilan TypeScript compiler emit'iga ekvivalent metadata yaratadi. Rust kod TypeScript type checker'i emas — type annotation'lardan class reference'larni statik tarzda ekstrakt qiladi.
 
-Cheklov: SWC interface/type alias parameter type'larni metadata'ga emit qila olmaydi (faqat class reference). Bu TypeScript bilan ham xuddi shunday — interface runtime'da yo'q.
+Cheklov: SWC interface/type alias parameter type'larni metadata'ga emit qila olmaydi (faqat class reference). TypeScript'da ham shunday — interface runtime'da yo'q, `design:paramtypes` array'da `Object` deb ko'rinadi.
 
-**Stage 2 (legacy) vs Stage 3 decorator farqi**
+**Legacy (experimental) vs Stage 3 decorator farqi**
 
-| Xususiyat | Stage 2 (legacy) | Stage 3 (TS 5.0+) |
+| Xususiyat | Legacy (experimental) | Stage 3 (TS 5.0+) |
 |-----------|------------------|-------------------|
 | `experimentalDecorators` | majburiy | yopiq (default) |
 | `emitDecoratorMetadata` | qo'llab-quvvatlanadi | qo'llab-quvvatlanmaydi |

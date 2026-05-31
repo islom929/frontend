@@ -47,7 +47,7 @@ let point2: { x: number; y: number } = { x: 10, y: 20 };
 
 **Convention:** interface/type alias'larda `;` (semicolon), inline type'larda esa `,` (comma) ko'proq ishlatiladi — lekin ikkalasi ham to'g'ri.
 
-Object type structural typing asosida ishlaydi. Ya'ni object'ning **nomi** emas, **shakli** (qaysi property'lar bor) muhim:
+Structural typing tufayli funksiya parameter'iga undan **ko'proq** property'ga ega object ham uzatilishi mumkin — target shape qoplangani yetarli:
 
 ```typescript
 function greet(person: { name: string }): string {
@@ -242,15 +242,15 @@ Lekin **default xulq** (`exactOptionalPropertyTypes: false`) — checker optiona
 ```typescript
 interface User { email?: string; }
 
-let a: User = {};                    // ✅ property yo'q
-let b: User = { email: undefined };  // ✅ default xulq — undefined qabul qilinadi
-let c: User = { email: "test" };     // ✅ property bor, qiymati string
+let withoutEmail: User = {};                  // ✅ property yo'q
+let undefinedEmail: User = { email: undefined };  // ✅ default xulq — undefined qabul qilinadi
+let stringEmail: User = { email: "test" };    // ✅ property bor, qiymati string
 ```
 
 **`exactOptionalPropertyTypes: true` yoqilsa**, optional `T?` va `T | undefined` ajratiladi:
 
 ```typescript
-let b: User = { email: undefined };  // ❌ Type 'undefined' is not assignable to type 'string'
+let undefinedEmail: User = { email: undefined };  // ❌ Type 'undefined' is not assignable to type 'string'
 // Faqat property'ni butunlay tushirib qoldirish mumkin: { }
 ```
 
@@ -259,14 +259,14 @@ Bu flag TS 4.4'da kiritilgan va `strict` meta-flag'ga kirmaydi (ataylab — back
 **`in` operator bilan farqi:**
 
 ```typescript
-interface A { x?: string; }
-interface B { x: string | undefined; }
+interface OptionalName { name?: string; }
+interface NullableName { name: string | undefined; }
 
-const a: A = {};              // x yo'q
-const b: B = { x: undefined }; // x bor, undefined
+const optional: OptionalName = {};              // name yo'q
+const nullable: NullableName = { name: undefined }; // name bor, undefined
 
-"x" in a; // false — property yo'q
-"x" in b; // true — property bor
+"name" in optional; // false — property yo'q
+"name" in nullable; // true — property bor
 ```
 
 Bu farq runtime'da `Object.keys()`, `JSON.stringify()`, spread operator va boshqa JS operatsiyalarida sezilarli.
@@ -339,29 +339,24 @@ register({
 });
 ```
 
-Optional vs required after optional cheklovi:
+Object property'larda optional va required tartibi cheklanmaydi — funksiya parameter'laridan farqli:
 
 ```typescript
-// ❌ Required required'dan keyin optional bo'lsa — xato yo'q
-interface OK {
-  name: string;
-  age: number;
-  email?: string; // optional
-}
-
-// ❌ Parameter'larda: required after optional
-// function bad(a: string, b?: string, c: string) {} // ❌
-
-// ✅ Object property'larda bu cheklov yo'q
-interface Mixed {
-  name?: string;
-  age: number;       // required after optional — OBJECT'DA OK
+// ✅ Object property'larda required optional'dan keyin kelishi mumkin
+interface User {
+  firstName?: string;
+  age: number;        // required after optional — object'da ruxsat etiladi
   email?: string;
 }
 
-// Parameter orderida emas, object property'da ruxsat etiladi
-// chunki object destructuring'da tartib ahamiyatsiz
+// ❌ Funksiya parameter'larida required optional'dan keyin kela olmaydi
+function register(firstName?: string, age: number) {} // TS1016: A required parameter cannot follow an optional parameter
+
+// ✅ To'g'ri tartib — optional parameter'lar oxirida
+function registerOk(age: number, firstName?: string) {}
 ```
+
+Object property'larda bu cheklov yo'q, chunki property'lar nom orqali ochiladi (`user.age`), parameter'lar esa pozitsiya orqali (`register(arg1, arg2)`) — pozitsion argument'da optional o'rtada turishi qaysi argument qaysi parameter'ga tegishli ekanini noaniq qiladi.
 
 </details>
 
@@ -379,7 +374,7 @@ function greet(user: User): string {
   return `Hello, ${user.name} (${user.email ?? "no email"})`;
 }
 
-const u: User = { name: "Ali" };
+const user: User = { name: "Ali" };
 ```
 
 ```javascript
@@ -388,8 +383,8 @@ function greet(user) {
   return `Hello, ${user.name} (${user.email ?? "no email"})`;
 }
 
-const u = { name: "Ali" };
-// Runtime'da: u.email === undefined (property yo'q)
+const user = { name: "Ali" };
+// Runtime'da: user.email === undefined (property yo'q)
 // Optional belgilash faqat compile-time check uchun
 ```
 
@@ -449,12 +444,12 @@ Bu behavior ko'pincha **kutilmagandek** bo'ladi — "readonly" so'zi deep immuta
 
 **Assignment checking:**
 
-Checker `checkPropertyAccessibility()` funksiyasida property'ga assign qilish harakatini ushlaydi:
+Assignment expression'ni (`expr = value`) tekshirayotganda checker target property'ga yozishga ruxsat borligini aniqlaydi:
 
 1. Assignment node'ni aniqlash (`expr = value`)
 2. Target property'ning Symbol'ini olish
 3. `SymbolFlags.Readonly` bitini tekshirish
-4. Agar readonly va bu initialization konteksti (`constructor`, object literal) **emas** bo'lsa — `Cannot assign to 'X'` diagnostikasi
+4. Agar readonly va bu initialization konteksti (`constructor`, object literal) **emas** bo'lsa — `Cannot assign to 'X' because it is a read-only property` diagnostikasi
 
 **Shallow nature sababi:**
 
@@ -494,7 +489,7 @@ class User {
 }
 ```
 
-Checker `isInConstructor()` helper orqali context'ni aniqlaydi va birinchi initialization'ga ruxsat beradi.
+Checker assignment'ning enclosing context (constructor body yoki property initializer) ichidaligini aniqlaydi va shu yerdagi birinchi initialization'ga ruxsat beradi.
 
 **Runtime:** `readonly` JS'da butunlay yo'qoladi. Compile'dan keyin property freely mutable. Haqiqiy runtime immutability uchun `Object.freeze()` yoki immutable library kerak.
 
@@ -615,7 +610,7 @@ interface Point {
   readonly y: number;
 }
 
-const p: Point = { x: 10, y: 20 };
+const point: Point = { x: 10, y: 20 };
 
 class User {
   readonly id: number;
@@ -627,7 +622,7 @@ class User {
 
 ```javascript
 // Compiled JS — readonly marker to'liq o'chiriladi
-const p = { x: 10, y: 20 };
+const point = { x: 10, y: 20 };
 
 class User {
   constructor(id) {
@@ -636,7 +631,7 @@ class User {
 }
 
 // Runtime'da himoya YO'Q:
-// p.x = 30;       // ✅ JS'da ishlaydi
+// point.x = 30;   // ✅ JS'da ishlaydi
 // user.id = "x";  // ✅ JS'da ishlaydi
 // readonly faqat compile-time — TS tekshiruvi
 ```
@@ -644,8 +639,8 @@ class User {
 Runtime immutability `Object.freeze()` bilan:
 
 ```javascript
-const p = Object.freeze({ x: 10, y: 20 });
-p.x = 30; // TypeError (strict mode) yoki sukut (sloppy mode)
+const point = Object.freeze({ x: 10, y: 20 });
+point.x = 30; // TypeError (strict mode) yoki sukut (sloppy mode)
 ```
 
 </details>
@@ -863,7 +858,7 @@ function parseHeaders(headers: Headers): void {
 
 parseHeaders({
   "content-type": "application/json",
-  "x-custom": ["value1", "value2"],
+  "set-cookie": ["session=abc", "theme=dark"],
 });
 ```
 
@@ -956,21 +951,27 @@ interface FruitMap {
 **Method qo'shish — gotcha:** `Record<K, V>` oddiy mapped type — qo'shimcha property/method yozib bo'lmaydi. Bunga harakat qilish odatda muvaffaqiyatsiz:
 
 ```typescript
-// ❌ Record ichida qo'shimcha — mumkin emas (oddiy mapped type)
-type WithSize = Record<string, number>; // faqat key-value
+// ❌ Record body'siga qo'shimcha property yozib bo'lmaydi — bu mapped type, interface emas
+type ScoreMap = Record<string, number>; // faqat key-value, body yo'q
 
-// ⚠️ Intersection bilan — texnik mumkin, lekin runtime'da chalkash
-type WithSize2 = Record<string, number> & { size(): number };
-// size — method tipi `() => number`, lekin Record'ning string index'i `number` kutadi
-// Bu intersection compile-time'da `never` yoki konflikt yaratadi
+// ⚠️ Intersection bilan qo'shsa — `size` ikki cheklovga tushadi:
+type ScoreMapWithSize = Record<string, number> & { size(): number };
+// Record<string, number> uchun `size` — string key, demak `number` bo'lishi kerak
+// { size(): number } uchun `size` — `() => number`
+// Natija: size tipi `number & (() => number)` — bu tipga mos qiymat YO'Q
+const scores: ScoreMapWithSize = {
+  math: 90,
+  size: () => 1, // ❌ Type '() => number' is not assignable to type 'number & (() => number)'
+};
+// Tip o'zi `never` emas, lekin `size` property'ni qoniqtirib bo'lmaydi
 
-// ✅ Interface — index signature value tipini kengroq qilish kerak
-interface WithSize3 {
+// ✅ Interface — index signature value tipini method'ni ham qamrab oladigan qilish kerak
+interface ScoreRegistry {
   [key: string]: number | (() => number); // value tipi method'ni ham qamrab oladi
   size(): number; // ✅ () => number index signature value'siga mos
+  math: number;   // ✅ number index signature value'siga mos
 }
-// MUHIM: interface'da index signature value tipidan tashqari property/method
-// bo'lishi mumkin emas — har ikkalasi ham `number | () => number` ga mos kelishi shart
+// Interface'da har bir named property index signature value tipiga assignable bo'lishi shart
 ```
 
 <details>
@@ -1011,7 +1012,7 @@ interface FruitMap {
 }
 ```
 
-Bu `IndexSignatureDeclaration` node — compiler uni `TypeFlags.Object | ObjectFlags.Interface` bilan track qiladi. `resolveIndexType()`'da har qanday string key ga `number` tipi tayinlanadi.
+Bu `IndexSignatureDeclaration` node — compiler uni `TypeFlags.Object | ObjectFlags.Interface` bilan track qiladi va type'ning string index info'si sifatida saqlaydi. Index access tekshiruvida har qanday string key ga `number` tipi tayinlanadi.
 
 Farq: `Record` **aniq property'lar** ro'yxati, index signature esa **umumiy qoida**. Shu sababli:
 - `Record<"a" | "b", number>` — object'da `a` va `b` majburiy, boshqalar yo'q
@@ -1080,7 +1081,7 @@ const form: FormData = {
   age: 25,
   newsletter: true,
   // Har qanday field dinamik
-  "custom-field-1": "value",
+  "referral-code": "SUMMER25",
   phone_number: "123-456",
 };
 ```
@@ -1257,32 +1258,35 @@ Property lookup `O(1)` hash map orqali — tez. Interface type relations `isRela
 **Method shorthand vs property function:**
 
 ```typescript
+interface Animal { name: string; }
+interface Dog extends Animal { bark(): void; }
+
 // Variance'ni ko'rsatish uchun interface'lar KENGROQ tip (Animal) kutadi
-interface A {
-  handler(x: Animal): void;       // method shorthand
+interface MethodStyle {
+  handle(animal: Animal): void;       // method shorthand
 }
 
-interface B {
-  handler: (x: Animal) => void;   // property function
+interface PropertyStyle {
+  handle: (animal: Animal) => void;   // property function
 }
 ```
 
 `strictFunctionTypes: true` bo'lganda:
-- **Method shorthand (A.handler):** parameter contravariance tekshirilmaydi — **bivariant** (eski xulq)
-- **Property function (B.handler):** parameter contravariance tekshiriladi — **contravariant** (zamonaviy strict)
+- **Method shorthand (`MethodStyle.handle`):** parameter contravariance tekshirilmaydi — **bivariant** (eski xulq)
+- **Property function (`PropertyStyle.handle`):** parameter contravariance tekshiriladi — **contravariant** (zamonaviy strict)
 
 ```typescript
-type DogHandler = (x: Dog) => void;
+type DogHandler = (animal: Dog) => void;
 
 const dogHandler: DogHandler = (dog) => dog.bark();
 // dogHandler faqat Dog'ni qabul qiladi — kengroq Animal uchun noxavfsiz
 
-let a: A = { handler: dogHandler };
+let withMethod: MethodStyle = { handle: dogHandler };
 // ✅ strictFunctionTypes bilan ham OK — method shorthand BIVARIANT
 // (texnik jihatdan unsound, lekin backward-compat uchun saqlangan)
 
-let b: B = { handler: dogHandler };
-// ❌ Type '(x: Dog) => void' is not assignable to type '(x: Animal) => void'
+let withProperty: PropertyStyle = { handle: dogHandler };
+// ❌ Type '(animal: Dog) => void' is not assignable to type '(animal: Animal) => void'
 // Property function CONTRAVARIANT: Animal param kutilgan, Dog param berilgan
 ```
 
@@ -1555,24 +1559,24 @@ const post: Post = {
 Chain extending:
 
 ```typescript
-interface A {
-  a: string;
+interface Entity {
+  id: string;
 }
 
-interface B extends A {
-  b: number;
+interface Timestamped extends Entity {
+  createdAt: number;
 }
 
-interface C extends B {
-  c: boolean;
+interface Article extends Timestamped {
+  published: boolean;
 }
 
-const c: C = {
-  a: "hello",
-  b: 42,
-  c: true,
+const article: Article = {
+  id: "a-1",
+  createdAt: 1700000000,
+  published: true,
 };
-// C'da: a, b, c — hammasi bor
+// Article'da: id, createdAt, published — hammasi bor
 ```
 
 Property narrowing (subtype override):
@@ -1623,7 +1627,7 @@ interface Animal {
 }
 
 interface Dog extends Animal {
-  // method override — kompatibilnost
+  // method override — signature mos kelishi shart
   makeSound(): string; // ✅ bir xil signature
 }
 
@@ -1707,20 +1711,20 @@ const user: User = {
 **Conflict holati:** ikki parent bir xil nomli property'ga ega bo'lsa, tiplar **identik** bo'lishi kerak (subtype yetarli emas):
 
 ```typescript
-interface A { value: string; }
-interface B { value: string; } // ✅ bir xil tip — OK
+interface HasName { value: string; }
+interface HasLabel { value: string; } // ✅ bir xil tip — OK
 
-interface C extends A, B {
+interface Field extends HasName, HasLabel {
   // value: string — conflictsiz birlashadi
 }
 
 // ❌ Tiplar farqli
-interface X { value: string; }
-interface Y { value: number; }
+interface StringField { value: string; }
+interface NumberField { value: number; }
 
-interface Z extends X, Y {
-  // ❌ Interface 'Z' cannot simultaneously extend types 'X' and 'Y'
-  // Named property 'value' of types 'X' and 'Y' are not identical
+interface MixedField extends StringField, NumberField {
+  // ❌ Interface 'MixedField' cannot simultaneously extend types 'StringField' and 'NumberField'
+  // Named property 'value' of types 'StringField' and 'NumberField' are not identical
 }
 ```
 
@@ -1746,34 +1750,21 @@ interface User extends HasName, HasAge, HasEmail:
 
 `binder.ts`'da `resolveBaseTypesOfInterface()` bu jarayon'ni amalga oshiradi. Har parent uchun ularning to'liq property ro'yxati (ularning o'zi ham extend qilgan bo'lishi mumkin) rekursiv olinadi.
 
-**Conflict check — `checkInheritedPropertiesAreIdentical()`:**
+**Conflict check:**
 
-Agar ikki parent bir xil nomli property'ga ega bo'lsa, checker tiplarni solishtiradi:
+Agar ikki parent bir xil nomli property'ga ega bo'lsa, checker bu property'larning tiplarini solishtiradi va ular **identik** emas bo'lsa diagnostika beradi: `Interface 'X' cannot simultaneously extend types 'A' and 'B'. Named property 'name' of types 'A' and 'B' are not identical.`
 
-```typescript
-function checkInheritedPropertiesAreIdentical(type: InterfaceType) {
-  for (const prop of getPropertiesOfType(type)) {
-    const baseProps = collectBaseProperties(prop.name, type.baseTypes);
-    for (const baseProp of baseProps) {
-      if (!isTypeIdenticalTo(prop.type, baseProp.type)) {
-        error("Interface cannot simultaneously extend types...");
-      }
-    }
-  }
-}
-```
+Muhim nuans: bu tekshiruv **type identity** (aynan bir xil tip) talab qiladi — **assignability** (subtype) emas. Ya'ni parent'lar bir xil nomli property'ga ega bo'lsa, tiplar aynan bir xil bo'lishi kerak. `string` va `"bark"` — `"bark"` `string`'ga assign bo'lsa ham, identik emas, demak xato.
 
-Muhim: `isTypeIdenticalTo` (bir xil tip) — `isTypeAssignableTo` (subtype) emas. Ya'ni parent'lar bir xil nomli property'ga ega bo'lsa, tiplar **aynan** bir xil bo'lishi kerak. `string` va `"hello"` (subtype bo'lsa ham) — xato.
-
-**Child override**'i esa subtype'ga toraytirishga ruxsat beradi:
+**Child override**'i esa subtype'ga toraytirishga ruxsat beradi. Sabab: child o'z declaration'i bilan ikkala parent property'ni qoplaydi, demak conflict o'rniga bitta aniq tip qoladi:
 
 ```typescript
-interface A { x: string; }
-interface B { x: string; }
+interface HasName { label: string; }
+interface HasLabel { label: string; }
 
-// ✅ A va B bir xil — conflict yo'q
-interface C extends A, B {
-  x: "hello"; // ✅ child'da subtype — ruxsat
+// ✅ ikki parent identik tip — conflict yo'q
+interface Tag extends HasName, HasLabel {
+  label: "primary" | "secondary"; // ✅ child override subtype — ruxsat
 }
 ```
 
@@ -1856,14 +1847,14 @@ interface Item extends HasName, HasLabel {
 }
 
 // Agar tiplar farq qilsa
-interface A { version: number; }
-interface B { version: string; }
+interface NumericVersion { version: number; }
+interface SemverVersion { version: string; }
 
-// ❌ interface C extends A, B {} — xato
-// ✅ Yechim: aniq dizaynni qayta ko'rib chiqish
-interface C extends A {
-  // Faqat A'dan version: number
-  // B'ni extend qilmaslik yoki versiya nomini o'zgartirish
+// ❌ interface Package extends NumericVersion, SemverVersion {} — xato
+// ✅ Yechim: dizaynni qayta ko'rib chiqish
+interface Package extends NumericVersion {
+  // Faqat NumericVersion'dan version: number
+  // SemverVersion'ni extend qilmaslik yoki property nomini o'zgartirish
 }
 ```
 
@@ -1993,7 +1984,9 @@ Declaration merging `binder.ts` bosqichida amalga oshadi. Parser bir xil nomli b
 
 **Method overload tartibining sababi:**
 
-Keyingi declaration'dagi method overload'lar **birinchi** ro'yxatga qo'shiladi (reverse order). Bu TypeScript'ning overload resolution algoritmi bilan bog'liq — compiler overload'larni yuqoridan pastga iteratsiya qiladi va birinchi mos keluvchini tanlaydi. Keyingi declaration'larga yuqori prioritet berilishi — "spetsialroq" overload'larni keyinroq qo'shish imkonini beradi.
+Keyingi declaration'dagi method overload'lar **birinchi** ro'yxatga qo'shiladi (reverse order). Bitta declaration ichidagi overload'larning o'zaro tartibi saqlanadi, lekin guruhlar darajasida keyingi declaration oldingisidan oldinroq turadi. Bu TypeScript'ning overload resolution algoritmi bilan bog'liq — compiler overload'larni yuqoridan pastga iteratsiya qiladi va birinchi mos keluvchini tanlaydi.
+
+**Istisno — string literal parameter:** agar overload'ning parameter'i bitta string literal type bo'lsa (`on(event: "click")`), bu signature merged overload ro'yxatining yuqorisiga ko'tariladi. Shuning uchun barcha overload'lari string literal bo'lgan misolda resolution baribir aniq mos keluvchini topadi — tartib amaliy natijaga ta'sir qilmaydi. Tartib faqat bir nechta overload bir argument'ga mos kelganda muhim bo'ladi.
 
 **Library augmentation mexanizmi:**
 
@@ -2064,7 +2057,7 @@ declare global {
   }
 }
 
-// Aksincha export declaration shart:
+// Fayl module bo'lishi uchun export shart, aks holda declare global ishlamaydi:
 export {};
 ```
 
@@ -2136,12 +2129,12 @@ interface Handler {
 //   on(event: "click"): void;   // birinchi — oxirgi
 // }
 
-const h: Handler = {
+const handler: Handler = {
   on(event) { /* ... */ }
 };
-h.on("click");   // ✅
-h.on("hover");   // ✅
-h.on("scroll");  // ✅
+handler.on("click");   // ✅
+handler.on("hover");   // ✅
+handler.on("scroll");  // ✅
 ```
 
 </details>
@@ -2198,8 +2191,8 @@ type UserType = {
 };
 
 // Object shape uchun ikkalasi ham ishlaydi
-const a: User = { name: "Ali", age: 25 };
-const b: UserType = { name: "Ali", age: 25 };
+const userViaInterface: User = { name: "Ali", age: 25 };
+const userViaType: UserType = { name: "Ali", age: 25 };
 ```
 
 ### Farqlar jadvali
@@ -2235,16 +2228,16 @@ type DogType = AnimalType & { breed: string; };
 
 ```typescript
 // Interface — conflict aniqlanadi, xato
-interface A { x: number; }
-interface B extends A {
-  x: string; // ❌ compile error: string ≠ number
+interface Product { price: number; }
+interface DiscountedProduct extends Product {
+  price: string; // ❌ compile error: string ≠ number
 }
 
 // Type — "silent never"
-type C = { x: number; };
-type D = C & { x: string; };
-// D.x type: never (number & string = never)
-// ⚠️ Compile xato yo'q, lekin property foydasiz
+type ProductType = { price: number; };
+type DiscountedProductType = ProductType & { price: string };
+// DiscountedProductType["price"] type: never (number & string = never)
+// Diqqat: compile xato yo'q, lekin property foydasiz — qiymat berib bo'lmaydi
 ```
 
 ### Qachon qaysi birini ishlatish
@@ -2449,14 +2442,14 @@ type UserType = {
   name: string;
 };
 
-const a: User = { name: "Ali" };
-const b: UserType = { name: "Ali" };
+const userViaInterface: User = { name: "Ali" };
+const userViaType: UserType = { name: "Ali" };
 ```
 
 ```javascript
 // Compiled JS — interface VA type alias HAM to'liq o'chiriladi
-const a = { name: "Ali" };
-const b = { name: "Ali" };
+const userViaInterface = { name: "Ali" };
+const userViaType = { name: "Ali" };
 
 // Ikkalasi ham faqat compile-time construct'lar
 // Runtime'da farq yo'q — oddiy JS object
@@ -2540,7 +2533,7 @@ const data = {...};       // Variable — type inferred
 const user: User = data;  // Variable reference — excess check YO'Q
 ```
 
-Compiler literal va non-literal'ni `isFreshLiteralType` flag orqali ajratadi. Object literal — **fresh** type (yangi yaratilgan), keyingi reference'lar esa **regular** type. Fresh type'da excess check, regular type'da structural compatibility tekshiriladi.
+Compiler literal va non-literal'ni "freshness" tushunchasi orqali ajratadi. To'g'ridan-to'g'ri yozilgan object literal — **fresh** type, o'zgaruvchiga assign qilingach esa reference **regular** type'ga aylanadi (freshness yo'qoladi). Fresh type'da excess check, regular type'da faqat structural compatibility tekshiriladi.
 
 **Bypass mexanizmlari:**
 
@@ -2554,9 +2547,9 @@ interface Flexible {
   [key: string]: unknown; // index signature
 }
 
-const obj: Flexible = {
+const profile: Flexible = {
   name: "Ali",
-  extra: "value", // ✅ index signature orqali
+  bio: "developer", // ✅ index signature orqali
 };
 ```
 
@@ -2607,11 +2600,11 @@ interface Point {
 }
 
 // Yechim 1: Variable ga avval assign
-const data = { x: 10, y: 20, z: 30 };
-const p1: Point = data; // ✅
+const rawPoint = { x: 10, y: 20, z: 30 };
+const fromVariable: Point = rawPoint; // ✅
 
 // Yechim 2: Type assertion (xavfli)
-const p2 = { x: 10, y: 20, z: 30 } as Point; // ✅ lekin xavfli
+const fromAssertion = { x: 10, y: 20, z: 30 } as Point; // ✅ lekin xavfli
 // ⚠️ Boshqa xatolarni ham yashiradi
 
 // Yechim 3: Index signature — ishonchli
@@ -2620,7 +2613,7 @@ interface FlexPoint {
   y: number;
   [key: string]: number; // qo'shimcha number property'lar ruxsat
 }
-const p3: FlexPoint = { x: 10, y: 20, z: 30 }; // ✅
+const flexPoint: FlexPoint = { x: 10, y: 20, z: 30 }; // ✅
 ```
 
 Real-world: React props:
@@ -2785,7 +2778,7 @@ type DeepReadonly<T> = {
 
 **Interface vs type alias:**
 
-Interface'lar recursive reference'da **afzalroq** — compiler interface'ni "named type" sifatida track qiladi, circular reference'ni identity orqali taniydi va ularni cycles sifatida aniqlashmaydi (chunki interface — declaration, type expression emas).
+Interface'lar recursive reference'da **afzalroq** — compiler interface'ni "named type" sifatida track qiladi va circular reference'ni identity orqali taniydi (chunki interface — declaration, type expression emas). Shu sababli interface o'ziga havola qilganda qayta-qayta expand qilinmaydi.
 
 Type alias'lar esa inline expand qilinish moyil — chuqur recursion'da compiler `instantiationDepth`'ga tezroq yetadi.
 
@@ -2898,9 +2891,9 @@ interface Comment {
 }
 
 function findComment(comments: Comment[], id: number): Comment | null {
-  for (const c of comments) {
-    if (c.id === id) return c;
-    const found = findComment(c.replies, id);
+  for (const comment of comments) {
+    if (comment.id === id) return comment;
+    const found = findComment(comment.replies, id);
     if (found !== null) return found;
   }
   return null;
@@ -2908,7 +2901,7 @@ function findComment(comments: Comment[], id: number): Comment | null {
 
 function countAll(comments: Comment[]): number {
   return comments.reduce(
-    (total, c) => total + 1 + countAll(c.replies),
+    (total, comment) => total + 1 + countAll(comment.replies),
     0
   );
 }
@@ -2935,7 +2928,7 @@ const tree: TreeNode = {
 };
 
 function countNodes(node: TreeNode): number {
-  return 1 + node.children.reduce((sum, c) => sum + countNodes(c), 0);
+  return 1 + node.children.reduce((sum, child) => sum + countNodes(child), 0);
 }
 ```
 
@@ -2950,7 +2943,7 @@ const tree = {
 };
 
 function countNodes(node) {
-  return 1 + node.children.reduce((sum, c) => sum + countNodes(c), 0);
+  return 1 + node.children.reduce((sum, child) => sum + countNodes(child), 0);
 }
 
 // Recursive struktura — oddiy nested JS object
@@ -2974,11 +2967,12 @@ type PropertyKey = string | number | symbol;
 
 Bu JavaScript'ning cheklovidir — object key faqat shu 3 tip bo'lishi mumkin. Boshqa tip (boolean, object, function) key sifatida ishlatilsa — runtime'da `String()` orqali string'ga convert bo'ladi.
 
-```typescript
-const obj = {};
-obj[true as any];  // runtime: obj["true"]
-obj[42];            // runtime: obj["42"] — number string'ga coerce
-obj[Symbol("id")];  // symbol — alohida
+```javascript
+// JavaScript runtime — TS tip cheklovisiz
+const store = {};
+store[true] = 1;          // runtime: store["true"] — boolean string'ga coerce
+store[42] = 2;            // runtime: store["42"] — number string'ga coerce
+store[Symbol("id")] = 3;  // symbol — alohida, coerce qilinmaydi
 ```
 
 `PropertyKey` qaerda ishlatiladi:
@@ -3012,7 +3006,7 @@ interface Wrong {
 interface Right {
   [key: string]: unknown;
   [key: number]: unknown;
-  // symbol index signature alohida yozilmaydi
+  [key: symbol]: unknown; // symbol index signature ham alohida yoziladi (TS 4.4+)
 }
 
 // ✅ Record ishlaydi (mapped type)
@@ -3067,10 +3061,7 @@ interface Bad {
 }
 ```
 
-Sabab: runtime'da har index access **aniq bir tip**'dan biri bo'lishi kerak — string yoki number. Union'ni "aralash" indeksda ishlatish aniq emas. Checker har index signature uchun alohida `IndexInfo`'ni talab qiladi:
-- `stringIndexInfo` — `string` index uchun
-- `numberIndexInfo` — `number` index uchun
-- `symbolIndexInfo` — `symbol` index uchun
+Sabab: compiler har index signature'ni alohida `IndexInfo` sifatida saqlaydi — har birining o'z key type'i (`string`, `number`, `symbol` yoki template literal pattern) bilan. Union key type bitta `IndexInfo`'ga to'g'ri kelmaydi, shuning uchun union o'rniga har tip uchun alohida signature yozish kerak. Bu cheklov mapped type bilan chetlanadi — `Record<PropertyKey, V>` union key'ni har a'zoga distribute qiladi.
 
 **Number index va string coercion:**
 
@@ -3089,9 +3080,9 @@ record.a; // number
 **`keyof any` va `PropertyKey`:**
 
 ```typescript
-type A = keyof any;       // string | number | symbol
-type B = PropertyKey;     // string | number | symbol
-type C = A extends B ? true : false; // true (same)
+type KeyofAny = keyof any;     // string | number | symbol
+type PropKey = PropertyKey;    // string | number | symbol
+type AreEqual = KeyofAny extends PropKey ? true : false; // true (same)
 ```
 
 Bular bir xil tip. Ko'p kodbazalarda `K extends PropertyKey` yoziladi — nom aniqroq. `K extends keyof any` — eski stil (TS 2.x), hozir ham ishlaydi.
@@ -3104,23 +3095,22 @@ Bular bir xil tip. Ko'p kodbazalarda `K extends PropertyKey` yoziladi — nom an
 <summary><strong>Kod Misollari</strong></summary>
 
 ```typescript
-// Generic constraint — valid key tipi
-function pick<T, K extends PropertyKey>(
+// Generic constraint — key ob'ektning haqiqiy kalitlaridan biri (keyof T ⊂ PropertyKey)
+function pick<T extends object, K extends keyof T>(
   obj: T,
   keys: K[]
-): Pick<T, Extract<K, keyof T>> {
-  const result = {} as Pick<T, Extract<K, keyof T>>;
+): Pick<T, K> {
+  const result = {} as Pick<T, K>;
   for (const key of keys) {
-    if (key in (obj as any)) {
-      (result as any)[key] = (obj as any)[key];
-    }
+    result[key] = obj[key];
   }
   return result;
 }
 
 const user = { id: 1, name: "Ali", email: "ali@mail.com", age: 25 };
 const subset = pick(user, ["id", "name"]);
-// { id: 1, name: "Ali" }
+// subset type: { id: number; name: string }
+// (user literal'da id qiymati number'ga widen bo'ladi, `1` literal emas)
 ```
 
 Record bilan:
@@ -3139,12 +3129,12 @@ cache[Symbol("id")] = "value3";
 
 ```typescript
 // Teng tip'lar
-type A = keyof any;        // string | number | symbol
-type B = PropertyKey;      // string | number | symbol
+type KeyofAny = keyof any;     // string | number | symbol
+type PropKey = PropertyKey;    // string | number | symbol
 
 // Generic constraint — ikkala sintaksis ishlaydi
-function setKey1<K extends keyof any>(k: K): K { return k; }
-function setKey2<K extends PropertyKey>(k: K): K { return k; }
+function identityViaKeyofAny<K extends keyof any>(key: K): K { return key; }
+function identityViaPropertyKey<K extends PropertyKey>(key: K): K { return key; }
 
 // Record'da `keyof any` ichki ishlatiladi
 type Record<K extends keyof any, V> = {
@@ -3155,21 +3145,21 @@ type Record<K extends keyof any, V> = {
 Object key runtime coercion:
 
 ```typescript
-const obj: Record<PropertyKey, string> = {};
+const store: Record<PropertyKey, string> = {};
 
-obj["hello"] = "world";   // string key
-obj[42] = "forty-two";    // number key (runtime: "42")
-obj[Symbol("id")] = "symbol-value";
+store["hello"] = "world";   // string key
+store[42] = "forty-two";    // number key (runtime: "42")
+store[Symbol("id")] = "symbol-value";
 
 // Access
-obj["hello"];             // "world"
-obj[42];                   // "forty-two" (aslida obj["42"])
-obj["42"];                // "forty-two" (bir xil — coerced)
+store["hello"];             // "world"
+store[42];                   // "forty-two" (aslida store["42"])
+store["42"];                // "forty-two" (bir xil — coerced)
 
 // Symbol alohida
-const sym = Symbol("id");
-obj[sym] = "symbolValue";
-obj[sym];                 // "symbolValue" — faqat shu sym bilan kirish mumkin
+const idKey = Symbol("id");
+store[idKey] = "symbolValue";
+store[idKey];                 // "symbolValue" — faqat shu symbol bilan kirish mumkin
 ```
 
 </details>
@@ -3178,9 +3168,7 @@ obj[sym];                 // "symbolValue" — faqat shu sym bilan kirish mumkin
 <summary><strong>Compiled Output</strong></summary>
 
 ```typescript
-// TS source
-type PropertyKey = string | number | symbol;
-
+// TS source — PropertyKey built-in, qayta declare qilish shart emas
 function getKey<K extends PropertyKey>(
   obj: Record<K, unknown>,
   key: K
@@ -3188,7 +3176,8 @@ function getKey<K extends PropertyKey>(
   return obj[key];
 }
 
-const result = getKey({ name: "Ali", 0: "zero" }, "name");
+const profile = { name: "Ali", email: "ali@mail.com" };
+const result = getKey(profile, "name");
 ```
 
 ```javascript
@@ -3197,7 +3186,8 @@ function getKey(obj, key) {
   return obj[key];
 }
 
-const result = getKey({ name: "Ali", 0: "zero" }, "name");
+const profile = { name: "Ali", email: "ali@mail.com" };
+const result = getKey(profile, "name");
 
 // Runtime'da hech qanday key type tekshiruvi yo'q
 // JS'da har qanday qiymat key sifatida ishlatish mumkin
@@ -3212,7 +3202,7 @@ const result = getKey({ name: "Ali", 0: "zero" }, "name");
 
 Object va interface bilan ishlashdagi nozik holatlar. Ular ko'pincha kutilmagandek xulq sifatida namoyon bo'ladi.
 
-### 🕳 Gotcha 1: `readonly` shallow — nested mutable
+### Gotcha 1: `readonly` shallow — nested mutable
 
 ```typescript
 interface Config {
@@ -3235,18 +3225,18 @@ cfg.database.port = 3306;         // ⚠️ Mutable!
 
 ---
 
-### 🕳 Gotcha 2: Excess property checking bypass variable orqali
+### Gotcha 2: Excess property checking bypass variable orqali
 
 ```typescript
 interface Point { x: number; y: number; }
 
 // ❌ Literal — excess property check
-const p1: Point = { x: 10, y: 20, z: 30 };
+const literalPoint: Point = { x: 10, y: 20, z: 30 };
 // Error: Object literal may only specify known properties
 
 // ✅ Variable orqali — bypass
-const data = { x: 10, y: 20, z: 30 };
-const p2: Point = data; // ✅ Hech qanday xato!
+const rawPoint = { x: 10, y: 20, z: 30 };
+const fromVariable: Point = rawPoint; // ✅ Hech qanday xato!
 // z property runtime'da QOLADI — TS tekshirmagan
 ```
 
@@ -3254,7 +3244,7 @@ const p2: Point = data; // ✅ Hech qanday xato!
 
 ---
 
-### 🕳 Gotcha 3: Interface merging va ambient modules
+### Gotcha 3: Interface merging va ambient modules
 
 ```typescript
 // Bir xil scope ichida (bitta fayl, yoki ambient declarations)
@@ -3274,7 +3264,7 @@ const user: User = { age: 25 };
 
 ---
 
-### 🕳 Gotcha 4: `noUncheckedIndexedAccess` o'chiq — silent undefined
+### Gotcha 4: `noUncheckedIndexedAccess` o'chiq — silent undefined
 
 ```typescript
 // tsconfig.json: "noUncheckedIndexedAccess": false (default)
@@ -3295,29 +3285,29 @@ value.toUpperCase(); // ❌ Runtime: TypeError: Cannot read properties of undefi
 
 ---
 
-### 🕳 Gotcha 5: Interface default generic parameter
+### Gotcha 5: Interface default generic parameter
 
 ```typescript
-interface Box<T = string> {
+interface Container<T = string> {
   value: T;
 }
 
-const a: Box = { value: "hello" };          // T = string (default)
-const b: Box<number> = { value: 42 };        // T = number (explicit)
+const stringContainer: Container = { value: "hello" };       // T = string (default)
+const numberContainer: Container<number> = { value: 42 };    // T = number (explicit)
 
 // Gotcha: explicit undefined bilan default ishlamaydi
-// const c: Box<undefined> = { value: undefined };
+// const undefinedContainer: Container<undefined> = { value: undefined };
 // T = undefined (default emas, explicit undefined)
 
 // Gotcha 2: default'ni o'zgartirish — backward compatibility muammosi
-interface Box2<T = number> { // default o'zgartirildi: string → number
+interface NumericContainer<T = number> { // default string → number bo'lib o'zgartirildi
   value: T;
 }
-// Oldingi code: const d: Box = { value: "hello" }; // ❌ endi xato
+// Oldingi kod: const legacyContainer: NumericContainer = { value: "hello" }; // ❌ endi xato
 // Default o'zgartirish — breaking change
 ```
 
-**Sabab:** Interface generic default parameter faqat **explicit omitted** bo'lganda ishlaydi (`Box` — T = string). `Box<undefined>` — explicit, default emas. Default'ni o'zgartirish backward incompatible — barcha `Box` ishlatilgan joylarda tiplar o'zgaradi. Library'larda default parameter'lar deyarli hech qachon o'zgartirilmaydi.
+**Sabab:** Interface generic default parameter faqat type argument **butunlay tushirilganda** ishlaydi (`Container` — T = string). `Container<undefined>` — explicit, default emas. Default'ni o'zgartirish backward incompatible — barcha argumentsiz ishlatilgan joylarda tiplar o'zgaradi. Library'larda default parameter'lar deyarli hech qachon o'zgartirilmaydi.
 
 ---
 
@@ -3374,11 +3364,11 @@ user.profile.age = 30;       // ⚠️ ISHLAYDI!
 interface Point { x: number; y: number; }
 
 // ❌ Literal — excess check
-// const p1: Point = { x: 1, y: 2, z: 3 }; // Error
+// const literalPoint: Point = { x: 1, y: 2, z: 3 }; // Error
 
 // ✅ Variable — bypass
-const data = { x: 1, y: 2, z: 3 };
-const p2: Point = data; // ✅ Hech qanday xato
+const rawPoint = { x: 1, y: 2, z: 3 };
+const fromVariable: Point = rawPoint; // ✅ Hech qanday xato
 
 // Bu inconsistency bilmaslik debug vaqtini oshiradi
 ```
@@ -3390,18 +3380,18 @@ const p2: Point = data; // ✅ Hech qanday xato
 ### ❌ Xato 4: Optional property va `| undefined`'ni aralashtirish
 
 ```typescript
-interface A { x?: string; }           // property bo'lmasligi mumkin
-interface B { x: string | undefined; } // property BOR, qiymati undefined bo'lishi mumkin
+interface OptionalEmail { email?: string; }           // property bo'lmasligi mumkin
+interface NullableEmail { email: string | undefined; } // property BOR, qiymati undefined bo'lishi mumkin
 
-const a: A = {};              // ✅ x yo'q
-const b: B = {};              // ❌ x kerak, hatto undefined bo'lsa ham
+const withoutEmail: OptionalEmail = {};       // ✅ email yo'q
+const missingEmail: NullableEmail = {};       // ❌ email kerak, hatto undefined bo'lsa ham
 
 // `in` operator bilan farq
-const objA: A = {};
-"x" in objA; // false — property yo'q
+const optional: OptionalEmail = {};
+"email" in optional; // false — property yo'q
 
-const objB: B = { x: undefined };
-"x" in objB; // true — property bor, qiymati undefined
+const nullable: NullableEmail = { email: undefined };
+"email" in nullable; // true — property bor, qiymati undefined
 ```
 
 **Nima uchun:** `x?: string` — "x bo'lmasligi mumkin" (`{}` valid). `x: string | undefined` — "x majburiy, qiymati undefined bo'lishi mumkin" (`{ x: undefined }` kerak). `exactOptionalPropertyTypes: true` flag bu farqni yanada kuchaytiradi. API response'larda `undefined` va missing property'ni ajratish muhim — har ikkala variant farqli semantikaga ega.
@@ -3490,47 +3480,47 @@ const admin: AdminUser = {
 ```typescript
 interface Config { host: string; port: number; }
 
-// A
-const a: Config = { host: "localhost", port: 3000, debug: true };
+// Holat A
+const directConfig: Config = { host: "localhost", port: 3000, debug: true };
 
-// B
+// Holat B
 const rawConfig = { host: "localhost", port: 3000, debug: true };
-const b: Config = rawConfig;
+const indirectConfig: Config = rawConfig;
 
-// C
+// Holat C
 function startServer(config: Config) {}
 startServer({ host: "localhost", port: 3000, debug: true });
 
-// D
-function startServer2(config: Config) {}
-const opts = { host: "localhost", port: 3000, debug: true };
-startServer2(opts);
+// Holat D
+function startServerFromVar(config: Config) {}
+const serverOptions = { host: "localhost", port: 3000, debug: true };
+startServerFromVar(serverOptions);
 ```
 
 <details>
 <summary>Javob</summary>
 
 ```typescript
-// A — ❌ XATO
-const a: Config = { host: "localhost", port: 3000, debug: true };
+// Holat A — ❌ XATO
+const directConfig: Config = { host: "localhost", port: 3000, debug: true };
 // Object LITERAL — excess property checking ishlaydi
 // debug Config'da yo'q → xato
 
-// B — ✅ XATO YO'Q
+// Holat B — ✅ XATO YO'Q
 const rawConfig = { host: "localhost", port: 3000, debug: true };
-const b: Config = rawConfig;
+const indirectConfig: Config = rawConfig;
 // Variable orqali — fresh emas, excess check yo'q
 // Structural: host ✅, port ✅ — yetarli
 // debug runtime'da qoladi — TS tekshirmagan
 
-// C — ❌ XATO
+// Holat C — ❌ XATO
 startServer({ host: "localhost", port: 3000, debug: true });
 // Funksiya argumenti — object literal (fresh)
 // Excess check ishlaydi
 
-// D — ✅ XATO YO'Q
-const opts = { host: "localhost", port: 3000, debug: true };
-startServer2(opts);
+// Holat D — ✅ XATO YO'Q
+const serverOptions = { host: "localhost", port: 3000, debug: true };
+startServerFromVar(serverOptions);
 // Variable orqali — fresh emas, excess check yo'q
 ```
 
@@ -3566,7 +3556,7 @@ function countAllComments(comments: Comment[]): number {
 // Yoki reduce bilan
 function countAll(comments: Comment[]): number {
   return comments.reduce(
-    (total, c) => total + 1 + countAll(c.replies),
+    (total, comment) => total + 1 + countAll(comment.replies),
     0
   );
 }

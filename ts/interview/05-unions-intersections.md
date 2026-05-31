@@ -45,7 +45,7 @@ Union (`|`) — qiymat bir nechta tip'lardan birortasi (OR). Intersection (`&`) 
 
 TypeScript tip tizimi set theory asosida ishlaydi. `string | number` — string'lar to'plami va number'lar to'plamining birlashmasi (qiymat ikkalasidan birortasi bo'lishi mumkin). `A & B` — A va B tip'larining barcha property'larini majburiy qilib qo'shadi (qiymat ikkala tipni qondirishi shart).
 
-Object tip'larida ikki operatsiya teskari ishlaydi:
+Object tip'larida ikki operation teskari ishlaydi:
 - Union: qiymat ko'pi bilan **umumiy** property'larga ega bo'ladi.
 - Intersection: qiymat barcha tip'larning **birlashgan** property'lariga ega bo'lishi shart.
 
@@ -164,6 +164,12 @@ function render<T>(result: ApiResult<T>): string {
 }
 
 // Redux actions
+interface AppState {
+  userId: string | null;
+  name?: string;
+  email?: string;
+}
+
 type Action =
   | { type: "USER_LOGIN"; payload: { userId: string } }
   | { type: "USER_LOGOUT" }
@@ -214,7 +220,7 @@ TypeScript control flow analysis'i `switch`/`if-else` da har case bo'yicha tipni
 
 Bu pattern yangi member qo'shilganda muhim:
 1. Yangi member qo'shildi (`type Status` ga yangi qiymat).
-2. `switch` da yangi case yozilmadi.
+2. `switch`'da yangi case yozilmadi.
 3. `default` branch'da `assertNever(status)` — endi `status` `never` emas, yangi member tipini saqlaydi.
 4. Compile error — barcha unhandled joylar topiladi.
 
@@ -278,7 +284,7 @@ function logEvent(event: Event): string {
 ### Edge Cases
 
 - **Return type infer**: `assertNever` `never` qaytarganda, function return type'ga ta'sir qilmaydi (`never` har tipga assignable).
-- **`throw` vs `return`**: `default: throw assertNever(...)` ham ishlaydi, lekin `return` kompozitsiyasi yaxshi.
+- **`throw` vs `return`**: `default: throw assertNever(...)` ham ishlaydi, lekin `return assertNever(...)` control flow'da function return tipini to'ldiradi (`never` har tipga assignable).
 - **Generic exhaustive**: generic `<T extends Status>` da ham `assertNever` ishlaydi.
 - **`if-else` chain**: oxirgi `else` bo'lmasa — narrowing'ga e'tibor; explicit `else` afzal.
 - **Production behavior**: `throw` qiladi — agar runtime'da yangi qiymat kelsa, fail fast.
@@ -292,7 +298,7 @@ function logEvent(event: Event): string {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Compiler tahlili**: TypeScript control flow `getFlowTypeOfReference` ichida har branch uchun type narrowing track qiladi. `switch` statement'i `analyzeSwitch` orqali iterate qilinadi — har case'da `narrowTypeBySwitchOnDiscriminant` `discriminantPropertyAccess` orqali narrow qiladi.
+**Compiler tahlili**: TypeScript control flow analysis flow node graph'ini traverse qilib har reference uchun flow type'ni hisoblaydi (`getFlowTypeOfReference`). `switch` statement'ida har `case` clause uchun discriminant property qiymatiga qarab union member'lari narrow qilinadi (`narrowTypeBySwitchOnDiscriminant`). Barcha case qoplanganda qoldiq tip — `never`.
 
 **`never` bottom type**: type lattice'da `never` eng tubdagi tip. `never <: T` (har tipga subtype). Bu `assertNever(value)` da `value: never` argumentni har funksiyada return qila olishini ta'minlaydi.
 
@@ -461,11 +467,12 @@ function isNonNullable<T>(value: T): value is NonNullable<T> {
 
 const items: (string | null | undefined)[] = ["Aziz", null, "Vali", undefined];
 
-// ❌ Oddiy predicate — narrowing ishlamaydi (TS 5.5'gacha)
+// TS 5.5'gacha — inline predicate narrowing bermaydi
 const filtered1 = items.filter(item => item !== null && item !== undefined);
-// type: (string | null | undefined)[]
+// TS 5.4 va undan oldin: (string | null | undefined)[]
+// TS 5.5+: inferred type predicate — string[] (inline shart tipni narrow qiladi)
 
-// ✅ Type guard bilan
+// ✅ Explicit type guard — barcha TS versiyalarida string[]
 const filtered2 = items.filter(isNonNullable);
 // type: string[]
 
@@ -523,7 +530,7 @@ function isUser(value: unknown): value is User {
 - **Generic type guard**: `<T>(value: unknown): value is T` — xavfli, runtime tekshiruv yo'q, faqat unsafe escape hatch.
 - **`asserts` farqi**: `is` boolean qaytaradi, `asserts` void va throw qiladi.
 - **Negation narrowing**: `!isString(x)` — `x` `string`'dan tashqari tipga narrow bo'ladi.
-- **Inferred predicates (TS 5.5+)**: `filter(x => x.length > 0)` — TS o'zi predicate'ni infer qiladi (oddiy holatlarda).
+- **Inferred predicates (TS 5.5+)**: `filter(x => x !== null)` — TS funksiya tipni narrow qilganda (`x is NonNullable<T>` kabi) predicate'ni o'zi infer qiladi. `x => x.length > 0` kabi tipni narrow qilmaydigan boolean shart uchun predicate infer qilinmaydi.
 
 ### Follow-up savollar
 
@@ -546,12 +553,12 @@ Function overload — bir nechta signature bilan call-site'da aniq tip beradi. U
 
 ### To'liq tushuntirish
 
-Funksiya signature'da union parametr ishlatilganda, return tipi har holat uchun bir xil bo'ladi. Bu cheklov agar input tipiga qarab output tipi farqlanishi kerak bo'lsa muammo. Function overload bu vaziyatni hal qiladi: bir nechta signature deklaratsiya + bitta implementation. TypeScript call-site'da mos signature'ni topadi.
+Funksiya signature'da union parametr ishlatilganda, return tipi har holat uchun bir xil bo'ladi. Bu cheklov agar input tipiga qarab output tipi farqlanishi kerak bo'lsa muammo. Function overload bu vaziyatni hal qiladi: bir nechta signature declaration + bitta implementation. TypeScript call-site'da mos signature'ni topadi.
 
 Overload buyrug'i:
 1. Yuqoridan pastga signature'larni iterate qiladi.
 2. Birinchi mos kelganini tanlaydi (eng tor avval).
-3. Implementation signature'ni tashqaridan ko'rinmaydi — faqat overload signature'lari ko'rinadi.
+3. Implementation signature tashqaridan ko'rinmaydi — faqat overload signature'lari ko'rinadi.
 
 ### Kod misol
 
@@ -592,7 +599,7 @@ class EventBus {
   on(event: "click", handler: (e: MouseEvent) => void): void;
   on(event: "keypress", handler: (e: KeyboardEvent) => void): void;
   on(event: "load", handler: () => void): void;
-  on(event: string, handler: Function): void {
+  on(event: string, handler: (...args: never[]) => void): void {
     // implementation
   }
 }
@@ -628,21 +635,21 @@ function map(arr: any[], second: any, third?: any): any[] {
 ### Follow-up savollar
 
 1. **"Overload vs union return — qachon qaysi?"** — Input-output bog'lanishi kerak bo'lsa overload, oddiy union return bo'lsa union signature.
-2. **"Conditional type bilan overload ni qanday almashtirish mumkin?"** — `T extends "img" ? HTMLImageElement : T extends "a" ? HTMLAnchorElement : HTMLElement`.
+2. **"Conditional type bilan overload'ni qanday almashtirish mumkin?"** — `T extends "img" ? HTMLImageElement : T extends "a" ? HTMLAnchorElement : HTMLElement`.
 3. **"Implementation signature qanday bo'lishi kerak?"** — Barcha overload'larga umumiy parent tip — odatda union va `any` return.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Overload resolution algoritmi**: `chooseOverload` function compiler'da — har call-site uchun candidate signature'larni iterate qiladi. Selectiya order:
-1. Generic'siz arity-mos signature'lar.
-2. Default parametr bilan signature'lar.
+**Overload resolution algoritmi**: call expression `resolveCall` orqali resolve qilinadi — overload signature'lari declaration tartibida iterate qilinadi va birinchi mos kelgani tanlanadi (eng tor signature avval yozilishi shart). Resolution relaxation bosqichlari (`chooseOverload`):
+1. Generic'siz, arity aniq mos signature'lar.
+2. Default parametr bilan signature'lar (arity yumshatiladi).
 3. Rest parametr bilan signature'lar.
-4. Generic signature'lar.
+4. Generic signature'lar (type inference bilan).
 
-Har qaysida signature mos kelishi `compareSignaturesIdentical` orqali tekshiriladi.
+Har bosqichda argument signature parametr'lariga assignable ekanligi tekshiriladi (identity emas, assignability).
 
-**Implementation hidden**: TypeScript design intent — implementation signature `any`/`unknown` parametr olishi mumkin, lekin consumer'lar uchun ko'rinmasligi kerak (capsulation).
+**Implementation hidden**: TypeScript design intent — implementation signature `any`/`unknown` parametr olishi mumkin, lekin consumer'lar uchun ko'rinmasligi kerak (encapsulation).
 
 **Discriminated alternative**: conditional type bilan `function fn<T extends Input>(x: T): Output<T>` — single signature, TypeScript map'ni hisoblaydi. Overload'dan farqi — readability va inferring power.
 
@@ -663,7 +670,7 @@ Har qaysida signature mos kelishi `compareSignaturesIdentical` orqali tekshirila
 
 ### To'liq tushuntirish
 
-`:` annotation tipni "widen" qiladi — inferred literal tip target tipga kengaytirildi. `satisfies` esa "narrow" qiladi — value tipi mos kelishi tekshiriladi, lekin TypeScript original inferred tipni saqlaydi. Bu union/intersection'da farq juda muhim:
+`:` annotation tipni "widen" qiladi — inferred literal tip target tipga kengaytirildi. `satisfies` esa inferred tipni saqlaydi — value tipi target'ga mosligini tekshiradi, lekin TypeScript original inferred tipni o'zgartirmaydi. Union/intersection target'da bu farq quyidagicha namoyon bo'ladi:
 
 - `: Config` bilan — `config.port` `string | number` (Config tipi).
 - `satisfies Config` bilan — `config.port` `number` (inferred aniq tip).
@@ -718,8 +725,8 @@ const dark: Theme = {
   bg: "black",
   fg: "white",
 };
-// dark tipi: Theme (union)
-dark.bg;  // "white" | "black" — widen qilingan
+// dark tipi: Theme (union — aniq variant'ga narrow bo'lmadi)
+dark.bg;  // "white" | "black" — har member'ning bg literal'lari union'i
 
 // Function return type — satisfies bilan refinement
 function createUser() {
@@ -760,9 +767,9 @@ routes.api.method;  // "POST" — literal
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Compiler implementation**: `checkSatisfiesExpression` ichida ikki nuqta tekshiruvi:
-1. `isTypeAssignableTo(sourceType, targetType)` — value target'ga mos kelishini tekshirish.
-2. Original `getContextualType` ni saqlash — inferred type'ni return qilish.
+**Compiler implementation**: `checkSatisfiesExpression` (TS 4.9'da qo'shilgan) ikki ish bajaradi:
+1. Target tip expression uchun contextual type sifatida qo'llaniladi, so'ng expression tipi target'ga assignable ekanligi tekshiriladi (`isTypeAssignableTo`). Mos kelmasa — error.
+2. Qaytariladigan tip — expression'ning o'z inferred tipi (target'ga widen qilinmaydi). `:` annotation'dan farqi shu — annotation declared tip'ni majburlaydi, `satisfies` esa faqat tekshiradi.
 
 **`as const` interaction**: `as const` literal'ni "frozen" qiladi — widen qilmaydi. `satisfies` ham widen qilmaydi. Birga ishlatilganda — eng tor (literal + readonly) tip saqlanadi.
 
@@ -791,7 +798,7 @@ Bir xil nomli property turli tip'lar bilan intersection'da `never` bo'ladi. Bund
 
 ### To'liq tushuntirish
 
-Intersection (`A & B`) ikkala tip property'larining birlashmasini olganda, bir xil nomli property turli tip'larda bo'lsa, TypeScript ularning intersection'ini hisoblaydi: `string & number = never`. Compiler bu paytda error bermaydi (lazy resolution), faqat consumer kod object yaratishga uringanda — hech qanday qiymat `never` tipiga assignable emas — error chiqadi. Primitive intersection da literal subset qoidasi qo'llanadi: `string & "x" = "x"` (literal — string'ning torroq subset'i).
+Intersection (`A & B`) ikkala tip property'larining birlashmasini olganda, bir xil nomli property turli tip'larda bo'lsa, TypeScript ularning intersection'ini hisoblaydi: `string & number = never`. Compiler bu paytda error bermaydi (lazy resolution), faqat consumer kod object yaratishga uringanda — hech qanday qiymat `never` tipiga assignable emas — error chiqadi. Primitive intersection'da literal subset qoidasi qo'llanadi: `string & "x" = "x"` (literal — string'ning torroq subset'i).
 
 ### Kod misol
 
@@ -811,10 +818,13 @@ type CResolved = {
 // y uchun hech qanday qiymat mos kelmaydi — never
 
 // Edge case — primitive'larda
-type StringNumber = string & number;     // never
+type StringNumber = string & number;     // never (ikkala primitive disjoint)
 type StringString = string & "literal";  // "literal" (literal string subset)
-type TrueBoolean = true & boolean;       // true
-type DateNumber = Date & number;         // never (mos kelmaydigan tip'lar)
+type TrueBoolean = true & boolean;       // true (true — boolean subtype)
+type DateNumber = Date & number;         // Date & number — never EMAS
+// Object tip (Date) primitive (number) bilan intersection — TS never'ga
+// reduce qilmaydi, intersection ko'rinishida qoladi. Bunday tipga hech
+// qanday qiymat assignable emas, lekin compiler uni `never` deb belgilamaydi.
 ```
 
 ### Edge Cases
@@ -995,7 +1005,7 @@ console.log(getOrderMessage(order));
 
 ### To'liq tushuntirish
 
-Type-safe state machine — har state uchun keyingi state'ni compile-time'da kafolatlash. `NextState` — mapped object type, har key (state) o'zining keyingi state literal'iga map qiladi. Generic `<S extends TrafficLight>` constraint bilan input literal saqlanadi, return type indexed access `NextState[S]` orqali — har specific input uchun aniq output tipi inferred. `as NextState[S]` assertion zarur, chunki `case "red"` ichida TypeScript `S` ni `"red"` deb narrow qila olmaydi (literal generic constraint subtle). Terminal state'lar (transition yo'q) `never` qaytaradigan tip orqali modellashtiriladi.
+Type-safe state machine — har state uchun keyingi state'ni compile-time'da kafolatlash. `NextState` — mapped object type, har key (state) o'zining keyingi state literal'iga map qiladi. Generic `<S extends TrafficLight>` constraint bilan input literal saqlanadi, return type indexed access `NextState[S]` orqali — har specific input uchun aniq output tipi inferred. `as NextState[S]` assertion zarur, chunki `case "red"` ichida TypeScript `S`'ni `"red"` deb narrow qila olmaydi (literal generic constraint subtle). Terminal state'lar (keyingi state'i yo'q) `NextState` map'da `never` qiymat orqali modellashtiriladi.
 
 ### Kod misol
 
@@ -1062,8 +1072,8 @@ const trafficSM: StateMachine<TrafficLight, NextState> = {
 ### Edge Cases
 
 - **Generic with literal**: `S extends "red"` constraint — only "red" input, "green" output.
-- **`as NextState[S]`**: assertion kerak — `case "red"` da TypeScript `S` ni "red" deb narrow qila olmaydi (literal constraint subtle).
-- **Empty transition**: terminal state ("delivered", "cancelled") — `never` qaytaradigan tip.
+- **`as NextState[S]`**: assertion kerak — `case "red"`'da TypeScript `S`'ni `"red"` deb narrow qila olmaydi (literal constraint subtle).
+- **Empty transition**: terminal state (keyingi state'i yo'q) — `NextState` map'da `never` qiymat orqali modellashtiriladi.
 
 ### Follow-up savollar
 
@@ -1163,7 +1173,7 @@ const successfulUsers = results
 
 ### Follow-up savollar
 
-1. **"`Promise` bilan qanday integratsiya?"** — `Promise<ApiResult<T>>` — resolved value har doim ApiResult tipida.
+1. **"`Promise` bilan qanday integration?"** — `Promise<ApiResult<T>>` — resolved value har doim ApiResult tipida.
 2. **"React Query/SWR'da shu pattern qanday?"** — `useQuery` `{ data, error, isLoading, status }` discriminated union shaklida result qaytaradi.
 
 </details>
@@ -1183,7 +1193,7 @@ const successfulUsers = results
 
 ### To'liq tushuntirish
 
-`in` operator narrowing — property union member'larining qaysi birida mavjudligini aniqlash orqali tipni torytiradi. Agar property barcha member'larda bor bo'lsa, narrowing hech qanday tipni eliminate qila olmaydi — natijada original union saqlanadi va specific method ga kirish error beradi. To'g'ri pattern: (1) `in` faqat farqlovchi property bilan — har member'da unique property bo'lsa, (2) discriminated union (`kind` literal property) — eng aniq va exhaustive check'ga moslashgan, (3) custom type guard (`pet is Dog`) — runtime logic'ni alohida funksiyaga ajratadi.
+`in` operator narrowing — property union member'larining qaysi birida mavjudligini aniqlash orqali tipni toraytiradi. Agar property barcha member'larda bor bo'lsa, narrowing hech qanday tipni eliminate qila olmaydi — natijada original union saqlanadi va specific method'ga kirish error beradi. To'g'ri pattern: (1) `in` faqat farqlovchi property bilan — har member'da unique property bo'lsa, (2) discriminated union (`kind` literal property) — eng aniq va exhaustive check'ga moslashgan, (3) custom type guard (`pet is Dog`) — runtime logic'ni alohida funksiyaga ajratadi.
 
 ### Kod misol
 
@@ -1260,7 +1270,7 @@ function makeSoundV3(pet: Pet): void {
 
 ### To'liq tushuntirish
 
-Intersection `A & B` har property uchun ikkala tipning intersection'ini hisoblaydi (`number & string = never`). Compiler bu paytda error bermaydi — type lazy resolution. Faqat object yaratish vaqti — `never` ga assignable hech qanday qiymat yo'q — yangi error yuzaga chiqadi. Bu silent fail'ni avtomatik aniqlash uchun utility tip yozish mumkin: `FindNever<T>` mapped type — har property `never` ekanligini tekshiradi va kalit nomini ekstrakt qiladi (`[K in keyof T]: T[K] extends never ? K : never`). Yechimlar: `Omit` bilan conflict property'ni olib tashlash, yoki overlap property'ni union'ga kengaytirish (`id: string | number`).
+Intersection `A & B` har property uchun ikkala tipning intersection'ini hisoblaydi (`number & string = never`). Compiler bu paytda error bermaydi — type lazy resolution. Faqat object yaratish vaqti — `never`'ga assignable hech qanday qiymat yo'q — yangi error yuzaga chiqadi. Bu silent fail'ni avtomatik aniqlash uchun utility tip yozish mumkin: `FindNever<T>` mapped type — har property `never` ekanligini tekshiradi va kalit nomini ajratib oladi (`[K in keyof T]: T[K] extends never ? K : never`). Yechimlar: `Omit` bilan conflict property'ni olib tashlash, yoki overlap property'ni union'ga kengaytirish (`id: string | number`).
 
 ### Kod misol
 
@@ -1322,7 +1332,7 @@ type NeverKeys = FindNever<AB>; // "id"
 - Discriminated union — uchta sharti: umumiy property, literal tip, farqli qiymat.
 - Exhaustive checking — `assertNever` bilan barcha member'lar handle qilinganligini guarantee qilish.
 - `typeof` primitive uchun, `instanceof` class uchun, `in` property mavjudligi uchun.
-- Custom type guard `value is T` — `filter`, `find` da type-safe narrowing.
+- Custom type guard `value is T` — `filter`, `find`'da type-safe narrowing.
 - Function overload — input → output aniq mapping. Conditional type alternative.
 - `satisfies` — type validation + inferred type saqlash. `:` annotation widen qiladi.
-- Intersection conflict silent `never`, intersection'da bir xil property turli tip'lar bilan — runtime'da `never`.
+- Intersection conflict — bir xil nomli property turli primitive tip'lar bilan silent `never` beradi; xato object yaratishga urinilganda (compile-time) ko'rinadi.

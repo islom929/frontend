@@ -39,15 +39,15 @@
 
 ### Qisqa javob
 
-Type narrowing — TypeScript compiler runtime tekshiruvlarni (`typeof`, `instanceof`, `in`, equality) tahlil qilib, union type'ni har code branch'da aniqroq tipga toraytirishi. Control flow analysis — kompilyator kodni yuqoridan pastga oqim grafi bo'yicha tahlil qilib, har nuqtada o'zgaruvchi tipini track qilishi.
+Type narrowing — TypeScript compiler runtime tekshiruvlarni (`typeof`, `instanceof`, `in`, equality) tahlil qilib, union type'ni har code branch'da aniqroq tipga toraytirishi. Control flow analysis — compiler kodni yuqoridan pastga oqim grafi bo'yicha tahlil qilib, har nuqtada o'zgaruvchi tipini track qilishi.
 
 ### To'liq tushuntirish
 
-Union type'da faqat barcha member'larga umumiy operatsiyalar ishlaydi. Specific property yoki method uchun avval narrowing qilish kerak — kompilyatorga "shu branch'da tip aniqroq" deb signal berish. TypeScript bu signallarni `if`, `switch`, `?:`, `&&`, `||`, `return`, `throw`, `break` orqali oladi.
+Union type'da faqat barcha member'larga umumiy operatsiyalar ishlaydi. Specific property yoki method uchun avval narrowing qilish kerak — compiler'ga "shu branch'da tip aniqroq" deb signal berish. TypeScript bu signallarni `if`, `switch`, `?:`, `&&`, `||`, `return`, `throw`, `break` orqali oladi.
 
 **Control flow analysis bosqichlari:**
 
-1. Kompilyator parsing'dan keyin syntax tree quradi.
+1. Compiler parsing'dan keyin syntax tree quradi.
 2. Har scope uchun flow graph (block, branch, loop) yaratiladi.
 3. Har node'da `getFlowTypeOfReference` o'zgaruvchining hozirgi tipini hisoblaydi.
 4. Branching ifoda (`if`, `switch`) `narrowType*` funksiyalari orqali tipni eliminate qiladi.
@@ -99,7 +99,7 @@ function getLengthGood(value: string | null): number {
 
 ### Edge Cases
 
-- **`==` vs `===`**: `== null` ikkala `null` va `undefined` ni oladi, `=== null` faqat `null`.
+- **`==` vs `===`**: `== null` ikkala `null` va `undefined`'ni oladi, `=== null` faqat `null`.
 - **Falsy values**: `0`, `""`, `false` truthy check'da olib tashlanadi — `null/undefined` ga e'tibor.
 - **Block scope**: `if` ichida `const` bilan reassign yo'q — narrowing saqlanadi.
 - **Function call'dan keyin**: object property narrowing yo'qoladi (mutation ehtimoli).
@@ -128,7 +128,7 @@ Truthiness narrowing — `if (value)` orqali `null`, `undefined`, `0`, `""`, `fa
 
 JavaScript'da har value `Boolean(value)` orqali truthy yoki falsy ga konvert bo'ladi. Falsy qiymatlar: `false`, `0`, `-0`, `0n`, `""`, `null`, `undefined`, `NaN`. Qolgan barcha qiymatlar truthy (jumladan `"false"`, `[]`, `{}`, `0n` dan tashqari bigint, function).
 
-Truthiness narrowing'ning xatosi: `string | null` tipida `if (value)` `null`'ni olib tashlaydi, lekin `""` (bo'sh string) ham truthy emas — agar `""` valid qiymat bo'lsa, false-positive yo'qotish. Xuddi shunday `number | null` da `0` valid bo'lsa — yo'qoladi.
+Truthiness narrowing'ning xatosi: `string | null` tipida `if (value)` `null`'ni olib tashlaydi, lekin `""` (bo'sh string) ham truthy emas — agar `""` valid qiymat bo'lsa, false-positive yo'qotish. Shu tarzda `number | null` da `0` valid bo'lsa — yo'qoladi.
 
 **To'g'ri pattern**: aniq tekshiruv (`value !== null`, `value !== undefined`) yoki `?.`/`??` operatorlari.
 
@@ -184,8 +184,10 @@ function greet(user: User | Empty): string {
   return "Anonim";
 }
 
-// Falsy qiymatlar to'liq ro'yxat
-type Falsy = false | 0 | -0 | 0n | "" | null | undefined; // NaN ham, lekin tipi number
+// Falsy qiymatlar to'liq ro'yxat (type sifatida)
+type Falsy = false | 0 | 0n | "" | null | undefined;
+// Runtime'da -0 va NaN ham falsy; lekin -0 literal type 0 ga collapse bo'ladi,
+// NaN'ning literal type'i yo'q (tipi number)
 ```
 
 ### Edge Cases
@@ -548,11 +550,11 @@ try {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Type predicate ABI**: TypeScript compiler `is` predicate'ni `getCheckFlags` orqali track qiladi. `narrowTypeByCallExpression` chaqiriq natijasini analyze qilib, argumentni narrow qiladi. `asserts` esa `narrowTypeByAssertion` orqali — return statement'dan keyingi flow'da type'ni update qiladi.
+**Type predicate flow**: type guard signature'i `value is T` predicate'ini olib yuradi (`getTypePredicateOfSignature`). Call expression'dagi guard chaqiruvi flow graph'da call node sifatida ro'yxatdan o'tadi — true branch'da argument predicate target tipiga, false branch'da target olib tashlangan tipga narrow qilinadi. `asserts value is T` esa boolean branch yaratmaydi: assertion call'dan keyingi flow continuation'da argument target tipga narrow qilinadi (throw bo'lmasa).
 
-**`asserts` vs `throw`**: `asserts` body to'g'ridan-to'g'ri throw qilishi shart. `return` qilsa — predicate ishlamaydi (TypeScript trust qiladi, runtime'da assertion ishlamasligi mumkin).
+**`asserts` vs `throw`**: assertion ishonchni signal qiladi, lekin runtime kafolatini bermaydi — body'da haqiqiy tekshiruv + `throw`'ni siz yozasiz. Body throw qilmasa yoki noto'g'ri tekshirsa, compiler baribir narrow qiladi va runtime'da xato tip o'tib ketadi.
 
-**Predicate variance**: predicate parameter contravariant — function argument tipi narrowing chaqiriqlarida muhim. Generic guard'lar `<T>` bilan har tip uchun yagona implementatsiya.
+**Predicate parameter pozitsiyasi**: function parameter pozitsiyasi contravariant — guard argument tipi narrowing call'larida muhim. Generic guard'lar `<T>` bilan har tip uchun yagona implementation beradi.
 
 </details>
 
@@ -669,7 +671,7 @@ palette.primary; // "red" — literal
 
 ### Qisqa javob
 
-`let` bilan e'lon qilingan o'zgaruvchi narrowing'dan keyin callback (closure) ichida ishlatilsa — TypeScript narrowing'ni yo'qotadi, chunki callback qachon chaqirilishi noma'lum (variable o'zgargan bo'lishi mumkin). TS 5.4+ `let` reassign bo'lmasa narrowing'ni saqlaydi. Yechim: `const` ga capture.
+`let` bilan e'lon qilingan o'zgaruvchi narrowing'dan keyin callback (closure) ichida ishlatilsa — TypeScript narrowing'ni yo'qotadi, chunki callback qachon chaqirilishi noma'lum (variable o'zgargan bo'lishi mumkin). TS 5.4+ `let` reassign bo'lmasa narrowing'ni saqlaydi. Yechim: `const`'ga capture.
 
 ### To'liq tushuntirish
 
@@ -683,7 +685,7 @@ Bu cheklov "false positive" emas — haqiqiy bug oldini oladi. Misol: narrow'dan
 TS 5.4+ flow-sensitive `let` analysis — agar `let` narrowing'dan keyin reassign qilinmasa, closure'da ham narrow saqlanadi. Lekin reassign bo'lsa — yo'qoladi.
 
 Yechimlar:
-1. **`const` ga capture** — universal va eski TS'larda ishlaydi.
+1. **`const`'ga capture** — universal va eski TS'larda ishlaydi.
 2. **Function parameter** — explicit pass.
 3. **TS 5.4+** — automatic (faqat reassign bo'lmasa).
 
@@ -706,7 +708,7 @@ function example1(): void {
   }
 }
 
-// Yechim 1: const ga capture
+// Yechim 1: const'ga capture
 function example2(): void {
   let value: string | number = "hello";
 
@@ -782,11 +784,11 @@ function example6(x: string | number): void {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Intra-procedural cheklov**: TypeScript inter-procedural analysis qilmaydi (function chaqiruvlar orasidagi side effect'lar). Bu compiler performance va undecidability sababli. Compiler `getEffectiveTypeRoots` orqali function boundary'larda type'ni reset qiladi.
+**Intra-procedural cheklov**: TypeScript inter-procedural narrowing qilmaydi — chaqirilgan function'ning side effect'lari (variable yoki property mutation) flow analysis'ga ko'rinmaydi. Bu undecidability va performance sababli: callee'ni har call site uchun analyze qilish soundness'ni kafolatlamaydi. Nested function chegarasini kesib o'tganda compiler outer reference'ning narrow tipini tashlab, declared tipga qaytadi.
 
-**TS 5.4 mexanizmi**: `getNarrowedTypeWorker` ichida `lastAssignmentLeavesNarrowedType` — agar `let` reassign bo'lmasa, closure context'da ham narrowing inherit qilinadi. Reassign bo'lsa — `getUnionType` declared tip bilan join qilinadi.
+**TS 5.4 mexanizmi**: 5.4 dan oldin nested function ichida ishlatilgan `let`/parameter har doim declared tipga widen qilinardi. 5.4 da compiler "last assignment point" ni qidiradi: agar nested function shu o'zgaruvchining oxirgi assignment'idan keyin yaratilsa va o'zgaruvchi nested function ichida reassign qilinmasa — narrow tip closure'da saqlanadi. Reassign bo'lsa, callback qachon chaqirilishi noma'lum bo'lgani uchun narrowing yo'qoladi.
 
-**Use site narrowing**: TS narrowing call site'da ishlaydi — declaration site'da emas. Bu `useDefineForClassFields` va `definite assignment` analysis'da murakkablashadi.
+**Use site narrowing**: narrowing reference'ning har use site'ida flow node'lardan hisoblanadi — declaration site'da emas. Shu sababli `definite assignment` (`!:` field) va `useDefineForClassFields` semantikasi narrowing'dan ajralib turadi.
 
 </details>
 
@@ -803,7 +805,7 @@ function example6(x: string | number): void {
 
 ### Qisqa javob
 
-Har `if` va `return` branch'idan keyin tip eliminate bo'ladi. `== null` ikkala null va undefined ni oladi.
+Har `if` va `return` branch'idan keyin tip eliminate bo'ladi. `== null` ikkala null va undefined'ni oladi.
 
 ### To'liq tushuntirish
 
@@ -914,7 +916,7 @@ function getLengthExtended(value: string | object | null): number {
 
 ### Follow-up savollar
 
-1. **"Nima uchun JS engine'lar `null` ni `"null"` deb qaytarmaydi?"** — TC39 backward compatibility uchun reject qilgan.
+1. **"Nima uchun JS engine'lar `null`'ni `"null"` deb qaytarmaydi?"** — TC39 backward compatibility uchun reject qilgan.
 2. **"`typeof` qanday yo'l bilan reliable yozish kerak?"** — Discriminated union yoki `instanceof`/`Array.isArray` kombinatsiyasi.
 
 </details>
@@ -1104,7 +1106,7 @@ async function fetchUsers(): Promise<string[]> {
 
 ### Qisqa javob
 
-Event map type bilan har event uchun aniq payload tip. Type guard funksiyalar har event ni narrow qiladi. Listener — generic constraint bilan.
+Event map type bilan har event uchun aniq payload tip. Type guard funksiyalar har event'ni narrow qiladi. Listener — generic constraint bilan.
 
 ### To'liq tushuntirish
 
@@ -1204,7 +1206,7 @@ function isUserLoginPayload(value: unknown): value is { userId: string; timestam
 
 **Mapped type + indexed access mexanizmi**: `EventMap[E]` indexed access `E` generic parametri orqali compile-time'da resolve qilinadi. TypeScript `getIndexedAccessType` chaqiruvi orqali har specific `E` literal uchun tegishli payload tipini hisoblaydi. Storage `{ [K in EventName]?: ... }` mapped type — har key uchun array, lekin generic context'da `Array<(payload: EventPayload<E>) => void>` exact tipni saqlamaydi (variance loss).
 
-**`as` assertion'lar sababi**: storage `{[K in EventName]?: ...}` mapped type'da har key uchun **invariant** array. Lekin runtime'da access — generic `E` orqali, compiler array tipini specific `E` ga match qila olmaydi. `as Array<...>` ishonchli — invariant ichki kodda `K` bilan kafolatlangan. Alternative: storage'ni `Map<EventName, Array<unknown>>` qilish + cast on access.
+**`as` assertion'lar sababi**: storage `{[K in EventName]?: ...}` mapped type'da har key alohida payload tipidagi array'ni saqlaydi. Generic `on`/`emit` ichida `this.listeners[event]` ifodasi `E` generic parametri orqali indexlanadi — compiler bu element tipini har bir `E` instantiation'i uchun aniq specific tipga rezolv qila olmaydi (generic indexed access'ning umumiy cheklovi), shuning uchun `as Array<...>` kerak bo'ladi. Assertion mantiqan to'g'ri: `event` va `handler` ikkalasi ham bir xil `E`'ga bog'langan. Alternative: storage'ni `Map<EventName, Array<unknown>>` qilib access'da cast qilish.
 
 **Distributive conditional + EventMap**: agar `match` pattern kerak bo'lsa, distributive conditional bilan har case uchun handler tipi: `{ [K in EventName]: (payload: EventMap[K]) => R }` — union'da har handler aniq payload tipini biladi.
 
@@ -1293,7 +1295,7 @@ function process3Good(obj: { name: string | null }): void {
   }
 }
 
-// Umumiy yechim — const ga capture
+// Umumiy yechim — const'ga capture
 function processGeneric<T>(value: T | null): void {
   const captured = value;
   if (captured !== null) {
@@ -1314,16 +1316,16 @@ declare function use<T>(value: T): void;
 ### Follow-up savollar
 
 1. **"Bu cheklovlar nima uchun bor?"** — Inter-procedural analysis'siz compiler conservative bo'lishi shart — soundness uchun.
-2. **"Yagona universal yechim qaysi?"** — Local `const` ga capture — har TS versiyada ishlaydi, har scenario'da xavfsiz.
+2. **"Yagona universal yechim qaysi?"** — Local `const`'ga capture — har TS versiyada ishlaydi, har scenario'da xavfsiz.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Soundness vs completeness trade-off**: TypeScript control flow analysis intentionally **unsound** ba'zi joylarda (covariant array, bivariant method) — ergonomics uchun. Lekin narrowing'da soundness afzal — function call'dan keyin object property narrowing reset qilinadi, chunki callee mutation qilishi mumkin. Compiler `getNarrowedTypeWorker` ichida har reference uchun `lastAssignmentLeavesNarrowedType` flag'ini tracking qiladi.
+**Soundness vs completeness trade-off**: TypeScript type system ba'zi joylarda ataylab **unsound** (covariant array, bivariant method parameter) — ergonomics uchun. Narrowing'da esa soundness afzal: function call'dan keyin object property narrowing reset qilinadi, chunki callee property'ni mutate qilishi mumkin va buni flow analysis ko'rmaydi.
 
-**`getFlowTypeOfReference` algoritmi**: TypeScript har `Reference` (variable, property access) uchun flow node graf'idan boshlab teskari yo'nalishda walk qiladi. Har `FlowAssignment`, `FlowCondition`, `FlowCall` node'i tipni narrowing/widening yo'li bilan o'zgartiradi. Closure scope cross-bo'lganda — local flow context yo'qoladi, declared type qaytariladi.
+**`getFlowTypeOfReference` algoritmi**: compiler har reference (variable, property access) uchun flow node graf'idan teskari yo'nalishda walk qiladi. Assignment, condition va call flow node'lari tipni narrowing/widening yo'li bilan o'zgartiradi. Nested function scope'iga kirilganda local flow konteksti uzilib, declared tip qaytariladi (5.4 dan oldin har doim, 5.4 dan keyin last-assignment sharti bilan).
 
-**TS 5.4 mexanizmi — `lastAssignmentLeavesNarrowedType`**: agar `let` o'zgaruvchi narrowing'dan keyin shu branch'da reassign bo'lmasa — compiler closure'da ham narrow tipni saqlaydi. Implementation `getTypeAtFlowNode` ichida — `FlowFlags.Unreachable` va `FlowFlags.Assignment` flag'larini tracking qiladi.
+**TS 5.4 mexanizmi**: agar `let` o'zgaruvchi narrowing'dan keyin shu scope'da reassign bo'lmasa va nested function ichida ham reassign qilinmasa — compiler closure'da narrow tipni saqlaydi. Reassign bo'lsa, callback ijro vaqti noma'lum bo'lgani uchun narrowing yo'qoladi.
 
 **`readonly` interaction**: `readonly` property mutation imkonsiz bo'lgani uchun — function call'dan keyin ham narrowing saqlanadi. Bu pattern API design'da muhim: immutable data — predictable type narrowing.
 
@@ -1422,7 +1424,7 @@ rootSafe.appendChild(/* ... */);
 
 ### Follow-up savollar
 
-1. **"`!` qachon ruxsat etiladi?"** — Invariant matematik kafolatlangan bo'lsa (constructor'da init, kompilyator buni ushlay olmaydi).
+1. **"`!` qachon ruxsat etiladi?"** — Invariant matematik kafolatlangan bo'lsa (constructor'da init, compiler buni ushlay olmaydi).
 2. **"ESLint qoidasi bormi?"** — `@typescript-eslint/no-non-null-assertion` — bloklaydi yoki ogohlantiradi.
 3. **"`noUncheckedIndexedAccess` bilan qanday?"** — Array/Object access har doim `T | undefined` qaytaradi — `!` yoki aniq tekshiruv.
 
@@ -1433,7 +1435,7 @@ rootSafe.appendChild(/* ... */);
 ## Xulosa
 
 - Type narrowing — union tipni `typeof`/`instanceof`/`in`/equality bilan toraytirish.
-- Control flow analysis — kompilyator kodni yuqoridan pastga oqim grafi bo'yicha tahlil qiladi.
+- Control flow analysis — compiler kodni yuqoridan pastga oqim grafi bo'yicha tahlil qiladi.
 - Truthiness narrowing — `0`/`""` falsy — string/number tipida xavfli, aniq `!== null` afzal.
 - Equality narrowing — `===` strict, `== null` ikkala null va undefined.
 - `typeof null === "object"` — JS bug, `=== null` alohida.

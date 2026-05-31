@@ -97,7 +97,7 @@ DeepPartial<Config>:
 4. logging → { level?: "debug"|"info"|"warn"|"error"; file?: string }
 ```
 
-TS 4.5+ da recursive type lar uchun **tail-call optimization** qo'llaniladi — agar recursive type to'g'ridan-to'g'ri return qilinsa, kompilator stack depth ni oshirmasdan evaluate qiladi. Real data odatda 5-10 level dan chuqurroq bo'lmaydi.
+`DeepPartial` ning rekursiv chaqiruvi mapped type ichida o'ralgani uchun (`{ [K in keyof T]?: DeepPartial<T[K]> }`) bu **tail-call EMAS** — har bir nesting level alohida instantiation depth eats. TS 4.5+ ning tail-call optimization'i faqat rekursiv natija to'g'ridan-to'g'ri qaytarilganda ishlaydi (`Performance` bo'limiga qarang). Amalda nesting object struktura instantiation depth limit'iga yetmaydigan darajada sayoz bo'ladi.
 
 Union type larga distributive ishlaydi: `DeepPartial<A | B>` = `DeepPartial<A> | DeepPartial<B>`. Bu odatda to'g'ri xatti-harakat.
 
@@ -558,7 +558,7 @@ Natija: "user" | "user.name" | "user.age"
 
 `PathValue` esa string ni template literal pattern matching bilan split qiladi — har safar birinchi `.` gacha bo'lgan key ni oladi va `T[Key]` ga tushadi. Bu linear recursion — path uzunligiga proporsional.
 
-**Performance ogohlantirish:** Chuqur nested type lar uchun `PathKeys` juda ko'p type instantiation yaratadi. 5-6 darajadan chuqurroq bo'lsa, kompilator sekinlashadi. Depth limit qo'shish tavsiya etiladi.
+**Performance ogohlantirish:** `PathKeys` ning rekursiv chaqiruvi template literal va mapped type ichida o'ralgani uchun **tail-call emas** — har nesting level mustaqil instantiation depth talab qiladi va har object darajasidagi key lar soni hosil bo'ladigan path union ini ko'paytiradi. Shu sababli `PathKeys` chuqur yoki keng struktura uchun tez `Type instantiation is excessively deep` (TS2589) chegarasiga yetadi (`Performance` bo'limidagi ~100 instantiation depth limit'i). Depth limit qo'shish tavsiya etiladi.
 
 </details>
 
@@ -746,29 +746,29 @@ Bu pattern larning barchasi recursive conditional types ga asoslangan ([Bo'lim 1
 ```typescript
 // Head — tuple ning birinchi elementi
 type Head<T extends any[]> = T extends [infer H, ...any[]] ? H : never;
-type H1 = Head<[string, number, boolean]>; // string
+type FirstField = Head<[string, number, boolean]>; // string
 
 // Tail — birinchi elementdan keyingi qism
 type Tail<T extends any[]> = T extends [any, ...infer R] ? R : [];
-type T1 = Tail<[string, number, boolean]>; // [number, boolean]
+type RestFields = Tail<[string, number, boolean]>; // [number, boolean]
 
 // Last — oxirgi element
 type Last<T extends any[]> = T extends [...any[], infer L] ? L : never;
-type L1 = Last<[string, number, boolean]>; // boolean
+type LastField = Last<[string, number, boolean]>; // boolean
 
 // Concat — ikki tuple ni birlashtirish
 type Concat<A extends any[], B extends any[]> = [...A, ...B];
-type C1 = Concat<[1, 2], [3, 4]>; // [1, 2, 3, 4]
+type Merged = Concat<[1, 2], [3, 4]>; // [1, 2, 3, 4]
 
 // Reverse — tuple ni teskari aylantirish
 type Reverse<T extends any[]> = T extends [infer H, ...infer R]
   ? [...Reverse<R>, H]
   : [];
-type R1 = Reverse<[1, 2, 3]>; // [3, 2, 1]
+type Reversed = Reverse<[1, 2, 3]>; // [3, 2, 1]
 
 // Length — tuple uzunligi
 type Length<T extends any[]> = T["length"];
-type Len = Length<[string, number, boolean]>; // 3
+type FieldCount = Length<[string, number, boolean]>; // 3
 ```
 
 **String Parsing:**
@@ -779,7 +779,7 @@ type Split<S extends string, D extends string> = S extends `${infer Head}${D}${i
   ? [Head, ...Split<Tail, D>]
   : S extends "" ? [] : [S];
 
-type S1 = Split<"a.b.c", ".">; // ["a", "b", "c"]
+type PathSegments = Split<"a.b.c", ".">; // ["a", "b", "c"]
 
 // Join — tuple ni string ga birlashtirish
 type Join<T extends string[], D extends string> = T extends []
@@ -790,7 +790,7 @@ type Join<T extends string[], D extends string> = T extends []
       ? `${H}${D}${Join<R, D>}`
       : never;
 
-type J1 = Join<["a", "b", "c"], ".">; // "a.b.c"
+type JoinedPath = Join<["a", "b", "c"], ".">; // "a.b.c"
 ```
 
 **Type-Level Arithmetic:**
@@ -862,7 +862,8 @@ Recursive type lar kompilator uchun qimmat operatsiya. Har bir recursion level d
 
 | Limit | Taxminiy qiymat | Izoh |
 |-------|----------------|------|
-| Conditional type recursion depth | ~50 (tail-call: ~1000) | `Type instantiation is excessively deep` xatosi |
+| Non-tail-call instantiation depth | ~100 | `Type instantiation is excessively deep and possibly infinite` xatosi |
+| Tail-call evaluation loop (TS 4.5+) | 1000 (hard limit) | Tail position'da rekursiya shu darajagacha aylantiriladi |
 | Union type members | Cheklangan | Katta union lar sekin |
 
 <details>
@@ -928,8 +929,13 @@ type PartialDate = SimpleDeep<Date>;
 // Date ning getTime, toJSON, valueOf kabi method lari ham optional!
 // Bu mantiqiy emas — Date ni butunlay qoldirish kerak
 
-// ✅ To'g'ri — BuiltIn check (to'liq versiya `DeepPartial<T>` bo'limida):
-type DeepPartial<T> = T extends BuiltIn ? T : /* Map/Set/Array/object recursive */;
+// ✅ To'g'ri — BuiltIn check birinchi branch da Date ni butunlay qaytaradi:
+type DeepPartial<T> = T extends BuiltIn
+  ? T
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
+// (Map/Set/Array bilan to'liq versiya `DeepPartial<T>` bo'limida)
 ```
 
 ### 2. Branded type arifmetikada brand yo'qoladi
@@ -1037,17 +1043,24 @@ type DeepKeys = PathKeys<TreeNode>; // ❌ — cheksiz
 
 // ✅ Depth limit bilan
 type SafePathKeys<T, D extends number[] = []> = D["length"] extends 4
-  ? never : /* ... */;
+  ? never
+  : T extends object
+    ? {
+        [K in keyof T & string]: T[K] extends object
+          ? K | `${K}.${SafePathKeys<T[K], [...D, 0]>}`
+          : K;
+      }[keyof T & string]
+    : never;
 ```
 
 ### ❌ Xato 4: Accumulator pattern o'rniga non-tail-call recursion
 
 ```typescript
-// ❌ Non-tail-call — ~50 depth limit
+// ❌ Non-tail-call — ~100 instantiation depth limit
 type BadReverse<T extends any[]> = T extends [infer H, ...infer R]
   ? [...BadReverse<R>, H] : [];
 
-// ✅ Tail-call — ~1000 depth limit
+// ✅ Tail-call — 1000 gacha evaluation loop
 type GoodReverse<T extends any[], Acc extends any[] = []> = T extends [infer H, ...infer R]
   ? GoodReverse<R, [H, ...Acc]> : Acc;
 ```
@@ -1266,7 +1279,7 @@ Bu bo'limda TypeScript ning type system ining to'liq kuchini ishlatib, o'z utili
 
 **Type-level programming:**
 - Tuple manipulation: `Head`, `Tail`, `Last`, `Reverse`, `Concat`
-- String parsing: `Split`, `Join`, `Replace`, `ReplaceAll`
+- String parsing: `Split`, `Join`
 - Type-level arithmetic: `Add`, `Subtract` (recursive tuple bilan)
 - State machines: compile-time transition validation
 

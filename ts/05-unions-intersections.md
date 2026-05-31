@@ -110,10 +110,10 @@ Type alias compile-time'da `SymbolTable`'ga yoziladi — har alias o'z scope'ida
 
 **Type alias vs interface — ichki farq:**
 
-- **Type alias:** `TypeAliasDeclaration` — type expression'ni lazy evaluate qiladi (zamonaviy TS'da cached). Declaration merging yo'q.
-- **Interface:** `InterfaceType` — `SymbolTable` bilan eager built. Declaration merging `binder.ts`'da `mergeSymbol()` orqali.
+- **Type alias:** `TypeAliasDeclaration` — type expression'ni kerak bo'lganda resolve qiladi (resolved type cached). Declaration merging yo'q.
+- **Interface:** bir nechta declaration bir symbol'ga birlashtiriladi (declaration merging), keyin `InterfaceType` sifatida resolve qilinadi.
 
-Zamonaviy TS'da (4.x+) ikkalasi ham cached — performance farqi kam. Asosiy farq **semantic expressiveness**: type alias kengroq constructs'ni qo'llab-quvvatlaydi (union, mapped, conditional), interface esa object shape va class implements'ga ixtisoslashgan.
+Asosiy farq **semantic expressiveness**: type alias kengroq constructs'ni qo'llab-quvvatlaydi (union, mapped, conditional), interface esa object shape va class implements'ga ixtisoslashgan. Interface declaration merging'ni qo'llab-quvvatlaydi — bir nomli bir nechta interface bitta tipga birlashadi, type alias'da bu mumkin emas.
 
 </details>
 
@@ -246,50 +246,51 @@ function printValue(value: string | number): void {
 }
 ```
 
-Union — TypeScript type system'ining eng ko'p ishlatiladigan konstruksiyalaridan biri. API response'lar, parameter variants, state types, discriminated unions — barchasi union ustiga quriladi.
+Union — TypeScript type system'ining eng ko'p ishlatiladigan construct'laridan biri. API response'lar, parameter variants, state types, discriminated unions — barchasi union ustiga quriladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`checker.ts`'da union type `UnionType` object sifatida yaratiladi — `getUnionType()` funksiyasi orqali. Bu funksiya member'larni **flatten** qiladi (nested union'larni yoyadi), **duplicate**'larni olib tashlaydi va **subtype**'larni eliminate qiladi:
+`checker.ts`'da union type `UnionType` object sifatida `getUnionType()` orqali yaratiladi. Bu funksiya member'larni normalize qiladi — uch bosqich:
 
 ```
 getUnionType([string, number]):
 
-1. flattenUnionType()     →  nested union'larni yoyish
-                              A | (B | C) → A | B | C
+1. Flatten             →  nested union'larni yoyish
+                          A | (B | C) → A | B | C
 
-2. removeDuplicates()     →  takroriy tiplarni olib tashlash
-                              string | string | number → string | number
+2. Deduplicate         →  takroriy tiplarni olib tashlash
+                          string | string | number → string | number
 
-3. reduceUnionType()      →  subtype'larni olib tashlash
-                              "hello" | string → string (literal string'ga kiradi)
+3. Subtype reduction   →  subtype'larni olib tashlash
+                          "hello" | string → string (literal string'ning subtype'i)
 
 4. Natija:
    UnionType {
      flags: TypeFlags.Union,
-     types: [StringType, NumberType],
-     objectFlags: ObjectFlags.None
+     types: [StringType, NumberType]
    }
 ```
+
+Subtype reduction default'da literal union'larga (`UnionReduction.Literal`) qo'llaniladi — `"hello" | string` da literal string'ning subtype'i bo'lgani uchun `string`'ga qisqaradi.
 
 **Widening gotcha:**
 
 TypeScript literal tiplarni keng tipga **widening** qiladi `let`/parameter context'ida:
 
 ```typescript
-let x = "hello";  // x type: string (widened from "hello")
-const y = "hello"; // y type: "hello" (literal)
+let greeting = "hello";   // greeting type: string (widened from "hello")
+const label = "hello";    // label type: "hello" (literal)
 
 // Union'da ham
-let id = condition ? "abc" : 42;
-// id type: string | number (widened)
+let mutableId = condition ? "abc" : 42;
+// mutableId type: string | number (widened)
 
-const id2 = condition ? "abc" : 42;
-// id2 type: string | number (ham widened — conditional expression)
+const constId = condition ? "abc" : 42;
+// constId type: string | number (ham widened — conditional expression)
 
 // const bilan literal:
-const id3 = "abc" as const; // type: "abc"
+const frozenId = "abc" as const; // type: "abc"
 ```
 
 **Property access'da common members:**
@@ -303,7 +304,7 @@ Union member'lar soni texnik jihatdan cheklanmagan, lekin amaliy cheklovlar bor:
 - Juda katta union'lar performance'ga ta'sir qiladi — checker member'lar bo'ylab iteratsiya qiladi
 - Amaliy tavsiya: union'ni keng emas, balki kichik discriminated union'larga bo'lib chiqish; juda katta enum'larga `as const` object yaxshiroq
 
-Runtime'da union type'ning izi yo'q — faqat `typeof`, `instanceof`, `in` kabi JS tekshiruvlar qoladi.
+Runtime'da union type'ning izi yo'q — faqat JS tekshiruvlar (`typeof`, `instanceof`, `in`) qoladi.
 
 </details>
 
@@ -905,7 +906,7 @@ function handle(response: HttpResponse | HttpError): void {
 }
 ```
 
-**TS 4.9+ yaxshilanish:** Eski versiyalarda `in` operator faqat union member'larida deklaratsiya qilingan property bilan narrowing qilardi. **TS 4.9'dan boshlab** `in` operator hatto `unknown` yoki property hech bir variantda deklaratsiya qilinmagan holatda ham narrowing qiladi — natija `Record<"X", unknown>` bo'ladi.
+**TS 4.9+ yaxshilanish:** Eski versiyalarda `in` operator faqat union member'larida e'lon qilingan property bilan narrowing qilardi. **TS 4.9'dan boshlab** `in` operator hatto `unknown` yoki property hech bir variantda e'lon qilinmagan holatda ham narrowing qiladi — tip `Record<"checkedKey", unknown>` bilan intersection qilinadi.
 
 ```typescript
 // TS 4.9+ — unknown bilan ham narrowing
@@ -918,13 +919,13 @@ function process(value: unknown): void {
 }
 
 // Union'da ham — property faqat bitta variantda
-type A = { shared: string };
-type B = { shared: string; onlyB: boolean };
+type BasePost = { title: string };
+type DraftPost = { title: string; isDraft: boolean };
 
-function process2(value: A | B): void {
-  if ("onlyB" in value) {
-    // value: B (narrowed) — bu pattern eski versiyalarda ham ishlardi
-    console.log(value.onlyB);
+function process2(post: BasePost | DraftPost): void {
+  if ("isDraft" in post) {
+    // post: DraftPost (narrowed) — bu pattern eski versiyalarda ham ishlardi
+    console.log(post.isDraft);
   }
 }
 ```
@@ -948,32 +949,28 @@ false: Bird
 
 **TS 4.9+ yaxshilanishi:**
 
-Eski TS'da `in` operator faqat discriminating property bilan narrowing qilardi. TS 4.9'dan boshlab checker yanada kuchli algoritm ishlatadi: agar property faqat bitta member'da **qo'shimcha** sifatida bo'lsa ham (masalan, ikki tip bir xil asosga ega, lekin biri qo'shimcha property'ga ega), narrowing ishlaydi.
+Union member'lardan biri property'ga ega, boshqasi ega emas — bu holatda narrowing barcha TS versiyalarida ishlagan (`BasePost | DraftPost` da `"isDraft"` tekshiruvi). TS 4.9 boshqa holatni hal qildi: property **hech bir tipda e'lon qilinmagan** bo'lsa. Bunda checker tipni `Record<"checkedKey", unknown>` bilan intersection qiladi:
 
 ```
-narrowTypeByInKeyword("extra", A | B) — TS 4.9+:
+"name" in packageJson — TS 4.9+:
 
-Type A = { shared: string }
-Type B = { shared: string; extra: boolean }
+packageJson: object   (unknown'dan typeof narrow qilingan)
 
-"extra" in value:
-  A: "extra" bormi? → YO'Q → false branch (A qoladi)
-  B: "extra" bormi? → HA → true branch (B qoladi)
-
-true:  B (eski TS'da value o'zgarmas edi)
-false: A
+Eski TS:    "name" in packageJson → object (o'zgarmas, name'ga kira olmaymiz)
+TS 4.9+:    "name" in packageJson → object & Record<"name", unknown>
+            → packageJson.name accessible (tipi unknown)
 ```
 
 **Optional property bilan ishlash:**
 
-Agar `type A = { x?: number }` bo'lsa, `"x" in obj` hali ham A'ga narrow qiladi. Checker optional property'ni ham "mavjud bo'lishi mumkin" deb hisoblaydi. Runtime'da `in` operator property'ning mavjudligini tekshiradi (qiymati `undefined` bo'lsa ham `true` qaytaradi — property declared, qiymat undefined).
+Agar `type Profile = { bio?: string }` bo'lsa, `"bio" in profile` hali ham `Profile`'ga narrow qiladi. Checker optional property'ni ham "mavjud bo'lishi mumkin" deb hisoblaydi. Runtime'da `in` operator property'ning mavjudligini tekshiradi (qiymati `undefined` bo'lsa ham `true` qaytaradi — property declared, qiymat undefined).
 
 ```typescript
-const obj = { x: undefined };
-"x" in obj; // true — property mavjud (qiymati undefined)
+const draft = { bio: undefined };
+"bio" in draft; // true — property mavjud (qiymati undefined)
 
-const obj2 = {};
-"x" in obj2; // false — property yo'q
+const empty = {};
+"bio" in empty; // false — property yo'q
 ```
 
 </details>
@@ -1139,30 +1136,30 @@ type Impossible = string & number; // never
 type AlsoImpossible = string & boolean; // never
 ```
 
-Bu **type theory**'da "bo'sh intersection" (empty intersection) — TypeScript buni **bottom type** `never` sifatida modellashtiradi. Intuitiv: `string` va `number` ikki alohida "to'plam" — ularning umumiy qismi bo'sh, shuning uchun natija `never`.
+Bu **type theory**'da "bo'sh intersection" (empty intersection) — TypeScript buni **bottom type** `never` sifatida modellashtiradi. `string` va `number` — qiymatlar to'plami sifatida disjoint (umumiy element yo'q), shuning uchun ikkalasiga bir vaqtda tegishli qiymat mavjud emas va natija `never`.
 
 **Literal tiplar bilan intersection — filter sifatida:**
 
 ```typescript
-type A = "admin" | "user" | "guest";
-type B = "admin" | "moderator";
+type AllRoles = "admin" | "user" | "guest";
+type StaffRoles = "admin" | "moderator";
 
-type Common = A & B; // "admin"
+type Common = AllRoles & StaffRoles; // "admin"
 // Faqat ikkala union'da ham bor bo'lgan literal qoladi
 ```
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Intersection type checker'da `IntersectionType` object sifatida yaratiladi — `getIntersectionType()` funksiyasi orqali. Algoritm:
+Intersection type checker'da `IntersectionType` object sifatida `getIntersectionType()` orqali yaratiladi. Algoritm:
 
 ```
-getIntersectionType([A, B, C]):
+getIntersectionType([HasName, HasAge, HasEmail]):
 
-1. flattenIntersectionType()    →  nested intersection'larni yoyish
+1. Flatten                       →  nested intersection'larni yoyish
                                     A & (B & C) → A & B & C
 
-2. removeDuplicates()            →  takroriy tiplarni olib tashlash
+2. Deduplicate                   →  takroriy tiplarni olib tashlash
                                     A & A & B → A & B
 
 3. Primitive conflict check:
@@ -1171,36 +1168,36 @@ getIntersectionType([A, B, C]):
    - "a" & "b" → never
 
 4. Object types — property merging:
-   {x: string} & {y: number} → {x: string; y: number}
+   {name: string} & {age: number} → {name: string; age: number}
 
 5. Recursive property intersection:
-   {a: {x: 1}} & {a: {y: 2}} → {a: {x: 1; y: 2}}
+   {config: {theme: 1}} & {config: {debug: 2}} → {config: {theme: 1; debug: 2}}
 ```
 
 **Type theory asosi:**
 
-Intersection — ikki tip'ning "umumiy elementlari" to'plami. Agar:
-- `A = {x: 1, 2, 3}` va `B = {2, 3, 4}` → `A & B = {2, 3}`
-- `A = string` va `B = number` → umumiy element yo'q → `never` (bo'sh to'plam)
-- `A = "a"` va `B = "a" | "b"` → `A & B = "a"`
-- `A = {name: string}` va `B = {age: number}` → `A & B = {name: string, age: number}` (har ikki property'ga ega bo'lgan object'lar)
+Tip'lar "qiymatlar to'plami" sifatida qaralganda, intersection ikki to'plamning umumiy qiymatlari:
+- `("a" | "b" | "c") & ("b" | "c" | "d")` → `"b" | "c"` (umumiy literal'lar)
+- `string & number` → umumiy qiymat yo'q → `never` (bo'sh to'plam)
+- `"admin" & ("admin" | "user")` → `"admin"`
+- `{ name: string } & { age: number }` → `{ name: string; age: number }`
 
-Object'larda intersection — "property union" semantikasiga ega: object'ning ikkala constraint'ga mos kelish uchun **har ikkala** property'ga ega bo'lishi kerak.
+Oxirgi holat boshqacha ko'rinadi: object tip "shu property'larga ega barcha object'lar" to'plamini ifodalaydi, va qancha property qo'shilsa, to'plam shuncha **toraydi**. `{ name: string }` va `{ age: number }` intersection'i — ikkala property'ga ham ega object'lar to'plami. Property nuqtai nazaridan natijaviy tip property'larni **birlashtiradi** (`name` ham, `age` ham), qiymatlar to'plami nuqtai nazaridan esa ikki to'plam **kesishadi** — ikkala constraint'ni bir vaqtda qondiruvchi object'lar qoladi.
 
 **`never` kengayishi:**
 
 Primitive conflict'da `never` alohida property uchun bo'lishi mumkin, lekin object butunlay `never` bo'lmaydi:
 
 ```typescript
-type A = { status: string; data: number };
-type B = { status: number; data: string };
+type ServerResponse = { status: string; payload: number };
+type LegacyResponse = { status: number; payload: string };
 
-type AB = A & B;
+type Merged = ServerResponse & LegacyResponse;
 // {
 //   status: string & number; // never
-//   data: number & string;   // never
+//   payload: number & string; // never
 // }
-// AB "technically" exists, lekin hech qanday qiymat mos kelmaydi
+// Merged "technically" mavjud, lekin hech qanday qiymat mos kelmaydi
 // Har property'ga qiymat qo'yib bo'lmaydi
 ```
 
@@ -1319,10 +1316,10 @@ Agar ikki tip'ning **bir xil nomdagi** property'lari turli tipga ega bo'lsa — 
 **1. Object property — rekursiv intersection:**
 
 ```typescript
-type A = { config: { theme: string; debug: boolean } };
-type B = { config: { theme: string; lang: string } };
+type UiSettings = { config: { theme: string; debug: boolean } };
+type LocaleSettings = { config: { theme: string; lang: string } };
 
-type AB = A & B;
+type AppSettings = UiSettings & LocaleSettings;
 // config: { theme: string; debug: boolean } & { theme: string; lang: string }
 // = config: { theme: string; debug: boolean; lang: string }
 // Object property'lar ham intersection — recursive
@@ -1331,28 +1328,28 @@ type AB = A & B;
 **2. Primitive property conflict — `never`:**
 
 ```typescript
-type X = { status: string };
-type Y = { status: number };
+type HttpEntry = { status: string };
+type CodeEntry = { status: number };
 
-type XY = X & Y;
+type ConflictEntry = HttpEntry & CodeEntry;
 // status: string & number = never
 // Property mavjud, lekin qiymat qo'yib bo'lmaydi
 
-// const xy: XY = { status: ??? }; // ❌ Hech qanday qiymat mos emas
+// const entry: ConflictEntry = { status: ... }; // ❌ Hech qanday qiymat mos emas
 ```
 
 **3. Literal type conflict — mos kelsa qoladi, mos kelmasa `never`:**
 
 ```typescript
-type P = { role: "admin" | "user" };
-type Q = { role: "admin" | "moderator" };
+type BasicRoles = { role: "admin" | "user" };
+type StaffRoles = { role: "admin" | "moderator" };
 
-type PQ = P & Q;
+type CommonRole = BasicRoles & StaffRoles;
 // role: ("admin" | "user") & ("admin" | "moderator") = "admin"
 // Faqat umumiy literal — "admin" qoldi
 
-const pq: PQ = { role: "admin" }; // ✅
-// const pq2: PQ = { role: "user" }; // ❌
+const account: CommonRole = { role: "admin" }; // ✅
+// const wrong: CommonRole = { role: "user" }; // ❌
 ```
 
 <details>
@@ -1361,18 +1358,18 @@ const pq: PQ = { role: "admin" }; // ✅
 Intersection type hisoblash jarayoni:
 
 ```
-A & B hisoblash:
+left & right hisoblash:
 
 1. Ikkala tipdagi barcha property'larni yig':
-   - Faqat A'da: A'dan olish
-   - Faqat B'da: B'dan olish
+   - Faqat left'da: left'dan olish
+   - Faqat right'da: right'dan olish
    - Ikkalasida ham: property tiplarini intersection qilish
 
 2. Property type intersection:
-   { a: string } & { a: string }     → { a: string }        (bir xil — qoladi)
-   { a: string } & { a: number }     → { a: never }          (conflict — never)
-   { a: {x: 1} } & { a: {y: 2} }     → { a: {x: 1; y: 2} }  (recursive)
-   { a: "x" | "y" } & { a: "y" | "z" } → { a: "y" }         (literal filter)
+   { role: string } & { role: string }       → { role: string }        (bir xil — qoladi)
+   { role: string } & { role: number }       → { role: never }         (conflict — never)
+   { meta: {x: 1} } & { meta: {y: 2} }        → { meta: {x: 1; y: 2} }  (recursive)
+   { role: "x" | "y" } & { role: "y" | "z" }  → { role: "y" }           (literal filter)
 
 3. Agar natijada `never` property bo'lsa:
    - Type o'zi never bo'lmaydi
@@ -1410,38 +1407,38 @@ Bu dizayn xatosining belgisi — ikki kodbaza'ning bir xil nomli lekin farqli se
 
 ```typescript
 // Case 1: Same type (no conflict)
-type A = { x: string };
-type B = { x: string };
-type AB = A & B; // { x: string }
-const ab: AB = { x: "hello" }; // ✅
+type Named = { name: string };
+type Titled = { name: string };
+type NamedTitled = Named & Titled; // { name: string }
+const labeled: NamedTitled = { name: "Ali" }; // ✅
 
 // Case 2: Object property (recursive merge)
-type C = { config: { host: string; port: number } };
-type D = { config: { host: string; timeout: number } };
-type CD = C & D;
+type ServerOpts = { config: { host: string; port: number } };
+type TimeoutOpts = { config: { host: string; timeout: number } };
+type FullOpts = ServerOpts & TimeoutOpts;
 // { config: { host: string; port: number; timeout: number } }
-const cd: CD = {
+const options: FullOpts = {
   config: { host: "localhost", port: 3000, timeout: 5000 },
 };
 
 // Case 3: Primitive conflict (never)
-type E = { status: string };
-type F = { status: number };
-type EF = E & F; // { status: never }
-// const ef: EF = { status: ??? }; // impossible
+type StringStatus = { status: string };
+type NumberStatus = { status: number };
+type BrokenStatus = StringStatus & NumberStatus; // { status: never }
+// const broken: BrokenStatus = { status: ... }; // impossible
 
 // Case 4: Literal filter
-type G = { role: "admin" | "user" };
-type H = { role: "admin" | "moderator" };
-type GH = G & H; // { role: "admin" }
-const gh: GH = { role: "admin" }; // ✅
+type BasicRoles = { role: "admin" | "user" };
+type StaffRoles = { role: "admin" | "moderator" };
+type SharedRole = BasicRoles & StaffRoles; // { role: "admin" }
+const account: SharedRole = { role: "admin" }; // ✅
 
 // Case 5: Subtype intersection
-type I = { x: number };
-type J = { x: 42 };
-type IJ = I & J;
-// { x: number & 42 } = { x: 42 } (42 ⊂ number)
-const ij: IJ = { x: 42 }; // ✅
+type AnyScore = { score: number };
+type PerfectScore = { score: 42 };
+type FinalScore = AnyScore & PerfectScore;
+// { score: number & 42 } = { score: 42 } (42 number'ning subtype'i)
+const grade: FinalScore = { score: 42 }; // ✅
 
 // Practical: avoiding conflict
 type WithTimestamp = { createdAt: Date };
@@ -1459,18 +1456,18 @@ type Entity = WithTimestamp & WithModified & {
 
 ```typescript
 // TS
-type A = { config: { theme: string; debug: boolean } };
-type B = { config: { theme: string; lang: string } };
-type AB = A & B;
+type UiSettings = { config: { theme: string; debug: boolean } };
+type LocaleSettings = { config: { theme: string; lang: string } };
+type AppSettings = UiSettings & LocaleSettings;
 
-const ab: AB = {
+const settings: AppSettings = {
   config: { theme: "dark", debug: true, lang: "uz" },
 };
 ```
 
 ```javascript
 // Compiled JS — intersection type butunlay o'chirildi
-const ab = {
+const settings = {
   config: { theme: "dark", debug: true, lang: "uz" },
 };
 
@@ -1543,9 +1540,9 @@ Discriminated Union aniqlash jarayoni:
    type'ni avtomatik toraytiradi
 ```
 
-**`narrowTypeByDiscriminantProperty()`:**
+**Switch discriminant narrowing:**
 
-Checker `switch (shape.kind)` ko'rilganda, har `case` label'iga qarab union'dan mos member'ni ajratadi:
+Checker `switch (shape.kind)` ko'rilganda (`narrowTypeBySwitchOnDiscriminant`), har `case` label'iga qarab union'dan mos member'ni ajratadi:
 
 ```
 switch (shape.kind) {
@@ -1562,22 +1559,23 @@ Discriminant property **literal** bo'lishi kerak, chunki narrowing uchun compile
 
 ```typescript
 // ❌ Discriminant sifatida ishlamaydi
-type A = { status: string; data: number };
-type B = { status: string; error: string };
+type WideSuccess = { status: string; data: number };
+type WideError = { status: string; error: string };
 
-function handle(x: A | B) {
-  if (x.status === "success") {
-    // x: A | B (narrowing ishlamadi — "success" compile-time'da A yoki B bilan bog'liq emas)
+function handle(response: WideSuccess | WideError) {
+  if (response.status === "success") {
+    // response: WideSuccess | WideError (narrowing ishlamadi —
+    // "success" keng `string` tipga teng, member bilan bog'lanmaydi)
   }
 }
 
 // ✅ Ishlaydi
-type A2 = { status: "success"; data: number };
-type B2 = { status: "error"; error: string };
+type LiteralSuccess = { status: "success"; data: number };
+type LiteralError = { status: "error"; error: string };
 
-function handle2(x: A2 | B2) {
-  if (x.status === "success") {
-    // x: A2 (narrowed) — literal type bilan
+function handleTyped(response: LiteralSuccess | LiteralError) {
+  if (response.status === "success") {
+    // response: LiteralSuccess (narrowed) — literal type bilan
   }
 }
 ```
@@ -1812,7 +1810,7 @@ function processApiData(data: unknown): void {
 **Muhim ogohlantiruv:** Custom type guard'da TypeScript **funksiya ichidagi mantiqni tekshirmaydi** — `is` keyword bilan siz TS'ga "menga ishon" deysiz. Agar mantiq noto'g'ri bo'lsa — runtime xato, lekin TS ogohlantirmaydi:
 
 ```typescript
-// ⚠️ Mantiqiy xato, lekin TS xato bermaydi
+// Diqqat: mantiqiy xato, lekin TS xato bermaydi
 function isString(value: unknown): value is string {
   return typeof value === "number"; // ❌ Noto'g'ri
 }
@@ -1868,7 +1866,7 @@ Yaxshi custom type guard'lar odatda bosqichma-bosqich tekshiruvni amalga oshirad
 3. Har property'ning tipi to'g'ri ekanligi (`typeof (value as X).x === "string"`)
 4. Literal union'lar (`(value as X).role === "admin" || ...`)
 
-Murakkabroq validation uchun **Zod**, **io-ts**, **runtypes** kabi library'lar ishlatiladi — ular schema'dan type guard va runtime validator'larni avtomatik yaratadi.
+Murakkabroq validation uchun library'lar ishlatiladi (**Zod**, **io-ts**, **runtypes**) — ular schema'dan type guard va runtime validator'larni avtomatik yaratadi.
 
 </details>
 
@@ -2004,7 +2002,7 @@ function move(animal) {
 
 Exhaustive checking — union tipi'ning **barcha** member'lari handle qilinganligini **compile-time'da** tekshirish. `switch` yoki `if-else` zanjirida barcha holatlar ko'rib chiqilgandan keyin, qolgan tip `never` bo'lishi kerak. Agar yangi member qo'shilsa va handle qilinmasa — TypeScript **compile-time xato** beradi.
 
-Bu pattern production kodda asosiy safety mexanizmi: yangi variant qo'shilganda, barcha ishlov beruvchi joylarni topib yangilash — **compiler** ta'minlaydi. Silent bug'lar o'rniga kompilyatsiya xatosi.
+Bu pattern production kodda asosiy safety mexanizmi: yangi variant qo'shilganda, barcha ishlov beruvchi joylarni topib yangilash — **compiler** ta'minlaydi. Silent bug'lar o'rniga compilation xatosi.
 
 ```typescript
 type Shape =
@@ -2088,7 +2086,7 @@ Bu pattern ikki qavat xavfsizlik beradi:
 
 2. **Runtime:** `throw new Error(...)` — agar runtime'da kutilmagan qiymat kelsa (masalan, API dan noto'g'ri payload), xato throw bo'ladi. Bu safety net.
 
-**Muhim nuance:** `_exhaustiveCheck` o'zgaruvchi type'i `never`, lekin runtime'da `shape`'ning qiymatini saqlaydi. `never` faqat compile-time konstruksiya — runtime'da variable oddiy JavaScript holat.
+**Muhim nuance:** `_exhaustiveCheck` o'zgaruvchi type'i `never`, lekin runtime'da `shape`'ning qiymatini saqlaydi. `never` faqat compile-time construct — runtime'da variable oddiy JavaScript holat.
 
 Shuning uchun xato xabari'da `_exhaustiveCheck` emas, `JSON.stringify(shape)` ishlatish kerak — `shape` runtime'da haqiqiy qiymatni saqlaydi.
 
@@ -2328,18 +2326,18 @@ Compiler `assertNever(method)` chaqiruvini ko'rganda, `method`'ning joriy tipini
 `assertNever` return type'i `never`. Bu checker uchun maxsus holat: `never` qaytaruvchi funksiya chaqirilgandan keyin, compiler keyingi kodni **unreachable** deb belgilaydi. Shuning uchun:
 
 ```typescript
-function getLabel(x: PaymentMethod): string {
-  switch (x.type) {
+function getLabel(method: PaymentMethod): string {
+  switch (method.type) {
     case "credit_card": return "CC";
     case "paypal": return "PP";
     case "bank_transfer": return "BT";
-    default: return assertNever(x); // ✅ ishlaydi
+    default: return assertNever(method); // ✅ ishlaydi
     // `never` ham `string`'ga assign bo'ladi (bottom type)
   }
 }
 ```
 
-`never` **har qanday** tipga assign bo'ladi — shuning uchun `return assertNever(x)` har xil return type'larda ishlaydi.
+`never` **har qanday** tipga assign bo'ladi — shuning uchun `return assertNever(method)` har xil return type'larda ishlaydi.
 
 **Arrow function variant:**
 
@@ -2519,19 +2517,19 @@ Compiler overload'larni **yuqoridan pastga** iteratsiya qiladi va birinchi mos k
 
 ```typescript
 // ✅ To'g'ri tartib — spetsifik birinchi
-function fn(x: "hello"): 1;
-function fn(x: string): 2;
-function fn(x: string | "hello"): 1 | 2 {
-  return x === "hello" ? 1 : 2;
+function rank(value: "hello"): 1;
+function rank(value: string): 2;
+function rank(value: string): 1 | 2 {
+  return value === "hello" ? 1 : 2;
 }
 
-fn("hello"); // type: 1 (birinchi mos)
-fn("world"); // type: 2 (ikkinchi)
+rank("hello"); // type: 1 (birinchi mos)
+rank("world"); // type: 2 (ikkinchi)
 
 // ❌ Noto'g'ri tartib — umumiy birinchi
-function fn2(x: string): 2;
-function fn2(x: "hello"): 1;
-// fn2("hello") → type: 2 (umumiy string birinchi mos keldi)
+function rankWrong(value: string): 2;
+function rankWrong(value: "hello"): 1;
+// rankWrong("hello") → type: 2 (umumiy string birinchi mos keldi)
 // Ikkinchi "hello" overload'ga hech qachon yetib bormaydi
 ```
 
@@ -2553,14 +2551,14 @@ Union type va function overloads — `checker.ts`'da **butunlay boshqa** mexaniz
 
 **Union type resolution:**
 
-Union type bilan funksiya chaqirilganda, checker oddiy type checking qiladi — argument union type'ga assignable bo'lsa, call ishlaydi. Return type **har doim** deklaratsiya qilingan return type (masalan `string`). Compiler argument'ning aniq tipini return type'ni aniqlash uchun **ishlatmaydi**.
+Union type bilan funksiya chaqirilganda, checker oddiy type checking qiladi — argument union type'ga assignable bo'lsa, call ishlaydi. Return type **har doim** e'lon qilingan return type (masalan `string`). Compiler argument'ning aniq tipini return type'ni aniqlash uchun **ishlatmaydi**.
 
 ```
 formatValue("hello"):
   - parameter type: string | number
   - argument: "hello" (string literal)
   - "hello" assignable to string | number? → HA
-  - return type: string (deklaratsiyadan)
+  - return type: string (e'londan)
 ```
 
 **Overload resolution algoritmi:**
@@ -2642,7 +2640,7 @@ function createElement(tag: string): HTMLElement {
 
 const div = createElement("div");    // HTMLDivElement
 const input = createElement("input"); // HTMLInputElement
-const custom = createElement("section");  // HTMLElement (fallback — overload mos kelmaydi)
+const custom = createElement("section");  // HTMLElement (umumiy string overload'iga mos keldi)
 
 // Case 4: Generic conditional (advanced)
 type ParseResult<T> =
@@ -2723,16 +2721,16 @@ const palette2 = {
 
 ```typescript
 // 1. Type annotation — literal yo'qoladi
-const a: Record<string, string> = { x: "hello" };
-// a.x type: string
+const annotated: Record<string, string> = { lang: "uz" };
+// annotated.lang type: string
 
 // 2. as const — literal, lekin tip tekshirilmaydi
-const b = { x: "hello" } as const;
-// b.x type: "hello", lekin Record<string, string> constraint'ga mos ekanligi tekshirilmagan
+const frozen = { lang: "uz" } as const;
+// frozen.lang type: "uz", lekin Record<string, string> constraint'ga mos ekanligi tekshirilmagan
 
 // 3. satisfies — ikkalasi ham: literal saqlanadi VA constraint tekshiriladi
-const c = { x: "hello" } satisfies Record<string, string>;
-// c.x type: "hello" (literal) — va Record'ga mos ekanligi tekshirilgan
+const validated = { lang: "uz" } satisfies Record<string, string>;
+// validated.lang type: "uz" (literal) — va Record'ga mos ekanligi tekshirilgan
 ```
 
 **`satisfies` enum/union validation uchun:**
@@ -2765,7 +2763,7 @@ type ActiveLabel = typeof STATUS_LABELS["active"];
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`satisfies` operator compiler'da **ikki bosqichli** tekshiruv amalga oshiradi:
+`satisfies` operator compiler'da uch bosqichli tekshiruv amalga oshiradi:
 
 1. **Infer** — avval expression'ning "natural type"'ini aniqlaydi (widening qilmasdan)
 2. **Check** — inferred tipni `satisfies` dan keyingi tipga **assignability** tekshiradi
@@ -2775,14 +2773,14 @@ type ActiveLabel = typeof STATUS_LABELS["active"];
 Annotation vs satisfies — compiler behavior:
 
 Annotation:
-  checkAssignability(value, annotationType) → variable has annotationType
-  a: Record<string, string> = { x: "hello" }
-  → a.x type: string (annotation'dan)
+  assignability check (value → annotationType) → variable type = annotationType
+  annotated: Record<string, string> = { lang: "uz" }
+  → annotated.lang type: string (annotation'dan)
 
 satisfies:
-  checkAssignability(value, satisfiesType) → variable has inferredType
-  b = { x: "hello" } satisfies Record<string, string>
-  → b.x type: "hello" (inferred'dan)
+  assignability check (value → satisfiesType) → variable type = inferredType
+  validated = { lang: "uz" } satisfies Record<string, string>
+  → validated.lang type: "uz" (inferred'dan)
 ```
 
 **Union narrowing bilan `satisfies`:**
@@ -2883,7 +2881,7 @@ const palette = {
 
 ## Edge Cases va Gotchas
 
-### 🕳 Gotcha 1: Union narrowing closure ichida yo'qoladi
+### Gotcha 1: Union narrowing closure ichida yo'qoladi
 
 ```typescript
 type Shape = { kind: "circle"; radius: number } | { kind: "square"; side: number };
@@ -2892,7 +2890,7 @@ function process(shape: Shape) {
   if (shape.kind === "circle") {
     // shape: Circle (narrowed)
     setTimeout(() => {
-      // ⚠️ Closure ichida: shape hali ham Shape (narrowing yo'qoladi!)
+      // Diqqat: closure ichida shape hali ham Shape (narrowing yo'qoladi)
       // shape.radius; // ❌ Property 'radius' does not exist on type 'Shape'
     }, 100);
   }
@@ -2913,7 +2911,7 @@ function processFixed(shape: Shape) {
 
 ---
 
-### 🕳 Gotcha 2: `typeof null === "object"` narrowing'da chiqarilmaydi
+### Gotcha 2: `typeof null === "object"` narrowing'da chiqarilmaydi
 
 ```typescript
 function check(val: string | object | null) {
@@ -2933,40 +2931,40 @@ function check(val: string | object | null) {
 
 ---
 
-### 🕳 Gotcha 3: Intersection — primitive va object
+### Gotcha 3: Intersection — primitive va object
 
 ```typescript
 // Primitive + uning shape'iga mos object — primitive'ga reduce
-type A = string & { length: number };
-const x: A = "hello"; // ✅ — string'da allaqachon length: number bor
+type WithLength = string & { length: number };
+const text: WithLength = "hello"; // ✅ — string'da allaqachon length: number bor
 
 // Primitive + disjoint object — intersection saqlanadi (never EMAS)
-type B = string & { customField: number };
-const y: B = "hello"; // ❌ "hello" — string, customField yo'q
-const z: B = "hello" as B; // ✅ assertion bilan mumkin (branded types pattern asosi)
+type BrandedString = string & { customField: number };
+const plain: BrandedString = "hello"; // ❌ "hello" — string, customField yo'q
+const branded: BrandedString = "hello" as BrandedString; // ✅ assertion bilan (branded types asosi)
 
 // Disjoint primitive — never
-type C = string & number; // never (ikki disjoint primitive)
-type D = "a" & "b"; // never (disjoint literal'lar)
+type StringAndNumber = string & number; // never (ikki disjoint primitive)
+type LiteralClash = "a" & "b"; // never (disjoint literal'lar)
 ```
 
 **Sabab:** Intersection ikkala tipga ham mos qiymatni talab qiladi. `string & { length: number }` — `length` allaqachon `string`'da bor, intersection valid (`"hello"` qabul qilinadi). `string & { customField: number }` — intersection **saqlanadi** (not collapsed to `never`), lekin oddiy string literal bilan inhabit qilib bo'lmaydi; faqat `as` assertion orqali yaratiladi. Bu **branded types** pattern'ining asosi: `type UserId = string & { __brand: "UserId" }`. **Disjoint primitive'lar** (`string & number`, `"a" & "b"`) esa `never` — bir vaqtda ikkala disjoint qiymat bo'la olmaydi.
 
 ---
 
-### 🕳 Gotcha 4: Discriminated union — discriminant property yo'q
+### Gotcha 4: Discriminated union — discriminant property yo'q
 
 ```typescript
-type A = { status: "success"; data: string };
-type B = { status: "error"; error: string };
-type C = { data: number }; // ⚠️ status property yo'q
+type SuccessResult = { status: "success"; data: string };
+type ErrorResult = { status: "error"; error: string };
+type RawResult = { data: number }; // Diqqat: status property yo'q
 
-type Response = A | B | C;
+type ApiResult = SuccessResult | ErrorResult | RawResult;
 
-function handle(r: Response) {
-  if (r.status === "success") {
-    // ❌ Property 'status' does not exist on type 'C'
-    // C'da status yo'q — switch discriminant qurilmaydi
+function handle(result: ApiResult) {
+  if (result.status === "success") {
+    // ❌ Property 'status' does not exist on type 'RawResult'
+    // RawResult'da status yo'q — discriminant butun union'da umumiy emas
   }
 }
 ```
@@ -2975,7 +2973,7 @@ function handle(r: Response) {
 
 ---
 
-### 🕳 Gotcha 5: Non-discriminated union — faqat umumiy property'lar
+### Gotcha 5: Non-discriminated union — faqat umumiy property'lar
 
 ```typescript
 type Book = { title: string; pages: number; author: string };
@@ -3221,11 +3219,11 @@ function assertNever(value: never): never {
 function renderNotification(n: Notification): string {
   switch (n.type) {
     case "email":
-      return `📧 To: ${n.to} | Subject: ${n.subject}`;
+      return `Email To: ${n.to} | Subject: ${n.subject}`;
     case "sms":
-      return `📱 To: ${n.phone} | ${n.message}`;
+      return `SMS To: ${n.phone} | ${n.message}`;
     case "push":
-      return `🔔 Device: ${n.deviceId} | ${n.title}`;
+      return `Push Device: ${n.deviceId} | ${n.title}`;
     default:
       return assertNever(n);
   }
@@ -3280,36 +3278,36 @@ function isAdmin(user: User): user is Admin {
 **Savol:** Quyidagi kodni tushuntiring — qaysi qator xato beradi va nima uchun?
 
 ```typescript
-type A = { x: number; y: string };
-type B = { x: number; y: number; z: boolean };
+type Order = { id: number; total: string };
+type Invoice = { id: number; total: number; paid: boolean };
 
-type C = A & B;
+type Merged = Order & Invoice;
 
-const c1: C = { x: 1, y: "hello", z: true };
-const c2: C = { x: 1, y: 42, z: true };
-const c3: C = { x: 1, z: true };
+const first: Merged = { id: 1, total: "100", paid: true };
+const second: Merged = { id: 1, total: 100, paid: true };
+const third: Merged = { id: 1, paid: true };
 ```
 
 <details>
 <summary>Javob</summary>
 
 ```typescript
-const c1: C = { x: 1, y: "hello", z: true };
-// ❌ y: string & number = never, "hello" never'ga mos kelmaydi
+const first: Merged = { id: 1, total: "100", paid: true };
+// ❌ total: string & number = never, "100" never'ga mos kelmaydi
 
-const c2: C = { x: 1, y: 42, z: true };
-// ❌ y: string & number = never, 42 ham never'ga mos kelmaydi
+const second: Merged = { id: 1, total: 100, paid: true };
+// ❌ total: string & number = never, 100 ham never'ga mos kelmaydi
 
-const c3: C = { x: 1, z: true };
-// ❌ y property majburiy (bor, lekin never type), va object'da yo'q
+const third: Merged = { id: 1, paid: true };
+// ❌ total property majburiy (bor, lekin never type), va object'da yo'q
 
-// C = { x: number; y: never; z: boolean }
-// y property: string & number = never
+// Merged = { id: number; total: never; paid: boolean }
+// total property: string & number = never
 // Hech qanday qiymat assign qilib bo'lmaydi
-// C type amalda ishlatib bo'lmaydi
+// Merged type amalda ishlatib bo'lmaydi
 ```
 
-**Tushuntirish:** `A.y: string` va `B.y: number` intersection'da `never` bo'ladi. `never`'ga hech qanday qiymat assign qilib bo'lmaydi — natija: C tip'i mavjud, lekin ishlatib bo'lmaydi.
+**Tushuntirish:** `Order.total: string` va `Invoice.total: number` intersection'da `never` bo'ladi. `never`'ga hech qanday qiymat assign qilib bo'lmaydi — natija: `Merged` tip'i mavjud, lekin ishlatib bo'lmaydi.
 
 </details>
 

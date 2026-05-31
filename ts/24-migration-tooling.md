@@ -29,7 +29,7 @@ Migration — JavaScript codebase ni TypeScript ga **bosqichma-bosqich** o'tkazi
 
 **Bosqichlar:**
 
-1. **`allowJs: true`** — TypeScript compiler `.js` fayllarni ham kompilyatsiyaga qo'shadi (`.ts` bilan birga). Bu bosqichda type check yo'q, lekin TS toolchain (jump-to-definition, refactor) `.js` da ishlay boshlaydi.
+1. **`allowJs: true`** — TypeScript compiler `.js` fayllarni ham compilation'ga qo'shadi (`.ts` bilan birga). Bu bosqichda type check yo'q, lekin TS toolchain (jump-to-definition, refactor) `.js` da ishlay boshlaydi.
 
 2. **`checkJs: true`** — JS fayllarni ham type-check qiladi. JSDoc annotation, control flow analysis va inference orqali implicit type'lar tekshiriladi. Bu xato'larni `.ts` ga o'tkazishdan oldin topadi.
 
@@ -86,13 +86,13 @@ Migration — JavaScript codebase ni TypeScript ga **bosqichma-bosqich** o'tkazi
 
 ### Nazariya
 
-`strict: true` — `strictNullChecks`, `noImplicitAny`, `strictFunctionTypes`, `strictBindCallApply`, `strictPropertyInitialization`, `noImplicitThis`, `useUnknownInCatchVariables`, `alwaysStrict` sub-flag'larini bir vaqtda yoqadi. Katta loyihada birdan yoqish yuzlab xato chiqaradi va developer'lar `@ts-ignore` bilan yopa boshlaydi (texnik qarz ortadi).
+`strict: true` — `strictNullChecks`, `noImplicitAny`, `strictFunctionTypes`, `strictBindCallApply`, `strictPropertyInitialization`, `noImplicitThis`, `useUnknownInCatchVariables`, `alwaysStrict` sub-flag'larini bir vaqtda yoqadi. Katta loyihada birdan yoqish ko'p xato chiqaradi va developer'lar `@ts-ignore` bilan yopa boshlaydi (texnik qarz ortadi).
 
 **Yechim — sub-flag'larni birma-bir yoqish** (har biri alohida PR):
 
 1. **`noImplicitAny: true`** — implicit `any` parameter/variable'larni xato sifatida belgilaydi. Eng ko'p xato chiqaradi (har annotation'siz parameter), lekin eng muhim — `any` migration progress'ini bloklash uchun.
 
-2. **`strictNullChecks: true`** — `null` va `undefined` ni har type ga assign qilish taqiqlanadi. `T | null | undefined` explicit yozilishi kerak. Null safety bugs (TypeError: cannot read property of undefined) ni kompilyatsiya vaqtida tutadi.
+2. **`strictNullChecks: true`** — `null` va `undefined` ni har type ga assign qilish taqiqlanadi. `T | null | undefined` explicit yozilishi kerak. Null safety bug'larni (TypeError: cannot read property of undefined) compile vaqtida tutadi.
 
 3. **`strictFunctionTypes: true`** — function parameter contravariance ni majbur qiladi (method shorthand'dan tashqari). [Bo'lim 25](25-type-compatibility.md) da batafsil.
 
@@ -110,9 +110,9 @@ Migration — JavaScript codebase ni TypeScript ga **bosqichma-bosqich** o'tkazi
 
 ### Nazariya
 
-JSDoc — `.js` fayllarni `.ts` ga o'tkazmasdan type safety berish usuli. `checkJs: true` bilan TypeScript compiler JSDoc annotation'larni o'qiydi va worth qiladi: `@typedef` interface'ga, `@param`/`@returns` function signature'ga aylanadi.
+JSDoc — `.js` fayllarni `.ts` ga o'tkazmasdan type safety berish usuli. `checkJs: true` bilan TypeScript compiler JSDoc annotation'larni o'qiydi va type sifatida ishlatadi: `@typedef` interface'ga, `@param`/`@returns` function signature'ga aylanadi.
 
-**Mexanizm:** TypeScript parser JSDoc comment'larni alohida grammar bilan parse qiladi (TSDoc subset). Type checker `.ts` faylda yozilgan annotation bilan teng huquqli ishlaydi — inference, narrowing, generic'lar — barchasi mavjud.
+**Mexanizm:** TypeScript parser standart JSDoc tag'larning bir qismini (`@type`, `@typedef`, `@param`, `@returns`, `@template`, va boshqalar) type annotation sifatida o'qiydi — qo'llab-quvvatlanmagan tag'lar e'tiborsiz qoldiriladi. Type checker bu annotation'lar bilan `.ts` faylda yozilgan type bilan teng huquqli ishlaydi — inference, narrowing, generic'lar — barchasi mavjud.
 
 **Qachon foydali:**
 - Vendor JS library'lariga lokal type annotation
@@ -140,7 +140,7 @@ JSDoc — `.js` fayllarni `.ts` ga o'tkazmasdan type safety berish usuli. `check
  * @returns {User | undefined}
  */
 function findUser(users, name) {
-  return users.find(u => u.name === name);
+  return users.find(user => user.name === name);
 }
 
 /** @type {User[]} */
@@ -183,13 +183,13 @@ Pragma comment'lar — fayl yoki qator darajasida TypeScript checker xulq'ini o'
 
 ### Nazariya
 
-`tsc` compilation katta loyihalarda sekin bo'ladi — type checker har fayl uchun butun program graph'ini analiz qiladi (cross-file type inference, structural compatibility). Optimizatsiya'lar — caching, parallelism, va checker yukini kamaytirish.
+`tsc` compilation katta loyihalarda sekin bo'ladi — type checker har fayl uchun butun program graph'ini analiz qiladi (cross-file type inference, structural compatibility). Optimization'lar — caching, parallelism, va checker yukini kamaytirish.
 
-| Optimizatsiya | Mexanizm |
+| Optimization | Mexanizm |
 |--------------|----------|
 | `incremental: true` | Build state'ni `.tsbuildinfo` cache faylga saqlaydi. Keyingi build'da faqat o'zgargan fayl va uning dependents'lari qayta tekshiriladi |
-| `skipLibCheck: true` | `node_modules/**/*.d.ts` fayllarini type-check qilmaydi (faqat sintaksis tekshirish). Library type'larida xato bo'lsa ham build muvaffaqiyatli |
-| Project References | Monorepo'da har package alohida `tsconfig` + `composite: true` bilan mustaqil build va cache. `tsc --build` topological order'da kompilyatsiya qiladi |
+| `skipLibCheck: true` | Barcha `.d.ts` declaration fayllarning ichki type-check'ini o'tkazib yuboradi (`node_modules` va lokal `.d.ts` — ikkalasi ham). Source kod ulardan ishlatgan type'lar baribir tekshiriladi; faqat declaration fayllarning o'zaro to'liq tekshiruvi tushib qoladi. Library type'larida xato bo'lsa ham build muvaffaqiyatli |
+| Project References | Monorepo'da har package alohida `tsconfig` + `composite: true` bilan mustaqil build va cache. `tsc --build` topological order'da compilation qiladi |
 | `isolatedModules` | Har fayl mustaqil transpile bo'lishi mumkinligini majbur qiladi. SWC/esbuild uchun kerak (ular cross-file analysis qilmaydi) |
 | `isolatedDeclarations` (TS 5.5+) | `.d.ts` emit uchun har faylda explicit type annotation majbur. Parallel declaration generation imkonini beradi |
 
@@ -216,13 +216,13 @@ TypeScript kod runtime'da ikki xil ishlatiladi: **runtime execution** (dev/scrip
 |------|----------|------------|
 | **`tsc`** | TypeScript compiler — type check + JS emit | Bor (to'liq) |
 | **`tsx`** | esbuild-based runtime wrapper (Node loader). TS faylni direct `node` ga uzatadi | Yo'q |
-| **`ts-node`** | TypeScript compiler API'sini Node `require` hook bilan ulashtiradi. Eski (default `--swc` flag yo'q) | Bor (default) |
+| **`ts-node`** | TypeScript compiler API'sini Node `require` hook bilan ulaydi — default'da to'liq type check qiladi. SWC transpiler'i opt-in (`--swc` flag yoki `"swc": true`), bu holatda type check tushib qoladi | Bor (default) |
 | **SWC** | Rust-based transpiler. AST-based o'zgartirish, cross-file analysis yo'q | Yo'q (faqat parse) |
 | **esbuild** | Go-based bundler/transpiler. SWC bilan o'xshash, lekin bundle ham qiladi | Yo'q |
 | **Node.js `--experimental-strip-types`** | Node 22.6+ da experimental: type annotation'larni strip qiladi (transform yo'q — `enum`, decorators ishlamaydi). Node 23.6+ da default yoqilgan | Yo'q |
 | **Node.js `--experimental-transform-types`** | Node 22.7+ — `enum`, `namespace`, parameter property'larni transform qiladi | Yo'q |
 
-**`tsx` vs `ts-node` farqi:** `tsx` esbuild bilan transpile qiladi (10-100x tezroq), lekin type check yo'q. `ts-node` default'da TypeScript compiler ishlatadi (sekin, lekin type check bor). Dev'da `tsx` afzal — type check'ni alohida `tsc --noEmit` orqali bajarish.
+**`tsx` vs `ts-node` farqi:** `tsx` esbuild bilan transpile qiladi (type check'siz, shuning uchun tezroq), `ts-node` default'da TypeScript compiler ishlatadi (sekinroq, lekin type check bor). Dev'da `tsx` afzal — type check'ni alohida `tsc --noEmit` orqali bajarish.
 
 **Pipeline:** Production'da build (SWC/esbuild — tez transpile) va type check (`tsc --noEmit` — to'liq tekshirish) **alohida step**'lar. Sabab: bundler'da type check'ni qo'shish CI vaqtini ko'paytiradi va parallel run imkoniyatini bloklaydi.
 
@@ -267,7 +267,7 @@ npx tsx watch src/index.ts
 
 **`Deno` secure-by-default:** Default'da fayl tizimi, network, env variable'larga ruxsat yo'q. Har resurs uchun flag kerak (`--allow-read=/path`, `--allow-net=api.example.com`). Bu supply-chain attack'larni cheklaydi.
 
-**`Bun` performance:** JavaScriptCore (Safari engine) + Zig native code. TS transpile esbuild bilan, lekin runtime'da Node.js dan tez (file I/O, HTTP).
+**`Bun` performance:** JavaScriptCore (Safari engine) + Zig native code. TS/JSX transpile o'zining built-in transpiler'i bilan (Zig'da yozilgan, esbuild emas), runtime'da Node.js dan tez (file I/O, HTTP).
 
 **`Biome` cheklov:** ESLint plugin ekosistemasi mavjud emas (custom rule yoki react-specific lint kerak bo'lsa cheklov). Format va asosiy lint uchun yetadi.
 
@@ -315,21 +315,21 @@ npx type-coverage --at-least 90 --strict
 
 ### 1. `checkJs` + lokal JS — kutilmagan xatolar
 
-`checkJs: true` yoqilganda `node_modules` default'da exclude qilinadi (`skipLibCheck` ham yordam beradi), lekin loyiha JS fayllarida implicit `any`, undefined property access kabi xatolar massa'da chiqishi mumkin.
+`checkJs: true` yoqilganda `node_modules` default'da exclude qilinadi (`skipLibCheck` ham yordam beradi), lekin loyiha JS fayllarida implicit `any`, undefined property access kabi xatolar ko'p miqdorda chiqishi mumkin.
 
 ```javascript
 // src/utils.js — checkJs: true ostida
-function calculate(a, b) {       // ❌ implicit any (noImplicitAny bilan)
-  return a.value + b.value;       // ❌ Property 'value' does not exist
+function addPrices(firstItem, secondItem) {  // ❌ implicit any (noImplicitAny bilan)
+  return firstItem.value + secondItem.value; // ❌ Property 'value' does not exist
 }
 
 // Yechim 1: vaqtinchalik suppress
 // @ts-nocheck
-function calculate(a, b) { return a.value + b.value; }
+function addPrices(firstItem, secondItem) { return firstItem.value + secondItem.value; }
 
 // Yechim 2: JSDoc bilan annotation
-/** @param {{value: number}} a @param {{value: number}} b */
-function calculate(a, b) { return a.value + b.value; }
+/** @param {{value: number}} firstItem @param {{value: number}} secondItem */
+function addPrices(firstItem, secondItem) { return firstItem.value + secondItem.value; }
 ```
 
 ### 2. `@ts-ignore` vs `@ts-expect-error` — muhim farq
@@ -339,14 +339,14 @@ function calculate(a, b) { return a.value + b.value; }
 // @ts-expect-error — xato BO'LMASA o'zi xato beradi
 
 // @ts-expect-error
-const x: number = "hello"; // Xato bor → suppress ✅
+const retryCount: number = "hello"; // Xato bor → suppress ✅
 
 // @ts-expect-error
-const y: number = 42; // Xato YO'Q → "Unused @ts-expect-error" ❌
+const httpPort: number = 42; // Xato YO'Q → "Unused @ts-expect-error" ❌
 // Bu yaxshi — keraksiz suppress tozalanadi
 ```
 
-### 3. SWC/esbuild — `const enum` cross-file va namespace merging ishlamaydi
+### 3. Single-file transpiler — `const enum` cross-file va namespace merging ishlamaydi
 
 ```typescript
 // shared.ts
@@ -355,11 +355,13 @@ export const enum Status { Active, Inactive }
 // app.ts
 import { Status } from "./shared";
 console.log(Status.Active);
-// tsc: 0 (inline qilinadi)
-// SWC/esbuild: Status.Active — Status object qaytaradi (ishlamaydi)
+// tsc: 0 (cross-file inline qilinadi)
+// SWC (har doim), esbuild transform mode (per-file, tsx orqali):
+//   import elide bo'ladi, Status emit qilinmaydi
+//   → runtime'da `Status is not defined` (ReferenceError)
 ```
 
-`const enum` inlining cross-file static analysis talab qiladi — SWC/esbuild har faylni izolyatsiya qilib transpile qiladi (`isolatedModules` modeli). Namespace merging ham xuddi shu sababdan ishlamaydi.
+`const enum` inlining cross-file static analysis talab qiladi — SWC har faylni alohida (izolyatsiyada) transpile qiladi (`isolatedModules` modeli), shuning uchun boshqa fayldagi `const enum` qiymatini bilmaydi. esbuild ham **transform mode**'da (per-file) shu cheklovga ega; faqat **bundle mode**'da (`--bundle`) butun graph'ni ko'rgani uchun cross-file qiymatni inline qila oladi. Namespace merging ham single-file transpiler'larda aynan shu sababdan ishlamaydi.
 
 **Yechim:** `isolatedModules: true` yoqing, `const enum` o'rniga oddiy `enum` yoki `as const` object pattern:
 
@@ -408,9 +410,9 @@ const port: number = "8080";
 // Kod tuzatilsa, @ts-expect-error o'zi xato beradi — suppress tozalanadi
 ```
 
-### ❌ Xato 3: SWC/esbuild bilan `const enum` ishlatish
+### ❌ Xato 3: Single-file transpiler bilan `const enum` ishlatish
 
-`const enum` cross-file inline talab qiladi — SWC/esbuild buni qilolmaydi. Oddiy enum yoki union type ishlatish.
+`const enum` cross-file inline talab qiladi — SWC va esbuild transform mode buni qilolmaydi (faqat esbuild bundle mode inline qiladi). Portativ yechim: oddiy enum yoki union type ishlatish.
 
 ### ❌ Xato 4: `tsc` bilan build + type-check birgalikda
 
@@ -477,8 +479,9 @@ Migration paytida `any` count o'sib boradi. `type-coverage` bilan CI da threshol
 function filterProducts(products, options = {}) {
   const { minPrice = 0, maxPrice = Infinity, sortBy = "name" } = options;
   return products
-    .filter(p => p.price >= minPrice && p.price <= maxPrice)
-    .sort((a, b) => sortBy === "price" ? a.price - b.price : a.name.localeCompare(b.name));
+    .filter(product => product.price >= minPrice && product.price <= maxPrice)
+    .sort((left, right) =>
+      sortBy === "price" ? left.price - right.price : left.name.localeCompare(right.name));
 }
 ```
 

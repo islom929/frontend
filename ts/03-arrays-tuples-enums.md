@@ -87,7 +87,7 @@ xs.push(1);  // endi: number[]
 xs.push("a"); // endi: (string | number)[]
 ```
 
-Evolving array — TS kompileri bo'sh array'ga har `push`'dan keyin tipni kengaytirib boradi. Mexanizm `noImplicitAny: true` rejimida ham ishlaydi (initial `any[]` xato bermaydi, chunki evolving), lekin agar evolving tugamasa va variable narrowing'siz keng scope'da ishlatilsa, kompilator `TS7034` xatosini chiqarishi mumkin (`Variable 'xs' implicitly has type 'any[]' in some locations where its type cannot be determined`). Shuning uchun bo'sh array'larga **annotation** tavsiya etiladi — evolving inference'ga tayanmaslik.
+Evolving array — TS compiler bo'sh array'ga har `push`'dan keyin tipni kengaytirib boradi. Mexanizm `noImplicitAny: true` rejimida ham ishlaydi (initial `any[]` xato bermaydi, chunki evolving), lekin agar evolving tugamasa va variable narrowing'siz keng scope'da ishlatilsa, compiler `TS7034` xatosini chiqarishi mumkin (`Variable 'xs' implicitly has type 'any[]' in some locations where its type cannot be determined`). Shuning uchun bo'sh array'larga **annotation** tavsiya etiladi — evolving inference'ga tayanmaslik.
 
 **Array method'lari va return type'lar:**
 
@@ -107,7 +107,7 @@ const first = names[0];                         // string (default)
 <summary><strong>Kod Misollari</strong></summary>
 
 ```typescript
-// Oddiy array deklaratsiyasi
+// Oddiy array declaration
 let names: string[] = ["Ali", "Vali", "Soli"];
 let ages: Array<number> = [25, 30, 35];
 let flags: boolean[] = [true, false, true];
@@ -226,7 +226,7 @@ Checker'da `readonly T[]` alohida `ReadonlyArray<T>` interface sifatida ifodalan
 - `Array<T> → ReadonlyArray<T>` — OK (subset'ga assign)
 - `ReadonlyArray<T> → Array<T>` — xato (`push` missing)
 
-**Funksiya parametrida `readonly` — "io-variance" pattern:**
+**Funksiya parametrida `readonly` — input/output asimmetriyasi:**
 
 ```typescript
 // Producer (output): T[] qaytarish — readonly ishlatilmaydi
@@ -261,7 +261,7 @@ items.splice(0, 1);     // ❌
 items[0] = "x";         // ❌ Index signature permits reading only
 items.sort();           // ❌ sort mutates
 items.reverse();        // ❌ reverse mutates
-(items as any).length = 0; // ⚠️ any bilan aldash — xato signal yo'q
+(items as any).length = 0; // Diqqat: any orqali readonly chetlab o'tiladi — TS signal bermaydi
 
 // ✅ Non-mutating methods — ishlaydi
 const upper = items.map(x => x.toUpperCase());     // string[]
@@ -381,7 +381,7 @@ Tuple va Array orasidagi asosiy farqlar:
 | Element tipi | Barcha bir xil | Har biri alohida |
 | `length` tipi | `number` | Literal son (`2`, `3`, ...) |
 | Index access | `T` (yoki `T \| undefined`) | Aniq tip per index |
-| Mutating | Ruxsat | ⚠️ Ruxsat (gotcha — quyida) |
+| Mutating | Ruxsat | Ruxsat (gotcha — quyida) |
 
 Tuple `length` tipi — **literal son** (masalan `2`). Bu tuple'ning compile-time'da "fixed-length" ekanligining asosiy belgisi. `lib.es5.d.ts`'da tuple interface'lar uchun `length` property'si literal type sifatida belgilangan.
 
@@ -390,7 +390,7 @@ Tuple `length` tipi — **literal son** (masalan `2`). Bu tuple'ning compile-tim
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Tuple tipi TypeScript checker'da `ObjectFlags.Tuple` flag bilan belgilanadi. `Array<T>`'ning maxsus variantsiyasi — har element alohida tip bilan. Compile vaqtida tuple'lar `TupleType` class sifatida saqlanadi, `elementTypes: Type[]` va `minLength: number` bilan.
+Tuple tipi TypeScript checker'da `ObjectFlags.Tuple` flag bilan belgilanadi — bu generic `Array<T>` interface ustiga qurilgan maxsus reference, har element alohida tip bilan. Tuple'ning element tiplari `TypeReference`'ning type argument'lari sifatida saqlanadi, tuple-specific metadata esa `TupleType` target'ida (`minLength`, `fixedLength`, `elementFlags`) joylashadi.
 
 **Tuple `length` — literal type:**
 
@@ -495,8 +495,8 @@ else { /* use user — bu yerda user: User | null, qo'shimcha narrow kerak */ }
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
 
-function add2(a: Vec2, b: Vec2): Vec2 {
-  return [a[0] + b[0], a[1] + b[1]];
+function addVectors(first: Vec2, second: Vec2): Vec2 {
+  return [first[0] + second[0], first[1] + second[1]];
 }
 ```
 
@@ -505,7 +505,7 @@ Tuple push gotcha'si:
 ```typescript
 let pair: [string, number] = ["hello", 42];
 
-// ⚠️ push ishlaydi — TS to'xtatmaydi
+// Diqqat: push ishlaydi — TS to'xtatmaydi
 pair.push("extra"); // string | number qabul qiladi
 console.log(pair); // ["hello", 42, "extra"]
 console.log(pair.length); // 3 (runtime)
@@ -556,11 +556,11 @@ Tuple'da ba'zi element'lar **ixtiyoriy** (optional) bo'lishi mumkin — `?` bila
 type Point2D = [number, number];
 type Point3D = [number, number, number?]; // z ixtiyoriy
 
-let p1: Point3D = [10, 20];          // ✅ 2 element
-let p2: Point3D = [10, 20, 30];      // ✅ 3 element
+let flatPoint: Point3D = [10, 20];        // ✅ 2 element
+let spatialPoint: Point3D = [10, 20, 30]; // ✅ 3 element
 ```
 
-Optional element'lar **funksiya parametrlari** uchun o'xshash (`function f(a, b, c?)`) — oxirida bo'lishi kerak. Sabab: o'rtada optional bo'lsa, qaysi element berilganini aniqlash ambiguous bo'ladi.
+Optional element'lar **funksiya parametrlari** bilan bir xil qoidaga bo'ysunadi (`function move(x, y, z?)` — optional parametr oxirida) — tuple'da ham optional element oxirida bo'lishi kerak. Sabab: o'rtada optional bo'lsa, qaysi element berilganini aniqlash ambiguous bo'ladi.
 
 ```typescript
 // ❌ O'rtada optional mumkin emas
@@ -616,14 +616,14 @@ Checker destructuring paytida optional element'larning tipini `T | undefined`'ga
 // Optional tuple — oxirgi element'lar
 type Point3D = [number, number, number?];
 
-let p1: Point3D = [10, 20];           // ✅ z yo'q
-let p2: Point3D = [10, 20, 30];       // ✅ z bor
+let flatPoint: Point3D = [10, 20];        // ✅ z yo'q
+let spatialPoint: Point3D = [10, 20, 30]; // ✅ z bor
 
-const [x1, y1, z1] = p1;
-// x1: number, y1: number, z1: number | undefined
+const [px, py, pz] = flatPoint;
+// px: number, py: number, pz: number | undefined
 
-if (z1 !== undefined) {
-  // z1: number (narrowed)
+if (pz !== undefined) {
+  // pz: number (narrowed)
 }
 
 // Funksiya signature — optional tuple
@@ -646,9 +646,9 @@ handleResponse([500, "Error", { cause: "db" }]); // ✅
 
 // Ketma-ket optional
 type FlexTuple = [string, number?, boolean?];
-let a: FlexTuple = ["hello"];            // ✅
-let b: FlexTuple = ["hello", 42];        // ✅
-let c: FlexTuple = ["hello", 42, true];  // ✅
+let labelOnly: FlexTuple = ["hello"];               // ✅
+let labelCount: FlexTuple = ["hello", 42];          // ✅
+let labelCountFlag: FlexTuple = ["hello", 42, true]; // ✅
 
 // Length ham union
 type FlexLen = FlexTuple["length"]; // 1 | 2 | 3
@@ -666,8 +666,8 @@ type FlexLen = FlexTuple["length"]; // 1 | 2 | 3
 ```typescript
 // TS source
 type Point3D = [number, number, number?];
-let p1: Point3D = [10, 20];
-let p2: Point3D = [10, 20, 30];
+let flatPoint: Point3D = [10, 20];
+let spatialPoint: Point3D = [10, 20, 30];
 
 function handle(res: [number, string, object?]) {
   const [code, msg, body] = res;
@@ -676,8 +676,8 @@ function handle(res: [number, string, object?]) {
 
 ```javascript
 // Compiled JS — optional marker o'chiriladi
-let p1 = [10, 20];
-let p2 = [10, 20, 30];
+let flatPoint = [10, 20];
+let spatialPoint = [10, 20, 30];
 
 function handle(res) {
   const [code, msg, body] = res;
@@ -701,10 +701,10 @@ Rest element — tuple ichida `...` bilan **qo'shimcha element'larni** belgilash
 // Rest element — oxirida
 type StringAndNumbers = [string, ...number[]];
 
-let a: StringAndNumbers = ["hello"];                 // ✅ 0 number
-let b: StringAndNumbers = ["hello", 1, 2, 3];        // ✅ 3 number
-let c: StringAndNumbers = ["hello", 1, 2, 3, 4, 5];  // ✅ 5 number
-// let d: StringAndNumbers = [1, 2, 3];              // ❌ birinchisi string bo'lishi kerak
+let empty: StringAndNumbers = ["hello"];               // ✅ 0 number
+let triple: StringAndNumbers = ["hello", 1, 2, 3];     // ✅ 3 number
+let many: StringAndNumbers = ["hello", 1, 2, 3, 4, 5]; // ✅ 5 number
+// let invalid: StringAndNumbers = [1, 2, 3];          // ❌ birinchisi string bo'lishi kerak
 ```
 
 **TS 4.2+:** Rest element har pozitsiyada bo'lishi mumkin (boshida, o'rtada, oxirida):
@@ -712,11 +712,11 @@ let c: StringAndNumbers = ["hello", 1, 2, 3, 4, 5];  // ✅ 5 number
 ```typescript
 // Boshida — oxirgi element aniq
 type TrailingString = [...number[], string];
-let t: TrailingString = [1, 2, 3, "end"]; // ✅
+let trailing: TrailingString = [1, 2, 3, "end"]; // ✅
 
 // O'rtada — boshi va oxiri aniq
 type Sandwich = [string, ...number[], string];
-let s: Sandwich = ["start", 1, 2, 3, "end"]; // ✅
+let sandwich: Sandwich = ["start", 1, 2, 3, "end"]; // ✅
 
 // Cheklov: bitta tuple'da faqat bitta rest element
 // type Invalid = [...string[], ...number[]]; // ❌
@@ -734,10 +734,10 @@ Rest tuple element'lar checker'da `ElementFlags.Rest` bilan belgilanadi. `TupleT
 ```typescript
 // Variadic tuple — T va U o'zlari tuple
 function concat<T extends unknown[], U extends unknown[]>(
-  a: [...T],
-  b: [...U]
+  first: [...T],
+  second: [...U]
 ): [...T, ...U] {
-  return [...a, ...b];
+  return [...first, ...second];
 }
 
 const result = concat([1, 2], ["a", "b"]);
@@ -755,7 +755,7 @@ Eski versiyalarda rest element faqat oxirida bo'lishi mumkin edi. TS 4.2'dan res
 type Sandwich<T> = [start: string, ...middle: T[], end: string];
 // middle — rest, "labeled"
 
-const s: Sandwich<number> = ["begin", 1, 2, 3, "finish"];
+const wrapped: Sandwich<number> = ["begin", 1, 2, 3, "finish"];
 // start: "begin", middle: [1, 2, 3], end: "finish"
 ```
 
@@ -806,10 +806,10 @@ Variadic tuple — real-world patterns:
 // Diqqat: parametrlar `readonly [...T]` — `as const` tuple'lar readonly,
 // mutable `[...T]` ga assign bo'lmaydi
 function concat<T extends readonly unknown[], U extends readonly unknown[]>(
-  a: readonly [...T],
-  b: readonly [...U]
+  first: readonly [...T],
+  second: readonly [...U]
 ): [...T, ...U] {
-  return [...a, ...b];
+  return [...first, ...second];
 }
 
 const joined = concat([1, 2] as const, ["a", "b"] as const);
@@ -824,8 +824,8 @@ function tail<T extends unknown[]>([, ...rest]: [unknown, ...T]): T {
   return rest;
 }
 
-const h = head([1, 2, 3]);      // h: number (1)
-const t = tail([1, "a", true]); // t: (string | boolean)[]
+const firstItem = head([1, 2, 3]);       // firstItem: number (1)
+const restItems = tail([1, "a", true]);  // restItems: [string, boolean] (tuple inference)
 
 // Curry pattern
 type Curried<Args extends unknown[], R> =
@@ -857,25 +857,25 @@ const result = apply(greet, ["Ali", 25]); // result: string
 ```typescript
 // TS source
 type StringAndNumbers = [string, ...number[]];
-let a: StringAndNumbers = ["hello", 1, 2, 3];
+let scores: StringAndNumbers = ["hello", 1, 2, 3];
 
 type Sandwich = [string, ...number[], string];
-let b: Sandwich = ["start", 1, 2, "end"];
+let wrapped: Sandwich = ["start", 1, 2, "end"];
 
 function concat<T extends unknown[], U extends unknown[]>(
-  a: [...T], b: [...U]
+  first: [...T], second: [...U]
 ): [...T, ...U] {
-  return [...a, ...b];
+  return [...first, ...second];
 }
 ```
 
 ```javascript
 // Compiled JS — rest element type'lari to'liq o'chiriladi
-let a = ["hello", 1, 2, 3];
-let b = ["start", 1, 2, "end"];
+let scores = ["hello", 1, 2, 3];
+let wrapped = ["start", 1, 2, "end"];
 
-function concat(a, b) {
-  return [...a, ...b];
+function concat(first, second) {
+  return [...first, ...second];
 }
 // Generic va tuple type'lari JS'da iz yo'q
 // Runtime'da oddiy spread operator
@@ -917,7 +917,7 @@ function getUser(): [id: number, name: string, email: string] {
 
 ```typescript
 // ❌ Qisman labeling — xato
-type Mixed = [name: string, number];
+type PartiallyLabeled = [name: string, number];
 // Error: Tuple members must all have names or all not have names
 
 // ✅ Hammasi labeled
@@ -933,8 +933,8 @@ Named va unnamed tuple'lar **bir xil type identity**'ga ega — label'lar type s
 type Named = [x: number, y: number];
 type Unnamed = [number, number];
 
-let a: Named = [10, 20];
-let b: Unnamed = a; // ✅ bir-biriga assign bo'ladi — label farq qilmaydi
+let labeled: Named = [10, 20];
+let unlabeled: Unnamed = labeled; // ✅ bir-biriga assign bo'ladi — label farq qilmaydi
 ```
 
 <details>
@@ -962,8 +962,9 @@ Sabab: compiler'ning tuple representation'ida consistency. Agar `[name: string, 
 
 ```typescript
 // Agar qisman labeling ruxsat etilganda:
-type A = [name: string, number];
-type B = [...A, boolean]; // B = ? [name: string, number, boolean]?
+type PartiallyLabeled = [name: string, number];
+type Extended = [...PartiallyLabeled, boolean];
+// Extended = ? [name: string, number, boolean]?
 // label propagation qoidasi belgisiz — shuning uchun to'liq taqiqlangan
 ```
 
@@ -1035,8 +1036,8 @@ distance([1, "2"]);
 ```typescript
 // TS source
 type Point = [x: number, y: number];
-const p: Point = [10, 20];
-const [x, y] = p;
+const point: Point = [10, 20];
+const [x, y] = point;
 
 function getCoordinates(): [lat: number, lng: number] {
   return [40.7, -74.0];
@@ -1045,8 +1046,8 @@ function getCoordinates(): [lat: number, lng: number] {
 
 ```javascript
 // Compiled JS — label'lar to'liq o'chiriladi
-const p = [10, 20];
-const [x, y] = p;
+const point = [10, 20];
+const [x, y] = point;
 
 function getCoordinates() {
   return [40.7, -74.0];
@@ -1106,16 +1107,16 @@ Bu pattern enum'ga eng yaqin alternativa: **bitta manba** (`ROLES`), **ikkita is
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`as const` checker'da `checkAssertionExpression` orqali ishlanadi. Array literal'ga `as const` qo'llanilganda, checker quyidagi qadamlarni bajaradi:
+`as const` — `const` type assertion. Checker uni "const context" sifatida belgilaydi va array literal'ga uchta effekt qo'llaydi:
 
 **1. Element widening'ni to'xtatish:**
-Odatda checker `["red", "green", "blue"]` array'ining element'larini `string`'ga widen qiladi. `as const` bilan bu widening o'tkazib yuboriladi — har element o'z literal tipida saqlanadi (`"red"`, `"green"`, `"blue"`).
+Odatda checker `["red", "green", "blue"]` array'ining element'larini `string`'ga widen qiladi. Const context'da bu widening o'tkazib yuboriladi — har element o'z literal tipida saqlanadi (`"red"`, `"green"`, `"blue"`).
 
 **2. Tuple inference:**
-Normal array literal `T[]` tipiga aylanadi. `as const` bilan esa `[T1, T2, T3]` tuple tipiga aylanadi — har element o'z pozitsiyasida. Checker `getArrayLiteralTupleTypeIfApplicable` funksiyasida `as const` flag'ni tekshiradi.
+Normal array literal `T[]` tipiga aylanadi. Const context'da esa `[T1, T2, T3]` tuple tipiga aylanadi — har element o'z pozitsiyasida.
 
 **3. Readonly modifier:**
-Tuple'ga `ReadonlyArray` modifier qo'shiladi — mutating method'lar cheklanadi. `ObjectFlags.ArrayLiteral` bilan birga `ObjectFlags.Readonly` flag o'rnatiladi.
+Hosil bo'lgan tuple `readonly` deb belgilanadi — element'lar `ReadonlyArray` interface orqali faqat non-mutating method'larga ega bo'ladi.
 
 **`typeof arr[number]` indexed access:**
 
@@ -1127,7 +1128,7 @@ type Elem = typeof arr[number];
 // type: 1 | 2 | 3
 ```
 
-Bu nima uchun ishlaydi: `readonly [1, 2, 3]` tuple type'ida `[number]` indexed access operator — **tuple'ning barcha element tiplari union**'ini qaytaradi. Compiler `TupleType.elementTypes` array'ini olib, ularning union'ini hisoblaydi.
+Bu nima uchun ishlaydi: `readonly [1, 2, 3]` tuple type'ida `[number]` indexed access operator — **tuple'ning barcha element tiplari union**'ini qaytaradi. Compiler tuple'ning barcha element tiplarini olib, ularning union'ini hisoblaydi.
 
 Oddiy array'da `number[]` → `string[number]` → `string` (element type). Tuple'da esa `readonly [1, 2, 3][number]` → `1 | 2 | 3` (har element alohida literal).
 
@@ -1230,12 +1231,12 @@ type ActionName = typeof ACTIONS[keyof typeof ACTIONS]["type"];
 
 ```typescript
 // readonly tuple — element'lar NARROW EMAS
-let a: readonly [string, number] = ["hello", 42];
-// a[0] type: string (literal emas!)
+let roTuple: readonly [string, number] = ["hello", 42];
+// roTuple[0] type: string (literal emas!)
 
 // as const — element'lar LITERAL
-const b = ["hello", 42] as const;
-// b[0] type: "hello" (literal!)
+const constTuple = ["hello", 42] as const;
+// constTuple[0] type: "hello" (literal!)
 
 // Muhim farq:
 // - readonly [string, number]: "element tiplari tor"
@@ -1347,7 +1348,7 @@ enum BadColor {
 ### Heterogeneous Enum (Aralash) — TAVSIYA ETILMAYDI
 
 ```typescript
-// ⚠️ Aralash — string + number — ishlatmang
+// Aralash — string + number — ishlatmang
 enum Mixed {
   No = 0,
   Yes = "YES",
@@ -1373,7 +1374,7 @@ enum Status { Active, Inactive }
 console.log(Status.Active); // 0 — value namespace
 
 // TYPE sifatida — compile-time type check
-let s: Status = Status.Active; // type namespace
+let status: Status = Status.Active; // type namespace
 ```
 
 Shu sababli enum declaration merging va namespace merging bilan ishlashi mumkin — compiler har enum uchun ikkita namespace (type va value) parallel track qiladi.
@@ -1384,9 +1385,9 @@ TS 5.0'gacha **har qanday** `number` numeric enum'ga assign bo'lardi — "intent
 
 ```typescript
 enum Direction { Up, Down, Left, Right }
-let d: Direction = 42;
+let direction: Direction = 42;
 // TS 5.0+: ❌ Type '42' is not assignable to type 'Direction'
-// TS < 5.0:  ⚠️ ruxsat etilardi (eski xulq)
+// TS < 5.0:  ruxsat etilardi (eski xulq)
 ```
 
 Lekin **bit flags** pattern'i hali ham ishlaydi — chunki bitwise operatsiyalar enum literal member'lari ustida hisoblanganda natija enum'ning union'iga kiradi:
@@ -1653,8 +1654,8 @@ console.log(Direction.Right);  // → compile: console.log(3)
 
 ```typescript
 enum Direction { Up = 0, Down = 1 }
-let d = Direction.Up;
-// → JS: let d = Direction.Up (object property lookup)
+let direction = Direction.Up;
+// → JS: let direction = Direction.Up (object property lookup)
 // Direction object yaratilgan, runtime'da mavjud
 ```
 
@@ -1662,8 +1663,8 @@ let d = Direction.Up;
 
 ```typescript
 const enum Speed { Fast = 100, Slow = 10 }
-let s = Speed.Fast;
-// → JS: let s = 100 /* Speed.Fast */ (literal value inline)
+let speed = Speed.Fast;
+// → JS: let speed = 100 /* Speed.Fast */ (literal value inline)
 // Speed object umuman YARATILMAYDI
 ```
 
@@ -1751,8 +1752,8 @@ const enum Status {
 // Object.values(Status); // ReferenceError
 
 // Faqat enum member'larning qiymatlari inline qilinadi:
-const s = Status.Active; // → const s = "ACTIVE"
-console.log(s); // "ACTIVE"
+const status = Status.Active; // → const status = "ACTIVE"
+console.log(status); // "ACTIVE"
 ```
 
 `isolatedModules` xatosi:
@@ -1766,7 +1767,7 @@ export const enum Theme {
 
 // app.ts (isolatedModules: true)
 import { Theme } from "./types";
-// ❌ TS2748: Cannot access ambient const enums when '--isolatedModules' is enabled
+// ❌ TS2748: Cannot access ambient const enums when the '--isolatedModules' flag is provided
 
 // Yechimlar:
 // 1. Oddiy enum
@@ -1948,13 +1949,11 @@ var Color;
 
 **2. Declaration merging:**
 
-TypeScript enum'lar bir necha joyda **merge** bo'lishi mumkin — bir xil nom bilan ikkita enum deklaratsiya qilinsa, ular birlashadi:
+TypeScript enum'lar **bir xil scope** ichida bir xil nom bilan bir necha marta declaration qilinsa **merge** bo'ladi — masalan, bitta fayl ichida yoki global ambient declaration'larda (modul fayllar o'zaro avtomatik merge bo'lmaydi, har modul alohida scope):
 
 ```typescript
-// File A
+// Bir scope ichida (bitta fayl yoki global ambient)
 enum Direction { Up, Down }
-
-// File B
 enum Direction { Left = 2, Right = 3 }
 
 // Natija: { Up: 0, Down: 1, Left: 2, Right: 3 }
@@ -2193,7 +2192,7 @@ Enum'lar bir nechta xavfli holatga ega — bular TypeScript'ning enum dizayni bo
 ```typescript
 // TS < 5.0
 enum Direction { Up, Down, Left, Right }
-let dir: Direction = 99; // ⚠️ ruxsat etilardi — xato yo'q
+let dir: Direction = 99; // ruxsat etilardi — xato yo'q
 ```
 
 TS 5.0'gacha har qanday `number` numeric enum'ga assign bo'lardi — bu eski "intentional unsoundness" xulq edi. **TS 5.0'dan boshlab** pure literal numeric enum union enum sifatida ishlaydi va bunday assignment xato beradi:
@@ -2208,15 +2207,15 @@ let dir: Direction = 99;
 Eski xulq faqat **computed member**'li enum'da saqlanadi (chunki bunday enum union'ga aylantirib bo'lmaydi):
 
 ```typescript
-enum Mixed { A = 1, B = Math.floor(Math.random() * 10) }
-let m: Mixed = 999; // ⚠️ Hali ham ruxsat etilgan
+enum Priority { Low = 1, Dynamic = Math.floor(Math.random() * 10) }
+let priority: Priority = 999; // Hali ham ruxsat etilgan (computed member)
 ```
 
 Bit flags pattern'i hali ham ishlaydi — chunki member'lar ustidagi bitwise operatsiya enum union'iga kiradi:
 
 ```typescript
-enum Perm { Read = 1, Write = 2 }
-const rw: Perm = Perm.Read | Perm.Write; // ✅ 3 — union'ga kiradi
+enum Permission { Read = 1, Write = 2 }
+const readWrite: Permission = Permission.Read | Permission.Write; // ✅ 3 — union'ga kiradi
 ```
 
 ### Pitfall 2: Reverse mapping chalkashligi
@@ -2268,7 +2267,7 @@ export const enum Status {
 
 // app.ts (isolatedModules: true)
 import { Status } from "./types";
-// ❌ TS2748: Cannot access ambient const enums when '--isolatedModules' is enabled
+// ❌ TS2748: Cannot access ambient const enums when the '--isolatedModules' flag is provided
 ```
 
 **Sabab:** `isolatedModules: true` har faylni alohida compile qiladi (esbuild, SWC, Babel stilida). `const enum` boshqa fayldan inline qilish uchun compiler'ga source fayllarga kirish kerak — lekin isolated compile'da bu mumkin emas.
@@ -2308,13 +2307,13 @@ Enum pitfall'larning sababi compiler'ning enum type representation'da:
 TS 5.0'gacha numeric enum `number` bilan **bi-directional** assignability'ga ega edi: `number → EnumType` va `EnumType → number` ikkalasi ham ishlardi. TS 5.0 ("All enums Are Union enums") pure literal numeric enum'larni union enum'ga aylantirdi — endi `number → EnumType` cheklanadi, faqat enum member'lari va ular ustidagi bitwise kombinatsiyalar ruxsat etiladi:
 
 ```typescript
-enum Perm { Read = 1, Write = 2, Execute = 4 }
+enum Permission { Read = 1, Write = 2, Execute = 4 }
 
-const combined = Perm.Read | Perm.Write; // 3 — member'lar ustidagi bitwise
-let p: Perm = combined; // ✅ TS 5.0+: union'ga kiradi
+const combined = Permission.Read | Permission.Write; // 3 — member'lar ustidagi bitwise
+let granted: Permission = combined; // ✅ TS 5.0+: union'ga kiradi
 
-let p2: Perm = 99; // ❌ TS 5.0+: '99' is not assignable to type 'Perm'
-                    // ⚠️ TS < 5.0: ruxsat etilardi
+let invalid: Permission = 99; // ❌ TS 5.0+: '99' is not assignable to type 'Permission'
+                              // TS < 5.0: ruxsat etilardi
 ```
 
 Computed (literal bo'lmagan) member'li enum'larda eski xulq saqlanadi — chunki bunday enum union sifatida modellashtirib bo'lmaydi.
@@ -2370,7 +2369,7 @@ function move(dir: Direction) {
 
 move(99);
 // TS 5.0+: ❌ Argument of type '99' is not assignable to parameter of type 'Direction'
-// TS < 5.0: ⚠️ ruxsat etilardi — "unknown" qaytarardi
+// TS < 5.0: ruxsat etilardi — "unknown" qaytarardi
 
 // Pitfall 2: reverse mapping
 console.log(Direction[99]); // undefined
@@ -2401,7 +2400,7 @@ enum Color {
 }
 
 // Pitfall 1 yo'q — string literal assign bo'lmaydi
-let c: Color = "RED"; // ❌ Xato
+let color: Color = "RED"; // ❌ Xato
 
 // Pitfall 3 yo'q — Object.keys toza
 Object.keys(Color); // ["Red", "Green", "Blue"]
@@ -2423,7 +2422,7 @@ type Direction = typeof Direction[keyof typeof Direction];
 // type: 0 | 1 | 2 | 3
 
 // Pitfall yo'q
-// let d: Direction = 99; // ❌ 99 assign bo'lmaydi (nominal yo'q, lekin literal union)
+// let direction: Direction = 99; // ❌ 99 assign bo'lmaydi (nominal yo'q, lekin literal union)
 Object.keys(Direction); // ["Up", "Down", "Left", "Right"] — toza
 Object.values(Direction); // [0, 1, 2, 3] — toza
 ```
@@ -2745,17 +2744,17 @@ Qaysi yondashuv qachon afzalroq? Kontekstga qarab qaror qilinadi:
 | Kriteriya | Enum | Union Type | as const Object |
 |-----------|------|------------|-----------------|
 | Runtime object kerak | ✅ Bor | ❌ Yo'q | ✅ Bor |
-| Bundle size | ⚠️ Kattaroq (IIFE) | ✅ 0 | ✅ Kichik (oddiy object) |
+| Bundle size | Kattaroq (IIFE) | ✅ 0 | ✅ Kichik (oddiy object) |
 | Tree shaking | ❌ Qiyin | ✅ Muammo yo'q | ✅ Yaxshi |
-| `isolatedModules` | ⚠️ `const enum` ishlamaydi | ✅ Mos | ✅ Mos |
+| `isolatedModules` | `const enum` ishlamaydi | ✅ Mos | ✅ Mos |
 | `erasableSyntaxOnly` | ❌ Mos emas | ✅ Mos | ✅ Mos |
-| Iterate (`Object.keys`) | ⚠️ Reverse mapping chalkash | ❌ Mumkin emas | ✅ Toza |
-| Numeric bit flags | ✅ Yaxshi | ⚠️ Qiyin | ⚠️ Qiyin |
+| Iterate (`Object.keys`) | Reverse mapping chalkash | ❌ Mumkin emas | ✅ Toza |
+| Numeric bit flags | ✅ Yaxshi | Qiyin | Qiyin |
 | Declaration merging | ✅ Mumkin | ❌ Yo'q | ❌ Yo'q |
 | Reverse mapping | ✅ Numeric da | ❌ Yo'q | ❌ Yo'q |
 | Namespace augmentation | ✅ Mumkin | ❌ Yo'q | ❌ Yo'q |
-| Browser ecosystem | ⚠️ Bundler'ga bog'liq | ✅ Universal | ✅ Universal |
-| Debugging | ✅ Toza (enum nomi) | ⚠️ Literal value | ✅ Object nomi |
+| Browser ecosystem | Bundler'ga bog'liq | ✅ Universal | ✅ Universal |
+| Debugging | ✅ Toza (enum nomi) | Literal value | ✅ Object nomi |
 
 **Xulosa (tavsiya):**
 
@@ -2773,7 +2772,7 @@ Yangi loyihada enum'dan voz kechish — zamonaviy TypeScript'ning asosiy tavsiya
 
 Uch yondashuvning compiler va bundler'da qanday qayta ishlanishi:
 
-**1. Enum — maxsus kompilyator mantig'i:**
+**1. Enum — maxsus compiler mantig'i:**
 - Emit: IIFE + object literal + reverse mapping logic (numeric bo'lsa)
 - Bundler: side-effect (immediately invoked) — tree shake qiyin
 - Runtime: object property lookup (`O(1)`, lekin indirection qatlami bor)
@@ -2790,21 +2789,21 @@ Uch yondashuvning compiler va bundler'da qanday qayta ishlanishi:
 
 **Declaration merging — enum'ning noyob xususiyati:**
 
-Faqat enum'da ishlaydi — chunki compiler `EnumDeclaration` node'larni same-named enum'lar uchun **merge** qilish logikasiga ega. Bu `||` operator pattern orqali (`(Dir || (Dir = {}))`) amalga oshadi. Union type va `as const` object'lar uchun bunday merging mexanizmi yo'q — ular oddiy type/value declaration.
+Faqat enum'da ishlaydi — chunki compiler `EnumDeclaration` node'larni same-named enum'lar uchun **merge** qilish logikasiga ega. Bu `||` operator pattern orqali (`(Direction || (Direction = {}))`) amalga oshadi. Union type va `as const` object'lar uchun bunday merging mexanizmi yo'q — ular oddiy type/value declaration.
 
 ```typescript
 // Enum — faqat shu merge bo'ladi
-enum Dir { Up }
-enum Dir { Down }
-// Dir = { Up: 0, 0: "Up", Down: 1, 1: "Down" }
+enum Direction { Up }
+enum Direction { Down }
+// Direction = { Up: 0, 0: "Up", Down: 1, 1: "Down" }
 
 // Union — merge yo'q
-type Dir1 = "up";
-type Dir1 = "down"; // ❌ Duplicate identifier
+type DirectionUnion = "up";
+type DirectionUnion = "down"; // ❌ Duplicate identifier
 
 // as const — merge yo'q
-const Dir2 = { Up: 0 } as const;
-const Dir2 = { Down: 1 } as const; // ❌ Cannot redeclare
+const DirectionConst = { Up: 0 } as const;
+const DirectionConst = { Down: 1 } as const; // ❌ Cannot redeclare
 ```
 
 **`erasableSyntaxOnly` flag bilan mos keluvchilik:**
@@ -2979,7 +2978,7 @@ const ROUTES = {
 
 Array, tuple va enum bilan ishlashda uchraydigan nozik holatlar. Bular ko'pincha production kodda silent xato sifatida namoyon bo'ladi.
 
-### 🕳 Gotcha 1: Tuple `push` length mismatch
+### Gotcha 1: Tuple `push` length mismatch
 
 ```typescript
 let pair: [string, number] = ["hello", 42];
@@ -3002,7 +3001,7 @@ let pair2: readonly [string, number] = ["hello", 42];
 
 ---
 
-### 🕳 Gotcha 2: Numeric enum + `Object.keys()` ikki barobar key
+### Gotcha 2: Numeric enum + `Object.keys()` ikki barobar key
 
 ```typescript
 enum Direction { Up, Down, Left, Right }
@@ -3025,38 +3024,30 @@ const names = Object.keys(Direction).filter(k => isNaN(Number(k)));
 
 ---
 
-### 🕳 Gotcha 3: `readonly T[]` va `Readonly<T[]>` farqi
+### Gotcha 3: `readonly T[]` va `Readonly<T[]>` farqi
 
 ```typescript
-// Ikkalasi — readonly array, lekin internal representation farqli
-type A = readonly string[];
-type B = Readonly<string[]>;
+// Ikki yozuv bir xil natija beradi — Readonly<T[]> array uchun readonly T[]'ga aylanadi
+type NativeReadonly = readonly string[];      // native readonly modifier
+type UtilityReadonly = Readonly<string[]>;    // Readonly<T> utility type bilan
+// Ikkalasi ham: readonly string[]
 
-// A: readonly string[] (native readonly modifier)
-// B: readonly string[] (Readonly<T> utility type bilan)
+// MUHIM: nested holatda faqat bitta daraja readonly bo'ladi
+type OuterReadonly = readonly string[][];          // tashqi readonly, ichki array mutable
+type UtilityNested = Readonly<string[][]>;         // bir xil: tashqi readonly, ichki mutable
+type DeepReadonlyManual = ReadonlyArray<ReadonlyArray<string>>; // ikkala daraja readonly
 
-// Ko'pincha bir xil, lekin generic constraint'larda farq bo'lishi mumkin
-function test<T>(arr: T) {
-  // T extends Readonly<any[]> — check bir xil
-  // T extends readonly any[] — sintaktik farq
-}
-
-// MUHIM: nested readonly farq qiladi
-type NestedA = readonly string[][];     // inner array mutable
-type NestedB = Readonly<string[][]>;    // outer readonly, inner mutable
-type NestedC = ReadonlyArray<ReadonlyArray<string>>; // ikkala daraja readonly
-
-// Deep readonly kerak bo'lsa:
+// Har darajani readonly qilish uchun recursive mapped type:
 type DeepReadonly<T> = {
   readonly [K in keyof T]: T[K] extends object ? DeepReadonly<T[K]> : T[K];
 };
 ```
 
-**Sabab:** `readonly T[]` va `Readonly<T[]>` sintaktik farqli lekin semantic bir xil — ikkalasi ham array'ning o'zini readonly qiladi. Lekin **nested** array yoki object'larda muhim farq bor: `readonly T[]` faqat tashqi darajani, `Readonly<T>` utility type esa faqat property darajasini ta'sirlaydi. Deep readonly uchun recursive utility type kerak.
+**Sabab:** `readonly T[]` va `Readonly<T[]>` sintaktik farqli lekin natija bir xil — `Readonly<T[]>` homomorphic mapped type sifatida array uchun `readonly T[]`'ga resolve qilinadi. Ikkalasi ham faqat **tashqi** darajani readonly qiladi; `string[][]` kabi nested holatda ichki array hamon mutable qoladi. Barcha darajani qotirish uchun recursive mapped type (`DeepReadonly`) kerak.
 
 ---
 
-### 🕳 Gotcha 4: Bo'sh array `const` va `never[]`
+### Gotcha 4: Bo'sh array `const` va `never[]`
 
 ```typescript
 // Bo'sh array — evolving any[] pattern
@@ -3077,20 +3068,20 @@ function firstOrDefault<T>(arr: T[]): T | undefined {
 }
 
 const result = firstOrDefault([]); // result: undefined
-// T inferred as `unknown` (TS 4.7+) yoki `never` (TS oldingi versiyalari).
-// `unknown` xavfsizroq: `result` ham `unknown | undefined` bo'ladi va
-// type-check'siz ishlatilmaydi.
+// Bo'sh array literal'da element candidate yo'q — T `never` deb infer qilinadi,
+// shuning uchun return type `never | undefined` = `undefined`.
+// `never` array'dan tashqariga "oqib" chiqsa, keyingi kodda ishlatish qiyinlashadi.
 
 // Aniq annotation yozish tavsiya:
 const empty2: number[] = [];
-const result2 = firstOrDefault<number>([]); // aniq generic
+const result2 = firstOrDefault<number>([]); // aniq generic → result2: number | undefined
 ```
 
-**Sabab:** Bo'sh array literal (`[]`) uchun TypeScript element tipini aniqlay olmaydi. Oddiy `let`/`const` da `any[]` yoki evolving array qo'yadi. Generic funksiya contekstida esa `never[]` yoki `unknown[]` infer qilishi mumkin — bu silent bug'larga olib keladi. Aniq type annotation har doim xavfsizroq.
+**Sabab:** Bo'sh array literal (`[]`) uchun TypeScript element tipini aniqlay olmaydi. Oddiy `let`/`const` da `any[]` (evolving array) qo'yadi. Generic funksiya contekstida esa element candidate bo'lmagani uchun type parameter `never` deb infer qilinadi (array `never[]` bo'ladi) — bu silent bug'larga olib keladi. Aniq type annotation yoki explicit generic argument har doim xavfsizroq.
 
 ---
 
-### 🕳 Gotcha 5: Enum vs union type — `JSON.stringify` natijasi farqli
+### Gotcha 5: Enum vs union type — `JSON.stringify` natijasi farqli
 
 ```typescript
 // Enum — runtime object
@@ -3109,8 +3100,8 @@ JSON.stringify({ dir: Direction.Up });
 
 // Union type — qiymat bevosita
 type Status2 = "active" | "inactive";
-const s: Status2 = "active";
-JSON.stringify({ status: s });
+const status: Status2 = "active";
+JSON.stringify({ status });
 // {"status":"active"} — literal qiymat
 ```
 
@@ -3153,20 +3144,20 @@ enum Direction { Up, Down, Left, Right }
 
 let dir: Direction = 99;
 // TS 5.0+:  ❌ Type '99' is not assignable to type 'Direction'
-// TS < 5.0: ⚠️ ruxsat etilardi — silent xato
+// TS < 5.0: ruxsat etilardi — silent xato
 ```
 
 TS 5.0 ("All enums Are Union enums") pure literal numeric enum'larni union enum'ga aylantirdi — endi 99 kabi enum'da yo'q son qabul qilinmaydi.
 
 **Lekin** quyidagi holatlarda eski xulq saqlanadi:
 - Computed (literal bo'lmagan) member'li enum: `enum E { A = Math.random() }`
-- TS 5.0'gacha kompilyatsiya qilingan kod
+- TS 5.0'gacha compile qilingan kod
 
 ```typescript
 // Computed member — eski xulq
-declare function compute(): number;
-enum Mixed { A = 1, B = compute() }
-let m: Mixed = 999; // ⚠️ Ruxsat etilgan
+declare function computeWeight(): number;
+enum Priority { Low = 1, Dynamic = computeWeight() }
+let priority: Priority = 999; // Ruxsat etilgan (computed member)
 
 // Aniq dizaynli alternativa
 type Direction2 = "UP" | "DOWN" | "LEFT" | "RIGHT";
@@ -3188,7 +3179,7 @@ export const enum Theme {
 
 // app.ts — isolatedModules: true
 import { Theme } from "./types";
-// ❌ TS2748: Cannot access ambient const enums when '--isolatedModules' is enabled
+// ❌ TS2748: Cannot access ambient const enums when the '--isolatedModules' flag is provided
 
 // ✅ Yechim 1 — oddiy enum
 export enum Theme2 { Light = "LIGHT", Dark = "DARK" }
@@ -3235,7 +3226,7 @@ sortNames([...names]); // mutable copy yaratish
 ```typescript
 let pair: [string, number] = ["hello", 42];
 
-// ⚠️ TS to'xtatmaydi — xavfli pattern
+// Diqqat: TS to'xtatmaydi — xavfli pattern
 pair.push("extra");
 console.log(pair); // ["hello", 42, "extra"] — runtime length 3
 // pair[2]; // ❌ TS: tuple type has no element at index 2
@@ -3257,36 +3248,36 @@ let pair2: readonly [string, number] = ["hello", 42];
 **Savol:** Har o'zgaruvchining TypeScript tomonidan inferred tipini ayting:
 
 ```typescript
-const a = [1, 2, 3];
-const b = [1, "hello", true];
-const c = [1, 2, 3] as const;
-let d = [1, 2, 3];
-const e: [number, string] = [1, "hello"];
-const f = [];
+const scores = [1, 2, 3];
+const mixedRow = [1, "hello", true];
+const fixedScores = [1, 2, 3] as const;
+let counters = [1, 2, 3];
+const userEntry: [number, string] = [1, "hello"];
+const items = [];
 ```
 
 <details>
 <summary>Javob</summary>
 
 ```typescript
-const a = [1, 2, 3];
+const scores = [1, 2, 3];
 // type: number[]
 
-const b = [1, "hello", true];
+const mixedRow = [1, "hello", true];
 // type: (string | number | boolean)[]
 
-const c = [1, 2, 3] as const;
+const fixedScores = [1, 2, 3] as const;
 // type: readonly [1, 2, 3] — readonly tuple, har element literal
 
-let d = [1, 2, 3];
+let counters = [1, 2, 3];
 // type: number[] — let/const farq yo'q array'da (faqat `as const` bilan farq bor)
 
-const e: [number, string] = [1, "hello"];
+const userEntry: [number, string] = [1, "hello"];
 // type: [number, string] — aniq annotation, tuple
 
-const f = [];
+const items = [];
 // type: any[] — bo'sh array, annotation yo'q
-// ⚠️ noImplicitAny: true bo'lsa ham TS bu yerda any[] qo'yadi
+// Diqqat: noImplicitAny: true bo'lsa ham TS bu yerda any[] qo'yadi
 // Evolving: push bilan tipni kengaytirishi mumkin
 ```
 
@@ -3419,7 +3410,7 @@ Bu bo'lim TypeScript'ning struktura tiplarini yoritdi:
 - **Rest Tuple** — `[T, ...U[]]` va `[...T[], U]` (TS 4.2+). Variadic tuple types orqali generic inference (TS 4.0+).
 - **Named Tuples** — `[x: number, y: number]` faqat documentation metadata. Runtime va type identity ta'sir yo'q.
 - **`as const` tuple** — `readonly tuple` + literal types. `typeof arr[number]` bilan union type yaratish.
-- **Numeric Enum** — IIFE + reverse mapping. Bit flags uchun mo'ljallangan, `number` bilan bidirectional assignability (unsoundness).
+- **Numeric Enum** — IIFE + reverse mapping. Bit flags uchun mo'ljallangan. TS 5.0'gacha har qanday `number` assign bo'lardi (unsoundness); TS 5.0+ pure literal enum'lar union enum, faqat member'lar va ular ustidagi bitwise kombinatsiya qabul qilinadi.
 - **String Enum** — IIFE, reverse mapping yo'q. Nominal-like identity (string literal assign bo'lmaydi).
 - **`const enum`** — inline substitution, bundle size 0. `isolatedModules` va `erasableSyntaxOnly` bilan muammo.
 - **Enum Under the Hood** — `Direction[Direction["Up"] = 0] = "Up"` assignment pattern. Declaration merging `||` trick orqali.

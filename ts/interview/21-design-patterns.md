@@ -1,6 +1,6 @@
-# Interview: Design Patterns TypeScript da
+# Interview: Design Patterns TypeScript'da
 
-> Factory, Abstract Factory, Singleton, Builder, Adapter, Facade, Proxy, Observer, Strategy, Command, State Machine, Repository, Result/Either, Middleware Pipeline — TypeScript ning generics, discriminated unions, conditional types va branded types yordamida type-safe implementatsiyalari bo'yicha interview savollari. Junior+ dan Senior darajagacha.
+> Factory, Abstract Factory, Singleton, Builder, Adapter, Facade, Proxy, Observer, Strategy, Command, State Machine, Repository, Result/Either, Middleware Pipeline — TypeScript'ning generics, discriminated unions, conditional types va branded types yordamida type-safe implementation'lari bo'yicha interview savollari. Junior+ dan Senior darajagacha.
 
 ---
 
@@ -9,12 +9,12 @@
 ### Nazariy savollar
 1. [Factory pattern — generic factory qanday yoziladi?](#savol-1-factory-pattern--generic-factory-qanday-yoziladi-middle) [Middle]
 2. [Abstract Factory pattern qachon kerak?](#savol-2-abstract-factory-pattern-qachon-kerak-middle) [Middle+]
-3. [Singleton TypeScript da: qachon va qanday?](#savol-3-singleton-typescript-da-qachon-va-qanday-middle) [Middle]
+3. [Singleton TypeScript'da: qachon va qanday?](#savol-3-singleton-typescript-da-qachon-va-qanday-middle) [Middle]
 4. [Builder pattern: fluent vs step builder?](#savol-4-builder-pattern-fluent-vs-step-builder-middle) [Middle+]
 5. [Strategy pattern nima va qachon ishlatiladi?](#savol-5-strategy-pattern-nima-va-qachon-ishlatiladi-middle) [Middle]
 6. [Adapter pattern — real-world misol](#savol-6-adapter-pattern--real-world-misol-junior) [Junior+]
 7. [Facade va Adapter farqi?](#savol-7-facade-va-adapter-farqi-middle) [Middle]
-8. [Proxy pattern — qaysi use case lar?](#savol-8-proxy-pattern--qaysi-use-case-lar-middle) [Middle+]
+8. [Proxy pattern — qaysi use case'lar?](#savol-8-proxy-pattern--qaysi-use-case-lar-middle) [Middle+]
 9. [Observer pattern — typed EventEmitter](#savol-9-observer-pattern--typed-eventemitter-middle) [Middle]
 10. [Command pattern: undo/redo qanday ishlaydi?](#savol-10-command-pattern-undoredo-qanday-ishlaydi-middle) [Middle+]
 11. [State Machine discriminated union bilan](#savol-11-state-machine-discriminated-union-bilan-senior) [Senior]
@@ -29,7 +29,7 @@
 
 ### Coding savollar
 18. [Type-safe `EventEmitter<Events>`](#savol-18-type-safe-eventemitterevents-senior) [Senior]
-19. [Generic `Result<T, E>` utility lar](#savol-19-generic-resultt-e-utility-lar-middle) [Middle+]
+19. [Generic `Result<T, E>` utility'lar](#savol-19-generic-resultt-e-utility-lar-middle) [Middle+]
 20. [Generic `Repository<T>` + in-memory](#savol-20-generic-repositoryt--in-memory-middle) [Middle+]
 21. [Type-safe Builder phantom types](#savol-21-type-safe-builder-phantom-types-senior) [Senior]
 22. [Async middleware pipeline](#savol-22-async-middleware-pipeline-senior) [Senior]
@@ -50,13 +50,13 @@
 
 ### Qisqa javob
 
-Factory — object yaratish logikasini bir joyga to'plab, client koddan yashiradi. TypeScript da generic + type map orqali factory qaytaradigan type avtomatik aniqlanadi — type assertion kerak emas.
+Factory — object yaratish logikasini bir joyga to'plab, client koddan yashiradi. TypeScript'da generic + type map orqali factory qaytaradigan type avtomatik aniqlanadi — type assertion kerak emas.
 
 ### To'liq tushuntirish
 
-**Factory ning maqsadlari:**
-1. **Encapsulation** — object yaratish detail ni yashirish
-2. **Conditional creation** — environment yoki config ga ko'ra turli implementation
+**Factory'ning maqsadlari:**
+1. **Encapsulation** — object yaratish detail'ni yashirish
+2. **Conditional creation** — environment yoki config'ga ko'ra turli implementation
 3. **Centralization** — yaratish logikasi bitta joyda
 4. **Type narrowing** — generic factory chaqiruvchiga aniq type qaytaradi
 
@@ -73,14 +73,14 @@ interface Map {
 function create<K extends keyof Map>(key: K): Map[K]
 ```
 
-**TypeScript ning kuchi:**
+**TypeScript'ning kuchi:**
 - `K extends keyof Map` — faqat mavjud key qabul qiladi (compile-time)
 - `Map[K]` — return type avtomatik
 - Type assertion (`as`) kerak emas
 
 **Factory turlari:**
 
-1. **Simple factory** — funksiya parameter ga ko'ra object qaytaradi
+1. **Simple factory** — funksiya parameter'ga ko'ra object qaytaradi
 2. **Factory method** — class method, subclass override qila oladi
 3. **Abstract factory** — bir-biriga bog'liq object oilasi yaratadi
 
@@ -152,11 +152,11 @@ class HttpLogger extends TransportLogger {
 - **Generic class factory:** `class Repository<T> {}` ni factory qilish — `function createRepo<T>(): Repository<T>` — caller `<T>` ko'rsatishi kerak
 - **Lazy creation:** factory har chaqiruvda yangi instance yaratadi — costly bo'lsa, caching qo'shish kerak
 - **Async factory:** factory `Promise` qaytarishi mumkin — caller `await`
-- **Default config:** factory `Partial<Config>` qabul qiladi, default lar merge qilinadi
+- **Default config:** factory `Partial<Config>` qabul qiladi, default'lar merge qilinadi
 
 ### Follow-up savollar
 
-1. **"Factory va constructor o'rtasidagi farq?"** — Constructor — class instance yaratadi. Factory — qanday class instantiate qilish detail ni yashiradi (subclass, config bo'yicha)
+1. **"Factory va constructor o'rtasidagi farq?"** — Constructor — class instance yaratadi. Factory — qanday class instantiate qilish detail'ni yashiradi (subclass, config bo'yicha)
 2. **"Type map va discriminated union farqi?"** — Type map: factory input → output. Discriminated union: variant data structure. Bir-birini to'ldiradi (factory discriminated union qaytaradi)
 
 </details>
@@ -170,7 +170,7 @@ class HttpLogger extends TransportLogger {
 
 ### Qisqa javob
 
-Abstract Factory — bir-biriga bog'liq object oilasini yaratadi. Client concrete class larni bilmaydi, faqat interface orqali ishlaydi. Theme switching, cross-platform UI, database driver larida ishlatiladi.
+Abstract Factory — bir-biriga bog'liq object oilasini yaratadi. Client concrete class'larni bilmaydi, faqat interface orqali ishlaydi. Theme switching, cross-platform UI, database driver'larida ishlatiladi.
 
 ### To'liq tushuntirish
 
@@ -199,9 +199,9 @@ ConcreteFactory2
 └── createB(): ProductB2
 ```
 
-Client `AbstractFactory` ga bog'lanadi, runtime da concrete factory tanlanadi.
+Client `AbstractFactory` ga bog'lanadi, runtime'da concrete factory tanlanadi.
 
-**Use case lar:**
+**Use case'lar:**
 1. **Theme system** — Material/Bootstrap/Tailwind theme uchun Button, Input, Modal
 2. **Cross-platform** — Web/Mobile/Desktop UI komponentlari
 3. **Database driver** — Postgres/MySQL/SQLite uchun connection, query, transaction
@@ -313,33 +313,33 @@ console.log(form.render());
 
 ### Edge Cases
 
-- **Family consistency:** abstract factory product lar bir-biriga mos kelishi kerak (Material Button + Material Input — to'g'ri, Material Button + Bootstrap Input — chaos)
-- **Adding new product:** har concrete factory ni yangilash kerak (open-closed principle buzilishi)
+- **Family consistency:** abstract factory product'lar bir-biriga mos kelishi kerak (Material Button + Material Input — to'g'ri, Material Button + Bootstrap Input — chaos)
+- **Adding new product:** har concrete factory'ni yangilash kerak (open-closed principle buzilishi)
 - **Adding new family:** oson — yangi concrete factory
-- **TypeScript benefit:** factory interface har method return type ni belgilaydi — concrete factory lar majburiy implement
+- **TypeScript benefit:** factory interface har method return type'ni belgilaydi — concrete factory'lar majburiy implement
 - **Generic abstract factory:** `interface UIFactory<T>` — type-safe customization
 
 ### Follow-up savollar
 
-1. **"Factory pattern dan qachon Abstract Factory ga o'tish kerak?"** — Bir tur object dan bir nechta tur object kerak bo'lganda. Family consistency muhim bo'lsa
-2. **"DI Container abstract factory ni almashtira oladimi?"** — Ha, ko'p case da. Container token bo'yicha implementation tanlaydi. Lekin abstract factory — declarative, type-safe
+1. **"Factory pattern'dan qachon Abstract Factory'ga o'tish kerak?"** — Bir tur object'dan bir nechta tur object kerak bo'lganda. Family consistency muhim bo'lsa
+2. **"DI Container abstract factory'ni almashtira oladimi?"** — Ha, ko'p case'da. Container token bo'yicha implementation tanlaydi. Lekin abstract factory — declarative, type-safe
 
 </details>
 
 ---
 
-### Savol 3: Singleton TypeScript da: qachon va qanday? [Middle]
+### Savol 3: Singleton TypeScript'da: qachon va qanday? [Middle]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-Singleton — class dan faqat bitta instance yaratilishini kafolatlaydi. TypeScript da `private constructor` + `static getInstance()` orqali. Module-level variable bilan ham singleton — ko'pincha yaxshiroq variant. Anti-pattern hisoblanishi mumkin (global state).
+Singleton — class'dan faqat bitta instance yaratilishini kafolatlaydi. TypeScript'da `private constructor` + `static getInstance()` orqali. Module-level variable bilan ham singleton — ko'pincha yaxshiroq variant. Anti-pattern hisoblanishi mumkin (global state).
 
 ### To'liq tushuntirish
 
-**Singleton ning ikkita asosiy implementation:**
+**Singleton'ning ikkita asosiy implementation:**
 
 **1. Class-based Singleton:**
 
@@ -370,14 +370,14 @@ export default connection;
 // Har joyda import bir xil instance
 ```
 
-**Module-level ning afzalligi:**
+**Module-level'ning afzalligi:**
 - Oddiy syntax
 - Native JS module caching
-- Test da easier — module mock
+- Test'da easier — module mock
 - Lazy initialization tabiiy
 
-**Singleton ning kamchiliklari:**
-1. **Global state** — test izolyatsiya muammosi
+**Singleton'ning kamchiliklari:**
+1. **Global state** — test isolation muammosi
 2. **Tight coupling** — har joyda `Class.getInstance()` chaqiruvi
 3. **DI bilan ziddiyat** — singleton dependency inject qilishni qiyinlashtiradi
 4. **Multi-threading** (Node worker) — har worker o'z singleton instance
@@ -462,9 +462,9 @@ export function resetConnection(): void {
 
 ### Edge Cases
 
-- **Inheritance:** singleton class ni extend qilish murakkab — child class o'zining singleton bo'lishi kerakmi yoki parent ni share qiladimi?
+- **Inheritance:** singleton class'ni extend qilish murakkab — child class o'zining singleton bo'lishi kerakmi yoki parent'ni share qiladimi?
 - **Multi-process (cluster, worker_threads):** har worker o'z singleton — process-level emas, worker-level
-- **Test isolation:** singleton state leak — `Class.reset()` yoki yangi container har test da
+- **Test isolation:** singleton state leak — `Class.reset()` yoki yangi container har test'da
 - **`Object.freeze`:** `Object.freeze(singleton)` — mutation oldini olish
 - **TC39 `@singleton` decorator:** class decorator orqali singleton — declarative
 
@@ -490,7 +490,7 @@ export function resetConnection(): void {
 
 **Builder pattern maqsadi:**
 
-Murakkab object ni bosqichma-bosqich yaratish — ko'p parameter li constructor o'rniga. Telescoping constructor anti-pattern dan qutqaradi.
+Murakkab object'ni bosqichma-bosqich yaratish — ko'p parameter li constructor o'rniga. Telescoping constructor anti-pattern'dan qutqaradi.
 
 **Fluent Builder:**
 
@@ -510,7 +510,7 @@ new Builder().url("/api").build(); // ❌ Runtime error
 
 **Step Builder (compile-time enforcement):**
 
-Phantom types — generic type parameter har setter da yangilanadi. `build()` faqat to'liq state da ishlaydi (TypeScript `this` parameter da check).
+Phantom types — generic type parameter har setter'da yangilanadi. `build()` faqat to'liq state'da ishlaydi (TypeScript `this` parameter'da check).
 
 ```typescript
 class Builder<S = {}> {
@@ -523,7 +523,7 @@ new Builder().url("/api").build(); // ❌ Compile error — method missing
 new Builder().url("/api").method("GET").build(); // ✅
 ```
 
-**Phantom types — runtime overhead yo'q:** type-level ma'lumot, JS ga compile bo'lganda yo'qoladi.
+**Phantom types — runtime overhead yo'q:** type-level ma'lumot, JS'ga compile bo'lganda yo'qoladi.
 
 **Trade-off:**
 
@@ -666,7 +666,7 @@ const req3 = request().url("/api").method("GET").build(); // ✅
 ### Edge Cases
 
 - **Immutability:** har setter `this` qaytaradi (mutation). Immutable variant — yangi builder instance qaytarish (memory cost)
-- **Reuse:** bir builder ni qayta ishlatish (`builder.build()` ikki marta) — internal state shared. Yangi builder afzal har build uchun
+- **Reuse:** bir builder'ni qayta ishlatish (`builder.build()` ikki marta) — internal state shared. Yangi builder afzal har build uchun
 - **Type inference limits:** complex phantom type — IDE tooltip "ugly". `interface` based step builder readable
 - **Performance:** runtime overhead yo'q (mutation). Phantom types compile-time only
 - **Inheritance:** step builder generic extend qilish murakkab — type parameter chain manage qilish kerak
@@ -674,7 +674,7 @@ const req3 = request().url("/api").method("GET").build(); // ✅
 ### Follow-up savollar
 
 1. **"Fluent va Step builder qaysi yaxshiroq?"** — Optional fields ko'p — Fluent. Required field strict — Step. Library API — Step (developer experience yuqori)
-2. **"`this` parameter type — qanday ishlaydi?"** — TypeScript phantom — `this: StepBuilder<{ url: true; method: true }>` — call site da `this` type mos kelishi kerak
+2. **"`this` parameter type — qanday ishlaydi?"** — TypeScript phantom — `this: StepBuilder<{ url: true; method: true }>` — call site'da `this` type mos kelishi kerak
 3. **"Ordered step (NeedsUrl → NeedsMethod) qanday foydali?"** — IDE autocomplete har bosqichda faqat valid method ko'rsatadi. Discoverability yuqori
 
 </details>
@@ -688,7 +688,7 @@ const req3 = request().url("/api").method("GET").build(); // ✅
 
 ### Qisqa javob
 
-Strategy — algoritmni interface orqali abstract qilib, runtime da almashtirishga imkon beradi. `if/else` yoki `switch` ning OOP alternative. Open/Closed Principle ga rioya qiladi — yangi strategy qo'shilganda mavjud kod o'zgarmaydi.
+Strategy — algoritmni interface orqali abstract qilib, runtime'da almashtirishga imkon beradi. `if/else` yoki `switch` ning OOP alternative. Open/Closed Principle'ga rioya qiladi — yangi strategy qo'shilganda mavjud kod o'zgarmaydi.
 
 ### To'liq tushuntirish
 
@@ -705,7 +705,7 @@ ConcreteStrategy1 implements IStrategy
 ConcreteStrategy2 implements IStrategy
 ```
 
-**Use case lar:**
+**Use case'lar:**
 1. **Sorting** — bubble/quick/merge sort
 2. **Pricing** — regular/bulk/seasonal pricing
 3. **Validation** — email/phone/credit card validation
@@ -842,17 +842,17 @@ console.log(sorter.sort([5, 2, 8, 1, 9])); // [1, 2, 5, 8, 9]
 
 ### Edge Cases
 
-- **State sharing:** strategy stateless bo'lishi afzal — bir strategy ko'p context da ishlatilishi mumkin
-- **Strategy bilan parameter:** har strategy turli parameter ga muhtoj bo'lsa — interface universalligi pasayadi. Generic constraint yoki object parameter
-- **Default strategy:** context constructor da default strategy berish — bo'sh state oldini olish
-- **Strategy chain:** bir nechta strategy ketma-ket — chain of responsibility ga yaqinroq
-- **Function as strategy:** simple case da interface o'rniga function type yetarli — `type Validator = (input: string) => boolean`
+- **State sharing:** strategy stateless bo'lishi afzal — bir strategy ko'p context'da ishlatilishi mumkin
+- **Strategy bilan parameter:** har strategy turli parameter'ga muhtoj bo'lsa — interface universalligi pasayadi. Generic constraint yoki object parameter
+- **Default strategy:** context constructor'da default strategy berish — bo'sh state oldini olish
+- **Strategy chain:** bir nechta strategy ketma-ket — chain of responsibility'ga yaqinroq
+- **Function as strategy:** simple case'da interface o'rniga function type yetarli — `type Validator = (input: string) => boolean`
 
 ### Follow-up savollar
 
 1. **"Strategy va Template Method farqi?"** — Strategy — runtime composition. Template Method — inheritance, hook method override
 2. **"Strategy pattern Function type bilan almashtirsa bo'ladimi?"** — Single-method interface — function type oddiyroq. Lekin strategy state yoki bir necha method bo'lsa — interface afzal
-3. **"`switch` qachon Strategy ga teng?"** — `switch` 3-4 case dan kam bo'lsa, va yangi case kam qo'shiladigan bo'lsa — `switch` yetarli. Aks holda Strategy
+3. **"`switch` qachon Strategy'ga teng?"** — `switch` 3-4 case'dan kam bo'lsa, va yangi case kam qo'shiladigan bo'lsa — `switch` yetarli. Aks holda Strategy
 
 </details>
 
@@ -865,13 +865,13 @@ console.log(sorter.sort([5, 2, 8, 1, 9])); // [1, 2, 5, 8, 9]
 
 ### Qisqa javob
 
-Adapter — mos kelmaydigan interface larni moslashtiradi. Legacy API yoki tashqi library ni ichki system interface ga moslash uchun ishlatiladi. Yangi kod da `target interface` bilan ishlanadi, adapter eski API ga chaqiruvni o'zgartiradi.
+Adapter — mos kelmaydigan interface'larni moslashtiradi. Legacy API yoki tashqi library'ni ichki system interface'ga moslash uchun ishlatiladi. Yangi kodda `target interface` bilan ishlanadi, adapter eski API'ga chaqiruvni o'zgartiradi.
 
 ### To'liq tushuntirish
 
-**Adapter ning maqsadi:**
+**Adapter'ning maqsadi:**
 
-Bir-biriga to'g'ri kelmaydigan ikki interface ni ulash. Client kod faqat o'z interface ini biladi — implementation detail (eski API, tashqi library) yashirin.
+Bir-biriga to'g'ri kelmaydigan ikki interface'ni ulash. Client kod faqat o'z interface'ini biladi — implementation detail (eski API, tashqi library) yashirin.
 
 **Strukturasi:**
 
@@ -886,15 +886,15 @@ Adapter implements Target
 └── method(): T  → adaptee.oldMethod()
 ```
 
-**Use case lar:**
-1. **Legacy API integration** — eski payment gateway API ni yangi `PaymentProcessor` interface ga
-2. **Third-party library** — boshqa shape ga ega kutubxona ni bizning interface ga
-3. **Migration** — yangi va eski API ikkalasi production da, adapter ko'prik
+**Use case'lar:**
+1. **Legacy API integration** — eski payment gateway API'ni yangi `PaymentProcessor` interface'ga
+2. **Third-party library** — boshqa shape'ga ega kutubxonani bizning interface'ga
+3. **Migration** — yangi va eski API ikkalasi production'da, adapter ko'prik
 4. **Multiple providers** — Stripe, PayPal, Square — har biri uchun adapter, client bir interface
 
 **Object Adapter vs Class Adapter:**
-- **Object Adapter** (composition) — adaptee ni constructor da olib saqlash. JS/TS afzal
-- **Class Adapter** (multiple inheritance) — JS da yo'q. Mixin orqali emulate qilish mumkin
+- **Object Adapter** (composition) — adaptee'ni constructor'da olib saqlash. JS/TS afzal
+- **Class Adapter** (multiple inheritance) — JS'da yo'q. Mixin orqali emulate qilish mumkin
 
 ### Kod misol
 
@@ -991,16 +991,16 @@ await processOrder(provider, 99.99);
 ### Edge Cases
 
 - **Two-way adapter:** ikki tomonlama moslash kerak bo'lganda (har ikkala interface ham bizniki) — kamdan-kam
-- **Performance overhead:** adapter har chaqiruvda data transformation — `amount * 100` kabi. Hot path da minimal saqlash kerak
-- **Error mapping:** adaptee error ni target interface error type ga aylantirish (`StripeError` → `PaymentError`)
-- **Side effect leak:** adaptee ning side effect lari adapter orqali tashqariga chiqishi mumkin (logging, telemetry)
+- **Performance overhead:** adapter har chaqiruvda data transformation — `amount * 100` kabi. Hot path'da minimal saqlash kerak
+- **Error mapping:** adaptee error'ni target interface error type'ga aylantirish (`StripeError` → `PaymentError`)
+- **Side effect leak:** adaptee'ning side effect'lari adapter orqali tashqariga chiqishi mumkin (logging, telemetry)
 - **Async vs sync mismatch:** sync adaptee → async target — Promise wrap. Async adaptee → sync target — qiyin (callback hell)
 
 ### Follow-up savollar
 
-1. **"Adapter va Facade farqi?"** — Adapter: interface mismatch (1-to-1 method mapping). Facade: complexity hiding (subsystem ga sodda entry point)
+1. **"Adapter va Facade farqi?"** — Adapter: interface mismatch (1-to-1 method mapping). Facade: complexity hiding (subsystem'ga sodda entry point)
 2. **"Adapter qachon over-engineering?"** — Adaptee va target deyarli bir xil — adapter qatlam keraksiz. Direct usage afzal
-3. **"Class Adapter JS da qanday?"** — JS multiple inheritance qo'llab-quvvatlamaydi. Mixin pattern bilan emulate, lekin Object Adapter ko'pincha afzal
+3. **"Class Adapter JS'da qanday?"** — JS multiple inheritance qo'llab-quvvatlamaydi. Mixin pattern bilan emulate, lekin Object Adapter ko'pincha afzal
 
 </details>
 
@@ -1013,7 +1013,7 @@ await processOrder(provider, 99.99);
 
 ### Qisqa javob
 
-**Adapter** — bir interface ni boshqa interface ga moslaydi (1-to-1 method mapping). **Facade** — murakkab subsystem ni sodda interface bilan o'rab oladi (1-to-many). Adapter — compatibility, Facade — simplicity.
+**Adapter** — bir interface'ni boshqa interface'ga moslaydi (1-to-1 method mapping). **Facade** — murakkab subsystem'ni sodda interface bilan o'rab oladi (1-to-many). Adapter — compatibility, Facade — simplicity.
 
 ### To'liq tushuntirish
 
@@ -1022,7 +1022,7 @@ await processOrder(provider, 99.99);
 | | Adapter | Facade |
 |---|---------|--------|
 | Maqsad | Interface compatibility | Complexity hiding |
-| Strukturasi | Bir adaptee ga moslash | Bir nechta subsystem class ni birlashtirish |
+| Strukturasi | Bir adaptee'ga moslash | Bir nechta subsystem class'ni birlashtirish |
 | Method mapping | 1-to-1 | 1-to-many |
 | Use case | Legacy/third-party integratsiya | API simplification |
 | Misol | `StripeAdapter` | `AuthFacade` |
@@ -1041,9 +1041,9 @@ Client → Facade → [Subsystem A, Subsystem B, Subsystem C]
 
 **Facade qachon kerak:**
 1. **Complex subsystem** — ko'p step kerak bo'lgan operatsiya
-2. **API entry point** — public API yashirin internal class lar bilan
-3. **Module isolation** — qaysi class lar tashqariga chiqishini cheklash
-4. **Workflow encapsulation** — business process ni bir method ga to'plash
+2. **API entry point** — public API yashirin internal class'lar bilan
+3. **Module isolation** — qaysi class'lar tashqariga chiqishini cheklash
+4. **Workflow encapsulation** — business process'ni bir method'ga to'plash
 
 ### Kod misol
 
@@ -1150,37 +1150,37 @@ class LoggerAdapter implements ModernLogger {
 
 ### Edge Cases
 
-- **Facade monolith object:** facade juda ko'p method bo'lsa — bir nechta facade ga ajratish kerak (har subsystem area uchun)
+- **Facade monolith object:** facade juda ko'p method bo'lsa — bir nechta facade'ga ajratish kerak (har subsystem area uchun)
 - **Hidden subsystem evolution:** facade orqali ishlovchi client subsystem o'zgarishini sezmaydi — backward compatibility yaxshilanadi
 - **Performance:** facade additional layer — har chaqiruv bir method call extra. Mostly negligible
-- **Testing:** facade test qilganda 4 ta subsystem ni mock qilish kerak. Integration test bilan birgalikda
+- **Testing:** facade test qilganda 4 ta subsystem'ni mock qilish kerak. Integration test bilan birgalikda
 - **Adapter chain:** bir nechta adapter ketma-ket (`AdapterB(AdapterA(legacy))`) — debugging qiyin
 
 ### Follow-up savollar
 
-1. **"Facade qachon Service Layer ga aylanadi?"** — Facade business logic qo'shsa — service. Pure orchestration — facade
-2. **"Adapter va Bridge farqi?"** — Adapter — mavjud interface compatibility. Bridge — abstraction va implementation ni alohida hierarchy da ajratish (proactive design)
-3. **"`AuthFacade` SOLID buzadimi?"** — Single Responsibility — agar facade faqat orchestration qilsa (business logic yo'q), SRP ni qoniqtiradi
+1. **"Facade qachon Service Layer'ga aylanadi?"** — Facade business logic qo'shsa — service. Pure orchestration — facade
+2. **"Adapter va Bridge farqi?"** — Adapter — mavjud interface compatibility. Bridge — abstraction va implementation'ni alohida hierarchy'da ajratish (proactive design)
+3. **"`AuthFacade` SOLID buzadimi?"** — Single Responsibility — agar facade faqat orchestration qilsa (business logic yo'q), SRP'ni qoniqtiradi
 
 </details>
 
 ---
 
-### Savol 8: Proxy pattern — qaysi use case lar? [Middle+]
+### Savol 8: Proxy pattern — qaysi use case'lar? [Middle+]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-Proxy — object ga qo'shimcha behavior qo'shadi (caching, access control, logging, lazy loading) — original object ni o'zgartirmasdan. Client object ga to'g'ridan-to'g'ri emas, proxy orqali murojaat qiladi.
+Proxy — object'ga qo'shimcha behavior qo'shadi (caching, access control, logging, lazy loading) — original object'ni o'zgartirmasdan. Client object'ga to'g'ridan-to'g'ri emas, proxy orqali murojaat qiladi.
 
 ### To'liq tushuntirish
 
 **Proxy turlari:**
 
 1. **Caching Proxy** — query natijasini cache qiladi
-2. **Lazy Proxy (Virtual)** — costly object ni faqat kerak bo'lganda yaratadi
+2. **Lazy Proxy (Virtual)** — costly object'ni faqat kerak bo'lganda yaratadi
 3. **Protection Proxy** — access control (role/permission)
 4. **Remote Proxy** — remote service uchun local placeholder
 5. **Logging Proxy** — chaqiruvlarni log qiladi
@@ -1206,7 +1206,7 @@ Proxy implements Subject
 
 **ES6 `Proxy` object:**
 
-JavaScript native `Proxy` — handler orqali har operation ni intercept. Pattern dan farq — JS spec konstruksiyasi.
+JavaScript native `Proxy` — handler orqali har operation'ni intercept. Pattern'dan farq — JS spec konstruksiyasi.
 
 ### Kod misol
 
@@ -1349,16 +1349,16 @@ logged.age = 26;       // [SET] age = 26
 
 ### Edge Cases
 
-- **Cache invalidation:** stale data muammosi. TTL, write-through, event-based invalidation strategy lar
+- **Cache invalidation:** stale data muammosi. TTL, write-through, event-based invalidation strategy'lar
 - **Proxy chain:** `LoggingProxy(CachingProxy(LazyProxy(Real)))` — har layer overhead, debugging qiyin
-- **`this` binding:** proxy method ichida `this` proxy. Inner subject ga proxy ni emas, inner ni o'zini berish kerak ba'zi case da
+- **`this` binding:** proxy method ichida `this` proxy. Inner subject'ga proxy'ni emas, inner'ni o'zini berish kerak ba'zi case'da
 - **TypeScript native Proxy type:** `Proxy<T>` `T` ga aylanadi (transparent). Compile-time inference yaxshi
 - **Memory leak (cache proxy):** cache size cheksiz → LRU yoki TTL bilan cheklash
 
 ### Follow-up savollar
 
 1. **"Proxy va Decorator farqi?"** — Proxy: access control/lifecycle. Decorator: behavior extension. Texnik o'xshash, intent farq
-2. **"ES6 `Proxy` qaysi case da pattern dan afzal?"** — Dynamic intercept — `get`/`set` har property uchun universal. Pattern da har method explicit
+2. **"ES6 `Proxy` qaysi case'da pattern'dan afzal?"** — Dynamic intercept — `get`/`set` har property uchun universal. Pattern'da har method explicit
 3. **"Proxy pattern va reverse proxy farqi?"** — Reverse proxy — network/HTTP konsepsiya (Nginx). Pattern — OOP konsepsiya. Maqsad bir xil — intermediate layer
 
 </details>
@@ -1372,7 +1372,7 @@ logged.age = 26;       // [SET] age = 26
 
 ### Qisqa javob
 
-Observer — bir object (Subject) holati o'zgarganda, barcha kuzatuvchilar (Observer) avtomatik xabar oladi. TypeScript da typed EventEmitter — `Events[K]` tuple/function type bilan har event uchun argument type lar compile-time da tekshiriladi.
+Observer — bir object (Subject) holati o'zgarganda, barcha kuzatuvchilar (Observer) avtomatik xabar oladi. TypeScript'da typed EventEmitter — `Events[K]` tuple/function type bilan har event uchun argument type'lar compile-time'da tekshiriladi.
 
 ### To'liq tushuntirish
 
@@ -1411,11 +1411,11 @@ emitter.emit("userLogin", 42, "wrong"); // ❌ type error
 - Value — argument tuple
 - `emit<K extends keyof Events>(event: K, ...args: Events[K])` — compiler tekshiradi
 
-**Observer use case lar:**
+**Observer use case'lar:**
 1. **Event-driven systems** — UI events, lifecycle hooks
 2. **Reactive state** — state change → UI update
 3. **Pub/Sub** — microservice communication
-4. **Logging/Telemetry** — har action ga listener
+4. **Logging/Telemetry** — har action'ga listener
 
 ### Kod misol
 
@@ -1520,7 +1520,7 @@ emitter.removeAllListeners("purchase"); // event uchun barcha listener
 
 ### Qisqa javob
 
-Command — operatsiyani object sifatida encapsulate qiladi: `execute()` + `undo()`. History stack da command lar saqlanadi — undo `pop` qilib `undo()` chaqiradi, redo `execute()` qaytadan. Text editor, drawing app, transaction lar uchun ideal.
+Command — operatsiyani object sifatida encapsulate qiladi: `execute()` + `undo()`. History stack'da command'lar saqlanadi — undo `pop` qilib `undo()` chaqiradi, redo `execute()` qaytadan. Text editor, drawing app, transaction'lar uchun ideal.
 
 ### To'liq tushuntirish
 
@@ -1543,7 +1543,7 @@ redo(): undone.pop() → cmd.execute() → done.push(cmd)
 new command: done.push(cmd); undone = []  // redo stack tozalanadi
 ```
 
-**Use case lar:**
+**Use case'lar:**
 1. **Text editor** — type, delete, format → undo/redo
 2. **Drawing app** — draw, erase, move
 3. **Database transaction** — execute statement, rollback
@@ -1711,7 +1711,7 @@ console.log(history.canRedo()); // false
 - **Composite command (Macro):** bir nechta command bitta atomic operation sifatida — `MacroCommand implements Command` ichida `subCommands: Command[]`
 - **Memory cost:** undo state saqlash — har command instance memory egallaydi. Big data — snapshot expensive
 - **Idempotency:** `redo` paytida command effect takrorlanmasligi kerak. Internal state (`this.id`) saqlash
-- **External state mutation:** command tashqi state ga ham ta'sir qilsa (DB, network) — undo qiyin yoki imkonsiz
+- **External state mutation:** command tashqi state'ga ham ta'sir qilsa (DB, network) — undo qiyin yoki imkonsiz
 - **History size:** cheksiz history → memory issue. LRU yoki history limit
 
 ### Follow-up savollar
@@ -1731,14 +1731,14 @@ console.log(history.canRedo()); // false
 
 ### Qisqa javob
 
-State Machine — object mumkin bo'lgan state lari va o'tishlarini boshqaradi. TypeScript discriminated union state ni type-safe qiladi: har state o'z data shape iga ega, transition function compile-time da invalid transition larni ushlaydi.
+State Machine — object mumkin bo'lgan state'lari va o'tishlarini boshqaradi. TypeScript discriminated union state'ni type-safe qiladi: har state o'z data shape'iga ega, transition function compile-time'da invalid transition'larni ushlaydi.
 
 ### To'liq tushuntirish
 
 **State Machine komponentlari:**
 
 1. **States** — discriminated union (har biri `kind` literal bilan)
-2. **Events/Actions** — state ni o'zgartirish triggerlari
+2. **Events/Actions** — state'ni o'zgartirish triggerlari
 3. **Transitions** — `(state, event) → newState`
 4. **Side effects** — transition vaqtidagi action (callback)
 
@@ -1751,7 +1751,7 @@ type OrderState =
   | { status: "paid"; items: string[]; orderId: string; paymentId: string };
 ```
 
-Har state o'z data shape iga ega. `status` discriminant — narrowing uchun.
+Har state o'z data shape'iga ega. `status` discriminant — narrowing uchun.
 
 **Transition function type-safety:**
 
@@ -1759,9 +1759,9 @@ Har state o'z data shape iga ega. `status` discriminant — narrowing uchun.
 function placeOrder(state: Extract<OrderState, { status: "draft" }>): Extract<OrderState, { status: "placed" }> {}
 ```
 
-Compiler `state.status === "draft"` ekanini kafolatlaydi. Boshqa state dan chaqirib bo'lmaydi.
+Compiler `state.status === "draft"` ekanini kafolatlaydi. Boshqa state'dan chaqirib bo'lmaydi.
 
-**Use case lar:**
+**Use case'lar:**
 - **Order processing** — draft → placed → paid → shipped → delivered
 - **Form wizard** — step1 → step2 → step3
 - **Authentication** — unauthenticated → loggingIn → authenticated → loggingOut
@@ -1950,7 +1950,7 @@ machine.ship("track-789"); // "Shipped: ..."
 ### Follow-up savollar
 
 1. **"XState bilan farqi?"** — XState: full state machine library — guards, actions, services, visualization. Discriminated union: lightweight, manual, type-safe core
-2. **"`never` type exhaustive check da qanday ishlaydi?"** — TS narrowing — switch barcha case ni qoplagandan keyin remaining type `never`. Yangi state qo'shilsa, narrowing fail → compile error
+2. **"`never` type exhaustive check'da qanday ishlaydi?"** — TS narrowing — switch barcha case'ni qoplagandan keyin remaining type `never`. Yangi state qo'shilsa, narrowing fail → compile error
 3. **"Side effect transition vaqtida — qachon va qaerda?"** — Subscribe listener orqali (state machine class). Yoki XState `entry`/`exit` actions
 
 <details>
@@ -1958,7 +1958,7 @@ machine.ship("track-789"); // "Shipped: ..."
 
 **Discriminated union narrowing — TypeScript internal:**
 
-Compiler `switch (state.status)` ni ko'rganda, har `case` da `state` ning type ni narrow qiladi. `case "draft"` ichida `state: Extract<OrderState, { status: "draft" }>` — `items` mavjud, `orderId` yo'q. Bu Control Flow Analysis (CFA) algoritmi orqali — TS 2.0 dan beri mavjud.
+Compiler `switch (state.status)` ni ko'rganda, har `case` da `state` ning type'ni narrow qiladi. `case "draft"` ichida `state: Extract<OrderState, { status: "draft" }>` — `items` mavjud, `orderId` yo'q. Bu Control Flow Analysis (CFA) algoritmi orqali — TS 2.0'dan beri mavjud.
 
 **`never` exhaustive check mexanizmi:**
 
@@ -1969,7 +1969,7 @@ default: {
 }
 ```
 
-Bu yerda `_exhaustive: never` — compiler `order` ning type i `never` ekanini tekshiradi. Agar barcha case qoplangan bo'lsa, `default` ga yetib kelganda `order` type i `never` ga narrowed (mantiqiy: barcha boshqa state lar already returned). Yangi state `cancelled` qo'shilsa, `default` da `order: { status: "cancelled"; reason: string }` — `never` ga assign qilib bo'lmaydi → compile error.
+Bu yerda `_exhaustive: never` — compiler `order` ning type'i `never` ekanini tekshiradi. Agar barcha case qoplangan bo'lsa, `default` ga yetib kelganda `order` type'i `never` ga narrowed (mantiqiy: barcha boshqa state'lar already returned). Yangi state `cancelled` qo'shilsa, `default` da `order: { status: "cancelled"; reason: string }` — `never` ga assign qilib bo'lmaydi → compile error.
 
 **Spec reference:** TypeScript handbook — Narrowing → Discriminated Unions, "exhaustiveness checking with the `never` type".
 
@@ -1979,11 +1979,11 @@ Har transition yangi object qaytaradi (`return { status: "placed", ... }`) — i
 
 **Performance — V8 hidden class optimization:**
 
-V8 har object literal uchun hidden class yaratadi. Discriminated union — har variant boshqa shape (draft vs placed) → har transition da yangi hidden class. Bu `monomorphic` hot path emas — JIT optimization cheklangan. Lekin state machine — domain logic, hot path emas. Performance issue noatamiy.
+V8 har object shape uchun hidden class yaratadi. Discriminated union — har variant boshqa shape (draft vs placed) → transition'da kelgan object hidden class'i o'zgaradi. State o'qiydigan kod bir nechta shape ko'rsa, property access polymorphic bo'ladi — monomorphic inline cache emas, JIT optimization cheklangan. Lekin state machine — domain logic, hot path emas. Performance ta'siri amalda sezilmaydi.
 
 **Statecharts (Harel statecharts) vs flat state machine:**
 
-Flat (discriminated union) — har state independent. Statecharts (XState) — hierarchical (parent-child states), parallel regions, history states. Misol: `editing.draft` `editing.validating` — har biri `editing` parent in da. Discriminated union — flat. Hierarchical kerak bo'lsa — XState yoki manual nested unions.
+Flat (discriminated union) — har state independent. Statecharts (XState) — hierarchical (parent-child states), parallel regions, history states. Misol: `editing.draft` `editing.validating` — har biri `editing` parent'i ichida. Discriminated union — flat. Hierarchical kerak bo'lsa — XState yoki manual nested unions.
 
 **Async state transitions:**
 
@@ -2010,18 +2010,18 @@ type AsyncState =
 
 ### Qisqa javob
 
-Result/Either — discriminated union `Ok<T> | Err<E>`. Exception o'rniga — compiler ikkala holatni handle qilishni majburlaydi. Functional error handling — Rust, Haskell, Scala da standart pattern.
+Result/Either — discriminated union `Ok<T> | Err<E>`. Exception o'rniga — compiler ikkala holatni handle qilishni majburlaydi. Functional error handling — Rust, Haskell, Scala'da standart pattern.
 
 ### To'liq tushuntirish
 
 **Exception muammolari:**
-1. **Hidden control flow** — function signature exception ni ko'rsatmaydi
+1. **Hidden control flow** — function signature exception'ni ko'rsatmaydi
 2. **Forgotten handling** — `try/catch` ni unutish mumkin
 3. **Stack unwinding cost** — performance overhead
 4. **Untyped:** `catch (e)` da `e: unknown`
 
 **Result/Either afzalliklari:**
-1. **Type-safe** — signature da `Result<T, E>` ko'rinadi
+1. **Type-safe** — signature'da `Result<T, E>` ko'rinadi
 2. **Compile-time enforcement** — kompilator handle qilishni majburlaydi
 3. **Composable** — `map`, `flatMap`, `chain`
 4. **No hidden control flow** — explicit success/failure path
@@ -2042,13 +2042,13 @@ type Result<T, E> =
 - `ok(value)` — Ok wrapper
 - `err(error)` — Err wrapper
 - `isOk(r)` — type guard
-- `map(r, fn)` — Ok da fn apply
-- `flatMap(r, fn)` — Ok da fn (Result qaytaruvchi) apply, flatten
+- `map(r, fn)` — Ok'da fn apply
+- `flatMap(r, fn)` — Ok'da fn (Result qaytaruvchi) apply, flatten
 - `unwrapOr(r, default)` — Ok bo'lsa value, Err bo'lsa default
 
 **Railway-oriented programming:**
 
-Functions Result qaytaradi → `flatMap` orqali chain. Birinchi `Err` butun chain ni to'xtatadi.
+Functions Result qaytaradi → `flatMap` orqali chain. Birinchi `Err` butun chain'ni to'xtatadi.
 
 ### Kod misol
 
@@ -2183,7 +2183,7 @@ if (isOk(result)) {
 
 ### Edge Cases
 
-- **Mix with exception:** Result code ichida `throw` qilsa — caught emas, raw exception propagates. Result va throw — birga ishlatish chaqaloq
+- **Mix with exception:** Result code ichida `throw` qilsa — caught emas, raw exception propagates. Result va throw'ni aralashtirish ikkala error path'ni bir vaqtda saqlaydi — bitta yondashuvni tanlash kerak
 - **Nested Result:** `Result<Result<T, E1>, E2>` — `flatMap` bilan flatten qilish kerak
 - **Async Result:** `Promise<Result<T, E>>` — `async/await` + `if (isErr(r)) return r` pattern
 - **Performance:** Result object — `try/catch` dan tezroq (stack unwinding yo'q)
@@ -2192,9 +2192,9 @@ if (isOk(result)) {
 
 ### Follow-up savollar
 
-1. **"Rust `Result` bilan TypeScript `Result` farqi?"** — Semantik bir xil. Rust da `?` operator — TypeScript da bu sintaxis yo'q (`if (isErr) return` manual)
-2. **"Effect/fp-ts da nima farq?"** — Effect/fp-ts: Result + IO + dependency injection + async — full monad ecosystem. Result alone: simple, pragmatic
-3. **"Exception qachon afzal?"** — Truly exceptional case lar (out-of-memory, programming bug). Business error — Result. Boundary (input validation) — Result; deep internal — exception
+1. **"Rust `Result` bilan TypeScript `Result` farqi?"** — Semantik bir xil. Rust'da `?` operator — TypeScript'da bu sintaxis yo'q (`if (isErr) return` manual)
+2. **"Effect/fp-ts'da nima farq?"** — Effect/fp-ts: Result + IO + dependency injection + async — full monad ecosystem. Result alone: simple, pragmatic
+3. **"Exception qachon afzal?"** — Truly exceptional case'lar (out-of-memory, programming bug). Business error — Result. Boundary (input validation) — Result; deep internal — exception
 
 </details>
 
@@ -2207,15 +2207,15 @@ if (isOk(result)) {
 
 ### Qisqa javob
 
-Repository — data access logic ni business logic dan ajratadi. TypeScript generic `Repository<T extends Entity>` har entity uchun type-safe CRUD interface beradi. `Omit` bilan auto-managed field (id, createdAt) compile-time da exclude qilinadi.
+Repository — data access logic'ni business logic'dan ajratadi. TypeScript generic `Repository<T extends Entity>` har entity uchun type-safe CRUD interface beradi. `Omit` bilan auto-managed field (id, createdAt) compile-time'da exclude qilinadi.
 
 ### To'liq tushuntirish
 
-**Repository ning maqsadlari:**
-1. **Persistence abstraction** — DB/cache/API detail ni yashirish
+**Repository'ning maqsadlari:**
+1. **Persistence abstraction** — DB/cache/API detail'ni yashirish
 2. **Testability** — InMemoryRepository bilan unit test
 3. **Single source of truth** — har entity uchun bir repository
-4. **Type safety** — Entity shape compile-time da
+4. **Type safety** — Entity shape compile-time'da
 
 **Generic constraint:**
 
@@ -2237,11 +2237,11 @@ interface Repository<T extends Entity> {
 
 **`Omit<T, K>` significance:**
 - `create` — `id`, `createdAt`, `updatedAt` repository tomonidan generate qilinadi. Caller berishi kerak emas
-- `update` — `id` URL/method da, `createdAt` immutable. Yangilanadigan field lar `Partial<Omit<...>>`
+- `update` — `id` URL/method'da, `createdAt` immutable. Yangilanadigan field'lar `Partial<Omit<...>>`
 
 **Repository va DDD (Domain-Driven Design):**
 
-DDD da Repository — domain layer va infrastructure layer ko'prigi. Domain object lar Repository orqali persistence dan ajratiladi.
+DDD'da Repository — domain layer va infrastructure layer ko'prigi. Domain object'lar Repository orqali persistence'dan ajratiladi.
 
 ### Kod misol
 
@@ -2439,18 +2439,18 @@ class PostgresUserRepository implements Repository<User> {
 ### Edge Cases
 
 - **Composite key:** `Entity { id: string }` — single key assumes. Composite key kerak bo'lsa — generic `Entity<TKey>`
-- **Soft delete:** `delete` actually `deletedAt` field set. `findAll` deleted ni exclude qilishi kerak
+- **Soft delete:** `delete` actually `deletedAt` field set. `findAll` deleted'ni exclude qilishi kerak
 - **Pagination:** `findAll({ offset, limit })` parameter — `Partial<T>` bilan mix. Yaxshi yondashuv: alohida `FindOptions`
-- **Transaction:** repository ko'p method bir transaction da — `repository.inTransaction(async (repo) => ...)` pattern
+- **Transaction:** repository ko'p method bir transaction'da — `repository.inTransaction(async (repo) => ...)` pattern
 - **Specification pattern:** complex filter — `Partial<T>` cheklangan. `findAll(spec: Specification<T>)` — kompozit query
-- **Generic constraint chain:** `extends Entity` — repository har entity ga bir xil base field talab qiladi
+- **Generic constraint chain:** `extends Entity` — repository har entity'ga bir xil base field talab qiladi
 - **Aggregation:** repository pure CRUD. Aggregation (sum, avg) — alternativa: query object yoki domain service
 
 ### Follow-up savollar
 
-1. **"Repository va Active Record farqi?"** — Repository: external collection, entity ga method yo'q. Active Record: entity o'zining `save()`, `delete()` method lariga ega
-2. **"DDD da Repository qaerda joylashadi?"** — Domain layer da interface, infrastructure layer da implementation. Dependency Inversion
-3. **"ORM va Repository overlap qiladimi?"** — Yes — Prisma/TypeORM da `prisma.user.findMany()` repository pattern instantiation. Custom repository — domain logic + abstraction
+1. **"Repository va Active Record farqi?"** — Repository: external collection, entity'ga method yo'q. Active Record: entity o'zining `save()`, `delete()` method'lariga ega
+2. **"DDD'da Repository qaerda joylashadi?"** — Domain layer'da interface, infrastructure layer'da implementation. Dependency Inversion
+3. **"ORM va Repository overlap qiladimi?"** — Yes — Prisma/TypeORM'da `prisma.user.findMany()` repository pattern instantiation. Custom repository — domain logic + abstraction
 
 </details>
 
@@ -2463,7 +2463,7 @@ class PostgresUserRepository implements Repository<User> {
 
 ### Qisqa javob
 
-Middleware pipeline — funksiyalar ichma-ich (onion) ishlaydi. `next()` chaqirilgandan oldingi kod "kirish" qatlami, keyin "chiqish" qatlami. Express, Koa, Connect framework lari shu pattern asosida. Chain of Responsibility pattern ning composable versiyasi.
+Middleware pipeline — funksiyalar ichma-ich (onion) ishlaydi. `next()` chaqirilgandan oldingi kod "kirish" qatlami, keyin "chiqish" qatlami. Express, Koa, Connect framework'lari shu pattern asosida. Chain of Responsibility pattern'ning composable versiyasi.
 
 ### To'liq tushuntirish
 
@@ -2503,7 +2503,7 @@ class Pipeline {
 - Chaqirilmasa — zanjir to'xtaydi (early return)
 - Ikki marta chaqirilsa — bug (har middleware bir marta)
 
-**Use case lar:**
+**Use case'lar:**
 1. **HTTP framework** — Express, Koa, Hono, NestJS interceptors
 2. **Redux middleware** — action interception
 3. **GraphQL middleware** — resolver wrapping
@@ -2662,19 +2662,19 @@ console.log(result.response);
 
 ### Edge Cases
 
-- **`next()` not called:** zanjir to'xtaydi — auth fail case da to'g'ri. Lekin accidental skip — silent bug
+- **`next()` not called:** zanjir to'xtaydi — auth fail case'da to'g'ri. Lekin accidental skip — silent bug
 - **`next()` called twice:** undefined behavior — har middleware bir marta chaqirilishi shart
-- **Error propagation:** `await next()` da exception throw bo'lsa — chaqiruvchi middleware da `try/catch` bo'lmasa, propagates outer
+- **Error propagation:** `await next()` da exception throw bo'lsa — chaqiruvchi middleware'da `try/catch` bo'lmasa, propagates outer
 - **Concurrent execution:** har middleware ketma-ket (await). Parallel kerak bo'lsa — `Promise.all` ichida
-- **Mutation vs immutability:** ctx mutate qilinadi — shared mutable state. Parallel request lar uchun har request o'z ctx
-- **Timeout:** middleware o'rab `Promise.race([next(), timeout])` — slow middleware ni cut qilish
-- **Order matters:** errorHandler outermost (boshqalar throw qilsa, catch qiladi). Auth bodyParser dan oldin (unauthorized request body parse qilinmasin)
+- **Mutation vs immutability:** ctx mutate qilinadi — shared mutable state. Parallel request'lar uchun har request o'z ctx
+- **Timeout:** middleware o'rab `Promise.race([next(), timeout])` — slow middleware'ni cut qilish
+- **Order matters:** errorHandler outermost (boshqalar throw qilsa, catch qiladi). Auth bodyParser'dan oldin (unauthorized request body parse qilinmasin)
 
 ### Follow-up savollar
 
 1. **"Express vs Koa middleware farqi?"** — Express: callback-based, error handling alohida. Koa: async/await native, error handling natural `try/catch`
 2. **"NestJS interceptor middleware bilan farqi?"** — Interceptor: Rx Observable bilan, response transformation. Middleware: lower level
-3. **"Chain of Responsibility pattern bilan farqi?"** — Middleware pipeline — chain of responsibility ning composable variant. Har handler explicit `next()` chaqiradi, classical chain da link manual
+3. **"Chain of Responsibility pattern bilan farqi?"** — Middleware pipeline — chain of responsibility'ning composable variant. Har handler explicit `next()` chaqiradi, classical chain'da link manual
 
 </details>
 
@@ -2684,7 +2684,7 @@ console.log(result.response);
 
 ### Savol 15: Decorator composition + factory output [Middle+]
 
-**Savol:** Output ni ayting:
+**Savol:** Output'ni ayting:
 
 ```typescript
 function pricingStrategy(name: string) {
@@ -2741,7 +2741,7 @@ run: tax
    - `discount` wrapper birinchi (eng tashqaridagi), `tax` ichida
    - Inside-out call: `discount` log → `tax` log → original method
 
-**Mantiqiy kompozitsiya:**
+**Mantiqiy composition:**
 
 `@pricingStrategy("discount") @pricingStrategy("tax") method`
 == `discount(tax(method))`
@@ -2792,15 +2792,15 @@ new Service().method();
 
 ### Edge Cases
 
-- **Factory side effect:** har class definition da factory chaqiriladi (har faylda class evaluate bo'lganda)
-- **Apply order:** matematik kompozitsiya kabi — innermost qabul qilingan original method
-- **Runtime call:** wrapped funksiya outer dan boshlanadi — onion model (kirish-chiqish)
+- **Factory side effect:** har class definition'da factory chaqiriladi (har faylda class evaluate bo'lganda)
+- **Apply order:** matematik composition tartibida — innermost qabul qilingan original method
+- **Runtime call:** wrapped funksiya outer'dan boshlanadi — onion model (kirish-chiqish)
 - **Same decorator name:** ikki marta `@same @same method()` — wrap ikki marta, har enter/exit takrorlanadi
-- **Async method:** wrapper o'zi sync, lekin `await originalMethod.call(this)` async chain ni saqlaydi
+- **Async method:** wrapper o'zi sync, lekin `await originalMethod.call(this)` async chain'ni saqlaydi
 
 ### Follow-up savollar
 
-1. **"Nima uchun apply order teskari?"** — Funksiya kompozitsiya semantikasi: `a(b(c(x)))` — birinchi `c` apply, keyin `b`, keyin `a`. Outermost decorator eng oxirgi qo'llaniladi
+1. **"Nima uchun apply order teskari?"** — Function composition semantikasi: `a(b(c(x)))` — birinchi `c` apply, keyin `b`, keyin `a`. Outermost decorator eng oxirgi qo'llaniladi
 2. **"Runtime enter/exit order qanday foydali?"** — Logging (before/after), timing (start/end), error handling — outer wrapper inner xatosini tutadi
 
 </details>
@@ -2809,7 +2809,7 @@ new Service().method();
 
 ### Savol 16: Strategy + `this` context output [Middle+]
 
-**Savol:** Output ni ayting:
+**Savol:** Output'ni ayting:
 
 ```typescript
 interface PricingStrategy {
@@ -2849,7 +2849,7 @@ Output:
 
 ```
 80
-Error: Cannot read properties of undefined (reading 'calculate')
+Error: Cannot read properties of undefined (reading 'strategy')
 80
 ```
 
@@ -2861,13 +2861,14 @@ Method chaqirilganda `this` — `calc` instance. `this.strategy.calculate(100)` 
 
 **Ikkinchi `fn(100)`:**
 
-`const fn = calc.getTotal` — method ni reference qilib oldik. Lekin `this` binding yo'q (free function chaqiruvi).
+`const fn = calc.getTotal` — method'ni reference qilib oldik. Lekin `this` binding yo'q (free function chaqiruvi).
+
+Class body har doim strict mode — `getTotal` ichida `this` `undefined`. `this.strategy` o'qishning o'zi (`.calculate` ga yetmasdan) `TypeError` beradi:
 
 ```typescript
 fn(100)
-// → this = undefined (strict mode) yoki globalThis
-// → this.strategy = undefined
-// → undefined.calculate(100) → TypeError
+// → this = undefined (class body — strict mode)
+// → this.strategy  → TypeError: Cannot read properties of undefined (reading 'strategy')
 ```
 
 **Uchinchi `bound(100)`:**
@@ -2930,14 +2931,14 @@ handler(); // "Clicked: Submit" ✅
 
 - **Strict mode:** `this = undefined`. Non-strict (sloppy) mode: `this = globalThis` — silent bug ehtimoli
 - **Arrow method memory:** har instance uchun yangi arrow function — class va arrow ko'p instance bo'lganda memory cost
-- **`super` arrow da:** `super` lexical — arrow ichida `super` parent method ga ishora qiladi. Lekin arrow method override qilib bo'lmaydi (instance property, prototype emas)
-- **Decorator `@bound` auto-bind:** `addInitializer` bilan har instance da method ni bind qilish
-- **`.call(otherInstance)`:** oddiy method da ishlaydi, arrow da ishlamaydi (`this` immutable)
+- **`super` arrow'da:** `super` lexical — arrow ichida `super` parent method'ga ishora qiladi. Lekin arrow method override qilib bo'lmaydi (instance property, prototype emas)
+- **Decorator `@bound` auto-bind:** `addInitializer` bilan har instance'da method'ni bind qilish
+- **`.call(otherInstance)`:** oddiy method'da ishlaydi, arrow'da ishlamaydi (`this` immutable)
 
 ### Follow-up savollar
 
 1. **"Class field arrow va prototype method qaysi yaxshiroq?"** — Prototype: memory efficient (single function). Arrow: auto-bind, lekin har instance uchun yangi. Frequent event handler — arrow afzal
-2. **"React class component da bu muammo qanday hal qilingan?"** — Class field arrow (`onClick = () => {}`) yoki constructor da `this.onClick = this.onClick.bind(this)`. Hook orqali functional component bilan muammo yo'q
+2. **"React class component'da bu muammo qanday hal qilingan?"** — Class field arrow (`onClick = () => {}`) yoki constructor'da `this.onClick = this.onClick.bind(this)`. Hook orqali functional component bilan muammo yo'q
 
 </details>
 
@@ -2945,7 +2946,7 @@ handler(); // "Clicked: Submit" ✅
 
 ### Savol 17: Middleware execution order [Middle+]
 
-**Savol:** Output ni ayting:
+**Savol:** Output'ni ayting:
 
 ```typescript
 type Middleware = (ctx: { value: number }, next: () => Promise<void>) => Promise<void>;
@@ -3036,7 +3037,7 @@ A out -1
 8. A: `value -= 1` → 0 - 1 = -1
 9. **A out -1**
 
-**Zanjir to'xtatish:** B `next()` chaqirmasa — C va keyingilar ishlamaydi. Lekin A ning `after next()` qismi hali ishlaydi.
+**Zanjir to'xtatish:** B `next()` chaqirmasa — C va keyingilar ishlamaydi. Lekin A'ning `after next()` qismi hali ishlaydi.
 
 ### Kod misol
 
@@ -3081,16 +3082,16 @@ await app.execute({ value: 0 });
 
 ### Edge Cases
 
-- **`next()` skip:** zanjir to'xtaydi, lekin awaiter middleware lar ning "after next()" code i hali ishlaydi
+- **`next()` skip:** zanjir to'xtaydi, lekin awaiter middleware'larning "after next()" code'i hali ishlaydi
 - **`next()` ikki marta:** undefined behavior — har middleware bir marta chaqirishi shart
-- **Throw `next()` dan oldin:** outer try/catch da catch qilinadi yoki propagates outer
+- **Throw `next()` dan oldin:** outer `try/catch`'da catch qilinadi yoki propagates outer
 - **Sync mutation visible:** ctx mutate qilinishi — har middleware ko'radi (shared reference)
 - **`await` order:** `await next()` block qiladi — keyin "after" code. `next().then(...)` — non-blocking
 
 ### Follow-up savollar
 
-1. **"`next()` ni chaqirmaslik foydalimi?"** — Ha, early return — auth fail, validation fail, cache hit case lar
-2. **"Pipeline parallel middleware?"** — `Promise.all([fetchUser(), fetchOrder()])` middleware ichida — concurrent I/O. Lekin middleware lar o'rtasida concurrency yo'q (await chain)
+1. **"`next()` ni chaqirmaslik foydalimi?"** — Ha, early return — auth fail, validation fail, cache hit case'lar
+2. **"Pipeline parallel middleware?"** — `Promise.all([fetchUser(), fetchOrder()])` middleware ichida — concurrent I/O. Lekin middleware'lar o'rtasida concurrency yo'q (await chain)
 
 </details>
 
@@ -3100,7 +3101,7 @@ await app.execute({ value: 0 });
 
 ### Savol 18: Type-safe `EventEmitter<Events>` [Senior]
 
-**Savol:** `on`, `off`, `emit`, `once`, `removeAllListeners` — barcha event name va argument type lari compile-time da tekshirilsin:
+**Savol:** `on`, `off`, `emit`, `once`, `removeAllListeners` — barcha event name va argument type'lari compile-time'da tekshirilsin:
 
 ```typescript
 interface UserEvents {
@@ -3115,7 +3116,7 @@ interface UserEvents {
 
 ### Qisqa javob
 
-Generic `TypedEventEmitter<Events extends Record<string, unknown[]>>`. Har method `K extends keyof Events` constraint bilan event name ni cheklaydi. Argument lar `...args: Events[K]` tuple spread orqali type-safe.
+Generic `TypedEventEmitter<Events extends Record<string, unknown[]>>`. Har method `K extends keyof Events` constraint bilan event name'ni cheklaydi. Argument'lar `...args: Events[K]` tuple spread orqali type-safe.
 
 ### To'liq tushuntirish
 
@@ -3136,7 +3137,7 @@ on<K extends keyof Events>(
 ): () => void
 ```
 
-- `K extends keyof Events` — faqat declared event lar
+- `K extends keyof Events` — faqat declared event'lar
 - `(...args: Events[K]) => void` — tuple → function signature
 - Return `() => void` — unsubscribe function (cleanup)
 
@@ -3267,7 +3268,7 @@ unsubscribers.forEach((unsub) => unsub());
 
 ### Edge Cases
 
-- **`Set` insertion order:** listener lar register tartibida chaqiriladi
+- **`Set` insertion order:** listener'lar register tartibida chaqiriladi
 - **Error in listener:** har handler `try/catch` da — bir handler fail bo'lsa, boshqalar davom etadi
 - **Re-entrant emit:** listener ichida `emit` chaqirsa — recursion. Stack overflow xavfi
 - **Listener modify during emit:** `Set` o'zgartirish iteration paytida — copy qilish (`[...handlers]`) afzal
@@ -3276,32 +3277,32 @@ unsubscribers.forEach((unsub) => unsub());
 
 ### Follow-up savollar
 
-1. **"Native `EventTarget` ga ko'chiriladimi?"** — `EventTarget`/`CustomEvent` ham mavjud, lekin TypeScript da type-safety zaif (manual cast)
+1. **"Native `EventTarget` ga ko'chiriladimi?"** — `EventTarget`/`CustomEvent` ham mavjud, lekin TypeScript'da type-safety zaif (manual cast)
 2. **"`once` cleanup memory leak xavfi?"** — Once never fires bo'lsa — wrapper saqlanadi. Manual cleanup yoki timeout
 3. **"Async listener qanday handle qilinadi?"** — Listener `async` bo'lsa, `emit` await qilmaydi (fire and forget). Async kerak bo'lsa `emitAsync` — `Promise.all(handlers.map(h => h(...args)))`
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Variadic Tuple Types — TS 4.0+:**
+**Rest parameter as tuple type — TS 3.0+:**
 
-`(...args: Events[K]) => void` — variadic tuple type. TS 4.0 dan oldin bu pattern impossible edi (`[A, B, C]` tuple ni rest parameter ga to'g'ridan-to'g'ri spread qilib bo'lmasdi). Spec: ECMAScript proposal yo'q (TS-specific feature). Internal: compiler tuple element type larini parameter slot larga bind qiladi.
+`(...args: Events[K]) => void` — rest parameter type'i tuple bo'lsa, compiler uni discrete parameter ketma-ketligiga yoyadi (`[userId: string, timestamp: Date]` → `(userId: string, timestamp: Date)`). Bu "rest parameters with tuple types" feature'i — TS 3.0'da kelgan, TS-specific (ECMAScript proposal yo'q). Bu TS 4.0'ning "variadic tuple types" feature'i bilan adashtirmaslik kerak — variadic tuple types tuple type ta'rifi *ichida* generic spread element (`[string, ...T]`) ga oid, boshqa narsa.
 
 **`keyof` cheklash mexanizmi:**
 
-`K extends keyof Events` — `K` faqat `Events` da declared key bo'lishi mumkin. Compiler `keyof Events` ni union of literal types ga aylantiradi (`"login" | "logout" | "purchase"`). `K extends "login" | "logout" | "purchase"` — narrowing. Boshqa string literal — assignability fail.
+`K extends keyof Events` — `K` faqat `Events` da declared key bo'lishi mumkin. Compiler `keyof Events` ni union of literal types'ga aylantiradi (`"login" | "logout" | "purchase"`). `K extends "login" | "logout" | "purchase"` — narrowing. Boshqa string literal — assignability fail.
 
 **`Map<keyof Events, Set<...>>` — runtime data structure:**
 
-`Map` insertion order saqlaydi (V8 hash table + linked list). `Set` ham insertion order. Listener lar register tartibida iterate qilinadi. Performance: `Map.get(key)` — O(1) average, `Set.has` — O(1), `Set.forEach` — O(n).
+`Map` va `Set` insertion order'ni saqlaydi — bu ECMAScript spec kafolati (engine implementation detail emas). Listener'lar register tartibida iterate qilinadi. Performance: `Map.get(key)` — O(1) average, `Set.has` — O(1), `Set.forEach` — O(n).
 
 **Type erasure issue:**
 
-`new Map<keyof Events, Set<(...args: any[]) => void>>` — `any[]` runtime type ma'lumotini yo'qotadi. Compile-time `Events[K]` type-safe, lekin runtime da `Set` har xil handler larni saqlaydi. Type system bu trade-off ni majburlaydi (TypeScript erased type system).
+`new Map<keyof Events, Set<(...args: any[]) => void>>` — `any[]` runtime type ma'lumotini yo'qotadi. Compile-time `Events[K]` type-safe, lekin runtime'da `Set` har xil handler'larni saqlaydi. Type system bu trade-off'ni majburlaydi (TypeScript erased type system).
 
 **Higher-Kinded Types simulation:**
 
-`Events` parameter — type-level Higher-Kinded Type approximation. Per-event constraint — generic constraint chain. fp-ts kabi kutubxonalar HKT ni encode qiladi (kind1, kind2) — verbose. Bu yondashuv pragmatik — TypeScript native HKT qo'llab-quvvatlamaydi.
+`Events` parameter — type-level Higher-Kinded Type approximation. Per-event constraint — generic constraint chain. fp-ts kabi kutubxonalar HKT'ni encode qiladi (kind1, kind2) — verbose. Bu yondashuv pragmatik — TypeScript native HKT qo'llab-quvvatlamaydi.
 
 **Cross-process Observer (Node Worker, MessagePort):**
 
@@ -3322,7 +3323,7 @@ emit() {
 }
 ```
 
-`WeakRef` — JS engine GC handler ni listener tarafida tutmaydi. Lekin `WeakRef.deref` non-deterministic — GC qachon ishlashi noma'lum. Production da kamdan-kam — explicit cleanup afzal.
+`WeakRef` — JS engine GC handler'ni listener tarafida tutmaydi. Lekin `WeakRef.deref` non-deterministic — GC qachon ishlashi noma'lum. Production'da kamdan-kam — explicit cleanup afzal.
 
 </details>
 
@@ -3330,7 +3331,7 @@ emit() {
 
 ---
 
-### Savol 19: Generic `Result<T, E>` utility lar [Middle+]
+### Savol 19: Generic `Result<T, E>` utility'lar [Middle+]
 
 **Savol:** `Result<T, E>` type va `ok`/`err` constructors, `map`, `flatMap`, `unwrapOr`, `mapErr` yozing:
 
@@ -3347,7 +3348,7 @@ emit() {
 
 ### Qisqa javob
 
-`Result<T, E>` — discriminated union `Ok<T> | Err<E>` with `_tag` discriminant. Utility lar — `map` Ok da fn apply, `flatMap` Ok da Result-returning fn apply, `unwrapOr` Err da default qaytaradi, `mapErr` Err transform.
+`Result<T, E>` — discriminated union `Ok<T> | Err<E>` with `_tag` discriminant. Utility'lar — `map` Ok'da fn apply, `flatMap` Ok'da Result-returning fn apply, `unwrapOr` Err'da default qaytaradi, `mapErr` Err transform.
 
 ### To'liq tushuntirish
 
@@ -3356,17 +3357,17 @@ emit() {
 - `readonly` — immutability, accidental mutation oldini olish
 - `Result<T, E>` — union of `Ok<T> | Err<E>`
 
-**Constructors (`ok`, `err`):** Generic factory — argument dan type inference. `ok(5)` → `Ok<number>`, `err("fail")` → `Err<string>`.
+**Constructors (`ok`, `err`):** Generic factory — argument'dan type inference. `ok(5)` → `Ok<number>`, `err("fail")` → `Err<string>`.
 
 **Type guards (`isOk`, `isErr`):** Return type `r is Ok<T>` — type predicate. Compiler `if (isOk(r))` ichida `r` ni `Ok<T>` ga narrow qiladi.
 
 **`map` vs `flatMap`:**
-- `map(r, fn: T → U)` — Ok da fn apply, result `Ok<U>`. Funktor operation
-- `flatMap(r, fn: T → Result<U, E>)` — Ok da fn apply, lekin natija allaqachon Result — flatten. Monad operation
+- `map(r, fn: T → U)` — Ok'da fn apply, result `Ok<U>`. Funktor operation
+- `flatMap(r, fn: T → Result<U, E>)` — Ok'da fn apply, lekin natija allaqachon Result — flatten. Monad operation
 
-**`mapErr` — error transformation:** xato turini boshqasiga aylantirish (logging uchun, yoki domain error ga normalize qilish).
+**`mapErr` — error transformation:** xato turini boshqasiga aylantirish (logging uchun, yoki domain error'ga normalize qilish).
 
-**`unwrapOr` vs `unwrap`:** `unwrapOr` — Err da default. `unwrap` — Err da throw (defensive, faqat known-Ok holatda).
+**`unwrapOr` vs `unwrap`:** `unwrapOr` — Err'da default. `unwrap` — Err'da throw (defensive, faqat known-Ok holatda).
 
 ### Kod misol
 
@@ -3443,8 +3444,10 @@ function combine<T, E>(results: Result<T, E>[]): Result<T[], E> {
 
 
 // === Usage ===
-const r1 = ok(5);
-const r2 = err("fail");
+// Result<number, string> deb annotate — aks holda err("fail") da T = unknown
+// bo'lib qoladi va (n) => n * 2 da n: unknown type error beradi
+const r1: Result<number, string> = ok(5);
+const r2: Result<number, string> = err("fail");
 
 // map
 console.log(map(r1, (n) => n * 2));   // { _tag: "Ok", value: 10 }
@@ -3515,7 +3518,7 @@ console.log(failed); // { _tag: "Err", error: "oops" }
 ### Follow-up savollar
 
 1. **"Fluent API qanday qo'shiladi?"** — `Result` class qilish — `result.map(fn).flatMap(fn2).unwrapOr(0)`. Lekin discriminated union immutable
-2. **"Async chaining qanday?"** — `flatMapAsync(r, async (v) => ...): Promise<Result>`. `async function*` generator bilan to'rt-yo'l yo'q
+2. **"Async chaining qanday?"** — `flatMapAsync(r, async (v) => ...): Promise<Result<U, E>>` — har qadam `await` qilinadi. Rust'ning `?` operatori yo'q, shuning uchun har Err'ni manual `if (isErr(r)) return r` bilan propagate qilinadi
 
 </details>
 
@@ -3530,11 +3533,11 @@ console.log(failed); // { _tag: "Err", error: "oops" }
 
 ### Qisqa javob
 
-`Repository<T extends Entity>` interface — CRUD method lar `Omit<T, "id" | "createdAt" | "updatedAt">` bilan auto-managed field lar exclude qilinadi. `InMemoryRepository<T>` — `Map<string, T>` orqali.
+`Repository<T extends Entity>` interface — CRUD method'lar `Omit<T, "id" | "createdAt" | "updatedAt">` bilan auto-managed field'lar exclude qilinadi. `InMemoryRepository<T>` — `Map<string, T>` orqali.
 
 ### To'liq tushuntirish
 
-**Generic constraint (`T extends Entity`):** har T uchun `id`, `createdAt`, `updatedAt` field lar majburiy. Bu base shape — repository implementation lar generic logic ishlatishi mumkin.
+**Generic constraint (`T extends Entity`):** har T uchun `id`, `createdAt`, `updatedAt` field'lar majburiy. Bu base shape — repository implementation'lar generic logic ishlatishi mumkin.
 
 **`Omit<T, K>` significance — `create` da:**
 - Caller `id`, `createdAt`, `updatedAt` bermaydi (repository generate qiladi)
@@ -3543,12 +3546,12 @@ console.log(failed); // { _tag: "Err", error: "oops" }
 
 **`Partial<Omit<T, ...>>` — `update` da:**
 - `Partial` — har field optional (partial update)
-- `Omit` — auto-managed field lar yangilanmaydi
-- Result: caller faqat domain field larni ozgina/ko'p berishi mumkin
+- `Omit` — auto-managed field'lar yangilanmaydi
+- Result: caller faqat domain field'larni ozgina/ko'p berishi mumkin
 
-**`Map<string, T>`:** insertion order saqlaydi, `get`/`set`/`delete` — O(1) average. Plain object dan afzal (prototype pollution yo'q, integer-key support).
+**`Map<string, T>`:** insertion order saqlaydi, `get`/`set`/`delete` — O(1) average. Plain object'dan afzal (prototype pollution yo'q, integer-key support).
 
-**Filter (`Partial<T>`):** equality match — `Object.entries(filter).every(...)`. Limitation: range, regex yo'q. Production da Specification pattern yoki query builder.
+**Filter (`Partial<T>`):** equality match — `Object.entries(filter).every(...)`. Limitation: range, regex yo'q. Production'da Specification pattern yoki query builder.
 
 **Specialized repository:** `UserRepository extends InMemoryRepository<User>` — domain-specific method qo'shish (`findByEmail`). Generic base + specific extension.
 
@@ -3704,11 +3707,11 @@ class UserRepository extends InMemoryRepository<User> {
 
 ### Qisqa javob
 
-Phantom types — generic `State` parameter har setter da yangilanadi (`State & { url: true }`). `build()` ning `this` parameter `Builder<{ url: true; method: true }>` ga cheklanadi. Runtime overhead yo'q.
+Phantom types — generic `State` parameter har setter'da yangilanadi (`State & { url: true }`). `build()` ning `this` parameter `Builder<{ url: true; method: true }>` ga cheklanadi. Runtime overhead yo'q.
 
 ### To'liq tushuntirish
 
-**Phantom type** — type-level only ma'lumot, runtime da hech qaerda saqlanmaydi. Faqat compiler graph ida `State` parameter tracked.
+**Phantom type** — type-level only ma'lumot, runtime'da hech qaerda saqlanmaydi. Faqat compiler graph'ida `State` parameter tracked.
 
 **Setter chain mexanizmi:**
 1. Initial state: `RequestBuilder<{}>`
@@ -3717,9 +3720,9 @@ Phantom types — generic `State` parameter har setter da yangilanadi (`State & 
 
 Har setter return type — yangi intersection. Type system "ladder" — pastdan yuqoriga.
 
-**`this` parameter cheklash:** TypeScript-specific feature. `build(this: RequestBuilder<{ url: true; method: true }>)` — call site da `this` actual type bu signature ga mos kelishi shart. Mos kelmasa — "method's 'this' is not assignable" error.
+**`this` parameter cheklash:** TypeScript-specific feature. `build(this: RequestBuilder<{ url: true; method: true }>)` — call site'da `this` actual type bu signature'ga mos kelishi shart. Mos kelmasa — "method's 'this' is not assignable" error.
 
-**`as any` cast — keraklimi?** Ha, sababi: runtime da `return this` — bir xil instance. Lekin type-level da `RequestBuilder<State>` va `RequestBuilder<State & { url: true }>` farqli (compiler perspective). `as any` — type system ga "trust me" signal. Alternativa: `as unknown as RequestBuilder<...>` — verbose lekin explicit.
+**`as any` cast — keraklimi?** Ha, sababi: runtime'da `return this` — bir xil instance. Lekin type-level'da `RequestBuilder<State>` va `RequestBuilder<State & { url: true }>` farqli (compiler perspective). `as any` — type system'ga "trust me" signal. Alternativa: `as unknown as RequestBuilder<...>` — verbose lekin explicit.
 
 **Alternative: ordered step interface** — har bosqich alohida interface (`NeedsUrl` → `NeedsMethod` → `OptionalSteps`). IDE autocomplete faqat next step ko'rsatadi (discoverability yuqori). Trade-off: order flexibility yo'q.
 
@@ -3859,9 +3862,9 @@ buildRequest().setUrl("/api").setMethod("POST").build(); // ✅
 
 ### Edge Cases
 
-- **`as any` cast:** runtime ish phantom type ga aloqasi yo'q — bir builder. Type system tomonidan yangi builder ko'rinadi
+- **`as any` cast:** runtime ish phantom type'ga aloqasi yo'q — bir builder. Type system tomonidan yangi builder ko'rinadi
 - **Builder reuse:** ikki marta `build()` chaqirish — bir xil instance, lekin type-level OK. Mutation problem
-- **IDE autocomplete:** ordered builder ga qaraganda — phantom type da barcha method ko'rinadi (state allows). Ordered — faqat keyingi step
+- **IDE autocomplete:** ordered builder'ga qaraganda — phantom type'da barcha method ko'rinadi (state allows). Ordered — faqat keyingi step
 - **Type complexity:** ko'p required field — `State & { url: true } & { method: true } & ...` chain. Readable lekin verbose
 - **Generic builder for any type:** `Builder<T, Required extends keyof T>` — har T uchun general
 
@@ -3869,18 +3872,18 @@ buildRequest().setUrl("/api").setMethod("POST").build(); // ✅
 
 1. **"Phantom types vs ordered interface qaysi yaxshiroq?"** — Ordered: discoverability yuqori (next step ko'rsatadi). Phantom: order flexibility. Library API — ordered afzal
 2. **"Runtime safety qaysi bo'lsa yaxshi?"** — Compile-time prevention. Runtime check (`if (!url) throw`) — fallback. Defensive code Production uchun
-3. **"Builder fluent API toxic chain bo'ladimi?"** — Endless chain — readability past. 5-7 method dan ko'p bo'lsa — multiple builder (sub-builder)
+3. **"Builder fluent API toxic chain bo'ladimi?"** — Endless chain — readability past. 5-7 method'dan ko'p bo'lsa — multiple builder (sub-builder)
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
 **Phantom types — type-level encoding:**
 
-Phantom type — runtime da hech qanday ma'lumot saqlamaydi (compile-time only). `State extends BuilderState` — generic parameter, lekin `private data: Partial<HttpRequest>` da hech qanday `State` ga bog'liq field yo'q. `as any` cast — type system ga "trust me" signal. JS output: `state` parameter ham, `State` type ham hech qaerda. Faqat compiler graph ida.
+Phantom type — runtime'da hech qanday ma'lumot saqlamaydi (compile-time only). `State extends BuilderState` — generic parameter, lekin `private data: Partial<HttpRequest>` da hech qanday `State` ga bog'liq field yo'q. `as any` cast — type system'ga "trust me" signal. JS output: `state` parameter ham, `State` type ham hech qaerda. Faqat compiler graph'ida.
 
 **`this` parameter type — TS-specific feature:**
 
-ECMAScript spec da yo'q. TypeScript: function signature da birinchi parameter `this: Type` — call site da `this` type ni majburlaydi. Misol: `build(this: RequestBuilder<{ url: true; method: true }>)` — `this` actual type mos kelmasa, "method call mode" da compile error.
+ECMAScript spec'da yo'q. TypeScript: function signature'da birinchi parameter `this: Type` — call site'da `this` type'ni majburlaydi. Misol: `build(this: RequestBuilder<{ url: true; method: true }>)` — `this` actual type mos kelmasa, "method call mode" da compile error.
 
 **Type assignability — structural typing:**
 
@@ -3906,7 +3909,7 @@ Har "state" alohida interface — narrowing explicit. Phantom — generic-based,
 
 **Runtime cost analysis:**
 
-Phantom types — zero runtime overhead. `as any` cast — JS output da yo'q. `State` parameter — JS output da yo'q. Compile-time only. Runtime: `data: Partial<HttpRequest>` — bir bayt ham extra emas.
+Phantom types — zero runtime overhead. `as any` cast — JS output'da yo'q. `State` parameter — JS output'da yo'q. Compile-time only. Runtime: `data: Partial<HttpRequest>` — bir bayt ham extra emas.
 
 **TypeScript spec — Generic Type Parameter Constraint:**
 
@@ -3927,7 +3930,7 @@ Phantom types — zero runtime overhead. `as any` cast — JS output da yo'q. `S
 
 ### Qisqa javob
 
-`Pipeline` class — middleware stack saqlaydi. `execute` da recursive `next()` funksiya — har middleware o'z `next()` ni chaqirib keyingisiga o'tadi. Async/await orqali sequential execution. Error throw outer middleware ga propagates.
+`Pipeline` class — middleware stack saqlaydi. `execute` da recursive `next()` funksiya — har middleware o'z `next()` ni chaqirib keyingisiga o'tadi. Async/await orqali sequential execution. Error throw outer middleware'ga propagates.
 
 ### To'liq tushuntirish
 
@@ -3960,7 +3963,7 @@ errorHandler in → logger in → auth in → handler → auth out → logger ou
 
 Har middleware ikki fazaga ega: "before next()" (request) va "after next()" (response).
 
-**Error propagation:** Inner middleware throw → `await next()` reject → outer `try/catch` qabul qiladi. `errorHandler` outermost — barcha xatolarni tutadi. Async stack trace V8 da chain ni saqlaydi.
+**Error propagation:** Inner middleware throw → `await next()` reject → outer `try/catch` qabul qiladi. `errorHandler` outermost — barcha xatolarni tutadi. Async stack trace V8'da chain'ni saqlaydi.
 
 **Middleware factory pattern:** `rateLimit(max, windowMs)` — closure'da config saqlaydi, `Middleware` qaytaradi. Customization uchun standart pattern.
 
@@ -4153,8 +4156,8 @@ console.log(unauthResult.response.status); // 401
 - **`next()` called twice:** undefined behavior — index ikki marta increment, race
 - **Error in error handler:** outermost error handler o'zi throw qilsa — unhandled. Outermost try/catch yoki global handler kerak
 - **Async generator middleware:** alternative pattern — yet uncommon
-- **Type-safe context extension:** middleware state ga property qo'shadi — TypeScript generic kerak (`Pipeline<State>`). Murakkab pattern
-- **Cancellation:** uzoq middleware ni to'xtatish — `AbortSignal` ctx da. Built-in support — manual cancel logic
+- **Type-safe context extension:** middleware state'ga property qo'shadi — TypeScript generic kerak (`Pipeline<State>`). Murakkab pattern
+- **Cancellation:** uzoq middleware'ni to'xtatish — `AbortSignal` ctx'da. Built-in support — manual cancel logic
 
 ### Follow-up savollar
 
@@ -4187,7 +4190,7 @@ execute()
 ← all done
 ```
 
-Har `await next()` — async frame suspended (microtask queue). Resume tartibi LIFO (last-in-first-out) — bu onion model ning bevosita oqibati.
+Har `await next()` — async frame suspended (microtask queue). Resume tartibi LIFO (last-in-first-out) — bu onion model'ning bevosita oqibati.
 
 **Closure capture — `next` variable:**
 
@@ -4197,23 +4200,23 @@ Har `await next()` — async frame suspended (microtask queue). Resume tartibi L
 
 `await next()` — Promise resolution kutib turadi. Event loop:
 1. `middleware[0]` execute boshlanadi (sync code)
-2. `await next()` — current task suspended, microtask queue ga `next()` resolve callback push
+2. `await next()` — current task suspended, microtask queue'ga `next()` resolve callback push
 3. `middleware[1]` execute boshlanadi (sync code, ichidagi `await`)
 4. ... va h.k.
 
-Innermost middleware tugagandan keyin, microtask queue dan reverse order da resume. Har `await` — bir microtask hop.
+Innermost middleware tugagandan keyin, microtask queue'dan reverse order'da resume. Har `await` — bir microtask hop.
 
 **Error propagation — async stack trace:**
 
-Async function da `throw` — Promise reject. `await next()` ichida throw bo'lsa, current `await` reject, exception "up" propagates `try/catch` block ga. V8 — async stack trace (Node 12+, --async-stack-traces) — full chain debug uchun.
+Async function'da `throw` — Promise reject. `await next()` ichida throw bo'lsa, current `await` reject, exception "up" propagates `try/catch` block'ga. V8 — async stack trace (Node 12+, --async-stack-traces) — full chain debug uchun.
 
 **Memory model — heap allocation:**
 
-Har `Pipeline.execute` da yangi closure (`next`, `index`) — heap allocated. Har middleware suspended frame — async context (V8 `AsyncContext` internal). High-throughput server da bu allocation cost bo'lishi mumkin — profiling kerak. V8 generational GC (Young Gen) — short-lived async frame larni samarali tozalaydi.
+Har `Pipeline.execute` da yangi closure (`next`, `index`) — heap allocated. Har `await` da async function o'z state'ini saqlash uchun frame allocate qiladi (suspend/resume state machine). High-throughput server'da bu allocation cost bo'lishi mumkin — profiling kerak. V8 generational GC (Young Gen / Scavenger) — short-lived async frame'larni samarali tozalaydi.
 
 **Backpressure va flow control:**
 
-Pipeline yo'q built-in backpressure. Slow middleware — barchasi kutadi. Koa-like middleware yo'q backpressure ni handle qilmaydi — explicit `AbortController` yoki timeout middleware kerak. Streaming kerak bo'lsa — Node.js `stream.Transform` afzal.
+Pipeline yo'q built-in backpressure. Slow middleware — barchasi kutadi. Koa-like middleware yo'q backpressure'ni handle qilmaydi — explicit `AbortController` yoki timeout middleware kerak. Streaming kerak bo'lsa — Node.js `stream.Transform` afzal.
 
 **Comparison: Koa source code reference:**
 
@@ -4224,12 +4227,16 @@ Koa `compose` function — bir xil pattern (`koa-compose` package, ~30 line). `d
 ```typescript
 class TypedPipeline<S extends object> {
   use<T extends object>(
-    mw: (ctx: S, next: () => Promise<void>) => Promise<void> | (S & T)
-  ): TypedPipeline<S & T> { ... }
+    mw: (ctx: S) => T
+  ): TypedPipeline<S & T> {
+    // mw ctx ni yangi field lar bilan kengaytiradi (S & T)
+    // ...
+    return this as unknown as TypedPipeline<S & T>;
+  }
 }
 ```
 
-Har `use` — new context type. Middleware return type — context extension. Complex inference — TS 4.7+ improvements. Library-grade implementation: `hono` (Hono framework) — full type-safe context evolution.
+Har `use` middleware ctx'ga yangi field qo'shadi → pipeline type'i `S & T` ga o'sadi. Keyingi middleware avvalgilar qo'shgan field'larni type-safe ko'radi. Bunday context evolution inference og'ir — har `use` ning generic chaqiruvi orqali kechadi. Library-grade implementation: Hono framework — full type-safe context evolution.
 
 </details>
 
@@ -4246,7 +4253,7 @@ Har `use` — new context type. Middleware return type — context extension. Co
 
 ### Qisqa javob
 
-`Command` interface — `execute()` + `undo()`. `CommandHistory` — done stack va undone stack. Har action `execute(command)` — done ga push, undone tozalanadi. `undo()` — done dan pop, undo chaqiriladi, undone ga push.
+`Command` interface — `execute()` + `undo()`. `CommandHistory` — done stack va undone stack. Har action `execute(command)` — done'ga push, undone tozalanadi. `undo()` — done'dan pop, undo chaqiriladi, undone'ga push.
 
 ### To'liq tushuntirish
 
@@ -4266,15 +4273,15 @@ new execute(delete1) → done: [add1, add2, delete1], undone: [] (tozalanadi)
 ```
 
 **Undo logic — inverse operation:**
-- `AddTodoCommand.undo` — items dan filter (id bo'yicha)
+- `AddTodoCommand.undo` — items'dan filter (id bo'yicha)
 - `CompleteTodoCommand.undo` — `previousState` ga qaytarish
 - `DeleteTodoCommand.undo` — saqlangan `deletedItem` va `deletedIndex` ga splice insert
 
-**Idempotency — redo uchun:** `AddTodoCommand` ichida `id` saqlanadi (`this.id`). Redo da `getNextId()` qaytadan chaqirilmaydi — bir xil `id` qaytadi. Aks holda redo yangi id beradi (history inconsistency).
+**Idempotency — redo uchun:** `AddTodoCommand` ichida `id` saqlanadi (`this.id`). Redo'da `getNextId()` qaytadan chaqirilmaydi — bir xil `id` qaytadi. Aks holda redo yangi id beradi (history inconsistency).
 
-**CompositeCommand (Macro):** bir nechta command — bitta atomic operation. Undo reverse order da (LIFO) — har subcommand undo qilinishi kerak teskari tartibda (chunki effect bir-biriga bog'liq).
+**CompositeCommand (Macro):** bir nechta command — bitta atomic operation. Undo reverse order'da (LIFO) — har subcommand undo qilinishi kerak teskari tartibda (chunki effect bir-biriga bog'liq).
 
-**Stack tozalash:** Yangi command execute → `undone = []`. Sabab: undone — alternative future. Yangi action — bu future ni invalidate qiladi (git checkout-like).
+**Stack tozalash:** Yangi command execute → `undone = []`. Sabab: undone — alternative future. Yangi action — bu future'ni invalidate qiladi (git checkout-like).
 
 ### Kod misol
 
@@ -4485,12 +4492,12 @@ console.log(list.items.length); // 3
 
 ### Edge Cases
 
-- **Idempotency:** redo execute ni qayta chaqiradi — internal state (`id`) saqlangan bo'lishi kerak
-- **External side effect:** command DB ga yozsa — undo qiyin yoki imkonsiz (rollback transaction kerak)
+- **Idempotency:** redo execute'ni qayta chaqiradi — internal state (`id`) saqlangan bo'lishi kerak
+- **External side effect:** command DB'ga yozsa — undo qiyin yoki imkonsiz (rollback transaction kerak)
 - **History size:** cheksiz history → memory leak. LRU yoki limit
-- **Composite undo order:** subcommand lar reverse order da undone — depending logic
+- **Composite undo order:** subcommand'lar reverse order'da undone — depending logic
 - **New command after undo:** undone stack tozalanadi (standard semantics). Branch history — git-like, complex
-- **Async command:** `execute(): Promise<T>` — `await` history da
+- **Async command:** `execute(): Promise<T>` — `await` history'da
 
 ### Follow-up savollar
 
@@ -4544,13 +4551,13 @@ describe("Config", () => {
 
 ### Qisqa javob
 
-Singleton `Config.instance` static property — test lar orasida shared state. Ikkinchi test `debug = true` qildi, uchinchi test bir xil instance ni oladi — state leak. Yechim: `beforeEach` da singleton ni reset qilish yoki DI ishlatish.
+Singleton `Config.instance` static property — test'lar orasida shared state. Ikkinchi test `debug = true` qildi, uchinchi test bir xil instance'ni oladi — state leak. Yechim: `beforeEach` da singleton'ni reset qilish yoki DI ishlatish.
 
 ### To'liq tushuntirish
 
 **Muammo:**
 
-Singleton — bitta instance app lifetime davomida. Test lar uchun bu antagonistik: har test independent bo'lishi kerak, lekin singleton state previous test dan kelaveradi.
+Singleton — bitta instance app lifetime davomida. Test'lar uchun bu antagonistik: har test independent bo'lishi kerak, lekin singleton state previous test'dan kelaveradi.
 
 ```
 Test 1: getInstance() → instance, debug = false ✅
@@ -4724,15 +4731,15 @@ describe("With container", () => {
 ### Edge Cases
 
 - **Module-level singleton:** `export const config = new Config()` — module cached. Jest `jest.resetModules()` yoki test setup
-- **`Object.freeze` singleton:** mutation oldini olish, lekin test da kerak bo'lsa problematic
+- **`Object.freeze` singleton:** mutation oldini olish, lekin test'da kerak bo'lsa problematic
 - **Async singleton:** `getInstance()` async — Promise cache leak
 - **Inheritance:** child class o'zining singleton ham resetlash kerak
-- **Cross-test pollution:** ESM module top-level code bir marta ishlaydi — test framework lar buni bypass qilishi kerak
+- **Cross-test pollution:** ESM module top-level code bir marta ishlaydi — test framework'lar buni bypass qilishi kerak
 
 ### Follow-up savollar
 
-1. **"Production da `reset()` method xavfsizmi?"** — Xavfli — anyone reset chaqirib state buzishi mumkin. Test-only build flag: `if (NODE_ENV !== "production")`
-2. **"Module-level singleton uchun nima?"** — Jest `jest.resetModules()` har test da. Yoki module-level singleton dan voz kechib — factory function
+1. **"Production'da `reset()` method xavfsizmi?"** — Xavfli — anyone reset chaqirib state buzishi mumkin. Test-only build flag: `if (NODE_ENV !== "production")`
+2. **"Module-level singleton uchun nima?"** — Jest `jest.resetModules()` har test'da. Yoki module-level singleton'dan voz kechib — factory function
 
 </details>
 
@@ -4745,8 +4752,8 @@ describe("With container", () => {
 ```typescript
 class App {
   constructor(private emitter: TypedEventEmitter<UserEvents>) {
-    this.emitter.on("login", this.handleLogin);
-    this.emitter.on("logout", this.handleLogout);
+    this.emitter.on("login", this.handleLogin.bind(this));
+    this.emitter.on("logout", this.handleLogout.bind(this));
   }
 
   handleLogin(userId: string, timestamp: Date) {
@@ -4765,7 +4772,7 @@ class App {
 const emitter = new TypedEventEmitter<UserEvents>();
 for (let i = 0; i < 1000; i++) {
   const app = new App(emitter);
-  // app garbage collect bo'lmaydi — emitter listener saqlaydi
+  // app garbage collect bo'lmaydi — emitter bound handler ni saqlaydi
 }
 ```
 
@@ -4774,7 +4781,7 @@ for (let i = 0; i < 1000; i++) {
 
 ### Qisqa javob
 
-`App` instance `emitter.on()` orqali handler register qiladi. Handler — `this.handleLogin` (bind qilingan method) — `app` instance ga reference saqlaydi. Emitter listener larni Set da saqlaydi → `app` instance lar garbage collect bo'lmaydi. Yechim: `destroy()` da `off()` chaqirish yoki `on()` unsubscribe function ni saqlash.
+`App` instance `emitter.on()` orqali handler register qiladi. Handler — `this.handleLogin.bind(this)` — `app` instance'ni `this` orqali ushlab turadi. Emitter listener'larni Set'da saqlaydi → `app` instance'lar garbage collect bo'lmaydi. Yechim: `destroy()` da `off()` chaqirish yoki `on()` qaytargan unsubscribe function'ni saqlash.
 
 ### To'liq tushuntirish
 
@@ -4791,11 +4798,11 @@ handler1 → app1 (closure)
 → app1 GC'd qilinmaydi
 ```
 
-**Closure muammosi:** `this.handleLogin` — method reference. JS engine method ga `this` bind qiladi avtomatik (`.bind(this)` like behavior). `handler` o'z ichida `this = app instance` saqlaydi.
+**Bound method muammosi:** `this.handleLogin.bind(this)` — har instance uchun yangi function yaratadi va u `app` instance'ni `this` sifatida ushlab turadi. Bu bound function emitter Set'ida saqlanadi, shu sababli `app` ga reference uzilmaydi. (Bare `this.handleLogin` reference — prototype dagi yagona function, instance'ni ushlamasdi va leak bermasdi; lekin u holda chaqirilganda `this` `undefined` bo'lib, `console.log` ishlasa-da, instance'ga bog'lanmas edi.)
 
 **Yechimlar:**
 
-**1. Unsubscribe save va destroy da off:**
+**1. Unsubscribe save va destroy'da off:**
 
 ```typescript
 class App {
@@ -4956,8 +4963,8 @@ console.log(emitter.listenerCount("login")); // 0
 
 ### Follow-up savollar
 
-1. **"`bind(this)` vs arrow method qaysi yaxshiroq?"** — Arrow class field — har instance da yangi function (memory). `bind(this)` — har constructor call da yangi reference. Functionally bir xil
-2. **"WeakRef qachon ishlatiladi?"** — Cache, library internal — caller cleanup qilmaydi. Advanced. Production da kamdan-kam
+1. **"`bind(this)` vs arrow method qaysi yaxshiroq?"** — Arrow class field — har instance'da yangi function (memory). `bind(this)` — har constructor call'da yangi reference. Functionally bir xil
+2. **"WeakRef qachon ishlatiladi?"** — Cache, library internal — caller cleanup qilmaydi. Advanced. Production'da kamdan-kam
 3. **"React component bilan o'xshashlik?"** — useEffect cleanup pattern — har subscription uchun return cleanup. Same principle
 
 </details>
@@ -4968,9 +4975,9 @@ console.log(emitter.listenerCount("login")); // 0
 
 - **Factory** — generic + type map orqali type-safe object creation
 - **Abstract Factory** — bir-biriga bog'liq object oilasi (theme, platform)
-- **Singleton** — bitta instance. Module-level yoki DI scope yaxshiroq pure singleton dan
+- **Singleton** — bitta instance. Module-level yoki DI scope yaxshiroq pure singleton'dan
 - **Builder** — Fluent (runtime check) vs Step (phantom types compile-time enforcement)
-- **Strategy** — runtime da algoritm almashtirish, Open/Closed Principle
+- **Strategy** — runtime'da algoritm almashtirish, Open/Closed Principle
 - **Adapter** — interface compatibility (1-to-1 mapping), legacy/third-party integration
 - **Facade** — complexity hiding (1-to-many), subsystem orchestration
 - **Proxy** — qo'shimcha behavior (caching, access control, lazy, logging)

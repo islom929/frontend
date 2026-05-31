@@ -74,7 +74,7 @@ CFA — Type Narrowing Jarayoni:
 
 **Muhim nuance:** CFA — **forward flow analysis** (kodni yuqoridan pastga tahlil qiladi), lekin **demand-driven** qoidada ishlaydi — flow type faqat reference ishlatilganda hisoblanadi. Ya'ni type'ni oldindan har bir nuqtada saqlab qo'ymaydi; faqat kerak bo'lgan nuqtada hisoblaydi va nuqtadan orqaga (backward) narrowing source'igacha yuradi. Bu yondashuv katta code base'larda performance'ni saqlaydi.
 
-Narrowing kompilatsiyaga **hech qanday runtime kod qo'shmaydi** — u sof compile-time mexanizm. Type annotation'lar o'chirilganda narrowing ham "yo'qoladi" — lekin developer yozgan `if (typeof x === "string")` shart sof JS operator bo'lgani uchun runtime'da o'z-o'zidan ishlaydi.
+Narrowing compiled output'ga **hech qanday runtime kod qo'shmaydi** — u sof compile-time mexanizm. Type annotation'lar o'chirilganda narrowing ham "yo'qoladi" — lekin developer yozgan `if (typeof x === "string")` shart sof JS operator bo'lgani uchun runtime'da o'z-o'zidan ishlaydi.
 
 </details>
 
@@ -241,7 +241,7 @@ CFA ikki yo'nalishda ishlaydi:
 
 `return`, `throw`, `break`, `continue` statement'lari **unreachable code** yaratadi — shu branch'dan chiqilganidan so'ng, qolgan kodda shu holat bo'lishi mumkin emas. Kompilator buni qayd etadi va keyingi kod uchun type'ni yangilaydi.
 
-CFA **intra-procedural** — faqat bitta funksiya ichidagi flow'ni tahlil qiladi. Funksiyalararo (`someFunction()` chaqiruvi ichida nima sodir bo'lishi) kuzatilmaydi — kompilator pessimistik yondashuv tanlaydi yoki property narrowing'ni invalidate qiladi (pastda batafsil yoritiladi).
+CFA **intra-procedural** — faqat bitta funksiya ichidagi flow'ni tahlil qiladi. Funksiyalararo (`someFunction()` chaqiruvi ichida nima sodir bo'lishi) kuzatilmaydi. Object argument property narrowing'ini kompilator chaqiruvdan keyin ham saqlaydi (optimistik) — chaqirilgan funksiya property'ni mutate qilganini bilmaydi (pastda batafsil yoritiladi).
 
 </details>
 
@@ -466,7 +466,7 @@ Equality tekshiruvlari (`===`, `!==`, `==`, `!=`) bilan TypeScript type'ni toray
 Equality narrowing uchta asosiy holat'da ishlaydi:
 
 1. **O'zgaruvchi === literal** — `if (x === "hello")` → `x` `"hello"` literal type'iga toraytiriladi
-2. **O'zgaruvchi === o'zgaruvchi** — `if (a === b)` → ikkalasi ham umumiy type'ga toraytiriladi (intersection)
+2. **O'zgaruvchi === o'zgaruvchi** — `if (a === b)` → ikkalasi ham umumiy (comparable) member'larga toraytiriladi
 3. **`== null` maxsus holat** — `null` **va** `undefined` ni bir vaqtda tekshiradi (JS loose equality qoidasi)
 
 ```typescript
@@ -495,7 +495,7 @@ function processNullable(value: string | null | undefined): void {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`checker.ts` da equality narrowing `getNarrowedTypeByComparison()` funksiyasi orqali ishlaydi. `===` operatori uchun kompilator ikkala operand'ning type set'laridan **intersection** ni hisoblaydi.
+`checker.ts` da equality narrowing `narrowTypeByEquality()` funksiyasi orqali ishlaydi. `===` operatori uchun kompilator har bir operand union'ining member'larini filter qiladi — boshqa operand bilan taqqoslanishi mumkin bo'lgan (comparable) member'lar qoladi. `string | number` va `string | boolean` uchun ikkala tomonda ham faqat `string` umumiy.
 
 ```
 a === b narrowing — checker.ts:
@@ -504,11 +504,12 @@ a: string | number
 b: string | boolean
 
 === true branch:
-  intersection(string|number, string|boolean) = string
+  a member'laridan b bilan comparable bo'lganlar → string
+  b member'laridan a bilan comparable bo'lganlar → string
   a: string, b: string
 
 === false branch:
-  a: string | number (o'zgarmaydi — intersect bo'lmagan qiymatlar qolishi mumkin)
+  a: string | number (o'zgarmaydi — qarama-qarshi qiymatlar qolishi mumkin)
   b: string | boolean (o'zgarmaydi)
 
 == null maxsus holat:
@@ -531,8 +532,8 @@ if (a === b) { /* ... */ } // Error: comparison appears to be unintentional
 
 ```
 a !== b true branch:
-  intersection'dan tashqaridagi type'lar qoladi
-  a: string | number (hammasi saqlanadi — TS pessimistik)
+  comparable member'lar olib tashlanmaydi — barchasi saqlanadi
+  a: string | number (TS pessimistik — qaysi member teng emasligini bilmaydi)
 
 a !== b false branch:
   a === b true branch'iga teng:
@@ -856,12 +857,12 @@ function formatValue(value: Date | RegExp | Error): string {
 }
 ```
 
-**Muhim cheklov:** `instanceof` right-hand side **constructor function** bo'lishi kerak. Interface va type alias — compile-time konstruksiyalar, runtime'da mavjud emas. Shuning uchun `x instanceof MyInterface` kompilatsiya xato beradi.
+**Muhim cheklov:** `instanceof` right-hand side **constructor function** bo'lishi kerak. Interface va type alias — compile-time konstruksiyalar, runtime'da mavjud emas. Shuning uchun `x instanceof MyInterface` compile-time xato beradi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`instanceof` — JS runtime operatori. Runtime'da `obj instanceof Constructor` — `Constructor.prototype` ni `obj` ning prototype chain'ida qidiradi (ichki `[[HasInstance]]` method orqali). TS bu operatsiyaga hech qanday kod qo'shmaydi.
+`instanceof` — JS runtime operatori. Runtime'da `obj instanceof Constructor` — agar `Constructor` da `Symbol.hasInstance` method bo'lsa uni chaqiradi, aks holda default holatda `Constructor.prototype` ni `obj` ning prototype chain'ida qidiradi (ECMAScript `OrdinaryHasInstance` algoritmi). TS bu operatsiyaga hech qanday kod qo'shmaydi.
 
 `checker.ts` da `instanceof` type guard ko'rilganda `narrowTypeByInstanceof()` chaqiriladi. Funksiya quyidagi qadamlarni bajaradi:
 
@@ -1290,9 +1291,9 @@ x = [];
 
 TS ba'zi hollarda narrowing'ni bekor qilib, o'zgaruvchini declared type'ga qaytaradi:
 
-1. **Funksiya call'lari** — object property narrowing'i uchun (`obj.prop` mutatsiya qilingan bo'lishi mumkin)
-2. **Closure'larda `let` reference** — callback ichida ishlatilganda (TS 5.4 dan oldingi konservativ yondashuv)
-3. **Loop iteratsiyalari** — loop boshida type'ni oldingi iteratsiyadan yakunidagi state'ga qaytaradi
+1. **Property yoki o'zgaruvchiga qayta assign** — `obj.value` narrowed bo'lib, keyin `obj.value = ...` yoki `obj = ...` yozilsa, narrowing bekor bo'ladi. Oddiy funksiya call'i (`mutate()`) esa object property narrowing'ini bekor **qilmaydi** — TS optimistik tarzda saqlaydi (pastdagi misol va [Control Flow va Closures](#control-flow-va-closures--narrowing-yoqolishi) bo'limida batafsil)
+2. **Closure'larda `let`/`var` reference** — `let` o'zgaruvchi callback ichida ishlatilganda, narrowing declared type'ga qaytariladi, chunki callback chaqirilgunicha o'zgaruvchi qayta assign qilingan bo'lishi mumkin
+3. **Loop iteratsiyalari** — loop boshida type'ni oldingi iteratsiya yakunidagi state'ni hisobga olib qayta hisoblaydi
 
 **`const` vs `let`:** `const` o'zgaruvchi uchun assignment narrowing faqat initialization'da ishlaydi — qayta assign qilish runtime'da mumkin emas, shuning uchun narrowed type mustahkam. `let` uchun esa har assignment'dan keyin narrowing o'zgarishi mumkin.
 
@@ -1335,7 +1336,7 @@ input = 100;    // ✅
 // input = true;   // ❌ Error
 // input = null;   // ❌ Error (agar strictNullChecks yoqilgan bo'lsa)
 
-// 4. Re-widening funksiya call'da
+// 4. Funksiya call object property narrowing'ini saqlaydi (optimistik)
 function example(): void {
   const obj: { value: string | null } = { value: "hello" };
 
@@ -1343,9 +1344,10 @@ function example(): void {
     // obj.value: string
     console.log(obj.value.toUpperCase()); // ✅
 
-    mutate(); // ⚠️ mutatsiya bo'lishi mumkin
-    // TS pessimistic: obj.value narrowed hali ham string
-    // Lekin runtime'da mutate() obj.value ni null qilishi mumkin
+    mutate(); // ⚠️ ichida obj.value ni null qilishi mumkin
+    // TS optimistik: obj.value hali ham string (narrowing saqlanadi)
+    console.log(obj.value.toUpperCase()); // ✅ — TS bu yerda ham string deb biladi
+    // Lekin runtime'da mutate() obj.value ni null qilgan bo'lsa — crash
     // Bu TS'ning intra-procedural analysis cheklovi
   }
 }
@@ -1739,6 +1741,22 @@ function isNotNull<T>(value: T | null | undefined): value is T {
 
 Bu guard har qanday type bilan ishlaydi — kompilator `T` ni har chaqiriqda aniqlaydi.
 
+**Inferred type predicates (TS 5.5+):** TypeScript 5.5 dan boshlab kompilator ba'zi funksiyalar uchun type predicate'ni **avtomatik** infer qiladi — `is` yozish shart emas. Shartlar: funksiyada explicit return type yo'q, bitta `return` statement, parameter mutate qilinmaydi, va return ifodasi parametrning refinement'iga bog'liq.
+
+```typescript
+// TS 5.5+: explicit return type yo'q → predicate avtomatik infer qilinadi
+function isString(value: unknown) {
+  return typeof value === "string";
+}
+// Inferred signature: (value: unknown) => value is string
+
+const items: (string | null)[] = ["a", null, "b"];
+const clean = items.filter((item) => item !== null);
+// TS 5.5+: clean: string[] — predicate inline callback'dan ham infer qilinadi
+```
+
+Diqqat: explicit `: boolean` annotation predicate inference'ni **bekor qiladi** — `function isString(value: unknown): boolean` hech qachon narrow qilmaydi. Aniq narrowing kafolati uchun `value is string` ni explicit yozish ishonchliroq.
+
 </details>
 
 <details>
@@ -2001,9 +2019,9 @@ if (isString(x)) {              │  assertIsString(x);
 // x: original type             │
 ```
 
-**Compiled JS'da `asserts` butunlay o'chiriladi.** Funksiya oddiy JS funksiya bo'lib qoladi — `throw` qiladigan validation funksiya. Runtime'da assertion funksiya mantiqan `if (!condition) throw Error()` bilan bir xil. TS faqat compile-time'da type narrowing uchun `asserts` deklaratsiyasini ishlatadi.
+**Compiled JS'da `asserts` butunlay o'chiriladi.** Funksiya oddiy JS funksiya bo'lib qoladi — `throw` qiladigan validation funksiya. Runtime'da assertion funksiya mantiqan `if (!condition) throw Error()` bilan bir xil. TS faqat compile-time'da type narrowing uchun `asserts` declaration'ini ishlatadi.
 
-**Kompilator assertion funksiyaning ichki mantiqini tekshirmaydi** — faqat `asserts` deklaratsiyasiga ishonadi. Agar funksiya noto'g'ri yozilgan bo'lsa (masalan, throw qilmay tugatilsa va assertion bajarilmasa ham davom etsa), runtime'da xato bo'ladi, lekin compile-time'da TS ogohlantirmaydi. Bu type guard'lardagi kabi "developer promise" paradigmasi.
+**Kompilator assertion funksiyaning ichki mantiqini tekshirmaydi** — faqat `asserts` declaration'iga ishonadi. Agar funksiya noto'g'ri yozilgan bo'lsa (masalan, throw qilmay tugatilsa va assertion bajarilmasa ham davom etsa), runtime'da xato bo'ladi, lekin compile-time'da TS ogohlantirmaydi. Bu type guard'lardagi kabi "developer promise" paradigmasi.
 
 **TS 3.7+ talablari:** Assertion function'lar TS 3.7 da qo'shilgan. Ishlashi uchun:
 - Funksiya return type `asserts condition` yoki `asserts param is Type` bo'lishi kerak
@@ -2922,7 +2940,7 @@ declare function someFunction(): void;
 
 ### 2. Object property narrowing funksiya call'dan keyin
 
-TS pessimistik: object property narrowing'i har qanday funksiya call'da invalidate bo'lishi mumkin. Yechim — property'ni local variable'ga olish:
+TS argument sifatida berilgan object property narrowing'ini funksiya call'dan keyin ham **saqlaydi** (optimistik) — kompilator funksiya property'ni mutate qilganini kuzatmaydi. Bu compile-time'da xato bermaydi, lekin funksiya runtime'da property'ni o'zgartirsa, narrowing yolg'on bo'lib qoladi. Yechim — property'ni local variable'ga olish:
 
 ```typescript
 // ⚠️ Xavfli
@@ -2945,7 +2963,7 @@ function safe(obj: { value: string | null }): void {
 declare function mutate(): void;
 ```
 
-### 3. Type guard ning daragi yetmasligi
+### 3. Type guard ning darajasi yetmasligi
 
 Ba'zi murakkab kombinatsiyalarni kompilator avtomatik tanib olmaydi:
 
@@ -3045,8 +3063,8 @@ CFA state machine (TS 5.4+):
 function processUser(user: { name: string | null }): void {
   if (user.name !== null) {
     processNameAndMaybeMutate();
-    // TS pessimistik emas bu holatda — narrowing saqlanadi
-    // Lekin runtime'da xavf bor
+    // TS optimistik: narrowing saqlanadi (user.name hali ham string)
+    // Lekin runtime'da funksiya user.name'ni null qilgan bo'lsa — xavf bor
     console.log(user.name.length);
   }
 }
@@ -3062,7 +3080,7 @@ function processUserSafe(user: { name: string | null }): void {
   }
 }
 
-// 2. Type guard daragi yetmasligi
+// 2. Type guard darajasi yetmasligi
 function hasAllKeys<T extends object, K extends string>(
   obj: T,
   keys: K[]
@@ -3141,7 +3159,7 @@ Bu bo'lim TS narrowing'ning nozik holatlarini yoritadi — kod normal ishlayotga
 
 ### 1. `typeof null === "object"` — JS Legacy Bug
 
-JavaScript'da `typeof null` — **`"object"`** qaytaradi. Bu ECMAScript spec'dagi tarixiy bug — dastlabki JS implementatsiyasida `null` object pointer sifatida ifodalangan va uning type tag'i object bilan bir xil edi. Spec yangilansa, mavjud kod buziladi, shuning uchun bu xatti-harakat **qasddan saqlangan**.
+JavaScript'da `typeof null` — **`"object"`** qaytaradi. Bu ECMAScript spec'dagi tarixiy bug — dastlabki JS implementation'ida `null` object pointer sifatida ifodalangan va uning type tag'i object bilan bir xil edi. Spec yangilansa, mavjud kod buziladi, shuning uchun bu xatti-harakat **qasddan saqlangan**.
 
 TS narrowing buni to'g'ri aks ettiradi — `typeof value === "object"` true branch'ida `null` olib tashlanmaydi.
 
@@ -3224,7 +3242,7 @@ Loop boshida va oxirida kompilator o'zgaruvchi type'ni declared type'ga qaytarad
 
 ### 4. `in` Operator Optional Property bilan — Qiymat hali ham undefined bo'lishi mumkin
 
-`in` operator narrowing optional property'larni "deklaratsiyalangan" deb hisoblaydi — lekin qiymat tipi `T | undefined` bo'lib qoladi (default `exactOptionalPropertyTypes: false` rejimida). Runtime'da `obj.prop === undefined` bo'lishi mumkin, hatto `"prop" in obj` true qaytarsa ham.
+`in` operator narrowing optional property'larni "e'lon qilingan" deb hisoblaydi — lekin qiymat tipi `T | undefined` bo'lib qoladi (default `exactOptionalPropertyTypes: false` rejimida). Runtime'da `obj.prop === undefined` bo'lishi mumkin, hatto `"prop" in obj` true qaytarsa ham.
 
 ```typescript
 interface User {
@@ -3354,7 +3372,7 @@ async function fetchUserName(id: number): Promise<string> {
 
 ---
 
-### ❌ Xato 3: Noto'g'ri type guard mantigi
+### ❌ Xato 3: Noto'g'ri type guard mantiqi
 
 ```typescript
 function isString(value: unknown): value is string {
@@ -3744,7 +3762,7 @@ Bu bo'lim TypeScript'ning type narrowing mexanizmini chuqur yoritdi — CFA'dan 
 **Built-in narrowing operator'lari:**
 
 - **Truthiness narrowing** — `if (value)` — falsy qiymatlarni olib tashlaydi. Gotcha: `0`, `""`, `NaN` ham falsy.
-- **Equality narrowing** — `===`, `==`, `!==` — intersection of types. `== null` maxsus holat: `null` va `undefined` ni birga qamraydi.
+- **Equality narrowing** — `===`, `==`, `!==` — har operand'ning faqat bir-biri bilan comparable bo'lgan member'lari qoladi. `== null` maxsus holat: `null` va `undefined` ni birga qamraydi.
 - **`typeof` guard** — primitive type'lar uchun. Gotcha: `typeof null === "object"`.
 - **`instanceof` guard** — class va constructor'lar bilan. Interface/type alias bilan ishlamaydi.
 - **`in` operator** — property mavjudligi bilan narrowing. Interface'lar uchun foydali. Optional property'ni "bor" deb hisoblaydi.
@@ -3766,7 +3784,7 @@ Bu bo'lim TypeScript'ning type narrowing mexanizmini chuqur yoritdi — CFA'dan 
 **Edge case'lar va gotchas:**
 
 - `typeof null === "object"` — JS legacy bug, TS aks ettiradi
-- Property narrowing method call'da yo'qolishi
+- Property narrowing funksiya call'dan keyin ham saqlanadi (optimistik) — mutation kuzatilmaydi, runtime risk bor
 - `let` re-widening loop va function boundary'da
 - `in` operator optional property'ni "bor" deb hisoblaydi
 - Aliased type guard faqat `const` bilan (TS 4.4+)

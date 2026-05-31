@@ -2,7 +2,7 @@
 
 > Mapped types — TypeScript'da mavjud object type'ning har bir property'sini **transform** qilish mexanizmi. `{ [K in keyof T]: NewType }` sintaksisi bilan barcha key'larni iterate qilish, property modifier'lar (`+?`, `-?`, `+readonly`, `-readonly`) bilan optional/readonly holatini o'zgartirish, key remapping (`as`) bilan key'larni qayta nomlash yoki filtrlash, va conditional types bilan birgalikda qudratli type transformation'lar yaratish.
 >
-> Bu bo'lim [09-advanced-generics.md](09-advanced-generics.md)'dagi asosiy tushunchalarni chuqurlashtirib, `Partial`, `Required`, `Readonly`, `Record` kabi built-in utility type'larning ichki implementatsiyasini, homomorphic mapped type'lar tushunchasini, va real-world pattern'larni yoritadi.
+> Bu bo'lim [09-advanced-generics.md](09-advanced-generics.md)'dagi asosiy tushunchalarni chuqurlashtirib, `Partial`, `Required`, `Readonly`, `Record` kabi built-in utility type'larning ichki implementation'ini, homomorphic mapped type'lar tushunchasini, va real-world pattern'larni yoritadi.
 
 ---
 
@@ -57,7 +57,7 @@ Type:     { [K in keyof T]:        TransformedType<T[K]> }
 3. **Modifier'lar** — `readonly`, `?` — qo'shish yoki olib tashlash
 4. **Key remapping** — `as NewKey` (TS 4.1+) — key'ni o'zgartirish
 
-**Homomorphic pattern:** Agar mapped type `keyof T`'dan key olsa — bu **homomorphic** mapped type. Kompilator original type'ning modifier'larini (optional, readonly) avtomatik saqlaydi.
+**Homomorphic pattern:** Agar mapped type `{ [K in keyof T]: ... }` shaklida bo'lsa (T — type parameter), bu **homomorphic** mapped type. Kompilator original type'ning modifier'larini (optional, readonly) avtomatik saqlaydi. Key source `keyof T` bo'lgan, yoki key source `T` constraint'i `keyof X` bo'lgan type parameter (`[P in K], K extends keyof X`) bo'lgan holatlar — ikkalasi ham homomorphic, shu sababli `Pick` ham modifier saqlaydi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -81,7 +81,7 @@ T = { name: string; age: number; active: boolean }
 
 **Internal mexanizm:** Kompilator mapped type node'ni qayta ishlaganda, key source'ni union'ga resolve qiladi va har bir member uchun alohida property instantiation yaratadi. Har property uchun value type alohida evaluate bo'ladi — agar conditional type yoki generic ishlatilsa, har iteration'da mustaqil computation.
 
-**Homomorphic detection:** Kompilator mapped type'ni qayta ishlayotganda key source'ni tekshiradi. Agar key source aynan `keyof T` bo'lsa (T — qandaydir type parameter), mapped type homomorphic deb belgilanadi va T'dagi modifier'lar (readonly, optional) natijaga tarqatiladi. Agar key source boshqa narsa bo'lsa (string literal union, `keyof any`, va boshqalar), non-homomorphic — modifier'lar yo'qoladi.
+**Homomorphic detection:** Kompilator mapped type'ni qayta ishlayotganda key source'ni tekshiradi. Agar key source aynan `keyof T` bo'lsa (T — qandaydir type parameter) — yoki key source `keyof T` bilan cheklangan type parameter bo'lsa (`Pick`'dagi `[P in K], K extends keyof T`) — mapped type homomorphic deb belgilanadi va T'dagi modifier'lar (readonly, optional) natijaga tarqatiladi. Agar key source boshqa narsa bo'lsa (string literal union, `keyof any`, va boshqalar), non-homomorphic — modifier'lar yo'qoladi.
 
 **Runtime'da iz yo'q:** Mapped types compile-time construct. JavaScript output'da hech qanday iz qolmaydi — barcha transform'lar type system ichida. Runtime immutability yoki validation uchun bu type'lar yaramaydi — faqat compile-time type safety.
 
@@ -265,7 +265,7 @@ type First = Tuple[0];  // string
 type Second = Tuple[1]; // number
 ```
 
-Array'da aniq index ishlatilsa (`Arr[0]`) — element type qaytadi. Runtime'da `array[0]` va `array["0"]` aynan bir xil property — JavaScript number key'larni stringga aylantiradi. TypeScript bu equivalence'ni `string | number` qaytarish orqali aks ettiradi.
+Array'da aniq index ishlatilsa (`Arr[0]`) — element type qaytadi (`string[][0]` → `string`). Bu indexed access — `keyof`'dan farqli. `keyof string[]` esa `number | "length" | ...` beradi, chunki runtime'da `array[0]` va `array["0"]` aynan bir xil property (JavaScript number key'larni string'ga aylantiradi), shuning uchun `keyof` index qismida `number` ham keladi.
 
 </details>
 
@@ -558,7 +558,7 @@ type FixedReq = FullyRequired<Example>;
 
 ### Nazariya
 
-TypeScript'ning built-in utility type'larining ko'pchiligi — mapped types bilan implementatsiya qilingan. Ularning ichini tushunish mapped types'ni chuqur o'zlashtirishga yordam beradi.
+TypeScript'ning built-in utility type'larining ko'pchiligi — mapped types bilan implement qilingan. Ularning ichini tushunish mapped types'ni chuqur o'zlashtirishga yordam beradi.
 
 **Asosiy utility'lar:**
 
@@ -764,7 +764,7 @@ type OmitType<T, V> = {
 };
 ```
 
-**`string & K` casting:** Template literal ichida `K` ishlatilganda, `K` `string | number | symbol` bo'lishi mumkin. `Capitalize`, `Uppercase`, `Lowercase` kabi string manipulation utility'lar faqat `string` qabul qiladi — shuning uchun `string & K` casting kerak:
+**`string & K` intersection:** Template literal ichida `K` ishlatilganda, `K` `string | number | symbol` bo'lishi mumkin. `Capitalize`, `Uppercase`, `Lowercase` kabi string manipulation utility'lar faqat `string` qabul qiladi — shuning uchun `string & K` intersection kerak (`K`'ni faqat string subset'iga cheklaydi):
 
 ```typescript
 type Getters<T> = {
@@ -824,7 +824,7 @@ Capitalize<"name"> → "Name"
 Capitalize<"email"> → "Email"
 ```
 
-**Homomorphic xususiyat va key remapping:** Key remapping ishlatilganda mapped type **homomorphic xususiyatni yo'qotadi** — original modifier'lar (readonly, optional) saqlanmaydi, chunki key'lar o'zgargan:
+**Homomorphic xususiyat va key remapping:** `as` clause mapped type'ni homomorphic'likdan **chiqarmaydi** — key source hamon `keyof T` bo'lib qoladi, shuning uchun original modifier'lar (readonly, optional) yangi key'larga **ko'chiriladi**:
 
 ```typescript
 interface Config {
@@ -832,15 +832,15 @@ interface Config {
   port?: number;
 }
 
-// Key remapping bilan — modifier'lar yo'qoladi
+// Key remapping — modifier'lar saqlanadi
 type Prefixed = {
   [K in keyof Config as `${string & K}Info`]: Config[K];
 };
-// { hostInfo: string; portInfo: number | undefined }
-// ❌ readonly va ? yo'q
+// { readonly hostInfo: string; portInfo?: number | undefined }
+// ✅ readonly va ? yangi key'da ham bor
 ```
 
-Bu nuance'ni bilish muhim — key remapping kuch beradi, lekin modifier preservation'ni yo'qotadi.
+Kompilator har output property'ni o'zining source property'siga bog'lab, modifier'larni shu bog'lanish orqali ko'chiradi — key nomi o'zgarsa ham bog'lanish saqlanadi. Modifier yo'qolishi faqat key source `keyof T`'dan ajralganda (non-homomorphic, masalan `Record`) yuz beradi.
 
 </details>
 
@@ -969,8 +969,8 @@ type ReactiveForm = WithChangeHandlers<FormData>;
 // {
 //   name: string;
 //   age: number;
-//   onNameChange: (new: string, old: string) => void;
-//   onAgeChange: (new: number, old: number) => void;
+//   onNameChange: (newValue: string, oldValue: string) => void;
+//   onAgeChange: (newValue: number, oldValue: number) => void;
 // }
 ```
 
@@ -1022,9 +1022,9 @@ DeepReadonly<Config>
                    → ReadonlyArray<string>
 ```
 
-Har recursive call yangi mapped type instantiation yaratadi. `DeepReadonly` kabi recursive mapped + conditional type'larda kompilator depth counter bilan chuqurlikni kuzatadi. Agar object 10+ level nested bo'lsa — instantiation count tezda o'sadi.
+Har recursive call yangi mapped type instantiation yaratadi. `DeepReadonly` kabi recursive mapped + conditional type'larda kompilator instantiation depth'ni kuzatadi va juda chuqur ketganda `TS2589: Type instantiation is excessively deep and possibly infinite` xatosi bilan to'xtaydi. Nesting chuqurlashgan sari instantiation count tez o'sadi — har qatlam property soniga ko'paytiriladi.
 
-**Caching nuance:** Mapped type'ning `keyof T` qismi bir marta hisoblandi va cache'landi. Lekin har property'ning value type'i uchun conditional evaluation alohida ishlaydi — bu yerda cache yo'q. Katta loyihalarda bu performance bottleneck bo'lishi mumkin.
+**Caching nuance:** Kompilator instantiation natijalarini type identity bo'yicha cache qiladi — bir xil argument bilan bir xil mapped/conditional type qayta uchrasa, qayta hisoblanmaydi. Lekin generic `T` har chaqiriq'da yangi konkret type bo'lsa, har biri yangi instantiation — cache hit bo'lmaydi. Katta loyihalarda ko'p noyob instantiation performance bottleneck bo'lishi mumkin.
 
 **`extends Function` pitfall:** Recursive mapped type + conditional'da `T[K] extends Function` check ishlatmaslik muhim — `Function` type anti-pattern. `T[K] extends (...args: any[]) => any` yoki `T[K] extends (...args: unknown[]) => unknown` ishlatish yaxshiroq:
 
@@ -1355,12 +1355,14 @@ Mapped type'lar ikki turga bo'linadi:
 
 **1. Homomorphic mapped types** — original type'ning **strukturasini saqlaydi**. Original type'dagi optional (`?`), readonly modifier'lar va boshqa xususiyatlar yangi type'ga avtomatik o'tadi (agar aniq o'zgartirilmasa).
 
-**Qoida:** Homomorphic mapped type — `keyof T` dan key oladigan mapped type.
+**Qoida:** Homomorphic mapped type — key source `keyof X` bo'lgan (X — type parameter), yoki key source `keyof X` bilan cheklangan type parameter bo'lgan mapped type. Birinchi shakl (`[K in keyof T]`) — modifier'larni `as` clause bilan ham, clause'siz ham saqlaydi. Ikkinchi shakl (`Pick`) — `[P in K]` bo'lib, `K extends keyof T` constraint orqali modifier source'i `T`'ga resolve bo'ladi.
 
 ```typescript
-// ✅ Homomorphic — keyof T dan key
+// ✅ Homomorphic — key source aynan keyof T
 type MyPartial<T> = { [K in keyof T]?: T[K] };
 type MyReadonly<T> = { readonly [K in keyof T]: T[K] };
+
+// ✅ Homomorphic ham — K constraint'i keyof T, modifier source T
 type MyPick<T, K extends keyof T> = { [P in K]: T[P] };
 ```
 
@@ -1371,7 +1373,7 @@ type MyPick<T, K extends keyof T> = { [P in K]: T[P] };
 type MyRecord<K extends keyof any, T> = { [P in K]: T };
 ```
 
-**Muhim:** Key remapping (`as`) ham homomorphic xususiyatni yo'qotadi — hatto `keyof T` ishlatilsa ham.
+**Muhim:** `as` clause (key remapping) homomorphic xususiyatni **buzmaydi** — key source hamon `keyof T` bo'lsa, original modifier'lar yangi key'larga ko'chiriladi. Modifier yo'qolishi faqat non-homomorphic key source'da (masalan `Record`, mustaqil union) yuz beradi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1379,14 +1381,17 @@ type MyRecord<K extends keyof any, T> = { [P in K]: T };
 **Homomorphic detection:** Kompilator mapped type'ni qayta ishlaganda key source'ni tekshiradi:
 
 ```
-Homomorphic shart: { [K in keyof SomeTypeParameter]: ... }
-                              ^^^^^^^^^^^^^^^^^^^^^^^
-                              Aynan `keyof T` yoki `keyof (generic param)`
+Homomorphic shart (ikki shakl):
+  1. { [K in keyof T]: ... }      → key source aynan keyof (type parameter)
+  2. { [P in K]: ... }, K extends keyof T
+                                  → K constraint'i keyof T → modifier source T
 
 Non-homomorphic: { [K in SomeUnion]: ... }
                         ^^^^^^^^^^
-                        Mustaqil union, generic'dan keyof emas
+                        Mustaqil union, type parameter'dan keyof emas
 ```
+
+Kompilator buni `keyof X` shaklidagi constraint'ga ega type parameter mavjudligini tekshirib aniqlaydi — `X` esa modifier source bo'ladi.
 
 Homomorphic pattern'da kompilator quyidagilarni bajaradi:
 
@@ -1400,13 +1405,13 @@ Non-homomorphic pattern'da:
 2. Hech qanday modifier propagation yo'q
 3. Faqat mapped type'da belgilangan modifier'lar qo'llaniladi
 
-**Key remapping va homomorphic loss:**
+**Key remapping va modifier propagation:**
 
 ```
 { [K in keyof T as NewKey]: ... }
 ```
 
-Key remapping bo'lganda natijaviy key'lar asliyatdan farqli — kompilator original property bilan yangi property orasida bog'liqlik'ni yo'qotadi. Shuning uchun modifier propagation ham yo'qoladi.
+Key remapping bo'lganda key source hamon `keyof T` — kompilator har output property'ni o'zining source property'siga bog'lab qoldiradi. Shuning uchun modifier propagation `as` clause bilan ham ishlaydi:
 
 ```typescript
 interface Config {
@@ -1418,13 +1423,13 @@ interface Config {
 type A = { [K in keyof Config]: Config[K] };
 // { readonly host: string; port?: number }
 
-// Key remapping — modifier yo'qoladi (homomorphic emas endi)
+// Key remapping — modifier hamon saqlanadi
 type B = { [K in keyof Config as `${K & string}Info`]: Config[K] };
-// { hostInfo: string; portInfo: number | undefined }
-// readonly va ? yo'q
+// { readonly hostInfo: string; portInfo?: number | undefined }
+// readonly va ? yangi key'da ham bor
 ```
 
-**Real-world implication:** `Record<keyof T, V>` ishlatish — juda keng tarqalgan xato. Developer'lar `Record`'ni shortcut sifatida ishlatadilar, lekin modifier'lar yo'qoladi:
+**Real-world implication:** `Record<keyof T, V>` ishlatish — juda keng tarqalgan xato. Developer'lar `Record`'ni shortcut sifatida ishlatadilar, lekin u non-homomorphic (key source mustaqil union) — modifier'lar yo'qoladi:
 
 ```typescript
 // ❌ Modifier yo'qoladi
@@ -1478,16 +1483,16 @@ type Identity<T> = { [K in keyof T]: T[K] };
 type IdConfig = Identity<Config>;
 // { readonly host: string; readonly port: number; timeout?: number }
 
-// 5. Key remapping — homomorphic yo'qoladi
+// 5. Key remapping — modifier hamon saqlanadi
 type Prefixed<T> = {
   [K in keyof T as `${string & K}Prop`]: T[K];
 };
 
 type PrefixedConfig = Prefixed<Config>;
 // {
-//   hostProp: string;           ❌ readonly yo'q
-//   portProp: number;           ❌ readonly yo'q
-//   timeoutProp: number | undefined; ❌ ? yo'q (undefined qoldi)
+//   readonly hostProp: string;       ✅ readonly ko'chdi
+//   readonly portProp: number;       ✅ readonly ko'chdi
+//   timeoutProp?: number;            ✅ ? ko'chdi
 // }
 
 // 6. Mapped + conditional — homomorphic xususiyat saqlanadi (keyof T ishlatilsa)
@@ -1566,7 +1571,7 @@ Conditional type distribution (farqli):
                                        ← union members alohida!
 ```
 
-Shuning uchun `{ [K in T]: ... }` pattern'da `T extends string` constraint qo'yilsa — `T` bu yerda mapped type'ning iteration variable sifatida ishlaydi va union member'lar bo'yicha iterate qiladi. Bu conditional distribution emas — bu mapped type'ning o'z iteration mexanizmi.
+Shuning uchun `{ [K in T]: ... }` pattern'da `T extends string` constraint qo'yilsa (T — string literal union) — `K` mapped type'ning iteration variable bo'lib, union'ning har member'i bo'yicha aylanadi. Bu conditional distribution emas — bu mapped type'ning o'z iteration mexanizmi: `K` har iteration'da bitta literal'ga bog'lanadi.
 
 **Union iteration pattern:** `{ [K in UnionType]: ... }` — union'ning har member'i K bo'lib turadi. Bu literal union'dan object yaratish uchun ishlatiladi:
 
@@ -1677,10 +1682,10 @@ Murakkab mapped type'lar kompilator performance'iga ta'sir qilishi mumkin. Quyid
 
 **Asosiy printsiplar:**
 
-1. **Recursion depth cheklash** — counter tuple bilan 10 darajadan chuqur ketmaslik
+1. **Recursion depth cheklash** — counter tuple bilan recursion'ni belgilangan darajada to'xtatish (kompilator `TS2589: Type instantiation is excessively deep` xatosiga yetmasdan)
 2. **Intermediate type alias'lar** — katta mapped type'larni kichik nomlangan bo'laklarga ajratish
 3. **Pick bilan pre-filter** — katta type'dan faqat kerakli property'larni oldindan tanlash
-4. **Conditional type kesishi** — `T[K] extends Function` tipli tekshiruvlar performance'ga ta'sir qiladi
+4. **Per-property conditional'ni yengillashtirish** — har property uchun bajariladigan conditional zanjiri (`extends A ? ... : extends B ? ...`) property soniga ko'paytiriladi; chuqur/keng conditional'ni soddalashtirish evaluation cost'ini kamaytiradi
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1702,7 +1707,7 @@ Taxminiy hisob (DeepReadonly, 3 level deep):
 Katta type'da tez o'sadi.
 ```
 
-**Profiling:** `tsc --generateTrace <dir>` bilan compilation trace yoziladi — Chrome DevTools'ning Performance tab'ida ochish mumkin. Mapped type'lar bilan bog'liq event'larni kuzating (internal mechanism). Agar bitta mapped type ko'p vaqt olsa — optimization kerak.
+**Profiling:** `tsc --generateTrace <dir>` bilan compilation trace yoziladi — Chrome DevTools'ning Performance tab'ida ochish mumkin. Trace'da har type'ni tekshirish (type checking) qancha vaqt olganini ko'rib, eng qimmat type evaluation'larni topish mumkin. Agar bitta mapped type ko'p vaqt olsa — refactor kerak.
 
 **Type caching:** Kompilator mapped type natijalarini cache qiladi. Bir xil `T` argument bilan bir xil mapped type qayta chaqirilsa — cache'dan olinadi. Lekin generic `T` har safar yangi type bo'lsa — cache ishlamaydi. Shuning uchun intermediate type alias'lar (`type A = X; type B = Y`) har alohida cache'ga tushadi — bu faydali optimization.
 
@@ -1716,7 +1721,7 @@ type Slow = DeepReadonly<HugeType>;
 type Fast = DeepReadonly<Pick<HugeType, "needed1" | "needed2">>;
 ```
 
-**`typeToTypeNodeCache`:** Kompilator ichida mapped type natijalari cache'lanadi. Bir xil input'ga bir xil output — lekin har chaqiriq'da yangi cache entry. Katta loyihalarda bu memory'ni ham ishlatadi.
+**Memory ta'siri:** Har noyob instantiation type system ichida saqlanadi — ko'p turli xil argument bilan ishlaydigan murakkab generic mapped type'lar compilation memory'sini oshiradi. Bu `tsc` jarayonining xotira sarfida ko'rinadi.
 
 **Intermediate type aliases — pedagogical benefit:** Murakkab mapped type'ni kichik bo'laklarga ajratish nafaqat performance, balki kod o'qilishini ham yaxshilaydi. Hard-to-read nested mapped type o'rniga nomlangan intermediate type'lar — har birining maqsadi aniq.
 
@@ -1897,7 +1902,7 @@ type NoStrings = OmitByType<Mixed, string>;
 // { age: number; active: boolean }
 ```
 
-**Nima uchun `never` property'ni o'chiradi:** Mapped type'da key `never` bo'lgan property kompilator tomonidan "mavjud emas" deb qaraladi va natijaviy type'ga qo'shilmaydi. Bu ECMAScript'da valid `never` key bo'lishi mumkin emasligi tufayli — bunday property mavjud bo'la olmaydi.
+**Nima uchun `never` property'ni o'chiradi:** Key remapping'da `as` clause natijasi property'ning yangi key type'ini belgilaydi. Agar bu type `never` bo'lsa, kompilator natijaviy object type'ni qurishda shu key'ni tashlab yuboradi — `never` hech qanday string/number/symbol literal'ni o'z ichiga olmaydi, shuning uchun unga mos property nomi yo'q. Bu type system mexanizmi (`never` — empty type), ECMAScript runtime cheklovi emas.
 
 **Power pattern:** `PickByType`, `OmitByType`, `PickByValue`, `OmitByValue` — barchasi `as never` pattern'iga asoslangan. `Omit` utility type ham ichki `as never` bilan implement qilingan (TS 4.1+):
 
@@ -1909,10 +1914,10 @@ type MyOmit<T, K extends keyof any> = {
 
 ### 5. Recursive Mapped + Function Check Shart
 
-Recursive mapped type (`DeepReadonly`, `DeepPartial`) yozilayotganda Function check **majburiy** — aks holda method'lar ichidagi parameter va prototype ham recursive bo'lib ketadi.
+Recursive mapped type (`DeepReadonly`, `DeepPartial`) yozilayotganda Function check **majburiy** — aks holda function-valued property `object` deb topilib recursive mapped type'ga aylanadi, va call signature mapped type ichida iterate qilinmagani uchun yo'qoladi (qaytgan type endi callable emas).
 
 ```typescript
-// ❌ Function check yo'q — infinite recursion risk
+// ❌ Function check yo'q — call signature yo'qoladi
 type BrokenDeep<T> = {
   readonly [K in keyof T]: T[K] extends object
     ? BrokenDeep<T[K]>
@@ -1921,12 +1926,16 @@ type BrokenDeep<T> = {
 
 interface HasMethod {
   name: string;
-  greet: () => string; // Function ham object!
+  greet: () => string; // function type ham object
 }
 
 type Broken = BrokenDeep<HasMethod>;
-// greet'ning parameter'lari va prototype'i ham readonly bo'ladi
-// Kompilator hayron bo'ladi
+// greet → object deb topiladi → BrokenDeep<() => string> ga recurse bo'ladi.
+// `keyof (() => string)` = never (call signature mapped type'da iterate qilinmaydi),
+// natijada greet `{}` ga aylanadi — call signature yo'qoladi.
+
+declare const broken: Broken;
+broken.greet(); // ❌ TS2349: This expression is not callable
 ```
 
 **Yechim — Function check oldinda:**
@@ -2041,7 +2050,7 @@ interface HasMethod {
 }
 
 type Broken = BrokenDeep<HasMethod>;
-// greet ning prototype'i ham readonly
+// greet → BrokenDeep<() => string> → call signature yo'qoladi → endi callable emas
 ```
 
 **✅ To'g'ri usul:**
@@ -2056,7 +2065,7 @@ type FixedDeep<T> = {
 };
 ```
 
-**Nima uchun:** `Function` `object` ga extends qiladi — funksiya ham object. Function check'siz mapped type function ichiga ham kirib ketadi. `(...args: any[]) => any` proper callable signature.
+**Nima uchun:** function type `object`'ga extends qiladi, shuning uchun Function check'siz recursive mapped type function-valued property'ni `object` deb topib unga ham qo'llanadi — call signature mapped type ichida iterate qilinmaydi, natijada qaytgan type callable bo'lmay qoladi. `(...args: any[]) => any` proper callable signature check.
 
 ---
 
@@ -2068,7 +2077,7 @@ interface HugeType { /* 100+ property */ }
 
 type Slow = DeepReadonly<WithAccessors<Promisify<HugeType>>>;
 // Har chaqiriq'da 100+ property uchun recursive transformation
-// Kompilator juda sekin
+// Instantiation soni property soniga ko'paytiriladi — compilation sekinlashadi
 ```
 
 **✅ To'g'ri usullar:**
@@ -2232,8 +2241,8 @@ type D = { [K in keyof Data]-?: Data[K] };
 // tags endi string[] (undefined ham olib tashlandi)
 
 type E = { [K in keyof Data as `${K & string}Info`]: Data[K] };
-// { idInfo: number; nameInfo: string; tagsInfo: string[] | undefined }
-// Key remapping — homomorphic yo'qoldi, modifier yo'q
+// { readonly idInfo: number; nameInfo: string; tagsInfo?: string[] }
+// Key remapping — modifier'lar yangi key'larga ko'chadi (readonly, ?)
 
 type F = { [K in keyof Data as Data[K] extends string ? K : never]: Data[K] };
 // { name: string }
@@ -2318,12 +2327,14 @@ Event bus uchun type-safe mapping yarating — event nomi + payload type dan han
 <summary>Javob</summary>
 
 ```typescript
-interface AppEvents {
+// type alias (interface emas) — index signature'siz interface
+// `Record<string, object>` constraint'iga assign bo'lmaydi (TS2344)
+type AppEvents = {
   "user:login": { userId: string; timestamp: number };
   "user:logout": { userId: string };
   "item:add": { itemId: string; quantity: number };
   "error": { message: string; code: number };
-}
+};
 
 // Event handler map
 type EventHandlers<T> = {
@@ -2400,7 +2411,7 @@ Bu bo'limda mapped types'ning chuqur mexanizmlari o'rganildi:
 - **`keyof` va index access** — mapped type building block'lari, `keyof` turli type'lar bilan (index signature, primitive, array)
 - **Property modifiers** — `+?`, `-?`, `+readonly`, `-readonly` — kombinatsiyalari, `-?` va `| undefined` farqi
 - **Built-in utility types** — `Partial`, `Required`, `Readonly`, `Pick`, `Record`, `Omit` — mapped type implementation'lari
-- **Key remapping (`as`)** — key rename, filter (`as never`), template literal + `Capitalize`, `string & K` casting
+- **Key remapping (`as`)** — key rename, filter (`as never`), template literal + `Capitalize`, `string & K` intersection
 - **Mapped + conditional** — `DeepReadonly`, `DeepPartial`, object diff, nullable keys extraction
 - **Custom patterns** — `Getters`, `Setters`, `EventMap`, `Validators`, form state, API response
 - **Homomorphic vs non-homomorphic** — `keyof T` → homomorphic (modifier saqlanadi), `Record` → non-homomorphic (yo'qoladi)
@@ -2415,7 +2426,7 @@ Bu bo'limda mapped types'ning chuqur mexanizmlari o'rganildi:
 4. **`string & K` template literal'da.** `keyof T`'da symbol va number bo'lishi mumkin — template literal'da filter kerak.
 5. **Recursive mapped + Function check.** `T[K] extends (...args: any[]) => any` shart, `Function` type anti-pattern.
 6. **Performance — intermediate alias, Pick pre-filter.** Katta type'larda murakkab mapped type'lar sekin.
-7. **Key remapping homomorphic yo'qotadi.** `as` clause bilan original modifier'lar saqlanmaydi.
+7. **Key remapping modifier saqlaydi.** `as` clause key source `keyof T` bo'lsa homomorphic'likni buzmaydi — readonly/optional yangi key'larga ko'chadi. Modifier yo'qolishi faqat non-homomorphic key source'da (`Record`, mustaqil union).
 8. **Index signature `keyof` `string | number` beradi.** JavaScript'ning number/string key equivalence'i.
 
 **Cross-references:**

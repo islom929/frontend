@@ -1,12 +1,12 @@
-# Bo'lim 17: Module System TypeScript da
+# Bo'lim 17: Module System TypeScript'da
 
-> TypeScript ning module system i — JavaScript ES Modules ustiga qurilgan, type-specific import/export mexanizmlari qo'shilgan system. `import type`, `verbatimModuleSyntax`, module resolution strategiyalari, path aliases, ambient modules, module augmentation — barchasi TypeScript ning type system ini module chegaralari orqali boshqarish uchun xizmat qiladi. Bu bo'limda JavaScript ning module asoslarini qaytarmaymiz ([JS: Modules](../js/15-modules.md) da batafsil) — faqat TypeScript qo'shadigan yangi tushunchalarni yoritamiz.
+> TypeScript'ning module system'i — JavaScript ES Modules ustiga qurilgan, type-specific import/export mexanizmlari qo'shilgan system. `import type`, `verbatimModuleSyntax`, module resolution strategiyalari, path aliases, ambient modules, module augmentation — barchasi TypeScript'ning type system'ini module chegaralari orqali boshqarish uchun xizmat qiladi. Bu bo'limda JavaScript'ning module asoslarini qaytarmaymiz ([JS: Modules](../js/15-modules.md) da batafsil) — faqat TypeScript qo'shadigan yangi tushunchalarni yoritamiz.
 
 ---
 
 ## Mundarija
 
-- [ES Modules TypeScript da](#es-modules-typescript-da)
+- [ES Modules TypeScript'da](#es-modules-typescript-da)
 - [`import type` va `export type`](#import-type-va-export-type)
 - [Inline Type Imports](#inline-type-imports)
 - [`verbatimModuleSyntax`](#verbatimmodulesyntax)
@@ -28,30 +28,30 @@
 
 ---
 
-## ES Modules TypeScript da
+## ES Modules TypeScript'da
 
 ### Nazariya
 
-TypeScript JavaScript ning ES Module syntax ini to'liq qo'llab-quvvatlaydi — `import`, `export`, `default export`, `re-export`. TypeScript bu syntax ustiga **type-specific** qo'shimchalar kiritadi:
+TypeScript JavaScript'ning ES Module syntax'ini to'liq qo'llab-quvvatlaydi — `import`, `export`, `default export`, `re-export`. TypeScript bu syntax ustiga **type-specific** qo'shimchalar kiritadi:
 
-1. **Type annotation lar** — export/import qilinadigan qiymatlar type annotated bo'lishi mumkin
-2. **`import type`** — faqat type import (JS ga hech narsa tushmaydi)
+1. **Type annotation'lar** — export/import qilinadigan qiymatlar type annotated bo'lishi mumkin
+2. **`import type`** — faqat type import (JS'ga hech narsa tushmaydi)
 3. **`export type`** — faqat type export
-4. **Interface va type alias export** — JS da mavjud bo'lmagan construct lar
+4. **Interface va type alias export** — JS'da mavjud bo'lmagan construct'lar
 
-TypeScript da module — **fayl darajasida** aniqlanadi. Agar faylda kamida bitta `import` yoki `export` statement bo'lsa — bu fayl **module**. Aks holda — **script** (global scope da ishlaydi).
+TypeScript'da module — **fayl darajasida** aniqlanadi. Agar faylda kamida bitta `import` yoki `export` statement bo'lsa — bu fayl **module**. Aks holda — **script** (global scope'da ishlaydi).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator `import` va `export` statement larni `tsconfig.json` dagi `module` option ga qarab transform qiladi:
+Kompilator `import` va `export` statement'larni `tsconfig.json`'dagi `module` option'ga qarab transform qiladi:
 
 - `"module": "commonjs"` — `export class X {}` → `exports.X = X`, `import { X }` → `const { X } = require("...")`
-- `"module": "esnext"` — import/export syntax o'zgarishsiz qoladi, faqat type annotation lar o'chiriladi
+- `"module": "esnext"` — import/export syntax o'zgarishsiz qoladi, faqat type annotation'lar o'chiriladi
 
-`export interface User {}` va `export type UserRole = ...` **to'liq o'chadi** — ular JS output da hech qanday iz qoldirmaydi chunki interface va type alias faqat compile-time construct.
+`export interface User {}` va `export type UserRole = ...` **to'liq o'chadi** — ular JS output'da hech qanday iz qoldirmaydi chunki interface va type alias faqat compile-time construct.
 
-Kompilator har bir fayl uchun **dependency graph** quradi — `import` statement lar orqali qaysi fayl qaysi faylga bog'liqligini aniqlaydi. Bu `tsc --build` va incremental compilation da ishlatiladi — faqat o'zgargan fayl va uning dependent lari qayta compile qilinadi.
+Kompilator har bir fayl uchun **dependency graph** quradi — `import` statement'lar orqali qaysi fayl qaysi faylga bog'liqligini aniqlaydi. Bu `tsc --build` va incremental compilation'da ishlatiladi — faqat o'zgargan fayl va uning dependent'lari qayta compile qilinadi.
 
 </details>
 
@@ -138,19 +138,19 @@ const service = new services_1.UserService();
 
 ### Nazariya
 
-TypeScript 3.8 da qo'shilgan `import type` va `export type` — **faqat type-level** import/export. Bu statement lar JS ga compile qilinganda **to'liq o'chiriladi**. Runtime da hech qanday iz qolmaydi.
+TypeScript 3.8'da qo'shilgan `import type` va `export type` — **faqat type-level** import/export. Bu statement'lar JS'ga compile qilinganda **to'liq o'chiriladi**. Runtime'da hech qanday iz qolmaydi.
 
 Bu nima uchun kerak:
 
-1. **Bundle size** — faqat type uchun import qilsangiz, bundler shu import ni o'chirishi kerak. `import type` bilan bu aniq belgilanadi.
-2. **Circular dependencies** — `import type` runtime da mavjud emas → circular dependency "uziladi".
-3. **Side effects** — ba'zi module lar import qilinganda side effect ishlaydi. `import type` bilan side effect **ishlamaydi**.
-4. **Aniqlik** — kodda type va value import lari ajratilganda, o'quvchi uchun nima runtime da mavjud ekanini darhol ko'rish mumkin.
+1. **Bundle size** — faqat type uchun import qilsangiz, bundler shu import'ni o'chirishi kerak. `import type` bilan bu aniq belgilanadi.
+2. **Circular dependencies** — `import type` runtime'da mavjud emas → circular dependency "uziladi".
+3. **Side effects** — ba'zi module'lar import qilinganda side effect ishlaydi. `import type` bilan side effect **ishlamaydi**.
+4. **Aniqlik** — kodda type va value import'lari ajratilganda, o'quvchi uchun nima runtime'da mavjud ekanini darhol ko'rish mumkin.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator `import type` ni ko'rganda — emit bosqichida bu statement ni **to'liq skip** qiladi. Oddiy `import` da esa kompilator o'zi aniqlashga harakat qiladi — agar import qilingan nom faqat type pozitsiyada ishlatilgan bo'lsa, emit qilmaydi. Lekin bu heuristic ba'zan noto'g'ri ishlaydi — ayniqsa re-export larda va circular dependency larda.
+Kompilator `import type`'ni ko'rganda — emit bosqichida bu statement'ni **to'liq skip** qiladi. Oddiy `import`'da esa kompilator o'zi aniqlashga harakat qiladi — agar import qilingan nom faqat type position'da ishlatilgan bo'lsa, emit qilmaydi. Lekin bu heuristic ba'zan noto'g'ri ishlaydi — ayniqsa re-export'larda va circular dependency'larda.
 
 ```
 TypeScript Compiler Pipeline:
@@ -182,10 +182,10 @@ export class UserService {
 ```typescript
 // app.ts — type-only import
 import type { User, UserRole } from "./types";
-// ✅ Faqat type uchun — JS da import bo'lmaydi
+// ✅ Faqat type uchun — JS'da import bo'lmaydi
 
 import { UserService } from "./types";
-// ✅ Runtime da kerak — JS da import qoladi
+// ✅ Runtime'da kerak — JS'da import qoladi
 
 const service = new UserService();
 const users: User[] = service.getAll();
@@ -194,7 +194,7 @@ const users: User[] = service.getAll();
 ```typescript
 // re-export
 export type { User, UserRole } from "./types";
-// ✅ Faqat type re-export — JS da hech narsa
+// ✅ Faqat type re-export — JS'da hech narsa
 ```
 
 **`import type` bilan cheklovlar:**
@@ -202,11 +202,11 @@ export type { User, UserRole } from "./types";
 ```typescript
 import type { UserService } from "./types";
 
-// ❌ Error — import type bilan runtime da ishlatish mumkin emas
+// ❌ Error — import type bilan runtime'da ishlatish mumkin emas
 const service = new UserService();
 // 'UserService' cannot be used as a value because it was imported using 'import type'
 
-// ✅ Faqat type position da ishlatish mumkin
+// ✅ Faqat type position'da ishlatish mumkin
 let user: UserService;                        // ✅ — type annotation
 function process(service: UserService): void {} // ✅ — parameter type
 type UserList = UserService[];                  // ✅ — array type
@@ -220,7 +220,7 @@ type UserList = UserService[];                  // ✅ — array type
 
 ### Nazariya
 
-TypeScript 4.5 da qo'shilgan **inline type import** — bitta `import` statement ichida ba'zi nomlarni `type` deb belgilash:
+TypeScript 4.5'da qo'shilgan **inline type import** — bitta `import` statement ichida ba'zi nomlarni `type` deb belgilash:
 
 ```typescript
 // Oldin — ikki alohida statement kerak edi
@@ -231,7 +231,7 @@ import { UserService } from "./types";
 import { type User, type UserRole, UserService } from "./types";
 ```
 
-Bu ancha qulayroq — bitta module dan bir nechta narsa import qilganda alohida-alohida statement yozish kerak emas.
+Bitta module'dan type va value aralash import qilinganda, alohida `import type` statement yozish o'rniga bitta statement ichida `type` keyword bilan har bir nomni belgilab ketiladi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -257,7 +257,7 @@ const total = items.reduce((sum, p) => sum + p.price, 0);
 const withTax = total * (1 + TAX_RATE);
 ```
 
-JS ga compile bo'lganda:
+JS'ga compile bo'lganda:
 
 ```javascript
 import { ProductService, TAX_RATE } from "./models";
@@ -277,16 +277,16 @@ const withTax = total * (1 + TAX_RATE);
 
 ### Nazariya
 
-TypeScript 5.0 da qo'shilgan `verbatimModuleSyntax` — module import/export ni boshqarishning **yangi standart** usuli. Bu option yoqilganda:
+TypeScript 5.0'da qo'shilgan `verbatimModuleSyntax` — module import/export'ni boshqarishning **yangi standart** usuli. Bu option yoqilganda:
 
 1. **`import type` majburiy** — agar import faqat type uchun ishlatilsa, `import type` yoki inline `type` yozish **shart**
 2. **Emit natijalari predictable** — kompilator hech qanday "guessing" qilmaydi
-3. **Eskisi o'rniga** — `importsNotUsedAsValues` va `preserveValueImports` option larini almashtiradi
+3. **Eskisi o'rniga** — `importsNotUsedAsValues` va `preserveValueImports` option'larini almashtiradi
 
 Bu nima uchun yaxshiroq:
-- **Aniqlik** — har bir import ning type yoki value ekanligi aniq ko'rinadi
+- **Aniqlik** — har bir import'ning type yoki value ekanligi aniq ko'rinadi
 - **Predictability** — kompilator emit natijasi hech qachon kutilmagan bo'lmaydi
-- **Bundler compatibility** — bundler lar (esbuild, SWC) faylni alohida transpile qilganda, type import larni aniq bilishi kerak
+- **Bundler compatibility** — bundler'lar (esbuild, SWC) faylni alohida transpile qilganda, type import'larni aniq bilishi kerak
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -311,7 +311,7 @@ import { type User, UserService } from "./types";
 // User — type (o'chiriladi), UserService — value (qoladi)
 ```
 
-`verbatimModuleSyntax` dan **oldin** kompilator heuristic ishlatardi — faqat type pozitsiyada ishlatilgan import larni avtomatik o'chirar edi. Bu ba'zan noto'g'ri natija berardi. Yangi approach da developer niyati source code da aniq ko'rinadi: `type` keyword bor → o'chiriladi, `type` keyword yo'q → JS ga qoladi.
+`verbatimModuleSyntax`'dan **oldin** kompilator heuristic ishlatardi — faqat type position'da ishlatilgan import'larni avtomatik o'chirar edi. Bu ba'zan noto'g'ri natija berardi. Yangi approach'da developer niyati source code'da aniq ko'rinadi: `type` keyword bor → o'chiriladi, `type` keyword yo'q → JS'ga qoladi.
 
 </details>
 
@@ -321,9 +321,9 @@ import { type User, UserService } from "./types";
 
 ### Nazariya
 
-Module resolution — kompilator `import` statement dagi module specifier ni **aniq fayl yo'liga** aylantirish jarayoni. `import { User } from "./user"` — `"./user"` qaysi faylga point qiladi?
+Module resolution — kompilator `import` statement'dagi module specifier'ni **aniq fayl yo'liga** aylantirish jarayoni. `import { User } from "./user"` — `"./user"` qaysi faylga point qiladi?
 
-TypeScript da bir nechta resolution strategiya bor:
+TypeScript'da bir nechta resolution strategiya bor:
 
 | Strategy | tsconfig value | Muhit | Xususiyat |
 |----------|---------------|-------|-----------|
@@ -352,13 +352,13 @@ Kompilator `import { X } from "specifier"` ko'rganda quyidagi jarayonni boshlayd
            + package.json "exports" field support
 ```
 
-**`"node16"` va `"bundler"` ning critical farqi:**
+**`"node16"` va `"bundler"`'ning critical farqi:**
 - `"node16"` — relative import uchun **extension majburiy** (`./user.js`)
 - `"bundler"` — extension-less (`./user`) ruxsat beriladi
-- Kompilator `.js` extension ni `.ts` ga map qiladi — `import "./user.js"` aslida `./user.ts` faylni topadi
+- Kompilator `.js` extension'ni `.ts`'ga map qiladi — `import "./user.js"` aslida `./user.ts` faylni topadi
 
 **`exports` field support:**
-`"node16"` va `"bundler"` da kompilator `package.json` dagi `exports` map ni parse qiladi va conditional export larni resolve qiladi. `"node"` strategiya `exports` ni butunlay skip qiladi.
+`"node16"` va `"bundler"`'da kompilator `package.json`'dagi `exports` map'ni parse qiladi va conditional export'larni resolve qiladi. `"node"` strategiya `exports`'ni butunlay skip qiladi.
 
 Resolution natijasi cache qilinadi — bir xil specifier ikkinchi marta resolve qilinmaydi.
 
@@ -385,7 +385,7 @@ import { User } from "./user"
 
 ```typescript
 import { User } from "./user.js";
-// Diqqat: .js kengaytma MAJBURIY (ESM da extension-less yo'q)
+// Diqqat: .js kengaytma MAJBURIY (ESM'da extension-less yo'q)
 // Kompilator .js → .ts mapping qiladi
 ```
 
@@ -424,15 +424,15 @@ import { User } from "./user";
 
 ### Nazariya
 
-`moduleDetection` — kompilatorga fayl module mi yoki script mi ekanini qanday aniqlashni aytadi:
+`moduleDetection` — kompilatorga fayl module'mi yoki script'mi ekanini qanday aniqlashni aytadi:
 
 | Qiymat | Xatti-harakat |
 |--------|--------------|
-| `"auto"` (default) | `import`/`export` bor → module. `package.json` da `"type": "module"` → module. Aks holda → script |
-| `"force"` | Barcha fayl lar module (hatto `import`/`export` yo'q bo'lsa ham) |
-| `"legacy"` | Faqat `import`/`export` bor bo'lsa module |
+| `"auto"` (default) | `import`/`export` bor → module. `module: "node16"`/`"nodenext"`'da `package.json`'da `"type": "module"` → module. `jsx: "react-jsx"`/`"react-jsxdev"`'da JSX fayl → module. Aks holda → script |
+| `"force"` | Barcha non-declaration fayllar module (hatto `import`/`export` yo'q bo'lsa ham) |
+| `"legacy"` | Faqat `import`/`export` bor bo'lsa module (TS 4.6 va undan oldingi xatti-harakat) |
 
-`"force"` — **tavsiya etiladi**. Bu global scope ifloslanishini oldini oladi va har bir fayl ni izolyatsiya qiladi.
+`"force"` — **tavsiya etiladi**. Bu global scope ifloslanishini oldini oladi va har bir faylni izolyatsiya qiladi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -443,7 +443,7 @@ const API_URL = "https://api.example.com";
 const TIMEOUT = 5000;
 ```
 
-- `"legacy"` bilan: bu fayl **script** — `API_URL` global scope da
+- `"legacy"` bilan: bu fayl **script** — `API_URL` global scope'da
 - `"force"` bilan: bu fayl **module** — o'zgaruvchilar izolyatsiyalangan
 
 ```json
@@ -463,9 +463,9 @@ const TIMEOUT = 5000;
 
 ### Nazariya
 
-`isolatedModules` — kompilatorga **fayl-bo'yicha transpilation** uchun cheklovlar qo'yadi. Bu option yoqilganda, har bir fayl **mustaqil ravishda** (boshqa fayl larning type ma'lumotisiz) transpile qilina olishi kerak.
+`isolatedModules` — kompilatorga **fayl-bo'yicha transpilation** uchun cheklovlar qo'yadi. Bu option yoqilganda, har bir fayl **mustaqil ravishda** (boshqa fayllarning type ma'lumotisiz) transpile qilina olishi kerak.
 
-Bu nima uchun kerak? Zamonaviy transpiler lar — **esbuild**, **SWC**, **Babel** — tezlik uchun har bir faylni **alohida** transpile qiladi. Ular type information ga ega emas — faqat syntax transformation qiladi.
+Bu nima uchun kerak? Zamonaviy transpiler'lar — **esbuild**, **SWC**, **Babel** — tezlik uchun har bir faylni **alohida** transpile qiladi. Ular type information'ga ega emas — faqat syntax transformation qiladi.
 
 **`isolatedModules` cheklovlari:**
 
@@ -482,7 +482,7 @@ Bu nima uchun kerak? Zamonaviy transpiler lar — **esbuild**, **SWC**, **Babel*
 ```typescript
 // ❌ Error — isolatedModules yoqilganda
 export { User } from "./types";
-// Transpiler bilmaydi User type mi yoki value mi
+// Transpiler bilmaydi User type'mi yoki value'mi
 
 // ✅ To'g'ri
 export type { User } from "./types";
@@ -518,9 +518,9 @@ export {}; // bo'sh export — faylni module qiladi
 
 ### Nazariya
 
-Path aliases — `tsconfig.json` dagi `paths` va `baseUrl` orqali import yo'llarini qisqartirish. `../../../../` o'rniga `@components/Button` kabi alias ishlatish mumkin.
+Path aliases — `tsconfig.json`'dagi `paths` va `baseUrl` orqali import yo'llarini qisqartirish. `../../../../` o'rniga `@components/Button` kabi alias ishlatish mumkin.
 
-**Muhim:** TypeScript `paths` ni **faqat type-checking** uchun ishlatadi — compile qilganda **almashtirilmaydi**. Runtime da resolve qilish uchun **bundler** (Webpack, Vite) yoki **runtime tool** (tsconfig-paths) kerak.
+**Muhim:** TypeScript `paths`'ni **faqat type-checking** uchun ishlatadi — compile qilganda **almashtirilmaydi**. Runtime'da resolve qilish uchun **bundler** (Webpack, Vite) yoki **runtime tool** (tsconfig-paths) kerak.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -550,7 +550,7 @@ import { Button } from "@components/Button";
 import { formatDate } from "@utils/date";
 ```
 
-**Vite konfiguratsiyasi** (alohida resolve ham kerak):
+**Vite configuration'i** (alohida resolve ham kerak):
 
 ```typescript
 // vite.config.ts
@@ -585,10 +585,10 @@ Bundler:    → src/components/Button.js ← Bundler resolve qiladi
 
 ### Nazariya
 
-Barrel export — bitta `index.ts` fayl orqali papka ichidagi barcha export larni bir joyga to'plash:
+Barrel export — bitta `index.ts` fayl orqali papka ichidagi barcha export'larni bir joyga to'plash:
 
 ```typescript
-// Oldin — har bir fayl dan alohida import
+// Oldin — har bir fayldan alohida import
 import { User } from "./models/user";
 import { Product } from "./models/product";
 
@@ -596,11 +596,11 @@ import { Product } from "./models/product";
 import { User, Product } from "./models";
 ```
 
-**Afzalliklari:** Toza import lar, refactoring oson.
+**Afzalliklari:** Toza import'lar, refactoring oson.
 
-**Muammolari:** Tree shaking buzilishi (bundler barrel ni to'liq load qilishi mumkin), circular dependency xavfi.
+**Muammolari:** Tree shaking buzilishi (bundler barrel'ni to'liq load qilishi mumkin), circular dependency xavfi.
 
-**Yechim:** Type-only barrel lar muammosiz — `export type` JS ga hech narsa emit qilmaydi.
+**Yechim:** Type-only barrel'lar muammosiz — `export type` JS'ga hech narsa emit qilmaydi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -615,7 +615,7 @@ export interface Product { id: number; title: string; price: number; }
 // models/index.ts — BARREL
 export type { User } from "./user";
 export type { Product } from "./product";
-// JS da hech narsa — tree shaking ta'sirlanmaydi
+// JS'da hech narsa — tree shaking ta'sirlanmaydi
 
 // Value barrel (ehtiyot bo'ling):
 export { UserService } from "./user-service";
@@ -627,12 +627,12 @@ export { ProductService } from "./product-service";
 ```typescript
 // ❌ Muammo — to'liq barrel import
 import { User } from "./models";
-// Bundler ./models/index.ts ni to'liq evaluate qilishi mumkin
+// Bundler ./models/index.ts'ni to'liq evaluate qilishi mumkin
 // product.ts ham load bo'ladi — kerak emas!
 
 // ✅ Type-only barrel — muammosiz
 export type { User } from "./user";
-// JS da hech narsa bo'lmaydi
+// JS'da hech narsa bo'lmaydi
 ```
 
 **Circular dependency xavfi:**
@@ -653,9 +653,9 @@ import { User } from "./index"; // ← barrel orqali
 
 ### Nazariya
 
-Ambient module — kompilatorga **type qo'shimchasiz module** haqida xabar berish. CSS, JSON, image fayllarni import qilganda kompilator ularning type ini bilmaydi. `declare module` bilan type berish mumkin.
+Ambient module — kompilatorga **type qo'shimchasiz module** haqida xabar berish. CSS, JSON, image fayllarni import qilganda kompilator ularning type'ini bilmaydi. `declare module` bilan type berish mumkin.
 
-`declare module` **hech qanday JS emit qilmaydi** — u faqat kompilatorga "bu module mavjud va type i shunday" deydi. Runtime da CSS/image import larni bundler handle qiladi.
+`declare module` **hech qanday JS emit qilmaydi** — u faqat kompilatorga "bu module mavjud va type'i shunday" deydi. Runtime'da CSS/image import'larni bundler handle qiladi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -709,16 +709,16 @@ declare module "some-untyped-library" {
 
 ### Nazariya
 
-Module augmentation — mavjud module ning type larini **kengaytirish** (yangi property, method qo'shish). Bu `declare module` bilan module ni qayta ochish orqali amalga oshadi. Original module kodi o'zgarmaydi — faqat type qo'shiladi.
+Module augmentation — mavjud module'ning type'larini **kengaytirish** (yangi property, method qo'shish). Bu `declare module` bilan module'ni qayta ochish orqali amalga oshadi. Original module kodi o'zgarmaydi — faqat type qo'shiladi.
 
-Bu [declaration merging](04-objects-interfaces.md) mexanizmiga asoslangan — bir xil nomli `interface` lar avtomatik birlashadi.
+Bu [declaration merging](04-objects-interfaces.md) mexanizmiga asoslangan — bir xil nomli `interface`'lar avtomatik birlashadi.
 
 **Muhim:** Module augmentation faqat **module** fayl ichida ishlaydi. Fayl module bo'lishi uchun `import` yoki `export` bo'lishi kerak.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-**Express — Request ga property qo'shish:**
+**Express — Request'ga property qo'shish:**
 
 ```typescript
 // types/express.d.ts
@@ -773,11 +773,11 @@ const port = process.env.PORT;          // ✅ type: string
 
 ### Nazariya
 
-Global augmentation — global scope ga yangi type yoki variable qo'shish. Module fayl ichida `declare global { ... }` bloki orqali amalga oshadi. Window object ga property qo'shish, global function declare qilish kabi holatlar uchun ishlatiladi.
+Global augmentation — global scope'ga yangi type yoki variable qo'shish. Module fayl ichida `declare global { ... }` bloki orqali amalga oshadi. Window object'ga property qo'shish, global function declare qilish kabi holatlar uchun ishlatiladi.
 
 **Muhim:** `declare global` faqat **module** fayl ichida ishlaydi. `export {}` — bo'sh export — faylni module qiladi.
 
-`declare global` faqat **type-level** declaration. JS da hech narsa qolmaydi — developer o'zi runtime da qiymat assign qilishi kerak.
+`declare global` faqat **type-level** declaration. JS'da hech narsa qolmaydi — developer o'zi runtime'da qiymat assign qilishi kerak.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -816,9 +816,9 @@ console.log(APP_NAME); // ✅ — global variable
 
 ### Nazariya
 
-Dynamic import — `import()` expression bilan runtime da module ni **lazy load** qilish. TypeScript bu expression ning return type ini avtomatik aniqlaydi — `Promise<typeof Module>`.
+Dynamic import — `import()` expression bilan runtime'da module'ni **lazy load** qilish. TypeScript bu expression'ning return type'ini avtomatik aniqlaydi — `Promise<typeof Module>`.
 
-Runtime da `import()` JS engine ning native dynamic import mexanizmi. Kompilator `module` target ga qarab emit qiladi — `"esnext"` da `import()` qoladi, `"commonjs"` da `require()` ga aylanishi mumkin.
+Runtime'da `import()` JS engine'ning native dynamic import mexanizmi. Kompilator `module` target'ga qarab emit qiladi — `"esnext"`'da `import()` qoladi, `"commonjs"`'da `require()`'ga aylanishi mumkin.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -853,7 +853,7 @@ async function getFormatter(locale: string) {
 **Type-only dynamic import — faqat type olish uchun:**
 
 ```typescript
-// Runtime da import bo'lmaydi
+// Runtime'da import bo'lmaydi
 type ChartModule = typeof import("./heavy-chart");
 type ChartType = import("./heavy-chart").HeavyChart;
 ```
@@ -866,9 +866,9 @@ type ChartType = import("./heavy-chart").HeavyChart;
 
 ### Nazariya
 
-Circular dependency — A moduli B ni import qiladi, B esa A ni import qiladi. Bu runtime da muammo yaratishi mumkin (undefined exports). **Lekin type-only import lar bilan circular dependency muammo bo'lmaydi** — chunki ular runtime da mavjud emas.
+Circular dependency — A moduli B ni import qiladi, B esa A ni import qiladi. Bu runtime'da muammo yaratishi mumkin (undefined exports). **Lekin type-only import'lar bilan circular dependency muammo bo'lmaydi** — chunki ular runtime'da mavjud emas.
 
-`import type` to'liq erase qilinadi — JS output da `require(...)` yoki `import ...` paydo bo'lmaydi. Runtime da module lar bir-birini import qilmaydi → circular dependency yo'qoladi.
+`import type` to'liq erase qilinadi — JS output'da `require(...)` yoki `import ...` paydo bo'lmaydi. Runtime'da module'lar bir-birini import qilmaydi → circular dependency yo'qoladi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -890,7 +890,7 @@ export class Post {
 ```typescript
 // ✅ Type-only import bilan — muammosiz
 // user.ts
-import type { Post } from "./post"; // ← runtime da yo'q
+import type { Post } from "./post"; // ← runtime'da yo'q
 export class User { posts: Post[] = []; }
 
 // post.ts
@@ -901,7 +901,7 @@ export class Post {
 }
 ```
 
-**Qoida:** Agar ikki module bir-biridan faqat **type** uchun import qilsa — `import type` circular dependency ni hal qiladi. Agar **value** ham kerak bo'lsa — type larni alohida fayl ga ajratish kerak.
+**Qoida:** Agar ikki module bir-biridan faqat **type** uchun import qilsa — `import type` circular dependency'ni hal qiladi. Agar **value** ham kerak bo'lsa — type'larni alohida faylga ajratish kerak.
 
 </details>
 
@@ -911,20 +911,20 @@ export class Post {
 
 ### Nazariya
 
-TypeScript 4.7 da qo'shilgan `.mts` va `.cts` kengaytmalari — fayl ning module formati ni **aniq** belgilash:
+TypeScript 4.7'da qo'shilgan `.mts` va `.cts` kengaytmalari — faylning module formati'ni **aniq** belgilash:
 
 | Kengaytma | Module formati | JS output | import syntax |
 |-----------|---------------|-----------|---------------|
-| `.ts` | `tsconfig.json` yoki `package.json` ga qarab | `.js` | `import` yoki `require` |
+| `.ts` | `tsconfig.json` yoki `package.json`'ga qarab | `.js` | `import` yoki `require` |
 | `.mts` | **Doim ESM** | `.mjs` | `import` |
 | `.cts` | **Doim CJS** | `.cjs` | `require()` |
 
 Bu kengaytmalar `module: "node16"` yoki `module: "nodenext"` bilan ishlaydi.
 
 Bu qachon kerak:
-- **Aralash project** — CJS va ESM fayllar bir project da
+- **Aralash project** — CJS va ESM fayllar bir project'da
 - **Library yaratish** — CJS va ESM uchun dual package
-- **Aniqlik** — fayl ning module formati fayl nomidan ko'rinadi
+- **Aniqlik** — faylning module formati fayl nomidan ko'rinadi
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -945,7 +945,7 @@ export function oldGreet(name: string): string {
 
 Kompilator `.mts` faylda CJS syntax (`require()`, `module.exports`) ko'rsa — error. `.cts` faylda ESM syntax (`import ... from`) ko'rsa — error. Bu fayl kengaytmasi va actual syntax mosligini enforced qiladi.
 
-Import resolution da ham ta'sir qiladi: `import "./utils.mjs"` ko'rganda kompilator `./utils.mts` faylni qidiradi.
+Import resolution'da ham ta'sir qiladi: `import "./utils.mjs"` ko'rganda kompilator `./utils.mts` faylni qidiradi.
 
 </details>
 
@@ -967,9 +967,9 @@ import { UserService } from "./services";
 type ServiceType = InstanceType<typeof UserService>; // ✅
 ```
 
-**Sabab:** `typeof X` syntax-jihatdan type pozitsiyada, lekin `X` o'zi value sifatida resolve qilinadi (qaysi runtime qiymat'ning type'ini olish kerakligini aniqlash uchun). `import type` bilan import qilingan nom **har qanday value position'da** — shu jumladan `typeof` operand sifatida — ishlatib bo'lmaydi.
+**Sabab:** `typeof X` syntax-jihatdan type position'da, lekin `X` o'zi value sifatida resolve qilinadi (qaysi runtime qiymat'ning type'ini olish kerakligini aniqlash uchun). `import type` bilan import qilingan nom **har qanday value position'da** — shu jumladan `typeof` operand sifatida — ishlatib bo'lmaydi.
 
-### 2. `verbatimModuleSyntax` va side-effect import lar
+### 2. `verbatimModuleSyntax` va side-effect import'lar
 
 ```typescript
 // verbatimModuleSyntax: true
@@ -977,12 +977,12 @@ type ServiceType = InstanceType<typeof UserService>; // ✅
 import "./polyfill"; // ✅ — side-effect import, qoladi
 import "reflect-metadata"; // ✅ — side-effect import, qoladi
 
-// Bu import lar hech narsa import qilmaydi (specifier yo'q),
-// lekin module ni EXECUTE qiladi. verbatimModuleSyntax bu import larni
+// Bu import'lar hech narsa import qilmaydi (specifier yo'q),
+// lekin module'ni EXECUTE qiladi. verbatimModuleSyntax bu import'larni
 // o'chirmaydi — ular value import (type emas).
 ```
 
-### 3. `module: "node16"` da `.js` extension — `.ts` fayl uchun
+### 3. `module: "node16"`'da `.js` extension — `.ts` fayl uchun
 
 ```typescript
 // Source fayl: ./user.ts
@@ -1015,7 +1015,7 @@ declare module "express" {
 // mavjud Express modulidagi Request interface'iga merge bo'ladi ✅
 ```
 
-### 5. `const enum` cross-file inline — `isolatedModules` da ishlamaydi
+### 5. `const enum` cross-file inline — `isolatedModules`'da ishlamaydi
 
 ```typescript
 // constants.ts
@@ -1024,11 +1024,11 @@ export const enum Color { Red = 0, Green = 1, Blue = 2 }
 // app.ts (isolatedModules: true)
 import { Color } from "./constants";
 const c = Color.Red;
-// ❌ — transpiler constants.ts ni ko'rmaydi, inline qila olmaydi
+// ❌ — transpiler constants.ts'ni ko'rmaydi, inline qila olmaydi
 
 // tsc (isolatedModules: false) bilan:
 // const c = 0; ← inline replace ✅
-// esbuild/SWC bilan: ❌ — ular const enum ni tushunmaydi
+// esbuild/SWC bilan: ❌ — ular const enum'ni tushunmaydi
 ```
 
 ---
@@ -1043,9 +1043,9 @@ const service = new UserService();
 // ❌ Error: 'UserService' cannot be used as a value
 ```
 
-**Nima uchun:** `import type` — faqat type position da. `new`, variable assignment, `typeof` (value position) — runtime operatsiyalar.
+**Nima uchun:** `import type` — faqat type position'da. `new`, variable assignment, `typeof` (value position) — runtime operatsiyalar.
 
-### ❌ Xato 2: Path aliases bundler da resolve qilmaslik
+### ❌ Xato 2: Path aliases bundler'da resolve qilmaslik
 
 ```json
 { "compilerOptions": { "paths": { "@/*": ["src/*"] } } }
@@ -1057,9 +1057,9 @@ import { Button } from "@/components/Button";
 // Runtime — ❌ Module not found
 ```
 
-**Nima uchun:** `paths` faqat type-checking uchun. Bundler (Vite, Webpack) yoki runtime tool alohida konfiguratsiya kerak.
+**Nima uchun:** `paths` faqat type-checking uchun. Bundler (Vite, Webpack) yoki runtime tool alohida configuration kerak.
 
-### ❌ Xato 3: `node16`/`nodenext` da extension-less import
+### ❌ Xato 3: `node16`/`nodenext`'da extension-less import
 
 ```typescript
 // moduleResolution: "node16"
@@ -1069,21 +1069,21 @@ import { User } from "./user";
 import { User } from "./user.js"; // ✅
 ```
 
-**Nima uchun:** Node.js ESM da import specifier to'liq fayl yo'li bo'lishi kerak. `.js` yoziladi chunki compile natijasi `.js`.
+**Nima uchun:** Node.js ESM'da import specifier to'liq fayl yo'li bo'lishi kerak. `.js` yoziladi chunki compile natijasi `.js`.
 
-### ❌ Xato 4: `const enum` ni `isolatedModules` bilan ishlatish
+### ❌ Xato 4: `const enum`'ni `isolatedModules` bilan ishlatish
 
 ```typescript
 export const enum Color { Red, Green, Blue }
-// ❌ — isolatedModules da cross-file inline mumkin emas
+// ❌ — isolatedModules'da cross-file inline mumkin emas
 
 export enum Color { Red, Green, Blue } // ✅ oddiy enum
 export type Color = "red" | "green" | "blue"; // ✅ union type
 ```
 
-**Nima uchun:** `const enum` inline replace uchun boshqa fayl ma'lumoti kerak — `isolatedModules` da bu mavjud emas.
+**Nima uchun:** `const enum` inline replace uchun boshqa fayl ma'lumoti kerak — `isolatedModules`'da bu mavjud emas.
 
-### ❌ Xato 5: Module augmentation da `import` ni unutish
+### ❌ Xato 5: Module augmentation'da `import`'ni unutish
 
 ```typescript
 // ❌ import yo'q — fayl script kontekstida, declare module ambient
@@ -1100,7 +1100,7 @@ declare module "express" {
 }
 ```
 
-**Nima uchun:** Script faylda `declare module "X"` — ambient module declaration (mavjud module bilan birlashmaydi, alohida declaration sifatida ko'riladi va kutilgan augmentation samarasiz qoladi). Module faylda esa — module augmentation (interface declaration merging tufayli mavjud `Request` ga property qo'shiladi). `import` yoki top-level `export` faylni module kontekstiga o'tkazadi.
+**Nima uchun:** Script faylda `declare module "X"` — ambient module declaration (mavjud module bilan birlashmaydi, alohida declaration sifatida ko'riladi va kutilgan augmentation samarasiz qoladi). Module faylda esa — module augmentation (interface declaration merging tufayli mavjud `Request`'ga property qo'shiladi). `import` yoki top-level `export` faylni module kontekstiga o'tkazadi.
 
 ---
 
@@ -1108,7 +1108,7 @@ declare module "express" {
 
 ### Mashq 1: Type-only Barrel (Oson)
 
-**Savol:** Quyidagi type larni barrel export qiling. `verbatimModuleSyntax: true` da ishlashi kerak.
+**Savol:** Quyidagi type'larni barrel export qiling. `verbatimModuleSyntax: true`'da ishlashi kerak.
 
 ```typescript
 // models/user.ts
@@ -1130,7 +1130,7 @@ export type { Product } from "./product";
 export type { Order } from "./order";
 ```
 
-**Tushuntirish:** `export type` — type-only re-export. `verbatimModuleSyntax` da barcha type re-export lari `export type` bo'lishi shart. JS output da hech narsa bo'lmaydi.
+**Tushuntirish:** `export type` — type-only re-export. `verbatimModuleSyntax`'da barcha type re-export'lari `export type` bo'lishi shart. JS output'da hech narsa bo'lmaydi.
 
 </details>
 
@@ -1138,7 +1138,7 @@ export type { Order } from "./order";
 
 ### Mashq 2: Express Augmentation (O'rta)
 
-**Savol:** Express `Request` ga `user`, `requestId`, `startTime` property larini qo'shing.
+**Savol:** Express `Request`'ga `user`, `requestId`, `startTime` property'larini qo'shing.
 
 <details>
 <summary>Javob</summary>
@@ -1156,7 +1156,7 @@ declare module "express-serve-static-core" {
 }
 ```
 
-**Tushuntirish:** `import "express"` faylni module qiladi → `declare module` augmentation bo'ladi. Interface declaration merging tufayli yangi property lar mavjud `Request` ga qo'shiladi.
+**Tushuntirish:** `import "express"` faylni module qiladi → `declare module` augmentation bo'ladi. Interface declaration merging tufayli yangi property'lar mavjud `Request`'ga qo'shiladi.
 
 </details>
 
@@ -1164,7 +1164,7 @@ declare module "express-serve-static-core" {
 
 ### Mashq 3: Circular Dependency Fix (O'rta)
 
-**Savol:** Quyidagi circular dependency ni hal qiling:
+**Savol:** Quyidagi circular dependency'ni hal qiling:
 
 ```typescript
 // user.ts
@@ -1192,7 +1192,7 @@ export class Post {
 }
 ```
 
-**Tushuntirish:** `import type` runtime da mavjud emas — circular dependency "uziladi". Agar runtime da ham kerak bo'lsa — type larni alohida `types.ts` faylga ajratish kerak.
+**Tushuntirish:** `import type` runtime'da mavjud emas — circular dependency "uziladi". Agar runtime'da ham kerak bo'lsa — type'larni alohida `types.ts` faylga ajratish kerak.
 
 </details>
 
@@ -1230,15 +1230,15 @@ declare module "image-optimizer" {
 }
 ```
 
-**Tushuntirish:** `declare module` — ambient module declaration. Ichidagi barcha construct lar faqat type-level — runtime da mavjud emas.
+**Tushuntirish:** `declare module` — ambient module declaration. Ichidagi barcha construct'lar faqat type-level — runtime'da mavjud emas.
 
 </details>
 
 ---
 
-### Mashq 5: `tsconfig.json` Konfiguratsiyasi (Qiyin)
+### Mashq 5: `tsconfig.json` Configuration'i (Qiyin)
 
-**Savol:** Vite + React loyihasi uchun module-related `tsconfig.json` konfiguratsiyasini yozing. Talablar: `verbatimModuleSyntax`, `isolatedModules`, bundler resolution, `@/` alias, `force` module detection.
+**Savol:** Vite + React loyihasi uchun module-related `tsconfig.json` configuration'ini yozing. Talablar: `verbatimModuleSyntax`, `isolatedModules`, bundler resolution, `@/` alias, `force` module detection.
 
 <details>
 <summary>Javob</summary>
@@ -1270,7 +1270,7 @@ declare module "image-optimizer" {
 - `moduleDetection: "force"` — barcha fayllar module
 - `verbatimModuleSyntax: true` — `import type` majburiy, predictable emit
 - `isolatedModules: true` — esbuild/SWC compatible
-- `paths` — alias (Vite config da ham `resolve.alias` kerak)
+- `paths` — alias (Vite config'da ham `resolve.alias` kerak)
 
 </details>
 
@@ -1278,11 +1278,11 @@ declare module "image-optimizer" {
 
 ## Xulosa
 
-Bu bo'limda TypeScript ning module system iga xos tushunchalar o'rganildi:
+Bu bo'limda TypeScript'ning module system'iga xos tushunchalar o'rganildi:
 
 **Type-only imports:**
-- **`import type`** (TS 3.8+) — faqat type uchun, JS da o'chiriladi
-- **Inline `type`** (TS 4.5+) — `import { type User, Service }` — bitta statement da aralash
+- **`import type`** (TS 3.8+) — faqat type uchun, JS'da o'chiriladi
+- **Inline `type`** (TS 4.5+) — `import { type User, Service }` — bitta statement'da aralash
 - **`verbatimModuleSyntax`** (TS 5.0+) — yangi standart, predictable emit
 
 **Module resolution:**
@@ -1290,19 +1290,19 @@ Bu bo'limda TypeScript ning module system iga xos tushunchalar o'rganildi:
 - **`"node16"`/`"nodenext"`** — zamonaviy Node.js ESM, `.js` extension kerak
 - **`"bundler"`** (TS 5.0+) — Vite/Webpack muhiti, extension-less
 
-**Konfiguratsiya:**
+**Configuration:**
 - **`moduleDetection: "force"`** — barcha fayllar module (tavsiya)
 - **`isolatedModules: true`** — fayl-bo'yicha transpilation (esbuild, SWC, Vite uchun)
-- **Path aliases** — `paths` + bundler konfiguratsiyasi
+- **Path aliases** — `paths` + bundler configuration'i
 
 **Module boshqaruv:**
 - **Barrel exports** — `index.ts` orqali export to'plash. Type-only barrel muammosiz
-- **Ambient modules** — `declare module "*.css"` — type qo'shimchasiz fayl lar uchun
-- **Module augmentation** — mavjud module type larini kengaytirish (`import` kerak!)
-- **Global augmentation** — `declare global` — global scope ga type qo'shish
+- **Ambient modules** — `declare module "*.css"` — type qo'shimchasiz fayllar uchun
+- **Module augmentation** — mavjud module type'larini kengaytirish (`import` kerak!)
+- **Global augmentation** — `declare global` — global scope'ga type qo'shish
 - **Dynamic imports** — `await import("./module")` — lazy loading, type-safe
 - **Circular deps** — `import type` bilan hal qilish
-- **`.mts`/`.cts`** (TS 4.7+) — ESM/CJS ni fayl darajasida aniq belgilash
+- **`.mts`/`.cts`** (TS 4.7+) — ESM/CJS'ni fayl darajasida aniq belgilash
 
 **Bog'liq bo'limlar:**
 - [JS: Modules](../js/15-modules.md) — JavaScript module asoslari

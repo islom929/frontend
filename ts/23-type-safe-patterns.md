@@ -1,6 +1,6 @@
 # Bo'lim 23: Type-Safe Patterns
 
-> Type-safe patterns — TypeScript ning type system ini to'liq ishlatib, **compile-time** da xatolarni ushlaydigan arxitektura pattern lar. Bu bo'limda branded/opaque types (nominal typing), exhaustive pattern matching, `const` assertions, type-safe builder va event emitter, runtime validation library lar (Zod, Valibot, io-ts, ArkType), va Result type orqali error handling o'rganiladi.
+> Type-safe patterns — TypeScript ning type system ini to'liq ishlatib, **compile-time** da xatolarni ushlaydigan architecture pattern'lar. Bu bo'limda branded/opaque types (nominal typing), exhaustive pattern matching, `const` assertions, type-safe builder va event emitter, runtime validation library lar (Zod, Valibot, io-ts, ArkType), va Result type orqali error handling o'rganiladi.
 
 ---
 
@@ -33,7 +33,7 @@ const postId: number = 42;
 getUser(postId); // ✅ TS, lekin SEMANTIK XATO
 ```
 
-Branded types — base type ga **fiziktan mavjud bo'lmagan** phantom property qo'shib, structural typing'ni "sindiradi". Natija: ikki struktural bir xil type kompile-time da farqlanadi (nominal typing).
+Branded types — base type'ga runtime'da mavjud bo'lmaydigan phantom property qo'shib, structural typing'ni buzadi. Natija: structural jihatdan bir xil ikki type compile-time'da farqlanadi (nominal typing).
 
 **QANDAY ISHLAYDI:**
 
@@ -82,7 +82,7 @@ declare const userIdBrand: unique symbol;
 type UserId = number & { readonly [userIdBrand]: void };
 ```
 
-`unique symbol` — har deklaratsiya alohida unique type yaratadi. `userIdBrand` faqat shu module'da expose, boshqa module'da `__brand: "UserId"` literal yaratib bypass qilib bo'lmaydi.
+`unique symbol` — har declaration alohida unique type yaratadi. `userIdBrand` faqat shu module'da expose, boshqa module'da `__brand: "UserId"` literal yaratib bypass qilib bo'lmaydi.
 
 **Runtime cost:** **NOL** — branded types pure compile-time. Emit'da `as UserId` olib tashlanadi, raqam shunchaki raqam bo'lib qoladi. Hech qanday runtime overhead.
 
@@ -94,7 +94,7 @@ const id = createUserId(42);
 const id = createUserId(42);  // ↑ assertion olib tashlandi, function call qoldi
 ```
 
-**`Brand` vs Opaque types:** "Opaque" termin bu pattern uchun ham ishlatiladi (boshqa tilllardan kelgan — Flow, Haskell newtype). TS'da `Brand` va `Opaque` synonyms — implementation bir xil.
+**`Brand` vs Opaque types:** "Opaque" termin bu pattern uchun ham ishlatiladi (boshqa til'lardan kelgan — Flow, Haskell newtype). TS'da `Brand` va `Opaque` synonyms — implementation bir xil.
 
 **Arithmetic problem:** Branded number'lar arithmetic operation'larda brand'ni **yo'qotadi**:
 
@@ -103,7 +103,7 @@ const price: USD = createUSD(10);
 const doubled = price * 2;  // doubled: number (USD emas!)
 ```
 
-Sabab: `*`, `+`, `-`, `/` operator'larining return type'i `number`. Brand intersection emas. Yechim: `unsafeMultiply` kabi explicit function'lar yozish yoki brand'ni qayta tasdiqlash (`(price * 2) as USD`).
+Sabab: `*`, `+`, `-`, `/` operator'larining return type'i `number`. Brand intersection emas. Yechim: explicit `unsafeMultiply` function yozish yoki brand'ni qayta tasdiqlash (`(price * 2) as USD`).
 
 </details>
 
@@ -166,9 +166,9 @@ type ZodUserId = z.infer<typeof UserIdSchema>;
 
 ### Nazariya
 
-Exhaustive matching — discriminated union'ning **barcha variant'larini** kompile-time da handle qilganingizni kafolatlash. Yangi variant qo'shilganda kompilator handle qilinmagan joylar bo'yicha error chiqaradi — runtime'gacha kechiktirilmaydi.
+Exhaustive matching — discriminated union'ning **barcha variant'larini** compile-time da handle qilganingizni kafolatlash. Yangi variant qo'shilganda compiler handle qilinmagan joylar bo'yicha error chiqaradi — runtime'gacha kechiktirilmaydi.
 
-**NIMA UCHUN:** Discriminated union'da `switch` ishlatganda yangi case qo'shsangiz, kompilator buni o'z-o'zidan ushlamaydi:
+**NIMA UCHUN:** Discriminated union'da `switch` ishlatganda yangi case qo'shsangiz, compiler buni o'z-o'zidan ushlamaydi:
 
 ```typescript
 type Status = "active" | "inactive";
@@ -182,7 +182,7 @@ function label(s: Status): string {
 // label("suspended") → return undefined (silent bug)
 ```
 
-Exhaustive check — `default` case'da `assertNever` ishlatib, kompilator'ni "barcha case handle qilingan" deb tasdiqlashga majbur qilamiz.
+Exhaustive check — `default` case'da `assertNever` ishlatib, compiler'ni "barcha case handle qilingan" deb tasdiqlashga majbur qilamiz.
 
 **QANDAY ISHLAYDI — `never` mexanizmi:**
 
@@ -218,7 +218,7 @@ Bu pattern compile-time exhaustiveness garantee beradi — runtime testlar shart
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Control flow analysis va narrowing:** TS kompilator har `case` blokdan keyin discriminant property'ni narrow qiladi (CFA — Control Flow Analysis). Discriminant — union'dagi barcha member'lar ulashadigan literal property (odatda `kind`, `type`, `tag`).
+**Control flow analysis va narrowing:** TS compiler har `case` blokdan keyin discriminant property'ni narrow qiladi (CFA — Control Flow Analysis). Discriminant — union'dagi barcha member'lar ulashadigan literal property (odatda `kind`, `type`, `tag`).
 
 ```typescript
 type Shape =
@@ -234,7 +234,7 @@ if (shape.kind === "circle") {
 
 **Bottom type `never` semantics:** TS type system'da `never` — bo'sh set (no values). Universal subtype — har type'ga assignable, lekin hech qanday qiymat `never` ga assign qilib bo'lmaydi (faqat `never` o'zi). Bu xususiyat exhaustiveness uchun ideal:
 - `assertNever(x: never)` — `x` ga faqat exhaustive narrowed branch'dan kelishi mumkin
-- Agar variant qoldirilsa, `x` aslida narrowed type bo'ladi → kompilator error
+- Agar variant qoldirilsa, `x` aslida narrowed type bo'ladi → compiler error
 
 **Record map vs Switch trade-off:**
 
@@ -330,7 +330,7 @@ const routes = { home: "/", about: "/about" } as const satisfies Record<string, 
 
 `as Record<string, string>` ishlatsa, type'ni widen qiladi (literal'lar yo'qoladi). `satisfies` esa **faqat tekshiradi**, type'ni o'zgartirmaydi.
 
-**`const` type parameter (TS 5.0+):** Generic function'larda parameter'ga `const` modifier qo'shsa, kompilator argument'ni avtomatik `as const` deb infer qiladi:
+**`const` type parameter (TS 5.0+):** Generic function'larda parameter'ga `const` modifier qo'shsa, compiler argument'ni avtomatik `as const` deb infer qiladi:
 
 ```typescript
 function pick<const T extends readonly string[]>(arr: T): T[number] {
@@ -353,7 +353,7 @@ const arr = [1, 2];     // arr: number[] (object literal widened)
 const arr2 = [1, 2] as const; // arr2: readonly [1, 2] (narrowed)
 ```
 
-Reason: `const arr = [1, 2]; arr.push(3)` legal — kompilator default'da mutation expect qiladi.
+Reason: `const arr = [1, 2]; arr.push(3)` legal — compiler default'da mutation expect qiladi.
 
 **`as const` semantics:**
 - Primitive literal → literal type (`"x"` → `"x"`, `42` → `42`)
@@ -366,8 +366,7 @@ Reason: `const arr = [1, 2]; arr.push(3)` legal — kompilator default'da mutati
 ```typescript
 // enum
 enum Status { Active = "active", Inactive = "inactive" }
-// Emit: function-based runtime object
-// TS-only — JS source'ga compile bo'lmaydi (verbatimModuleSyntax bilan ban)
+// Emit: IIFE asosidagi runtime object (erasable emas — JS kod generate qiladi)
 
 // as const alternative
 const Status = { Active: "active", Inactive: "inactive" } as const;
@@ -377,9 +376,9 @@ type Status = (typeof Status)[keyof typeof Status];  // "active" | "inactive"
 ```
 
 `as const` afzal:
-- Bundle size kichikroq (runtime helper yo'q)
+- Bundle size kichikroq (enum IIFE wrapper yo'q)
 - Tree-shaking yaxshi (har property ajratiladi)
-- `verbatimModuleSyntax` bilan compatible
+- Type-only emit constraint'lar bilan moslashadi — enum runtime kod generate qiladi, shu sababli `--erasableSyntaxOnly` (TS 5.8+) uni rad etadi; `as const` esa pure value
 - `Status["Active"]` value `"active"` (string), enum'da numeric/string mixed bo'lishi mumkin (kutilmagan)
 
 **`satisfies` bilan use case'lar:**
@@ -451,7 +450,7 @@ const config = new DbBuilder()
   .build(); // runtime: throw "port required"
 ```
 
-Type-safe builder kompile-time'da bu xatoni ushlaydi — `.build()` faqat barcha required field'lar set bo'lganda chaqirilishi mumkin.
+Type-safe builder compile-time'da bu xatoni ushlaydi — `.build()` faqat barcha required field'lar set bo'lganda chaqirilishi mumkin.
 
 **Ikki yondashuv:**
 
@@ -527,7 +526,7 @@ build(
 
 TS'da `this` parameter'i — method chaqiruvchi `this` type'iga constraint. `RequiredKeys<T> extends Provided` — conditional type:
 - Required'lar berildi → `this: Builder<T, Provided>` (method chaqirish mumkin)
-- Yetishmadi → `this: never` (method chaqirish mumkin emas, kompilator error)
+- Yetishmadi → `this: never` (method chaqirish mumkin emas, compiler error)
 
 ```typescript
 new Builder<DbConfig>()
@@ -536,10 +535,11 @@ new Builder<DbConfig>()
 // Provided: "host"
 // RequiredKeys<DbConfig>: "host" | "port" | "database"
 // "host" | "port" | "database" extends "host"? → ❌ false
-// this: never → "Property 'build' is not callable"
+// this type: never → "The 'this' context of type 'TypeSafeBuilder<DbConfig, "host">'
+//                     is not assignable to method's 'this' of type 'never'"
 ```
 
-**Runtime cost:** Yo'q — barcha generic constraint'lar kompile-time. Build'da TypeSafeBuilder oddiy class sifatida emit qilinadi. Data accumulation `data: Partial<T>` orqali — runtime ishlash standart.
+**Runtime cost:** Yo'q — barcha generic constraint'lar compile-time. Build'da TypeSafeBuilder oddiy class sifatida emit qilinadi. Data accumulation `data: Partial<T>` orqali — runtime ishlash standart.
 
 **Trade-off:** Phantom type builder TS magic ko'p (mapped type, conditional `this`, type assertion'lar `as unknown as`). Library API sifatida yaxshi (consumer murakkablikni ko'rmaydi), application kod uchun step builder yoki Zod schema tezroq.
 
@@ -595,7 +595,7 @@ const cfg = new TypeSafeBuilder<DbConfig>()
 
 ### Nazariya
 
-Type-safe event emitter — event nomi va payload kompile-time'da tekshiriladigan publisher/subscriber pattern. Klassik `EventEmitter` (Node.js core) string event name va `any[]` payload bilan ishlaydi — type safety yo'q. Generic event map bu kamchilikni hal qiladi.
+Type-safe event emitter — event nomi va payload compile-time'da tekshiriladigan publisher/subscriber pattern. Klassik `EventEmitter` (Node.js core) string event name va `any[]` payload bilan ishlaydi — type safety yo'q. Generic event map bu kamchilikni hal qiladi.
 
 **NIMA UCHUN:** Klassik Node `EventEmitter`:
 
@@ -647,7 +647,7 @@ emitter.on("userLoggedIn", fn);
 //                       ↑ listener type: T["userLoggedIn"] = (userId: string, ts: Date) => void
 ```
 
-`K extends keyof T` — K'ni event nomlari union'iga cheklaydi. `T[K]` — indexed access type, kompilator K'ni narrow'lab listener signature'ini topadi.
+`K extends keyof T` — K'ni event nomlari union'iga cheklaydi. `T[K]` — indexed access type, compiler K'ni narrow'lab listener signature'ini topadi.
 
 **`Parameters<T[K]>` utility:** Built-in utility — function type'dan parameter tuple'ni chiqaradi:
 
@@ -684,8 +684,9 @@ class TypedEmitter<T extends EventMap> {
   private listeners = new Map<keyof T, Set<(...args: any[]) => void>>();
 
   on<K extends keyof T>(event: K, listener: T[K]): this {
-    if (!this.listeners.has(event)) this.listeners.set(event, new Set());
-    this.listeners.get(event)!.add(listener);
+    const set = this.listeners.get(event) ?? new Set<(...args: any[]) => void>();
+    set.add(listener);
+    this.listeners.set(event, set);
     return this;
   }
 
@@ -724,7 +725,7 @@ emitter.emit("userLoggedIn", "user-1", new Date()); // ✅
 
 ### Nazariya
 
-TypeScript type'lar **kompile-time-only** — emit'dan keyin yo'q. Runtime'da `JSON.parse`, `fetch`, `localStorage`, form input — barchasi `unknown`/`any` qaytaradi, TS bularning shape'ini kafolatlamaydi. **Runtime validation library'lar** schema'ni bir marta yozib, ham runtime validation ham compile-time type'ni undan chiqaradi (single source of truth).
+TypeScript type'lar **compile-time-only** — emit'dan keyin yo'q. Runtime'da `JSON.parse`, `fetch`, `localStorage`, form input — barchasi `unknown`/`any` qaytaradi, TS bularning shape'ini kafolatlamaydi. **Runtime validation library'lar** schema'ni bir marta yozib, ham runtime validation ham compile-time type'ni undan chiqaradi (single source of truth).
 
 **NIMA UCHUN:** Ko'p loyihalarda quyidagi anti-pattern:
 
@@ -737,7 +738,7 @@ user.name.toUpperCase(); // ❌ Agar API noto'g'ri shape qaytarsa, runtime'da cr
 Schema-based validation runtime'da to'g'ri tekshiradi va type'ni xavfsiz chiqaradi:
 
 ```typescript
-const UserSchema = z.object({ name: z.string(), email: z.string().email() });
+const UserSchema = z.object({ name: z.string(), email: z.email() });
 type User = z.infer<typeof UserSchema>;
 
 const user = UserSchema.parse(await response.json());
@@ -771,14 +772,14 @@ type User = z.infer<typeof UserSchema>;
 // { name: string; age: number }
 ```
 
-`z.object({...})` runtime'da `ZodObject` instance qaytaradi. Type darajasida `ZodObject<{ name: ZodString; age: ZodNumber }>` — generic parameter. `z.infer<T>` conditional type'lar zanjiri orqali generic parameter'dan "output type"'ni chiqaradi:
+`z.object({...})` runtime'da `ZodObject` instance qaytaradi. Type darajasida `ZodObject<{ name: ZodString; age: ZodNumber }>` — generic parameter. `z.infer<T>` indexed access type orqali schema'ning "output type"'ini o'qiydi:
 
 ```typescript
-type infer<T extends ZodType<any>> = T["_output"];
-// ZodObject ichida _output phantom property bor (compile-time-only)
+type infer<T extends ZodType> = T["_output"];
+// ZodType ichida _output phantom field bor (compile-time-only, runtime'da yo'q)
 ```
 
-Bu **type-level computation** — runtime'da hech narsa ishlamaydi, faqat TS compiler schema struct'ini "o'qib" type yaratadi.
+Bu **type-level computation** — runtime'da hech narsa ishlamaydi, faqat TS compiler schema'ning generic parameter'idan type yaratadi.
 
 **`safeParse` vs `parse`:**
 
@@ -800,7 +801,7 @@ if (result.success) {
 **Validation runtime overhead:** Har `parse()` chaqiruvi schema'ni traversal qiladi — har property tekshiriladi, regex match'lar bajariladi. Hot path'larda (har request'da) cost'lik. Yechim:
 - **Boundary validation** — faqat data'ning kirish nuqtasida (API response, form submit)
 - **Memoization** — bir xil schema bir xil data uchun cache
-- **Schema compilation** — Zod'da `z.optimizer` (experimental), Ajv da JSON Schema → compiled function
+- **Schema compilation** — Ajv JSON Schema'ni compiled validation function'ga aylantiradi (`new Function` orqali generated kod). Zod v4 ichki JIT (parse vaqtida schema'ni bir marta compiled function'ga aylantiradi); build-time AOT compilation uchun community tool'lar mavjud
 
 **TypeBox alternativa:** JSON Schema generate qiladigan library — Ajv (eng tez JSON validator) bilan ishlaydi. Performance-critical (API gateway, microservice) loyihalarda Zod'dan tezroq.
 
@@ -829,7 +830,7 @@ import { z } from "zod";
 
 const UserSchema = z.object({
   name: z.string().min(2),
-  email: z.string().email(),
+  email: z.email(),
   age: z.number().min(18),
   role: z.enum(["admin", "user"]),
 });
@@ -889,7 +890,7 @@ const result = User.decode(apiResponse);
 - **`catch (e)`** parameter'i `unknown` (TS 4.4+ strict) — har gal narrowing kerak
 - **Implicit control flow** — har function'da exception bubble up qilishi mumkin
 
-**Result type** — error'ni qiymat sifatida qaytarish (functional pattern). Caller error'ni explicit handle qilishga kompile-time'da majbur:
+**Result type** — error'ni qiymat sifatida qaytarish (functional pattern). Caller error'ni explicit handle qilishga compile-time'da majbur:
 
 ```typescript
 type Result<T, E = Error> = { ok: true; value: T } | { ok: false; error: E };
@@ -902,7 +903,7 @@ function getUser(id: number): Result<User, "NotFound" | "Unauthorized"> {
 }
 
 const r = getUser(42);
-// r.value;  // ❌ — kompilator narrowing talab qiladi
+// r.value;  // ❌ — compiler narrowing talab qiladi
 if (r.ok) r.value;  // ✅ User
 else r.error;       // ✅ "NotFound" | "Unauthorized"
 ```
@@ -948,13 +949,14 @@ function ok<T>(value: T): Result<T, never> { return { ok: true, value }; }
 function err<E>(error: E): Result<never, E> { return { ok: false, error }; }
 ```
 
-`Result<T, never>` — error rail bo'sh, faqat success. `Result<never, E>` — success rail bo'sh, faqat error. Union construction'da:
+`Result<T, never>` — error rail bo'sh, faqat success. `Result<never, E>` — success rail bo'sh, faqat error:
 
 ```typescript
-type T1 = Result<string, never>;  // { ok: true; value: string } | never
-type T2 = Result<string, Error>;  // success branch'i T1 bilan compatible
-// never qism union'dan tushib ketadi
+type T1 = Result<string, never>;
+// { ok: true; value: string } | { ok: false; error: never }
 ```
+
+`{ ok: false; error: never }` branch union'dan o'chmaydi — bu hali type sifatida turadi, lekin `error: never` tufayli unga qiymat yarata olmaysiz (uninhabitable branch). `ok()` har doim `{ ok: true; value: T }` qaytaradi, shuning uchun praktikada faqat success branch ishlatiladi va natija kengroq target'ga (masalan `Result<string, Error>`) muammosiz assignable bo'ladi.
 
 **`map` va `flatMap` semantics:**
 
@@ -964,7 +966,7 @@ function map<T, U, E>(r: Result<T, E>, fn: (v: T) => U): Result<U, E> {
 }
 ```
 
-`map` — success qiymatni transform qiladi, error o'tkazib yuboradi. `r` ning `r.ok === false` versiyasi `Result<never, E>` — bu `Result<U, E>` ga assignable (never universal subtype).
+`map` — success qiymatni transform qiladi, error o'tkazib yuboradi. `r.ok === false` branch'da `r` ning type'i `{ ok: false; error: E }` — bu branch `T`/`U` ga bog'liq emas, shuning uchun u to'g'ridan-to'g'ri `Result<U, E>` ning error branch'iga assignable.
 
 ```typescript
 function flatMap<T, U, E>(r: Result<T, E>, fn: (v: T) => Result<U, E>): Result<U, E> {
@@ -984,11 +986,11 @@ const r = flatMap(step1(), step2);
 // r: Result<string, "E1" | "E2">  ← error union
 ```
 
-Bu kuchli — har step o'z error type'ini deklaratsiya qiladi, pipeline barcha mumkin bo'lgan error'larni birlashtiradi.
+Bu kuchli — har step o'z error type'ini return type'ida e'lon qiladi, pipeline barcha mumkin bo'lgan error'larni birlashtiradi.
 
 **Production library — `neverthrow`:** Stable TS Result library. Async variant — `ResultAsync<T, E>` Promise'larni handle qiladi. `.match()`, `.unwrapOr()`, `.andThen()` (flatMap) — fluent API.
 
-**Performance comparison:** Result'da har step object allocation. `throw` da stack unwind. Modern V8'da har ikkalasi optimized — hot path'da Result biroz tezroq (predictable control flow), cold path'da bir xil. Microbenchmark'lar context-specific.
+**Performance comparison:** Result har step'da bitta object allocation qiladi; `throw` esa exception throw qilinganda stack unwinding talab qiladi (qaytariladigan qiymat yo'q, JS engine call stack'ni teskari yo'naltirib catch'gacha boradi). Aniq farq engine, throw chastotasi va kod shakliga bog'liq — universal "tezroq" da'vo yo'q. Tanlov performance emas, error semantikasiga asoslanishi kerak: expected error → Result, exceptional → throw.
 
 </details>
 
@@ -1087,8 +1089,8 @@ function toHex(color: Color): string {
     case "green": return "#00ff00";
     // "blue" UNUTILDI
     default: return assertNever(color);
-    // ❌ Compile error: 'string' is not assignable to 'never'
-    // Bu YAXSHI — xato compile-time da topildi
+    // ❌ Compile error: Argument of type '"blue"' is not assignable to parameter of type 'never'
+    // (default'da color "blue" ga narrow bo'ladi) — xato compile-time da topildi
   }
 }
 ```
@@ -1264,7 +1266,7 @@ import { z } from "zod";
 
 const RegisterSchema = z.object({
   name: z.string().min(2, "Name too short"),
-  email: z.string().email("Invalid email"),
+  email: z.email("Invalid email"),
   age: z.number().min(18, "Must be 18+"),
   role: z.enum(["admin", "user", "moderator"]),
 });
@@ -1301,7 +1303,19 @@ function match<T, E, U>(r: Result<T, E>, h: { ok: (v: T) => U; err: (e: E) => U 
   return r.ok ? h.ok(r.value) : h.err(r.error);
 }
 
-// Pipeline:
+type RawInput = { name: string; email: string; age: number };
+type User = { name: string; email: string; age: number };
+
+function validateInput(input: RawInput): Result<RawInput, string> {
+  return input.name.length >= 2 ? ok(input) : err("Name too short");
+}
+function validateEmail(input: RawInput): Result<RawInput, string> {
+  return input.email.includes("@") ? ok(input) : err("Invalid email");
+}
+function createUser(input: RawInput): Result<User, string> {
+  return input.age >= 18 ? ok(input) : err("Must be 18+");
+}
+
 const result = flatMap(
   flatMap(
     validateInput({ name: "Ali", email: "ali@test.com", age: 25 }),
@@ -1309,6 +1323,7 @@ const result = flatMap(
   ),
   createUser
 );
+// result: Result<User, string> — { ok: true, value: { name: "Ali", ... } }
 ```
 
 </details>

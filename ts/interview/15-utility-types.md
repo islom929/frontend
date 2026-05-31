@@ -413,7 +413,7 @@ type UserReturn = ReturnType<UserService["getUser"]>;
 ### Edge Cases
 
 - **Overload** — barcha signature'larni olish uchun manual extraction kerak (complex utility)
-- **Generic** — concrete type berib parametrize qilish kerak: `ReturnType<typeof identity<string>>` ishlamaydi, manual `string` o'tkazish kerak
+- **Generic** — TS 4.7+ instantiation expression bilan parametrize qilish mumkin: `ReturnType<typeof identity<string>>` → `string`. Bunday yozuvsiz (`ReturnType<typeof identity>`) type parameter `unknown`'ga instantiate bo'ladi
 - **Constructor** — `ReturnType` ishlamaydi, `InstanceType<typeof Class>` kerak
 - **Method'lar** — `T["methodName"]` bilan accessing, so'ng ReturnType
 
@@ -505,7 +505,7 @@ class Container {
 - **Abstract class** — `abstract new` constraint TS 4.2+'dan beri qo'llab-quvvatlanadi. Eski TS'da abstract class'da `ConstructorParameters` ishlamaydi
 - **Private constructor** — `private constructor` bo'lgan singleton'da ishlamaydi (constructor signature accessible emas)
 - **Overloaded constructor** — overloaded signature'larda — faqat oxirgi
-- **Generic class** — `class Repo<T>` — type parameter T noma'lum, manual instantiation kerak
+- **Generic class** — `class Repository<T>` — parametrlanmasa T `unknown`'ga instantiate bo'ladi; TS 4.7+ instantiation expression bilan `ConstructorParameters<typeof Repository<string>>` aniq tip beradi
 
 ### Follow-up savollar
 
@@ -588,7 +588,7 @@ type Data = AsyncResult<typeof fetchData>;
 
 ### Follow-up savollar
 
-1. **"Nima uchun nested Promise unwrap?"** — JS runtime semantics: `await Promise.resolve(Promise.resolve(42))` → `42` (chunks not nested resolution). Awaited shu behavior'ni type-level'da modellashtiradi.
+1. **"Nima uchun nested Promise unwrap?"** — JS runtime semantics: Promise boshqa thenable bilan resolve qilinsa, uning state'ini adopt qiladi (`Promise<Promise<T>>` runtime'da mavjud emas). `await Promise.resolve(Promise.resolve(42))` → `42`. `Awaited` shu flatten behavior'ni type-level'da modellashtiradi.
 2. **"`Awaited` bilan `Promise.all` qanday ishlaydi?"** — `Promise.all([p1, p2])` return type `Promise<[T1, T2]>`. `Awaited` tuple unwrap qiladi: `[T1, T2]`.
 
 </details>
@@ -680,10 +680,10 @@ type NoThisOmit = OmitThisParameter<typeof noThis>; // typeof noThis (no change)
 
 ### Edge Cases
 
-- Function'da `this` deklarasiyasi yo'q → `ThisParameterType` `unknown` qaytaradi
-- Arrow function — `this` bind qilolmaydi, `this` parametr deklarasiyasi xato
-- Class instance method'lari implicit `this` — `ThisParameterType` instance type'ni qaytaradi
-- Strict mode'da `noImplicitThis` flag — `this` deklarasiyasi majburiy
+- Function'da explicit `this` parametr yo'q → `ThisParameterType` `unknown` qaytaradi
+- Arrow function — `this` bind qilolmaydi, `this` parametr deklaratsiyasi xato
+- Class method'da implicit `this` (`this` parametr yozilmagan) function type'ga kirmaydi — `ThisParameterType` `unknown` qaytaradi, instance type'ni emas. Instance type'ni olish uchun method'da explicit `this: Calculator` yozish kerak
+- `noImplicitThis: true` flag — `this` annotatsiyasiz function body'da `this` ishlatish xato beradi (lekin method'da implicit `this` baribir instance type sifatida ishlaydi)
 
 ### Follow-up savollar
 
@@ -716,7 +716,7 @@ function describe(prefix) {
 declare function describe(this: User, prefix: string): string;
 
 const user: User = { name: "Ali", age: 25 };
-const wrongThis = { foo: "bar" };
+const wrongThis = { title: "admin" };
 
 describe.call(user, "Info");       // ✅ user assignable to User
 describe.call(wrongThis, "Info");  // ❌ wrongThis not assignable to User
@@ -819,7 +819,7 @@ OmitThisParameter<T>     = /* conditional + infer combination */;
 Awaited<T>               = /* recursive conditional + infer */;
 ```
 
-**3. Intrinsic** — compiler ichida (C++/Rust):
+**3. Intrinsic** — compiler ichida hardcode qilingan (`.d.ts` da `= intrinsic`, haqiqiy logika `checker.ts` ichida):
 
 ```typescript
 Uppercase<S>   = intrinsic;
@@ -868,7 +868,7 @@ type C = Capitalize<"hello">;  // "Hello"
 
 ### Follow-up savollar
 
-1. **"Nima uchun string manipulation type'lari intrinsic?"** — Performance — recursive template literal har character uchun rekursiya juda sekin. Compiler-level O(n) implementation.
+1. **"Nima uchun string manipulation type'lari intrinsic?"** — Pure type-level recursion har character uchun yangi conditional type instantiation hosil qiladi va recursion depth limit'ga tez uriladi. Intrinsic versiyada string transformatsiya compiler'ning string handling kodida to'g'ridan-to'g'ri bajariladi, hech qanday type instantiation yo'q.
 2. **"`NoInfer<T>` qanday ishlaydi?"** — Compiler inference candidate'larni yig'ayotganda shu pozitsiyani skip qiladi. Generic type inference manual cheklash uchun.
 
 </details>
@@ -991,7 +991,7 @@ type T6 = string | 0;
 ### To'liq tushuntirish
 
 - T1, T3 — oddiy union filter
-- T2 — Extract intersection-ga o'xshash, faqat ikkala union'da bo'lgan'lari
+- T2 — Extract T'ning U bilan assignable member'larini saqlaydi; literal union'larda bu ikkala union'da ham bor element'lar to'plamini beradi (`"b"`, `"c"` `"a"|"d"` da yo'q → never)
 - T4 — discriminated union variant extraction
 - T5 — Function tip'i call signature bor type'lar (function literal'larni qamrab oladi)
 - T6 — NonNullable faqat null/undefined ni olib tashlaydi, 0 va "" saqlanadi (falsy emas, nullish faqat)
@@ -1054,7 +1054,7 @@ type T5 = Repository<unknown>;
 
 ### Edge Cases
 
-- Generic class concrete type bilan instantiate qilish kerak: `ConstructorParameters<typeof Repository<string>>` ishlamaydi, manual `[name: string, items: string[]]` yozish kerak
+- Generic class concrete type bilan: TS 4.7+ instantiation expression — `ConstructorParameters<typeof Repository<string>>` → `[name: string, items: string[]]`. Bunday yozuvsiz `T` `unknown`'ga instantiate bo'ladi
 - Optional parametr labeled tuple'da `?` bilan
 - Async function'ning ReturnType har doim Promise — Awaited bilan unwrap
 
@@ -1288,7 +1288,7 @@ const created = await service.create({
 
 ### Follow-up savollar
 
-1. **"`Merge` deep variant qanday yoziladi?"** — Recursive — har nested key uchun, T va U'da bor bo'lsa rekursiv merge.
+1. **"`Merge` deep variant qanday yoziladi?"** — Recursive — har nested key uchun, T va U'da bor bo'lsa recursive merge.
 2. **"`Readonly<Omit<...>> & { ... }` — intersection mutable field qoldiradi mi?"** — Ha, intersection part alohida — readonly modifier qo'llanilmaydi.
 
 <details>
@@ -1331,12 +1331,10 @@ type Event =
 
 type WithoutType = Omit<Event, "type">;
 // ❌ Kutilgan: { x: number; y: number } | { delta: number }
-// ✅ Haqiqiy: { x: number; y: number } | { delta: number }
-// AMMO type'larning umumiy property bo'lmasa — kutilmagan natija
-
-type Bad = Omit<Event, "x">;
-// { type: "click"; y: number } | { type: "scroll"; delta: number }
-// "x" faqat bitta variant'da, lekin Omit umumiy bo'lib qoladi
+// ✅ Haqiqiy: {}
+// Sabab: Omit<T, K> = Pick<T, Exclude<keyof T, K>>. Union'da keyof faqat
+// UMUMIY key'larni beradi → keyof Event = "type". Exclude<"type", "type"> = never.
+// Pick<Event, never> = {} — barcha variant-specific property yo'qoladi.
 
 // Distributive version
 type DistributiveOmit<T, K extends keyof any> =
@@ -1464,7 +1462,7 @@ type AsyncMethods<T> = {
 - Method bo'lsa: key saqlanadi (`K`).
 - Field bo'lsa: `never` — key olib tashlanadi.
 
-`never` key mapped type'da yo'qoladi (xuddi union'dagi kabi). Bu native TS filtering mexanizmi — alohida `FilterMethods<T>` yozish kerak emas.
+`as` clause `never` qaytarsa, mapped type o'sha key'ni natija type'idan butunlay tashlab yuboradi. Bu native TS filtering mexanizmi — alohida `FilterMethods<T>` yozish kerak emas.
 
 **`Awaited` bilan double-wrap oldini olish**
 
@@ -1506,17 +1504,17 @@ type AsyncRepo = {
 **`keyof T` private/protected behavior**
 
 ```typescript
-class Service {
-  public foo() {}
-  private bar() {}
-  protected baz() {}
+class UserService {
+  public getUser() {}
+  private validate() {}
+  protected normalize() {}
 }
 
-type Keys = keyof Service;
-// "foo" — faqat public
+type Keys = keyof UserService;
+// "getUser" — faqat public
 ```
 
-`keyof` ECMAScript visibility semantics'ini hurmat qiladi. `AsyncMethods<Service>` faqat public method'larni wrap qiladi — private/protected runtime'da accessible, lekin type-level'da ko'rinmaydi.
+`keyof` TypeScript'ning `private`/`protected` visibility'sini hurmat qiladi — bu modifier'lar compile-time only construct (ECMAScript `#field` emas), shu sababli `keyof` ulardan faqat public member'larni qaytaradi. `AsyncMethods<UserService>` faqat public method'larni wrap qiladi. `private`/`protected` member'lar runtime'da oddiy property sifatida mavjud (TS emit ularni o'chirmaydi), lekin type-level'da `keyof`'ga kirmaydi.
 
 </details>
 
@@ -1604,15 +1602,15 @@ config.server.options.ssl = false;   // ✅
 
 ### Edge Cases
 
-- `ReadonlyArray<T>` → `Array<T>` — `Array.isArray` runtime check, lekin compile-time uchun branch zarur
-- Tuple `readonly [number, string]` → `[number, string]` — tuple shape saqlanadi
+- `ReadonlyArray<T>` → `Array<T>` — alohida branch zarur, aks holda `object` branch `ReadonlyArray`'ni structural object sifatida map qiladi va `length`/index property'larini transform qilib yuboradi
+- Tuple `readonly [number, string]` → shallow `Mutable` tuple shape'ni saqlaydi, lekin `DeepMutable`'ning `ReadonlyArray<infer U>` branch'i tuple'ni `Array<number | string>`'ga aylantiradi (yuqoridagi Deep Dive ko'rsatilgan)
 - Function — base case, o'zgarishsiz
 - Class instance — method'lar saqlanadi, property'lar mutable bo'ladi
 
 ### Follow-up savollar
 
 1. **"Nima uchun TS 2.8'da `-readonly` kiritilgan?"** — Original'da faqat `readonly` qo'shish edi. Olib tashlash uchun yangi syntax kerak edi — `Required<T>` va `Mutable<T>` implement qilish uchun.
-2. **"`as const` ni qanday qaytarish kerak?"** — `Mutable<typeof obj>` — `as const` narrowed type'ni keng qilish (literal'larni primitive'ga).
+2. **"`as const` `readonly` modifier'ini qanday olib tashlash kerak?"** — `Mutable<typeof config>` faqat `readonly` modifier'ni olib tashlaydi (literal type'lar saqlanadi: `{ readonly port: 3000 }` → `{ port: 3000 }`). Literal'ni primitive'ga kengaytirish alohida operatsiya — `Mutable` buni qilmaydi.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
@@ -1660,16 +1658,21 @@ Shu sababli explicit branch: `ReadonlyArray<U> → Array<DeepMutable<U>>` — in
 Tuple holati:
 
 ```typescript
-type T = readonly [number, string];
-type M = Mutable<T>;
-// readonly [number, string] (Mutable o'zgartirmadi)
+type Pair = readonly [number, string];
+
+type M = Mutable<Pair>;
+// [number, string] — homomorphic mapped type tuple shape'ni saqlaydi,
+// -readonly tuple'ni mutable qildi
 
 // Lekin DeepMutable:
-type DM = DeepMutable<T>;
-// number[] | string[] — array'ga aylandi
+type DM = DeepMutable<Pair>;
+// (number | string)[] — ReadonlyArray<infer U> branch U = number | string
+// infer qildi, natija Array<number | string>; tuple shape yo'qoldi
 ```
 
-Tuple'da `ReadonlyArray<infer U>` branch destructive — tuple shape'i yo'qoladi. Aniq tuple variant kerak bo'lsa qo'shimcha branch yoziladi:
+Shallow `Mutable<T>` — `{ -readonly [K in keyof T]: T[K] }` homomorphic, `keyof Pair` tuple index'larini (`0`, `1`, `length`, ...) bo'ylab map qiladi va tuple shape'ni saqlab, faqat `-readonly` modifier'ni qo'llaydi → mutable tuple.
+
+`DeepMutable<T>` esa avval `T extends ReadonlyArray<infer U>` branch'iga tushadi: `readonly [number, string]` `ReadonlyArray<number | string>`'ga assignable, shuning uchun `U = number | string` infer qilinadi va natija `Array<number | string>` — tuple shape'i `infer U` orqali bitta union'ga yig'iladi. Tuple shape'ni saqlab deep mutable qilish uchun alohida tuple branch yoziladi:
 
 ```typescript
 type DeepMutableTuple<T> =
@@ -1737,7 +1740,7 @@ type UserType = ReturnType<typeof getUser>;
 // { id: number; name: string; email: string }
 
 // Qoida: ReturnType, Parameters, InstanceType, ConstructorParameters
-// hammasi TYPE qabul qiladi. Runtime value dan type olish uchun typeof kerak
+// hammasi TYPE qabul qiladi. Runtime value'dan type olish uchun typeof kerak
 
 type R = ReturnType<typeof someFunction>;
 type P = Parameters<typeof someFunction>;

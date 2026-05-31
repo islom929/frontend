@@ -65,7 +65,7 @@ type J = ReturnTypeOf<string>;              // never
 ### Follow-up savollar
 
 1. **"`T extends U` boolean qaytaradi degan tushuncha to'g'rimi?"** — Yo'q, type-level type qaytaradi (`X` yoki `Y`). `IsString<T>` `true | false` qaytarsa ham, bu literal type'lar, runtime boolean emas.
-2. **"Conditional type'ning resolution algoritmi?"** — TS `inferTypeForConditional` — T va U structurally compare qiladi (assignability check). Generic'da T aniq bo'lmasa — deferred.
+2. **"Conditional type'ning resolution algoritmi?"** — checker `T` (check type) va `U` (extends type) o'rtasida assignability tekshiradi. Generic'da `T` hali substitute bo'lmagan bo'lsa, conditional deferred holatda qoladi va faqat type argument berilganda resolve bo'ladi.
 
 </details>
 
@@ -126,7 +126,7 @@ type DeepReturn<T> =
     : never;
 type H = DeepReturn<() => Promise<string>>;  // string
 
-// Infer'da default — TS 4.7+
+// Tuple head infer — bo'sh tuple uchun fallback branch
 type FirstOrDefault<T> = T extends [infer F, ...any] ? F : never;
 type I = FirstOrDefault<[1, 2, 3]>;          // 1
 type J = FirstOrDefault<[]>;                 // never
@@ -222,10 +222,9 @@ type Y = Wrapped<never>;     // true — never assignable to string
 type IsNever<T> = [T] extends [never] ? true : false;
 type Z = IsNever<never>;     // true
 
-// Filter never'ni union'dan
-type RemoveNever<T> = T extends never ? never : T;
-// Bu noto'g'ri ishlaydi — distributive
-// Aslida har union member individual tekshiriladi
+// Union'dan never'ni alohida filter qilishga hojat yo'q:
+// never union'da avtomatik absorb bo'ladi
+type Absorbed = string | never;   // string — never yo'qoladi
 
 // Object property'dan never'ni o'chirish
 type NonNeverKeys<T> = {
@@ -334,7 +333,7 @@ type DeepReadonly<T> = {
 - **Modifier'lar ham distributive emas** — mapped type union T uchun har member'ga qo'llanmaydi (homomorphic transformation).
 - **Homomorphic mapped type** — `{ [K in keyof T]: ... }` (keyof T to'g'ridan-to'g'ri ishlatilsa) — T'ning modifier'larini saqlaydi (optional, readonly).
 - **Non-homomorphic** — `{ [K in "a" | "b"]: ... }` — T'ning modifier'larini olmaydi.
-- **`-readonly` index signature'da** — index signature'ga readonly modifier qo'llab-quvvatlanmaydi (`-readonly` ham).
+- **Modifier index signature'da ham ishlaydi** — homomorphic mapped type T'dagi index signature'ning `readonly`/optional modifier'larini ham saqlaydi yoki `+`/`-` bilan o'zgartiradi (`type Mutable<T> = { -readonly [K in keyof T]: T[K] }` index signature'ni ham mutable qiladi).
 - **Key remapping `never`** — `[K in keyof T as never]` — property o'chiriladi. Filter pattern.
 
 ### Follow-up savollar
@@ -507,7 +506,7 @@ call(greet, "Ali", 25);                  // ✅
 
 ### Edge Cases
 
-- **Tail-call optimization (TS 4.5+)** — accumulator pattern bilan deeply recursive type'lar. TS limit avval `~50` depth edi, TS 4.5+ tail-rec uchun `~1000`.
+- **Tail-call evaluation (TS 4.5+)** — accumulator pattern bilan deeply recursive type'lar. Non-tail recursion depth limit'i past (bir necha o'nlab step), TS 4.5+ tail-recursive shape uchun hard limit `1000` (release notes).
 - **Middle rest** — `[A, ...B[], C]` — `[A]` + array + `[C]` (TS 4.0+ variadic tuple). Labeled middle rest (`[a: A, ...b: B[], c: C]`) — TS 4.0+ labeled tuple.
 - **Optional rest tuple** — `[A, B?]` — B optional. `[A, ...B[]]` — B array spread.
 - **Tuple labels** — `[id: number, name: string]` — labels documentation, runtime'da yo'q.
@@ -515,29 +514,29 @@ call(greet, "Ali", 25);                  // ✅
 
 ### Follow-up savollar
 
-1. **"Tail recursion qanday optimize qilinadi?"** — TS 4.5+ checker'da `instantiateRecursiveType` — tail-recursive shape recognize qiladi, iterative evaluation (recursive stack o'rniga).
+1. **"Tail recursion qanday optimize qilinadi?"** — TS 4.5+ checker recursive conditional type'ning oxirgi expression yana o'sha conditional bo'lsa (tail position), uni instantiation stack o'sishisiz iterativ tarzda hisoblaydi.
 2. **"Variadic tuple va `arguments` farqi?"** — `arguments` — runtime old-style array-like. Variadic tuple — type-level spread, kerakli runtime — rest parameter (`...args`).
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Variadic tuple internal representation:**
+**Variadic tuple inference:**
 
-TS tuple'ni `TupleTypeReference` shaklida saqlaydi. Rest element `VariadicTupleElement` flag bilan belgilanadi. Spread inference — `inferTypesForVariadicTuple` algoritmida:
+Tuple type bir nechta fixed element va eng ko'pi bilan bitta variadic (`...T`) element'dan iborat. `[A, ...B, C]` shaklida spread'dan element type infer qilishda checker quyidagicha ishlaydi:
 
-1. Fixed prefix length aniqlanadi
-2. Fixed suffix length aniqlanadi
-3. Middle rest element type infer qilinadi
+1. Fixed prefix uzunligi aniqlanadi (`A`)
+2. Fixed suffix uzunligi aniqlanadi (`C`)
+3. Qolgan o'rta qism variadic element'ga (`B`) biriktiriladi
 
-**Tail-call optimization (TS 4.5+):**
+**Tail-call evaluation (TS 4.5+):**
 
-Recursive type'ning oxirgi expression (`Acc` pattern) recursive bo'lsa, TS instantiation stack o'rniga loop ishlatadi. Bu memory tejaydi va deep recursion'ga ruxsat beradi. Implementation: `instantiateConditionalType` da tail-rec detection.
+Recursive conditional type'ning oxirgi expression (`Acc` pattern bilan) yana o'sha conditional bo'lsa, checker uni instantiation stack o'rniga iterativ tarzda hisoblaydi. Bu deep recursion'ga ruxsat beradi.
 
 **Limit'lar:**
 
-- Non-tail-recursive: TS instantiation depth (TS 5.0+ taxminan 50, lekin aniq raqam TS spec'da fixed emas, performance bo'yicha)
-- Tail-recursive: kattaroq (Reverse 1000 element ishlay olishi mumkin)
-- Type instantiation count limit `5,000,000` (TS internal flag)
+- Non-tail-recursive: har step yangi nested instantiation hosil qiladi, depth limit'iga tez urishadi (bir necha o'nlab element'dan keyin)
+- Tail-recursive: hard limit 1000 (TS 4.5 release notes)
+- Type instantiation count limit `5,000,000` — checker bu chegaradan oshganda `Type instantiation is excessively deep` (TS2589) xato beradi
 
 </details>
 
@@ -585,20 +584,26 @@ type StateMachine<States extends string> = {
   transitions: Record<States, States[]>;
 };
 
+// States transitions key'laridan infer qilinadi (barcha state'lar shu yerda).
+// initialState NoInfer bilan — u inference manbai emas, shu union'ga tekshiriladi.
 function createMachine<States extends string>(
-  initialState: States,
-  transitions: Record<NoInfer<States>, NoInfer<States>[]>
+  transitions: Record<States, States[]>,
+  initialState: NoInfer<States>
 ): StateMachine<States> {
   return { initialState, transitions };
 }
 
-const machine = createMachine("idle", {
-  idle: ["running"],
-  running: ["idle", "paused"],
-  paused: ["running"],
-});
-// States = "idle" — faqat initialState'dan infer
-// transitions key'lari validated against "idle"
+const machine = createMachine(
+  {
+    idle: ["running"],
+    running: ["idle", "paused"],
+    paused: ["running"],
+  },
+  "idle"
+);
+// States = "idle" | "running" | "paused" — transitions key'laridan
+// initialState "idle" shu union'ga tekshiriladi (NoInfer)
+// createMachine({ ... }, "stopped"); // ❌ "stopped" assignable emas
 
 // Reducer pattern
 function reducer<S, A extends { type: string }>(
@@ -618,7 +623,7 @@ function reducer<S, A extends { type: string }>(
 
 ### Follow-up savollar
 
-1. **"`NoInfer` polyfill TS 5.4'gacha qanday yozilgan?"** — `type NoInfer<T> = [T] extends [infer U] ? U : never` yoki intersection trick (`T & {}`) bilan inference'ni cheklash. Native `NoInfer` checker'da maxsus flag bilan ishlaydi, polyfill'lar to'liq emas (ba'zi edge case'larda inference o'tib ketadi).
+1. **"`NoInfer` polyfill TS 5.4'gacha qanday yozilgan?"** — eng keng tarqalgani intersection trick (`T & {}`): TS bu position'dan to'g'ridan-to'g'ri inference qilmaydi. `[T] extends [infer U] ? U : never` kabi variantlar ishonchsiz — TS ko'pincha bu yerdan ham inference oladi. Native `NoInfer` esa hech bir edge case'da inference o'tkazmaydi.
 2. **"`NoInfer` har generic'da ishlatish kerakmi?"** — Yo'q, faqat inference asymmetric kerak bo'lganda (caller bir argument'dan T'ni olishni xohlasa, boshqasi bog'liq).
 
 <details>
@@ -626,17 +631,16 @@ function reducer<S, A extends { type: string }>(
 
 **`NoInfer` implementation — TS 5.4+:**
 
-TS checker'da `intrinsicTypeKinds` enum'iga `NoInfer` qo'shilgan. Inference algoritmi `inferFromTypes`'da source type `NoInfer` brand bilan belgilangan bo'lsa, candidate'larga qo'shilmaydi. Faqat boshqa (`NoInfer` brand'siz) pozitsiya'lardan T candidate'lari yig'iladi.
+`NoInfer<T>` checker'da maxsus substitution type sifatida ifodalanadi (`TypeFlags.Substitution`, constraint `unknown` bilan — bu kombinatsiya boshqa hech qayerda uchramaydi). Inference paytida checker bu marker bilan belgilangan pozitsiyani inference candidate'lari uchun ko'rib chiqmaydi. Boshqa barcha kontekstda `T` va `NoInfer<T>` bir xil type. PR #56794 (Anders Hejlsberg) yangi type kind kiritmaslik uchun ataylab mavjud substitution type infrastructure'ini qayta ishlatadi — shu sababli `NoInfer` tooling ecosystem'ni buzmaydi va marker erasure mexanizmidan foydalanadi.
 
 **Pre-5.4 workaround'lar — limitations:**
 
 ```typescript
-type NoInferLegacy<T> = [T][T extends any ? 0 : never];
-// T extends any har doim true, [T][0] = T qaytaradi
-// Lekin TS ba'zi versions'da bu trick'dan ham inference oladi
+type NoInferLegacy<T> = T & {};
+// TS bu intersection position'idan to'g'ridan-to'g'ri inference qilmaydi
 ```
 
-Intersection trick — `T & {}` (yoki `T & unknown`) ham inference'ni qisman bloklaydi, lekin variance va subtype relation buzilishi mumkin. Modern TS 5.4+ — native `NoInfer` afzal.
+Intersection trick (`T & {}`) inference'ni qisman bloklaydi, lekin subtype relation'ga ta'sir qilishi mumkin (masalan primitive'larga `& {}` qo'shilishi). Modern TS 5.4+ — native `NoInfer` afzal, chunki u type'ni o'zgartirmasdan faqat inference'ni bloklaydi.
 
 **Asymmetric inference pattern'lari:**
 
@@ -644,7 +648,7 @@ Intersection trick — `T & {}` (yoki `T & unknown`) ham inference'ni qisman blo
 |---------|-------|-------|
 | Anchor + constraint | `<T>(value: T, fallback: NoInfer<T>)` | Caller value'dan T olinadi, fallback uni cheklaydi |
 | Discriminator | `<T>(items: T[], key: NoInfer<keyof T>)` | items'dan T inferred, key validated |
-| State machine | `<S>(initial: S, transitions: NoInfer<...>)` | initial'dan states, transitions cross-check |
+| State machine | `<S>(transitions: Record<S, S[]>, initial: NoInfer<S>)` | transitions key'laridan states, initial cross-check |
 
 **Performance ta'siri:**
 
@@ -679,7 +683,7 @@ function example<T extends string | number>(
   if (typeof value === "string") {
     return value.split(","); // ❌ Type 'string[]' not assignable to 'T extends string ? string[] : number'
   }
-  return 0 as any;
+  return 0; // ❌ Type 'number' not assignable to 'T extends string ? string[] : number'
 }
 
 // ✅ Yechim 1: Function overloads
@@ -734,15 +738,15 @@ function example3<T extends string | number>(
 
 **Why deferred:**
 
-TS conditional type `T extends U ? X : Y` resolution `getConditionalType` da. Agar `T` yoki `U`'da generic type parameter mavjud bo'lsa va parameter substitution hali bo'lmagan bo'lsa — conditional `getDeferredConditionalType` qaytaradi (DeferredTypeReference).
+TS conditional type `T extends U ? X : Y` resolution `getConditionalType` da. Agar `T` yoki `U`'da hali substitute bo'lmagan generic type parameter mavjud bo'lsa, checker conditional'ni resolve qila olmaydi va uni deferred conditional type sifatida saqlaydi — type argument berilganda qaytadan hisoblanadi.
 
 **Body narrowing limitation:**
 
 JS-level `typeof`, `instanceof`, type predicate'lar — `value` parameter type'ini narrow qiladi (control flow analysis). Lekin generic `T` parameter'ni narrow qila olmaydi (T abstract — har call'da turli value bo'lishi mumkin).
 
-**Future improvement:**
+**Workaround:**
 
-TS team `Higher-kinded narrowing` issue ochilgan — generic T'ni body'da narrow qilish. Hozircha yo'q. Workaround — overload yoki assertion.
+Generic `T`'ni body ichida conditional return type uchun narrow qilishning to'g'ridan-to'g'ri yo'li hozircha yo'q. Amaldagi yechimlar — overload (caller side aniqlik) yoki body'da `as` assertion (dasturchining mas'uliyati).
 
 </details>
 
@@ -846,7 +850,7 @@ type DeepReadonly<T> = {
 
 ### Qisqa javob
 
-HKT — type parameter o'zi ham generic bo'lishi ("generic ning generic"). TS to'g'ridan-to'g'ri qo'llab-quvvatlamaydi. Workaround pattern'lar: overload, URI-based encoding (fp-ts), conditional dispatch.
+HKT — type parameter o'zi ham generic bo'lishi ("generic'ning generic'i"). TS to'g'ridan-to'g'ri qo'llab-quvvatlamaydi. Workaround pattern'lar: overload, URI-based encoding (fp-ts), conditional dispatch.
 
 ### To'liq tushuntirish
 
@@ -976,7 +980,7 @@ type E = DeepFlatten<string[][][]>; // string
 
 ### Follow-up savollar
 
-1. **"`Flatten<[1, "a", true]>` — natija?"** — `[1, "a", true]` tuple = `(1 | "a" | true)[]` sub-type emas, balki structural. Tuple'da `T[number]` = `1 | "a" | true` — distributive infer.
+1. **"`Flatten<[1, "a", true]>` — natija?"** — `1 | "a" | true`. Tuple `(infer U)[]` pattern'iga mos keladi va `U` element type'larining union'i sifatida infer qilinadi (tuple'da `T[number]` = `1 | "a" | true`).
 
 </details>
 
@@ -1015,7 +1019,7 @@ type E = string | number;
 - `parseInt: (s: string, r?: number) => number` → `R = number`
 - `string` — funksiya emas → false branch → `never`
 - `() => void` → `R = void`
-- E — distributive: T naked parameter, union T = `() => string | () => number`:
+- E — distributive: T naked parameter, union T = `(() => string) | (() => number)`:
   ```
   GetReturnType<() => string> | GetReturnType<() => number>
   = string | number

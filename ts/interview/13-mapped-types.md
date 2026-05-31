@@ -23,7 +23,7 @@
 
 ### Qisqa javob
 
-Mapped type — mavjud object type ning har property'sini iterate qilib, yangi object type yaratish. Syntax: `{ [K in keyof T]: NewType }`.
+Mapped type — mavjud object type'ning har property'sini iterate qilib, yangi object type yaratish. Syntax: `{ [K in keyof T]: NewType }`.
 
 ### To'liq tushuntirish
 
@@ -83,13 +83,13 @@ type Nullable<T> = { [K in keyof T]: T[K] | null };
 
 ### Qisqa javob
 
-**Homomorphic** — `keyof T` dan key oladigan mapped type, original modifier'larni (`readonly`, `?`) saqlaydi. **Non-homomorphic** — boshqa source (`Record<K, V>` kabi) ishlatadi, modifier'larni yo'qotadi.
+**Homomorphic** — `keyof T` dan key oladigan mapped type, original modifier'larni (`readonly`, `?`) saqlaydi. **Non-homomorphic** — boshqa source ishlatadi (masalan `Record<K, V>`), modifier'larni yo'qotadi.
 
 ### To'liq tushuntirish
 
 Homomorphic mapped type — `{ [K in keyof T]: ... }` shaklida bo'lib, T tipi instantiated bo'lganda compiler T'ning structural ma'lumotini (jumladan modifier'larni) tahlil qiladi va natija type'ga ko'chiradi. Bu special behavior — `Partial<T>`, `Required<T>`, `Readonly<T>`, `Pick<T, K>` shu mexanizmga asoslangan.
 
-Non-homomorphic mapped type — `{ [P in K]: ... }` shaklida (`Record<K, V>` kabi) — K type T'dan kelmaydi, compiler structural ma'lumotni ko'chirmaydi, faqat yangi shape yaratadi.
+Non-homomorphic mapped type — `{ [P in K]: ... }` shaklida (masalan `Record<K, V>`) — K type T'dan kelmaydi, compiler structural ma'lumotni ko'chirmaydi, faqat yangi shape yaratadi.
 
 ### Kod misol
 
@@ -100,12 +100,12 @@ interface Config {
   timeout?: number;
 }
 
-// Homomorphic — modifier lar saqlanadi
+// Homomorphic — modifier'lar saqlanadi
 type PartialConfig = Partial<Config>;
 // { readonly host?: string; readonly port?: number; timeout?: number }
 // ✅ readonly saqlandi, timeout optional qoldi
 
-// Non-homomorphic — modifier lar yo'qoladi
+// Non-homomorphic — modifier'lar yo'qoladi
 type RecordConfig = Record<keyof Config, string>;
 // { host: string; port: string; timeout: string }
 // ❌ readonly VA optional yo'qoldi
@@ -335,7 +335,7 @@ type ColorMap = StringRecord<"primary" | "secondary">;
 
 - `Record<string, T>` — index signature ekvivalenti (`{ [key: string]: T }`)
 - `Record<never, T>` → `{}` (bo'sh object)
-- `keyof Record<string, T>` → `string` (number emas — TS 4.4+ behavior)
+- `keyof Record<string, T>` → `string` (number emas). Bu literal index signature'dan farq qiladi: `keyof { [key: string]: T }` → `string | number`. Sabab — `Record` mapped type (`[P in string]`) sifatida hisoblanadi, literal index signature esa `number` coercion'ni ham qo'shadi (intentional inconsistency)
 - `Record<K, T>` da K literal union bo'lsa — exhaustive object talab qilinadi (har key kerak)
 
 ### Follow-up savollar
@@ -502,7 +502,7 @@ type AsyncMethods<T> = {
 
 ### Qisqa javob
 
-Recursive mapped type — value type'ni rekursiv transform qiladi (`DeepReadonly`, `DeepPartial`). Cheksiz rekursiyani oldini olish uchun base case (primitive, function) tekshirish zarur. TS 50 darajagacha rekursiyaga ruxsat beradi.
+Recursive mapped type — value type'ni rekursiv transform qiladi (`DeepReadonly`, `DeepPartial`). Cheksiz rekursiyani oldini olish uchun base case (primitive, function) tekshirish zarur. Non-tail recursive instantiation ~50 darajagacha, tail recursive (TS 4.5+) 1000 darajagacha ruxsat etiladi.
 
 ### To'liq tushuntirish
 
@@ -514,17 +514,17 @@ type DeepReadonly<T> = {
 };
 ```
 
-Xavf — base case noto'g'ri bo'lsa cheksiz rekursiya yoki noto'g'ri natija:
-- **Function** `extends object` true — function'ning property'lari readonly bo'ladi, callable yo'qoladi
-- **Array** `extends object` true — array'ning method'lari (`push`, `pop`) ham readonly bo'ladi
-- **Built-in object'lar** (Date, Map, Set) — internal state buziladi
+Xavf — base case noto'g'ri bo'lsa noto'g'ri natija:
+- **Function** `extends object` true. Homomorphic mapped type function type'ga qo'llanganda call signature yo'qoladi — `keyof (() => void)` = `never`, natija `{}` (bo'sh object, callable emas)
+- **Array/Tuple** — homomorphic mapped type array'ga qo'llanganda compiler array shape'ni saqlaydi (element type transform qilinadi). Demak naive variant array'ni buzmaydi, lekin element'larni rekursiv transform qilish va `readonly` array'ga aylantirish nazoratini explicit `ReadonlyArray` branch beradi
+- **Built-in object'lar** (Date, Map, Set) — `extends object` true, property'lari readonly bo'ladi, lekin internal slot'lar va method'lar (runtime mutable) shu holatda qoladi
 
-To'g'ri pattern — barcha "leaf" type'larni base case'da exclude qilish.
+To'g'ri pattern — function, array va built-in "leaf" type'larni base case'da alohida ishlash.
 
 ### Kod misol
 
 ```typescript
-// ❌ Naive — function va array uchun noto'g'ri
+// ❌ Naive — function uchun noto'g'ri
 type NaiveDeepReadonly<T> = {
   readonly [K in keyof T]: T[K] extends object ? NaiveDeepReadonly<T[K]> : T[K];
 };
@@ -537,7 +537,12 @@ interface Config {
 }
 
 type Bad = NaiveDeepReadonly<Config>;
-// callback ham object kabi traverse qilingan — buzilgan
+// {
+//   readonly port: number;
+//   readonly callback: {};                  // ❌ call signature yo'qoldi (keyof fn = never)
+//   readonly tags: readonly string[];       // array homomorphic saqlandi
+//   readonly nested: { readonly host: string };
+// }
 
 // ✅ Proper — function, array uchun alohida branch
 type DeepReadonly<T> =
@@ -563,7 +568,7 @@ type DeepPartial<T> =
 
 ### Edge Cases
 
-- **TS 50 darajalik rekursiya limit'i** — circular type yoki juda chuqur nesting'da `Type instantiation is excessively deep` error
+- **Rekursiya limit'i (~50 daraja non-tail)** — circular type yoki juda chuqur nesting'da `Type instantiation is excessively deep` error
 - **`Date`, `RegExp`, `Map`, `Set`** — `extends object` true, lekin internal slot'lar bor. `T extends Date ? T : ...` qo'shish kerak
 - **Tuple** — `[number, string]` `extends ReadonlyArray<U>` true, lekin element type'larini alohida transform qilish kerak
 - **Union member** — `T extends object` distribution union'ni ajratadi, har member alohida traverse qilinadi
@@ -576,19 +581,19 @@ type DeepPartial<T> =
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Compiler recursive mapped type'ni qanday instantiate qiladi: har rekursiv chaqiruvda yangi type instance generate qilinadi. TS optimizatsiya: agar bir xil instantiation takrorlanmasa — cache'lanadi (`instantiationCache`). Lekin generic parameter har chaqiruvda yangi bo'lsa, cache hit yo'q, performance pasayadi.
+Compiler recursive mapped type'ni qanday instantiate qiladi: har rekursiv chaqiruvda yangi type instance generate qilinadi. Compiler bir xil type'ni bir xil type argument'lar bilan qayta instantiate qilmasligi uchun natijalarni cache'laydi. Lekin generic parameter har chaqiruvda yangi bo'lsa, cache hit yo'q, compile vaqt o'sadi.
 
-Instantiation depth limit (`tsc` source code'da hardcoded):
-- Non-tail recursive: 50 daraja
-- Tail recursive (TS 4.5+): 1000 daraja
-- `Type instantiation is excessively deep and possibly infinite` error — instantiation count limit'dan oshganda
+Instantiation depth limit:
+- Non-tail recursive: ~50 daraja (type instantiation depth)
+- Tail recursive (TS 4.5+): 1000 daraja — conditional type oxirida yana conditional type bo'lsa, compiler resolution'ni loop'da bajaradi (qo'shimcha call stack ishlatmaydi)
+- `Type instantiation is excessively deep and possibly infinite` error — depth yoki instantiation count limit'dan oshganda
 
 Bypass strategiyalari:
 - Conditional `T extends infer U ? ... : never` — `U` yangi binding sifatida compiler'ga yordam beradi (lazy evaluation)
 - Manual depth limit — tuple length tracker (`Depth extends [...Depth, any]`)
 - Tail-recursive refactor — recursive call eng oxirgi pozitsiyada
 
-Type checker (`tsc`) Node.js'da ishlaydi (V8 runtime). Recursive mapped instantiation V8 JIT optimization'idan foyda olmaydi — type checker o'zining cache strategiyasi bilan ishlaydi. Compile time recursive type complexity ga proportional o'sadi.
+Depth limit type checker'ning ichki hisoblagichi — bu runtime call stack emas, balki instantiation chuqurligini kuzatuvchi counter. Limit'dan oshganda compiler `excessively deep and possibly infinite` error chiqaradi va instantiation'ni to'xtatadi. Compile time esa unique type instantiation soniga proportional o'sadi: cache hit bo'lganda qayta hisoblanmaydi, har chaqiruvda yangi type argument bo'lsa cache miss va qo'shimcha ish.
 
 </details>
 
@@ -632,7 +637,7 @@ type A = {
   name: string;
   tags?: string[];
 };
-// Homomorphic — modifier lar saqlanadi
+// Homomorphic — modifier'lar saqlanadi
 
 type B = {
   readonly id?: number;
@@ -804,7 +809,7 @@ type D = {
 
 ### Follow-up savollar
 
-1. **"A variantda `string & K` o'rniga `K` yozsak nima bo'ladi?"** — Compile error: `Type 'K' does not satisfy the constraint 'string'`.
+1. **"A variantda `string & K` o'rniga `K` yozsak nima bo'ladi?"** — Bu `Obj` (barcha key'lar string) uchun xatosiz compile bo'ladi, chunki `keyof Obj` = `"name" | "age" | "email"` string literal union, `Uppercase`'ning `extends string` constraint'iga mos. `string & K` faqat key'larda `number`/`symbol` bo'lishi mumkin bo'lgan generic `<T>` holatida zarur — u holatda `K` ga `Type 'K' does not satisfy the constraint 'string'` xatosi chiqadi.
 
 </details>
 
@@ -849,15 +854,8 @@ type Result = {
       cert?: string;
     };
   };
-  logger?: (msg: string) => void;  // function — base case
-  tags?: {
-    // ⚠️ Array buzilgan — har Array.prototype method optional bo'ladi
-    [n: number]?: string;
-    length?: number;
-    push?: (...items: string[]) => number;
-    pop?: () => string | undefined;
-    // ... barcha Array method'lari
-  };
+  logger?: (msg: string) => void;       // function — base case
+  tags?: (string | undefined)[];        // array saqlandi, element'lar optional
 };
 ```
 
@@ -865,9 +863,9 @@ type Result = {
 
 - `server` — object, rekursiv traverse, har nested property optional
 - `logger` — function (callable), base case branch — o'zi qaytariladi (faqat top-level optional)
-- `tags` — array `extends object` true, definition'da Array branch yo'q. Mapped type array'ni traverse qiladi: `[K in keyof string[]]?` — bu `length`, `push`, `pop`, va index key'larini iterate qiladi. Natija — array shape butunlay buziladi (har Array.prototype method optional bo'ladi)
+- `tags` — array `extends object` true, mapped type array'ga qo'llanadi. Homomorphic mapped type compiler'da array uchun special-case: array shape saqlanadi, element type transform qilinadi. `?` modifier element type'ga `undefined` qo'shadi → `(string | undefined)[]`. Array obyektga aylanib buzilmaydi, lekin element'lar `undefined` qabul qilishi ko'pincha kutilmagan
 
-To'g'ri DeepPartial — Array uchun alohida branch:
+Array elementiga `| undefined` qo'shilishi kerak bo'lmasa — Array uchun alohida branch:
 
 ```typescript
 type DeepPartialFixed<T> =
@@ -880,13 +878,13 @@ type FixedResult = DeepPartialFixed<Config>;
 // {
 //   server?: { ... };
 //   logger?: (msg: string) => void;
-//   tags?: string[];           // ✅ array shape saqlandi
+//   tags?: string[];           // ✅ element'lar undefined emas
 // }
 ```
 
 ### Edge Cases
 
-- Array branch MAJBURIY — aks holda `T extends object` array'ni ham yutadi
+- Array branch element'lardan `| undefined`'ni olib tashlash uchun kerak — `T extends object` array'ni buzmaydi (homomorphic special-case), lekin `?` modifier element'larga `undefined` qo'shadi
 - `ReadonlyArray<U>` uchun ham alohida branch kerak (yoki `readonly U[]` shaklini support)
 - Tuple type'lar `Array<U>` ga match qiladi, lekin tuple shape (positional types) yo'qoladi
 
@@ -895,7 +893,7 @@ type FixedResult = DeepPartialFixed<Config>;
 
 Recursive mapped type'ning subtle nuance'lari:
 
-**1. Function preservation:** Function ham `extends object` true. Mapped `[K in keyof Function]?` iterate qilsa: `length?`, `name?`, `prototype?`, `apply?`, `call?`, `bind?` — callable signature yo'qoladi. To'g'ri pattern — function branch birinchi.
+**1. Function preservation:** Function ham `extends object` true. Plain function type'da `keyof (() => void)` = `never` (named member yo'q) — mapped type natijasi `{}`, callable signature yo'qoladi. Call/named property'lari bor function uchun esa o'sha property'lar mapped bo'ladi, lekin call signature baribir yo'qoladi. To'g'ri pattern — function branch birinchi.
 
 **2. Array branch tartibi:** `T extends (...args: any[]) => any` birinchi, keyin `T extends Array<infer U>`, oxirida `T extends object`. Sabab: array ham object, function ham object — spetsifik tekshiruv umumiyga qadar.
 
@@ -989,7 +987,7 @@ interface User { id: number; name: string; age: number; email: string }
 ### Kod misol
 
 ```typescript
-// Pick — tanlangan key larni olish
+// Pick — tanlangan key'larni olish
 type MyPick<T, K extends keyof T> = {
   [P in K]: T[P];
 };
@@ -1029,7 +1027,7 @@ type Omitted2 = MyOmit2<User, "email">;
 
 ### Follow-up savollar
 
-1. **"Qaysi variant afzal?"** — Standart `lib.es5.d.ts` Variant 1 (`Pick<T, Exclude<keyof T, K>>`) ishlatadi. Variant 2 (key remapping) TS 4.1+ kiritilgan, lekin standart implementatsiya o'zgarmagan. Ikkalasi ham homomorphic, semantic teng.
+1. **"Qaysi variant afzal?"** — Standart `lib.es5.d.ts` Variant 1 (`Pick<T, Exclude<keyof T, K>>`) ishlatadi. Variant 2 (key remapping) TS 4.1+ kiritilgan, lekin standart implementation o'zgarmagan. Ikkalasi ham homomorphic, semantic teng.
 2. **"`StrictOmit` qanday yoziladi?"** — `type StrictOmit<T, K extends keyof T> = Omit<T, K>` — `K extends keyof T` strict bound qo'shadi.
 
 </details>
@@ -1093,8 +1091,8 @@ type NonPrimitive = OmitByType<User, string | number | boolean>;
 ### Edge Cases
 
 - `T[K] extends ValueType` — exact match emas, structural compatibility tekshiradi
-- `boolean` value bo'lganda `extends true` distribution: `true | false` har biri alohida tekshiriladi
-- `null` va `undefined` — `extends string` false, lekin `string | null` value type — match bo'ladi
+- `T[K]` indexed access — naked type parameter emas, shuning uchun `T[K] extends V` **distribute qilmaydi**. `T[K]` union bo'lsa (`string | null`), butun union bir butun sifatida tekshiriladi: `(string | null) extends string` → false → property filterlanadi (match emas)
+- Element distribution kerak bo'lsa naked param orqali: `type IsString<X> = X extends string ? true : false` — X naked bo'lgani uchun union har member'i alohida tekshiriladi
 - Strict equality kerak bo'lsa: `T[K] extends V ? V extends T[K] ? K : never : never`
 
 ### Follow-up savollar
@@ -1127,12 +1125,12 @@ interface V2 { id: number; name: string; phone: string; avatar: string }
 ### Kod misol
 
 ```typescript
-// T da bor, U da yo'q key lar
+// T da bor, U da yo'q key'lar
 type Diff<T, U> = {
   [K in Exclude<keyof T, keyof U>]: T[K];
 };
 
-// T va U da umumiy key lar
+// T va U da umumiy key'lar
 type Common<T, U> = {
   [K in Extract<keyof T, keyof U>]: T[K];
 };
@@ -1388,7 +1386,12 @@ type Result = DeepReadonly<Config>;
 
 ### Xato tushuntirish
 
-Base case yo'q — function ham `[K in keyof T]` orqali traverse qilinadi. Function'ning `length`, `name`, `apply`, `call` property'lari readonly bo'ladi, lekin callable signature yo'qoladi.
+Base case yo'q — `extends object` shartisiz har value `BadDeepReadonly<T[K]>` orqali rekursiv chaqiriladi. Lekin natija primitive va function uchun bir xil emas:
+
+- **Primitive** (`port: number`) — `BadDeepReadonly<number>` baribir `number` qaytaradi. Homomorphic mapped type (`{ [K in keyof T]: ... }`) non-object type'ga qo'llanganda compiler uni o'zgartirmaydi (identity behavior). `keyof number` Number.prototype method nomlarini bersa ham, mapped type ularni iterate qilmaydi — primitive shar holicha qoladi. Demak primitive value buzilmaydi.
+- **Function** (`callback: () => void`) — `BadDeepReadonly<() => void>`. Function ham object, lekin homomorphic mapped type call signature'ni ko'chirmaydi: `keyof (() => void)` = `never`, natija `{}` — non-callable. `callback()` chaqirig'i `error TS2349: This expression is not callable` beradi.
+
+Yagona buzilish — function. Base case'siz versiya primitive'ni emas, faqat function call signature'ni yo'qotadi.
 
 ### Kod misol
 

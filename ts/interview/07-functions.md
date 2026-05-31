@@ -6,7 +6,7 @@
 
 ## Nazariy savollar
 
-### Savol 1: TS da funksiya return type ni yozish kerakmi yoki inference ga qo'yish kerakmi? [Junior+]
+### Savol 1: TS'da funksiya return type'ni yozish kerakmi yoki inference'ga qo'yish kerakmi? [Junior+]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -17,7 +17,7 @@ Internal funksiyada inference yetarli, public API (export, library boundary)'da 
 
 ### To'liq tushuntirish
 
-TS funksiya body'dan return type ni inference qiladi. Bu kod tozaligi uchun yaxshi, lekin ba'zi holatlarda explicit yozish foydali:
+TS funksiya body'dan return type'ni inference qiladi. Bu kod tozaligi uchun yaxshi, lekin ba'zi holatlarda explicit yozish foydali:
 
 - **Public API / library export** — type signature contract, body o'zgarsa ham public type tekshiriladi
 - **Recursive function** — TS rekursiv chaqiruvni inference qila olmaydi (ba'zan circular)
@@ -82,7 +82,7 @@ Optional `?` — berilmasa `undefined`, type `T | undefined`. Default `= value` 
 | Parameter type | `T \| undefined` | `T` |
 | Tartib | Faqat oxirgi parameter'da | Istalgan joyda (lekin oldingi default'lar `undefined` orqali skip qilinadi) |
 
-JS spec ECMA-262 spec'ida — default parameter `undefined` berilganda ishga tushadi (`IsDefaultParameterUsedHandled`).
+ECMA-262 spec'da default parameter faqat argument `undefined` bo'lganda (yoki umuman berilmaganda) initializer'ni evaluate qiladi — bu argument binding bosqichida amalga oshadi.
 
 ### Kod misol
 
@@ -110,7 +110,7 @@ function f2(x: number = 0) { return x; }    // x: number (default bor)
 - **`null` berilganda** — default ishlamaydi (faqat `undefined` trigger qiladi). `greetDefault("Ali", null as any)` → `"null, Ali!"`.
 - **Default qiymat sifatida boshqa parameter** — `function f(a: number, b: number = a * 2)` — keyingi parameter oldingisiga reference berishi mumkin (chap-to-o'ng).
 - **Destructuring default** — `function f({ x = 0 } = {})` — ikki daraja default (object yo'qsa `{}`, x yo'qsa `0`).
-- **`function.length`** — birinchi default yoki rest parameter'gacha bo'lgan parameter'larni sanaydi. `function f(a: number, b: number = 0, c: number)` — `f.length === 1`. Optional `?` ham `function.length`'ga sanalmaydi.
+- **`function.length`** — birinchi default yoki rest parameter'gacha bo'lgan parameter'larni sanaydi. `function f(a: number, b: number = 0, c: number)` — `f.length === 1`. Optional `?` esa emit'da hech qanday initializer chiqarmaydi (`b?: number` → JS'da `function f(a, b)`), shuning uchun `function f(a: number, b?: number)` — `f.length === 2`: optional parameter sanaladi.
 
 ### Follow-up savollar
 
@@ -171,7 +171,7 @@ const c = bad("a,b,c"); // string — string[] EMAS, chunki birinchi overload yu
 - **Overload va default parameter** — implementation'da default berib bo'ladi, overload signatures'da optional sifatida ko'rsatiladi.
 - **`this` parameter overload'da** — har bir overload'da alohida yozilishi kerak.
 - **Generic overload** — har overload o'z type parameter'iga ega bo'lishi mumkin.
-- **Type guard overload** — `function isString(x: unknown): x is string` — predicate overload da ishlaydi.
+- **Type guard overload** — `function isString(x: unknown): x is string` — predicate overload'da ishlaydi.
 
 ### Follow-up savollar
 
@@ -181,13 +181,13 @@ const c = bad("a,b,c"); // string — string[] EMAS, chunki birinchi overload yu
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-TS spec'ida overload resolution — `getCandidateSignatures` algoritmi. Har overload uchun:
+Overload resolution checker'da har overload signature'ni declaration tartibida ko'rib chiqadi. Har overload uchun:
 1. Argument count check (optional/rest hisobga olinadi)
-2. Each argument assignable to corresponding parameter?
-3. Generic inference — type arguments infer qilinadi
+2. Har argument tegishli parameter'ga assignable'mi?
+3. Generic inference — type argument'lar infer qilinadi
 4. Constraint check
 
-Birinchi `true` qaytargan overload tanlanadi. Agar hech biri mos kelmasa — implementation signature tekshiriladi (lekin uning return type caller'ga ko'rinmaydi, faqat parameter compatibility uchun).
+Birinchi to'liq mos kelgan overload tanlanadi. Agar hech biri mos kelmasa — TS xato beradi (`No overload matches this call`). Implementation signature caller uchun candidate emas: u faqat overload signatures'ni body bilan bog'laydi, return type caller'ga ko'rinmaydi.
 
 **Method dispatch'siz** — overload faqat TS type system'da, runtime'da bitta funksiya. JS'ga compile'da overload signatures o'chiriladi, faqat implementation qoladi.
 
@@ -313,10 +313,12 @@ const timer = new Timer();
 timer.tick(); // ✅ this = timer
 
 const detached = timer.tick;
-// detached(); // ❌ 'this' context of type 'void' is not assignable to 'Timer'
+// detached(); // ❌ TS2684: The 'this' context of type 'void' is not assignable to method's 'this' of type 'Timer'.
 
+// ⚠️ setInterval'ning callback parameter type'i `(...args: any[]) => void` —
+// `this: Timer` parameter unga assignable bo'lib qoladi, shuning uchun TS BU YERDA XATO BERMAYDI.
+// Runtime'da `this` baribir yo'qoladi — bu silent bug (TS#10285).
 setInterval(timer.tick, 1000);
-// ❌ Argument of type '() => void' not assignable — this lost
 
 setInterval(() => timer.tick(), 1000); // ✅ arrow binds this lexically
 setInterval(timer.tick.bind(timer), 1000); // ✅ explicit bind
@@ -431,7 +433,7 @@ const getAnimal: GetAnimal = getDog; // ✅ Dog Animal'ga assignable
 
 **Variance theory:**
 
-- **Covariant** — sub-type relation saqlanadi (`Dog ⊂ Animal` → `Array<Dog> ⊂ Array<Animal>` readonly bo'lsa).
+- **Covariant** — sub-type relation saqlanadi (`Dog ⊂ Animal` → `ReadonlyArray<Dog> ⊂ ReadonlyArray<Animal>`). TS mutable `Array<T>`'ni ham covariant deb hisoblaydi, lekin bu unsound (`Array<Dog>`'ga `Animal` push qilib bo'lmasligi kerak edi).
 - **Contravariant** — sub-type relation teskari (`Dog ⊂ Animal` → `(Animal) => U ⊂ (Dog) => U`).
 - **Bivariant** — ikkala yo'nalishda mos (unsafe, lekin amaliy uchun foydali).
 - **Invariant** — hech qanday yo'nalishda mos kelmaydi.
@@ -443,7 +445,7 @@ TS function type'larida default:
 
 **`strictFunctionTypes` implementation:**
 
-TS checker `checkTypeRelatedTo` function'ida — function types comparing. Parameter type uchun source/target almashtiriladi (contravariance). Method shorthand `MethodSignature` flag bilan belgilanadi va bivariance saqlanadi.
+Function type'lar relation tekshiruvida parameter type uchun source/target rollari almashtiriladi — shu contravariance'ni beradi. Method shorthand signature'lar (`method(x: T): U`) checker'da alohida belgilanadi: ular uchun parameter comparison bivariant qoldiriladi (`strictFunctionTypes` ularga ta'sir qilmaydi), arrow property (`method: (x: T) => U`) esa to'liq contravariant tekshiriladi.
 
 </details>
 
@@ -522,11 +524,11 @@ function returnsUndefined(): undefined {
 - **`void` operator (JS)** — TS `void` type'i bilan farq. `void 0` — `undefined` qiymat ekspresion JS'da.
 - **`void` in generic position** — `Promise<void>` — `then` callback `value` parameter `void` (ishlatib bo'lmaydi).
 - **Empty body callback `() => {}`** — bo'sh block (object literal emas), `undefined` qaytaradi. Object qaytarish uchun `() => ({})` qavs.
-- **`void 0` vs `undefined`** — JS minification trick. ES5+ da global `undefined` non-writable, lekin local scope'da `let undefined = 1` mumkin edi (sloppy mode ES3). `void 0` har doim `undefined` qiymatga aylanadi (semantic guarantee).
+- **`void 0` vs `undefined`** — JS minification trick. ES5+ da global `undefined` non-writable, lekin local scope'da `var undefined = 1` bilan shadow qilish mumkin (ES3 davrida global `undefined` ham writable edi). `void 0` esa har doim `undefined` qiymatga aylanadi — `void` operator operand'dan qat'i nazar `undefined` qaytaradi.
 
 ### Follow-up savollar
 
-1. **"Nima uchun `() => void` ga `() => Promise<void>` mos kelmaydi (default)?"** — Async funksiya `Promise<undefined>` qaytaradi. Caller `void` deb ignore qilsa, unhandled promise rejection bo'lishi mumkin. TS bu xavfni ko'rsatadi.
+1. **"`() => Promise<void>` ni `() => void` joyiga berish xavfsizmi?"** — Type system jihatdan **mos keladi** (`void` return istalgan qiymatni, jumladan `Promise`'ni ham, ignore qiladi). Lekin runtime xavfli: `forEach(async () => await save())` da har callback Promise qaytaradi, `forEach` uni `void` deb tashlab yuboradi — natijada awaited bo'lmagan promise'lar, unhandled rejection. TS buni xato deb belgilamaydi; bu `@typescript-eslint/no-misused-promises` rule'i ushlaydigan pattern.
 2. **"`noImplicitReturns` qachon void'ga ta'sir qiladi?"** — Funksiya'da ba'zi branch'lar return qilmasa xato beradi. `void` return type bilan bu flag triggered bo'lmaydi (har branch implicit `undefined` qaytaradi).
 
 </details>
@@ -924,7 +926,7 @@ Trade-off jadvali:
 ### Follow-up savollar
 
 1. **"`NoInfer` qachon kerak?"** — Generic type parameter ikki joyda ishlatilganda, faqat bittasidan inference qilinishi kerak bo'lsa. Misol: `function as<T>(value: T, fallback: NoInfer<T>)` — fallback'dan T infer bo'lmaydi.
-2. **"Conditional return implementation'ga ta'sir qiladimi?"** — Faqat caller side'da farq. Body ichida har doim `as` kerak (TS generic body'da conditional ni resolve qilmaydi).
+2. **"Conditional return implementation'ga ta'sir qiladimi?"** — Faqat caller side'da farq. Body ichida har doim `as` kerak (TS generic body'da conditional'ni resolve qilmaydi).
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
@@ -1076,19 +1078,22 @@ setInterval(counter.increment, 1000);
 
 ### Qisqa javob
 
-Ikkala chaqiruvda `this` Counter instance'ga bog'lanmaydi. `this: Counter` parameter — TS uchun marker, JS'da detach'da `this = undefined` (strict) yoki `globalThis` (non-strict). TS compile-time xato beradi.
+Ikkala chaqiruvda ham `this` runtime'da Counter instance'ga bog'lanmaydi (detach'da `this = undefined` strict mode'da, `globalThis` non-strict'da). Lekin TS faqat to'g'ridan-to'g'ri `increment()` chaqiruvini compile-time'da ushlaydi — u yerda `this: Counter` parameter `void` context'ga assignable emas. `setInterval(counter.increment, ...)` esa `any[]`-callback parameter'i tufayli xato bermaydi, garchi runtime bug aynan o'sha.
 
 ### To'liq tushuntirish
 
 ```typescript
 const increment = counter.increment;
-// increment(); // ❌ 'this' context of type 'void' is not assignable to method's 'this' of type 'Counter'
+increment(); // ❌ TS2684: The 'this' context of type 'void' is not assignable to method's 'this' of type 'Counter'.
 
+// ⚠️ Bu qator esa XATO BERMAYDI: setInterval callback parameter'i `(...args: any[]) => void`,
+// `this: Counter` parameter unga assignable bo'lib qoladi. TS bu yerda `this` yo'qolishini ko'rmaydi.
 setInterval(counter.increment, 1000);
-// ❌ Same error — callback'da this lost
 ```
 
-JS runtime'da bu xato faqat method body ichida `this.count++` chaqirilganda paydo bo'lardi (`Cannot read property 'count' of undefined`). TS `this` parameter bilan compile-time'da topadi.
+Faqat `increment()` qatori compile xato beradi — bu yerda `this` context `void` deb chiqariladi va `this: Counter` parameter'ga assignable emas. `setInterval(counter.increment, ...)` esa TS uchun mos (`any[]`-callback), lekin runtime'da `this` baribir yo'qoladi — bu silent bug.
+
+JS runtime'da bu xato method body ichida `this.count++` ishga tushganda paydo bo'lardi (`Cannot read properties of undefined (reading 'count')`). TS `this` parameter bilan to'g'ridan-to'g'ri chaqiruvni compile-time'da ushlaydi.
 
 **Tuzatishlar:**
 
@@ -1113,7 +1118,7 @@ class CounterArrow {
 - **Arrow class field memory cost** — har instance'da method copy. Prototype method — sinf bo'yicha bir marta saqlanadi.
 - **`.bind()` performance** — har chaqiruvda yangi bound function. Kashlash kerak bo'lsa, constructor'da: `this.increment = this.increment.bind(this)`.
 - **TypeScript Decorator `@autobind`** — `@autobind` decorator method'larni avtomatik bind qiladi (3rd-party).
-- **`globalThis` non-strict** — `script` tag'larda (strict mode emas) detach method'da `this = window`. `count` `window`'da yo'q → `undefined++` → `NaN`.
+- **Class method body har doim strict** — ES class body strict mode (surrounding script non-strict bo'lsa ham). Shuning uchun detach qilingan `increment()` da `this = undefined`, va `this.count++` → `TypeError: Cannot read properties of undefined (reading 'count')`. `this = window` (va keyin `NaN`) faqat class'siz oddiy funksiya sloppy mode'da chaqirilganda yuz beradi.
 
 ### Follow-up savollar
 
@@ -1127,9 +1132,9 @@ class CounterArrow {
 
 TS'da `function method(this: T, x: U)` — `this` faqat type annotation. JS'ga compile'da `this` parameter olib tashlanadi, `function method(x)` qoladi. Argument tartibi `arguments[0]` = `x` (this position 0 hisoblanmaydi).
 
-**Compile-time check algoritmi:**
+**Compile-time check mexanizmi:**
 
-TS checker `checkMethodReference` — method'ga reference olinganda `this: T` declared bo'lsa, target type tekshiriladi. Detached call'da `this` `void` deb hisoblanadi (`this: void` parametriga assignable, lekin `this: Counter` parametriga assignable emas).
+Funksiyada `this: T` parameter declared bo'lsa, checker har chaqiruvda actual `this` context'ni shu parameter'ga assignable'mi deb tekshiradi. Bound receiver'siz to'g'ridan-to'g'ri chaqiruvda `this` context `void` deb chiqariladi: `void` `this: void` parameter'ga mos, lekin `this: Counter` parameter'ga assignable emas — shu yerda TS2684 chiqadi.
 
 **Arrow class field — emit farqi:**
 
@@ -1245,11 +1250,11 @@ Function type `(P) => R` ikki pozitsiyaga ega. Sub-typing relation `A ⊂ B` (A 
 
 **`strictFunctionTypes` implementation:**
 
-TS checker `compareSignaturesRelated` funksiyasida har parameter `compareTypes(target, source)` (contravariant — almashtirilgan) bilan tekshiriladi. Return type `compareTypes(source.return, target.return)` (covariant). Method shorthand'da `SignatureFlags.IsMethod` flag — bu flag bilan parameter compare bivariant (`compareTypes` ikki yo'nalishda).
+Signature relation tekshiruvida har parameter target/source rollari almashtirilgan holda solishtiriladi (contravariant), return type esa source→target yo'nalishida (covariant). Method shorthand sifatida declared signature'lar checker'da method deb belgilanadi: ular uchun parameter comparison ikki yo'nalishda (bivariant) qilinadi, `strictFunctionTypes` ularga taalluqli emas.
 
 **Method bivariance — tarixiy sabab:**
 
-TS 2.6'gacha barcha function parameter'lar bivariant edi. Eski kod migration uchun (`Array.prototype.forEach((value: number) => ...)` — `number` `unknown`'dan derive bo'lsa contravariance buzgan bo'lardi) — TS team method shorthand uchun bivariance saqladi. Arrow property syntax (`method: (x: T) => U`) — strict contravariance.
+TS 2.6'gacha barcha function parameter'lar bivariant edi. `strictFunctionTypes` qo'shilganda built-in API method'lari (`Array.prototype.push`, `forEach` va h.k.) declaration'lari ko'plab mavjud kodni buzgan bo'lardi, shuning uchun TS team method shorthand sifatida yozilgan signature'lar uchun bivariance'ni saqlab qoldi. Arrow property syntax (`method: (x: T) => U`) esa strict contravariant tekshiriladi.
 
 **Bottom type `never` ning roli:**
 
