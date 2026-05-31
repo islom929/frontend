@@ -271,7 +271,7 @@ JavaScript'da funksiyalar — **birinchi darajali fuqarolar (first-class citizen
 
 Bu xususiyat nima uchun muhim? Ko'pgina dasturlash tillarida (masalan, eski Java versiyalarida) funksiyalar "ikkinchi darajali" edi — ularni o'zgaruvchiga saqlash yoki argument sifatida berish mumkin emas edi. JavaScript funksiyalarning first-class bo'lishi butun tilning **functional programming** qobiliyatlarining asosi — closure, callback, higher-order function, decorator, memoization — bularning barchasi aynan shu xususiyat tufayli mumkin.
 
-ECMAScript spetsifikatsiyasi bo'yicha funksiya aslida **callable object** — ya'ni oddiy ob'ektga `[[Call]]` internal method qo'shilgan maxsus versiya. Shu sababli funksiyaga property qo'shish, `typeof` bilan tekshirish, va ob'ekt kabi ishlash mumkin:
+ECMAScript specification'i bo'yicha funksiya aslida **callable object** — ya'ni oddiy ob'ektga `[[Call]]` internal method qo'shilgan maxsus versiya. Shu sababli funksiyaga property qo'shish, `typeof` bilan tekshirish, va ob'ekt kabi ishlash mumkin:
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -396,7 +396,7 @@ function executeMiddlewares(req, middlewares) {
 
 ### Nazariya
 
-**IIFE** (Immediately Invoked Function Expression) — bu funksiya yaratilishi bilan **darhol chaqiriladi**. U scope izolyatsiyasi, module pattern, va bir martalik initialization uchun ishlatiladi.
+**IIFE** (Immediately Invoked Function Expression) — bu funksiya yaratilishi bilan **darhol chaqiriladi**. U scope isolation'i, module pattern, va bir martalik initialization uchun ishlatiladi.
 
 IIFE JavaScript tarixida juda muhim rol o'ynagan. ES6'dan oldin `let`, `const` va modullar yo'q edi — faqat `var` va function scope bor edi. Shu sababli dasturchilar global scope'ni ifloslantirmaslik uchun IIFE ishlatishgan. jQuery, Lodash, va boshqa mashhur kutubxonalarning barchasi IIFE ichida o'ralgan edi. Zamonaviy kodda ES modules va block scope (`let`/`const`) IIFE'ning aksariyat use case'larini almashtirgani bo'lsa-da, legacy kod bilan ishlashda va top-level await mavjud bo'lmagan muhitda async initialization uchun IIFE hali ham kerak.
 
@@ -419,7 +419,7 @@ IIFE JavaScript tarixida juda muhim rol o'ynagan. ES6'dan oldin `let`, `const` v
 
 **Nima uchun kerak?**
 
-1. **Scope izolyatsiyasi** — o'zgaruvchilar global scope'ni ifloslamaydi
+1. **Scope isolation'i** — o'zgaruvchilar global scope'ni ifloslamaydi
 2. **Module pattern** — public/private separation
 3. **Bir martalik initialization** kod
 
@@ -555,7 +555,7 @@ console.log(config.apiUrl); // "http://localhost:3000"
 ES6 modullar va block scope (`let`/`const`) kirgandan keyin, IIFE'ning ko'p use case'lari **ortiqcha** bo'ldi:
 
 ```javascript
-// ❌ Eski usul — IIFE bilan scope izolyatsiya
+// ❌ Eski usul — IIFE bilan scope isolation
 (function() {
   var secret = "maxfiy";
   // ...
@@ -598,7 +598,7 @@ export function getSecret() { return secret; }
 
 **Higher-Order Function (HOF)** — bu boshqa funksiyani **argument sifatida qabul qiladigan**, yoki funksiyani **natija sifatida qaytaradigan**, yoki ikkalasini ham qiladigan funksiya. Bu tushuncha matematikadan kelgan va functional programming ning **asosiy qurilish bloki**.
 
-HOF nima uchun muhim? U kodni **abstraksiya** qilish imkonini beradi — "nima qilish" dan "qanday qilish" ni ajratadi. Masalan, `array.filter(predicate)` da filter "massivda yurib chiqish" logikasini o'z ichiga oladi, siz esa faqat "qaysi elementni olish" qoidasini berasiz. Bu separation of concerns prinsipi bo'lib, kodni o'qish va test qilishni osonlashtiradi.
+HOF nima uchun muhim? U kodni **abstraction** qilish imkonini beradi — "nima qilish" dan "qanday qilish" ni ajratadi. Masalan, `array.filter(predicate)` da filter "massivda yurib chiqish" logikasini o'z ichiga oladi, siz esa faqat "qaysi elementni olish" qoidasini berasiz. Bu separation of concerns prinsipi bo'lib, kodni o'qish va test qilishni osonlashtiradi.
 
 JavaScript'da HOF'lar hamma joyda: `map`, `filter`, `reduce`, `addEventListener`, `setTimeout`, `Promise.then`, Express middleware — bularning barchasi HOF. First-class functions tushunchasining **amaliy qo'llanishi** aynan shu yerda namoyon bo'ladi.
 
@@ -913,7 +913,7 @@ readConfig("./config.json", function(error, config) {
 
 Nima uchun purelik muhim? Pure funksiyalar kodni **predictable** (oldindan aytib berish mumkin) qiladi, test yozish osonlashadi (faqat input/output tekshirish yetarli, mock kerak emas), parallel bajarish xavfsiz bo'ladi (shared state yo'q), va caching/memoization mumkin bo'ladi (bir xil input = bir xil output). React'ning butun rendering tizimi pure function konsepsiyasiga asoslangan — component pure bo'lishi kerak, side effect'lar esa `useEffect` ichida bo'lishi kerak.
 
-**Side Effect** — funksiyaning tashqi dunyoga ta'sir qilishi: global o'zgaruvchini o'zgartirish, console'ga yozish, DOM'ni o'zgartirish, network request, file tizimiga yozish, yoki `Math.random()`/`Date.now()` ishlatish. Side effect'lar zarur (ularsiz dastur foydali ish qila olmaydi), lekin ularni **nazorat qilish** va **izolyatsiya qilish** kerak.
+**Side Effect** — funksiyaning tashqi dunyoga ta'sir qilishi: global o'zgaruvchini o'zgartirish, console'ga yozish, DOM'ni o'zgartirish, network request, file tizimiga yozish, yoki `Math.random()`/`Date.now()` ishlatish. Side effect'lar zarur (ularsiz dastur foydali ish qila olmaydi), lekin ularni **nazorat qilish** va **isolation qilish** kerak.
 
 ```javascript
 // ✅ Pure — bir xil input, bir xil output, side effect yo'q
@@ -1179,21 +1179,21 @@ withUzbekTax(10000); // 102000
 **Real-world: API so'rovlar uchun curried helper:**
 
 ```javascript
-const request = curry(function(method, baseUrl, endpoint, data) {
+// curry fn.length ga qaraydi — shuning uchun barcha 3 parametr majburiy
+const request = curry(function(method, baseUrl, endpoint) {
   return fetch(`${baseUrl}${endpoint}`, {
     method,
-    headers: { "Content-Type": "application/json" },
-    body: data ? JSON.stringify(data) : undefined
+    headers: { "Content-Type": "application/json" }
   }).then(res => res.json());
 });
 
-// Maxsus funksiyalar yaratamiz
+// Maxsus funksiyalar yaratamiz — method va baseUrl oldindan berildi
 const apiGet = request("GET")("https://api.example.com");
-const apiPost = request("POST")("https://api.example.com");
+const apiDelete = request("DELETE")("https://api.example.com");
 
-// Ishlatish — qisqa va o'qilishi oson
+// Ishlatish — oxirgi argument (endpoint) berilganda fetch ishga tushadi
 const users = await apiGet("/users");
-const newUser = await apiPost("/users")({ name: "Ali", email: "ali@mail.com" });
+const removed = await apiDelete("/users/42");
 
 // Test muhiti uchun boshqa base URL
 const testGet = request("GET")("http://localhost:3000");
@@ -1232,7 +1232,7 @@ const handleAgeChange = handleInputChange("age")(isValidAge);
 
 **Partial Application** — funksiyaning **ba'zi argumentlarini oldindan berish** va qolgan argumentlarni kutuvchi yangi funksiya yaratish texnikasi. Currying bilan o'xshash bo'lsa-da, muhim farqi bor: currying har doim birma-bir argument oladi (`f(a)(b)(c)`), partial application esa bir nechtasini bir yo'la berib qolgan argumentlarni kutadi (`f(a, b)` → `g(c)`).
 
-Partial application nima uchun foydali? U **maxsuslashtirilgan funksiyalar** yaratishning eng oson usuli. Masalan, umumiy `log(level, timestamp, message)` funksiyasidan `errorLog(message)` kabi tayyor funksiya yaratish mumkin. JavaScript'da `Function.prototype.bind` aslida partial application ning built-in implementatsiyasi.
+Partial application nima uchun foydali? U **maxsuslashtirilgan funksiyalar** yaratishning eng oson usuli. Masalan, umumiy `log(level, timestamp, message)` funksiyasidan `errorLog(message)` kabi tayyor funksiya yaratish mumkin. JavaScript'da `Function.prototype.bind` aslida partial application ning built-in implementation.
 
 **Currying bilan farqi:**
 
@@ -1240,7 +1240,7 @@ Partial application nima uchun foydali? U **maxsuslashtirilgan funksiyalar** yar
 |-----------|---------|---------------------|
 | **Argument berish** | Birma-bir: `f(a)(b)(c)` | Bir nechtasini birdan: `f(a, b)` → `g(c)` |
 | **Qaytarish** | Doim 1-argumentli funksiya | Qolgan argumentlarni kutuvchi funksiya |
-| **Maqsad** | Funksiya transformatsiyasi | Argumentlarni oldindan to'ldirish |
+| **Maqsad** | Funksiya transformation | Argumentlarni oldindan to'ldirish |
 | **Argument tartibi** | Chapdan o'ngga qat'iy | Istalgan joyda (placeholder bilan) |
 
 ```javascript
@@ -1281,7 +1281,7 @@ Misol: log.bind(null, "ERROR")
   → Chaqirilganda: log("ERROR", ...qolganArgs)
 ```
 
-Custom `partial` funksiyasi (placeholder bilan) ham xuddi shu prinsipda ishlaydi — lekin `bind` dan farqli, u argumentlarning **istalgan pozitsiyasida** placeholder qo'yish imkonini beradi. Bu closures'ning amaliy qo'llanishi — [05-closures.md](05-closures.md) dagi mexanizm bu yerda to'g'ridan-to'g'ri ishlatilmoqda.
+Custom `partial` funksiyasi (placeholder bilan) ham shu prinsipda ishlaydi — lekin `bind` dan farqli, u argumentlarning **istalgan pozitsiyasida** placeholder qo'yish imkonini beradi. Bu closures'ning amaliy qo'llanishi — [05-closures.md](05-closures.md) dagi mexanizm bu yerda to'g'ridan-to'g'ri ishlatilmoqda.
 
 </details>
 
@@ -1408,7 +1408,7 @@ Vizual pipeline:
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-**`compose` va `pipe` implementatsiyasi:**
+**`compose` va `pipe` implementation:**
 
 ```javascript
 // compose — o'ngdan chapga bajaradi: compose(f, g, h)(x) = f(g(h(x)))
@@ -1553,7 +1553,7 @@ Memoization oddiy — ichida **Map** (yoki object) bor, argument ni key sifatida
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-**Oddiy `memoize` implementatsiyasi:**
+**Oddiy `memoize` implementation:**
 
 ```javascript
 function memoize(fn) {
@@ -1657,7 +1657,7 @@ const calculateExpensiveReport = memoize(function(transactions, startDate, endDa
 // Birinchi chaqiruv — hisob-kitob bajariladi
 const report1 = calculateExpensiveReport(transactions, "2025-01-01", "2025-01-31");
 
-// Xuddi shu argumentlar bilan — cache'dan
+// Aynan shu argumentlar bilan — cache'dan
 const report2 = calculateExpensiveReport(transactions, "2025-01-01", "2025-01-31");
 // report1 === report2 — bir xil reference!
 ```
@@ -1676,7 +1676,7 @@ const report2 = calculateExpensiveReport(transactions, "2025-01-01", "2025-01-31
 
 **Throttle** — berilgan vaqt oralig'ida **ko'pi bilan bitta marta** bajaradi. Qancha tez chaqirmang, har N millisekund'da faqat birgina marta ishlaydi. Scroll event, resize, yoki sensor ma'lumotlarini qayta ishlashda throttle ishlatiladi.
 
-Bu ikki pattern zamonaviy frontend dasturlashda **deyarli har doim** kerak: search input'larda debounce, scroll/resize handler'larda throttle, API rate limiting'da throttle. Lodash va boshqa kutubxonalarda tayyor implementatsiyalar bor, lekin ularni o'zingiz yoza olish — closure va timer'lar bilan ishlashni to'liq tushunganingiz isboti.
+Bu ikki pattern zamonaviy frontend dasturlashda **deyarli har doim** kerak: search input'larda debounce, scroll/resize handler'larda throttle, API rate limiting'da throttle. Lodash va boshqa kutubxonalarda tayyor implementation bor, lekin ularni o'zingiz yoza olish — closure va timer'lar bilan ishlashni to'liq tushunganingiz isboti.
 
 ```
 Debounce (300ms):
@@ -2063,7 +2063,7 @@ test(1, 2, 3, 4);
 → rest = [3, 4]  // Faqat QOLGAN argumentlar — haqiqiy Array!
 ```
 
-V8 ichida rest parameters optimizatsiyasi: V8 rest parameters uchun `arguments` object yaratmaydi — to'g'ridan-to'g'ri Array yaratadi. Bu **yanada tezroq** ishlaydi, chunki `arguments` exotic object yaratish qo'shimcha overhead talab qiladi.
+V8 ichida rest parameters optimization: V8 rest parameters uchun `arguments` object yaratmaydi — to'g'ridan-to'g'ri Array yaratadi. Bu **yanada tezroq** ishlaydi, chunki `arguments` exotic object yaratish qo'shimcha overhead talab qiladi.
 
 </details>
 
@@ -2355,7 +2355,7 @@ Har bir funksiya object bo'lgani uchun ([First-Class Functions](#first-class-fun
 
 **`name` property** — funksiyaning **debug-friendly** nomi. Bu DevTools call stack'da, error stack trace'da, va `console.log`'da funksiyani identifikatsiya qilish uchun ishlatiladi. Anonymous funksiyalar ham kontekstga qarab nom olishi mumkin — bu ES6'da kiritilgan **name inference** mexanizmi.
 
-**`length` property** — funksiyaning e'lon qilingan **majburiy parametrlari** soni. Bu rest parameters (`...args`) va default value bilan berilgan parametrlarni **hisoblamaydi**. `length` meta-programming da, masalan `curry` funksiyasida, kerakli argumentlar sonini aniqlash uchun ishlatiladi — yuqoridagi [Currying](#currying) bo'limidagi `curry` implementatsiyamiz aynan `fn.length` ga tayanadi.
+**`length` property** — funksiyaning e'lon qilingan **majburiy parametrlari** soni. Bu rest parameters (`...args`) va default value bilan berilgan parametrlarni **hisoblamaydi**. `length` meta-programming da, masalan `curry` funksiyasida, kerakli argumentlar sonini aniqlash uchun ishlatiladi — yuqoridagi [Currying](#currying) bo'limidagi `curry` implementation aynan `fn.length` ga tayanadi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2464,7 +2464,7 @@ console.log(defaultFirst.length); // 0 — a default, b va c ham hisoblanmaydi!
 **Real-world: `length` ni `curry` da ishlatish:**
 
 ```javascript
-// Yuqoridagi curry implementatsiyamiz fn.length ga tayanadi:
+// Yuqoridagi curry implementation fn.length ga tayanadi:
 function curry(fn) {
   return function curried(...args) {
     if (args.length >= fn.length) { // ← fn.length — kerakli argumentlar soni
@@ -2484,18 +2484,20 @@ curriedAdd(1)(2)(3); // 6 — 3 ta argument to'planganda chaqiradi
 **Debugging uchun `name`:**
 
 ```javascript
-// Error stack trace da funksiya nomi ko'rinadi:
-const handlers = {
-  // Anonymous — stack trace da "anonymous" yoki "<anonymous>"
-  bad: function() { throw new Error("xato"); },
+// Inline callback'lar — name inference ishlamaydi, stack trace anonim
+[1].forEach(function() { throw new Error("xato"); });
+// Stack trace: at <anonymous> (file.js:2) — funksiya nomsiz
 
-  // Named — stack trace da "handleUserCreate" ko'rinadi
-  good: function handleUserCreate() { throw new Error("xato"); }
-};
+// Named function expression — nom har joyda saqlanadi
+[1].forEach(function handleItem() { throw new Error("xato"); });
+// Stack trace: at handleItem (file.js:6) — aniq qaysi funksiya
 
-// DevTools da:
-// bad():  Error at Object.<anonymous> (file.js:2)
-// good(): Error at handleUserCreate (file.js:5)  ← ancha foydali!
+// Eslatma: object property yoki o'zgaruvchiga tayinlangan anonim funksiya
+// ES6 name inference orqali nom oladi — bu holatda inference ishlamaydi,
+// chunki funksiya to'g'ridan-to'g'ri argument sifatida berilmoqda:
+const fn = function() {};
+console.log(fn.name);                    // "fn" — inference o'zgaruvchidan
+console.log([function() {}][0].name);    // "" — inference yo'q, nomsiz qoladi
 ```
 
 </details>
@@ -2770,9 +2772,9 @@ safeSum(100000); // 5000050000 — stack overflow yo'q!
 
 ### Nazariya
 
-Tail Call Optimization (TCO) — ES6 (ES2015) spetsifikatsiyasida aniqlangan optimizatsiya. Agar funksiyaning **oxirgi operatsiyasi** (tail position) boshqa funksiyani chaqirish bo'lsa, engine yangi stack frame yaratmasdan, mavjud frame'ni qayta ishlatishi mumkin. Bu recursive funksiyalarning stack overflow bo'lmasligini ta'minlaydi.
+Tail Call Optimization (TCO) — ES6 (ES2015) specification'ida aniqlangan optimization. Agar funksiyaning **oxirgi operatsiyasi** (tail position) boshqa funksiyani chaqirish bo'lsa, engine yangi stack frame yaratmasdan, mavjud frame'ni qayta ishlatishi mumkin. Bu recursive funksiyalarning stack overflow bo'lmasligini ta'minlaydi.
 
-**Muhim:** TCO spetsifikatsiyada bor, lekin hozircha **faqat Safari (JavaScriptCore)** implement qilgan. V8 (Chrome/Node.js) va SpiderMonkey (Firefox) implement qilmagan — sabablari: debugging qiyinligi (stack trace yo'qoladi) va performance trade-off'lar.
+**Muhim:** TCO specification'da bor, lekin hozircha **faqat Safari (JavaScriptCore)** implement qilgan. V8 (Chrome/Node.js) va SpiderMonkey (Firefox) implement qilmagan — sabablari: debugging qiyinligi (stack trace yo'qoladi) va performance trade-off'lar.
 
 ```
 Tail Position — funksiyaning OXIRGI operatsiyasi recursive chaqiruv bo'lishi kerak:
@@ -2799,9 +2801,9 @@ TCO siz (oddiy recursion):                TCO bilan:
 │ fact(1, 120) │                          │              │
 │ fact(2, 60)  │                          │              │
 │ fact(3, 20)  │    →   Stack o'sib       │ fact(5,1)    │ → Frame qayta ishlatiladi
-│ fact(4, 5)   │        boradi            │  ↓ fact(4,5) │ → xuddi shu frame
-│ fact(5, 1)   │                          │  ↓ fact(3,20)│ → xuddi shu frame
-│ main()       │                          │  ↓ fact(2,60)│ → xuddi shu frame
+│ fact(4, 5)   │        boradi            │  ↓ fact(4,5) │ → ayni shu frame
+│ fact(5, 1)   │                          │  ↓ fact(3,20)│ → ayni shu frame
+│ main()       │                          │  ↓ fact(2,60)│ → ayni shu frame
 └──────────────┘                          │  ↓ fact(1,120)→ return 120
                                           │ main()       │
                                           └──────────────┘
@@ -2824,7 +2826,7 @@ addCPS(2, 3, result => console.log(result)); // 5
 
 **Spec darajasida TCO**: ES6 (2015) da **Proper Tail Calls** (PTC) spec'ga kiritildi. Tail position — funksiya oxirgi operatsiyasi bevosita `return f(...)` bo'lishi kerak. `return f(x) + 1`, `return await f()`, `try { return f() }` — tail position EMAS.
 
-**Engine implementatsiyasi**:
+**Engine implementation**:
 - ✅ **Safari (JavaScriptCore)** — strict mode'da implement qilingan
 - ❌ **V8 (Chrome/Node.js)** — implement qilinmagan
 - ❌ **SpiderMonkey (Firefox)** — implement qilinmagan
@@ -3092,7 +3094,7 @@ IIFE ichida `"use strict"` direktivasi yozilsa, `this` global object **emas**, `
 
 // Arrow IIFE — lexical this (outer scope'dan)
 (() => {
-  console.log(this); // Modul'da: {} (module exports), browser: window/globalThis
+  console.log(this); // ES module: undefined, CommonJS module: {} (module.exports), browser script: window/globalThis
 })();
 ```
 
@@ -3700,7 +3702,7 @@ Bu bo'limda biz JavaScript Functions ning **barcha muhim tomonlarini** ko'rib ch
 |-------|-------------|
 | **Declaration vs Expression vs Arrow** | Hoisting, `this`, `arguments` farqlari — qachon qaysi birini ishlatish |
 | **First-Class Functions** | Funksiyalar = qiymatlar: saqlash, berish, qaytarish mumkin |
-| **IIFE** | Darhol chaqiriladigan funksiya — scope izolyatsiya. ES6 modullar bilan kamroq kerak |
+| **IIFE** | Darhol chaqiriladigan funksiya — scope isolation. ES6 modullar bilan kamroq kerak |
 | **Higher-Order Functions** | Funksiya qabul qilish/qaytarish — `map`, `filter`, decorator, factory |
 | **Callbacks** | Async pattern asosi — Promises/async-await ga yo'l |
 | **Pure Functions** | Bir xil input = bir xil output, side effect yo'q — test, memoize, predict qilish oson |

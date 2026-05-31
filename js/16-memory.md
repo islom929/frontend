@@ -1,6 +1,6 @@
 # Bo'lim 16: Memory Management
 
-> JavaScript da xotira qanday ajratiladi va bo'shatiladi — Stack va Heap arxitekturasi, Garbage Collection algoritmlari, memory leak turlari va ularni topish, WeakRef/WeakMap/WeakSet bilan GC-friendly kod yozish.
+> JavaScript da xotira qanday ajratiladi va bo'shatiladi — Stack va Heap architecture'si, Garbage Collection algoritmlari, memory leak turlari va ularni topish, WeakRef/WeakMap/WeakSet bilan GC-friendly kod yozish.
 
 ---
 
@@ -45,7 +45,7 @@ Stack overflow — juda chuqur yoki cheksiz recursion natijasida stack hajmi tug
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-V8 engine da heap bir nechta bo'limlarga (**spaces**) bo'lingan. Har bir bo'lim o'z maqsadiga ega va alohida GC strategiyasi bilan boshqariladi. V8 arxitekturasi versiyalar bo'ylab soddalashgan — quyidagi zamonaviy V8 (2023+) layout'i:
+V8 engine da heap bir nechta bo'limlarga (**spaces**) bo'lingan. Har bir bo'lim o'z maqsadiga ega va alohida GC strategiyasi bilan boshqariladi. V8 architecture'si versiyalar bo'ylab soddalashgan — quyidagi zamonaviy V8 (2023+) layout'i:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -78,7 +78,7 @@ V8 engine da heap bir nechta bo'limlarga (**spaces**) bo'lingan. Har bir bo'lim 
 └──────────────────────────────────────────────────────────┘
 ```
 
-- **New Space (Young Generation)** — ikki **semi-space** (From/To) ga bo'lingan, Cheney's copying algorithm ishlatiladi. Yangi yaratilgan object'lar shu yerga tushadi. **Scavenger** (Minor GC) tez-tez tozalaydi: tirik object'larni From space dan To space ga ko'chiradi, so'ng ikki space o'rin almashadi. Hajmi heap konfiguratsiyasiga qarab bir necha MB.
+- **New Space (Young Generation)** — ikki **semi-space** (From/To) ga bo'lingan, Cheney's copying algorithm ishlatiladi. Yangi yaratilgan object'lar shu yerga tushadi. **Scavenger** (Minor GC) tez-tez tozalaydi: tirik object'larni From space dan To space ga ko'chiradi, so'ng ikki space o'rin almashadi. Hajmi heap configuration'iga qarab bir necha MB.
 - **Old Space (Old Generation)** — yashab qolgan (odatda 2 ta Scavenger tsiklidan omon qolgan) object'lar shu yerga **promote** bo'ladi. Eski V8 versiyalarida Old Space "Old Pointer Space" va "Old Data Space" ga bo'lingan, keyin esa alohida "Map Space" (Hidden Classes uchun) bor edi — **zamonaviy V8 (v11, 2023+)** da bu bo'laklar yagona Old Space'ga birlashtirildi. Hidden Classes endi boshqa long-lived object'lar bilan bir joyda saqlanadi. **Mark-Sweep-Compact** (Major GC) kamroq, lekin chuqurroq tozalaydi.
 - **Large Object Space** — `kMaxRegularHeapObjectSize` chegarasidan katta object'lar to'g'ridan-to'g'ri shu yerga joylashadi (aniq chegara versiyaga va pointer compression sozlamalariga bog'liq, odatda yuzlab KB tartibida). Bu object'lar ko'chirilmaydi — faqat mark-sweep.
 - **Code Space** — JIT compiled kod (Ignition bytecode emas, TurboFan/Maglev tomonidan yaratilgan mashina kodi). Bajariladigan instruksiyalar shu yerda.
@@ -175,11 +175,11 @@ Bu farq React/Redux da muhim ahamiyatga ega. State'ni mutate qilsangiz reference
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-V8 da primitive qiymatlar bilan ishlashda bir nechta optimizatsiya mavjud:
+V8 da primitive qiymatlar bilan ishlashda bir nechta optimization mavjud:
 
-**String Interning** — V8 ba'zi string'larni intern qiladi. Bir xil qiymatli qisqa string'lar bitta xotira joyini ishlatishi mumkin (memory tejash uchun). Lekin bu faqat engine ichki optimizatsiyasi — tashqaridan observable emas, string hali ham immutable va copy by value semantikasida ishlaydi.
+**String Interning** — V8 ba'zi string'larni intern qiladi. Bir xil qiymatli qisqa string'lar bitta xotira joyini ishlatishi mumkin (memory tejash uchun). Lekin bu faqat engine ichki optimization'i — tashqaridan observable emas, string hali ham immutable va copy by value semantikasida ishlaydi.
 
-**Small Integer (Smi) tagged representation** — V8 da kichik integer'lar **Smi (Small Integer)** formatida to'g'ridan-to'g'ri pointer ichida saqlanadi: pointer'ning eng kichik biti tag sifatida ishlatiladi, qolgan bitlar integer qiymatini to'g'ridan-to'g'ri ko'rsatadi — alohida heap allocation kerak emas. Diapazoni arxitekturaga bog'liq: klassik 32-bit V8 da Smi = 31-bit (-2³⁰ dan 2³⁰−1 gacha); **pointer compression** yoqilgan 64-bit V8 da (zamonaviy default) ham 31-bit Smi ishlatiladi. Ushbu optimizatsiya integer arifmetikani floating-point (HeapNumber) dan sezilarli tezroq qiladi — arithmetic paytida hech qanday pointer dereference kerak emas.
+**Small Integer (Smi) tagged representation** — V8 da kichik integer'lar **Smi (Small Integer)** formatida to'g'ridan-to'g'ri pointer ichida saqlanadi: pointer'ning eng kichik biti tag sifatida ishlatiladi, qolgan bitlar integer qiymatini to'g'ridan-to'g'ri ko'rsatadi — alohida heap allocation kerak emas. Diapazoni architecture'ga bog'liq: klassik 32-bit V8 da Smi = 31-bit (-2³⁰ dan 2³⁰−1 gacha); **pointer compression** yoqilgan 64-bit V8 da (zamonaviy default) ham 31-bit Smi ishlatiladi. Ushbu optimization integer arifmetikani floating-point (HeapNumber) dan sezilarli tezroq qiladi — arithmetic paytida hech qanday pointer dereference kerak emas.
 
 ```javascript
 // V8 Smi — pointer ichida, heap allocation yo'q — juda tez:
@@ -513,7 +513,7 @@ Orinoco tufayli GC pauza'lari asosan background thread'larga ko'chiriladi, shuni
 
 Concurrent va incremental GC qanday qilib asosiy dastur parallel ishlab turganda ham tutashliq (correctness) ni saqlaydi? Bu uchta asosiy mexanizm ustiga quriladi: **tri-color marking**, **write barrier** va **remembered set**.
 
-**1. Tri-color Marking** — Dijkstra/Lamport abstraksiyasi. Har bir object uchta rangdan birida bo'ladi:
+**1. Tri-color Marking** — Dijkstra/Lamport abstraction'i. Har bir object uchta rangdan birida bo'ladi:
 
 ```
    ⚪ OQ (White)   — hali kuzatilmagan. Mark faza oxirida oq qolganlar = garbage.
@@ -554,7 +554,7 @@ if (marking_in_progress && is_black(obj) && is_white(newChild)) {
 obj.child = newChild; // haqiqiy store
 ```
 
-**3. Remembered Set** — generational GC uchun muhim optimizatsiya. Scavenger faqat Young Generation'ni tozalaydi, lekin Old → Young reference'lar ham root hisoblanadi (aks holda Scavenger Old'dagi reference tufayli tirik object'ni tozalab yuborardi). Har safar Scavenger ishlaganda butun Old Space'ni skan qilish juda qimmat bo'ladi — buning o'rniga V8 **remembered set** yuritadi: Old → Young reference'lar ro'yxati. Har yozish paytida write barrier tekshiradi: "bu store Old object'dan Young object'gami?" — agar ha bo'lsa, source card/slot remembered set'ga qo'shiladi.
+**3. Remembered Set** — generational GC uchun muhim optimization. Scavenger faqat Young Generation'ni tozalaydi, lekin Old → Young reference'lar ham root hisoblanadi (aks holda Scavenger Old'dagi reference tufayli tirik object'ni tozalab yuborardi). Har safar Scavenger ishlaganda butun Old Space'ni skan qilish juda qimmat bo'ladi — buning o'rniga V8 **remembered set** yuritadi: Old → Young reference'lar ro'yxati. Har yozish paytida write barrier tekshiradi: "bu store Old object'dan Young object'gami?" — agar ha bo'lsa, source card/slot remembered set'ga qo'shiladi.
 
 ```
    OLD SPACE                          YOUNG SPACE
@@ -572,7 +572,7 @@ obj.child = newChild; // haqiqiy store
    faqat remembered set root sifatida kuzatiladi.
 ```
 
-**Amaliy ta'siri:** bu mexanizmlar tufayli zamonaviy V8 da GC overhead kichik bo'ladi, lekin allocation-heavy va mutation-heavy kod write barrier overhead'ini ham ko'taradi. Xotira samaradorligi va CPU samaradorligi o'rtasida nozik balans bor — shuning uchun "allocation dan qochish" umumiy optimizatsiya maslahati.
+**Amaliy ta'siri:** bu mexanizmlar tufayli zamonaviy V8 da GC overhead kichik bo'ladi, lekin allocation-heavy va mutation-heavy kod write barrier overhead'ini ham ko'taradi. Xotira samaradorligi va CPU samaradorligi o'rtasida nozik balans bor — shuning uchun "allocation dan qochish" umumiy optimization maslahati.
 
 ---
 
@@ -732,7 +732,7 @@ function teardownFixed() {
 
 ### 4. Closures — Katta Data ni Ushlab Turish
 
-Spec darajasida closure o'zi yaratilgan `LexicalEnvironment`'ga reference saqlaydi — ya'ni tashqi scope'dagi **barcha** o'zgaruvchilar potentsial ushlab turilishi mumkin. V8 **scope analysis** (context allocation optimizatsiyasi) bilan qaysi o'zgaruvchilar haqiqatan inner funksiya(lar) tomonidan **captured** qilinganini aniqlaydi va faqat shularni Context object slot'iga joylashtiradi — qolganlari stack frame slot'ida qoladi va funksiya tugaganda tozalanadi. Lekin bu optimizatsiya har doim ham ishlamaydi — `eval`, `with`, `arguments`, yoki murakkab control flow uni bekor qilishi mumkin. Agar closure body'si katta o'zgaruvchini haqiqatan eslatib qolsa — u data GC tozalay olmaydi:
+Spec darajasida closure o'zi yaratilgan `LexicalEnvironment`'ga reference saqlaydi — ya'ni tashqi scope'dagi **barcha** o'zgaruvchilar potentsial ushlab turilishi mumkin. V8 **scope analysis** (context allocation optimization'i) bilan qaysi o'zgaruvchilar haqiqatan inner funksiya(lar) tomonidan **captured** qilinganini aniqlaydi va faqat shularni Context object slot'iga joylashtiradi — qolganlari stack frame slot'ida qoladi va funksiya tugaganda tozalanadi. Lekin bu optimization har doim ham ishlamaydi — `eval`, `with`, `arguments`, yoki murakkab control flow uni bekor qilishi mumkin. Agar closure body'si katta o'zgaruvchini haqiqatan eslatib qolsa — u data GC tozalay olmaydi:
 
 > **Eslatma:** Bu **escape analysis**'dan farqli optimization. Escape analysis esa object'ning funksiyadan "qochib chiqish"ini tekshiradi (agar qochmasa — scalar replacement qilinadi, ya'ni object hech yaratilmaydi, property'lari register'larga bo'linadi). Ikki xil V8 optimization, turli bosqichlarda ishlaydi.
 
@@ -1386,8 +1386,8 @@ class ParticlePool {
 // ❌ Har iteratsiyada yangi object/array:
 function processItems(items) {
   for (let i = 0; i < items.length; i++) {
-    const temp = { value: items[i], index: i }; // YANGI object
-    const coords = [temp.value.x, temp.value.y]; // YANGI array
+    const record = { value: items[i], index: i }; // YANGI object
+    const coords = [record.value.x, record.value.y]; // YANGI array
     render(coords);
   }
   // 10,000 item = 20,000 ta keraksiz allocation
@@ -1395,14 +1395,14 @@ function processItems(items) {
 
 // ✅ Oldindan yaratib, qayta ishlatish:
 function processItemsOptimized(items) {
-  const temp = { value: null, index: 0 }; // BITTA object
-  const coords = [0, 0];                  // BITTA array
+  const record = { value: null, index: 0 }; // BITTA object
+  const coords = [0, 0];                    // BITTA array
 
   for (let i = 0; i < items.length; i++) {
-    temp.value = items[i];
-    temp.index = i;
-    coords[0] = temp.value.x;
-    coords[1] = temp.value.y;
+    record.value = items[i];
+    record.index = i;
+    coords[0] = record.value.x;
+    coords[1] = record.value.y;
     render(coords);
   }
   // 0 ta yangi allocation — GC yuki yo'q ✅
@@ -1411,13 +1411,14 @@ function processItemsOptimized(items) {
 
 ### 3. TypedArray — Katta Sonli Data uchun
 
-Homogen sonli data (masalan, audio sample'lari, pixel buffer, koordinata massivi) uchun `TypedArray` oddiy `Array` dan sezilarli darajada samaraliroq — aniq afzalliklar esa V8'ning array optimizatsiyalari bilan birga ko'rib chiqilishi kerak:
+Homogen sonli data (masalan, audio sample'lari, pixel buffer, koordinata massivi) uchun `TypedArray` oddiy `Array` dan sezilarli darajada samaraliroq — aniq afzalliklar esa V8'ning array optimization'lari bilan birga ko'rib chiqilishi kerak:
 
 ```javascript
-// Oddiy Array — V8 elementlar homogen bo'lsa PACKED_DOUBLE_ELEMENTS
-// kind'ga o'tib element'larni inline (boxing'siz) saqlashi mumkin,
-// lekin shape yaxlitligi buzilsa (masalan, bo'sh slot, undefined, obyekt)
-// HOLEY yoki GENERIC kind'ga deoptimize bo'ladi va har element boxed bo'ladi:
+// Oddiy Array — V8 elementlar homogen double bo'lsa PACKED_DOUBLE_ELEMENTS
+// kind'ga o'tib element'larni inline (boxing'siz) saqlashi mumkin.
+// Holega ega bo'lsa (delete, bo'sh slot) → HOLEY_DOUBLE_ELEMENTS, double
+// bo'lmagan qiymat (object, string) qo'shilsa → PACKED_ELEMENTS (tagged),
+// bu paytda double'lar HeapNumber sifatida box qilinadi:
 const regularArray = new Array(1_000_000);
 for (let i = 0; i < 1_000_000; i++) {
   regularArray[i] = i * 1.5;
@@ -1431,12 +1432,12 @@ const typedArray = new Float64Array(1_000_000);
 for (let i = 0; i < 1_000_000; i++) {
   typedArray[i] = i * 1.5;
 }
-// Aniq 8 MB (1M × 8 bayt) + kichik buffer header. Shape optimizatsiyasiga
+// Aniq 8 MB (1M × 8 bayt) + kichik buffer header. Shape optimization'iga
 // bog'liq emas — har doim zich, predictable.
 ```
 
 **`TypedArray` ning amaliy afzalliklari:**
-- **Predictable layout** — V8 ning "elements kind" optimizatsiyasiga bog'liq emas, har doim bir xil zich format
+- **Predictable layout** — V8 ning "elements kind" optimization'iga bog'liq emas, har doim bir xil zich format
 - **Transferable** — `postMessage` orqali Worker'larga `ArrayBuffer` ni zero-copy transfer qilish mumkin
 - **Interop** — WebGL, WebAudio, WASM, Canvas ImageData, crypto — barcha browser API'lar `TypedArray` bilan ishlaydi
 - **SIMD-friendly** — zich memory layout SIMD (vector) instruksiyalari uchun ideal
@@ -1478,7 +1479,7 @@ console.log(copy.self === copy);   // true
 ```javascript
 // ✅ null bilan katta object reference tozalash:
 function processLargeData() {
-  let data = fetchHugeDataset(); // 100MB
+  let data = fetchHugeDataset(); // katta dataset
   const summary = computeSummary(data);
   data = null; // GC tozalashi mumkin — summary yetarli
   return summary;
@@ -1487,7 +1488,7 @@ function processLargeData() {
 // ✅ Block scope bilan scope ni kichik saqlash:
 function good() {
   {
-    const hugeArray = loadData(); // 50MB
+    const hugeArray = loadData(); // katta array
     doSomething(hugeArray);
   } // hugeArray scope tugadi — GC tozalashi mumkin
 
@@ -1545,7 +1546,7 @@ async function readTwiceSafe() {
 
 ### Gotcha 2: `FinalizationRegistry` callback ishonchli emas — cleanup logic'ni bog'lamang
 
-`FinalizationRegistry` callback'i **"might be called, might not be called, at an unspecified time"** — spec aniq shu so'zlarni ishlatadi. Engine dastur tugashidan oldin callback'larni chaqirmasligi mumkin, GC umuman ishlamasligi mumkin (masalan, yetarli memory bor bo'lsa), yoki callback cross-realm scenariy'da suppress qilinishi mumkin.
+`FinalizationRegistry` callback'i hech qachon chaqirilmasligi mumkin — ECMAScript spec'da konformant engine cleanup callback'larni chaqirishga **majbur emas** deb belgilangan. Engine dastur tugashidan oldin callback'larni chaqirmasligi mumkin, GC umuman ishlamasligi mumkin (masalan, yetarli memory bor bo'lsa), yoki callback cross-realm scenariy'da suppress qilinishi mumkin.
 
 ```javascript
 // ❌ Resource cleanup FinalizationRegistry ga tayanmaslik:
@@ -1631,7 +1632,7 @@ function forEachTracked(callback) {
 
 ### Gotcha 4: Detached ArrayBuffer — `TypedArray` view bo'sh bo'lib qoladi
 
-`ArrayBuffer` ni `postMessage` orqali Worker'ga transfer qilish **zero-copy** — lekin transfer'dan keyin original buffer **detached** bo'lib qoladi. Har qanday `TypedArray` view shu buffer ustida ishlagan bo'lsa — darhol 0 uzunlikka aylanadi va barcha read/write `TypeError` beradi.
+`ArrayBuffer` ni `postMessage` orqali Worker'ga transfer qilish **zero-copy** — lekin transfer'dan keyin original buffer **detached** bo'lib qoladi. Har qanday `TypedArray` view shu buffer ustida ishlagan bo'lsa — darhol 0 uzunlikka aylanadi: indexed read `undefined` qaytaradi, indexed write jimgina e'tiborsiz qoldiriladi, `set`/`fill` kabi method'lar esa `TypeError` tashlaydi.
 
 ```javascript
 const buffer = new ArrayBuffer(1024);
@@ -1644,11 +1645,20 @@ worker.postMessage(buffer, [buffer]); // transfer — zero-copy
 
 console.log(view.length); // 0 — DETACHED!
 console.log(buffer.byteLength); // 0 — DETACHED!
-view[0] = 99;
+
+// Indexed read/write detached buffer ustida XATO BERMAYDI — jimgina muvaffaqiyatsiz:
+console.log(view[0]); // undefined — detached buffer'dan o'qish undefined qaytaradi
+view[0] = 99;         // no-op — yozish jimgina e'tiborsiz qoldiriladi (xato yo'q)
+console.log(view[0]); // undefined — yozilmadi
+
+// Method'lar esa TypeError beradi (ValidateTypedArray detach'ni tekshiradi):
+view.set([1, 2, 3]);
 // TypeError: Cannot perform %TypedArray%.prototype.set on a detached ArrayBuffer
+view.fill(0);
+// TypeError: Cannot perform %TypedArray%.prototype.fill on a detached ArrayBuffer
 ```
 
-**Nima uchun:** `postMessage(data, transferList)` ikkinchi argumenti buffer egaligini qabul qiluvchi thread'ga o'tkazadi. Yuboruvchi thread'da buffer "detached" holatga o'tadi — memory aslida allocated bo'ladi, lekin ushbu realm'da undan foydalanib bo'lmaydi. Bu **intentional**: zero-copy transfer uchun ikkita thread bitta buffer'ga egalik qila olmasligi kerak (race condition'ni oldini olish).
+**Nima uchun:** `postMessage(data, transferList)` ikkinchi argumenti buffer egaligini qabul qiluvchi thread'ga o'tkazadi. Yuboruvchi thread'da buffer "detached" holatga o'tadi — memory aslida allocated bo'ladi, lekin ushbu realm'da undan foydalanib bo'lmaydi. Bu **intentional**: zero-copy transfer uchun ikkita thread bitta buffer'ga egalik qila olmasligi kerak (race condition'ni oldini olish). Indexed access (`view[0]`) bilan method'lar (`view.set()`) detach holatida turlicha ishlaydi: spec'ning `TypedArraySetElement`/`IntegerIndexedElementSet` operatsiyasida detached buffer index out-of-bounds bo'lib qoladi — write jimgina e'tiborsiz, read `undefined`. `set`/`fill`/`subarray` kabi method'lar esa boshida `ValidateTypedArray` chaqiradi va detach'da `TypeError` tashlaydi.
 
 **Yechim:** Agar buffer ikkala tomonda ham kerak bo'lsa — transfer qilmang, oddiy structured clone ishlating (lekin bu copy bo'ladi). Yoki `SharedArrayBuffer` ishlating (atomic operations va `Atomics` bilan) — lekin bu cross-origin isolation talab qiladi va faqat `COOP/COEP` header'lari sozlangan joylarda ishlaydi.
 
@@ -1761,14 +1771,14 @@ function attachData2(element, data) { cache2.set(element, data); }
 ### Mistake 5: Closure da Kerakdan Ko'p Data Capture Qilish
 
 ```javascript
-// ❌ Anti-pattern — 80MB closure:
+// ❌ Anti-pattern — closure butun katta datasetlarni ushlab turadi:
 function createHandler() {
-  const allUsers = fetchAllUsers();       // 50MB
-  const allProducts = fetchAllProducts(); // 30MB
+  const allUsers = fetchAllUsers();       // katta dataset
+  const allProducts = fetchAllProducts(); // katta dataset
 
   return function handleClick(userId) {
     const user = allUsers.find(u => u.id === userId); // faqat bitta kerak
-    return user.name; // lekin 80MB xotirada!
+    return user.name; // lekin ikkala dataset ham xotirada qoladi!
   };
 }
 
@@ -1776,7 +1786,7 @@ function createHandler() {
 function createHandler() {
   const allUsers = fetchAllUsers();
   const userNames = new Map(allUsers.map(u => [u.id, u.name]));
-  // allUsers va allProducts GC tozalaydi — closure ularni reference qilmaydi
+  // allUsers GC tozalaydi — closure uni reference qilmaydi, faqat userNames
 
   return function handleClick(userId) {
     return userNames.get(userId); // kichik Map — samarali ✅
@@ -2089,5 +2099,9 @@ console.log(p2.x);         // 0 — reset qilingan ✅
 10. **Performance:** Object pooling, hot loop da allocation kamaytirish, TypedArray katta data uchun, `structuredClone` deep copy uchun.
 
 ---
+
+> **Oldingi bo'lim:** [15-modules.md](15-modules.md) — Modules: ES Modules, CommonJS, dynamic import, tree shaking, module resolution.
+>
+> **Keyingi bo'lim:** [17-type-coercion.md](17-type-coercion.md) — Type Coercion va Equality: ToPrimitive, ToNumber, ToString, `==` vs `===`, truthy/falsy.
 
 > **Keyingi bo'lim:** [17-type-coercion.md](17-type-coercion.md) — Type Coercion va Equality: primitive turlar va `typeof`, implicit vs explicit conversion, `ToString`/`ToNumber`/`ToBoolean`/`ToPrimitive` algoritmlari, `==` vs `===` (Abstract Equality), truthy/falsy qiymatlar, `instanceof` va `Symbol.hasInstance`, Symbol va well-known symbols, BigInt, `Map` vs `Object`, `Set` vs `Array`, IEEE 754 floating point, `Object.is()` va 4 xil equality algoritmi.

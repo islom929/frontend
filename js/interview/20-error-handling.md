@@ -110,7 +110,7 @@ console.log(err.field);   // "email"
 console.log(err.stack);   // ✅ to'liq stack trace — Error dan meros
 ```
 
-`this.name = this.constructor.name` pattern har qanday subclass uchun avtomatik to'g'ri nom beradi. `super(message)` chaqirilganda `Error.captureStackTrace()` (V8) ham ishlaydi — stack trace to'g'ri joyni ko'rsatadi.
+`this.name = this.constructor.name` pattern har qanday subclass uchun avtomatik to'g'ri nom beradi. `super(message)` `Error` constructor'ni chaqiradi — o'sha paytda V8 joriy call stack snapshot'ini olib `stack` property'ni tayyorlaydi (`message` ham shu yerda o'rnatiladi).
 
 **Deep Dive:**
 
@@ -137,14 +137,14 @@ async function loadConfig() {
     return JSON.parse(data);
   } catch (error) {
     // Asl xatoni cause sifatida saqlash
-    throw new Error("Konfiguratsiya yuklanmadi", { cause: error });
+    throw new Error("Configuration yuklanmadi", { cause: error });
   }
 }
 
 try {
   await loadConfig();
 } catch (error) {
-  console.log(error.message);       // "Konfiguratsiya yuklanmadi"
+  console.log(error.message);       // "Configuration yuklanmadi"
   console.log(error.cause.message); // "ENOENT: no such file" yoki "Unexpected token..."
   // Zanjir: yuqori darajadagi xato → asl sabab
 }
@@ -253,12 +253,12 @@ if (!ok) console.log(error);
 | Control flow | Implicit — catch ga sakraydi | Explicit — if/else |
 | Performance | try/catch overhead (minimal) | Oddiy object qaytarish |
 | Composability | try/catch nesting | Oddiy destructuring |
-| Qachon | Kutilmagan xatolar (bug, crash) | Kutilgan xatolar (validatsiya, lookup) |
+| Qachon | Kutilmagan xatolar (bug, crash) | Kutilgan xatolar (validation, lookup) |
 | TypeScript | Type narrowing qiyin | Discriminated union — type-safe |
 
 **Deep Dive:**
 
-Performance: zamonaviy engine'larda try/catch overhead minimal (V8 TurboFan optimized). Lekin `throw` stack trace yaratadi — bu costly operatsiya. Agar xato **tez-tez** sodir bo'lsa (validatsiya loop ichida) — Result pattern tezroq. Agar xato **kamdan-kam** sodir bo'lsa — `throw` yaxshi.
+Performance: zamonaviy engine'larda try/catch overhead minimal (V8 TurboFan optimized). Lekin `throw` stack trace yaratadi — bu costly operatsiya. Agar xato **tez-tez** sodir bo'lsa (validation loop ichida) — Result pattern tezroq. Agar xato **kamdan-kam** sodir bo'lsa — `throw` yaxshi.
 
 
 </details>
@@ -296,7 +296,7 @@ const err = new AppError("null reference", 500, false);
 | Kutilganmi | Ha | Yo'q |
 | Yechim | Retry, fallback, xabar | Kodni tuzatish |
 | Dastur | Davom etishi mumkin | To'xtatish tavsiya qilinadi |
-| Misol | 404, timeout, validatsiya | TypeError, null reference |
+| Misol | 404, timeout, validation | TypeError, null reference |
 
 **Deep Dive:**
 
@@ -374,7 +374,7 @@ const breaker = new CircuitBreaker(
 
 **Deep Dive:**
 
-Real production da qo'shimcha narsalar kerak: health check endpoint, sliding window (so'nggi N sekunddagi xatolar), half-open da faqat bitta so'rov o'tkazish (semaphore), logging/metrics. Netflix Hystrix (Java) va opossum (Node.js) kutubxonalari to'liq implementatsiya beradi.
+Real production da qo'shimcha narsalar kerak: health check endpoint, sliding window (so'nggi N sekunddagi xatolar), half-open da faqat bitta so'rov o'tkazish (semaphore), logging/metrics. Netflix Hystrix (Java) va opossum (Node.js) kutubxonalari to'liq implementation beradi.
 
 
 </details>
@@ -424,7 +424,7 @@ async function getUserData(userId) {
 
 Pattern'ning 3 ta prinsipi: (1) Har bir bosqich o'z try/catch'ida — bitta bosqich xatosi boshqasiga ta'sir qilmaydi. (2) Muvaffaqiyatli natijada cache yangilanadi — keyingi xatoda yangi cache ishlatiladi. (3) Fallback natija har doim qaytadi — foydalanuvchi "500 error" ko'rmaydi.
 
-**Deep Dive:** Resilience engineering'da bu pattern "bulkhead" prinsipi bilan bog'liq — har bir bosqich izolyatsiyalangan, bitta bosqich xatosi boshqalarni cascading failure'ga olib kelmaydi. Netflix va Amazon kabi kompaniyalar multi-tier fallback (primary API → replica → cache → static default) ishlatadi. Browser'da Service Worker cache layer ham shu pattern'ning infratuzilma darajasidagi implementatsiyasi.
+**Deep Dive:** Resilience engineering'da bu pattern "bulkhead" prinsipi bilan bog'liq — har bir bosqich isolation'langan, bitta bosqich xatosi boshqalarni cascading failure'ga olib kelmaydi. Netflix va Amazon kabi kompaniyalar multi-tier fallback (primary API → replica → cache → static default) ishlatadi. Browser'da Service Worker cache layer ham shu pattern'ning infratuzilma darajasidagi implementation'i.
 
 </details>
 
@@ -933,7 +933,7 @@ function validateForm(data) {
   if (!data.email) errors.push(new ValidationError("Email kerak", "email"));
   if (!data.password) errors.push(new ValidationError("Parol kerak", "password"));
   if (errors.length > 0) {
-    throw new AggregateError(errors, "Forma validatsiyadan o'tmadi");
+    throw new AggregateError(errors, "Forma validation'dan o'tmadi");
   }
 }
 ```
@@ -966,7 +966,7 @@ console.log(err.stack);
 //     at <anonymous> ...
 ```
 
-**V8 lazy stack trace** — performance optimizatsiyasi: `new Error()` paytida stack darhol format qilinmaydi, faqat internal pointer saqlanadi. `.stack` property birinchi marta o'qilganda string'ga aylantiriladi va cache qilinadi. Agar error catch qilinib stack hech qachon o'qilmasa — formatting overhead butunlay yo'q.
+**V8 lazy stack trace** — performance optimization: `new Error()` paytida stack darhol format qilinmaydi, faqat internal pointer saqlanadi. `.stack` property birinchi marta o'qilganda string'ga aylantiriladi va cache qilinadi. Agar error catch qilinib stack hech qachon o'qilmasa — formatting overhead butunlay yo'q.
 
 `Error.captureStackTrace(target, constructorOpt)` — **V8-only** API. `constructorOpt` argument'iga berilgan funksiya va undan keyingi frame'lar stack'dan **olib tashlanadi**. Custom error class'lar va assert utility'lar uchun foydali — foydalanuvchi stack'da utility frame'larini ko'rmaydi:
 
@@ -1002,7 +1002,7 @@ function assert(condition, message) {
 <details>
 <summary><strong>Javob</strong></summary>
 
-`Error.prototype.message`, `name`, `stack` — barchasi **non-enumerable** property'lar. `JSON.stringify` faqat enumerable own property'larni serialize qiladi (`EnumerableOwnPropertyNames` abstract operation) — shuning uchun Error obyekti uchun natija `"{}"` bo'ladi:
+`Error.prototype.message`, `name`, `stack` — barchasi **non-enumerable** property'lar. `JSON.stringify` faqat enumerable own property'larni serialize qiladi (`EnumerableOwnProperties` abstract operation) — shuning uchun Error obyekti uchun natija `"{}"` bo'ladi:
 
 ```javascript
 const error = new Error("Yuklash xatosi");
@@ -1081,7 +1081,7 @@ async function processFile(path) {
 `finally` blok **doim** ishlaydi: try muvaffaqiyatli tugasa ham, throw bo'lsa ham, `return` ishlasa ham. Cleanup (file close, connection release, timer clear, mutex release) uchun ideal — `catch` shart emas (xato propagate bo'lib davom etadi).
 
 **Boshqa pattern'lar:**
-- **using statement** (ES2024+ Stage 3, hozircha barcha runtime'larda yo'q): `using connection = openConnection();` — block tugaganda avtomatik `[Symbol.dispose]()` chaqiriladi.
+- **using statement** (Explicit Resource Management, ES2026): `using connection = openConnection();` — block tugaganda avtomatik `[Symbol.dispose]()` chaqiriladi. V8/Chrome, Node, Deno qo'llaydi; async resurs uchun `await using` + `[Symbol.asyncDispose]()`.
 - **Wrapper pattern**: `withConnection(async (conn) => {...})` — connection ochish/yopish wrapper ichida.
 
 **Anti-pattern — finally ichida throw qilish:** Agar `connection.close()` o'zi throw qilsa — bu xato `try` ichidagi original xatoni **override** qiladi. Production-ready kod:

@@ -204,7 +204,7 @@ console.log(user.createdAt); // 2026-02-06T...
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spec bo'yicha `new` operator quyidagi qadamlarni bajaradi (OrdinaryCreateFromConstructor):
+ECMAScript spec bo'yicha `new` funksiyaning `[[Construct]]` internal method'ini chaqiradi. `[[Construct]]` quyidagi qadamlarni bajaradi (yangi object `OrdinaryCreateFromConstructor`, `this` binding `OrdinaryCallBindThis` orqali):
 
 ```javascript
 // new UserAccount("Ali", "ali@example.com") ichida nima sodir bo'ladi:
@@ -410,7 +410,7 @@ ECMAScript spec bo'yicha implicit binding **Reference Record** mexanizmi orqali 
 
 "Lost binding" aynan shu mechanism tufayli sodir bo'ladi: `const fn = obj.method` expression da `GetValue(ref)` chaqiriladi va **faqat funksiya qiymati** olinadi — Reference Record yo'qoladi. Keyin `fn()` chaqirilganda yangi Reference Record yaratiladi, lekin uning `[[Base]]` `undefined` bo'ladi (standalone call), shuning uchun default binding ishga tushadi.
 
-V8 da property access + call ketma-ketligi uchun **LoadIC + CallIC** inline cache'lar ishlatiladi. Method call pattern (`obj.method()`) aniqlanganida V8 buni **monomorphic call site** sifatida optimizatsiya qiladi — Hidden Class tekshiruvi + function pointer bir operatsiyada amalga oshiriladi.
+V8 da property access + call ketma-ketligi uchun **LoadIC + CallIC** inline cache'lar ishlatiladi. Method call pattern (`obj.method()`) aniqlanganida V8 buni **monomorphic call site** sifatida optimization qiladi — Hidden Class tekshiruvi + function pointer bir operatsiyada amalga oshiriladi.
 
 </details>
 
@@ -438,7 +438,7 @@ company.department.getTeamName()
     │        │         │
     │        │         └─ funksiya
     │        └─ THIS = shu object (oxirgi)
-    └─ bu hisobga olinMASYDI
+    └─ bu hisobga OLINMAYDI
 ```
 
 ### Implicit Binding Yo'qotish (Lost Binding)
@@ -458,7 +458,9 @@ user.greet(); // "Salom, Ali"
 
 // ❌ Implicit binding YO'QOLDI
 const greetFn = user.greet; // faqat funksiya reference olindi, object EMAS
-greetFn(); // "Salom, undefined" — this = window (non-strict)
+greetFn();
+// Non-strict (browser): "Salom, " — this = window, window.name default "" (bo'sh string)
+// Strict mode / Node ES module: TypeError — this = undefined, undefined.name → throw
 ```
 
 Nima uchun? Chunki `greetFn()` **oddiy funksiya chaqiruvi** — `.` oldida object yo'q. Shuning uchun **default binding** qo'llaniladi.
@@ -751,7 +753,9 @@ const team = {
   // Oddiy function — o'zining this'i bor
   showMembersRegular() {
     this.members.forEach(function(member) {
-      // ❌ this = window (yoki undefined) — oddiy function ning this'i
+      // ❌ forEach callback'i thisArg'siz chaqirildi → default binding
+      // Non-strict Node: this = global, global.name → undefined
+      // (Strict mode: this = undefined → this.name TypeError)
       console.log(`${this.name}: ${member}`);
     });
   },
@@ -818,10 +822,14 @@ const user = {
   name: "Ali",
   greet: () => {
     console.log(`Salom, ${this.name}`);
-    // this = window (arrow function tashqi scope = global)
+    // arrow → this lexical: object literal'da o'z this'i yo'q,
+    // tashqi (module/global) scope this'i olinadi — user EMAS
   }
 };
-user.greet(); // "Salom, undefined"
+user.greet();
+// Node ES module top-level (this = undefined): undefined.name → TypeError
+// Node CJS top-level (this = module.exports = {}): {}.name → "Salom, undefined"
+// Browser script top-level (this = window): "Salom, " (window.name default "")
 
 // ✅ TO'G'RI — oddiy function yoki shorthand method
 const user2 = {
@@ -872,11 +880,11 @@ service.notify("Server started"); // "[MyApp] Server started"
 
 // ❌ Variable ga assign — this yo'qoldi
 const notify = service.notify;
-notify("Server started"); // "[undefined] Server started"
-// this = window (non-strict) → window.appName = undefined
+notify("Server started"); // TypeError: Cannot read properties of undefined (reading 'appName')
+// class body har doim strict → standalone chaqiruvda this = undefined → undefined.appName throw
 ```
 
-**Nima bo'ldi?** `notify` o'zgaruvchisiga faqat **funksiya reference** berildi, `service` **object** dan uzildi. `notify()` — oddiy funksiya chaqiruvi, shuning uchun **default binding** ishlaydi.
+**Nima bo'ldi?** `notify` o'zgaruvchisiga faqat **funksiya reference** berildi, `service` **object** dan uzildi. `notify()` — oddiy funksiya chaqiruvi, shuning uchun **default binding** ishlaydi. Class method'ning tanasi har doim strict mode'da bo'lgani uchun bu yerda `this = undefined`, va `this.appName` o'qishi `TypeError` beradi.
 
 ### Muammo 2: Callback Sifatida Berish
 
@@ -888,20 +896,20 @@ class Timer {
   }
 
   start() {
-    // ❌ setTimeout callback — oddiy funksiya chaqiruvi
+    // ❌ setInterval callback — oddiy funksiya chaqiruvi
     setInterval(function() {
-      this.seconds++; // this = window, Timer emas!
+      this.seconds++; // class body strict → this = undefined, Timer emas!
       console.log(`${this.label}: ${this.seconds}s`);
-      // "undefined: NaN"
+      // TypeError: Cannot read properties of undefined (reading 'seconds')
     }, 1000);
   }
 }
 
 const timer = new Timer("Upload");
-timer.start(); // "undefined: NaN" har sekundda
+timer.start(); // birinchi tick'da TypeError throw qiladi
 ```
 
-**Nima bo'ldi?** `setInterval` ichidagi callback — oddiy funksiya. U `setInterval` tomonidan chaqiriladi, `timer` object tomonidan emas. Shuning uchun **default binding** ishlaydi.
+**Nima bo'ldi?** `setInterval` ichidagi callback — oddiy funksiya. U `setInterval` tomonidan chaqiriladi, `timer` object tomonidan emas. Shuning uchun **default binding** ishlaydi. Callback class method tanasida e'lon qilingani uchun strict mode'ni meros qiladi → `this = undefined`, va `this.seconds++` `TypeError` beradi.
 
 ### Muammo 3: Nested Function Ichida
 
@@ -1151,10 +1159,10 @@ button.addEventListener("click", (event) => {
 const app = {
   name: "MyApp",
 
-  // ❌ Regular function — this = window
+  // ❌ Regular function — this = window (WindowProxy), app EMAS
   delayedLogRegular() {
     setTimeout(function() {
-      console.log(this.name); // undefined (window.name)
+      console.log(this.name); // "" — window.name default bo'sh string ("MyApp" EMAS)
     }, 1000);
   },
 
@@ -1166,7 +1174,7 @@ const app = {
   }
 };
 
-app.delayedLogRegular(); // undefined
+app.delayedLogRegular(); // "" (window.name bo'sh string)
 app.delayedLogArrow();   // "MyApp"
 ```
 
@@ -1582,7 +1590,7 @@ console.log(laptop.createdAt); // Date object — yangi instance
 1. `[[BoundTargetFunction]]` (original function) topadi
 2. `[[BoundThis]]` ni **ignore qiladi** (chunki `new` eng yuqori priority)
 3. `[[BoundArguments]]` + new call args ni birlashtirib target function'ga uzatadi
-4. `newTarget` — bound function'ning o'zi
+4. `newTarget` bound function'ning o'zi bo'lsa — uni `[[BoundTargetFunction]]` bilan almashtiradi (`SameValue(F, newTarget)` tekshiruvi), shuning uchun yangi instance'ning `[[Prototype]]` original target'ning `prototype`'idan keladi
 
 Ya'ni `new` bound function'ni "unwrap" qiladi — original target'ni new bilan chaqiradi. Bu `Function.prototype.bind` ning design feature'i: bound function'ni `new` bilan ishlatish imkonini berish.
 
@@ -1700,7 +1708,7 @@ class UserController {
         return response.json();
       })
       .then(function(data) {
-        // ❌ this = undefined (strict) yoki window (non-strict)
+        // ❌ class body strict → callback'da this = undefined
         this.users = data; // TypeError: Cannot set properties of undefined
       });
   }
@@ -1889,9 +1897,10 @@ person.greet();                      // A: "Ali"
 // Implicit binding: this = person
 
 const greet = person.greet;
-greet();                             // B: undefined (non-strict) yoki TypeError (strict)
-// Default binding: this = window → window.name = "" (browser da default bo'sh string)
-// Strict mode da: this = undefined → TypeError
+greet();                             // B: "" (browser) / undefined (Node) / TypeError (strict)
+// Default binding: non-strict browser this = window → window.name default bo'sh string ("")
+// Non-strict Node: this = global → global.name = undefined
+// Strict mode: this = undefined → undefined.name → TypeError
 
 person.greet.call({ name: "Vali" }); // C: "Vali"
 // Explicit binding: this = { name: "Vali" }
@@ -2057,7 +2066,8 @@ emitter.emit("data");
 ```javascript
 // Output:
 // "[Emitter] Emitting: data"
-// "Received by: undefined"
+// "Received by: "          (browser, non-strict — window.name bo'sh string)
+// "Received by: undefined" (Node, non-strict — global.name yo'q)
 ```
 
 **Tushuntirish:**
@@ -2065,7 +2075,7 @@ emitter.emit("data");
 1. `emitter.emit("data")` — `this = emitter` (implicit binding) → `[Emitter] Emitting: data`
 2. `this.events[event].forEach(cb => cb())` — `cb` bu `handler.onData` ning **reference**'i
 3. `cb()` — oddiy funksiya chaqiruvi (`.` oldida object yo'q)
-4. Default binding: `this = window` (non-strict) → `window.name` = `""` (browser da default bo'sh string)
+4. `handler` object literal'i sloppy → `onData` standalone chaqirilganda default binding: browser'da `this = window`, `window.name` default `""`; Node'da `this = global`, `global.name` `undefined`
 5. `handler.onData` method reference olindi, lekin `handler` object bilan **aloqasi uzildi**
 
 **To'g'ri qilish:**
@@ -2241,4 +2251,4 @@ G: Object   (setTimeout dan keyin)
 
 ---
 
-> **Keyingi bo'lim:** [11-event-loop.md](11-event-loop.md) — Event Loop: JavaScript single-threaded runtime, Call Stack, Web APIs, Callback Queue, Microtask Queue, macrotask vs microtask priority, `setTimeout(fn, 0)` nima uchun darhol ishlamaydi, `requestAnimationFrame` va `queueMicrotask`, Node.js libuv event loop arxitekturasi va browser bilan farqlari.
+> **Keyingi bo'lim:** [11-event-loop.md](11-event-loop.md) — Event Loop: JavaScript single-threaded runtime, Call Stack, Web APIs, Callback Queue, Microtask Queue, macrotask vs microtask priority, `setTimeout(fn, 0)` nima uchun darhol ishlamaydi, `requestAnimationFrame` va `queueMicrotask`, Node.js libuv event loop architecture'si va browser bilan farqlari.

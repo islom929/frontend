@@ -270,7 +270,7 @@ console.log(globalHandler()); // { debug: true, version: "2.0" }
 
 ### Nazariya
 
-V8 engine closure'larni qanday implement qiladi va optimizatsiya qiladi — bu bilim production'da performance-critical kod yozishda foydali.
+V8 engine closure'larni qanday implement qiladi va optimization qiladi — bu bilim production'da performance-critical kod yozishda foydali.
 
 **Context Object**: V8'da closure hosil bo'lganda, tashqi scope'dagi **faqat closure tomonidan ishlatiladigan** o'zgaruvchilar maxsus **Context** object'iga ko'chiriladi. Bu object heap'da saqlanadi (stack'da emas). Closure ishlatiLMAYDIGAN o'zgaruvchilar Context'ga tushMAYDI — ular stack frame bilan birga yo'qoladi.
 
@@ -299,12 +299,12 @@ Stack frame (outer):
 inner.[[Environment]] → Context Object (heap'da)
 ```
 
-**Optimizatsiya**: V8 parse-time da scope analysis qiladi — qaysi o'zgaruvchilar closure tomonidan ishlatilishini aniqlaydi. Faqat kerakli o'zgaruvchilar Context'ga ko'chiriladi. Bu "context allocation" deyiladi. Agar `eval()` ishlatilsa — V8 qaysi o'zgaruvchilar kerak bo'lishini aniqlay olmaydi va **barcha** o'zgaruvchilarni Context'ga ko'chiradi. Shu sababli `eval()` closure performance'ga salbiy ta'sir qiladi.
+**Optimization**: V8 parse-time da scope analysis qiladi — qaysi o'zgaruvchilar closure tomonidan ishlatilishini aniqlaydi. Faqat kerakli o'zgaruvchilar Context'ga ko'chiriladi. Bu "context allocation" deyiladi. Agar `eval()` ishlatilsa — V8 qaysi o'zgaruvchilar kerak bo'lishini aniqlay olmaydi va **barcha** o'zgaruvchilarni Context'ga ko'chiradi. Shu sababli `eval()` closure performance'ga salbiy ta'sir qiladi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-V8 optimizatsiyasini ko'rsatuvchi misol:
+V8 optimization'ini ko'rsatuvchi misol:
 
 ```javascript
 function createProcessor() {
@@ -352,7 +352,7 @@ function createBad() {
 
 Closure'ning eng asosiy use case'i — ma'lumotni tashqi dunyodan **yashirish** (encapsulation). JavaScript'da ES2022'da private fields (`#`) standart bo'lgungacha class'larda haqiqiy private data yo'q edi. Closure yagona ishonchli encapsulation usuli bo'lgan — va hozir ham ko'p loyihalarda ishlatiladi.
 
-Encapsulation principleining maqsadi: object'ning ichki holatini (state) tashqi kod tomonidan to'g'ridan-to'g'ri o'zgartirilishidan saqlash. Bu **invariants** (ishonchlilik shartlari) ni saqlashga yordam beradi — masalan, "balance manfiy bo'lmasligi kerak" qoidasi faqat method'lar orqali tekshiriladi.
+Encapsulation principle'ining maqsadi: object'ning ichki holatini (state) tashqi kod tomonidan to'g'ridan-to'g'ri o'zgartirilishidan saqlash. Bu **invariants** (ishonchlilik shartlari) ni saqlashga yordam beradi — masalan, "balance manfiy bo'lmasligi kerak" qoidasi faqat method'lar orqali tekshiriladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -488,7 +488,7 @@ Partial application — funksiyaning ba'zi argumentlarini oldindan "qotirish" va
 
 Currying'dan farqi: currying — `f(a, b, c)` ni `f(a)(b)(c)` ga aylantiradi (har bir argument alohida). Partial application — bir nechta argumentni bir vaqtda fix qiladi. Ikkalasi ham closure'ga asoslanadi.
 
-Use case'lar: konfiguratsiyalangan API client'lar, default options bilan funksiyalar, dependency injection, callback'larda context binding.
+Use case'lar: configuration qilingan API client'lar, default options bilan funksiyalar, dependency injection, callback'larda context binding.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -759,11 +759,11 @@ memoized(200);  // "Computing for 200..." — yangi argument, hisoblaydi
 
 #### Nazariya
 
-Closure yordamida stateful iterator yaratish — har chaqiruvda keyingi qiymatni qaytaruvchi funksiya. Bu iterator pattern'ning closure-based implementatsiyasi: state (`current`, `done`) closure ichida saqlanadi, har `next()` chaqiruv shu state'ni o'zgartirib, navbatdagi qiymatni qaytaradi.
+Closure yordamida stateful iterator yaratish — har chaqiruvda keyingi qiymatni qaytaruvchi funksiya. Bu iterator pattern'ning closure-based implementation'i: state (`current`, `done`) closure ichida saqlanadi, har `next()` chaqiruv shu state'ni o'zgartirib, navbatdagi qiymatni qaytaradi.
 
 ES6 dan boshlab JavaScript'da **Iterator Protocol** standart bo'lgan — `next()` method'i `{value, done}` qaytaradi. Closure-based iterator bu protocol'ni qo'l bilan implement qilishning eng oson usuli (generator function'lar yo'q paytda yagona usul edi).
 
-Closure-based iterator vs Generator: closure'da state explicit (siz manage qilasiz), generator'da implicit (engine state machine yaratadi). Har ikkisi ham ishlaydi — tanlov kod o'qilish qulayligi va kontekst'ga bog'liq. Generator'lar state machine transformatsiyasi tufayli biroz qo'shimcha overhead'ga ega bo'lishi mumkin, lekin zamonaviy engine'lar (V8 7.2+/2018 dan beri "zero-cost async/await" va shunga o'xshash generator optimizatsiyalari) ularni yaxshi optimizatsiya qiladi.
+Closure-based iterator vs Generator: closure'da state explicit (siz manage qilasiz), generator'da implicit (engine state machine yaratadi). Har ikkisi ham ishlaydi — tanlov kod o'qilish qulayligi va kontekst'ga bog'liq. Generator'lar pause/resume uchun engine ichida qo'shimcha state saqlagani sababli biroz qo'shimcha overhead'ga ega bo'lishi mumkin, lekin zamonaviy engine'lar ularni yaxshi optimization qiladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -932,7 +932,7 @@ ops.cleanup();
 Memory leak — keraksiz bo'lib qolgan memory'ning tozalanmasligi. Closure'lar bilan memory leak quyidagi hollarda sodir bo'ladi:
 
 **1. Keraksiz reference saqlash:**
-Closure tashqi scope'dagi katta object'ga reference saqlaydi, lekin aslida faqat kichik qismini ishlatadi. V8 optimizatsiya qiladi (faqat ishlatilgan o'zgaruvchilarni Context'ga ko'chiradi), lekin `eval` yoki `debugger` ishlatilsa bu optimizatsiya o'chadi.
+Closure tashqi scope'dagi katta object'ga reference saqlaydi, lekin aslida faqat kichik qismini ishlatadi. V8 optimization qiladi (faqat ishlatilgan o'zgaruvchilarni Context'ga ko'chiradi), lekin `eval` yoki `debugger` ishlatilsa bu optimization o'chadi.
 
 **2. Event listener'lar:**
 DOM element'ga closure bilan event listener qo'shiladi, lekin element olib tashlanganida listener remove qilinmaydi — closure (va u ushlab turgan scope) GC bo'lmaydi.
@@ -1115,10 +1115,10 @@ Closure'lar kuchli, lekin ularning performance ta'sirini bilish kerak:
 Har bir closure tashqi scope'ning Environment Record'iga reference saqlaydi — bu qo'shimcha memory. Agar minglab closure yaratilsa va har biri katta scope'ga reference saqlasa — memory usage oshadi.
 
 **2. Scope chain length:**
-Chuqur nested closure'larda o'zgaruvchi qidirish uzoqroq scope chain bo'ylab yuradi. V8 scope caching bilan buni optimizatsiya qiladi, lekin extremely deep nesting'da ta'sir sezilishi mumkin.
+Chuqur nested closure'larda o'zgaruvchi qidirish uzoqroq scope chain bo'ylab yuradi. V8 scope caching bilan buni optimization qiladi, lekin extremely deep nesting'da ta'sir sezilishi mumkin.
 
-**3. Engine optimizatsiyasi:**
-V8 closure'larni yaxshi optimizatsiya qiladi — faqat ishlatilgan o'zgaruvchilarni heap'ga ko'chiradi. Lekin `eval`, `with`, `debugger` statement'lari bu optimizatsiyani buzadi.
+**3. Engine optimization'i:**
+V8 closure'larni yaxshi optimization qiladi — faqat ishlatilgan o'zgaruvchilarni heap'ga ko'chiradi. Lekin `eval`, `with`, `debugger` statement'lari bu optimization'ni buzadi.
 
 **4. Prototype method vs Closure method:**
 Class/prototype method'lari barcha instance'lar orasida **share** qilinadi (bitta funksiya). Closure method'lari har instance uchun **alohida** funksiya yaratadi — ko'proq memory.
@@ -1160,7 +1160,7 @@ class User {
 
 ### `arguments` object va arrow function closure
 
-Arrow function'lar o'zlarining `arguments` object'iga ega emas — ular `arguments`'ni **lexical parent** function'dan oladi (xuddi `this` kabi). Bu closure bilan birga nozik xulq-atvorga olib keladi.
+Arrow function'lar o'zlarining `arguments` object'iga ega emas — ular `arguments`'ni **lexical parent** function'dan oladi (`this` bilan bir xil mexanizm). Bu closure bilan birga nozik xulq-atvorga olib keladi.
 
 ```javascript
 function outer() {
@@ -1730,12 +1730,12 @@ Bu bo'limda closure'ning barcha qatlamlari yoritildi:
 - **Closure** — funksiya + uning yaratilgan paytdagi lexical environment. Reference saqlaydi, copy emas.
 - **`[[Environment]]` internal slot** — funksiya yaratilganda joriy LexicalEnvironment shu slot'ga saqlanadi.
 - **Closure hosil bo'lish** — 5 qadam: tashqi EC yaratilish → ichki funksiya define → ichki funksiya tashqariga chiqish → tashqi EC tugash → ichki funksiya chaqirilish.
-- **V8 optimizatsiyasi** — faqat closure ishlatgan o'zgaruvchilar Context object'iga ko'chiriladi. `eval` bu optimizatsiyani buzadi.
+- **V8 optimization'i** — faqat closure ishlatgan o'zgaruvchilar Context object'iga ko'chiriladi. `eval` bu optimization'ni buzadi.
 - **Use cases** — data privacy, factory functions, partial application, module pattern, event handlers, memoization, stateful iterators.
 - **Memory** — closure tashqi Environment Record'ni heap'da tirik saqlaydi. Barcha reference'lar yo'qolganda GC tozalaydi.
 - **Memory leaks** — timer'lar, event listener'lar, keraksiz reference'lar. Yechim: cleanup funksiyalari, AbortController, scope ajratish.
 - **Loop muammosi** — `var` bitta binding, `let` har iteratsiya yangi binding.
-- **Performance** — closure method vs prototype method (memory tradeoff), scope chain depth, engine optimizatsiyalari.
+- **Performance** — closure method vs prototype method (memory tradeoff), scope chain depth, engine optimization'lari.
 
 Scope va closure — JavaScript'ning fundamental tushunchalari. Keyingi bo'limlardagi objects, prototypes, va ayniqsa `this` keyword closure bilan chambarchas bog'liq.
 

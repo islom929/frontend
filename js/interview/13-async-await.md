@@ -37,7 +37,7 @@ Asosiy xususiyatlar:
 - `await` faqat `async` function ichida yoki ES Module top-level'da ishlatiladi
 - Error handling oddiy `try/catch` bilan ishlaydi — `.catch()` zanjiri kerak emas
 
-**Deep Dive:** Under the hood `async/await` generator + Promise pattern'ga teng. V8 7.2+ dan beri `await` optimized — ortiqcha microtick yaratmaydi (oldin 3 ta microtick kerak edi, hozir 1 ta).
+**Deep Dive:** Under the hood `async/await` generator + Promise pattern'ga teng. V8 7.2 (Chrome 72)'dan beri native Promise'ni `await` qilish optimized — ortiqcha wrapper yaratmaydi (oldin kamida 3 ta microtick kerak edi, hozir native Promise uchun 1 ta).
 
 </details>
 
@@ -263,7 +263,7 @@ Ehtiyot bo'lish kerak: top-level await modulni "async" qiladi — bu modulni imp
 <details>
 <summary><strong>Javob</strong></summary>
 
-`AbortController` — asinxron operatsiyalarni bekor qilish uchun standart API. `fetch()` bilan integratsiyalashgan.
+`AbortController` — asinxron operatsiyalarni bekor qilish uchun standart API. `fetch()` bilan integration'lashgan.
 
 ```javascript
 async function fetchWithTimeout(url, timeoutMs = 5000) {
@@ -458,20 +458,20 @@ Mapping:
 **Edge Cases:**
 - **`await` non-Promise qiymat**: `await 42` → engine `PromiseResolve(42)` orqali Promise yaratadi va microtask queue'ga resume task qo'yadi — bir microtick kechikish doim mavjud
 - **`await` thenable**: Custom `then` method'i bo'lgan object ham await qilinadi — `Promise.resolve(thenable)` ichida unwrap qilinadi
-- **Engine resume**: Generator state machine bytecode'ga compile qilinadi — har `await` resume point'iga aylanadi, lokal o'zgaruvchilar `JSGeneratorObject`'ning context slot'larida saqlanadi
+- **Engine resume**: Async function holati `JSGeneratorObject`'da saqlanadi — lokal o'zgaruvchilar va register'lar `parameters_and_registers` FixedArray'da, joriy Context esa alohida `context` field'da. Har `await` `SuspendGenerator` bytecode'iga, resume esa `ResumeGenerator` builtin'iga aylanadi
 
 **Follow-up savollar:**
-1. **`async function` Promise instance qaytaradimi?** — Ha, doim. Hatto `return undefined` ham `Promise.resolve(undefined)` qaytaradi. `Symbol.species` orqali subclass'larda override qilish mumkin.
+1. **`async function` Promise instance qaytaradimi?** — Ha, doim. Hatto `return undefined` ham `Promise.resolve(undefined)` qaytaradi. Qaytarilgan Promise **doim** native `%Promise%` — async function `Symbol.species`'ni e'tiborga olmaydi, shuning uchun Promise subclass instance qaytarib bo'lmaydi.
 2. **`await` ichida exception qanday tashlanadi?** — Engine resume callback'ni `generator.throw(error)` orqali chaqiradi — bu try/catch ichidagi yoki tashqaridagi handler'gacha propagate bo'ladi.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-V8 7.2+ optimizatsiya (2018-yil sonida qabul qilingan): oldingi versiyalarda `await someValue` quyidagi qadamlarni bajarardi — `someValue`'ni Promise'ga wrap qilish, throwaway Promise yaratish, va resume callback'ni `then`'ga ulash. Bu 3 ta microtick olardi (har biri alohida microtask sifatida).
+V8 7.2 (Chrome 72) optimization'i: oldingi versiyalarda `await someValue` quyidagi qadamlarni bajarardi — `someValue`'ni Promise'ga wrap qilish, throwaway Promise yaratish, va resume callback'ni `then`'ga ulash. Bu kamida 3 ta microtick olardi (har biri alohida microtask sifatida). Bu farq spec'ga ham TC39 PR #1250 orqali kiritilgan.
 
-Hozirgi optimizatsiyada: agar await qilingan qiymat allaqachon native Promise bo'lsa (`%PromisePrototype%` chain'da) — engine to'g'ridan-to'g'ri shu Promise'ga resume callback'ni ulaydi va faqat 1 microtick oladi. Bu optimizatsiya stack trace'ni ham yaxshilaydi (oraliq Promise'lar yo'q).
+Hozirgi optimization'da: agar await qilingan qiymat allaqachon native Promise bo'lsa (`%Promise%` instance) — `PromiseResolve` qo'shimcha wrapper yaratmaydi, engine to'g'ridan-to'g'ri shu Promise'ga resume callback'ni ulaydi va faqat 1 microtick oladi. Non-Promise qiymat (`await 42`, `await null`) hamon yangi Promise'ga wrap qilinadi — bir microtick saqlanadi. Optimization stack trace'ni ham yaxshilaydi (oraliq Promise'lar yo'q).
 
-Spec mexanizmi: `AwaitExpression` evaluation bosqichida `PromiseResolve(value)` chaqiriladi (Promise allaqachon Promise bo'lsa identity qaytaradi), keyin `PerformPromiseThen` orqali resume callback `[[AsyncContext]]` bilan attach qilinadi. Funksiya `JSAsyncFunctionResumeContext` bytecode'da to'xtaydi va microtask'da davom ettiriladi.
+Spec mexanizmi: `Await(value)` operatsiyasida `PromiseResolve(%Promise%, value)` chaqiriladi (value allaqachon native Promise bo'lsa identity qaytaradi — qo'shimcha wrapper yaratilmaydi), keyin `PerformPromiseThen` orqali resume `fulfilled`/`rejected` closure'lari attach qilinadi. Async funksiya execution context suspend bo'ladi va boshqaruv caller'ga qaytadi; resume closure microtask (Job) sifatida bajariladi. V8'da bu `SuspendGenerator` bytecode (state `JSGeneratorObject`'da saqlanadi) va `ResumeGenerator` builtin orqali amalga oshiriladi.
 
 </details>
 
@@ -721,7 +721,7 @@ Muhim: `fetchUsers` va `fetchOrders` bir-biridan mustaqil, lekin ikkalasi ham bi
 
 `await` expression ichki mexanizmi: `await Promise.resolve()` chaqirilganda engine async funksiyaning holatini (local variables, execution position, `[[AsyncContext]]` snapshot) saqlaydi va microtask queue'ga **resume callback** qo'shadi. ECMAScript spec bo'yicha `await value` — `PromiseResolve(value)` chaqiriladi → resume callback `PerformPromiseThen` orqali attach qilinadi → joriy async funksiya suspend bo'ladi.
 
-Har bir `await` kamida bitta microtask tick sarflaydi (V8 7.2+ optimizatsiya bilan — oldin 3 ta edi). Ikkita mustaqil async funksiya parallel chaqirilganda ularning `await` dan keyingi qismlari microtask queue'da FIFO tartibda saqlanadi — qaysi funksiya avval `await` ga yetgan bo'lsa, uning resume callback'i avval queue'ga tushadi va avval bajariladi.
+Har bir `await` kamida bitta microtask tick sarflaydi (V8 7.2+ optimization bilan — oldin kamida 3 ta edi). Ikkita mustaqil async funksiya parallel chaqirilganda ularning `await` dan keyingi qismlari microtask queue'da FIFO tartibda saqlanadi — qaysi funksiya avval `await` ga yetgan bo'lsa, uning resume callback'i avval queue'ga tushadi va avval bajariladi.
 
 Bu tartib **deterministik** — bir xil kod har doim bir xil output beradi (concurrent ko'rinsa ham, real parallelism yo'q — single-threaded event loop). V8'da har microtask `MicrotaskQueue` ichida saqlanadi va call stack bo'shaganda batch'da bajariladi. Microtask ichida yana microtask qo'shilsa — shu batch oxirida bajariladi (macrotask'ga kutish kerak emas).
 
@@ -813,7 +813,7 @@ async function handler() {
 
 ### Follow-up savollar
 
-1. **Sync function ichida throw async function chaqirsa-chi?** — Sync funksiya throw qilsa — call stack'ga chiqadi (oddiy sync error). Lekin async function'ni `await`'siz chaqirsa — Promise hammon yo'qoladi (fire-and-forget).
+1. **Sync function ichida throw async function chaqirsa-chi?** — Sync funksiya throw qilsa — call stack'ga chiqadi (oddiy sync error). Lekin async function'ni `await`'siz chaqirsa — qaytgan Promise e'tiborsiz qoladi (fire-and-forget), reject bo'lsa `unhandledrejection` dispatch qilinadi.
 2. **`Promise.reject(err)` vs async `throw err` farqi bormi?** — Yo'q, semantik bir xil. Lekin async function ichida `throw` ko'proq idiomatic — stack trace yaxshiroq.
 
 </details>
@@ -880,7 +880,7 @@ Bu yondashuv "worker pool" yoki "fixed-size concurrency" pattern deb ataladi. Pr
 
 JavaScript single-threaded event loop bo'lganligi sababli `currentIndex++` race condition'ga olib kelmaydi: V8 har worker'ning kodini atomic batch'da bajaradi (yield point — faqat `await`). Increment expression `await` bo'lmagani uchun preemption sodir bo'lmaydi.
 
-Performance considerations: katta `limit` qiymatlari (masalan, 1000+) server'ni overload qilishi mumkin (TCP connection limits, file descriptor exhaustion). Network operations uchun odatda 5-20 oralig'i optimal — RTT (round-trip time) va server capacity ga qarab.
+Performance considerations: katta `limit` qiymatlari server'ni overload qilishi mumkin (TCP connection limits, file descriptor exhaustion). Optimal `limit` server capacity, RTT (round-trip time) va resurs cheklovlariga qarab tanlanadi — yagona to'g'ri qiymat yo'q, profiling bilan o'lchanadi.
 
 Memory: results array ham task'lar tugagunga qadar to'liq saqlanadi. Streaming pattern (async generator) bilan memory tejash mumkin agar barcha natijani saqlash shart bo'lmasa.
 

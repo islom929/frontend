@@ -192,7 +192,7 @@ const user = { name: "Ali", age: 25 };
 
 // for...in (prototype'ga ehtiyot bo'ling)
 for (const key in user) {
-  if (Object.hasOwn(user, key)) { // prototype filterliash
+  if (Object.hasOwn(user, key)) { // prototype filterlash
     console.log(key, user[key]);
   }
 }
@@ -355,7 +355,7 @@ Lookahead/lookbehind — pattern'ni match'ga **kiritmasdan** tekshirish:
 // Narx — faqat $ belgisi keyin
 "$100 €200 $300".match(/(?<=\$)\d+/g); // ["100", "300"]
 
-// Parol validatsiya — lookahead bilan
+// Parol validation — lookahead bilan
 const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$]).{8,}$/;
 // (?=.*[a-z])  — kamida bitta kichik harf BOR
 // (?=.*[A-Z])  — kamida bitta katta harf BOR
@@ -481,7 +481,7 @@ async function loadUserDashboard(userId) {
 **Edge Cases:**
 - **Destructuring + iterator protocol**: Array destructuring `Symbol.iterator` ishlatadi — Set, Map, String, generator hammasi ishlaydi
 - **Optional chaining + delete**: `delete obj?.prop` valid sintaksis, lekin obj null/undefined bo'lsa `true` qaytaradi (no-op)
-- **Spread vs `Object.assign`**: Spread `Object.prototype` ga emas, target object'ga property'larni `[[Set]]` orqali yozadi — getter/setter trigger qiladi (oldin to'g'ridan-to'g'ri `[[DefineOwnProperty]]` qilardi)
+- **Spread vs `Object.assign`**: Object spread `CopyDataProperties` abstract operation orqali ishlaydi — har property'ni target'ga `CreateDataPropertyOrThrow` (`[[DefineOwnProperty]]`) bilan yozadi, target'dagi setter'ni **trigger qilmaydi**. `Object.assign` esa `[[Set]]` ishlatadi — target'dagi mavjud setter'ni **chaqiradi**. Manba'dan o'qishda ikkalasi ham `[[Get]]` ishlatadi (getter chaqiriladi)
 
 **Follow-up savollar:**
 1. **`Object.assign` vs spread farqi nima?** — Spread `[[Get]]` + `[[DefineOwnProperty]]` ishlatadi, `Object.assign` `[[Get]]` + `[[Set]]` ishlatadi. Setter mavjud bo'lganda farq sezilarli.
@@ -706,7 +706,7 @@ undefined  // arr[10] — index yo'q, undefined
 <details>
 <summary><strong>Javob</strong></summary>
 
-Numeric separator (`_`) (ES2021) — katta sonlarni o'qish osonlashtiradigan vizual ajratgich. Runtime'da hech qanday ta'siri yo'q — lexer bosqichida olib tashlanadi. JIT compiler `1_000_000` va `1000000` uchun bir xil bytecode ishlab chiqaradi.
+Numeric separator (`_`) (ES2021) — katta sonlarni o'qish osonlashtiradigan vizual ajratgich. Runtime'da hech qanday ta'siri yo'q — `_` parse bosqichida (NumericLiteralSeparator grammar production) olib tashlanadi va `1_000_000` bilan `1000000` aynan bir xil numeric literal'ga aylanadi. Parse'dan keyin ular engine uchun farqsiz.
 
 ```javascript
 // Barcha son turlarida ishlaydi:
@@ -751,10 +751,10 @@ console.log(9007199254740992n + 1n); // 9007199254740993n — ✅ aniq
 
 // ✅ Explicit conversion kerak
 console.log(10n + BigInt(5)); // 15n
-console.log(Number(10n) + 5); // 15 — lekin precision yo'qoldi
+console.log(Number(10n) + 5); // 15 — Number'ga o'tkazish MAX_SAFE_INTEGER'dan katta BigInt'da precision yo'qotadi
 
 // Operatsiyalar:
-console.log(10n / 3n); // 3n — integer division (BigInt floor)
+console.log(10n / 3n); // 3n — integer division, nolga tomon truncation (-10n / 3n → -3n, floor emas)
 console.log(10n ** 100n); // very large number, no overflow
 
 // JSON.stringify — TypeError!
@@ -770,7 +770,7 @@ JSON.stringify({ id: 1n }); // '{"id":"1"}'
 - Timestamps with nanosecond precision (`process.hrtime.bigint()`)
 - ID'lar — agar database 64-bit integer ishlatsa (PostgreSQL `bigint`, MongoDB ObjectId)
 
-**Deep Dive:** V8 BigInt'ni heap'da arbitrary-precision integer sifatida saqlaydi (kichik BigInt'lar inline pointer tagging orqali smi-like optimizatsiyada). Number esa IEEE 754 double-precision float (52 bit mantissa + 11 bit exponent + 1 bit sign). BigInt operatsiyalari Number'dan sekinroq — har operatsiyada heap allocation va variable-length arithmetic algoritmi ishlaydi (Karatsuba multiplication katta sonlar uchun). Performance kritik joylarda Number ishlatish afzal, agar precision yetsa.
+**Deep Dive:** V8 BigInt'ni heap'da object sifatida saqlaydi — digit'lar massivi plus alohida sign bit. Digit kengligi platformaga bog'liq: 64-bit mashinalarda har digit 64-bit (0 dan 2⁶⁴-1 gacha), 32-bit mashinalarda 32-bit (0 dan 2³²-1 gacha) — CPU register kengligiga moslangan. Smi (Small Integer) sifatida inline saqlanmaydi, har BigInt heap allocation talab qiladi. Number esa IEEE 754 double-precision float (52 bit mantissa + 11 bit exponent + 1 bit sign). BigInt operatsiyalari Number'dan sekinroq — har operatsiyada heap allocation va digit'lar bo'yicha variable-length arithmetic ishlaydi (katta sonlar uchun Karatsuba multiplication). Performance kritik joylarda Number ishlatish afzal, agar precision yetsa.
 
 
 </details>
@@ -907,7 +907,7 @@ for (const value of nums) {
 <details>
 <summary><strong>Javob</strong></summary>
 
-`??=` operator memoization (lazy initialization) uchun ideal — agar qiymat null/undefined bo'lsa, kompyuter qilib assign qiladi, aks holda hech narsa qilmaydi:
+`??=` operator memoization (lazy initialization) uchun ideal — agar qiymat null/undefined bo'lsa, o'ng tomonni hisoblab assign qiladi, aks holda hech narsa qilmaydi:
 
 ```javascript
 const cache = {};

@@ -1,6 +1,6 @@
 # Bo'lim 27: ES2024+ va Kelgusi Standartlar
 
-> ECMAScript har yili yangilanadi — TC39 komiteti proposal'larni Stage 0 dan Stage 4 gacha olib boradi. Stage 4 ga yetgan feature'lar rasmiy standartga qo'shiladi. Bu bo'limda ES2024 va ES2025 yangiliklari hamda kelgusi muhim proposal'lar batafsil yoritiladi.
+> ECMAScript har yili yangilanadi — TC39 komiteti proposal'larni Stage 0 dan Stage 4 gacha olib boradi. Stage 4 ga yetgan feature'lar rasmiy standartga qo'shiladi. Bu bo'limda ES2024, ES2025 va ES2026 yangiliklari hamda kelgusi muhim proposal'lar batafsil yoritiladi.
 
 ---
 
@@ -11,11 +11,11 @@
 - [Promise.withResolvers (ES2024)](#promisewithresolvers-es2024)
 - [String isWellFormed va toWellFormed (ES2024)](#string-iswellformed-va-towellformed-es2024)
 - [RegExp v Flag — Unicode Sets (ES2024)](#regexp-v-flag--unicode-sets-es2024)
-- [Array.fromAsync (ES2024)](#arrayfromasync-es2024)
+- [Array.fromAsync (ES2026)](#arrayfromasync-es2026)
 - [Atomics.waitAsync (ES2024)](#atomicswaitasync-es2024)
 - [Set Methods (ES2025)](#set-methods-es2025)
 - [Iterator Helpers (ES2025)](#iterator-helpers-es2025)
-- [Explicit Resource Management — using (ES2025)](#explicit-resource-management--using-es2025)
+- [Explicit Resource Management — using (ES2026)](#explicit-resource-management--using-es2026)
 - [Import Attributes (ES2025)](#import-attributes-es2025)
 - [RegExp Pattern Modifiers (ES2025)](#regexp-pattern-modifiers-es2025)
 - [Duplicate Named Capturing Groups (ES2025)](#duplicate-named-capturing-groups-es2025)
@@ -154,7 +154,7 @@ const newWay = Object.groupBy(products, p => p.category);
 
 ### Nazariya
 
-`Promise.withResolvers()` — Promise constructor'ni ishlatmasdan, `resolve` va `reject` funksiyalarini tashqarida olish imkonini beradi. Bu **Deferred pattern** ning standart implementatsiyasi.
+`Promise.withResolvers()` — Promise constructor'ni ishlatmasdan, `resolve` va `reject` funksiyalarini tashqarida olish imkonini beradi. Bu **Deferred pattern** ning standart implementation'i.
 
 Ilgari bu pattern uchun quyidagi boilerplate kerak edi:
 
@@ -172,7 +172,7 @@ const promise = new Promise((res, rej) => {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`Promise.withResolvers()` ichida aynan yuqoridagi eski pattern bajariladigan. Method yangi Promise yaratadi, executor'dan `resolve` va `reject` ni oladi, va uchala qiymatni bitta object sifatida qaytaradi.
+`Promise.withResolvers()` ichida aynan yuqoridagi eski pattern bajariladi. Method yangi Promise yaratadi, executor'dan `resolve` va `reject` ni oladi, va uchala qiymatni bitta object sifatida qaytaradi.
 
 ```
 Promise.withResolvers() qaytaradi:
@@ -371,11 +371,11 @@ letterOnly.test("Hello!");   // false
 
 ---
 
-## Array.fromAsync (ES2024)
+## Array.fromAsync (ES2026)
 
 ### Nazariya
 
-`Array.fromAsync()` — async iterable yoki async mapping'dan array yaratadi. `Array.from()` ning async versiyasi. `for await...of` loop yozish o'rniga bitta method chaqiruvi bilan array hosil qilish mumkin.
+`Array.fromAsync()` — async iterable yoki async mapping'dan array yaratadi. Stage 4 ga 2025-iyunda yetdi, ES2026 spec'ga kiritildi (V8/Chrome'da 2024-yildan beri ishlaydi). `Array.from()` ning async versiyasi. `for await...of` loop yozish o'rniga bitta method chaqiruvi bilan array hosil qilish mumkin.
 
 Qabul qiladigan argumentlar:
 1. **Async iterable** — `Symbol.asyncIterator` ga ega object
@@ -593,7 +593,7 @@ requiredPermissions.isSubsetOf(userPermissions); // true — ruxsat bor
 
 ### Nazariya
 
-Iterator Helpers — `Iterator.prototype` ga qo'shilgan method'lar. Array method'lariga o'xshash (`map`, `filter`, `take`, `drop`, `flatMap`, `reduce`, `toArray`, `forEach`, `some`, `every`, `find`), lekin muhim farqi bor — ular **lazy** (dangasa). Ya'ni elementlar faqat kerak bo'lganda hisoblandi — katta yoki cheksiz collection'lar bilan ishlashda juda samarali.
+Iterator Helpers — `Iterator.prototype` ga qo'shilgan method'lar. Array method'lariga o'xshash (`map`, `filter`, `take`, `drop`, `flatMap`, `reduce`, `toArray`, `forEach`, `some`, `every`, `find`), lekin muhim farqi bor — ular **lazy** (dangasa). Ya'ni elementlar faqat kerak bo'lganda hisoblanadi — katta yoki cheksiz collection'lar bilan ishlashda samarali.
 
 Array method'larida har bir qadam butun array ni qayta ishlaydi va yangi array yaratadi. Iterator helper'larda esa zanjir (pipeline) quriladi va elementlar birma-bir, kerak bo'lganda o'tadi.
 
@@ -745,11 +745,11 @@ bigArray.values()
 
 ---
 
-## Explicit Resource Management — using (ES2025)
+## Explicit Resource Management — using (ES2026)
 
 ### Nazariya
 
-`using` va `await using` — resurslarni **avtomatik tozalash** uchun yangi syntax. Fayl handle'lar, database connection'lar, lock'lar kabi resurslarni ochib, ishlatib, keyin **majburiy yopish** kerak bo'lganda ishlatiladi.
+`using` va `await using` — resurslarni **avtomatik tozalash** uchun yangi syntax. Stage 4 ga 2025-iyunda yetdi, ES2026 spec'ga kiritildi. Fayl handle'lar, database connection'lar, lock'lar kabi resurslarni ochib, ishlatib, keyin **majburiy yopish** kerak bo'lganda ishlatiladi.
 
 C# dagi `using`, Python dagi `with`, va Java dagi `try-with-resources` ga o'xshash. JavaScript'da ilgari `try/finally` bilan yozilgan edi — yangi syntax buni ancha soddalashtiradi.
 
@@ -766,7 +766,7 @@ using resource = getResource();
 // Scope tugaganda AVTOMATIK:
 // resource[Symbol.dispose]() chaqiriladi
 
-Bu aslida quyidagiga kompilyatsiya qilinadi:
+Bu aslida quyidagiga transform qilinadi:
 
 const resource = getResource();
 try {
@@ -1103,26 +1103,22 @@ match (response) {
 }
 ```
 
-### Record va Tuple
+### Record va Tuple — withdrawn
 
-Immutable va deeply comparable data structure'lar — primitive sifatida.
+Immutable va deeply comparable data structure'lar — primitive sifatida. **Bu proposal 2025-aprel TC39 plenary'da rasman WITHDRAWN qilindi** (repository arxivlandi), chunki yangi primitive tur qo'shish engine performance va `typeof`/`===` semantikasi bo'yicha consensus topa olmadi. O'rniga **Composites** proposal taklif qilinmoqda — bu yangi primitive emas, balki immutable, structural-equality'li **object** turi.
 
 ```javascript
-// ⚠️ Status (2026-04): Proposal Stage 2 da ko'p yil qolib ketdi — 2024-25 da
-// championship o'zgardi va engine implementation'dagi murakkablik tufayli
-// asl "new primitive" yondashuvi qayta ko'rib chiqilmoqda. TC39'da alternativ
-// variant — "Composites" yoki "Keyed Collections" kabi — muhokama qilinmoqda.
-// Quyidagi `#{...}` syntax'i oxirgi shakl bo'lmasligi mumkin.
-
+// ⚠️ Quyidagi #{...} / #[...] syntax HECH QACHON standartga kirmaydi — withdrawn.
+// Tarixiy ko'rinish (qanday bo'lishi rejalashtirilgani):
 const record = #{ name: "Ali", age: 25 };
 const tuple = #[1, 2, 3];
 
-// Deep equality — primitive kabi ===
-#{ a: 1 } === #{ a: 1 }; // true (object'da false bo'lardi!)
-#[1, 2] === #[1, 2];     // true
+// Reja: deep (structural) equality — primitive kabi ===
+#{ a: 1 } === #{ a: 1 }; // rejada true (object'da false bo'lardi)
+#[1, 2] === #[1, 2];     // rejada true
 
-// Immutable
-// record.name = "Vali"; // ❌ TypeError
+// Reja: immutable
+// record.name = "Vali"; // rejada TypeError
 ```
 
 **Hozirgi alternativ (production'da):** `Object.freeze()` deep + custom structural equality (lodash `isEqual`), yoki Immutable.js / Immer kutubxonalari.
@@ -1266,7 +1262,7 @@ Object.groupBy([1, 2, 3], n => n > 1);
 const right = Map.groupBy(data, item => item.type);
 // Map { { id: 1 } → [...], { id: 2 } → [...] }
 // Lekin eslatma: Map.groupBy identity-based — ikki har xil { id: 1 } object
-// alohida kalit hisoblanadi. Normalizatsiya uchun avval mapping qiling.
+// alohida kalit hisoblanadi. Normalization uchun avval mapping qiling.
 
 // ✅ String kalitni majburiy qilish — JSON.stringify bilan
 const byIdString = Object.groupBy(data, item => JSON.stringify(item.type));
@@ -1379,7 +1375,7 @@ await processWithConn(async conn => {
 });
 ```
 
-**Nima uchun:** `using` spec-level `try/finally` kabi kompilyatsiya bo'ladi — `finally` blokidagi dispose `return` qiymat hisoblanganidan **keyin**, lekin chaqiruvchi uni olishdan **oldin** bajariladi. Bu mexanizm scope-bound lifecycle'ni kafolatlaydi.
+**Nima uchun:** `using` spec-level `try/finally` kabi desugar bo'ladi — `finally` blokidagi dispose `return` qiymat hisoblanganidan **keyin**, lekin chaqiruvchi uni olishdan **oldin** bajariladi. Bu mexanizm scope-bound lifecycle'ni kafolatlaydi.
 
 **Yechim:** `using` scope'idan faqat **primitive** yoki **resource'ga bog'liq bo'lmagan ma'lumot** qaytaring. Resource'ning o'zini yoki uning method'ini hech qachon tashqariga bermang.
 
@@ -1490,11 +1486,19 @@ function waitForCancellable(bus, event, signal) {
 // ✅ v flag da escape qilish
 /[a-z\&\&]/v; // OK, literal &&
 
-// ❌ Subtraction/intersection bilan multi-char set — faqat string properties
-/[\q{ab}--\q{a}]/v;        // ✅ \q{} string property — OK
-/[[ab]--[a]]/v;             // ❌ character class ichida multi-char literal emas
-// Sabab: v flag character class ichida faqat single characters va
-// string properties (\q{...}, \p{RGI_Emoji}, va h.k.)
+// Nested class va string disjunction — ikkalasi ham valid, lekin ma'nosi farqli
+/[[ab]--[a]]/v.test("b");      // true — set {a,b} dan {a} ayirildi → {b}
+/^[[ab]--[a]]$/v.test("ab");   // false — anchor bilan: class faqat bitta belgi match qiladi
+/[[ab]--[a]]/v.test("ab");     // true — anchorsiz "ab" ichidagi "b" ni topadi (substring)
+// [ab] — ikki belgili SET (a yoki b), "ab" string EMAS
+
+// Ko'p belgili STRING uchun — \q{...} disjunction kerak
+/^[\q{ab}\q{cd}]$/v.test("ab"); // true — \q{ab} "ab" string'ini match qiladi
+/^[\q{ab}\q{cd}]$/v.test("cd"); // true
+/^[\q{ab}\q{cd}]$/v.test("a");  // false — to'liq "ab" kerak
+// Sabab: oddiy character class single code point match qiladi;
+// ko'p belgili string'lar faqat \q{...} yoki string property
+// (\p{RGI_Emoji}, \p{Basic_Emoji}) orqali ifodalanadi
 
 // ✅ Migration strategy — `u` kodini v ga o'tkazishda avval test
 function upgradeRegex(pattern) {
@@ -1582,7 +1586,7 @@ const evenFibs = fibonacci()
 // [2, 8, 34, 144, 610, 2584, 10946, 46368, 196418, 832040]
 ```
 
-**Tushuntirish:** Fibonacci cheksiz generator — lekin iterator helper'lar lazy bo'lgani uchun faqat kerak bo'lgan elementlar hisoblandi. `filter` → `drop` → `take` pipeline'i birma-bir element o'tkazadi.
+**Tushuntirish:** Fibonacci cheksiz generator — lekin iterator helper'lar lazy bo'lgani uchun faqat kerak bo'lgan elementlar hisoblanadi. `filter` → `drop` → `take` pipeline'i birma-bir element o'tkazadi.
 
 </details>
 
@@ -1623,7 +1627,7 @@ getMissingPermissions(user, required);
 
 ### Mashq 4: using bilan resource management (Qiyin)
 
-**Savol:** `Lock` class yarating — `Symbol.dispose` implementatsiya qilsin. `using` bilan ishlatilganda avtomatik unlock bo'lsin.
+**Savol:** `Lock` class yarating — `Symbol.dispose` implement qilsin. `using` bilan ishlatilganda avtomatik unlock bo'lsin.
 
 <details>
 <summary>Javob</summary>
@@ -1690,11 +1694,11 @@ try {
 | `Promise.withResolvers` | ES2024 | Async | Deferred pattern — resolve/reject tashqarida |
 | `isWellFormed/toWellFormed` | ES2024 | String | Lone surrogate xavfsizligi |
 | RegExp `v` flag | ES2024 | RegExp | Set operatsiyalari, Unicode property'lar |
-| `Array.fromAsync` | ES2024 | Async | Async iterable → Array |
+| `Array.fromAsync` | ES2026 | Async | Async iterable → Array |
 | `Atomics.waitAsync` | ES2024 | Concurrency | Non-blocking shared memory wait |
 | Set methods | ES2025 | Collection | union, intersection, difference — to'plam matematikasi |
 | Iterator Helpers | ES2025 | Iteration | Lazy map/filter/take — katta data uchun samarali |
-| `using` / `await using` | ES2025 | Resource | Avtomatik resource cleanup — leak prevention |
+| `using` / `await using` | ES2026 | Resource | Avtomatik resource cleanup — leak prevention |
 | Import Attributes | ES2025 | Modules | JSON import xavfsizligi |
 | RegExp modifiers | ES2025 | RegExp | Qisman flag control |
 | Duplicate named groups | ES2025 | RegExp | Alternative branch'larda bir xil nom |

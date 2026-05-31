@@ -1,6 +1,6 @@
 # Bo'lim 17: Type Coercion va Equality
 
-> JavaScript da qiymatlar turli type'lar o'rtasida avtomatik yoki qo'lda konvertatsiya qilinadi — bu type coercion. ECMAScript spetsifikatsiyasidagi Abstract Operations (ToString, ToNumber, ToBoolean, ToPrimitive) bu jarayonni boshqaradi. `==` va `===` operatorlari, truthy/falsy qiymatlar, Symbol, BigInt, Map, Set, WeakMap, WeakSet va structuredClone — barchasi shu bo'limda.
+> JavaScript da qiymatlar turli type'lar o'rtasida avtomatik yoki qo'lda convert qilinadi — bu type coercion. ECMAScript specification'idagi Abstract Operations (ToString, ToNumber, ToBoolean, ToPrimitive) bu jarayonni boshqaradi. `==` va `===` operatorlari, truthy/falsy qiymatlar, Symbol, BigInt, Map, Set, WeakMap, WeakSet va structuredClone — barchasi shu bo'limda.
 
 ---
 
@@ -47,7 +47,7 @@ Bu farq `===` taqqoslashda, funksiya argumentlarida va xotira boshqaruvida funda
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-V8 engine da primitive qiymatlar bevosita **stack** da yoki object ichida inline saqlanadi. Kichik butun sonlar **Smi (Small Integer)** tag bilan to'g'ridan-to'g'ri pointer ichida saqlanadi — eng tez format, alohida heap allocation yo'q. Smi diapazoni arxitekturaga bog'liq: klassik 32-bit V8 da 31-bit (-2³⁰ dan 2³⁰−1 gacha), zamonaviy 64-bit V8 da **pointer compression** yoqilgan default rejimda ham 31-bit Smi ishlatiladi. Boshqa primitive'lar (HeapNumber — IEEE 754 double, HeapString) heap'da saqlanadi, lekin ular immutable bo'lgani uchun xavfsiz. Reference type'lar doim heap'da saqlanadi, stack'da faqat ularga pointer turadi.
+V8 engine da primitive qiymatlar bevosita **stack** da yoki object ichida inline saqlanadi. Kichik butun sonlar **Smi (Small Integer)** tag bilan to'g'ridan-to'g'ri pointer ichida saqlanadi — eng tez format, alohida heap allocation yo'q. Smi diapazoni architecture'ga bog'liq: klassik 32-bit V8 da 31-bit (-2³⁰ dan 2³⁰−1 gacha), zamonaviy 64-bit V8 da **pointer compression** yoqilgan default rejimda ham 31-bit Smi ishlatiladi. Boshqa primitive'lar (HeapNumber — IEEE 754 double, HeapString) heap'da saqlanadi, lekin ular immutable bo'lgani uchun xavfsiz. Reference type'lar doim heap'da saqlanadi, stack'da faqat ularga pointer turadi.
 
 ```
 ┌───────────────────────────────────────────────┐
@@ -112,17 +112,17 @@ Batafsil xotira haqida: [16-memory.md](16-memory.md)
 
 `typeof` operatori qiymatning type'ini **string** sifatida qaytaradi. U 8 ta mumkin bo'lgan natija beradi: `"string"`, `"number"`, `"boolean"`, `"undefined"`, `"symbol"`, `"bigint"`, `"object"`, va `"function"`. `typeof` **unary operator** — operand'dan oldin yoziladi va qavslar ixtiyoriy (`typeof x` yoki `typeof(x)` — ikkalasi bir xil).
 
-Eng mashhur bug: `typeof null === "object"`. Bu 1995 yildagi implementatsiya xatosi bo'lib, hech qachon tuzatilmadi — tuzatilsa, millionlab web saytlar buziladi. Shu sababli `null` tekshirish uchun `value === null` ishlatish kerak.
+Eng mashhur bug: `typeof null === "object"`. Bu 1995 yildagi implementation xatosi bo'lib, hech qachon tuzatilmadi — tuzatilsa, millionlab web saytlar buziladi. Shu sababli `null` tekshirish uchun `value === null` ishlatish kerak.
 
 Array ham `typeof` da `"object"` qaytaradi — chunki Array specification bo'yicha object'ning maxsus turi. Array tekshirish uchun `Array.isArray()` ishlatish kerak. Eng aniq type aniqlash usuli — `Object.prototype.toString.call(value)` — u `"[object Type]"` formatida aniq natija beradi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-1995 yildagi Mocha/SpiderMonkey implementatsiyasida qiymatlar ichki representatsiyada **type tag** bilan saqlangan. Tag va qiymat bitta 32-bit word ichida edi:
+1995 yildagi Mocha/SpiderMonkey implementation'ida qiymatlar ichki representation'da **type tag** bilan saqlangan. Tag va qiymat bitta 32-bit word ichida edi:
 
 ```
-Type tag system (eski Mocha implementatsiyasi):
+Type tag system (eski Mocha implementation'i):
 ┌─────────┬──────────────┐
 │ Tag     │ Type         │
 ├─────────┼──────────────┤
@@ -135,9 +135,9 @@ Type tag system (eski Mocha implementatsiyasi):
 Special: null = NULL pointer (0x00) → tag 000 → "object"!
 ```
 
-`null` ichki representatsiyada **NULL pointer** edi — barcha bitlar 0. `typeof` implementatsiyasi type tag'ni tekshirganda, `000` ko'rib `"object"` deb qaytardi. TC39 ES Harmony davrida bu bug'ni tuzatish uchun `typeof null === "null"` proposal ko'tarilgan, lekin backward compatibility tufayli rad etilgan — million sonli web saytlar `typeof null === "object"` ga tayanib ishlaydi.
+`null` ichki representation'da **NULL pointer** edi — barcha bitlar 0. `typeof` implementation'i type tag'ni tekshirganda, `000` ko'rib `"object"` deb qaytardi. TC39 ES Harmony davrida bu bug'ni tuzatish uchun `typeof null === "null"` proposal ko'tarilgan, lekin backward compatibility tufayli rad etilgan — million sonli web saytlar `typeof null === "object"` ga tayanib ishlaydi.
 
-**Eslatma:** Zamonaviy V8 endi bu eski tagged pointer sxemasini ishlatmaydi — uning o'rniga **NaN-boxing** (SpiderMonkey) yoki pointer compression + Smi tagging (V8) kabi boshqa representatsiyalar ishlatiladi. Lekin `typeof null === "object"` natijasi spec darajasida saqlanib qolgan — bu endi implementatsiya detali emas, spec talabi.
+**Eslatma:** Zamonaviy V8 endi bu eski tagged pointer sxemasini ishlatmaydi — uning o'rniga **NaN-boxing** (SpiderMonkey) yoki pointer compression + Smi tagging (V8) kabi boshqa representation'lar ishlatiladi. Lekin `typeof null === "object"` natijasi spec darajasida saqlanib qolgan — bu endi implementation detali emas, spec talabi.
 
 </details>
 
@@ -196,9 +196,9 @@ console.log(preciseType(new Set()));  // "set"
 
 **Explicit (qo'lda) coercion** — dasturchi `Number()`, `String()`, `Boolean()` kabi funksiyalar orqali aylantiradi. Kodni o'quvchi nima sodir bo'layotganini aniq ko'radi.
 
-**Implicit (avtomatik) coercion** — engine o'zi aylantiradi, masalan `"5" + 3` da number string'ga aylanadi. Bu ko'pincha kutilmagan natijalarga olib keladi, chunki dasturchi konversiya sodir bo'layotganini ko'rmaydi.
+**Implicit (avtomatik) coercion** — engine o'zi aylantiradi, masalan `"5" + 3` da number string'ga aylanadi. Bu ko'pincha kutilmagan natijalarga olib keladi, chunki dasturchi conversion sodir bo'layotganini ko'rmaydi.
 
-ECMAScript spetsifikatsiyasida bu jarayon **Abstract Operations** deb ataladi — `ToString`, `ToNumber`, `ToBoolean`, `ToPrimitive`. Bu ichki operatsiyalar to'g'ridan-to'g'ri chaqirilmaydi, lekin engine har doim ularni ishlatadi. Har bir operator va kontekst ma'lum bir abstract operation'ni trigger qiladi.
+ECMAScript specification'ida bu jarayon **Abstract Operations** deb ataladi — `ToString`, `ToNumber`, `ToBoolean`, `ToPrimitive`. Bu ichki operatsiyalar to'g'ridan-to'g'ri chaqirilmaydi, lekin engine har doim ularni ishlatadi. Har bir operator va kontekst ma'lum bir abstract operation'ni trigger qiladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -260,7 +260,7 @@ Muhim nuanslar: `-0` `"0"` ga aylanadi (lekin `Object.is(-0, 0)` ularni farqlayd
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spec (7.1.12 ToString) bo'yicha konversiya jadvali:
+ECMAScript spec (7.1.17 ToString) bo'yicha conversion jadvali:
 
 ```
 ┌──────────────────┬──────────────────────┐
@@ -294,7 +294,7 @@ Array uchun `ToString` ichki `Array.prototype.toString()` ni chaqiradi, u o'z na
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-String konversiyaning turli usullari va ularning farqlari:
+String conversion'ning turli usullari va ularning farqlari:
 
 ```javascript
 // String() — explicit:
@@ -346,12 +346,12 @@ Object.is(-0, 0)        // false — ular aslida farqli!
 
 `ToNumber` — qiymatni **number** ga aylantirish abstract operatsiyasi. U `Number(value)`, matematik operatorlar (`-`, `*`, `/`, `%`, `**`), comparison operatorlar (`>`, `<`, `>=`, `<=`), `==` (ba'zi holatlarda), va unary `+` operator (`+value`) da ishga tushadi. `+` operatori maxsus: agar ikki tomondan birortasi string bo'lsa, u `ToString` ni trigger qiladi; aks holda `ToNumber` ni.
 
-Eng ko'p xato keltiradigan nuanslar: `null` `0` ga, `undefined` esa `NaN` ga aylanadi — bu ikki qiymat semantik jihatdan o'xshash ko'rinsa-da, number konversiyada butunlay farq qiladi. Bo'sh string `""` `0` ga aylanadi. `parseInt()` va `Number()` farqli ishlaydi — `Number()` butun string'ni bir vaqtda parse qiladi (xato bo'lsa `NaN`), `parseInt()` esa boshidan raqamlarni o'qiydi va birinchi raqam bo'lmagan belgida to'xtaydi.
+Eng ko'p xato keltiradigan nuanslar: `null` `0` ga, `undefined` esa `NaN` ga aylanadi — bu ikki qiymat semantik jihatdan o'xshash ko'rinsa-da, number conversion'da butunlay farq qiladi. Bo'sh string `""` `0` ga aylanadi. `parseInt()` va `Number()` farqli ishlaydi — `Number()` butun string'ni bir vaqtda parse qiladi (xato bo'lsa `NaN`), `parseInt()` esa boshidan raqamlarni o'qiydi va birinchi raqam bo'lmagan belgida to'xtaydi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spec (7.1.4 ToNumber) bo'yicha konversiya jadvali:
+ECMAScript spec (7.1.4 ToNumber) bo'yicha conversion jadvali:
 
 ```
 ┌──────────────────┬───────────┬────────────────────────────────┐
@@ -378,7 +378,7 @@ ECMAScript spec (7.1.4 ToNumber) bo'yicha konversiya jadvali:
 └──────────────────┴───────────┴────────────────────────────────┘
 ```
 
-Spec da `null` → `+0` va `undefined` → `NaN` alohida belgilangan. String konversiyada engine avval whitespace'ni strip qiladi, keyin bo'sh string `""` bo'lsa `0` qaytaradi. Aks holda string'ni to'liq number sifatida parse qilishga harakat qiladi — agar biror belgi raqam bo'lmasa (hex/binary/octal prefix'dan tashqari), `NaN` qaytaradi.
+Spec da `null` → `+0` va `undefined` → `NaN` alohida belgilangan. String conversion'da engine avval whitespace'ni strip qiladi, keyin bo'sh string `""` bo'lsa `0` qaytaradi. Aks holda string'ni to'liq number sifatida parse qilishga harakat qiladi — agar biror belgi raqam bo'lmasa (hex/binary/octal prefix'dan tashqari), `NaN` qaytaradi.
 
 **⚠️ `Number()` constructor vs abstract `ToNumber` — muhim farq:** yuqoridagi jadval **abstract `ToNumber` operation**'ga tegishli (spec 7.1.4) — u unary `+`, `-`, arifmetik operatorlarda ishga tushadi va BigInt uchun `TypeError` tashlaydi. Lekin **`Number()` constructor** funksiya sifatida chaqirilganda (`Number(123n)`) maxsus handle qiladi: u `ToNumeric` dan foydalanadi va BigInt'ni number'ga "lossy" (katta sonlarda aniqlik yo'qolishi bilan) aylantiradi. Shuning uchun `Number(123n) === 123` ishlaydi, lekin `+123n` `TypeError` beradi:
 
@@ -386,7 +386,7 @@ Spec da `null` → `+0` va `undefined` → `NaN` alohida belgilangan. String kon
 Number(123n)   // 123  ✅ — Number() constructor BigInt'ni aylantiradi
 +123n          // TypeError — unary + abstract ToNumber'ni chaqiradi
 123n + 0       // TypeError — arifmetik + abstract ToNumber'ni chaqiradi
-Number(2n ** 53n + 1n) // 9007199254740992 ⚠️ — aniqlik yo'qoldi (MAX_SAFE_INTEGER)
+Number(2n ** 53n + 1n) // 9007199254740992 ⚠️ — aniqlik yo'qoldi (input 9007199254740993n, MAX_SAFE_INTEGER'dan yuqori)
 ```
 
 </details>
@@ -407,7 +407,7 @@ Number("42px")      // NaN — "px" bor, butun string parse qilinmadi
 parseInt("42px")    // 42  — "42" ni oldi, "px" ni tashlab ketdi
 Number("")          // 0   — bo'sh string → 0
 parseInt("")        // NaN — Number("") dan farqli!
-parseInt("0x1A")    // 26  — hex tushinadi
+parseInt("0x1A")    // 26  — hex tushunadi
 parseInt("111", 2)  // 7   — binary (2-lik sanoq tizimi)
 
 // Arifmetik bilan implicit coercion:
@@ -449,7 +449,7 @@ Ko'pchilik kutmagan holatlar: bo'sh array `[]` va bo'sh object `{}` **truthy** �
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spec (7.1.2 ToBoolean) da konversiya juda oddiy — lookup table:
+ECMAScript spec (7.1.2 ToBoolean) da conversion juda oddiy — lookup table:
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -467,7 +467,7 @@ ECMAScript spec (7.1.2 ToBoolean) da konversiya juda oddiy — lookup table:
    ↑ BU RO'YXATDA BO'LMAGAN HAMMA NARSA TRUTHY!
 ```
 
-V8 da ToBoolean operatsiyasi juda tez — inline comparison'lar ketma-ketligi. Engine qiymatni oladi va falsy ro'yxat bilan solishtiradi. Agar hech biriga mos kelmasa — `true`. Bu lookup O(1) — hech qanday konversiya yoki hisoblash kerak emas.
+V8 da ToBoolean operatsiyasi juda tez — inline comparison'lar ketma-ketligi. Engine qiymatni oladi va falsy ro'yxat bilan solishtiradi. Agar hech biriga mos kelmasa — `true`. Bu lookup O(1) — hech qanday conversion yoki hisoblash kerak emas.
 
 </details>
 
@@ -907,7 +907,7 @@ null ga yetdi? → false
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-instanceof ning ishlashi, qo'lda implementatsiyasi va cheklovlari:
+instanceof ning ishlashi, qo'lda implementation'i va cheklovlari:
 
 ```javascript
 class Animal {}
@@ -918,7 +918,7 @@ dog instanceof Dog    // true
 dog instanceof Animal // true — prototype chain da bor
 dog instanceof Object // true — hammasi Object'dan meros
 
-// Qo'lda instanceof implementatsiyasi:
+// Qo'lda instanceof implementation'i:
 function myInstanceof(obj, Constructor) {
   let proto = Object.getPrototypeOf(obj);
   while (proto !== null) {
@@ -1038,7 +1038,7 @@ Boolean(sym)    // true ✅ — symbol truthy
 
 **BigInt** — ES2020 da qo'shilgan primitive type. `Number.MAX_SAFE_INTEGER` (2^53 - 1 = 9007199254740991) dan katta butun sonlar bilan ishlash uchun mo'ljallangan — bu chegaradan oshganda oddiy Number noto'g'ri natijalar beradi (precision yo'qoladi). BigInt sonning oxiriga `n` qo'shiladi yoki `BigInt()` funksiyasi bilan yaratiladi.
 
-Muhim cheklov: BigInt va Number aralashtirib arifmetika qilib **bo'lmaydi** — `TypeError` beradi. Explicit konversiya kerak: `BigInt(num)` yoki `Number(big)` (lekin katta sonlarda aniqlik yo'qolishi mumkin). Comparison (`<`, `>`, `==`) ishlaydi, lekin `===` type farqi tufayli `false` beradi (`1n === 1 → false`). `JSON.stringify()` BigInt'ni qo'llab-quvvatlamaydi — custom serialization kerak.
+Muhim cheklov: BigInt va Number aralashtirib arifmetika qilib **bo'lmaydi** — `TypeError` beradi. Explicit conversion kerak: `BigInt(num)` yoki `Number(big)` (lekin katta sonlarda aniqlik yo'qolishi mumkin). Comparison (`<`, `>`, `==`) ishlaydi, lekin `===` type farqi tufayli `false` beradi (`1n === 1 → false`). `JSON.stringify()` BigInt'ni qo'llab-quvvatlamaydi — custom serialization kerak.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -1058,7 +1058,7 @@ const c = BigInt("0x1A");        // 26n (hex)
 
 // ❌ Number bilan aralashtirish MUMKIN EMAS (arifmetik + abstract ToNumber):
 1n + 1         // TypeError: Cannot mix BigInt and other types
-// ✅ Explicit konversiya kerak:
+// ✅ Explicit conversion kerak:
 1n + BigInt(1)  // 2n — BigInt tomoniga aylantirish (aniq, xavfsiz)
 Number(1n) + 1  // 2 — Number() constructor maxsus holat sifatida BigInt'ni
                 //      qo'llab-quvvatlaydi (⚠️ katta sonlarda aniqlik yo'qoladi)
@@ -1096,7 +1096,7 @@ const tax = balance * 13n / 100n;
 
 `Map` — ES6 da qo'shilgan data structure. Object ga o'xshasa-da muhim farqlari bor: Map da key **har qanday type** bo'lishi mumkin (Object, Function, primitive), key tartibi **insertion order** bilan kafolatlanadi, `size` property O(1), va u to'g'ridan-to'g'ri `for...of` bilan iterable. Object da key faqat string/symbol, prototype pollution xavfi bor, va tez-tez qo'shish/o'chirish uchun optimallashtirilmagan.
 
-**Amaliy qoida**: tez-tez o'zgaradigan key-value ma'lumotlar uchun Map, tuzilishi oldindan ma'lum konfiguratsiya uchun Object ishlatish kerak. JSON serialization kerak bo'lsa — Object (Map'ni JSON ga aylantirish qo'lda bo'ladi).
+**Amaliy qoida**: tez-tez o'zgaradigan key-value ma'lumotlar uchun Map, tuzilishi oldindan ma'lum configuration uchun Object ishlatish kerak. JSON serialization kerak bo'lsa — Object (Map'ni JSON ga aylantirish qo'lda bo'ladi).
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -1450,7 +1450,7 @@ console.log(Object.is(negZero, -0)); // true
 // -0 aniqlash usullari:
 console.log(1 / -0);                // -Infinity
 console.log(1 / +0);                // Infinity
-console.log(-0 .toString());        // "0" — string'da farq yo'q!
+console.log((-0).toString());        // "0" — string'da farq yo'q!
 console.log(`${-0}`);               // "0"
 console.log(JSON.stringify(-0));     // "0"
 
@@ -1516,7 +1516,7 @@ console.log(Number.isFinite(42));        // true
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-isNaN trap'lari, safe integer tekshirish va radix konversiya:
+isNaN trap'lari, safe integer tekshirish va radix conversion:
 
 ```javascript
 // ─── isNaN() vs Number.isNaN() — MUHIM FARQ ───
@@ -1763,7 +1763,7 @@ JavaScript da **4 ta equality algorithm** mavjud — har birining qoidalari farq
 
 4. **SameValueZero** — `Object.is()` ga o'xshash, lekin `-0 === +0 → true` deb hisoblaydi. `Map`, `Set`, `Array.prototype.includes()` ichida ishlatiladi. `NaN === NaN → true` (shuning uchun `[NaN].includes(NaN) → true`, lekin `[NaN].indexOf(NaN) → -1` chunki `indexOf` `===` ishlatadi).
 
-`Object.is()` amaliy holatlarda kam ishlatiladi — lekin polyfill, test framework va spec implementatsiyalarida muhim. Unda `NaN` ni aniqlash va `-0` ni farqlash kerak bo'lganda foydali.
+`Object.is()` amaliy holatlarda kam ishlatiladi — lekin polyfill, test framework va spec implementation'larida muhim. Unda `NaN` ni aniqlash va `-0` ni farqlash kerak bo'lganda foydali.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1863,7 +1863,7 @@ function strictEqual(a, b) {
 
 ### Nazariya
 
-JavaScript dagi bitwise operatorlar number'ni **32-bit signed integer** ga aylantiradi (`ToInt32()` ichki operation), keyin har bir bit ustida amal bajaradi, natijani yana number'ga qaytaradi. Bu 64-bit float → 32-bit int konversiya muhim: `2^31 - 1` (2147483647) dan katta yoki `-2^31` (-2147483648) dan kichik sonlar noto'g'ri natija beradi, float kasr qismi kesiladi.
+JavaScript dagi bitwise operatorlar number'ni **32-bit signed integer** ga aylantiradi (`ToInt32()` ichki operation), keyin har bir bit ustida amal bajaradi, natijani yana number'ga qaytaradi. Bu 64-bit float → 32-bit int conversion muhim: `2^31 - 1` (2147483647) dan katta yoki `-2^31` (-2147483648) dan kichik sonlar noto'g'ri natija beradi, float kasr qismi kesiladi.
 
 **Operatorlar**:
 - **AND (`&`)** — ikkala bit 1 bo'lgandagina 1. Mask bilan bit'larni tekshirish/o'chirish uchun.
@@ -1882,13 +1882,13 @@ JavaScript dagi bitwise operatorlar number'ni **32-bit signed integer** ga aylan
 - **`~~n`** — double NOT, `Math.trunc()` o'rnida ishlatiladi. 32-bit chegarasi bor — **katta sonlarda noto'g'ri ishlaydi!** (`~~(2**31) → -2147483648`)
 - **Feature flags** — bitta integer'da ko'p xususiyatlar holatini saqlash (lekin 32 bitdan ko'p flag kerak bo'lsa `BigInt` yoki `Set<string>` ishlatish kerak).
 
-**Performance va o'qilishi**: tarixiy jihatdan bitwise operatsiyalar arifmetikadan tezroq deyilgan, lekin **zamonaviy V8 ikkalasini ham bir xil optimizatsiya** qiladi — integer fast path ishlaganda `n * 2` va `n << 1` aslida bir xil native instruction'ga aylanadi. Bitwise trick'lar o'qilishi qiyin bo'lgani uchun zamonaviy kodda ko'pincha standart arifmetik va `Math` method'lari afzalroq. Bitwise'ni faqat **ma'no jihatdan** mos bo'lgan joyda (bitmask, hash, binary protocol, bit-level algoritmlar) ishlatish kerak, "optimization" uchun emas.
+**Performance va o'qilishi**: tarixiy jihatdan bitwise operatsiyalar arifmetikadan tezroq deyilgan, lekin **zamonaviy V8 ikkalasini ham bir xil optimization** qiladi — integer fast path ishlaganda `n * 2` va `n << 1` aslida bir xil native instruction'ga aylanadi. Bitwise trick'lar o'qilishi qiyin bo'lgani uchun zamonaviy kodda ko'pincha standart arifmetik va `Math` method'lari afzalroq. Bitwise'ni faqat **ma'no jihatdan** mos bo'lgan joyda (bitmask, hash, binary protocol, bit-level algoritmlar) ishlatish kerak, "optimization" uchun emas.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
 ```
-ToInt32() konversiya jarayoni:
+ToInt32() conversion jarayoni:
 ┌──────────────────────────────────────────────────┐
 │ 64-bit IEEE 754 float → 32-bit signed integer    │
 │                                                    │
@@ -1984,7 +1984,8 @@ console.log("#" + rgbToHex(255, 128, 64)); // "#ff8040"
 
 // Rangni teskari qilish (invert):
 const inverted = color ^ 0xFFFFFF;
-console.log(inverted.toString(16)); // "007fbf"
+console.log(inverted.toString(16)); // "7fbf" — toString(16) leading nol qo'shmaydi
+console.log(inverted.toString(16).padStart(6, "0")); // "007fbf"
 
 // ─── Quick Checks — Tez tekshirish usullari ───
 
@@ -2088,8 +2089,8 @@ console.log(d1 + 1000);
 // "Thu Jan 01 2026 ...1000" — 1 sekund keyingi Date emas!
 
 // ✅ Number kontekstini majburlash kerak:
-console.log(+d1 + 1000);           // 1767225600000 — 1 sekund keyingi timestamp
-console.log(d1.getTime() + 1000);  // 1767225600000 — aniqroq, explicit
+console.log(+d1 + 1000);           // 1767225601000 — 1 sekund keyingi timestamp
+console.log(d1.getTime() + 1000);  // 1767225601000 — aniqroq, explicit
 console.log(d1 - d2);              // -86400000 — - operator "number" hint, ms farq
 
 // Date diff hisoblash:
@@ -2152,11 +2153,11 @@ parseInt(0.000001);        // 0 ✅
 parseInt(0.00000001);      // 1 ❌
 // String(0.00000001) === "1e-8"
 
-// Juda katta sonlar ham xavfli:
-parseInt(100000000000000000000); // 1 ❌
-// String(1e20) === "100000000000000000000" aslida, lekin:
-parseInt(1e21);            // 1 ❌
-// String(1e21) === "1e+21"
+// Juda katta sonlar ham xavfli — scientific notation threshold 1e21:
+parseInt(1e20); // 100000000000000000000 ✅ — String(1e20) hali to'liq raqamlarda
+// String(1e20) === "100000000000000000000"
+parseInt(1e21);            // 1 ❌ — 1e21 dan boshlab exponential format
+// String(1e21) === "1e+21", parseInt "1" ni o'qib "e+21" da to'xtaydi
 
 // ✅ To'g'ri usul — Math.trunc yoki ~~ (kichik sonlar uchun):
 Math.trunc(0.0000005);     // 0 ✅
@@ -2169,7 +2170,7 @@ Math.trunc(Number("0.0000005")); // 0
 
 **Nima uchun:** `parseInt` spec'i `Call(ToString, value)` bilan string'ga aylantiradi, so'ng `StringToRadixNumber` algoritmi ishlaydi. Scientific notation'da `e` belgisi raqam emas — parser shu joyda to'xtaydi va oldindan parse qilingan mantissa qismini qaytaradi. Bu `parseInt`'ning string-first tabiati tufayli yuzaga keladi.
 
-**Yechim:** `parseInt` **faqat string'larda** ishlating (foydalanuvchi input, localStorage). Number'dan integer olish uchun `Math.trunc()` yoki `Math.floor()` ishlatish kerak — ular number'da ishlaydi, string konversiya qilmaydi.
+**Yechim:** `parseInt` **faqat string'larda** ishlating (foydalanuvchi input, localStorage). Number'dan integer olish uchun `Math.trunc()` yoki `Math.floor()` ishlatish kerak — ular number'da ishlaydi, string conversion qilmaydi.
 
 ### Gotcha 4: `JSON.stringify` `undefined`'ni array'da `null`, object'da yo'qotadi
 
@@ -2302,7 +2303,7 @@ processName(0);   // 0 — saqlandi ✅
 const input = "5";
 const result = input + 3; // "53" ← string concatenation!
 
-// ✅ To'g'ri — explicit konversiya:
+// ✅ To'g'ri — explicit conversion:
 const result2 = Number(input) + 3;   // 8
 const result3 = +input + 3;           // 8
 
@@ -2619,6 +2620,6 @@ console.log(cache.has(42));     // true ✅
 
 ---
 
-> **Keyingi bo'lim:** [18-dom.md](18-dom.md) — DOM Manipulation — Document Object Model qanday ishlaydi, DOM tree strukturasi, Node vs Element, DOM traversal (parentNode, children, nextSibling), element yaratish va o'zgartirish (createElement, append, remove), attribute vs property, classList API, data-* atributlar, performance optimizatsiyalari (reflow/repaint, DocumentFragment, requestAnimationFrame), Shadow DOM asoslari.
+> **Keyingi bo'lim:** [18-dom.md](18-dom.md) — DOM Manipulation — Document Object Model qanday ishlaydi, DOM tree strukturasi, Node vs Element, DOM traversal (parentNode, children, nextSibling), element yaratish va o'zgartirish (createElement, append, remove), attribute vs property, classList API, data-* atributlar, performance optimization'lari (reflow/repaint, DocumentFragment, requestAnimationFrame), Shadow DOM asoslari.
 
 **Cross-references:** [06-objects.md](06-objects.md) (Object copying), [07-prototypes.md](07-prototypes.md) (prototype chain, instanceof), [16-memory.md](16-memory.md) (WeakMap/WeakSet, GC, structuredClone), [14-iterators-generators.md](14-iterators-generators.md) (Symbol.iterator)

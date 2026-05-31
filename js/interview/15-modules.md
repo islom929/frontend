@@ -138,7 +138,7 @@ import Database, { createPool } from './database.mjs';
 
 ```javascript
 // Static import — DOIM yuklanadi
-import { Chart } from './chart.mjs'; // 200KB — sahifa ochilganda
+import { Chart } from './chart.mjs'; // sahifa ochilganda, butun bundle'ga kiradi
 
 // Dynamic import — KERAK BO'LGANDA yuklanadi
 async function showChart() {
@@ -179,7 +179,7 @@ Yechimlar:
 1. **Umumiy dependency'ni alohida modulga chiqarish** — A va B ning umumiy qismini C ga
 2. **Dynamic import** — `await import('./b.mjs')` lazy
 3. **Dependency injection** — parametr orqali berish
-4. **Arxitekturani qayta ko'rish** — ko'pincha circular = noto'g'ri arxitektura
+4. **Architecture'ni qayta ko'rish** — ko'pincha circular = noto'g'ri architecture
 
 </details>
 
@@ -461,14 +461,14 @@ app start
 app end
 ```
 
-ESM `import` deklaratsiyalari **hoisted** — kod yozilishidan qat'i nazar, engine ularni modul tepasiga ko'taradi. Parse → Link → Evaluate bosqichlarida import qilingan modullar **dependency tartibida** evaluate qilinadi. Shuning uchun `utils.mjs` top-level kodi `app.mjs` ning birinchi `console.log` dan **oldin** ishlaydi.
+ESM `import` declaration'lari **hoisted** — kod yozilishidan qat'i nazar, engine ularni modul tepasiga ko'taradi. Parse → Link → Evaluate bosqichlarida import qilingan modullar **dependency tartibida** evaluate qilinadi. Shuning uchun `utils.mjs` top-level kodi `app.mjs` ning birinchi `console.log` dan **oldin** ishlaydi.
 
 **Amaliy ta'sir:**
 - Side effect'larga tayanish xavfli — "birinchi qator" `console.log` aslida birinchi emas
 - Conditional `if (cond) import './x'` SyntaxError beradi (static import top-level)
 - Shart bilan side effect kerak bo'lsa — `await import('./utils.mjs')` (dynamic) ishlatish
 
-**Deep Dive:** Spec'da ESM 3 bosqichli loading bor — Parse (import/export deklaratsiyalarni topish), Link (binding'lar ulanadi, qiymat hali yo'q), Evaluate (top-level code dependency tartibida ishlaydi). `import` deklaratsiyasini funksiya yoki `if` ichiga joylash SyntaxError beradi — chunki linker compile-time'da dependency graph qurishi kerak.
+**Deep Dive:** Spec'da ESM 3 bosqichli loading bor — Parse (import/export declaration'larni topish), Link (binding'lar ulanadi, qiymat hali yo'q), Evaluate (top-level code dependency tartibida ishlaydi). `import` declaration'ni funksiya yoki `if` ichiga joylash SyntaxError beradi — chunki linker compile-time'da dependency graph qurishi kerak.
 
 </details>
 
@@ -514,12 +514,11 @@ try {
 ```
 
 **Xato turlari:**
-- `TypeError` — MIME type noto'g'ri, CORS, yoki specifier resolution xatosi
+- `TypeError` — browser'da loading xatosi (network fail, CORS, MIME type, 404/500, specifier resolution) hammasi `TypeError` bo'lib reject bo'ladi
 - `SyntaxError` — modul kodi parse bo'lmadi
-- `NetworkError` (browser) — fetch failed
-- `MODULE_NOT_FOUND` (Node.js) — fayl topilmadi
+- `MODULE_NOT_FOUND` / `ERR_MODULE_NOT_FOUND` (Node.js) — fayl topilmadi (browser'dan farqli, Node generic `Error` ishlatadi)
 
-**Deep Dive:** Dynamic import internal'da `HostImportModuleDynamically` spec abstract operation'ni chaqiradi — bu host (browser/Node.js) tomonidan implement qilinadi. Promise reject bo'lganda — module record cache'ga **xato holatda** saqlanadi, keyingi import shu xatoni qaytaradi. Cache bust qilish uchun query string ishlatish kerak: `import('./mod.mjs?v=' + Date.now())`.
+**Deep Dive:** Dynamic import internal'da `HostImportModuleDynamically` spec abstract operation'ni chaqiradi — bu host (browser/Node.js) tomonidan implement qilinadi. Modul uch bosqichda yuklanadi: loading (fetch) → linking (parse) → evaluation. Spec bo'yicha **faqat evaluation bosqichidagi xato cache'lanadi** — keyingi import shu saqlangan xatoni qaytaradi. Loading yoki linking bosqichidagi xato (network, MIME, CORS, 404) cache'lanmaydi — keyingi import qayta urinib ko'rishi mumkin. Amalda Chromium-based browser'lar `fetch` natijasini HTTP darajasida cache'laydi, shuning uchun deploy'dan keyin eski chunk nomiga so'rov sticky failure berishi mumkin — bu module-system emas, browser cache xatti-harakati. Cache bust uchun query string ishlatiladi: `import('./mod.mjs?v=' + Date.now())`.
 
 </details>
 
@@ -573,7 +572,7 @@ export { a, b };
 
 CJS'da nima uchun ishlamaydi: `require()` sinxron — chaqiruvchi thread'ni bloklaydi. `await` sinxron kontekstda semantik jihatdan ma'nosiz.
 
-**Deep Dive:** Spec'da TLA `AsyncBlock` evaluation mexanizmi orqali implement qilingan. Modul `[[CycleRoot]]` va `[[AsyncEvaluation]]` slot'lari bilan kelishiladi. Bundler'lar (Webpack 5+, Rollup, Vite) TLA modullarni `__webpack_async__` yoki o'xshash wrapper bilan o'raydi — chunki bundled output sinxron IIFE bo'lishi mumkin emas. Bu bundle size'ga 1-2 KB qo'shadi.
+**Deep Dive:** Spec'da TLA `AsyncBlock` evaluation mexanizmi orqali implement qilingan. Modul `[[CycleRoot]]` va `[[AsyncEvaluation]]` slot'lari bilan kelishiladi. Bundler'lar (Webpack 5+, Rollup, Vite) TLA modullarni `__webpack_async__` yoki o'xshash wrapper bilan o'raydi — chunki bundled output sinxron IIFE bo'lishi mumkin emas. Bu wrapper bundle hajmiga oz miqdorda runtime overhead qo'shadi.
 
 </details>
 

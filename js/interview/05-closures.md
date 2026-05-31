@@ -108,7 +108,7 @@ Memory lifecycle:
 3. Tashqi funksiya tugaydi — EC chiqadi, lekin record tirik
 4. Closure funksiyaga hech qanday reference qolmaganida → GC record'ni tozalaydi
 
-V8 optimizatsiyasi: faqat closure **ishlatgan** o'zgaruvchilar Context object'iga ko'chiriladi. Ishlatilmagan o'zgaruvchilar stack'da qoladi va tashqi funksiya tugaganda yo'qoladi.
+V8 optimization'i: faqat closure **ishlatgan** o'zgaruvchilar Context object'iga ko'chiriladi. Ishlatilmagan o'zgaruvchilar stack'da qoladi va tashqi funksiya tugaganda yo'qoladi.
 
 ```javascript
 function example() {
@@ -308,18 +308,18 @@ const ref = { current: null };
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Stale closure muammosi React'da `useEffect` va `useCallback` hook'larida ko'p uchraydi. React'ning Fiber arxitekturasida har render funksiya komponenti qaytadan chaqiriladi va har closure-based callback yangi `[[Environment]]` bilan yaratiladi. Lekin `useEffect` dependency array stale bo'lsa — eski callback timer/event listener queue'da saqlanib, oldingi render'dagi Environment Record'ni ushlab qoladi. `useRef` bu muammoni hal qiladi: ref object reference identity render'lar orasida bir xil (React `currentRoot.memoizedState` da saqlaydi), `.current` mutable. Closure ref object'ning o'ziga reference saqlaydi — `.current` read har doim joriy qiymatni qaytaradi.
+Stale closure muammosi React'da `useEffect` va `useCallback` hook'larida ko'p uchraydi. React'ning Fiber architecture'sida har render funksiya komponenti qaytadan chaqiriladi va har closure-based callback yangi `[[Environment]]` bilan yaratiladi. Lekin `useEffect` dependency array stale bo'lsa — eski callback timer/event listener queue'da saqlanib, oldingi render'dagi Environment Record'ni ushlab qoladi. `useRef` bu muammoni hal qiladi: ref object reference identity render'lar orasida bir xil (React fiber'ning hook state'ida saqlanadi), `.current` mutable. Closure ref object'ning o'ziga reference saqlaydi — `.current` read har doim joriy qiymatni qaytaradi.
 
 </details>
 
 </details>
 
-### 7. V8 closure'ni qanday optimizatsiya qiladi? [Senior]
+### 7. V8 closure'ni qanday optimization qiladi? [Senior]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
-V8 closure'lar uchun bir nechta optimizatsiya qo'llaydi:
+V8 closure'lar uchun bir nechta optimization qo'llaydi:
 
 **1. Context Allocation (Selective Capture):**
 V8 parse-time da qaysi o'zgaruvchilar closure tomonidan ishlatilishini aniqlaydi. Faqat **ishlatilgan** o'zgaruvchilar maxsus **Context** object'iga ko'chiriladi (heap'ga). Ishlatilmaganlar stack'da qoladi.
@@ -336,7 +336,7 @@ function example() {
 **2. Inline Caching:**
 Closure ichidagi variable access cache'lanadi — har safar scope chain bo'ylab yurmasdan, to'g'ridan-to'g'ri Context object'dagi index orqali murojaat.
 
-**3. Optimizatsiyani buzadigan narsalar:**
+**3. Optimization'ni buzadigan narsalar:**
 - Dinamik kod baholash — barcha o'zgaruvchilar Context'ga ko'chiriladi
 - `debugger` statement — yuqoridagi bilan bir xil ta'sir
 - `with` statement — scope chain dynamic bo'ladi
@@ -405,12 +405,12 @@ class Validator {
 | Runtime enforce | Ha (scope) | Ha (TypeError) |
 | Inheritance | Yo'q (composition) | Subclass ham ko'rmaydi |
 
-Closure — functional style, class `#private` — OOP style. Ikkalasi ham haqiqiy privacy beradi. Tanlash loyiha arxitekturasiga bog'liq.
+Closure — functional style, class `#private` — OOP style. Ikkalasi ham haqiqiy privacy beradi. Tanlash loyiha architecture'siga bog'liq.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Class `#private` fields V8 ichida unique `Private Name` (Symbol'ga o'xshash, lekin ECMAScript spec'da alohida tur — `Private Names` table) orqali implement qilingan. Har private field class evaluation paytida noyob Private Name oladi. Bu field'ga kirish `PrivateFieldGet`/`PrivateFieldSet` abstract operation'lar orqali amalga oshadi — `obj.[[PrivateFieldValues]]` internal slot'idan brand check bilan o'qiladi. Closure-based privacy esa Lexical Environment mexanizmi orqali — o'zgaruvchi boshqa scope'dan accessible emas (resolve `ResolveBinding` ichida fail bo'ladi). Ikkalasi ham runtime enforcement beradi. Private field'lar `in` operator bilan brand-check imkonini beradi: `#field in obj` — bu syntax shakli class'ga tegishli instance ekanligini aniqlashga ishlatiladi.
+Class `#private` fields V8 ichida unique `Private Name` (Symbol'ga o'xshash, lekin ECMAScript spec'da alohida tur — `Private Name` qiymatlari) orqali implement qilingan. Har private field class evaluation paytida noyob Private Name oladi. Bu field'ga kirish `PrivateGet`/`PrivateSet` abstract operation'lar (ECMA-262 §7.3.30/§7.3.31) orqali amalga oshadi — har object'ning `[[PrivateElements]]` internal slot'idagi `PrivateElement` ro'yxatidan brand check bilan o'qiladi. Closure-based privacy esa Lexical Environment mexanizmi orqali — o'zgaruvchi boshqa scope'dan accessible emas (resolve `ResolveBinding` ichida fail bo'ladi). Ikkalasi ham runtime enforcement beradi. Private field'lar `in` operator bilan brand-check imkonini beradi: `#field in obj` — bu syntax shakli class'ga tegishli instance ekanligini aniqlashga ishlatiladi.
 
 </details>
 
@@ -717,7 +717,7 @@ Agar `inner()` ichida `var x = 20` bo'lmaganida — A qatorda `10` chiqardi (clo
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Spec bo'yicha `FunctionDeclarationInstantiation` (ECMA-262 §10.2.11) function body'dagi `var` deklaratsiyalarini `VarScopedDeclarations` ro'yxatiga yig'adi va `CreateMutableBinding(x, false)` + `InitializeBinding(x, undefined)` ni VariableEnvironment'da bajaradi — bu Creation Phase'da `x = undefined`. Execution paytida `console.log(x)` `ResolveBinding("x")` chaqiradi — local Environment Record'da topadi → `undefined` qaytaradi, tashqi scope'ga umuman bormaydi. V8 parser scope analysis vaqtida `x` ni local scope'da topadi va `kStackLocal` slot'iga allocate qiladi (`kContextLocal` emas) — chunki closure capture qilmaydi. Agar local `var x` bo'lmaganida — `x` tashqi scope'ning Context object'iga reference orqali closure hosil qilgan bo'lardi.
+Spec bo'yicha `FunctionDeclarationInstantiation` (ECMA-262 §10.2.11) function body'dagi `var` declaration'larini `VarScopedDeclarations` ro'yxatiga yig'adi va `CreateMutableBinding(x, false)` + `InitializeBinding(x, undefined)` ni VariableEnvironment'da bajaradi — bu Creation Phase'da `x = undefined`. Execution paytida `console.log(x)` `ResolveBinding("x")` chaqiradi — local Environment Record'da topadi → `undefined` qaytaradi, tashqi scope'ga umuman bormaydi. V8 parser scope analysis vaqtida `x` ni local scope'da topadi va `kStackLocal` slot'iga allocate qiladi (`kContextLocal` emas) — chunki closure capture qilmaydi. Agar local `var x` bo'lmaganida — `x` tashqi scope'ning Context object'iga reference orqali closure hosil qilgan bo'lardi.
 
 </details>
 
@@ -768,7 +768,7 @@ IIFE har chaqiruvda yangi scope yaratadi — `var` ning bitta binding muammosi h
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-IIFE yechimi ishlashining sababi: har bir IIFE chaqiruvi `FunctionDeclarationInstantiation` orqali yangi Function Environment Record yaratadi va `j` parametri shu record'ga `CreateMutableBinding(j, false)` + `InitializeBinding(j, argument)` bilan yoziladi. Ichki function shu record'ga `[[Environment]]` orqali closure hosil qiladi (function yaratilganda `OrdinaryFunctionCreate` joriy LexicalEnvironment'ni `[[Environment]]` slot'iga saqlaydi). Natijada har bir closure alohida Function Environment Record'dagi alohida `j` binding'ga ega bo'ladi. `let` per-iteration binding ham xuddi shu mexanizmni `CreatePerIterationEnvironment` orqali avtomatik ta'minlaydi.
+IIFE yechimi ishlashining sababi: har bir IIFE chaqiruvi `FunctionDeclarationInstantiation` orqali yangi Function Environment Record yaratadi va `j` parametri shu record'ga `CreateMutableBinding(j, false)` + `InitializeBinding(j, argument)` bilan yoziladi. Ichki function shu record'ga `[[Environment]]` orqali closure hosil qiladi (function yaratilganda `OrdinaryFunctionCreate` joriy LexicalEnvironment'ni `[[Environment]]` slot'iga saqlaydi). Natijada har bir closure alohida Function Environment Record'dagi alohida `j` binding'ga ega bo'ladi. `let` per-iteration binding ham aynan shu mexanizmni `CreatePerIterationEnvironment` orqali avtomatik ta'minlaydi.
 
 </details>
 
@@ -929,7 +929,7 @@ Qachon class: minglab instance (memory-efficient), inheritance kerak, framework 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-V8 ichida class instance'lar **Hidden Class** (`Map`) mechanism orqali optimizatsiya qilinadi — bir xil property layout'li object'lar bitta Map'ni share qiladi, JIT compiler inline caching qila oladi. Factory pattern'da har chaqiruv yangi object literal qaytaradi — agar property tartibi va turi bir xil bo'lsa, V8 transitiona tree orqali Map'ni share qiladi. Lekin closure-based method'lar har instance uchun alohida `JSFunction` object yaratadi (har biri o'z `Context` ga reference saqlaydi). Class method'lar esa `Constructor.prototype` da bitta `JSFunction` sifatida yashaydi va barcha instance lookup orqali ulashadi — natijada minglab instance bilan ishlaganda memory va JIT optimization sezilarli yaxshiroq.
+V8 ichida class instance'lar **Hidden Class** (`Map`) mechanism orqali optimization qilinadi — bir xil property layout'li object'lar bitta Map'ni share qiladi, JIT compiler inline caching qila oladi. Factory pattern'da har chaqiruv yangi object literal qaytaradi — agar property tartibi va turi bir xil bo'lsa, V8 transition tree orqali Map'ni share qiladi. Lekin closure-based method'lar har instance uchun alohida `JSFunction` object yaratadi (har biri o'z `Context` ga reference saqlaydi). Class method'lar esa `Constructor.prototype` da bitta `JSFunction` sifatida yashaydi va barcha instance lookup orqali ulashadi — natijada minglab instance bilan ishlaganda memory va JIT optimization sezilarli yaxshiroq.
 
 </details>
 
@@ -988,12 +988,12 @@ console.log(add5(10, 20)); // 35
 |---|---|---|
 | Argument tartibi | Har biri alohida chaqiruvda | Bir nechta birdaniga |
 | Natija | `f(a)(b)(c)` | `g(b, c)` (b va c qolgan) |
-| Konfiguratsiya | Strict (har argument bir-bir) | Flexible |
+| Configuration | Strict (har argument bir-bir) | Flexible |
 | Native support | Yo'q (kutubxonalar: Lodash, Ramda) | `Function.prototype.bind` |
 
 Use case'lar:
 - **Currying**: functional pipeline'lar, function composition, point-free style
-- **Partial application**: konfiguratsiyalangan funksiya yaratish (API client base URL, default options)
+- **Partial application**: configuration qilingan funksiya yaratish (API client base URL, default options)
 
 ```javascript
 // Real-world: API client
@@ -1086,7 +1086,7 @@ Qachon generator: murakkab control flow (pause/resume), lazy evaluation, async i
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Generator funksiyalar V8 ichida **state machine transformation** orqali implement qilingan — bytecode generation paytida `yield` har bir uchrashi unique resume point'ga aylantiriladi. Generator object spec'da `[[GeneratorState]]` internal slot bilan ishlaydi (`"suspendedStart"`, `"suspendedYield"`, `"executing"`, `"completed"`). `next()` chaqirilganda `GeneratorResume` abstract operation generator'ni resume qiladi va keyingi `yield` gacha bytecode'ni davom ettiradi. V8 7.2 da "Suspendable functions" arxitekturasi kiritildi — generator object yaratish overhead'i bytecode handler darajasida optimallashtirildi (`SuspendGenerator` va `ResumeGenerator` opcode'lari). Lekin manual closure-based iterator hali ham eng minimal — chunki state machine transformation yo'q, faqat oddiy function call.
+Generator funksiyalar V8 ichida **state machine transformation** orqali implement qilingan — bytecode generation paytida `yield` har bir uchrashi unique resume point'ga aylantiriladi. Generator object spec'da `[[GeneratorState]]` internal slot bilan ishlaydi (`"suspendedStart"`, `"suspendedYield"`, `"executing"`, `"completed"`). `next()` chaqirilganda `GeneratorResume` abstract operation generator'ni resume qiladi va keyingi `yield` gacha bytecode'ni davom ettiradi. V8 v6.6 da "suspendable functions" (generator, async function, module) bytecode darajasida optimallashtirildi — interpreter ichida ishlash tezligi oshdi va compiled size kamaydi (`SuspendGenerator` va `ResumeGenerator` opcode'lari). Lekin manual closure-based iterator hali ham eng minimal — chunki state machine transformation yo'q, faqat oddiy function call.
 
 </details>
 
@@ -1097,7 +1097,7 @@ Generator funksiyalar V8 ichida **state machine transformation** orqali implemen
 <details>
 <summary><strong>Javob</strong></summary>
 
-Closure performance odatda muammo emas — V8 yaxshi optimizatsiya qiladi. Lekin ba'zi hollarda sezilarli ta'sir bo'lishi mumkin:
+Closure performance odatda muammo emas — V8 yaxshi optimization qiladi. Lekin ba'zi hollarda sezilarli ta'sir bo'lishi mumkin:
 
 **1. Memory overhead — ko'p closure instance:**
 
@@ -1144,9 +1144,9 @@ function level1() {
 }
 ```
 
-V8 scope caching bilan buni optimizatsiya qiladi, lekin extremely deep nesting (10+ level) production'da kamdan-kam uchraydi.
+V8 scope caching bilan buni optimization qiladi, lekin extremely deep nesting (10+ level) production'da kamdan-kam uchraydi.
 
-**3. Dinamik kod baholash — optimizatsiyani buzadi:**
+**3. Dinamik kod baholash — optimization'ni buzadi:**
 
 ```javascript
 function bad() {
@@ -1182,7 +1182,7 @@ function multiplyBy(factor) {
 **Tavsiyalar:**
 
 1. Minglab/millionlab instance kerak bo'lsa — class/prototype ishlatish
-2. Dinamik kod baholash konstruktsiyalarini ishlatmaslik (zamonaviy kod uchun standart)
+2. Dinamik kod baholash construct'larini ishlatmaslik (zamonaviy kod uchun standart)
 3. Hot path'larda closure yaratishni kamaytirish — cache, hoist out of loop
 4. Profile qilish — taxmin emas, o'lchov (`performance.now`, Chrome DevTools)
 

@@ -22,7 +22,7 @@
 - [Intl.Segmenter](#intlsegmenter)
 - [Intl.ListFormat](#intllistformat)
 - [Intl.DisplayNames](#intldisplaynames)
-- [Temporal API (Stage 3)](#temporal-api-stage-3)
+- [Temporal API (Stage 4)](#temporal-api-stage-4)
 - [Intl.DurationFormat](#intldurationformat)
 - [Common Mistakes](#common-mistakes)
 - [Edge Cases va Gotchas](#edge-cases-va-gotchas)
@@ -172,7 +172,7 @@ date.getTime(); // 1710347445123
 
 // Timezone offset — UTC dan farq (minutlarda)
 date.getTimezoneOffset(); // -300 (Toshkent UTC+5 da — 5 soat = 300 minut)
-// ⚠️ Belgi sanadu: getTimezoneOffset() = UTC − local (minutlarda)
+// ⚠️ Belgi qoidasi: getTimezoneOffset() = UTC − local (minutlarda)
 // Toshkent (UTC+5): UTC − (UTC+5) = −5 soat = −300 min → manfiy
 // New York (UTC−5): UTC − (UTC−5) = +5 soat = +300 min → musbat
 // Qisqasi: UTC+X zonasi → −X*60, UTC−X zonasi → +X*60
@@ -448,7 +448,7 @@ console.log(`${t4 - t3} ms`);
 
 ### Nazariya
 
-Date object JavaScript dagi eng "tuzoqli" API'lardan biri. U 1995-yilda Java'ning `java.util.Date` asosida 10 kunda yozilgan va ko'plab dizayn xatolari bor. Quyidagi pitfall'lar har bir developer bilishi kerak bo'lgan muammolar.
+Date object JavaScript dagi eng "tuzoqli" API'lardan biri. U 1995-yilda til prototipi bilan birga, Java'ning `java.util.Date` klassi asosida yaratilgan — `java.util.Date` esa keyinchalik Java'da o'zining dizayn kamchiliklari uchun deprecated qilingan. Shu meros tufayli Date'da ko'plab dizayn muammolari bor. Quyidagi pitfall'lar har bir developer bilishi kerak bo'lgan muammolar.
 
 ### Pitfall 1: Month 0-indexed
 
@@ -663,7 +663,7 @@ rangeFmt.formatRange(start, end); // "Mar 13 – 20, 2024"
 new Intl.DateTimeFormat("en-US", {
   timeStyle: "long",
   timeZone: "America/New_York",
-}).format(date); // "11:30:00 AM EST"
+}).format(date); // "12:30:00 PM EDT" (13-mart — DST kuchda, UTC-4)
 
 new Intl.DateTimeFormat("en-US", {
   timeStyle: "long",
@@ -793,7 +793,7 @@ new Intl.NumberFormat("en-IN").format(1234567);
 
 ### Nazariya
 
-`Intl.RelativeTimeFormat` — "2 kun oldin", "3 hours ago", "through keyingi hafta" kabi **nisbiy vaqt** iboralarini locale-aware formatda yaratadi. Bu `if/else` bilan qo'lda "1 day ago" / "2 days ago" yozishdan ko'ra ancha oson va to'g'ri.
+`Intl.RelativeTimeFormat` — "2 kun oldin", "3 soatdan keyin", "o'tgan hafta" kabi **nisbiy vaqt** iboralarini locale-aware formatda yaratadi. Bu `if/else` bilan qo'lda "1 day ago" / "2 days ago" yozishdan ko'ra ancha oson va to'g'ri.
 
 Formatter ikki asosiy option qabul qiladi:
 - **`numeric`**: `"always"` (default) → "1 kun oldin", `"auto"` → "kecha" (agar mumkin bo'lsa)
@@ -1201,14 +1201,15 @@ const options = languages.map(code => ({
 
 ---
 
-## Temporal API (Stage 3)
+## Temporal API (Stage 4)
 
 ### Nazariya
 
-**Temporal** — Date object'ni almashtirishga mo'ljallangan yangi standart API. Proposal TC39'ga 2018-yilda kiritilgan va 2021-yildan beri Stage 3 da. 2026-yil boshida:
-- **Firefox** — 125+ versiyadan (2024-mart) experimental implementation shipping
-- **Chrome/Safari** — implementation jarayoni davom etmoqda, flag orqasida sinovda
-- **Polyfill** — `@js-temporal/polyfill` production'da ishlatishga yaroqli
+**Temporal** — Date object'ni almashtirishga mo'ljallangan yangi standart API. Proposal TC39'da uzoq Stage 3 davridan so'ng Stage 4 ga yetdi va ECMA-262 hamda ECMA-402 standartlariga qo'shilmoqda. Shipping holati (2026-may):
+- **Firefox** — 139 versiyadan (2025-may) unflagged shipping (birinchi browser)
+- **Chrome / Edge** — Chrome 144 dan (2026-yanvar) native qo'llab-quvvatlash
+- **Safari** — hali shipping yo'q
+- **Polyfill** — `@js-temporal/polyfill` Safari va eski browser'lar uchun production'da ishlatishga yaroqli
 
 Temporal Date'ning barcha muammolarini hal qiladi:
 
@@ -1300,7 +1301,7 @@ const calendarDuration = start.until(end, { largestUnit: "month" });
 calendarDuration.months; // 2
 calendarDuration.days;   // 12
 
-// ⚠️ Calendar units (month, year) → day konversiya uchun relativeTo MAJBURIY
+// ⚠️ Calendar units (month, year) → day conversion uchun relativeTo MAJBURIY
 // Sabab: 1 oy = necha kun? Fevral 28/29, iyul 31 — anchor kerak
 calendarDuration.total({ unit: "day", relativeTo: start }); // 72
 // calendarDuration.total("day"); // ❌ RangeError — relativeTo yo'q
@@ -1314,7 +1315,7 @@ const zdt = Temporal.ZonedDateTime.from({
   timeZone: "America/New_York",
 });
 
-// Timezone konversiya
+// Timezone conversion
 const tashkent = zdt.withTimeZone("Asia/Tashkent");
 tashkent.hour; // boshqa soat — timezone farqi
 
@@ -1332,7 +1333,7 @@ const zonedDT = instant.toZonedDateTimeISO("Asia/Tashkent");
 
 ### Nazariya
 
-`Intl.DurationFormat` — vaqt oralig'larini (`Temporal.Duration` yoki oddiy object) locale-aware formatda ko'rsatish uchun. TC39'da 2023-yil oxirida Stage 4 ga yetgan, ECMA-402 2024 edition'iga kiritilgan. 2026-yil holatida Chrome 129+, Firefox 134+, Node.js 22+ da mavjud.
+`Intl.DurationFormat` — vaqt oralig'larini (`Temporal.Duration` yoki oddiy object) locale-aware formatda ko'rsatish uchun. ECMA-402'ga qo'shilgan. Shipping: Safari 16.4+, Chrome 129+, Firefox 136+, Node.js 23+ — 2025-mart holatida Baseline Newly available.
 
 Bu API Temporal.Duration bilan juda mos: `start.until(end)` dan olingan duration'ni to'g'ridan-to'g'ri formatlash mumkin.
 
@@ -1367,7 +1368,7 @@ new Intl.DurationFormat("uz", { style: "long" })
   .format({ hours: 2, minutes: 30 });
 // "2 soat 30 daqiqa" (taxminan)
 
-// Temporal.Duration bilan integratsiya
+// Temporal.Duration bilan integration
 const start = Temporal.PlainTime.from("09:00:00");
 const end = Temporal.PlainTime.from("17:30:00");
 const workDuration = start.until(end);
@@ -1401,7 +1402,9 @@ const date = new Date(2024, 3, 13); // 3 = April!
 const march = new Date(2024, 2, 13); // 2 = March
 
 // ✅ Yoki ISO string ishlatish (1-based oy) — Z bilan UTC aniq ko'rsatiladi
-const march2 = new Date("2024-03-13T00:00:00Z"); // Z siz local time parse qilinadi!
+const march2 = new Date("2024-03-13T00:00:00Z");
+// ⚠️ Diqqat: date-time string'da Z bo'lmasa (masalan "2024-03-13T00:00:00")
+//    local time deb parse qilinadi — natija timezone'ga bog'liq
 ```
 
 **Nima uchun:** `Date` API Java'ning `java.util.Date` dan olingan — u ham 0-based oy ishlatadi. Bu 1995-yildagi dizayn xatosi — Temporal API'da tuzatilgan.
@@ -1502,7 +1505,9 @@ const d = new Date("2024-03-09T12:00:00-05:00"); // EST (UTC-5)
 // ❌ Timestamp + 86400000 (24*60*60*1000 ms)
 const next = new Date(d.getTime() + 86_400_000);
 // next.toString() → local da 13:00 (12:00 emas!)
-// Sabab: DST transition paytida local clock 23 soat o'tdi, UTC timestamp 24 soat o'tdi
+// Sabab: 24 real soat qo'shildi, lekin 10-mart local kalendar kuni
+// faqat 23 soat (spring forward 1 soatni "o'g'irlaydi") → 24 real soat
+// keyingi 12:00 dan 1 soat oshib ketadi → 13:00
 
 // ✅ setDate() bilan — local calendar day qo'shadi
 const copy = new Date(d);
@@ -1526,7 +1531,7 @@ const d = new Date(2024, 0, 31); // 2024-01-31
 d.setMonth(1); // Fevral → overflow → Mart 2 (2024-leap, 31→29+2)
 d.setDate(15); // Endi: 2024-03-15 (kutilgan 2024-02-15 emas!)
 
-// ✅ Batcha set yoki konstruktor
+// ✅ Batcha set yoki constructor
 const safe = new Date(2024, 1, 15); // 2024-02-15 — overflow yo'q
 ```
 
@@ -1590,7 +1595,7 @@ text.length;                // 16 (UTF-16 code units)
 [...seg.segment(text)].length; // 13 ✅ (graphemes — 👋🏽 = 1)
 ```
 
-**Nima uchun:** Unicode'da bir "inson belgisi" bir nechta code point'dan iborat bo'lishi mumkin — skin tone modifier (`\u{1F3FD}`), ZWJ sequence, combining accents (`é` = `e` + `\u0301`). Spec operatsiyalar turli abstraksiya darajasida ishlaydi.
+**Nima uchun:** Unicode'da bir "inson belgisi" bir nechta code point'dan iborat bo'lishi mumkin — skin tone modifier (`\u{1F3FD}`), ZWJ sequence, combining accents (`é` = `e` + `\u0301`). Spec operatsiyalar turli abstraction darajasida ishlaydi.
 
 **Yechim:** Foydalanuvchi tomon "belgi soni" ko'rsatilganda (tweet counter, input maxlength) **Intl.Segmenter** ishlating. `.length` faqat memory/encoding balans uchun.
 
@@ -1619,7 +1624,7 @@ const good = dates.map(d => formatter.format(d));
 const bad2 = dates.map(d => d.toLocaleDateString("en-US", { dateStyle: "long" }));
 ```
 
-**Nima uchun:** `Intl.*` konstruktorlari ichida ICU pattern parsing, CLDR data lookup va format skeleton compilation bor. Bu operatsiyalar ar-zaletib takrorlanganda o'nlab millisekundlarni yig'adi. V8 ba'zi `toLocale*` chaqiruvlari uchun ichki cache'ga ega, lekin bu spec talabi emas.
+**Nima uchun:** `Intl.*` constructor'lari ichida ICU pattern parsing, CLDR data lookup va format skeleton compilation bor. Bu operatsiyalar har instantiation'da takrorlanadi, shuning uchun katta array'da formatter'ni loop ichida qayta yaratish keraksiz qo'shimcha ish qiladi. V8 ba'zi `toLocale*` chaqiruvlari uchun ichki cache'ga ega, lekin bu spec talabi emas.
 
 **Yechim:** Har formatter variant uchun bitta instance saqlang (module-level constant yoki memoize). React/Vue komponentlar ichida `useMemo`/`computed` bilan o'rang.
 

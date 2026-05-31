@@ -44,7 +44,7 @@ Event Loop — Call Stack va Queue'lar o'rtasidagi aloqani boshqaradigan cheksiz
 1. **Call Stack bo'shmi?** — agar yo'q, kutamiz
 2. **Microtask Queue** ni **TO'LIQ** bo'shat (yangi qo'shilganlarni ham)
 3. **Macrotask Queue** dan **BITTA** task ol va bajir
-4. **Render** (kerak bo'lsa — ~16.6ms oraliqda)
+4. **Render** (kerak bo'lsa — display refresh rate'ga moslab, har tick'da emas)
 5. 1-qadamga qayt
 
 ```javascript
@@ -115,7 +115,7 @@ console.log("Sync");
 ```
 
 Qo'shimcha nuqtalar:
-- HTML Standard "Timers" bo'limi: nesting level 5+ bo'lganda minimum delay **4ms** (clamping)
+- HTML Standard "Timers" bo'limi: nesting level 5 dan oshganda (ya'ni 6-darajadan boshlab) minimum delay **4ms** ga clamp qilinadi
 - Background tab'larda browser'lar `setTimeout` ni throttle qiladi (Chrome — taxminan 1 soniya, Firefox — implementation-defined)
 - Amalda OS scheduler resolution tufayli timer trigger 1-4ms kechikishi mumkin
 
@@ -177,7 +177,7 @@ Promise.resolve().then(() => console.log("promise"));
 ```
 
 rAF animatsiya uchun ideal:
-- Browser render sikli bilan sinxronlashgan (~60fps)
+- Browser render sikliga bog'langan — har frame'dan oldin chaqiriladi (display refresh rate'da, odatda ~60fps)
 - Background tab'da avtomatik to'xtaydi (battery tejaydi)
 - `setTimeout(fn, 16)` dan aniqroq
 
@@ -561,12 +561,11 @@ Macrotask: setTimeout_5 → "5"
 
 `return Promise.resolve()` bilan return qilish muhim — bu `.then(9)`'ni faqat shu Promise resolve bo'lgandagina queue'ga qo'shadi. Oddiy `return undefined` bo'lganida `.then(9)` darhol microtask queue'ga tushardi.
 
-`return Promise.resolve()` qo'shimcha microtask tick kutadi — spec bo'yicha `PromiseResolveThenableJob` yaratiladi (thenable resolve qilish uchun). Bu spec evolution:
+`return Promise.resolve()` qo'shimcha microtask tick kutadi. Outer promise'ni boshqa native promise bilan resolve qilganda spec uch job zanjirini bajaradi: `PromiseResolveThenableJob` (returned promise'ning `.then`'ini chaqirish uchun) → inner promise reaction (`resolveOuter`'ni queue qiladi) → outer promise settle bo'lib keyingi `.then` reaction. Adoption point'dan keyingi `.then`'gacha bu **3 ta microtask tick** — oddiy `return undefined` (1 tick)'dan 2 tick ko'p.
 
-- **Eski spec (ES2018 gacha):** 2 ta qo'shimcha microtask tick (`NewPromiseResolveThenableJob` + `PromiseReactionJob`)
-- **ES2019+ (V8 7.2+):** 1 ta qo'shimcha microtask tick — optimization: native `Promise` resolve qilinayotganda `PromiseResolve` shortcut qo'llaniladi
+Bu tafsilot tez-tez `await` optimization bilan aralashtiriladi. V8 7.2 (Node 11+) `await`'ni tezlashtirgan: `await someNativePromise` endi 3 emas 1 tick'da resume bo'ladi (qo'shimcha wrapper promise tashlandi). Lekin bu optimization faqat `await`'ga tegishli — `.then` chain ichida `return Promise.resolve()` orqali promise adoption hali ham 3 tick. Adoption'ni qisqartiruvchi `proposal-faster-promise-adoption` 2026-da hali **Stage 1** — spec'ga kirmagan.
 
-Bu farq **shu savol natijasiga ta'sir qilmaydi** (tartib bir xil), lekin boshqa murakkab interleaving'larda muhim bo'lishi mumkin. Interview'da "spec version'ga qarab tick soni farq qilishi mumkin" deb eslatish bilim chuqurligini ko'rsatadi.
+Bu detal **shu savol natijasiga ta'sir qilmaydi** (raqobatdosh microtask yo'q, shuning uchun "9" baribir "7"dan keyin darhol keladi), lekin promise'lar bir-biriga interleave bo'lgan murakkab holatda tick soni tartibni o'zgartiradi.
 
 </details>
 
@@ -630,7 +629,7 @@ function scheduleUpdate(update) {
 ### Edge Cases
 
 - **Cross-origin iframe'larda** — `MessageChannel` postMessage cross-context kommunikatsiya uchun mo'ljallangan, lekin scheduling pattern bitta context'da ham ishlaydi
-- **Port transferring** — port `Transferable` interfeysni implement qiladi, `postMessage`'ning ikkinchi argumenti orqali boshqa context'ga uzatish mumkin
+- **Port transferring** — port `Transferable` interface'ni implement qiladi, `postMessage`'ning ikkinchi argumenti orqali boshqa context'ga uzatish mumkin
 - **Garbage Collection** — port'larga reference saqlanmasa, channel GC qilinadi va callback'lar ishlamaydi
 
 ### Follow-up savollar
@@ -641,11 +640,11 @@ function scheduleUpdate(update) {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-`MessageChannel` HTML Standard'da "Message channels" bo'limida belgilangan. Har port `MessagePort` interfeysini implement qiladi va `Transferable` — `postMessage`'ning ikkinchi argumenti orqali boshqa context'ga (Worker, iframe) o'tkazilishi mumkin.
+`MessageChannel` HTML Standard'da "Message channels" bo'limida belgilangan. Har port `MessagePort` interface'ini implement qiladi va `Transferable` — `postMessage`'ning ikkinchi argumenti orqali boshqa context'ga (Worker, iframe) o'tkazilishi mumkin.
 
 `postMessage(null)` callback `port.onmessage`'ga **"posted message" task source** orqali yetkaziladi. HTML spec timer clamping qoidasini faqat **"timer task source"**'ga (setTimeout/setInterval) qo'llaydi — bu boshqa task source bo'lgani uchun 4ms cheklovi yo'q.
 
-React 18+ `Scheduler` paketi shu mexanizmni ishlatadi: `scheduler/src/forks/SchedulerDOM.js`'da `MessageChannel` orqali yield qilinadi (time-slicing). `MessageChannel` mavjud bo'lmagan environment'larda (eski Node.js, JSDOM ba'zi versiyalari) fallback sifatida `setTimeout(fn, 0)` ishlatiladi.
+React 18+ `Scheduler` paketi shu mexanizmni ishlatadi: `scheduler/src/forks/Scheduler.js`'da `MessageChannel` orqali yield qilinadi (time-slicing) — `channel.port1.onmessage` ish bajaradi, `port.postMessage(null)` esa macrotask sifatida rejalashtiradi. `setImmediate` ham `MessageChannel` ham mavjud bo'lmagan environment'larda fallback sifatida `setTimeout(fn, 0)` ishlatiladi.
 
 </details>
 
@@ -796,7 +795,7 @@ Check fazasi (poll'dan keyin):
 
 `libuv` har fazani ketma-ket bajaradi: timers → pending → idle/prepare → poll → check → close. Har faza tugagach, **`uv_run` ichida** `process_nextTick_queue()` va microtask queue chaqiriladi.
 
-`process.nextTick` Node.js'ning `_tickInfo` internal struktura orqali boshqariladi — bu **C++ darajadagi queue**, V8 microtask queue'sidan alohida. `_tickInfo.length > 0` bo'lganda V8 har JS callback'dan keyin nextTick'larni drain qiladi.
+`process.nextTick` callback'lari `lib/internal/process/task_queues.js`'da JS-land `FixedQueue` (`const queue = new FixedQueue()`) ichida saqlanadi — bu V8 microtask queue'sidan **alohida** queue. C++ tomonida esa kichik `tickInfo` shared array bor: `tickInfo[kHasTickScheduled]` flag'i orqali runtime JS'ga kirmasdan nextTick kutilayotganini biladi. Sync operatsiya tugagach, Node bu nextTick queue'ni microtask checkpoint'dan **oldin** to'liq drain qiladi.
 
 Microtask queue esa V8'ning standart `MicrotaskQueue` — Node.js V8 embedder API orqali `EnqueueMicrotask`/`PerformCheckpoint` chaqiradi. Node.js v11+ dan boshlab microtask checkpoint har JS callback'dan keyin amalga oshiriladi (oldin faza oxirida edi — bu xatti-harakat o'zgarishi).
 

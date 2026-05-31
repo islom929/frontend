@@ -102,7 +102,7 @@ const handler = {
 <details>
 <summary>Javob</summary>
 
-ECMAScript spetsifikatsiyasi bo'yicha `[[Set]]` internal method boolean qaytaradi — `true` (muvaffaqiyatli) yoki `false` (muvaffaqiyatsiz). Proxy'ning set trap'i ham shu qoidaga amal qiladi. Agar trap `false` yoki falsy qiymat (undefined dahil) qaytarsa va strict mode bo'lsa — engine `TypeError` tashlaydi.
+ECMAScript spec bo'yicha `[[Set]]` internal method boolean qaytaradi — `true` (muvaffaqiyatli) yoki `false` (muvaffaqiyatsiz). Proxy'ning set trap'i ham shu qoidaga amal qiladi. Agar trap `false` yoki falsy qiymat (undefined ham) qaytarsa va strict mode bo'lsa — engine `TypeError` tashlaydi.
 
 ```javascript
 // ❌ return yo'q — undefined qaytaradi (falsy)
@@ -112,7 +112,7 @@ const proxy = new Proxy({}, {
     // implicit return undefined
   }
 });
-proxy.x = 1; // Strict mode: TypeError: 'set' on proxy: trap returned falsish
+proxy.x = 1; // Strict mode: TypeError: 'set' on proxy: trap returned falsish for property 'x'
 
 // ✅ Reflect.set ishlatish — avtomatik true qaytaradi
 const proxy = new Proxy({}, {
@@ -167,7 +167,7 @@ proxy.id;
 
 Invariant'lar engine tomonidan **automatic** tekshiriladi — developer bu tekshiruvni o'chirib qo'ya olmaydi.
 
-**Deep Dive:** ECMAScript spec'da har bir Proxy internal method (masalan `[[Get]]`) oxirida `ValidateGetTrap` kabi validation bosqichi bor — trap natijasi va target'ning property descriptor'i solishtiriladi. Bu tekshiruv `Object.getOwnPropertyDescriptor(target, prop)` chaqiradi — shuning uchun invariant enforcement'ning o'zi ham runtime cost qo'shadi. Proxy invariant'lari JavaScript'ning "integrity level" kafolatlarini himoya qiladi — `Object.freeze` va `Object.seal` semantic'lari proxy orqali ham buzilmasligini ta'minlaydi.
+**Deep Dive:** ECMAScript spec'da invariant tekshiruvi alohida operation emas, balki har bir Proxy internal method ichida inline yozilgan. `[[Get]]` trap'ni chaqirgandan keyin `target.[[GetOwnProperty]](P)` internal method'i bilan target'ning property descriptor'ini oladi — agar descriptor data property bo'lib `[[Configurable]]: false` va `[[Writable]]: false` bo'lsa, trap qaytargan qiymat `SameValue` bilan `descriptor.[[Value]]` ga teng bo'lishi shart, aks holda `TypeError`. Bu descriptor o'qish har trap chaqiruviga qo'shimcha cost qo'shadi. Proxy invariant'lari JavaScript'ning "integrity level" kafolatlarini himoya qiladi — `Object.freeze` va `Object.seal` semantic'lari proxy orqali ham buzilmasligini ta'minlaydi.
 
 </details>
 
@@ -196,7 +196,7 @@ revoke(); // proxy bekor qilindi
 - **Security** — foydalanuvchi sessiyasi tugaganda data'ga kirishni to'xtatish
 - **Resource management** — proxy ushlab turgan reference'larni tozalash
 
-`revoke()` chaqirilganda proxy ichki `[[Handler]]` va `[[Target]]` ni `null` ga o'zgartiradi — boshqa qayta tiklab bo'lmaydi.
+`revoke()` chaqirilganda proxy ichki `[[ProxyTarget]]` va `[[ProxyHandler]]` slot'larini `null` ga o'zgartiradi — boshqa qayta tiklab bo'lmaydi.
 
 
 </details>
@@ -245,7 +245,7 @@ proxy.getBalance(); // ✅ 1000
 
 `bind(target)` bilan method chaqirilganda `this` = `target` (haqiqiy class instance) bo'ladi — private field'larga kira oladi.
 
-**Deep Dive:** Private field'lar spec'da `[[PrivateName]]` internal slot orqali ishlaydi — engine object'da alohida "brand" tekshiradi. Bu `WeakMap` semantikasiga o'xshash, lekin engine darajasida optimallashtirilgan. TC39 da Proxy + private fields muammosi atayin hal qilinmagan — committee bu cheklovni xavfsizlik uchun zarur deb hisoblaydi, chunki proxy private data'ga kirish imkonini bermasa encapsulation kuchli qoladi.
+**Deep Dive:** Spec'da har object `[[PrivateElements]]` internal slot saqlaydi — bu PrivateElement record'lar listi, har biri Private Name kalit bilan. `#balance` ga kirilganda `PrivateGet` operation'i `PrivateElementFind` orqali shu listdan mos Private Name'ni qidiradi — topilmasa `TypeError` ("brand check" muvaffaqiyatsiz). Proxy alohida object bo'lgani uchun uning `[[PrivateElements]]` listida `Wallet`'ning `#balance`'i yo'q. Bu `WeakMap` semantikasiga o'xshash, lekin engine darajasida implement qilingan. TC39 da Proxy + private fields muammosi atayin hal qilinmagan — committee bu cheklovni xavfsizlik uchun zarur deb hisoblaydi, chunki proxy private data'ga kirish imkonini bermasa encapsulation kuchli qoladi.
 
 </details>
 
@@ -335,7 +335,7 @@ const proxy = new Proxy(obj, {
 
 Vue 3 ham shu lazy pattern ishlatadi — `reactive()` object faqat access bo'lgan property'larni recursive proxy qiladi.
 
-**Deep Dive:** V8 da Proxy object'lari "exotic object" sifatida treat qilinadi — TurboFan optimizing compiler Proxy property access'ni inline cache (IC) bilan optimallashtira olmaydi, chunki har bir `get`/`set` trap ixtiyoriy JS kodi. Benchmark'larda Proxy property access oddiy object'dan ~5-10x sekin. MobX 5+ va Vue 3 Proxy ishlatadi, lekin Solid.js Proxy'dan qochadi va Signal pattern bilan reaktivlik ta'minlaydi — bu performance-critical rendering'da afzallik beradi.
+**Deep Dive:** V8 da Proxy object'lari "exotic object" sifatida treat qilinadi — TurboFan optimizing compiler Proxy property access'ni inline cache (IC) bilan optimallashtira olmaydi, chunki har bir `get`/`set` trap ixtiyoriy JS kodi. Har access oddiy property lookup o'rniga trap funksiya chaqiruvi va invariant tekshiruviga aylanadi — natijada oddiy object access'dan sezilarli sekin (aniq nisbat V8 versiyasi, trap murakkabligi va benchmark'ga bog'liq). MobX 5+ va Vue 3 Proxy ishlatadi, lekin Solid.js Proxy'dan qochadi va Signal pattern bilan reaktivlik ta'minlaydi — bu performance-critical rendering'da afzallik beradi.
 
 </details>
 
@@ -578,7 +578,7 @@ const proxy = new Proxy(config, {
 });
 ```
 
-**Deep Dive:** `Object.freeze` spec'da `[[PreventExtensions]]` + barcha own property'larni `{writable: false, configurable: false}` qiladi. Proxy `get` trap chaqirilgandan keyin engine `Object.getOwnPropertyDescriptor(target, prop)` bilan descriptor tekshiradi — agar `configurable: false` va `writable: false` bo'lsa, trap qaytargan qiymat `SameValue` bilan target'dagi qiymatga teng bo'lishi shart. Shu sababli frozen object ustida Proxy faqat side-effect (logging) uchun foydali — qiymatni o'zgartirish mumkin emas.
+**Deep Dive:** `Object.freeze` spec'da `[[PreventExtensions]]` + barcha own property'larni `{writable: false, configurable: false}` qiladi. Proxy `get` trap chaqirilgandan keyin engine `target.[[GetOwnProperty]](P)` internal method'i bilan descriptor tekshiradi — agar `configurable: false` va `writable: false` bo'lsa, trap qaytargan qiymat `SameValue` bilan target'dagi qiymatga teng bo'lishi shart. Shu sababli frozen object ustida Proxy faqat side-effect (logging) uchun foydali — qiymatni o'zgartirish mumkin emas.
 
 </details>
 

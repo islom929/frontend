@@ -87,7 +87,7 @@ JavaScript engine'lar C++ tilida yozilgan. Engine bir nechta asosiy komponentdan
 
 ### Nazariya
 
-Har bir brauzer va runtime o'zining JavaScript engine'iga ega. Ular bir xil ECMAScript spetsifikatsiyasini implement qiladi, ya'ni bir xil source code hamma engine'da bir xil natija beradi. Lekin ichki arxitekturalari farq qiladi — parsing strategiyasi, compiler bosqichlari, optimization texnikalari, garbage collection algoritmlari.
+Har bir brauzer va runtime o'zining JavaScript engine'iga ega. Ular bir xil ECMAScript spec'ni implement qiladi, ya'ni bir xil source code hamma engine'da bir xil natija beradi. Lekin ichki architecture'lari farq qiladi — parsing strategiyasi, compiler bosqichlari, optimization texnikalari, garbage collection algoritmlari.
 
 **V8 (Google)**
 
@@ -97,7 +97,7 @@ V8 — Google tomonidan C++ da yozilgan engine. Chrome brauzer, Node.js, Deno, E
 
 SpiderMonkey — Mozilla tomonidan C/C++ da yozilgan engine, Firefox brauzerda ishlatiladi. Bu JavaScript uchun yaratilgan birinchi engine (1995, Brendan Eich). Source code avval parser tomonidan AST'ga aylantiriladi, keyin bytecode emitter AST'dan bytecode hosil qiladi. Hosil qilingan bytecode quyidagi tier'lar orqali ishlanadi:
 
-- **Baseline Interpreter** — bytecode interpreter (Firefox 70, 2019 yildan qo'shilgan). Bytecode'ni `computed goto` (threaded dispatch) va Baseline JIT'dan qayta ishlatiladigan assembly stub'lar yordamida interpret qiladi. Inline Cache va profiling data Baseline JIT bilan birgalikda ishlatiladi — bu eski C++ interpreter'ga nisbatan sezilarli tezroq
+- **Baseline Interpreter** — bytecode interpreter (Firefox 70, 2019 yildan qo'shilgan). Baseline JIT'ning kod generatsiya infratuzilmasini qayta ishlatib, generated assembly threaded interpreter loop hosil qiladi: har bytecode instruction'dan keyin keyingi instruction'ga indirect jump (threaded dispatch). Inline Cache va profiling data Baseline JIT bilan birgalikda ishlatiladi — bu eski C++ interpreter'ga nisbatan sezilarli tezroq
 - **Baseline Compiler (Baseline JIT)** — non-optimizing baseline JIT compiler. Bytecode'dan tezda machine code hosil qiladi, lekin chuqur optimization qo'llamaydi
 - **Warp (WarpMonkey)** — optimizing JIT compiler (Firefox 83, 2020 yildan IonMonkey'ning o'rnini bosgan). CacheIR-based type feedback asosida yuqori darajada optimized machine code ishlab chiqaradi
 
@@ -119,7 +119,7 @@ JavaScriptCore — Apple tomonidan yaratilgan engine, Safari brauzer va WebKit f
 | Baseline Compiler | Sparkplug | Baseline Compiler | Baseline JIT |
 | Mid-tier | Maglev | yo'q (Baseline'dan to'g'ridan-to'g'ri Warp'ga) | DFG JIT |
 | Top-tier Optimizer | TurboFan | Warp | FTL JIT |
-| GC | Orinoco (Generational + Concurrent + Incremental) | Generational + Incremental + Concurrent | Riptide (Concurrent + Incremental) |
+| GC | Orinoco (Generational + Concurrent + Incremental) | Generational + Incremental + Concurrent | Riptide (Generational + Concurrent) |
 | Ishlatiladi | Chrome, Node.js, Deno, Edge | Firefox | Safari, iOS brauzerlar |
 
 Bu kursda asosiy e'tibor **V8**'ga qaratiladi — chunki u eng keng tarqalgan (Chrome + Node.js), ochiq kodli, va pipeline'i juda yaxshi hujjatlashtirilgan. Boshqa engine'lar bir xil ECMAScript spec'ga amal qilgani uchun, V8'ning mexanizmlarini chuqur tushunib olgach, ularning ishlash printsiplarini ham anglash qiyin bo'lmaydi.
@@ -131,7 +131,7 @@ Barcha engine'lar ECMAScript spec'ga amal qiladi — observable behavior bir xil
 
 1. **Pipeline tier'lari soni va strategiyasi** — V8 to'rt bosqichli, SpiderMonkey ikki asosiy bosqichli (Baseline + Warp), JSC to'rt bosqichli. Ko'p tier'lar startup vaqti va peak performance o'rtasida yaxshi balans beradi: oddiy kod interpreter'da qoladi, hot code yuqori tier'larga ko'tariladi.
 2. **Inline caching strategiyasi** — har engine property access'ni o'zgacha cache'laydi. Format va shape tracking detallari farq qiladi, lekin umumiy g'oya bir xil: tez-tez uchraydigan shape'larni cache'lash.
-3. **Garbage Collection algoritmi** — V8 Orinoco (concurrent + incremental), JSC Riptide (concurrent). GC pause'lar brauzer responsiveness'iga ta'sir qiladi — zamonaviy GC'lar minimal pause uchun optimize qilingan.
+3. **Garbage Collection algoritmi** — V8 Orinoco (generational + concurrent + incremental), JSC Riptide (generational + concurrent). GC pause'lar brauzer responsiveness'iga ta'sir qiladi — zamonaviy GC'lar minimal pause uchun optimize qilingan.
 4. **Hidden class implementation** — V8 ularni `Map` (V8 source kodidagi ichki termin, JavaScript `Map` object'idan farqli) deb ataydi, JSC `Structure` deydi. Funksional maqsad bir xil — object shape'ni track qilib property access'ni tezlashtirish.
 
 </details>
@@ -226,7 +226,7 @@ V8 engine misolida to'liq pipeline:
        │ (funksiya "hot" bo'lsa — ko'p chaqirilsa)
        ▼
 ┌──────────────┐
-│  Sparkplug   │  Bytecode → Machine Code (tez, optimizatsiyasiz)
+│  Sparkplug   │  Bytecode → Machine Code (tez, optimization'siz)
 │ (Baseline)   │  Faqat Ignition overhead ni yo'qotadi
 └──────┬───────┘
        │
@@ -731,7 +731,7 @@ getX(p3); // ❌ Boshqa shape — inline cache miss, deopt mumkin
 ```
 
 ```javascript
-// ✅ Optimizatsiyani saqlash uchun — doim bir xil shape'da object yarating
+// ✅ Optimization'ni saqlash uchun — doim bir xil shape'da object yarating
 function createPoint(x, y) {
   return { x, y }; // ✅ doim bir xil tartibda — bir xil hidden class
 }
@@ -761,7 +761,7 @@ Har bir object yaratilganda V8 unga hidden class (Map) biriktiradi. Hidden class
 Hidden class nima uchun kerak: agar V8 object'ning shape'ini bilsa, property'ning xotiradagi aniq offset'ini ham biladi. Shunda property lookup hash table orqali emas, to'g'ridan-to'g'ri offset orqali — C/C++ struct'dagi field access bilan teng tezlikda, bitta memory load instruction'da bajariladi.
 
 **Inline Caching (IC):**
-Inline cache — property access operatsiyasi uchun shortcut. Birinchi marta `obj.x` bajarilganda engine property'ni topadi va uning hidden class + offset'ini cache'laydi. Keyingi safar xuddi shu shape'dagi object kelsa — cache'dan to'g'ridan-to'g'ri offset bilan oladi, qidiruv kerak emas.
+Inline cache — property access operatsiyasi uchun shortcut. Birinchi marta `obj.x` bajarilganda engine property'ni topadi va uning hidden class + offset'ini cache'laydi. Keyingi safar aynan shu shape'dagi object kelsa — cache'dan to'g'ridan-to'g'ri offset bilan oladi, qidiruv kerak emas.
 
 IC holatlari:
 - **Monomorphic** — faqat bitta shape uchraydigan joy. Eng tez — single cache entry
@@ -795,7 +795,7 @@ Hidden Class yaratilish jarayoni:
                                                                 └───────────────────────────┘
 ```
 
-Transition chain — har bir property qo'shilganda yangi hidden class yaratiladi, lekin transition'lar cache'lanadi. Agar boshqa object ham xuddi shu tartibda xuddi shu property'larni qo'shsa — tayyor hidden class ishlatiladi, yangi yaratilmaydi.
+Transition chain — har bir property qo'shilganda yangi hidden class yaratiladi, lekin transition'lar cache'lanadi. Agar boshqa object ham aynan shu tartibda aynan shu property'larni qo'shsa — tayyor hidden class ishlatiladi, yangi yaratilmaydi.
 
 Inline Caching mexanizmi:
 
@@ -1161,7 +1161,7 @@ CPU darajasida stack va heap allocation:
 
 **Heap allocation**: V8 da bump pointer allocation — New Space ichida "bump pointer" joriy bo'sh joyni ko'rsatadi. Yangi object uchun pointer siljiydi. Lekin heap cheklanganda — GC ishga tushadi, ko'chirish (compaction) kerak, fragmentation bilan kurashish kerak. Bu O(1) amortized, lekin GC pause'lar predictable emas.
 
-**Escape analysis** — V8 optimizatsiyasi: agar object faqat funksiya ichida ishlatilsa va tashqariga chiqmasa ("escape qilmaydi"), V8 uni umuman allocate qilmaslikka qaror qilishi mumkin. Bu **scalar replacement** deb ataladi: object o'rniga uning property'lari alohida register/stack qiymatlari sifatida saqlanadi, heap allocation umuman bajarilmaydi. Bu GC pressure'ni kamaytiradi. Escape analysis faqat TurboFan darajasida ishlaydi va oddiy, predictable object'lar uchun samarali.
+**Escape analysis** — V8 optimization'i: agar object faqat funksiya ichida ishlatilsa va tashqariga chiqmasa ("escape qilmaydi"), V8 uni umuman allocate qilmaslikka qaror qilishi mumkin. Bu **scalar replacement** deb ataladi: object o'rniga uning property'lari alohida register/stack qiymatlari sifatida saqlanadi, heap allocation umuman bajarilmaydi. Bu GC pressure'ni kamaytiradi. Escape analysis faqat TurboFan darajasida ishlaydi va oddiy, predictable object'lar uchun samarali.
 
 </details>
 
@@ -1542,7 +1542,7 @@ console.log(sum(5));
 
 ```javascript
 // Xato: RangeError: Maximum call stack size exceeded
-// Sabab: base case yo'q — sum(5) → sum(4) → sum(3) → ... → sum(-Infinity)
+// Sabab: base case yo'q — sum(5) → sum(4) → sum(3) → ... manfiy son'larga davom etadi, stack to'lguncha to'xtamaydi
 
 // ✅ Tuzatilgan versiya:
 function sum(n) {

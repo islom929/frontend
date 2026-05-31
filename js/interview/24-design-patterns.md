@@ -11,13 +11,13 @@
 <details>
 <summary>Javob</summary>
 
-Design pattern — dasturiy ta'minotda takroriy uchraydigan muammolarning isbotlangan, qayta ishlatilishi mumkin bo'lgan arxitekturaviy yechimlari. Pattern'lar uchta kategoriyaga bo'linadi:
+Design pattern — dasturiy ta'minotda takroriy uchraydigan dizayn muammolari uchun isbotlangan, qayta ishlatilishi mumkin bo'lgan yechim. Pattern'lar uchta kategoriyaga bo'linadi:
 
 | Kategoriya | Nima haqida | Misollar |
 |-----------|------------|---------|
 | **Creational** | Object yaratishni boshqarish | Factory, Singleton, Builder |
 | **Structural** | Object/class tuzilishi, birlashtirish | Module, Decorator, Adapter, Facade, Proxy |
-| **Behavioral** | Object'lar arasi aloqa, javobgarlik | Observer, Strategy, Command, State, Iterator |
+| **Behavioral** | Object'lar o'rtasidagi aloqa, javobgarlik | Observer, Strategy, Command, State, Iterator |
 
 Pattern'lar kodni tuzilmali, qayta ishlatiluvchi va boshqa developer'larga tushunarli qiladi. "Biz Pub/Sub pattern ishlatamiz" desangiz — jamoadagi har kim nima nazarda tutilganini tushunadi.
 
@@ -125,7 +125,7 @@ bus.publish("user:login", data);      // publisher subscriber ni bilmaydi
 ```
 
 **Observer** — DOM `addEventListener`, Node.js `EventEmitter`.
-**Pub/Sub** — Redis Pub/Sub, RabbitMQ, Kafka, microservice'lar arasi aloqa.
+**Pub/Sub** — Redis Pub/Sub, RabbitMQ, Kafka, microservice'lar o'rtasidagi aloqa.
 
 </details>
 
@@ -282,7 +282,7 @@ const dashboard = new DashboardFacade();
 const data = await dashboard.getUserDashboard(42);
 ```
 
-**Real-world:** jQuery (`$`), `fetch` API (XMLHttpRequest ustidan), React `ReactDOM.render()`, Node.js `fs.readFile`.
+**Real-world:** jQuery `$.ajax` (XMLHttpRequest ustidagi facade), `axios` (XHR va Node.js `http` modulini bitta API ostida birlashtiradi), Node.js `fs.readFile` (past darajadagi `open`/`read`/`close` syscall'larni yashiradi).
 
 </details>
 
@@ -349,7 +349,7 @@ const request = new RequestBuilder()
   .build();
 ```
 
-**Qachon ishlatiladi:** 4+ parameter, ko'p optional konfiguratsiya, method chaining kerak bo'lganda.
+**Qachon ishlatiladi:** 4+ parameter, ko'p optional configuration, method chaining kerak bo'lganda.
 
 **Real-world:** Knex.js query builder, Joi validation schema, Jest matchers, supertest API testing.
 
@@ -421,7 +421,7 @@ app.use(async (ctx, next) => {
 
 Bu classic CoR da odatda yo'q — handler so'rovni qayta ishlab keyingisiga uzatadi va qaytib kelmaydi.
 
-**Deep Dive:** GoF kitobida CoR "each handler either handles the request or passes it to the successor" deb ta'riflangan — handler faqat bitta ishni qiladi: handle yoki forward. Middleware esa "cross-cutting concern" — logging, auth, CORS kabi barcha so'rovlarga tegishli logika. Express middleware stack `app._router.stack` array'ida saqlanadi, NestJS esa `@UseGuards`, `@UseInterceptors` decorator'lar orqali CoR ni metadata-driven qiladi. Bu pattern'ning asosi GoF "Chain of Responsibility" — lekin `await next()` dan keyin kodning ishlashi (onion model) klassik CoR da yo'q, bu Koa innovatsiyasi.
+**Deep Dive:** GoF kitobida CoR "each handler either handles the request or passes it to the successor" deb ta'riflangan — handler faqat bitta ishni qiladi: handle yoki forward. Middleware esa "cross-cutting concern" — logging, auth, CORS kabi barcha so'rovlarga tegishli logika. Express middleware'larni ichki router'da tartibli array (stack) sifatida saqlaydi va so'rov kelganda shu tartibda iteratsiya qiladi; NestJS esa `@UseGuards`, `@UseInterceptors` decorator'lar orqali CoR'ni metadata-driven qiladi. Bu pattern'ning asosi GoF "Chain of Responsibility" — lekin `await next()` dan keyin kodning ishlashi (onion model) klassik CoR'da yo'q, bu Koa kiritgan yangilik.
 
 </details>
 

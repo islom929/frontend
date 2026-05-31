@@ -1,6 +1,6 @@
 # Bo'lim 15: Modules
 
-> Module — kodni mustaqil, qayta ishlatiladigan bo'laklarga ajratish tizimi. Global scope ifloslanishining oldini oladi va zamonaviy JavaScript arxitekturasining asosini tashkil etadi.
+> Module — kodni mustaqil, qayta ishlatiladigan bo'laklarga ajratish tizimi. Global scope ifloslanishining oldini oladi va zamonaviy JavaScript architecture'sining asosini tashkil etadi.
 
 ---
 
@@ -49,7 +49,7 @@ Modullar quyidagi muammolarni hal qiladi:
 
 **Module system engine perspektivasidan nima beradi**:
 1. **Static analysis** — import/export compile-time'da aniq, bundler tree-shaking qila oladi
-2. **Scope isolation** — global scope ifloslanishi yo'q, V8 har file uchun alohida hidden class optimizatsiyasi qila oladi
+2. **Scope isolation** — global scope ifloslanishi yo'q, V8 har file uchun alohida hidden class optimization'i qila oladi
 3. **Dead code elimination** — qaysi export ishlatilmayotganini aniqlash mumkin
 
 **Module resolution**: har tizim o'z algoritmiga ega:
@@ -303,7 +303,7 @@ console.log(counter.getCount()); // 2
 
 // b.js
 const counter = require('./counter');
-console.log(counter.getCount()); // 2 ← XUDDI SHU instance! Cache'dan olindi
+console.log(counter.getCount()); // 2 ← aynan shu instance! Cache'dan olindi
 counter.increment();
 console.log(counter.getCount()); // 3
 
@@ -600,11 +600,12 @@ import lodash from 'lodash';
 const { map, filter } = lodash;
 
 // CommonJS dan ESM modulni import qilish:
-// ❌ require() ESM modulni YUKLAMAYDI
-// const mod = require('./esm-module.mjs'); // Error!
+// Node.js 22.12+ (LTS) — require() sinxron ESM graph'ni yuklaydi (unflagged):
+const mod = require('./esm-module.mjs'); // ✅ ishlaydi, agar top-level await yo'q bo'lsa
+// Agar ESM yoki uning dependency'sida top-level await bo'lsa → ERR_REQUIRE_ASYNC_MODULE
 
-// ✅ Dynamic import() ishlatish:
-const mod = await import('./esm-module.mjs');
+// ✅ Universal yo'l (har versiyada, top-level await bo'lsa ham): dynamic import()
+const asyncMod = await import('./esm-module.mjs');
 ```
 
 </details>
@@ -659,7 +660,7 @@ Asosiy ishlatish:
 
 ```javascript
 // Static import — doim yuklaydi (top-level da)
-import { heavyLibrary } from './heavy.mjs'; // 500KB doim yuklanadi
+import { heavyLibrary } from './heavy.mjs'; // og'ir modul — doim yuklanadi
 
 // Dynamic import — kerak bo'lganda
 async function processData() {
@@ -828,7 +829,7 @@ T6: back to a, a.exports = {fromA: ..., b}
 ```
 
 **ES Modules — 3-fazali loading**:
-1. **Parsing** — import/export deklaratsiyalarini topish
+1. **Parsing** — import/export declaration'larini topish
 2. **Linking** — binding'larni ulashish (qiymat hali yo'q, faqat reference)
 3. **Evaluation** — top-level code execution, binding'lar qiymat bilan to'ldiriladi
 
@@ -1071,7 +1072,7 @@ Faqat ko'rsatilgan fayllar side effect'li — qolganlari safe to remove.
 
 ### ESM import'lar **hoisted** — side effects faylning `console.log` dan oldin ishlaydi
 
-Static `import` deklaratsiyalari har doim modul tepasiga **hoisted** qilinadi. Siz ularni fayl o'rtasida yoki oxirida yozsangiz ham — engine ularni birinchi navbatda evaluate qiladi. Bu degani: import qilingan modul'ning top-level kodi (side effects) sizning **har qanday koddingizdan oldin** bajariladi.
+Static `import` declaration'lari har doim modul tepasiga **hoisted** qilinadi. Siz ularni fayl o'rtasida yoki oxirida yozsangiz ham — engine ularni birinchi navbatda evaluate qiladi. Bu degani: import qilingan modul'ning top-level kodi (side effects) sizning **har qanday koddingizdan oldin** bajariladi.
 
 ```javascript
 // analytics.mjs
@@ -1088,7 +1089,7 @@ console.log("app end");
 // app end
 ```
 
-**Nima uchun:** ECMAScript spec'da ESM 3 bosqichli loading'ga ega: **Parse → Link → Evaluate**. Parse bosqichida engine barcha `import` deklaratsiyalarini topadi (ular qaerda yozilganidan qat'i nazar) va dependency graph'ga qo'shadi. Evaluation bosqichida **dependency tartibida** modullar bajariladi — shuning uchun import qilingan modul side effect'lari har doim sizning kodi'ngizdan oldin ishlaydi.
+**Nima uchun:** ECMAScript spec'da ESM 3 bosqichli loading'ga ega: **Parse → Link → Evaluate**. Parse bosqichida engine barcha `import` declaration'larini topadi (ular qaerda yozilganidan qat'i nazar) va dependency graph'ga qo'shadi. Evaluation bosqichida **dependency tartibida** modullar bajariladi — shuning uchun import qilingan modul side effect'lari har doim sizning kodi'ngizdan oldin ishlaydi.
 
 **Amaliy ta'sir:**
 - **Conditional import ishlamaydi** — `if (cond) import './analytics.mjs'` SyntaxError. Static import runtime shart'larga bog'liq bo'la olmaydi. Shart kerak bo'lsa — `import()` (dynamic).
@@ -1104,7 +1105,7 @@ console.log("app end");
 
 ---
 
-### Dynamic `import()` cache key — URL string, semantik normalizatsiya YO'Q
+### Dynamic `import()` cache key — URL string, semantik normalization YO'Q
 
 `import()` har chaqirilganda module'ni cache'dan oladi — lekin cache key **aynan shu string**. Bir xil module'ning turli yozuvlari (`./a.mjs` va `./folder/../a.mjs`) **turli cache entry** yaratadi, memory waste va unexpected behavior keltirib chiqaradi.
 
@@ -1113,13 +1114,13 @@ console.log("app end");
 await import('./module.mjs');            // Entry 1
 await import('./folder/../module.mjs');  // Entry 2 — "turli URL" deb hisoblangan
 await import('./module.mjs?v=2');        // Entry 3 — query string turli
-await import('./MODULE.mjs');            // Entry 4 — case-sensitive OS'larda turli
+await import('./MODULE.mjs');            // Entry 4 — URL string'i turli (path case-sensitive)
 
 // Har biri alohida network fetch + parse + evaluation
 // Har biri alohida module namespace object — memory bo'yicha alohida
 ```
 
-**Nima uchun:** ESM spec'da module identity **Module Specifier Resolution** natijasi bilan aniqlanadi. Browser URL'ni normalize qiladi (masalan `/./` → `/`), lekin **query string** va **fragment** (`#`) hisobga olinadi. Node.js `?v=2` ni turli entry deb biladi — shu sababli cache busting uchun (HMR kabi) bu ishlatiladi.
+**Nima uchun:** ESM spec'da module map **(resolved URL, type)** juftligi bilan kalitlanadi. Browser URL'ni normalize qiladi (masalan `/./` → `/`), lekin **query string** va **fragment** (`#`) hisobga olinadi, path component'lar esa case-sensitive taqqoslanadi. Node.js `?v=2` ni turli entry deb biladi — shu sababli cache busting uchun (HMR kabi) bu ishlatiladi.
 
 **Amaliy oqibatlar:**
 - **Memory waste** — bir xil modul bir necha marta yuklanadi
@@ -1129,7 +1130,7 @@ await import('./MODULE.mjs');            // Entry 4 — case-sensitive OS'larda 
 **Yechim:**
 - **Bitta canonical path** ishlating — import'larni normalize qiling (tooling, ESLint rule)
 - **Cache busting** kerak bo'lsa — query string ataylab ishlating (HMR, versioning)
-- **`import.meta.resolve()`** (ES2024+) — URL'ni canonical form'ga o'tkazish uchun
+- **`import.meta.resolve()`** — URL'ni canonical form'ga o'tkazish uchun (ECMAScript emas, host-defined: WHATWG HTML spec + Node.js)
 
 ```javascript
 // ✅ import.meta.resolve — standart yo'l
@@ -1139,35 +1140,36 @@ const module = await import(url);
 
 ---
 
-### `import *` namespace imports — tree shaking **ishlamaydi**
+### `import *` namespace imports — computed access tree shaking'ni buzadi
 
-`import * as Lib from 'library'` — butun namespace'ni import qiladi. Bundler tree shake qila olmaydi — chunki namespace object dinamik ravishda accessible (`Lib[someKey]`) va static analiz xavfsizlik uchun **butun modul**ni saqlab qoladi.
+`import * as Lib from 'library'` namespace import'ining tree shaking holati bundler'ga va access pattern'ga bog'liq. Static member access (`Lib.map`) — Rollup va Webpack uni dependency graph'da kuzatib, ishlatilmagan export'larni olib tashlay oladi. Computed access (`Lib[someKey]`) — bu **dynamic property access**, compile-time'da qaysi key ishlatilishini aniqlab bo'lmaydi, shu sababli bundler butun namespace'ni saqlab qoladi. esbuild esa namespace import'lar bo'yicha kamroq agressiv — ba'zi holatlarda static access bo'lsa ham butun modulni saqlaydi.
 
 ```javascript
-// ❌ Tree shaking ISHLAMAYDI — butun library bundle'ga tushadi
+// ⚠️ Static member access — Rollup/Webpack tree shake qila oladi, esbuild ba'zan yo'q
 import * as lodash from 'lodash-es';
-lodash.map([1, 2, 3], x => x * 2); // Faqat map ishlatilmoqda, lekin butun lodash bundled
+lodash.map([1, 2, 3], x => x * 2); // `lodash.map` static — kuzatilishi mumkin
 
-// Bundler fikrlashi: "Lib['map']" yozish mumkin edi, shuning uchun HAMMA narsa kerak
-// Result: butun namespace bundle'da — faqat ishlatilgan funksiya o'rniga
+// ❌ Computed access — HECH BIR bundler tree shake qila olmaydi
+const fnName = 'map';
+lodash[fnName]([1, 2, 3], x => x * 2); // key runtime'da → butun namespace saqlanadi
 
-// ✅ Tree shaking ISHLAYDI — named imports
+// ✅ Eng ishonchli — named imports (har bundler'da bir xil natija)
 import { map, filter } from 'lodash-es';
-map([1, 2, 3], x => x * 2); // Faqat map + filter bundle'da
+map([1, 2, 3], x => x * 2); // faqat map + filter bundle'da
 
-// Yoki qaytroq — faqat kerakli fayl:
+// Yoki sub-path — faqat kerakli fayl:
 import map from 'lodash-es/map.js';
-map([1, 2, 3], x => x * 2); // Eng minimal bundle
+map([1, 2, 3], x => x * 2); // eng minimal bundle
 ```
 
-**Nima uchun:** Tree shaking `mark & sweep` algoritmi bilan ishlaydi — bundler dependency graph bo'ylab yurib, ishlatilgan export'larni mark qiladi. Lekin `namespace[key]` pattern — bu **dynamic property access**, compile-time'da qaysi key ishlatilishi noma'lum. Bundler **xavfsizlik** uchun butun namespace'ni saqlab qoladi (agar ba'zi key runtime'da ishlatilsa, ular mavjud bo'lishi kerak).
+**Nima uchun:** Tree shaking `mark & sweep` algoritmi bilan ishlaydi — bundler dependency graph bo'ylab yurib, ishlatilgan export'larni mark qiladi. `Lib.map` kabi static access'da bundler aniq `map` export ishlatilganini biladi. `Lib[someKey]` kabi computed access'da esa key qiymati compile-time'da noma'lum, shuning uchun bundler **xavfsizlik** uchun butun namespace'ni saqlaydi — runtime'da istalgan key olinishi mumkin.
 
-**Xavfli tomoni:** Kutubxona namespace import bilan yozilgan bo'lsa (masalan React types), foydalanuvchi bundle ekstra KB'lar bilan sarflanadi — development'da ko'rinmaydi, lekin production bundle'da sezilarli.
+**Xavfli tomoni:** Computed access bilan yozilgan kod yoki esbuild kabi konservativ bundler ishlatilsa — namespace import butun modulni bundle'ga tortadi. development'da ko'rinmaydi, lekin production bundle'da ortiqcha hajm sezilarli.
 
 **Yechim:**
-- **Named imports** — har doim afzal
+- **Named imports** — har bundler'da ishonchli, har doim afzal
 - **Sub-path imports** — `lodash-es/map.js` kabi (eng mayda granulatsiya)
-- **Namespace'ni faqat type-only yoki debug uchun** ishlating (masalan TypeScript `import type *`)
+- **Namespace'ni faqat type-only uchun** ishlating — TypeScript'da `import type * as Lib from '...'` (runtime'da butunlay o'chiriladi)
 
 ---
 
@@ -1252,7 +1254,7 @@ Agar sizning library side-effect'ga tayansa va `package.json`'da `"sideEffects":
 }
 
 // Foydalanuvchi kodi:
-import 'my-lib/register'; // Customisers.define() chaqiradi
+import 'my-lib/register'; // customElements.define() chaqiradi
 
 // ❌ Bundler bu faylni olib tashlaydi — "hech qanday import yo'q, side effect yo'q deb aytilgan"
 // Web Component ro'yxatdan o'tmaydi, crash production'da
@@ -1394,7 +1396,7 @@ import { Button } from 'my-lib/Button';
 ### ❌ Xato 5: Circular Dependency Muammosi
 
 ```javascript
-// ❌ a.mjs
+// ❌ a.mjs (entry)
 import { b } from './b.mjs';
 export const a = "A + " + b;
 
@@ -1402,8 +1404,10 @@ export const a = "A + " + b;
 import { a } from './a.mjs';
 export const b = "B + " + a;
 
-// a import qilinganda: a = "A + B + undefined"
-// Chunki a hali assign bo'lmagan paytda b uni ishlatadi
+// node a.mjs → ReferenceError: Cannot access 'a' before initialization
+// Evaluation post-order: b.mjs avval bajariladi, b'da `a` o'qiladi —
+// lekin a.mjs hali bajarilmagan, `const a` TDZ'da → ReferenceError
+// (CJS bo'lsa `undefined` qaytarardi — ESM `const` binding TDZ'da throw qiladi)
 ```
 
 ### ✅ To'g'ri usul:
@@ -1422,7 +1426,7 @@ import { shared } from './shared.mjs';
 export const b = "B + " + shared;
 ```
 
-**Nima uchun:** Circular dependency'da initialization tartibi noaniq bo'ladi. Eng yaxshi yechim — arxitekturani qayta ko'rib chiqish va circular'ni yo'qotish.
+**Nima uchun:** Circular dependency'da evaluation tartibi aniq (post-order DFS), lekin bog'liq modul ikkinchisining hali initialize bo'lmagan binding'iga murojaat qilishi mumkin — ESM'da bu `const`/`let` uchun TDZ ReferenceError beradi. Eng yaxshi yechim — architecture'ni qayta ko'rib chiqish va circular'ni yo'qotish.
 
 ---
 
@@ -1575,7 +1579,7 @@ console.log(analytics === analytics2); // true — bir xil instance
 
 7. **Import Attributes (ES2025)** — `with { type: 'json' }` — non-JS modullarni type-safe import qilish.
 
-8. **Circular dependencies** — A→B→A. Muammoga olib keladi. Yechim: umumiy dependency'ni alohida modulga chiqarish yoki arxitekturani o'zgartirish.
+8. **Circular dependencies** — A→B→A. Muammoga olib keladi. Yechim: umumiy dependency'ni alohida modulga chiqarish yoki architecture'ni o'zgartirish.
 
 9. **Tree shaking** — ishlatilmagan kodni bundle'dan olib tashlash. Faqat ESM bilan samarali ishlaydi (static analysis tufayli).
 

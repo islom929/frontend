@@ -88,7 +88,7 @@ const user = new User("Alice", 25);
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-V8'da object yaratilganda engine **Hidden Class** yaratadi. (V8 source kodida bu internal strukturaga `Map` deb nom beriladi — lekin bu JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha, ular shunchaki bir xil so'zni ishlatadi.) Hidden Class object'ning "shakli" (shape) — qaysi property'lar bor va ular memory'da qanday joylashgan. Bir xil ketma-ketlikda bir xil property'lar qo'shilgan object'lar **bitta** Hidden Class'ni share qiladi — bu inline caching va optimizatsiya uchun muhim (batafsil [01-js-engine.md](01-js-engine.md) da).
+V8'da object yaratilganda engine **Hidden Class** yaratadi. (V8 source kodida bu internal strukturaga `Map` deb nom beriladi — lekin bu JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha, ular shunchaki bir xil so'zni ishlatadi.) Hidden Class object'ning "shakli" (shape) — qaysi property'lar bor va ular memory'da qanday joylashgan. Bir xil ketma-ketlikda bir xil property'lar qo'shilgan object'lar **bitta** Hidden Class'ni share qiladi — bu inline caching va optimization uchun muhim (batafsil [01-js-engine.md](01-js-engine.md) da).
 
 ```
 const a = { x: 1, y: 2 };
@@ -102,7 +102,7 @@ const d = { x: 1, y: 2, z: 3 };
 // d ham boshqa Hidden Class — property soni farq qiladi
 ```
 
-V8 optimizatsiyasi uchun: object'larga property'larni **bir xil tartibda** qo'shish — Hidden Class'larni share qilishga yordam beradi, bu esa property access'ni tezlashtiradi.
+V8 optimization uchun: object'larga property'larni **bir xil tartibda** qo'shish — Hidden Class'larni share qilishga yordam beradi, bu esa property access'ni tezlashtiradi.
 
 </details>
 
@@ -560,7 +560,7 @@ ECMAScript spec'da property enumeration uchun ikki asosiy internal method va bir
 3. Faqat `enumerable: true` bo'lgan property'larni filtrlaydi
 4. `kind` parametriga qarab key, value, yoki [key, value] qaytaradi
 
-`for...in` loop uchun esa spec'da `EnumerateObjectProperties(O)` abstract operation ishlatiladi — bu **prototype chain** bo'ylab ham yuradi. Engine `[[GetPrototypeOf]]()` orqali prototype chain'ni traverse qiladi va har bir level'dagi enumerable string key'larni yig'adi (Symbol key'lar skip qilinadi). ES2020'dan boshlab spec tartibni kafolatlaydi: har object uchun `[[OwnPropertyKeys]]` natural order (integer index'lar avval, keyin insertion order string'lar), keyin prototype'ga ko'tarilib davom etadi. Faqat duplicated key'lar (shadow bo'lgan) ikkinchi marta yieldlanmaydi.
+`for...in` loop uchun esa spec'da `EnumerateObjectProperties(O)` abstract operation ishlatiladi — bu **prototype chain** bo'ylab ham yuradi. Engine `[[GetPrototypeOf]]()` orqali prototype chain'ni traverse qiladi va har bir level'dagi enumerable string key'larni yig'adi (Symbol key'lar skip qilinadi), shadow bo'lgan key ikkinchi marta yieldlanmaydi. Muhim nuance: `for...in` enumeration tartibi spec'da **to'liq kafolatlanmagan**. `EnumerateObjectProperties` spec note'i: "The mechanics and order of enumerating the properties is not specified". `Object.keys`/`Reflect.ownKeys` esa `[[OwnPropertyKeys]]` orqali qat'iy tartibga ega (integer index'lar avval, keyin insertion order string'lar) — lekin `for...in` uchun bu tartib spec talabi emas, faqat amaliyotda barcha asosiy engine'lar bir xil object uchun shu tartibni beradi. Prototype chain bo'ylab tartib esa engine'ga bog'liq — spec uni belgilamaydi.
 
 V8'da `Object.keys()` kabi operatsiyalar uchun **enum cache** mavjud — agar object'ning Hidden Class (Map) o'zgarmagan bo'lsa, oldingi enumeration natijasi cache'dan qaytariladi.
 
@@ -639,7 +639,7 @@ ES2022 dan oldin, `hasOwnProperty` instance method sifatida `Object.prototype` d
 
 `Object.hasOwn` static method sifatida shu muammolarni hal qiladi: u har doim `Object` orqali chaqiriladi, hech qachon override qilinmaydi.
 
-Spec implementatsiyasi:
+Spec implementation:
 ```
 Object.hasOwn(obj, key):
   1. O = ToObject(obj)
@@ -1269,7 +1269,7 @@ console.log(config.get("missing.key")); // undefined
 
 Bu bo'limda object'larning ichki mexanizmlari yoritildi:
 
-- **Creation Patterns** — literal, constructor, `Object.create()`, class. V8 Hidden Class optimizatsiyasi.
+- **Creation Patterns** — literal, constructor, `Object.create()`, class. V8 Hidden Class optimization.
 - **Property Descriptors** — `writable`, `enumerable`, `configurable`. `Object.defineProperty()` bilan batafsil sozlash.
 - **Getters/Setters** — computed properties va validation. Tashqaridan oddiy property, ichida logika.
 - **Immutability** — `preventExtensions` → `seal` → `freeze`. Barchasi shallow — deep freeze recursive kerak.

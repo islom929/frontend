@@ -281,7 +281,7 @@ inner.addEventListener("click", () => console.log("inner BUBBLE"));
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`EventTarget` interface'ining ichki implementatsiyasida har bir element **event listener list** saqlaydi. `addEventListener` chaqirilganda yangi yozuv qo'shiladi: `{ type, callback, capture, passive, once, signal }`. Agar ayni `type + callback + capture` kombinatsiyasi allaqachon mavjud bo'lsa, duplicate qo'shilmaydi (spec bo'yicha).
+`EventTarget` interface'ining ichki implementation'ida har bir element **event listener list** saqlaydi. `addEventListener` chaqirilganda yangi yozuv qo'shiladi: `{ type, callback, capture, passive, once, signal }`. Agar ayni `type + callback + capture` kombinatsiyasi allaqachon mavjud bo'lsa, duplicate qo'shilmaydi (spec bo'yicha).
 
 `once: true` qo'yilganda brauzer handler'ni wrapper'ga o'raydi — handler birinchi marta chaqirilgandan keyin avtomatik `removeEventListener` bajariladi. `passive: true` brauzer rendering thread'iga signal beradi — bu listener `preventDefault()` chaqirmasligi kafolatlangan, shuning uchun scroll/touch event'larda compositor thread handler tugashini kutmasdan scrollni boshlaydi.
 
@@ -410,16 +410,16 @@ stopImmediatePropagation:
 
 ### Nazariya
 
-`preventDefault()` — brauzerning **standart xulq-atvorini** bekor qiladi (link navigatsiya, form submit, checkbox toggle, kontekst menyu). Muhim: u propagation'ni **TO'XTATMAYDI** — hodisa bubble qilishda davom etadi.
+`preventDefault()` — brauzerning **standart xulq-atvorini** bekor qiladi (link navigation, form submit, checkbox toggle, kontekst menyu). Muhim: u propagation'ni **TO'XTATMAYDI** — hodisa bubble qilishda davom etadi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Har bir `Event` object'da `cancelable` boolean flag bor. `preventDefault()` faqat `cancelable: true` bo'lgan event'larda ishlaydi — aks holda chaqirish hech narsa qilmaydi. `event.defaultPrevented` property `true` bo'ladi agar `preventDefault()` muvaffaqiyatli chaqirilgan bo'lsa. Brauzer event dispatch tugagandan keyin `defaultPrevented` flag'ni tekshiradi va `true` bo'lsa default action'ni bajarilmaydi.
+Har bir `Event` object'da `cancelable` boolean flag bor. `preventDefault()` faqat `cancelable: true` bo'lgan event'larda ishlaydi — aks holda chaqirish hech narsa qilmaydi. `event.defaultPrevented` property `true` bo'ladi agar `preventDefault()` muvaffaqiyatli chaqirilgan bo'lsa. Brauzer event dispatch tugagandan keyin `defaultPrevented` flag'ni tekshiradi va `true` bo'lsa default action bajarilmaydi.
 
-`passive: true` bilan ro'yxatdan o'tkazilgan listener ichida `preventDefault()` chaqirilsa, brauzer uni **ignore** qiladi va console'ga warning chiqaradi. Bu spec da aniq belgilangan — passive listener `cancelable` event'ni cancel qilish huquqiga ega emas. Chrome 56+ da `document`/`window` dagi `touchstart`, `touchmove`, `wheel` event'lari default passive — shuning uchun bu event'larda `preventDefault()` ishlashi uchun `{ passive: false }` ni aniq ko'rsatish kerak.
+`passive: true` bilan ro'yxatdan o'tkazilgan listener ichida `preventDefault()` chaqirilsa, brauzer uni **ignore** qiladi va console'ga warning chiqaradi. Bu spec da aniq belgilangan — passive listener `cancelable` event'ni cancel qilish huquqiga ega emas. `passive` ko'rsatilmaganda default `false`, lekin Safari'dan tashqari brauzerlarda `Window`, `Document` va `Document.body` document-level node'larda `wheel`, `mousewheel`, `touchstart`, `touchmove` event'lari uchun default `true` — shuning uchun bu event'larda shu node'larda `preventDefault()` ishlashi uchun `{ passive: false }` ni aniq ko'rsatish kerak.
 
-Event'ning default action'lari: `click` — link navigatsiya, checkbox toggle; `submit` — form yuborish; `keydown` — matn kiritish; `wheel` — scroll; `contextmenu` — o'ng click menyu; `dragstart` — drag operatsiya. Ba'zi event'lar `cancelable: false` — masalan `scroll`, `load`, `focus`, `blur` — ularning default action'ni bekor qilish mumkin emas.
+Event'ning default action'lari: `click` — link navigation, checkbox toggle; `submit` — form yuborish; `keydown` — matn kiritish; `wheel` — scroll; `contextmenu` — o'ng click menyu; `dragstart` — drag operatsiya. Ba'zi event'lar `cancelable: false` — masalan `scroll`, `load`, `focus`, `blur` — ularning default action'ni bekor qilish mumkin emas.
 
 </details>
 
@@ -427,10 +427,10 @@ Event'ning default action'lari: `click` — link navigatsiya, checkbox toggle; `
 <summary><strong>Kod Misollari</strong></summary>
 
 ```javascript
-// Link navigatsiyani to'xtatish
+// Link navigation'ni to'xtatish
 link.addEventListener("click", (e) => {
   e.preventDefault();
-  console.log("Navigatsiya yo'q");
+  console.log("Navigation yo'q");
 });
 
 // Form submit ni to'xtatish
@@ -456,7 +456,7 @@ document.addEventListener("contextmenu", (e) => {
 // Ular ALOHIDA narsa!
 
 link.addEventListener("click", (e) => {
-  e.preventDefault();    // navigatsiya yo'q
+  e.preventDefault();    // navigation yo'q
   e.stopPropagation();   // bubbling yo'q
 });
 
@@ -469,7 +469,7 @@ button.addEventListener("click", () => {
 // HTML spec bo'yicha — bu faqat MA'LUM event'lar uchun preventDefault() ga teng
 // Asosan: <a>/<form> kabi default action'i bor bo'lgan elementlar
 button.onclick = () => { return false; };
-// - click on <a href="..."> → preventDefault() (navigatsiya yo'q) ✅
+// - click on <a href="..."> → preventDefault() (navigation yo'q) ✅
 // - submit on <form>        → preventDefault() (sahifa reload yo'q) ✅
 // - click on oddiy <button> (default action'i yo'q) → hech qanday effekt
 // Hech qachon stopPropagation qilmaydi!
@@ -770,7 +770,7 @@ document.addEventListener("scroll", (e) => {
                    └────────────┘
 ```
 
-Chrome 56+ dan boshlab `document`/`window` dagi `touchstart`, `touchmove`, `wheel` event'lari **default passive** (Chrome 51 faqat `passive` option'ni kiritdi, 56 da default qilindi).
+Safari'dan tashqari brauzerlarda `Window`, `Document` va `Document.body` document-level node'lardagi `wheel`, `mousewheel`, `touchstart`, `touchmove` event'lari uchun `passive` default `true` (boshqa hollarda default `false`). Bu node'larda preventDefault'ni ishlatish uchun `{ passive: false }` aniq berilishi kerak.
 
 </details>
 
@@ -1018,16 +1018,16 @@ Shadow DOM encapsulation'i event propagation'iga ham ta'sir qiladi. Shadow root 
 
 **Native event'lar** (click, input, focus, keydown, ...) spec bo'yicha **default composed: true** — shadow DOM'dan tabiiy o'tadi. Custom event'lar esa default **`composed: false`** — agar komponent tashqariga signal yubormoqchi bo'lsa, `new CustomEvent("name", { composed: true, bubbles: true })` aniq belgilash kerak.
 
-**`event.composedPath()`** — event'ning to'liq propagation yo'lini qaytaradi, **shadow DOM ichini ham o'z ichiga olib**. Oddiy `event.target` faqat shadow boundary'ning **retarget qilingan** targeti ko'rsatadi (komponent tashqaridagi kod uchun ichki node emas, host element ko'rinadi). Bu encapsulation'ning event tomoni.
+**`event.composedPath()`** — event listener chaqiriladigan node'lar ro'yxatini qaytaradi. `open` shadow tree'lar bu ro'yxatga to'liq kiradi, ammo `closed` shadow tree'dagi node'lar — agar joriy `currentTarget`'dan yetib bo'lmasa — ro'yxatdan chiqarib tashlanadi (DOM spec). Oddiy `event.target` esa faqat shadow boundary'ning **retarget qilingan** targetini ko'rsatadi (komponent tashqaridagi kod uchun ichki node emas, host element ko'rinadi). Bu encapsulation'ning event tomoni.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Event retargeting** — shadow DOM'dan event tashqariga chiqqanda spec `target`'ni **shadow host**'ga o'zgartiradi. Ya'ni tashqi listener `event.target` deb tekshirsa — u shadow host'ni ko'radi, ichki element emas. Bu "seeing through" shadow'ning oldini oladi. Lekin `event.composedPath()` hali ham haqiqiy original target va to'liq yo'lni qaytaradi — debugging va intentional access uchun.
+**Event retargeting** — shadow DOM'dan event tashqariga chiqqanda spec `target`'ni **shadow host**'ga o'zgartiradi. Ya'ni tashqi listener `event.target` deb tekshirsa — u shadow host'ni ko'radi, ichki element emas. Bu "seeing through" shadow'ning oldini oladi. `open` shadow root uchun `event.composedPath()` haqiqiy original target va to'liq yo'lni qaytaradi — debugging va intentional access uchun.
 
 Event bir necha shadow tree'dan o'tganda har bir shadow boundary'da qayta retarget bo'ladi. Masalan, shadow A ichida shadow B bo'lsa va B ichidan event chiqsa — A ichida target = B host, A tashqarisida target = A host.
 
-**`closed` shadow root** ichida dispatch qilingan event'lar ham tashqariga retarget bilan chiqishi mumkin — `mode: "closed"` faqat DOM API access'ni cheklaydi, event flow'ga ta'sir qilmaydi. Ya'ni closed shadow ichidagi click event hali ham outer document'da eshitiladi (agar composed: true bo'lsa).
+**`closed` shadow root** ichida dispatch qilingan event'lar ham tashqariga retarget bilan chiqishi mumkin — `mode: "closed"` event flow'ni to'xtatmaydi. Ya'ni closed shadow ichidagi click event hali ham outer document'da eshitiladi (agar composed: true bo'lsa). Farqi: closed shadow root uchun tashqaridan chaqirilgan `event.composedPath()` shadow tree ichidagi node'larni qaytarmaydi — ro'yxat host element'dan boshlanadi (spec: closed mode'da composedPath shadow ichini ochmaydi).
 
 </details>
 
@@ -1095,7 +1095,7 @@ shadowElement.addEventListener("click", () => {});
 // Custom eventlar — default composed: false:
 const hidden = new CustomEvent("my-event"); // composed: false
 shadowElement.dispatchEvent(hidden);
-// Outer document'da EHSHITILMAYDI — shadow ichida qoladi
+// Outer document'da ESHITILMAYDI — shadow ichida qoladi
 
 const visible = new CustomEvent("my-event", { composed: true, bubbles: true });
 shadowElement.dispatchEvent(visible);
@@ -1246,7 +1246,7 @@ class Component {
 
 ### Gotcha 4: `<div role="button">` keyboard'da ishlamaydi — native button NOT equivalent
 
-`<button>` elementida Enter/Space bosilsa — brauzer avtomatik `click` event'ni sintez qiladi (accessibility). Lekin `<div role="button">` yaratsangiz — bu sintez **ishlamaydi**. Keyboard handler qo'shmasdan custom tugma aktsessability buzadi.
+`<button>` elementida Enter/Space bosilsa — brauzer avtomatik `click` event'ni sintez qiladi (accessibility). Lekin `<div role="button">` yaratsangiz — bu sintez **ishlamaydi**. Keyboard handler qo'shmasdan custom tugma accessibility'ni buzadi.
 
 ```javascript
 // ✅ Native button — keyboard avtomatik ishlaydi:
@@ -1410,7 +1410,7 @@ for (let i = 0; i < buttons.length; i++) {
 ### Xato 5: SPA da global listener tozalanmaydi
 
 ```javascript
-// Noto'g'ri — har navigatsiyada yangi listener qo'shiladi
+// Noto'g'ri — har navigation'da yangi listener qo'shiladi
 function initPage() {
   window.addEventListener("scroll", handleScroll); // leak!
 }
@@ -1459,7 +1459,7 @@ button.addEventListener("click", () => console.log("6: button CAPTURE"), true);
 
 1. **Capturing phase** (document → body, target'dan yuqoridagi ancestor'lar): faqat `capture: true` listener'lar ishlaydi → `2: document CAPTURE`, `4: body CAPTURE`.
 
-2. **Target phase** (button'da): DOM spec bo'yicha target node'da **barcha listener'lar registration tartibida** ishlaydi — capture flag e'tiborga olinmaydi. Button'da listener'lar qo'shilish tartibi: line 936 `5 BUBBLE` birinchi, line 937 `6 CAPTURE` ikkinchi → `5: button BUBBLE`, `6: button CAPTURE`.
+2. **Target phase** (button'da): DOM spec bo'yicha target node'da **barcha listener'lar registration tartibida** ishlaydi — capture flag e'tiborga olinmaydi. Button'da listener'lar qo'shilish tartibi: `5: button BUBBLE` birinchi, `6: button CAPTURE` ikkinchi qo'shilgan → shu tartibda chaqiriladi.
 
 3. **Bubbling phase** (body → document): faqat `capture: false` (default) listener'lar ishlaydi → `3: body BUBBLE`, `1: document BUBBLE`.
 

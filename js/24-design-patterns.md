@@ -1,6 +1,6 @@
 # Bo'lim 24: Design Patterns
 
-> Design pattern — dasturiy ta'minotda takroriy uchraydigan muammolarning isbotlangan, qayta ishlatilishi mumkin bo'lgan arxitekturaviy yechimlari. JavaScript da pattern'lar uchta kategoriyaga bo'linadi: Creational (yaratish), Structural (tuzilish), Behavioral (xatti-harakat).
+> Design pattern — dasturiy ta'minotda takroriy uchraydigan muammolarning isbotlangan, qayta ishlatilishi mumkin bo'lgan architecture darajasidagi yechimlari. JavaScript da pattern'lar uchta kategoriyaga bo'linadi: Creational (yaratish), Structural (tuzilish), Behavioral (xatti-harakat).
 
 ---
 
@@ -48,7 +48,7 @@ Creational pattern'lar — object yaratish jarayonini boshqaradi. To'g'ridan-to'
 
 Factory pattern — object yaratish logikasini bitta joyga markazlashtiradi. Client kod qaysi class yoki constructor ishlatilayotganini bilmasligi kerak — faqat factory'ga "nima kerak" deydi, factory tegishli object'ni yaratib beradi. Bu code coupling'ni kamaytiradi: yangi object turi qo'shish uchun faqat factory'ni o'zgartirish yetarli, client kodga tegmaslik mumkin.
 
-**Muammo:** Object yaratish murakkablashganda — turli constructor'lar, turli konfiguratsiyalar, conditional logic — yaratish kodi tarqalib ketadi va har joyda takrorlanadi.
+**Muammo:** Object yaratish murakkablashganda — turli constructor'lar, turli configuration'lar, conditional logic — yaratish kodi tarqalib ketadi va har joyda takrorlanadi.
 
 **Yechim:** Bitta funksiya yoki method barcha yaratish logikasini o'z ichiga oladi.
 
@@ -282,11 +282,11 @@ db1.query("SELECT * FROM users");
 
 ### Nazariya
 
-Builder pattern — murakkab object'ni **qadam-baqadam** (step-by-step) yaratish imkonini beradi. Constructor'ga 10+ parameter berish o'rniga, har bir konfiguratsiyani alohida method bilan belgilash mumkin. Method chaining bilan oson o'qiladi.
+Builder pattern — murakkab object'ni **qadam-baqadam** (step-by-step) yaratish imkonini beradi. Constructor'ga 10+ parameter berish o'rniga, har bir configuration'ni alohida method bilan belgilash mumkin. Method chaining bilan oson o'qiladi.
 
 **Muammo:** Constructor parametrlari ko'payib ketganda — qaysi argument nima ekanini tushunish qiyin bo'ladi, optional parametrlar uchun `null`/`undefined` uzatish kerak bo'ladi.
 
-**Yechim:** Builder object har bir konfiguratsiyani alohida method bilan qabul qiladi va oxirida `build()` bilan final object'ni qaytaradi.
+**Yechim:** Builder object har bir configuration'ni alohida method bilan qabul qiladi va oxirida `build()` bilan final object'ni qaytaradi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -384,7 +384,7 @@ console.log(query);
 
 **Real-world:** Knex.js query builder, Joi schema builder, Jest test matchers, DOM API (`document.createElement` + setAttribute + appendChild kabi chain).
 
-**Qachon ishlatish:** Object yaratish 4+ parameter talab qilganda, optional konfiguratsiyalar ko'p bo'lganda, method chaining orqali oson o'qiladigan API kerak bo'lganda.
+**Qachon ishlatish:** Object yaratish 4+ parameter talab qilganda, optional configuration'lar ko'p bo'lganda, method chaining orqali oson o'qiladigan API kerak bo'lganda.
 
 </details>
 
@@ -552,7 +552,7 @@ function calculateTotal(items) {
 const trackedCalc = withLogging(withTiming(calculateTotal, "Total"), "Calc");
 trackedCalc([{ price: 100, qty: 2 }, { price: 50, qty: 3 }]);
 // [Calc] Chaqirildi: [[{price:100,qty:2}, {price:50,qty:3}]]
-// [Total] 0.05ms
+// [Total] <duration>ms
 // [Calc] Natija: 350
 ```
 
@@ -889,14 +889,14 @@ Observer'lar `Map<string, Function[]>` strukturasida saqlanadi. Har bir `on()` c
 
 `emit()` da `[...listeners].forEach()` — spread operator bilan copy olish muhim. Agar iterate paytida `once` listener o'zini arraydan o'chirsa, original array'ning length'i o'zgaradi va boshqa listener'lar skip bo'lishi mumkin. Shallow copy bu muammoni hal qiladi, lekin har bir emit'da yangi array allocate qiladi.
 
-`once()` implementatsiyasi closure pattern — wrapper funksiya original listener'ni closure'da saqlaydi. `wrapper._original = listener` — bu qo'shimcha property off() da original listener bo'yicha qidirish uchun. V8 funksiyaga dynamic property qo'shganda hidden class transition sodir bo'ladi. Ko'p listener'lar ro'yxatdan o'tganda `indexOf()` O(n) — katta listener array'larda `Set` ishlatish samaraliroq.
+`once()` implementation'i closure pattern — wrapper funksiya original listener'ni closure'da saqlaydi. `wrapper._original = listener` — bu qo'shimcha property off() da original listener bo'yicha qidirish uchun. V8 funksiyaga dynamic property qo'shganda hidden class transition sodir bo'ladi. Ko'p listener'lar ro'yxatdan o'tganda `indexOf()` O(n) — katta listener array'larda `Set` ishlatish samaraliroq.
 
 </details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-EventEmitter — JavaScript'dagi Observer pattern'ning standart implementatsiyasi:
+EventEmitter — JavaScript'dagi Observer pattern'ning standart implementation'i:
 
 ```javascript
 class EventEmitter {
@@ -913,7 +913,10 @@ class EventEmitter {
   off(event, listener) {
     const listeners = this.#events.get(event);
     if (!listeners) return this;
-    const index = listeners.indexOf(listener);
+    // once() wrapper'i ham, original listener ham mos kelishi uchun
+    const index = listeners.findIndex(
+      (registered) => registered === listener || registered._original === listener
+    );
     if (index > -1) listeners.splice(index, 1);
     return this;
   }
@@ -1146,7 +1149,7 @@ class PaymentProcessor {
   pay(amount, data) {
     if (!this.#strategy) throw new Error("Strategy tanlanmagan");
     if (!this.#strategy.validate(data)) {
-      throw new Error(`${this.#strategy.name} validatsiyadan o'tmadi`);
+      throw new Error(`${this.#strategy.name} validation'dan o'tmadi`);
     }
     return this.#strategy.process(amount, data);
   }
@@ -1175,7 +1178,7 @@ processor.pay(200, { walletAddress: "0xabc123def456" });
 
 ### Nazariya
 
-Command — har bir amalni (action) **object** sifatida encapsulate qiladi. Bu undo/redo, command history, queue, va macro command'larni implement qilishni osonlashtiradi. Har bir command object'da `execute()` va ixtiyoriy `undo()` metodi bor.
+Command — har bir amalni (action) **object** sifatida encapsulate qiladi. Bu undo/redo, command history, queue, va macro command'larni implement qilishni osonlashtiradi. Har bir command object'da `execute()` va ixtiyoriy `undo()` method'i bor.
 
 **Muammo:** Amallarni kechiktirish (queue), qaytarish (undo), qayta bajarish (redo) yoki loglash kerak.
 
@@ -1186,7 +1189,7 @@ Command — har bir amalni (action) **object** sifatida encapsulate qiladi. Bu u
 
 Har bir command — alohida class instance. `new AddTextCommand(editor, text, position)` chaqirilganda V8 yangi object allocate qiladi va constructor argument'larni instance property sifatida saqlaydi. Barcha `AddTextCommand` instance'lari bir xil hidden class'ga ega — `execute()` va `undo()` prototype'da share qilinadi, har bir instance uchun takrorlanmaydi.
 
-Undo stack (`#history = []`) va redo stack (`#redoStack = []`) command object reference'larni saqlaydi. Har bir command o'z holat ma'lumotlarini (`this.text`, `this.position`, `this.deletedText`) saqlaydi — bu undo imkonini beradi. Memory perspective: uzoq editing session'da history stack cheksiz o'sishi mumkin. Real-world implementatsiyalarda stack size limit qo'yiladi — eski command'lar dequeue qilinadi va GC tozalaydi.
+Undo stack (`#history = []`) va redo stack (`#redoStack = []`) command object reference'larni saqlaydi. Har bir command o'z holat ma'lumotlarini (`this.text`, `this.position`, `this.deletedText`) saqlaydi — bu undo imkonini beradi. Memory perspective: uzoq editing session'da history stack cheksiz o'sishi mumkin. Real-world implementation'larda stack size limit qo'yiladi — eski command'lar dequeue qilinadi va GC tozalaydi.
 
 `this.#redoStack = []` — yangi amal bajarilganda redo stack butunlay yangi empty array bilan almashtiriladi. Eski array va undagi barcha command object'lar reference yo'qolgani uchun GC candidate bo'ladi. `splice` o'rniga yangi array assign qilish V8 da tezroq — eski array'ni tozalash GC'ga qoldiriladi.
 
@@ -1599,11 +1602,11 @@ await pipeline.execute({
 
 ### Nazariya
 
-Iterator — collection elementlariga **ketma-ket kirish** uchun standart interface beradi. JavaScript da Iterator Protocol built-in — `Symbol.iterator` metodi bilan har qanday object'ni iterable qilish mumkin. `for...of`, spread operator, destructuring — barchasi iterator protocol ishlatadi.
+Iterator — collection elementlariga **ketma-ket kirish** uchun standart interface beradi. JavaScript da Iterator Protocol built-in — `Symbol.iterator` method'i bilan har qanday object'ni iterable qilish mumkin. `for...of`, spread operator, destructuring — barchasi iterator protocol ishlatadi.
 
 **Muammo:** Turli data structure'lar (array, linked list, tree) — har birining traverse usuli boshqacha. Client kod data structure'ning ichki tuzilishini bilishi kerak.
 
-**Yechim:** Iterator — yagona interface (`next()` metodi, `{ value, done }` qaytaradi) orqali har qanday collection'ni traverse qilish.
+**Yechim:** Iterator — yagona interface (`next()` method'i, `{ value, done }` qaytaradi) orqali har qanday collection'ni traverse qilish.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1786,17 +1789,16 @@ function calculate() {
 // Variant 1: withLogging(withTiming(calculate))
 const v1 = withLogging(withTiming(calculate, "calc"), "log");
 v1();
-// [log] IN           ← outer logging birinchi
-// calc: 0.05ms       ← inner timing
-// [log] OUT          ← outer logging oxirgi
+// [log] IN              ← outer logging birinchi
+// calc: <faqat calc>    ← inner timing — yalang'och calculate o'lchanadi
+// [log] OUT             ← outer logging oxirgi
 
 // Variant 2: withTiming(withLogging(calculate)) — ORDER TESKARI!
 const v2 = withTiming(withLogging(calculate, "log"), "calc");
 v2();
-// calc: (start)      ← outer timing birinchi
-// [log] IN           ← inner logging
+// [log] IN              ← inner logging
 // [log] OUT
-// calc: 0.08ms       ← outer timing (log overhead ham hisoblangan)
+// calc: <calc + log>    ← outer timing: console.log chaqiruvlari ham o'lchovga kiradi
 
 // ⚠️ Variant 2 da timing LOG overhead'ni ham o'lchaydi — noto'g'ri benchmark!
 ```
@@ -1934,7 +1936,9 @@ function processUser(u) {
 const json = JSON.stringify(admin);
 const restored = JSON.parse(json);
 console.log(restored instanceof AdminUser); // false ❌ — faqat POJO bo'ldi
+```
 
+```javascript
 // ✅ Consistent — hamma doim class instance
 class User {
   constructor(data) { Object.assign(this, data); }
@@ -2022,37 +2026,36 @@ order2.ship(); // ishlaydi — lekin to'lov yo'q edi!
 // Test'lar faqat legitimate flow ishlatsa — bug topilmaydi
 // Production'da race condition yoki noto'g'ri API call setState ni ochiq state'ga o'tkazadi
 
-// ✅ To'g'ri: setState private yoki internal
+// ✅ To'g'ri: transition'ni state class'ga uzatish — public setState yo'q
 class OrderSafe {
   #state;
 
   constructor() {
-    this.#state = new PendingState(this);
+    // Transition funksiyasini #setState orqali state class'ga beramiz
+    this.#state = new PendingStateSafe(this, (next) => this.#setState(next));
   }
 
-  // Public API — faqat action'lar, transitions yo'q
+  // Public API — faqat action'lar, transition method yo'q
   pay(paymentData) { this.#state.pay(paymentData); }
   ship(address)    { this.#state.ship(address); }
   deliver()        { this.#state.deliver(); }
   cancel()         { this.#state.cancel(); }
 
-  // Internal — state class'lar chaqiradi (private method, tashqaridan kirish yo'q)
-  // State class'larga OrderSafe instance beriladi, ular #internalSetState chaqiradi
-
-  // Yoki Symbol orqali "private" API
-  [Symbol.for("OrderSafe.internal.setState")](state) {
-    // Validation: agar kerak bo'lsa
+  // True-private method — tashqaridan chaqirib bo'lmaydi (# private field semantikasi)
+  #setState(state) {
     this.#state = state;
   }
 }
 
-// State class'lar Symbol key orqali transition qiladi:
+// State class transition'ni faqat constructor'da olgan callback orqali bajaradi:
 class PendingStateSafe {
-  constructor(order) { this.order = order; }
+  constructor(order, setState) {
+    this.order = order;
+    this.setState = setState; // OrderSafe.#setState ga bog'langan closure
+  }
   pay(data) {
     if (!data?.amount) throw new Error("Amount kerak");
-    const transitionKey = Symbol.for("OrderSafe.internal.setState");
-    this.order[transitionKey](new PaidStateSafe(this.order));
+    this.setState(new PaidStateSafe(this.order, this.setState));
   }
 }
 
@@ -2060,9 +2063,9 @@ class PendingStateSafe {
 // XState — declarative state machine, visual debugging, transition validation built-in
 ```
 
-**Nima uchun:** State pattern'ning invariant'i: **ma'lum state'da faqat ruxsat etilgan transitions bajariladi**. Agar state o'zgartirish public API bo'lsa, bu invariant buziladi. `PaidState` ga o'tish faqat `pay()` muvaffaqiyatli tugagandan keyin bo'lishi kerak — direct `setState(PaidState)` bu qoidani yutadi. Xuddi `private` field'lar kabi, state transition internal bo'lishi kerak.
+**Nima uchun:** State pattern'ning invariant'i: **ma'lum state'da faqat ruxsat etilgan transitions bajariladi**. Agar state o'zgartirish public API bo'lsa, bu invariant buziladi. `PaidState` ga o'tish faqat `pay()` muvaffaqiyatli tugagandan keyin bo'lishi kerak — direct `setState(PaidState)` bu qoidani yutadi. State transition encapsulation talab qiladi: o'zgartirish faqat state class'lar ichidan kelishi shart, tashqi kod uchun yopiq bo'lishi kerak.
 
-**Yechim:** State transition method'ini **private** (`#setState`) yoki `Symbol.for()` orqali "hidden" qiling. State class'lar shu symbol key orqali transition qiladi, tashqi kod esa faqat action method'lari (`pay`, `ship`) orqali interact qiladi. Production uchun **XState** kabi library'lar — visual state chart, transition guards, history, parallel states bilan to'liq state machine support.
+**Yechim:** State transition'ni **true-private** `#setState` method orqali yopiq qiling va uni state class'larga callback (closure) sifatida uzating. `#` private field tashqaridan chaqirib bo'lmaydi — bu invariant'ni til darajasida kafolatlaydi. `Symbol.for()` bu maqsadga **mos kelmaydi**: u global Symbol Registry'da saqlanadi, shuning uchun har qanday kod bir xil string key bilan `Symbol.for("...")` chaqirib transition method'iga kira oladi — privacy bermaydi. (Module-scope `Symbol()` — unique, registry'da emas — relativ yopiqlik beradi, lekin `#` private field'dan kuchsizroq.) Production uchun **XState** kabi library'lar — visual state chart, transition guards, history, parallel states bilan to'liq state machine support.
 
 ---
 
@@ -2203,7 +2206,7 @@ class NotificationMediator { /* faqat notification */ }
 
 ### Mashq 1: EventEmitter implement qiling (O'rta)
 
-**Savol:** `on(event, listener)`, `off(event, listener)`, `once(event, listener)`, `emit(event, ...args)` metodlari bilan `EventEmitter` class yarating.
+**Savol:** `on(event, listener)`, `off(event, listener)`, `once(event, listener)`, `emit(event, ...args)` method'lari bilan `EventEmitter` class yarating.
 
 <details>
 <summary>Javob</summary>
@@ -2410,7 +2413,7 @@ light.send("TIMER"); // red → green
 | **Pub/Sub** | Behavioral | Observer — tight coupling | Event bus (loose coupling) |
 | **Strategy** | Behavioral | if/else bilan algoritm tanlash | Almashtiriladigan strategy object'lar |
 | **Command** | Behavioral | Amallarni kechiktirish, qaytarish | Action = object (execute/undo) |
-| **Mediator** | Behavioral | N*N component aloqasi | Markaziy hub — N aloqa |
+| **Mediator** | Behavioral | N*(N-1) component aloqasi | Markaziy hub — N aloqa |
 | **State** | Behavioral | if/else holat mashinasi | Har bir holat — alohida class |
 | **Chain of Resp.** | Behavioral | Murakkab so'rov qayta ishlash | Handler'lar zanjiri (middleware) |
 | **Iterator** | Behavioral | Turli collection traverse usullari | Yagona next() interface |

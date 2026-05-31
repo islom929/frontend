@@ -44,7 +44,7 @@ Bu uch tur bir-birining ichiga joylashishi (nesting) mumkin — natijada **scope
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spetsifikatsiyasida scope tushunchasi **Environment Record** orqali implement qilingan. Har bir scope uchun yangi Environment Record yaratiladi. Bu record ichida shu scope'dagi barcha binding'lar (o'zgaruvchi-qiymat juftliklari) saqlanadi.
+ECMAScript specification'ida scope tushunchasi **Environment Record** orqali implement qilingan. Har bir scope uchun yangi Environment Record yaratiladi. Bu record ichida shu scope'dagi barcha binding'lar (o'zgaruvchi-qiymat juftliklari) saqlanadi.
 
 ```
 Scope turlari va Environment Record aloqasi:
@@ -130,7 +130,7 @@ Global Environment Record
 └── [[GlobalThisValue]] → globalThis object
 ```
 
-`var` global declaration nima uchun `globalThis` property bo'ladi? ECMAScript spec bo'yicha global code'dagi `var` statement **CreateGlobalVarBinding** abstract operation ni chaqiradi — bu operation global object'ga property qo'shadi. `let`/`const` esa **CreateGlobalLetBinding** ni chaqiradi — bu global object'ga tegmaydi, faqat declarative record'ga yozadi.
+`var` global declaration nima uchun `globalThis` property bo'ladi? ECMAScript spec bo'yicha GlobalDeclarationInstantiation global code'dagi `var` uchun **CreateGlobalVarBinding** abstract operation ni chaqiradi — bu operation global object'ga property qo'shadi. `let`/`const`/`class` esa Global Environment Record'ning **CreateMutableBinding** / **CreateImmutableBinding** metodi orqali yaratiladi — bular faqat declarative record'ga yozadi, global object'ga tegmaydi.
 
 </details>
 
@@ -262,7 +262,7 @@ console.log(counter()); // 1 — har chaqiruvda YANGI scope, yangi count
 
 Block scope — `{}` qavslar ichida `let` yoki `const` bilan e'lon qilingan o'zgaruvchilar **faqat shu block ichida** accessible bo'lishi. Bu ES6 (2015)'da kiritilgan — undan oldin JavaScript'da block scope mavjud emas edi, faqat function scope bor edi.
 
-Block scope yaratadigan konstruktsiyalar:
+Block scope yaratadigan construct'lar:
 - `if / else if / else` bloklari
 - `for`, `for...in`, `for...of` loop'lari
 - `while`, `do...while` loop'lari
@@ -561,7 +561,7 @@ console.log(x + y + z) bajarilganda:
 3. x → c() da yo'q → b() da yo'q → a() da topildi ✅ (x = 1)
 ```
 
-V8 engine'da scope chain traversal optimizatsiya qilingan: agar engine parse-time da identifier qaysi scope'ga tegishli ekanini aniqlay olsa, u **to'g'ridan-to'g'ri** shu scope'ga murojaat qiladi — zanjir bo'ylab ketma-ket qidirmaydi. Bu "scope resolution" deyiladi va bytecode'da index orqali amalga oshiriladi.
+V8 engine'da scope chain traversal optimization qilingan: agar engine parse-time da identifier qaysi scope'ga tegishli ekanini aniqlay olsa, u **to'g'ridan-to'g'ri** shu scope'ga murojaat qiladi — zanjir bo'ylab ketma-ket qidirmaydi. Bu "scope resolution" deyiladi va bytecode'da index orqali amalga oshiriladi.
 
 </details>
 
@@ -801,7 +801,7 @@ Bu recursive jarayon — har bir scope'da tekshirib, topilmasa tashqariga o'tadi
 ReferenceError haqiqatda GetValue() bosqichida sodir bo'ladi (read) yoki PutValue() (strict write).
 ```
 
-V8 optimizatsiyasi: V8 parse-time da har bir identifier uchun scope depth va index ni aniqlaydi. Runtime da zanjir bo'ylab qidirmasdan, to'g'ridan-to'g'ri kerakli scope'dagi index'ga murojaat qiladi. Bu **scope caching** deyiladi.
+V8 optimization'i: V8 parse-time da har bir identifier uchun context'dagi slot index va depth ni aniqlaydi (ScopeInfo metadata orqali). Runtime da zanjir bo'ylab qidirmasdan, `LdaContextSlot slot_index depth` bytecode orqali to'g'ridan-to'g'ri kerakli context slot'iga murojaat qiladi.
 
 </details>
 
@@ -866,7 +866,7 @@ console.log(globalThis.leaked); // "Oops!" — globalThis property
 
 ### Nazariya
 
-Strict mode — JavaScript'ning **qat'iyroq** rejimi bo'lib, `"use strict"` directive bilan yoqiladi. ES5 (2009) da kiritilgan. Strict mode bir qator xavfli va xatoga olib keladigan xulq-atvorlarni taqiqlaydi, code'ni xavfsizroq va optimizatsiyaga qulayroq qiladi.
+Strict mode — JavaScript'ning **qat'iyroq** rejimi bo'lib, `"use strict"` directive bilan yoqiladi. ES5 (2009) da kiritilgan. Strict mode bir qator xavfli va xatoga olib keladigan xulq-atvorlarni taqiqlaydi, code'ni xavfsizroq va optimization'ga qulayroq qiladi.
 
 Strict mode ikki darajada yoqiladi:
 1. **Script darajasida** — fayl boshiga `"use strict";` yoziladi, butun fayl uchun amal qiladi
@@ -903,7 +903,7 @@ V8 va boshqa engine'lar parsing paytida `"use strict"` directive'ini topib, qolg
 
 1. **Parse-time errors**: Syntax xatolari (duplicate params, with statement) parser'da reject qilinadi
 2. **Runtime semantics**: `this` binding, `delete`, `eval` xatti-harakatlari boshqacha
-3. **Optimizatsiya imkoniyati**: Strict code'ni V8 tezroq optimize qila oladi, chunki xavfli operatsiyalar yo'q
+3. **Optimization imkoniyati**: Strict code'ni V8 tezroq optimize qila oladi, chunki xavfli operatsiyalar yo'q
 
 **Modullarda implicit strict mode**:
 
@@ -923,20 +923,20 @@ function example() {
 example();
 ```
 
-**V8 da strict mode optimizatsiyasi**:
+**V8 da strict mode optimization'i**:
 
-V8 strict functions'ni alohida flag bilan belgilaydi va quyidagi optimizatsiyalarni qila oladi:
+V8 strict functions'ni alohida flag bilan belgilaydi va quyidagi optimization'larni qila oladi:
 
 1. **No `arguments.caller`**: caller chain saqlash kerak emas
 2. **No `with`**: scope chain analysis statik
 3. **No silent assign failures**: read-only property'lar darhol throw qiladi
 4. **Better inlining**: this binding aniq
 
-Bu optimizatsiyalar tufayli strict mode funksiyalar ko'pincha non-strict funksiyalarga nisbatan samaraliroq compile va execute bo'ladi — aniq tezlik farqi loyiha va workload'ga bog'liq.
+Bu optimization'lar tufayli strict mode funksiyalar ko'pincha non-strict funksiyalarga nisbatan samaraliroq compile va execute bo'ladi — aniq tezlik farqi loyiha va workload'ga bog'liq.
 
 **Engine uchun strict mode ning umumiy foydasi:**
 
-1. **Scope optimizatsiyasi** — `with` va (strict) `eval` ning scope'ni buzish imkoniyati yo'q bo'lgani uchun engine compile-time da scope'ni to'liq aniqlay oladi → tezroq variable lookup
+1. **Scope optimization'i** — `with` va (strict) `eval` ning scope'ni buzish imkoniyati yo'q bo'lgani uchun engine compile-time da scope'ni to'liq aniqlay oladi → tezroq variable lookup
 2. **`this` security** — tasodifan global object'ni o'zgartirish xavfi yo'qoladi — method'lar kutilgan kontekstda chaqirilishga majbur
 3. **Implicit global ban** — assignment-da scope chain bo'ylab yo'q nomga uchrasa, ReferenceError throw qiladi (non-strict'da global property yaratilardi) → engine reachability analysis aniqroq
 4. **Hidden class stability (V8)** — `with` yo'qligi object shape'larni barqarorroq qiladi → inline caching samaraliroq ishlaydi
@@ -1000,7 +1000,7 @@ with (obj) {
 }
 
 // with scope chain'ni buzadi — engine compile-time da scope'ni
-// aniqlay olmaydi, shuning uchun optimizatsiya imkonsiz bo'ladi
+// aniqlay olmaydi, shuning uchun optimization imkonsiz bo'ladi
 ```
 
 **5. `arguments.callee` taqiqlanadi:**

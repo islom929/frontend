@@ -192,7 +192,7 @@ async function example() {       ┌──────────────�
 
 Spec bo'yicha `await` operatori ichida **PromiseResolve** abstract operation chaqiriladi. Agar operand allaqachon native Promise bo'lsa (`IsPromise(x) && x.constructor === %Promise%`) — spec qoidasi bo'yicha uni to'g'ridan-to'g'ri ishlatadi (qo'shimcha wrap qilmaydi). Agar oddiy qiymat yoki thenable bo'lsa — `Promise.resolve()` bilan wrap qiladi. Keyin `.then()` handler'i orqali funksiya davom ettiriladi — bu handler microtask queue'ga joylashadi.
 
-V8 7.2+ (Chrome 72+, Node.js 12+) ning haqiqiy optimizatsiyasi boshqa narsa — **ES2020 spec change**'i bilan `AsyncFunctionAwait`'ning **intermediary "throwaway" Promise**'ini olib tashlagan (3 microtick → 1 microtick). Bu quyida "V8 Optimization: Zero-Cost Async/Await" bo'limida batafsil.
+V8 7.2+ (Chrome 72+, Node.js 12+) ning haqiqiy optimization'i boshqa narsa — TC39 normative spec change (ecma262 PR #1250) bilan `await`'ning **intermediary "throwaway" Promise**'ini olib tashlagan: agar operand allaqachon native Promise bo'lsa, minimum 3 microtick o'rniga 1 microtick (V8 blog "Faster async functions and promises"). Bu quyida "V8 Optimization: Zero-Cost Async/Await" bo'limida batafsil.
 
 > **Eslatma:** Event loop mexanizmi haqida batafsil — [11-event-loop.md](11-event-loop.md), Promises haqida — [12-promises.md](12-promises.md)
 
@@ -339,7 +339,7 @@ async function processOrder(orderId) {
       return null;
     }
     if (err instanceof ValidationError) {
-      console.error("Validatsiya xatosi:", err.details);
+      console.error("Validation xatosi:", err.details);
       return { error: err.details };
     }
     // Kutilmagan xato — qayta throw
@@ -699,7 +699,7 @@ ES2022 dan boshlab, **ES Modules** ichida `await` ni `async` funksiya siz ham is
 Top-level await faqat ES Module'larda ishlaydi — `.mjs` fayllar yoki `"type": "module"` ko'rsatilgan `package.json` dagi `.js` fayllar. CommonJS (`require`) va oddiy script'larda (non-module `<script>`) ishlamaydi.
 
 Top-level await quyidagi scenariolarda ishlatiladi:
-1. **Module initialization** — database connection, konfiguratsiya yuklash
+1. **Module initialization** — database connection, configuration yuklash
 2. **Dynamic import** — shart bo'yicha modul yuklash
 3. **Fallback pattern** — birinchi CDN ishlamasa ikkinchisini sinash
 4. **Conditional module loading** — environment ga qarab turli modul
@@ -964,7 +964,7 @@ await fetch('/slow', { signal: ctrl.signal });
 
 `Promise.race` faqat birinchi settled Promise'ni qaytaradi, boshqalar davom etaveradi. `AbortController` esa **haqiqiy cancellation** beradi — fetch API'ning signal'iga subscribe bo'ladi va `abort` event'ida network connection yopiladi.
 
-**`AbortSignal.timeout()` (ES2024)** — alohida controller yaratish keraksiz:
+**`AbortSignal.timeout()`** (WHATWG DOM, ECMAScript emas) — alohida controller yaratish keraksiz:
 ```javascript
 fetch(url, { signal: AbortSignal.timeout(5000) });
 ```
@@ -1117,7 +1117,7 @@ const results = await concurrentLimit(tasks, 5);
 console.log(`${results.length} ta natija olindi`);
 ```
 
-`pLimit` pattern — sodda va ishonchli implementatsiya:
+`pLimit` pattern — sodda va ishonchli implementation:
 
 ```javascript
 function pLimit(concurrency) {
@@ -1741,27 +1741,27 @@ function getValue() {
 
 ---
 
-### Top-level await + circular imports — deadlock xavfi
+### Top-level await + circular imports — partial initialization
 
-Top-level `await` ES Module'larda modul'ni **async** qiladi — uni import qilgan boshqa modullar shu await tugashini kutadi. Agar circular import bilan birga ishlatsangiz, **deadlock** yuzaga kelishi mumkin: A modul B'ni kutadi, B esa A ni kutadi.
+Top-level `await` ES Module'larda modul'ni **async** qiladi — uni import qilgan boshqa modullar shu await tugashini kutadi. Circular import bilan birga ishlatilsa, **partial initialization** muammosi yuzaga keladi: bir modul boshqasining eksportini hali `await` tugamasdan oladi va qiymat `undefined` bo'ladi.
 
 ```javascript
 // ❌ a.mjs
-import { b } from './b.mjs'; // B modulini kutadi
+import { b } from './b.mjs';
 export const a = await initA(); // sekin initialization
 
 // ❌ b.mjs
-import { a } from './a.mjs'; // A modulini kutadi
+import { a } from './a.mjs';
 export const b = await initB(a); // a ga bog'liq — lekin a hali tayyor emas!
 
 // Yuklash: import a.mjs
-// → a.mjs: import b.mjs kutadi
-// → b.mjs: import a.mjs kutadi (allaqachon loading)
-// → circular detected, lekin a.mjs awaits hali complete emas
-// → deadlock: a waits for b, b waits for a's awaited value
+// → a.mjs body boshlanadi: import b.mjs evaluatsiya qilinadi
+// → b.mjs body boshlanadi: import a.mjs cycle-closing edge — qaytib await QILINMAYDI
+// → b.mjs `await initB(a)` ga yetadi, lekin a hali TDZ'da (a.mjs await tugamagan)
+// → initB(undefined) yoki ReferenceError — partial initialization
 ```
 
-**Nima uchun:** ESM spec'da top-level await modul'ning "async graph"'ini yaratadi. Loader modullar o'rtasidagi dependency'ni topoligik tartibda hal qilishga urinadi, lekin circular + async kombinatsiyasi **partial initialization** holatiga olib keladi — A modul hali awaiting, B'ga eksport qilingan qiymat hali `undefined`.
+**Nima uchun:** ESM spec'da top-level await modul'ning async dependency graph'ini yaratadi. Cycle bo'lganda spec **cycle-closing edge'ni await qilmaydi** — aks holda haqiqiy hang bo'lar edi (`tc39/proposal-top-level-await`). Buning o'rniga b.mjs o'z body'sini a.mjs `await initA()` tugashini kutmasdan davom ettiradi, shuning uchun `a` hali initialize bo'lmagan (`undefined` yoki TDZ ReferenceError). Haqiqiy **deadlock** esa boshqa holatda — runtime'da ikki modul bir-birining side effect natijasini dynamic kutganda — yuzaga keladi (`tc39/proposal-top-level-await` README TLA risk sifatida sanaydi).
 
 **Best practices:**
 1. **Circular import'lardan saqlaning** — bu har doim design smell
@@ -1913,9 +1913,9 @@ async function main() {
 // A started
 // B started
 // C started
-// A aborted    ← ✅ B failed'dan keyin darhol
-// C aborted    ← ✅
-// Caught: B failed
+// Caught: B failed   ← abort() sync chaqirildi, keyin shu log
+// A aborted          ← ✅ abort listener microtask'da
+// C aborted          ← ✅
 ```
 
 **Muhim:** Har bir async operation `AbortSignal` qabul qilishi kerak. `fetch`, `setTimeout` (custom wrapper bilan), va modern API'lar bu pattern'ni qo'llab-quvvatlaydi.

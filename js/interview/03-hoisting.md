@@ -11,7 +11,7 @@
 <details>
 <summary>Javob</summary>
 
-Hoisting — JavaScript engine'ning Creation Phase da declaration'larni scope'da registratsiya qilish mexanizmi. Kod fizik ravishda "ko'tarilmaydi" — engine execution context yaratilganda barcha declaration'larni topadi va environment record'ga yozadi.
+Hoisting — JavaScript engine'ning Creation Phase da declaration'larni scope'da registration qilish mexanizmi. Kod fizik ravishda "ko'tarilmaydi" — engine execution context yaratilganda barcha declaration'larni topadi va environment record'ga yozadi.
 
 `var` → `undefined` bilan initialize (o'qish mumkin), `let`/`const` → `uninitialized` (TDZ — o'qish ReferenceError), function declaration → to'liq funksiya bilan initialize (chaqirishga tayyor).
 
@@ -135,7 +135,7 @@ Muhim farq: `var` bilan expression **TypeError** beradi (undefined mavjud, lekin
 
 ```javascript
 // Zamonaviy standard:
-// const — default tanlovi (90%+ hollarda)
+// const — default tanlovi (reassignment kerak bo'lmasa)
 const API_URL = "https://api.example.com";
 const users = []; // ✅ array content o'zgarishi mumkin
 
@@ -297,7 +297,7 @@ Execution Phase:
 4. `value = 30` (assignment — oddiy `PutValue`, override)
 5. `console.log(value)` → 30
 
-**Qoida:** `FunctionDeclarationInstantiation` algoritmida function declaration'lar var declaration'lardan **keyin** qayta ishlanadi va ularni override qiladi (spec 29.f-g qadamlar). Execution Phase'da esa assignment'lar tartib bo'yicha oddiy `PutValue` orqali ishlaydi — hoisting yo'q.
+**Qoida:** `FunctionDeclarationInstantiation` algoritmida function declaration'lar var declaration'lardan **keyin** qayta ishlanadi va ularni override qiladi (`functionsToInitialize` ro'yxati var binding'lar yaratilgandan so'ng `SetMutableBinding` bilan o'tkaziladi). Execution Phase'da esa assignment'lar tartib bo'yicha oddiy `PutValue` orqali ishlaydi — hoisting yo'q.
 
 **Deep Dive:**
 
@@ -516,7 +516,7 @@ Strict mode'da: `"strict"` keyin `"undefined"`. Non-strict mode'da: `"strict"` k
 ES2015 dan boshlab block ichidagi function declaration spec'da aniq belgilangan, lekin xulq-atvor strict mode'ga bog'liq:
 
 - **Strict mode** (yoki ES Module): function declaration faqat **block-scoped** binding yaratadi (`let`-like). Block tashqarisida o'zgaruvchi mavjud emas — `typeof` `"undefined"` qaytaradi.
-- **Non-strict mode**: ECMAScript Annex B "Web Compatibility Semantics" (B.3.2) qoidalariga ko'ra ikki binding yaratiladi — block-scoped + function-scoped (eng oxirgi assignment qiymati bilan). Bu legacy code uchun saqlangan, 2015'dan barcha brauzerlar va Node'da bir xil ishlaydi.
+- **Non-strict mode**: ECMAScript Annex B "Block-Level Function Declarations Web Legacy Compatibility Semantics" qoidalariga ko'ra ikki binding yaratiladi — block-scoped + function-scoped. Spec'gacha bu xulq-atvor engine'larda turlicha implement qilingan edi va Annex B uni keyin standartlashtirgan; web compatibility uchun saqlangan, lekin engine'lararo to'liq bir xil emas (masalan, block hech qachon bajarilmasa, function-scoped binding qiymati `undefined` yoki funksiya bo'lishi engine'ga bog'liq).
 
 ### Kod misol
 
@@ -551,7 +551,7 @@ console.log(typeof helper); // "function"
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-ECMAScript Annex B "Additional ECMAScript Features for Web Browsers" — bu standart qism web compatibility uchun saqlangan legacy behavior'larni belgilaydi. B.3.2 "Block-Level Function Declarations Web Legacy Compatibility Semantics" non-strict mode'da block function declaration uchun ikkita binding yaratishni belgilaydi: block scope'da `let`-like binding (`InstantiateFunctionObject` natijasi) va function scope'da `var`-like binding. Block ichidagi har bir assignment function-scoped binding'ni ham yangilaydi. Strict mode'da Annex B qoidalari **qo'llanilmaydi** — faqat block-scoped binding qoladi.
+ECMAScript Annex B "Additional ECMAScript Features for Web Browsers" — bu standart qism web compatibility uchun saqlangan legacy behavior'larni belgilaydi. "Block-Level Function Declarations Web Legacy Compatibility Semantics" non-strict mode'da block function declaration uchun ikkita binding yaratishni belgilaydi: block scope'da `let`-like binding (`InstantiateFunctionObject` natijasi) va function scope'da `var`-like binding. Block ichidagi har bir assignment function-scoped binding'ni ham yangilaydi. Strict mode'da Annex B qoidalari **qo'llanilmaydi** — faqat block-scoped binding qoladi.
 
 </details>
 

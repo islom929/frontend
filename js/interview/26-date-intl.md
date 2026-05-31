@@ -26,7 +26,7 @@ date.getFullYear(); // 2024 — timestamp'dan hisoblangan
 date.getMonth();    // 2 — timestamp'dan hisoblangan
 ```
 
-Timestamp diapazoni: ±8,640,000,000,000,000 ms — taxminan ±271,821 yil.
+Timestamp diapazoni: ±8,640,000,000,000,000 ms — ±100,000,000 kun, ya'ni 271821 BC dan 275760 AD gacha. Diapazondan tashqari qiymat — `Invalid Date` (`NaN`).
 
 </details>
 
@@ -142,7 +142,7 @@ a.toISOString() === b.toISOString(); // true ✅
 <details>
 <summary>Javob</summary>
 
-ECMAScript spetsifikatsiyasi bo'yicha:
+ECMAScript specification'i bo'yicha:
 
 ```javascript
 // Faqat date (vaqtsiz) — UTC deb parse qilinadi
@@ -195,7 +195,7 @@ new Date().getTime();  // 1710345600000
 
 **Qoida:** Faqat timestamp kerak bo'lsa — `Date.now()`. Date object kerak bo'lsa — `new Date()`.
 
-Yuqori aniqlikdagi vaqt o'lchash uchun `performance.now()` ishlatiladi — u millisekund qaytaradi (sub-ms fractional qism bilan). Browser'larda Spectre mitigatsiyasi tufayli aniqlik ~100µs gacha cheklangan.
+Yuqori aniqlikdagi vaqt o'lchash uchun `performance.now()` ishlatiladi — u millisekund qaytaradi (sub-ms fractional qism bilan) va monotonic clock'ga asoslangan (tizim soati o'zgarsa ham orqaga ketmaydi). Spectre timing-attack mitigatsiyasi tufayli aniqlik clamp qilinadi: cross-origin isolated bo'lmagan kontekstda 100µs, isolated kontekstda 5µs (MDN).
 
 </details>
 
@@ -347,7 +347,7 @@ const seg = new Intl.Segmenter("zh", { granularity: "word" });
 const words = [...seg.segment("今天天气很好")]
   .filter(s => s.isWordLike)
   .map(s => s.segment);
-// ["今天", "天气", "很", "好"] ✅ (xitoycha so'zlar)
+// ["今天", "天气", "很好"] ✅ (xitoycha so'zlar — probelsiz matn ajratildi)
 ```
 
 Use case'lar: tweet belgi limiti, matn truncate, xitoycha/yaponcha so'z ajratish.
@@ -359,7 +359,7 @@ Use case'lar: tweet belgi limiti, matn truncate, xitoycha/yaponcha so'z ajratish
 <details>
 <summary>Javob</summary>
 
-Temporal — TC39 Stage 3 proposal, Date object'ni almashtirishga mo'ljallangan yangi standart API.
+Temporal — TC39 Stage 4 (ES2026'ga kirgan), Date object'ni almashtirishga mo'ljallangan yangi standart API.
 
 | Muammo (Date) | Yechim (Temporal) |
 |--------------|-----------------|
@@ -373,7 +373,7 @@ Temporal — TC39 Stage 3 proposal, Date object'ni almashtirishga mo'ljallangan 
 ```javascript
 // Date — mutable, xavfli
 const date = new Date(2024, 2, 13);
-date.setDate(date.getDate() + 7); // AQL DATE O'ZGARDI
+date.setDate(date.getDate() + 7); // ASL DATE O'ZGARDI
 
 // Temporal — immutable, xavfsiz
 const plain = Temporal.PlainDate.from("2024-03-13");
@@ -398,7 +398,7 @@ const end = Temporal.PlainDate.from("2024-03-13");
 start.until(end); // P2M12D (2 oy 12 kun)
 ```
 
-**Deep Dive:** Temporal hali browser'larda standart sifatida mavjud emas (2024-yil holatida). Polyfill: `@js-temporal/polyfill`. Production'da hozircha `date-fns` yoki `luxon` tavsiya qilinadi.
+**Deep Dive:** Temporal Chrome 144+, Firefox 139+, Edge 144+ da native qo'llab-quvvatlanadi, lekin Safari stable'da hali yo'q (faqat Technology Preview), shu sababli hali Baseline emas. To'liq qamrov uchun `@js-temporal/polyfill` ishlatiladi. Universal qo'llab-quvvatlash kerak bo'lsa hozircha `date-fns` yoki `luxon` ham tanlov bo'lib qoladi.
 
 </details>
 
@@ -518,7 +518,7 @@ function safeSetYear(date, year) {
 import { addMonths } from "date-fns";
 const next = addMonths(birthday, 1); // birthday o'zgarmaydi
 
-// 5. Temporal — immutable by design (kelgusida)
+// 5. Temporal — immutable by design (Chrome/Firefox/Edge native, Safari'da polyfill)
 const plain = Temporal.PlainDate.from("2024-03-13");
 plain.add({ months: 1 }); // yangi object, plain o'zgarmaydi
 ```

@@ -28,7 +28,7 @@
 
 ### Nazariya
 
-JavaScript da har bir object'ning ichki **`[[Prototype]]`** slot'i bor. Bu ECMAScript spetsifikatsiyasidagi internal slot bo'lib, u boshqa object'ga (yoki `null` ga) ishora qiladi. `[[Prototype]]` to'g'ridan-to'g'ri kodda ko'rinmaydi — u engine ichida mavjud va JavaScript'ning meros (inheritance) tizimining asosi.
+JavaScript da har bir object'ning ichki **`[[Prototype]]`** slot'i bor. Bu ECMAScript specification'idagi internal slot bo'lib, u boshqa object'ga (yoki `null` ga) ishora qiladi. `[[Prototype]]` to'g'ridan-to'g'ri kodda ko'rinmaydi — u engine ichida mavjud va JavaScript'ning meros (inheritance) tizimining asosi.
 
 `[[Prototype]]` nima uchun kerak? Agar 1000 ta foydalanuvchi ob'ekti yaratish kerak bo'lsa va har birida `greet()` metodi bo'lishi kerak bo'lsa, har bir ob'ektda alohida `greet` funksiya saqlash — 1000 ta bir xil funksiya nusxasini xotirada saqlash degani. Prototype bu muammoni hal qiladi: `greet` ni bitta prototype ob'ektda saqlash va 1000 ta instance shu bitta funksiyani **share** qilishi mumkin.
 
@@ -44,7 +44,7 @@ ECMAScript spec bo'yicha `[[Prototype]]` — bu **internal slot**. Internal slot
 3. **`Object.create(proto)`** bilan yaratilganda — `[[Prototype]]` = `proto`
 4. **`class` bilan** yaratilganda — `new Constructor()` bilan bir xil
 
-V8 engine ichida har bir object'ning **Hidden Class** degan ichki tuzilmasi bor. (V8 source kodida bu struktura `Map` deb nomlanadi — lekin bu JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha: V8'ning Hidden Class'i object shape'ini tasvirlovchi metadata, `Map` esa foydalanuvchi kodi uchun key-value collection API.) Hidden Class object'ning shape'ini (qaysi property'lari bor, qanday tartibda, qaysi tipda) saqlaydi va uning ichida `[[Prototype]]` ga pointer ham mavjud. Shu sababli prototype lookup juda tez ishlaydi — engine har safar chain'ni yurmaydi, balki **inline cache (IC)** orqali avval topilgan natijani eslab qoladi.
+V8 engine ichida har bir object'ning **Hidden Class** degan ichki tuzilmasi bor. (V8 source kodida bu struktura `Map` deb nomlanadi — lekin bu JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha: V8'ning Hidden Class'i object shape'ini tasvirlovchi metadata, `Map` esa foydalanuvchi kodi uchun key-value collection API.) Hidden Class object'ning shape'ini (qaysi property'lari bor, qanday tartibda, qaysi tipda) saqlaydi va uning ichida `[[Prototype]]` ga pointer ham mavjud. Shu sababli prototype lookup tez ishlaydi — engine har safar chain'ni yurmaydi, balki **inline cache (IC)** orqali avval topilgan natijani eslab qoladi.
 
 ```
 V8 ichida object layout:
@@ -209,7 +209,7 @@ prototype  = funksiya YARATADIGAN        (faqat funksiyalarda mavjud)
 | **Nima** | `[[Prototype]]` ga accessor (getter/setter) | `new` bilan yaratiladigan instance'lar uchun ota object |
 | **Ishlatish** | `Object.getPrototypeOf()` ishlating | Constructor function / class ichida |
 | **O'zgartirish** | `Object.setPrototypeOf()` ishlating | `Fn.prototype.method = ...` |
-| **Standart** | ES2015'da standart, lekin legacy | Boshidanoq til spetsifikatsiyasida |
+| **Standart** | ES2015'da standart, lekin legacy | Boshidanoq til specification'ida |
 
 ---
 
@@ -503,7 +503,7 @@ console.log(dict.toString);       // "bu oddiy property" — method emas
 console.log("key" in dict);       // true
 console.log(dict.hasOwnProperty); // undefined — Object.prototype yo'q
 
-// Use case: konfiguratsiya yoki cache object'i —
+// Use case: configuration yoki cache object'i —
 // prototype method nomlari bilan collision bo'lmaydi
 ```
 
@@ -517,7 +517,7 @@ console.log(dict.hasOwnProperty); // undefined — Object.prototype yo'q
 
 ES6 da `class` sintaksisi paydo bo'lishidan oldin, JavaScript'da ob'ekt yaratish uchun **constructor function** ishlatilgan. Bu oddiy funksiya bo'lib, `new` keyword bilan chaqirilganda maxsus xulq-atvor ko'rsatadi: avtomatik ravishda yangi bo'sh ob'ekt yaratadi, `this` ni shu ob'ektga bog'laydi, prototype chain o'rnatadi va oxirida qaytaradi.
 
-Constructor function'larni tushunish zamonaviy JavaScript'da ham muhim. `class` sintaksisi aslida constructor function'ning **syntactic sugar'i** — ichida xuddi shu mexanizm ishlaydi. Ko'plab mavjud kutubxonalar va legacy kodlar constructor function ishlatadi.
+Constructor function'larni tushunish zamonaviy JavaScript'da ham muhim. `class` sintaksisi aslida constructor function'ning **syntactic sugar'i** — ichida aynan shu mexanizm ishlaydi. Ko'plab mavjud kutubxonalar va legacy kodlar constructor function ishlatadi.
 
 **Muhim pattern:** method'larni **prototype** da e'lon qilish kerak, har bir instance ichida emas. Agar method'ni constructor ichida `this.greet = function() {...}` deb yozsangiz, har bir yangi instance uchun **alohida funksiya** yaratiladi — bu xotirani sarflaydi. `Person.prototype.greet = function() {...}` deb yozsangiz, barcha instance'lar **bitta funksiyani share** qiladi.
 
@@ -595,7 +595,7 @@ User function object
 
 Bu ikki tushunchani aralashtirish — keng tarqalgan xato. Birinchisi (`__proto__`) — User funksiyaning **o'zi** meros oladigan object, ikkinchisi (`.prototype`) — User yaratadigan **instance**'lar meros oladigan object.
 
-**`class` syntax farqi:** `class` konstruktor ham xuddi shu mexanizm'da ishlaydi, lekin qo'shimcha qoidalar bilan — `class` konstruktorini `new` siz chaqirish darhol `TypeError` qaytaradi (constructor function kabi silent global bind emas), `class` body default strict mode, va `class` konstruktorining `.prototype` property `writable: false` (qayta tayinlash mumkin emas).
+**`class` syntax farqi:** `class` constructor ham aynan shu mexanizm'da ishlaydi, lekin qo'shimcha qoidalar bilan — `class` constructor'ini `new` siz chaqirish darhol `TypeError` qaytaradi (constructor function kabi silent global bind emas), `class` body default strict mode, va `class` constructor'ining `.prototype` property `writable: false` (qayta tayinlash mumkin emas).
 
 </details>
 
@@ -646,7 +646,7 @@ const aliClone = new ali.constructor("Ali Clone", 25);
 console.log(aliClone instanceof Person); // true
 ```
 
-Constructor function'lar uchun **naming convention**: bosh harf bilan boshlanadi (`Person`, `Car`, `HttpClient`). Bu `new` bilan chaqirilishi kerakligini bildiruvchi convention. Kichik harf bilan boshlangan funksiya — oddiy funksiya. Bu ECMAScript spec talabi emas, JavaScript jamiyatida qabul qilingan an'ana — ES6 `class` syntax ham xuddi shu convention'ga amal qiladi (`class User`, `class HttpClient`).
+Constructor function'lar uchun **naming convention**: bosh harf bilan boshlanadi (`Person`, `Car`, `HttpClient`). Bu `new` bilan chaqirilishi kerakligini bildiruvchi convention. Kichik harf bilan boshlangan funksiya — oddiy funksiya. Bu ECMAScript spec talabi emas, JavaScript jamiyatida qabul qilingan an'ana — ES6 `class` syntax ham aynan shu convention'ga amal qiladi (`class User`, `class HttpClient`).
 
 </details>
 
@@ -914,7 +914,7 @@ IsArray(argument):
   4. Otherwise → return false
 ```
 
-V8'da bu amalda JSArray instance type tekshiruvi — object'ning internal type kind'i realm'dan mustaqil identifier bilan belgilangan, shuning uchun iframe/worker'dan kelgan array'lar ham doim to'g'ri aniqlanadi. Xuddi shu muammo (cross-realm identification) `Error`, `RegExp`, `Map`, `Set`, `Date` kabi barcha built-in constructor'lar uchun mavjud — ularning ham spec'da alohida "exotic object" turi yoki internal slot (`[[ErrorData]]`, `[[RegExpMatcher]]`, `[[MapData]]`, `[[SetData]]`, `[[DateValue]]`) mavjud. Masalan `Error` uchun `e instanceof Error` cross-realm'da ishlamasligi mumkin, lekin `Object.prototype.toString.call(e)` → `"[object Error]"` har qanday realm'da to'g'ri ishlaydi (toString spec darajasida `[[ErrorData]]` slot'ini tekshiradi).
+V8'da bu amalda JSArray instance type tekshiruvi — object'ning internal type kind'i realm'dan mustaqil identifier bilan belgilangan, shuning uchun iframe/worker'dan kelgan array'lar ham doim to'g'ri aniqlanadi. Aynan shu muammo (cross-realm identification) `Error`, `RegExp`, `Map`, `Set`, `Date` kabi barcha built-in constructor'lar uchun mavjud — ularning ham spec'da alohida "exotic object" turi yoki internal slot (`[[ErrorData]]`, `[[RegExpMatcher]]`, `[[MapData]]`, `[[SetData]]`, `[[DateValue]]`) mavjud. Masalan `Error` uchun `e instanceof Error` cross-realm'da ishlamasligi mumkin, lekin `Object.prototype.toString.call(e)` → `"[object Error]"` har qanday realm'da to'g'ri ishlaydi (toString spec darajasida `[[ErrorData]]` slot'ini tekshiradi).
 
 **Muammo 3: Primitive qiymatlar**
 
@@ -1001,17 +1001,17 @@ Object.setPrototypeOf(b, a);
 // engine chain'da a → b → a → ... cycle aniqlaydi va bloklaydi
 ```
 
-**V8 Hidden Class invalidatsiyasi — nima uchun sekin:**
+**V8 Hidden Class invalidation — nima uchun sekin:**
 
 V8'da har bir object'ning Hidden Class'i object'ning shape'ini **va prototype'ini** birgalikda tasvirlaydi. Ya'ni `[[Prototype]]` — Hidden Class'ning **ajralmas qismi**. Bundan kelib chiqadigan oqibat:
 
 1. `setPrototypeOf` chaqirilganda → object'ning Hidden Class o'zgarishi kerak
 2. V8 yangi Hidden Class yaratadi (yoki mavjud "dictionary mode"ga o'tkazadi)
 3. Shu object bilan bog'liq barcha **inline cache**'lar invalidate bo'ladi
-4. Agar shu object JIT-compiled kodda hot bo'lgan bo'lsa — **deoptimizatsiya** boshlanadi
+4. Agar shu object JIT-compiled kodda hot bo'lgan bo'lsa — **deoptimization** boshlanadi
 5. Bundan keyin property lookup'lar slow-path (dictionary lookup) orqali bo'ladi
 
-Shu sababli V8 documentation `Object.setPrototypeOf` ni "extremely slow operation" deb belgilagan — bitta chaqirish butun IC va JIT qurilgan infrastrukturani buzishi mumkin.
+Shu sababli MDN `[[Prototype]]` ni o'zgartirishni "currently a very slow operation in every browser and JavaScript engine" deb belgilagan — bitta chaqirish shu object bilan bog'liq IC va JIT qurilgan infrastrukturani buzishi mumkin.
 
 **Proxy orqali interception:**
 
@@ -1059,9 +1059,9 @@ console.log(obj.greet()); // "Hello" — yangi prototype'dan
 
 `Object.setPrototypeOf` ni production kodda ishlatish **tavsiya etilmaydi**. Sabablari:
 
-1. **V8 Hidden Class** optimizatsiyasini buzadi — engine object'ning shape'ini qayta hisoblashi kerak
+1. **V8 Hidden Class** optimization'ini buzadi — engine object'ning shape'ini qayta hisoblashi kerak
 2. **Inline cache** invalidate bo'ladi — avval cache'langan property lookup'lar qaytadan bajariladi
-3. MDN ham buni **"extremely slow operation"** deb belgilagan
+3. MDN ham buni **"a very slow operation"** deb belgilagan
 
 ```javascript
 // ❌ Runtime da prototype o'zgartirish:
@@ -1313,7 +1313,7 @@ console.log(Object.prototype.hasOwnProperty.call(user, "name")); // true ✅
 console.log(Object.hasOwn(user, "name")); // true ✅
 ```
 
-Xuddi shu muammo boshqa user input'dan kelgan object'lar (masalan `JSON.parse` natijasi) bilan ham yuzaga kelishi mumkin — malicious payload'da `"hasOwnProperty": "x"` bo'lsa, kodingiz crash bo'lishi mumkin.
+Aynan shu muammo boshqa user input'dan kelgan object'lar (masalan `JSON.parse` natijasi) bilan ham yuzaga kelishi mumkin — malicious payload'da `"hasOwnProperty": "x"` bo'lsa, kodingiz crash bo'lishi mumkin.
 
 **Yechim:** Production kodda har doim `Object.hasOwn(obj, key)` (ES2022+) yoki `Object.prototype.hasOwnProperty.call(obj, key)` ishlating — instance method'ga to'g'ridan-to'g'ri chaqirmang.
 
@@ -1465,7 +1465,7 @@ console.log(team2.members); // [] ✅ — alohida
 // ❌ Runtime da prototype o'zgartirish:
 const obj = { a: 1 };
 const proto = { greet() { return "hi"; } };
-Object.setPrototypeOf(obj, proto); // SEKIN — V8 optimizatsiya buziladi
+Object.setPrototypeOf(obj, proto); // SEKIN — V8 optimization buziladi
 ```
 
 ### ✅ To'g'ri usul:
@@ -1477,7 +1477,7 @@ const obj = Object.create(proto);
 obj.a = 1;
 ```
 
-**Nima uchun:** `setPrototypeOf` V8'ning hidden class (Map) va inline cache optimizatsiyalarini buzadi. Engine object'ning butun shape'ini qayta qurishga majbur bo'ladi.
+**Nima uchun:** `setPrototypeOf` V8'ning hidden class (Map) va inline cache optimization'larini buzadi. Engine object'ning butun shape'ini qayta qurishga majbur bo'ladi.
 
 ---
 

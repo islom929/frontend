@@ -144,7 +144,7 @@ Class body parse qilinganida engine **ClassDefinitionEvaluation** algorithm'ini 
 2. `ClassBody` dagi har bir `MethodDefinition` uchun **DefineMethod** / **PropertyDefinitionEvaluation** chaqiriladi
 3. Instance method'lar `constructor.prototype` ga `Object.defineProperty` orqali qo'shiladi — `enumerable: false`, `writable: true`, `configurable: true`
 4. Static method'lar constructor function'ning o'ziga own property sifatida qo'shiladi
-5. Class field'lar (public va private) alohida **ClassFieldDefinition** record'lari sifatida saqlanadi — ular `new` chaqirilganida constructor oxirida evaluate bo'ladi
+5. Class field'lar (public va private) alohida **ClassFieldDefinition** record'lari sifatida saqlanadi — ular `new` chaqirilganida `InitializeInstanceElements` orqali evaluate bo'ladi: base class'da constructor body'dan oldin (`this` yaratilgandan keyin), derived class'da `super()` qaytishidan keyin (batafsil — "Public Class Fields" bo'limida)
 
 V8'da class yaratilganida engine `JSFunction` object yaratadi va unga `SharedFunctionInfo` bog'laydi. Prototype object `JSObject` sifatida allocate qilinadi va **Hidden Class** orqali shape tracking ishlaydi. (V8 source kodida Hidden Class `Map` deb nomlanadi — lekin bu JavaScript'dagi `Map` data structure'dan butunlay boshqa tushuncha.) Constructor'dagi `this.prop = value` assignment'lar V8'ning inline cache (IC) mexanizmi orqali optimallashtiriladi — har bir property qo'shilganida yangi Hidden Class transition yaratiladi.
 
@@ -643,7 +643,7 @@ Public class field'lar spec'da **Define semantics** ishlatadi — **Set semantic
 
 Bu degani: agar parent class'da `set name(v) { ... }` bo'lsa ham, child class'dagi `name = "default"` field shu setter'ni **bypass** qiladi va to'g'ridan-to'g'ri own property yaratadi. Bu TC39 tomonidan ataylab tanlangan — field'lar predictable bo'lishi uchun.
 
-Engine ichida class field'lar **ClassFieldDefinition** record sifatida class evaluation vaqtida yig'iladi. Har bir field `[[Name]]` (property key) va `[[Initializer]]` (thunk function)'dan iborat. `new` bilan constructor chaqirilganida, constructor body bajarilgandan **keyin** field initializer'lar tartib bo'yicha evaluate bo'ladi. Initializer ichida `this` yangi yaratilgan instance'ga ishora qiladi.
+Engine ichida class field'lar **ClassFieldDefinition** record sifatida class evaluation vaqtida yig'iladi. Har bir field `[[Name]]` (property key) va `[[Initializer]]` (thunk function)'dan iborat. Spec field initializer'larni `InitializeInstanceElements` orqali e'lon tartibida evaluate qiladi, lekin **qachon** evaluate bo'lishi class turiga bog'liq: **base class**'da field'lar constructor body **ishlashidan oldin** qo'shiladi (`this` yaratilgandan keyin, body'ning birinchi qatoridan oldin); **derived class**'da esa field'lar `super()` qaytishi bilan, ya'ni `super()` chaqiruvidan **keyin**, qolgan constructor body'dan oldin qo'shiladi. Shu sababli parent constructor child class field'ini `undefined` ko'radi — child field'lari `super()` ichidagi parent body tugagandan keyin set bo'ladi. Initializer ichida `this` yangi yaratilgan instance'ga ishora qiladi.
 
 V8'da class field'lar object'ning **Hidden Class** transition chain'iga oldindan qo'shiladi. V8 class literal'ni parse qilganida barcha field'larning nomlarini biladi va `InitialMap`'ni yaratadi (V8 source'dagi "Map" — Hidden Class'ning ichki nomi, JS `Map` data structure emas) — bu instance creation'ni tezlashtiradi chunki property'lar uchun shape transition'lar oldindan hisoblangan bo'ladi. Arrow function field'lar uchun har instance'da yangi `JSFunction` allocate qilinadi — bu prototype method'ga nisbatan ko'proq memory ishlatadi.
 
@@ -961,7 +961,7 @@ console.log(temp.celsius);    // 0
 
 ### Nazariya
 
-`instanceof` class bilan ham xuddi constructor function bilan bir xil ishlaydi — prototype chain bo'ylab `Class.prototype` ni qidiradi. Class inheritance'da (`extends`) child instance parent uchun ham `true` qaytaradi.
+`instanceof` class bilan ham, constructor function bilan ham bir xil ishlaydi — prototype chain bo'ylab `Class.prototype` ni qidiradi. Class inheritance'da (`extends`) child instance parent uchun ham `true` qaytaradi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1017,7 +1017,7 @@ console.log(form instanceof AbstractValidator); // true — duck typing
 
 `class` sintaksisi constructor function + prototype pattern'ining qulay yozuvi, lekin u **faqat syntactic sugar emas** — bir nechta muhim **behavior farqlari** mavjud. Bu farqlar engine darajasida internal slot va semantika orqali qo'llaniladi:
 
-- **`new` majburiyligi** — class konstruktorni `new` siz chaqirish darhol `TypeError` beradi (engine `[[IsClassConstructor]]` slot'ni tekshiradi). Constructor function esa `new` siz chaqirilsa, `this` globalThis (yoki strict mode'da undefined) bo'ladi — bu silent bug manbai.
+- **`new` majburiyligi** — class constructor'ni `new` siz chaqirish darhol `TypeError` beradi (engine `[[IsClassConstructor]]` slot'ni tekshiradi). Constructor function esa `new` siz chaqirilsa, `this` globalThis (yoki strict mode'da undefined) bo'ladi — bu silent bug manbai.
 - **Strict mode avtomatik** — class body har doim strict mode'da parse qilinadi, hatto tashqi kod sloppy bo'lsa ham. Constructor function'da `"use strict"` direktivasini qo'lda yozish kerak.
 - **Method `enumerable: false`** — class method'lari prototype'da non-enumerable bo'lib define qilinadi. Constructor function'da `Fn.prototype.method = ...` esa default enumerable — `for...in` loop'lar method'larni ham iteratsiyaga oladi.
 - **Method'lar constructable emas** — class method'larida `[[Construct]]` internal slot yo'q. Ya'ni `new instance.method()` darhol TypeError beradi. Constructor function method'lari esa texnik jihatdan `new` bilan chaqirilishi mumkin.
@@ -1368,7 +1368,7 @@ console.log(fish.swim());   // "Nemo suzmoqda (5m chuqurlikda)"
 
 ### 2. Class Composition (Delegation Pattern)
 
-Class ichida boshqa object/class'larni **property** sifatida saqlash va ularga **delegatsiya** qilish. OOP dunoyisida bu **"has-a"** munosabat:
+Class ichida boshqa object/class'larni **property** sifatida saqlash va ularga **delegation** qilish. OOP dunyosida bu **"has-a"** munosabat:
 
 ```javascript
 // ─── Alohida capability class'lar ───
@@ -1399,7 +1399,7 @@ class GPS {
 
   navigate(lat, lng) {
     this.#location = { lat, lng };
-    return `Navigatsiya: ${lat}, ${lng}`;
+    return `Navigation: ${lat}, ${lng}`;
   }
 
   get location() { return { ...this.#location }; }
@@ -1461,7 +1461,7 @@ class Car {
 
 const tesla = new Car("Tesla Model 3", 450);
 console.log(tesla.start());              // "Tesla Model 3: Motor yondi (450 HP)"
-console.log(tesla.navigate(41.31, 69.28)); // "Navigatsiya: 41.31, 69.28"
+console.log(tesla.navigate(41.31, 69.28)); // "Navigation: 41.31, 69.28"
 console.log(tesla.addSong("Bohemian Rhapsody"));
 console.log(tesla.play());               // "♫ Bohemian Rhapsody ijro"
 console.log(tesla.dashboard());
@@ -1557,7 +1557,7 @@ console.log(hero.speed);   // 100
 | Memory | har instance'da own method | prototype sharing ishlaydi |
 | Runtime o'zgartirish | spread bilan yangi object | property assignment bilan |
 | Test qilish | oson (pure function) | oson (alohida component) |
-| TypeScript bilan | interfeys qiyin | interfeys oson |
+| TypeScript bilan | interface qiyin | interface oson |
 | Ishlatiladigan joy | utility, plugin, small object | domain model, OOP architecture |
 
 ---
@@ -1888,7 +1888,7 @@ class Broken {
 }
 
 const b = new Broken();
-console.log(b.apiUrl); // "undefined/v1" — baseUrl hali mavjud emasganda evaluate bo'ldi
+console.log(b.apiUrl); // "undefined/v1" — apiUrl baseUrl mavjud bo'lishidan oldin evaluate bo'ldi
 ```
 
 **Qoida:** Field'lar tartib bo'yicha (yuqoridan pastga) evaluate bo'ladi. Tepada aniqlangan field'ga murojaat qilish mumkin, lekin pastdagi field'ga murojaat qilish — `undefined` beradi.

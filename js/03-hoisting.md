@@ -1,6 +1,6 @@
 # Bo'lim 3: Hoisting — Ichki Mexanizm
 
-> Hoisting — JavaScript engine'ning Creation Phase'da o'zgaruvchi va funksiya declaration'larni scope'ning boshiga registratsiya qilish mexanizmi. Kod fizik ravishda "ko'tarilmaydi" — engine shunchaki declaration'larni kod bajarilishidan oldin qayta ishlaydi.
+> Hoisting — JavaScript engine'ning Creation Phase'da o'zgaruvchi va funksiya declaration'larni scope'ning boshiga registration qilish mexanizmi. Kod fizik ravishda "ko'tarilmaydi" — engine shunchaki declaration'larni kod bajarilishidan oldin qayta ishlaydi.
 
 ---
 
@@ -71,18 +71,17 @@ function example() {
 }
 
 V8 bytecode (simplified):
-  CreateFunctionContext   ; create EC
-  LdaUndefined            ; x = undefined  ← Creation phase
-  Star x
+  LdaUndefined            ; accumulator = undefined  ← var x boshida initialize
+  Star r0                 ; accumulator → r0 (x lokal register r0'da)
   LdaGlobal "console"
   LdaNamedProperty "log"
-  Ldar x                  ; x ni o'qish — endi undefined
+  Ldar r0                 ; r0 → accumulator (x ni o'qish — endi undefined)
   Call ...
-  LdaSmi 10               ; 10 ni load
-  Star x                  ; x = 10
+  LdaSmi 10               ; accumulator = 10
+  Star r0                 ; accumulator → r0 (x = 10)
 ```
 
-Ko'rinib turibdiki, `Star x` (undefined assignment) `console.log`'dan oldin keladi — bu Creation Phase'ning natijasi. V8 declaration'ni "hoist" qilmaydi, balki `undefined` initialization'ni boshida joylashtiradi.
+Ko'rinib turibdiki, `Star r0` (undefined assignment) `console.log`'dan oldin keladi — bu Creation Phase'ning natijasi. V8 declaration'ni "hoist" qilmaydi, balki funksiya tanasi boshida `var x`'ni `undefined` bilan initialize qiladi. Bu yerda `x` closure'da ishlatilmagani uchun stack register'da (`r0`) yashaydi; closed-over bo'lsa, `CreateFunctionContext` orqali heap'dagi context'da saqlanardi.
 
 </details>
 
@@ -737,7 +736,7 @@ let tdzVar = 10;
 
 ### Block ichida `function declaration` — strict/non-strict farqi (Annex B)
 
-Non-strict mode'da block ichidagi function declaration ECMAScript Annex B "Web Compatibility Semantics" qoidalariga ko'ra **ikki binding** yaratadi (2015'dan beri barcha web brauzerlar uchun majburiy): block-scoped binding (block ichida `let`-like) va function-scoped binding (block tashqarisida — eng oxirgi assignment qiymati). Strict mode'da esa faqat block-scoped binding qoladi — Annex B qoidalari qo'llanilmaydi.
+Non-strict mode'da block ichidagi function declaration ECMAScript Annex B "Web Compatibility Semantics" qoidalariga ko'ra **ikki binding** yaratadi (2015'dan beri barcha web brauzerlar uchun majburiy): block-scoped binding (block ichida `let`-like) va function-scoped binding (block tashqarisida — `var`-like, scope boshida `undefined`). Function-scoped binding'ga qiymat avtomatik berilmaydi — u faqat block ichidagi function declaration **bajarilganda** (dynamically evaluated) block-scoped binding'ning joriy qiymati bilan sinxronlanadi. Strict mode'da esa faqat block-scoped binding qoladi — Annex B qoidalari qo'llanilmaydi.
 
 ```javascript
 // Non-strict mode — Annex B web compatibility (brauzerlar bir xil ishlaydi)
@@ -745,14 +744,19 @@ if (true) {
   function legacyFn() { return 1; }
 }
 legacyFn(); // 1 (function-scoped binding ham yaratiladi)
+```
 
+```javascript
 // Strict mode — faqat block-scoped, block tashqarisida YO'Q
-"use strict";
-if (true) {
-  function strictFn() { return 2; }
-  console.log(strictFn()); // 2 ✅
-}
-// console.log(strictFn()); // ❌ ReferenceError — block'dan tashqarida yo'q
+// "use strict" directive scope/funksiya BOSHIDA bo'lishi shart — IIFE bilan isolation
+(function () {
+  "use strict";
+  if (true) {
+    function strictFn() { return 2; }
+    console.log(strictFn()); // 2 ✅
+  }
+  // console.log(strictFn()); // ❌ ReferenceError — block'dan tashqarida yo'q
+})();
 ```
 
 **Yechim:** Block ichida funksiya kerak bo'lsa — `const fn = function() {}` yoki arrow function ishlating. Bu eng aniq behavior va ES Modules (default strict) bilan mos. Annex B B.3.2 — 2015'dan barcha brauzerlar va zamonaviy Node uchun majburiy; eski legacy engine'larda farq bo'lishi mumkin.
@@ -1185,7 +1189,7 @@ Execution Phase:
 
 Bu bo'limda Hoisting mexanizmini chuqur o'rgandik:
 
-- **Hoisting** — Creation Phase'da declaration'larning scope'da registratsiya qilinishi. Kod fizik ko'chirilmaydi
+- **Hoisting** — Creation Phase'da declaration'larning scope'da registration qilinishi. Kod fizik ko'chirilmaydi
 - **var** → `undefined` bilan initialize (o'qish mumkin, lekin qiymati undefined)
 - **let/const** → `uninitialized` (TDZ'da — o'qish ReferenceError)
 - **function declaration** → to'liq funksiya bilan initialize (chaqirishga tayyor)

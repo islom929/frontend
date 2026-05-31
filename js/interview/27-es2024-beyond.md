@@ -173,7 +173,7 @@ naturals()
 <details>
 <summary>Javob</summary>
 
-`using` — resurslarni avtomatik tozalash uchun yangi syntax (ES2025). Resource object'da `Symbol.dispose` (sync) yoki `Symbol.asyncDispose` (async) bo'lishi kerak.
+`using` — resurslarni avtomatik tozalash uchun yangi syntax (Explicit Resource Management, Stage 4 finished proposal). Resource object'da `Symbol.dispose` (sync) yoki `Symbol.asyncDispose` (async) bo'lishi kerak.
 
 ```javascript
 // ❌ try/finally — ko'p boilerplate, xatolarga moyil
@@ -476,7 +476,7 @@ TC39 — ECMAScript standartini boshqaradigan komitet. Har bir yangi feature quy
 Har yil mart oyidagi TC39 yig'ilishigacha Stage 4 ga yetgan proposal'lar shu yilgi ECMAScript versiyasiga kiritiladi (iyun'da Ecma GA tomonidan rasman tasdiqlanadi).
 
 ```
-Misol: Object.groupBy() yoʻli
+Misol: Object.groupBy() yo'li
 2021 — Stage 1 (proposal)
 2023 — Stage 3 (browser'lar implement qilmoqda)
 2024 — Stage 4 → ES2024 ga kiritildi
@@ -562,7 +562,7 @@ async function process() {
 - `defer(callback)` — dispose vaqtida chaqiriladigan callback
 - `move()` — resource'larni boshqa stack'ga ko'chiradi
 
-**Deep Dive:** `DisposableStack` spec'da `[[DisposableResourceStack]]` internal slot'da resource'larni saqlaydi. `move()` method yangi stack yaratadi va barcha resource'larni ko'chiradi — eski stack bo'shaydi va "disposed" holatga o'tadi. Agar dispose paytida bir nechta resource xato bersa — birinchi xato `SuppressedError.error` ga, ikkinchisi `SuppressedError.suppressed` ga joylashadi, zanjirlanib ketadi. Bu Go `defer` stack va C# `using` block semantikasining kombinatsiyasi.
+**Deep Dive:** `DisposableStack` spec'da `[[DisposableResourceStack]]` internal slot'da resource'larni saqlaydi. `move()` method yangi stack yaratadi va barcha resource'larni ko'chiradi — eski stack bo'shaydi va "disposed" holatga o'tadi. Agar dispose paytida bir nechta resource xato bersa — resource'lar LIFO tartibda dispose qilingani uchun har yangi dispose xatosi `SuppressedError.error` ga, undan oldin to'plangan xato esa `SuppressedError.suppressed` ga joylashadi. Natijada eng oxirgi otilgan dispose xatosi tashqi `.error` da, oldingilari `.suppressed` ichida ichma-ich zanjirlanadi. Bu Go `defer` stack va C# `using` block semantikasining kombinatsiyasi.
 
 </details>
 

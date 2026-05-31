@@ -100,7 +100,7 @@ gen.next(); //                 → { value: undefined, done: true }
 <details>
 <summary>Javob</summary>
 
-`yield*` — boshqa iterable yoki generator'ga iteratsiyani **delegatsiya** qiladi. Ichki iterable'ning barcha qiymatlarini tashqi generator orqali birma-bir yield qiladi.
+`yield*` — boshqa iterable yoki generator'ga iteratsiyani **delegation** qiladi. Ichki iterable'ning barcha qiymatlarini tashqi generator orqali birma-bir yield qiladi.
 
 ```javascript
 function* inner() {
@@ -228,7 +228,8 @@ const result = [...take(
   lazyFilter(lazyMap(range(10), x => x * x), x => x > 20),
   3
 )];
-// Faqat 8 ta raqam hisoblandi (25, 36, 49 topilganda to'xtaydi)
+// range faqat 1..8 ni chiqardi: 25, 36, 49 yield qilingach take 4-element (64=8²) ni
+// so'raydi va shundagina to'xtaydi — 9 va 10 umuman hisoblanmaydi
 ```
 
 </details>
@@ -410,7 +411,7 @@ Mavjud method'lar: `.map()`, `.filter()`, `.take()`, `.drop()`, `.flatMap()`, `.
 
 Bu generator bilan qo'lda yozilgan lazy pipeline'ning standart versiyasi.
 
-**Deep Dive:** Iterator Helpers TC39 proposal (Stage 4) `Iterator.prototype` ga method'lar qo'shadi. `Iterator.from()` — istalgan iterable yoki iterator'ni wrap qiladi. Lazy method'lar (map, filter, take) yangi `WrapForValidIteratorPrototype` object qaytaradi — har bir `next()` chaqiruvda pipeline'dagi oldingi bosqichdan element so'raydi. Bu pull-based evaluation modeli.
+**Deep Dive:** Iterator Helpers TC39 proposal (Stage 4, ES2025) `Iterator.prototype` ga method'lar qo'shadi. Lazy method'lar (`map`, `filter`, `take`, `drop`, `flatMap`) yangi **Iterator Helper object** qaytaradi — uning prototip'i `%IteratorHelperPrototype%`. Har bir `next()` chaqiruvda bu object pipeline'dagi oldingi bosqichdan element so'raydi — pull-based evaluation. `Iterator.from()` esa boshqa narsa: agar argument allaqachon `Iterator.prototype` zanjirida bo'lsa o'zini qaytaradi, aks holda uni `%WrapForValidIteratorPrototype%` object'ga o'raydi (faqat `next()` bor plain iterator'ni to'liq Iterator'ga aylantirish uchun).
 
 </details>
 
@@ -622,7 +623,7 @@ for await (const val of asyncIterable) {
 
 **`for await...of` sync iterable bilan ham ishlaydi** — agar `Symbol.asyncIterator` topilmasa, engine `Symbol.iterator` ni ishlatadi va har value'ni `Promise.resolve()` ga o'raydi. Sequential — bitta iteratsiya tugamaguncha keyingisi boshlanmaydi (parallel emas).
 
-**Deep Dive:** Async iterator spec'da `[[AsyncGeneratorQueue]]` internal slot bilan kelishiladi — pending `next()` chaqiruvlari navbatda turadi. Bir vaqtda birdan ortiq `next()` chaqirilsa, ular sequential bajariladi (parallelism emas). Bu generator state machine konsistensiyasini saqlash uchun — `yield` pozitsiyasi va local variable'lar bir vaqtda turli context'larda bo'la olmaydi.
+**Deep Dive:** Yuqoridagi misol — qo'lda yozilgan async iterator (oddiy object). `async function*` bilan yaratilgan **async generator** esa qo'shimcha mexanizmga ega: spec'da har async generator object `[[AsyncGeneratorQueue]]` internal slot'ga ega — pending `next()`/`return()`/`throw()` chaqiruvlari `AsyncGeneratorRequest` record'lari sifatida navbatda turadi. Generator hali oldingi `next()` ustida ishlayotgan paytda yangi `next()` chaqirilsa, u darhol bajarilmaydi — navbatga qo'shiladi va sequential ishlaydi (parallelism emas). Bu generator state machine konsistensiyasini saqlash uchun — `yield` pozitsiyasi va local variable'lar bir vaqtda turli resume context'larda bo'la olmaydi.
 
 </details>
 

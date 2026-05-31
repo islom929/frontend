@@ -13,9 +13,9 @@
 
 Bu ikki tushuncha butunlay farqli narsalar:
 
-- **`__proto__`** — har bir **object** da mavjud accessor. Object'ning `[[Prototype]]` internal slot'iga (ya'ni uning "ota" prototype object'iga) kirish imkonini beradi. Zamonaviy kodda `Object.getPrototypeOf()` ishlatish tavsiya etiladi.
+- **`__proto__`** — har bir **object** da mavjud accessor. Object'ning `[[Prototype]]` internal slot'iga (ya'ni u meros oladigan prototype object'ga) kirish imkonini beradi. Zamonaviy kodda `Object.getPrototypeOf()` ishlatish tavsiya etiladi.
 
-- **`prototype`** — faqat **funksiya**larda mavjud oddiy property. `new` bilan funksiya chaqirilganda, yangi yaratilgan object'ning `[[Prototype]]` iga aynan shu `prototype` object bog'lanadi. Ya'ni u funksiyaning o'zi uchun emas, funksiya **yaratadigan instance'lar** uchun ota object.
+- **`prototype`** — faqat **funksiya**larda mavjud oddiy property. `new` bilan funksiya chaqirilganda, yangi yaratilgan object'ning `[[Prototype]]` iga aynan shu `prototype` object bog'lanadi. Ya'ni u funksiyaning o'zi uchun emas, funksiya **yaratadigan instance'lar** ning prototype'i sifatida ishlatiladi.
 
 ```javascript
 function Dog(name) { this.name = name; }
@@ -23,7 +23,7 @@ Dog.prototype.bark = function() { return "Hav!"; };
 
 const rex = new Dog("Rex");
 
-// rex.__proto__ — rex ning "otasi" = Dog.prototype
+// rex.__proto__ — rex ning prototype'i = Dog.prototype
 console.log(rex.__proto__ === Dog.prototype); // true ✅
 console.log(Object.getPrototypeOf(rex) === Dog.prototype); // true ✅
 
@@ -34,7 +34,7 @@ console.log(rex.prototype); // undefined
 | | `__proto__` | `prototype` |
 |-|-------------|-------------|
 | **Kimda bor** | Har bir object | Faqat function'larda |
-| **Nima** | `[[Prototype]]` ga accessor | `new` bilan yaratiladigan instance'lar uchun ota |
+| **Nima** | `[[Prototype]]` ga accessor | `new` bilan yaratiladigan instance'lar uchun prototype |
 | **Zamonaviy API** | `Object.getPrototypeOf()` | `Fn.prototype.method = ...` |
 
 </details>
@@ -49,7 +49,7 @@ Prototype chain — ob'ektlar bir-biriga `[[Prototype]]` orqali bog'langan zanji
 Lookup algoritmi:
 1. Object'ning **own property** larida qidiradi
 2. Topilmasa — `[[Prototype]]` da qidiradi
-3. Topilmasa — otaning otasida, va hokazo
+3. Topilmasa — `[[Prototype]]` ning `[[Prototype]]` ida, va hokazo
 4. `Object.prototype` → `null` ga yetilsa va topilmasa — `undefined`
 
 ```javascript
@@ -285,9 +285,9 @@ console.log(ali.greet()); // "Ali" — delegation orqali ishlaydi
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-ES6 `class` sintaksisi kirganidan keyin JavaScript'da ham class-based ko'rinishi bor, lekin bu asosan **syntactic sugar** — ichida xuddi shu prototype mexanizm ishlaydi. `class User { greet() {} }` engine ichida `User.prototype.greet = function() {}` ga aylanadi (method'lar prototype'ga, static'lar constructor function'ga). `extends` esa `Object.setPrototypeOf(Child, Parent)` (static inheritance uchun) + `Child.prototype.[[Prototype]] = Parent.prototype` (instance method inheritance) kombinatsiyasi.
+ES6 `class` sintaksisi kirganidan keyin JavaScript'da ham class-based ko'rinishi bor, lekin bu asosan **syntactic sugar** — ichida aynan shu prototype mexanizm ishlaydi. `class User { greet() {} }` engine ichida `User.prototype.greet = function() {}` ga aylanadi (method'lar prototype'ga, static'lar constructor function'ga). `extends` esa `Object.setPrototypeOf(Child, Parent)` (static inheritance uchun) + `Child.prototype.[[Prototype]] = Parent.prototype` (instance method inheritance) kombinatsiyasi.
 
-Lekin class'da ba'zi xulq-atvor sugar emas — alohida semantika: constructor'ni `new` bilan chaqirish majburiy (`[[IsClassConstructor]]` slot tekshiriladi, oddiy call'da TypeError), class body'ning ichi har doim strict mode, class declaration'lar hoist bo'lmaydi (TDZ'da turadi), `super` syntax faqat class va object literal method'larda ishlaydi (`HomeObject` slot'iga bog'liq), va `#private` field'lar faqat class'da bor.
+Lekin class'da ba'zi xulq-atvor sugar emas — alohida semantika: constructor'ni `new` bilan chaqirish majburiy (`[[IsClassConstructor]]` slot tekshiriladi, oddiy call'da TypeError), class body'ning ichi har doim strict mode, class declaration binding'i scope boshiga hoist bo'ladi lekin declaration evaluate bo'lguncha TDZ'da turadi (`let`/`const` kabi — erta access `ReferenceError`), `super` syntax faqat class va object literal method'larda ishlaydi (`HomeObject` slot'iga bog'liq), va `#private` field'lar faqat class'da bor.
 
 </details>
 
@@ -351,7 +351,7 @@ Object.freeze(Object.prototype);
 
 Prototype pollution hujumi recursive merge orqali `[[Set]]` abstract operation ketma-ketligini ekspluatatsiya qiladi. `merge({}, JSON.parse('{"__proto__": {"isAdmin": true}}'))` ichida loop iteratsiya `target["__proto__"]` ni read qiladi — bu `Object.prototype.__proto__` getter accessor orqali `Object.prototype` ni qaytaradi. Recursive call `merge(Object.prototype, { isAdmin: true })` ga aylanadi — keyingi iteratsiyada `Object.prototype["isAdmin"] = true` set qilinadi va global ta'sir bo'ladi.
 
-Spec bo'yicha `__proto__` Annex B.2.2.1 da `Object.prototype` da accessor property sifatida aniqlangan: get `[[GetPrototypeOf]]`, set `[[SetPrototypeOf]]` chaqiradi. `Object.create(null)` bilan yaratilgan object'da bu accessor inherit qilinmaydi — `__proto__` oddiy data property sifatida yoziladi (`[[DefineOwnProperty]]`). Node.js 22+ va modern browser'lar `JSON.parse` paytida `__proto__` key'ni `[[Prototype]]` slot'iga emas, oddiy data property sifatida set qiladi — lekin `merge` funksiyasidagi keyingi `[[Set]]` accessor'ga tushadi va pollution sodir bo'ladi. Himoya: `for...of Object.keys` ishlatish (own enumerable string keys), yoki `Object.create(null)` ni intermediate object sifatida ishlatish.
+Spec bo'yicha `__proto__` Annex B.2.2.1 da `Object.prototype` da accessor property sifatida aniqlangan: get `[[GetPrototypeOf]]`, set `[[SetPrototypeOf]]` chaqiradi. `Object.create(null)` bilan yaratilgan object'da bu accessor inherit qilinmaydi — `__proto__` oddiy data property sifatida yoziladi (`[[DefineOwnProperty]]`). `JSON.parse` esa `__proto__` key'ni `[[Prototype]]` slot'iga emas, oddiy own data property sifatida o'rnatadi — bu ES2015'dan beri spec talabi (`InternalizeJSONProperty` `[[Set]]` emas `CreateDataProperty` ishlatadi). Pollution xavfi keyingi qadamda: `merge` funksiyasi `target["__proto__"]` ni `[[Set]]` orqali yozganda accessor setter'ga tushadi va `[[SetPrototypeOf]]` chaqiriladi. Himoya: `for...of Object.keys` ishlatish (own enumerable string keys), yoki `Object.create(null)` ni intermediate object sifatida ishlatish.
 
 </details>
 
@@ -447,7 +447,7 @@ console.log(u1.greetProto === u2.greetProto);       // true — 1 ta funksiya!
 | **Access tezligi** | Inline cache orqali bir xil tezlikda (V8 IC) | Inline cache orqali bir xil tezlikda (V8 IC) |
 | **Private data** | Closure orqali mumkin | Closure bilan mumkin emas |
 
-**Modern V8 eslatma:** Eski materiallar "prototype access biroz sekinroq" deb yozadi, lekin **modern V8 inline caching** monomorphic load'da own va prototype property'ni deyarli bir xil tezlikda hal qiladi. Feedback vector cache'langanidan keyin ikkalasi ham bitta "load by offset" operation'ga kompilyatsiya qilinadi. Haqiqiy performance farqi — **memory allocation** (1000 instance = 1000 funksiya), access tezligi emas.
+**Modern V8 eslatma:** Eski materiallar "prototype access biroz sekinroq" deb yozadi, lekin **modern V8 inline caching** monomorphic load'da own va prototype property'ni deyarli bir xil tezlikda hal qiladi. Feedback vector cache'langanidan keyin ikkalasi ham bitta "load by offset" operation'ga compile qilinadi. Haqiqiy performance farqi — **memory allocation** (1000 instance = 1000 funksiya), access tezligi emas.
 
 **Tavsiya:** Default'da prototype method ishlating. Instance method faqat closure orqali private data kerak bo'lganda — yoki method instance-specific state'ni capture qilishi kerak bo'lsa.
 
@@ -877,7 +877,7 @@ false
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Bu ECMAScript spec'dagi `OrdinarySet` algoritmi (ECMA-262 §10.1.9.2) bilan tushuntiriladi. `OrdinarySetWithOwnDescriptor(O, P, V, Receiver, ownDesc)` ichida agar `ownDesc` `undefined` bo'lsa (own property yo'q), parent ga delegatsiya qiladi. Parent'da property data descriptor va `[[Writable]]` `false` bo'lsa — algoritm `false` qaytaradi (yoki strict mode'da TypeError). Sabab: assignment semantikasi inherited read-only invariant'ni saqlash kerak — agar parent'da read-only bo'lsa, child shadow yarata olmaydi.
+Bu ECMAScript spec'dagi `[[Set]]` algoritmi bilan tushuntiriladi: `OrdinarySet` (ECMA-262 §10.1.9.1) `OrdinarySetWithOwnDescriptor` (§10.1.9.2) ni chaqiradi. `OrdinarySetWithOwnDescriptor(O, P, V, Receiver, ownDesc)` ichida agar `ownDesc` `undefined` bo'lsa (own property yo'q), parent ga delegatsiya qiladi. Parent'da property data descriptor va `[[Writable]]` `false` bo'lsa — algoritm `false` qaytaradi (yoki strict mode'da TypeError). Sabab: assignment semantikasi inherited read-only invariant'ni saqlash kerak — agar parent'da read-only bo'lsa, child shadow yarata olmaydi.
 
 Lekin `Object.defineProperty(child, "x", { value: 20 })` **ishlaydi**, chunki `defineProperty` `[[Set]]` ni emas, `[[DefineOwnProperty]]` ni chaqiradi (ECMA-262 §10.1.6). `[[DefineOwnProperty]]` parent'ning writable atributini tekshirmaydi — faqat o'z object'idagi mavjud property'ni va `[[Extensible]]` flag'ni hisobga oladi. Bu farq sintaktik shadowing va explicit descriptor definition orasidagi semantik chegarani belgilaydi.
 
@@ -1062,7 +1062,7 @@ Asosiy tanlov sabablari: **xavfsizlik** (`Object.create(null)` da `__proto__` is
 `Object.prototype` — barcha (default prototype chain'li) object'larning eng yuqori ajdodi. Unda quyidagi method'lar bor:
 
 - **`toString()`** — `"[object Object]"` qaytaradi (override mumkin)
-- **`valueOf()`** — object'ning primitive konvertatsiyasi
+- **`valueOf()`** — coercion paytida object'ning primitive qiymatini qaytaradi
 - **`hasOwnProperty(key)`** — property own ekanligini tekshiradi
 - **`isPrototypeOf(obj)`** — `obj` ning prototype chain'ida `this` bormi
 - **`propertyIsEnumerable(key)`** — property enumerable own ekanligini
