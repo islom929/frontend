@@ -1,6 +1,6 @@
 # Bo'lim 39: React Server Components va Server Actions
 
-> Kursning yakuniy bo'limi. **React Server Components (RSC)** — komponent type'larini "Server" va "Client" ga ajratuvchi paradigm. Server Component'lar server'da render qilinadi va **RSC Payload** sifatida client'ga yuboriladi (komponent kodi bundle'da emas, faqat render natijasi). Client Component'lar bundle'da yetkazib beriladi va brauzer'da hydrate qilinadi. **Server Actions** — `'use server'` direktiv bilan declarative RPC mexanizm: async funksiyalar client'dan chaqiriladi va server'da bajariladi (form action integration, JavaScript-less progressive enhancement). `cache(fn)` per-request memoization, Streaming SSR bilan RSC integration'i, Next.js App Router framework standardlari, va kursning umumiy yakuni — bu fayl mazmuni.
+> Kursning yakuniy bo'limi. **React Server Components (RSC)** — komponent type'larini "Server" va "Client" ga ajratuvchi paradigm. Server Component'lar server'da render qilinadi va **RSC Payload** sifatida client'ga yuboriladi (komponent kodi bundle'da emas, faqat render natijasi). Client Component'lar bundle'da yetkazib beriladi va brauzer'da hydrate qilinadi. **Server Actions** — `'use server'` directive bilan declarative RPC mexanizm: async funksiyalar client'dan chaqiriladi va server'da bajariladi (form action integration, JavaScript-less progressive enhancement). `cache(fn)` per-request memoization, Streaming SSR bilan RSC integration'i, Next.js App Router framework standardlari, va kursning umumiy yakuni — bu fayl mazmuni.
 
 ---
 
@@ -62,7 +62,7 @@ RSC'da:
 - **Server Component kodi client bundle'iga qo'shilmaydi** (bundle size kamayadi).
 - Server Component server'da render qilinadi va **RSC Payload** sifatida yuboriladi.
 - Client Component'lar oddiy SSR pattern'ida ishlaydi (bundle + hydration).
-- `'use client'` direktiv komponentni Client deb belgilaydi.
+- `'use client'` directive komponentni Client deb belgilaydi.
 
 **Foydalari:**
 
@@ -76,9 +76,9 @@ RSC'da:
 > - **2020 December:** RSC e'lon qilindi — "Introducing Zero-Bundle-Size React Server Components" blog post (Dan Abramov, Lauren Tan, Joseph Savona, Sebastian Markbåge) + React Conf talk. Eksperimental demo.
 > - **2022 October (Next.js 13):** App Router beta — birinchi production-ready RSC implementation.
 > - **2023 May (Next.js 13.4):** App Router stable. React 18 + RSC integration stabilization, `react-server-dom-webpack` package.
-> - **2024 December (R19):** RSC API stable, `'use server'` va `'use client'` direktivlar React core'ga rasmiy ravishda kiritildi. Framework adoption: Next.js 15, TanStack Start (beta), Waku.
+> - **2024 December (R19):** RSC API stable, `'use server'` va `'use client'` directive'lar React core'ga rasmiy ravishda kiritildi. Framework adoption: Next.js 15, TanStack Start (beta), Waku.
 > - **Kelajak:** Vanilla React standalone RSC bundler API'lari (`react-server-dom-*` package'lari ko'paymoqda).
-> - **Sabab:** Web app'lar bundle hajmi katta bo'lib ketdi (ko'pchilik production app'lar 200-500 KB+ JS), mobile-first va Web Vitals talablari, server-only data access ergonomics.
+> - **Sabab:** Web app'lar client JS bundle hajmi sezilarli o'sib ketdi, mobile-first va Web Vitals talablari kuchaydi, server-only data access ergonomics izlandi.
 
 **RSC vs Server-Side Rendering vs Static Site Generation:**
 
@@ -193,7 +193,10 @@ export default function ProductPage({ product }: ProductPageProps) {
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const product = await fetchProduct(ctx.params!.id as string);
+  const id = ctx.params?.id;
+  if (typeof id !== 'string') return { notFound: true };
+
+  const product = await fetchProduct(id);
   return { props: { product } };
 };
 ```
@@ -265,7 +268,7 @@ RSC (App Router) — faqat 'use client' kod client bundle'ga kiradi:
   - Server-only kod (DB query, fetcher, server SDK) bundle'ga KIRMAYDI
 ```
 
-**Praktik effekt:** Server-only library'lar (database client, ORM, server SDKs, markdown parser) client bundle'dan chiqib ketadi — bundle hajmi sezilarli kamayadi (real raqamlar app strukturasiga bog'liq, ko'pincha 30-70% bundle reduction).
+**Praktik effekt:** Server-only library'lar (database client, ORM, server SDKs, markdown parser) client bundle'dan chiqib ketadi — bundle hajmi sezilarli kamayadi. Kamayish darajasi app strukturasiga bog'liq: server-only kod ulushi qancha katta bo'lsa, client bundle shuncha ko'p qisqaradi.
 
 </details>
 
@@ -313,7 +316,7 @@ Har bir komponent **Server** yoki **Client** type'iga ega. Bu type komponent qay
 1. **Server Component Client Component'ni JSX child sifatida render qila oladi**, lekin Client Component faylida deklaratsiya qilingan utility'lar Server context'da execute qilinmaydi — ular Client Reference proxy sifatida server bundle'ga kiritiladi. Demak `'use client'` faylidagi browser-only API'lar (window, document, useState) Server context'da chaqirilmaydi.
 2. **Client Component Server Component'ni `children` prop sifatida qabul qila oladi** — bu "interleaving" pattern (composition bo'lim'ida). Lekin Client Component Server Component **modulini bevosita import qila olmaydi**.
 3. **Async Server Component** — funksiya `async` bo'lishi mumkin va `await` ishlatadi.
-4. **Default Server** — App Router'da `'use server'` direktiv yo'q bo'lsa Server Component.
+4. **Default Server** — App Router'da `'use client'` directive yo'q bo'lsa Server Component.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -494,7 +497,7 @@ Client bundle:
 
 ### Nazariya
 
-`'use client'` — file top'idagi string literal direktiv. Faylni Client Component deb belgilaydi va modul boundary yaratadi.
+`'use client'` — file top'idagi string literal directive. Faylni Client Component deb belgilaydi va modul boundary yaratadi.
 
 **Syntax:**
 
@@ -745,7 +748,10 @@ export default async function ProductsPage() {
 **Restrictions:**
 
 - Server Action funksiyalari **`async`** bo'lishi shart.
-- Argument va return value **serializable** bo'lishi kerak. RSC serialization JSON'dan kengroq: primitives, plain objects, arrays, `Date`, `Map`, `Set`, `BigInt`, `FormData`, `Promise`, JSX elementlar, **registered Symbols** (`Symbol.for(name)` — global registry orqali) — qo'llab-quvvatlanadi. **Qo'llab-quvvatlanmaydi:** ixtiyoriy function reference (lekin Server Action sifatida `'use server'` bilan belgilangan funksiya — pass qilinishi mumkin), class instances (method'lar bilan), DB connection, **local Symbols** (`Symbol(name)` — har chaqiriqda unique instance), DOM nodes.
+- Argument va return value **serializable** bo'lishi kerak — RSC serialization JSON'dan kengroq, lekin argument va return value uchun ruxsat etilgan tiplar bir xil emas.
+  - **Argument sifatida qo'llab-quvvatlanadi:** primitives (string, number, `BigInt`, boolean, `undefined`, `null`, globally registered Symbol), serializable qiymatlarni saqlovchi iterable'lar (String, Array, `Map`, `Set`, TypedArray, ArrayBuffer), `Date`, `FormData` instance'lari, plain object'lar (serializable property'lar bilan), `Promise`, va **Server Function'lar** (`'use server'` bilan belgilangan boshqa funksiya).
+  - **Argument sifatida qo'llab-quvvatlanmaydi:** React element / JSX, Server Function bo'lmagan ixtiyoriy function (komponent funksiyasi ham), class'lar va class instance'lari (built-in'lardan tashqari), `null` prototype'li object'lar, globally registered bo'lmagan Symbol (`Symbol('label')` — har chaqiriqda unique), event handler'dan kelgan Event object'lar, DB connection, DOM node'lar.
+  - **Return value:** boundary Client Component prop'lari bilan bir xil tiplar serializable hisoblanadi. Server→client yo'nalishida (RSC payload) React element / JSX uzatilishi mumkin — bu argument yo'nalishidan farq qiladi, chunki JSX faqat server'dan client'ga oqimda serialize qilinadi, client'dan argument sifatida emas.
 
 **RPC vs traditional API:**
 
@@ -1193,7 +1199,7 @@ async function ProductPage({ id }: { id: string }) {
 }
 ```
 
-Avantage:
+Afzalliklari:
 - Linear code flow.
 - No loading state (Suspense boundary handles it).
 - Server-only data fetching (no API endpoint duplication).
@@ -1215,7 +1221,7 @@ async function DashboardPage() {
 }
 ```
 
-`Promise.all` paralel fetching — sequential `await`'larga nisbatan total time qisqaradi (sequential: sum, parallel: max(eng sekin fetch)). N ta independent fetch uchun eng katta tezlik N ga yaqin (har biri taxminan teng davomiyli bo'lganda).
+`Promise.all` parallel fetching — sequential `await`'larga nisbatan total time qisqaradi (sequential: sum, parallel: max(eng sekin fetch)). N ta independent fetch uchun eng katta tezlik N ga yaqin (har biri taxminan teng davomiyli bo'lganda).
 
 **Sequential dependent fetching:**
 
@@ -1671,7 +1677,7 @@ export function LikeButton({
 
 ### Nazariya
 
-Server Actions — async funksiyalar, `'use server'` direktiv bilan belgilangan, client'dan chaqirilishi mumkin va server'da bajariladi.
+Server Actions — async funksiyalar, `'use server'` directive bilan belgilangan, client'dan chaqirilishi mumkin va server'da bajariladi.
 
 **Lifecycle:**
 
@@ -1702,7 +1708,8 @@ async function deletePost(id: string): Promise<{ success: boolean; error?: strin
     await db.delete(posts).where(eq(posts.id, id));
     return { success: true };
   } catch (error) {
-    return { success: false, error: error.message };
+    const message = error instanceof Error ? error.message : 'Delete failed';
+    return { success: false, error: message };
   }
 }
 
@@ -2324,7 +2331,7 @@ const [optimisticItems, addOptimistic] = useOptimistic(
 async function handleAdd(formData: FormData) {
   const text = formData.get('text') as string;
 
-  addOptimistic({ id: 'temp', text, status: 'pending' });
+  addOptimistic({ id: `optimistic-${Date.now()}`, text, status: 'pending' });
   await addItemAction(formData);
 }
 ```
@@ -2339,8 +2346,11 @@ async function handleAdd(formData: FormData) {
 5. Action completes → revalidation → real items qaytadi
 6. Komponent re-render bo'ladi yangi server state bilan — optimistic state
    o'rnini real state egallaydi (avtomatik "discard")
-7. Action throw qilsa va UI re-render bo'lmasa, optimistic state ko'rinishda
-   qoladi — manual error handling kerak (try/catch ichida revert action)
+7. Action throw qilsa, React optimistic state'ni avtomatik base qiymatga
+   qaytaradi (Transition tugaganda — muvaffaqiyat yoki xato farqsiz). Optimistic
+   update ko'rinishda QOLMAYDI. Manual error handling base qiymatni qaytarish
+   uchun emas — foydalanuvchiga xato xabarini ko'rsatish uchun kerak (try/catch
+   ichida xatoni ushlab error state'ga yozish)
 ```
 
 **Concurrency:**
@@ -2578,33 +2588,41 @@ Bir requestda `getCurrentUser` 5 ta komponentdan chaqirilsa — **1 ta** DB quer
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Implementation (taxminiy):**
+React `cache` argument array'ni yaxlit kalit qilib ishlatmaydi — agar shunday qilsa, har chaqiriqda yangi array yaratilgani uchun cache hech qachon hit bo'lmasdi. Buning o'rniga argument'lar bo'yicha **cache node zanjiri** quriladi: har argument bittadan map orqali keyingi node'ga olib boradi (string/number/boolean kabi primitive'lar uchun `Map`, object'lar uchun `WeakMap`). Zanjir oxiridagi node funksiya natijasini saqlaydi.
+
+**Implementation (soddalashtirilgan, zanjir tamoyilini ko'rsatadi):**
 
 ```javascript
-// react/server (taxminiy)
-export function cache<T extends Function>(fn: T): T {
-  return function cached(...args: any[]) {
-    const cacheStore = getCurrentRequestCache();
-    let fnCache = cacheStore.get(fn);
+// react/cache (soddalashtirilgan)
+const TERMINAL = Symbol('terminal');
 
-    if (!fnCache) {
-      fnCache = new Map();
-      cacheStore.set(fn, fnCache);
+export function cache(fn) {
+  return function cached(...args) {
+    // Har request'da yangi root cache node (request scope)
+    let node = getCurrentRequestCacheNode(fn);
+
+    // Har argument bo'yicha zanjirni bir qadam pastga tushiramiz
+    for (const arg of args) {
+      const store =
+        typeof arg === 'object' && arg !== null ? node.weak : node.strong;
+      let next = store.get(arg);
+      if (next === undefined) {
+        next = { strong: new Map(), weak: new WeakMap() };
+        store.set(arg, next);
+      }
+      node = next;
     }
 
-    // Cache key: argument array (referential)
-    const key = args.length === 0 ? '_empty' : args;
-
-    if (fnCache.has(key)) {
-      return fnCache.get(key);
+    // Zanjir oxiri — shu argument kombinatsiyasi uchun natija
+    if (node[TERMINAL] === undefined) {
+      node[TERMINAL] = fn(...args);
     }
-
-    const result = fn(...args);
-    fnCache.set(key, result);
-    return result;
+    return node[TERMINAL];
   };
 }
 ```
+
+Argument'lar bir xil reference yoki primitive bo'lsa (`Object.is` semantikasi — `Map`/`WeakMap` kalitlari bilan) bir xil zanjirga tushadi → cache hit. Yangi object literal yoki yangi array har chaqiriqda boshqa reference → boshqa zanjir → cache miss.
 
 **Request scope:**
 
@@ -2765,12 +2783,12 @@ export default async function DashboardPage() {
 }
 
 async function PostsSection({ userId }: { userId: string }) {
-  const posts = await fetchPosts(userId); // 500ms
+  const posts = await fetchPosts(userId); // tez DB query
   return <PostsList posts={posts} />;
 }
 
 async function RecommendationsSection({ userId }: { userId: string }) {
-  const recs = await fetchRecommendations(userId); // 2000ms (ML inference)
+  const recs = await fetchRecommendations(userId); // sekin (ML inference)
   return <RecommendationsList items={recs} />;
 }
 ```
@@ -2791,7 +2809,7 @@ T=slow:     Recommendations ready (ML inference tugadi), stream chunk:
             <RecommendationsList /> (RecommendationsSkeleton'ni almashtiradi)
 ```
 
-User UserHeader'ni eng tez ko'radi (initial HTML flush), Posts/Recommendations o'z fetch davomiyligi bilan ketma-ket paydo bo'ladi. **Blocking parallel pattern bilan solishtirganda** (`await Promise.all([...])` Suspense'siz): total time = max(eng sekin fetch) — barcha section'lar tayyor bo'lguncha hech nima ko'rinmaydi. **Sequential pattern bilan solishtirganda** (`await x; await y; await z`): total time = sum (kümülativ vaqt). **Streaming bilan:** instant initial paint + progressive reveal — har section o'z fetch davomiyligi tugaganda ko'rinadi, eng sekin section boshqalarni bloklamaydi.
+User UserHeader'ni eng tez ko'radi (initial HTML flush), Posts/Recommendations o'z fetch davomiyligi bilan ketma-ket paydo bo'ladi. **Blocking parallel pattern bilan solishtirganda** (`await Promise.all([...])` Suspense'siz): total time = max(eng sekin fetch) — barcha section'lar tayyor bo'lguncha hech nima ko'rinmaydi. **Sequential pattern bilan solishtirganda** (`await x; await y; await z`): total time = barcha fetch davomiyliklari yig'indisi (sum). **Streaming bilan:** instant initial paint + progressive reveal — har section o'z fetch davomiyligi tugaganda ko'rinadi, eng sekin section boshqalarni bloklamaydi.
 
 **`loading.tsx` (Next.js convention):**
 
@@ -3086,7 +3104,7 @@ export const Route = createFileRoute('/')({
   },
 });
 
-async function HomePage() {
+function HomePage() {
   const posts = Route.useLoaderData();
 
   return (
@@ -3174,7 +3192,10 @@ export default function ProductPage({ product }: { product: Product }) {
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const product = await fetchProduct(ctx.params!.id as string);
+  const id = ctx.params?.id;
+  if (typeof id !== 'string') return { notFound: true };
+
+  const product = await fetchProduct(id);
   if (!product) return { notFound: true };
   return { props: { product } };
 };
@@ -3293,12 +3314,14 @@ function ClientPage({ dataPromise }: { dataPromise: Promise<Data> }) {
 }
 ```
 
-### Props Must Be JSON-Serializable
+### Props Server'dan Client'ga Serializable Bo'lishi Kerak
+
+Server Component'dan Client Component'ga uzatilgan prop'lar serializable bo'lishi shart. Serialization JSON'dan kengroq (`Date`, `Map`, `Set`, `BigInt`, `Promise`, JSX element'lar qo'llab-quvvatlanadi), lekin oddiy function va class instance prop sifatida uzatilmaydi — yagona istisno `'use server'` bilan belgilangan Server Action.
 
 ```tsx
 // ❌ NOTO'G'RI — passing function from Server to Client
 function ServerComponent() {
-  const handler = () => console.log('clicked'); // function not serializable
+  const handler = () => console.log('clicked'); // oddiy function — serialize qilinmaydi
   return <ClientButton onClick={handler} />; // Error
 }
 
@@ -3866,7 +3889,7 @@ Mashq 4 yuqoridagi `useOptimistic` Server Actions section'idagi TodoList pattern
 - **Client Component** `TodoList.tsx` `useOptimistic` reducer pattern'i bilan add/toggle/delete actions'ni boshqaradi.
 - **Server Actions** `addTodo`, `toggleTodo`, `deleteTodo` (`'use server'` faylida) — har biri `revalidatePath('/todos')` chaqiradi.
 - **Pending visual feedback** — optimistic item'da `pending: true` flag → `opacity: 0.5` styling.
-- **Transition context** — `useOptimistic` Transition ichida ishlaydi: Server Action tugab `revalidatePath` chaqirilgach, server state bilan re-render → optimistic state discard. Action throw bo'lsa va revalidation bo'lmasa, manual `try/catch` ichida revert action kerak (yoki `useFormStatus` bilan error visualization).
+- **Transition context** — `useOptimistic` Transition ichida ishlaydi: Server Action tugab `revalidatePath` chaqirilgach, server state bilan re-render → optimistic state discard. Action throw bo'lsa ham React optimistic state'ni avtomatik base qiymatga qaytaradi (Transition tugaganda — muvaffaqiyat yoki xato farqsiz, optimistic update ko'rinishda qolmaydi). `try/catch` optimistic'ni revert qilish uchun emas — xatoni ushlab foydalanuvchiga xabar ko'rsatish uchun kerak (`useActionState` qaytargan state yoki alohida `useState` orqali).
 - **Race condition prevention** — `useOptimistic` Transition queue avtomatik concurrency'ni boshqaradi: bir nechta optimistic update parallel bo'lsa, ular ketma-ket queue'ga qo'shiladi.
 
 </details>
@@ -3952,7 +3975,7 @@ export async function CommentsSection({ postId }: { postId: string }) {
 // app/blog/[slug]/CommentsList.tsx (Client — optimistic UI)
 'use client';
 
-import { useOptimistic, useState } from 'react';
+import { useOptimistic } from 'react';
 
 interface Comment {
   id: string;
@@ -3963,9 +3986,12 @@ interface Comment {
 }
 
 export function CommentsList({ initialComments }: { initialComments: Comment[] }) {
-  const [comments] = useState(initialComments);
+  // Base value — prop'ning o'zi. `useState(initialComments)` ishlatish XATO bo'lardi:
+  // useState initializer faqat mount'da o'qiladi, `revalidatePath`'dan keyin server
+  // yangilangan comments'ni prop sifatida yuborganda useState eski qiymatda qotib qoladi.
+  // useOptimistic base'i prop'dan kelishi kerak — re-render'da yangilanadi → optimistic discard to'g'ri ishlaydi.
   const [optimisticComments, addOptimisticComment] = useOptimistic(
-    comments,
+    initialComments,
     (state, newComment: Comment) => [...state, newComment]
   );
 
@@ -4147,7 +4173,7 @@ Bu kurs React'ning **fundamental va advanced** tomonlarini qamrab oldi. Lekin Re
 
 **Final Recommendation:**
 
-React'ni o'rganish — bir martalik jarayon emas. Ekosistema doim yangilanadi (R20 RFC'lar yo'lda, React Compiler stable bo'lyapti, RSC framework'lari kengayyapti). Shu kursni o'qib bo'lib:
+React'ni o'rganish — bir martalik jarayon emas. Ekosistema doim yangilanadi (React Compiler 1.0 stable chiqdi, RSC framework'lari kengaymoqda, yangi RFC'lar muhokama qilinmoqda). Shu kursni o'qib bo'lib:
 
 1. **Real production project'larda ishlash** — kichik proyektlardan boshlab, asta-sekin enterprise scale'gacha.
 2. **Open source contribution** — React, Next.js, TanStack repository'larini kuzatish.

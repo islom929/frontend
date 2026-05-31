@@ -1,6 +1,6 @@
 # Bo'lim 8: List Rendering va Keys
 
-> List rendering — array ma'lumotini JSX element'lar yig'masiga o'tkazish jarayoni. `key` prop esa Reconciliation algorithmiga node identity'ni xabarlash mexanizmi. Bu bo'lim `map()` pattern'ini, `key` qoidalarini, index-as-key trade-off'ini, nested list'larni va kalit-asosli komponent state hayotiyligini yoritadi.
+> List rendering — array ma'lumotini JSX element'lar yig'masiga o'tkazish jarayoni. `key` prop esa Reconciliation algorithmiga node identity'ni xabarlash mexanizmi. Bu bo'lim `map()` pattern'ini, `key` qoidalarini, index-as-key trade-off'ini, nested list'larni va kalit-asosli Component state hayotiyligini yoritadi.
 
 ---
 
@@ -10,7 +10,7 @@
 - [Nima uchun `key` Talab Qilinadi](#nima-uchun-key-talab-qilinadi)
 - [`key` Prop Qoidalari](#key-prop-qoidalari)
 - [Index `key` Sifatida — Trade-off](#index-key-sifatida--trade-off)
-- [`key` va Komponent Identity](#key-va-komponent-identity)
+- [`key` va Component Identity](#key-va-component-identity)
 - [Nested Lists va Key Scope](#nested-lists-va-key-scope)
 - [Key Collisions va Composite Keys](#key-collisions-va-composite-keys)
 - [Reordering Performance — Reconciler Bog'lanishi](#reordering-performance--reconciler-boglanishi)
@@ -87,13 +87,13 @@ _jsx('ul', {
 });
 ```
 
-Diqqat qiling: `_jsx`'ning **uchinchi argumenti** — `key`. JSX transform `key` prop'ni `props` object'idan ajratib oladi va alohida positional argument sifatida uzatadi. Bu — `key`'ning React Element internal slot'ida (`element.key`) saqlanishini ta'minlaydi va u **prop sifatida komponentga uzatilmaydi**.
+Diqqat qiling: `_jsx`'ning **uchinchi argumenti** — `key`. JSX transform `key` prop'ni `props` object'idan ajratib oladi va alohida positional argument sifatida uzatadi. Bu — `key`'ning React Element internal slot'ida (`element.key`) saqlanishini ta'minlaydi va u **prop sifatida Component'ga uzatilmaydi**.
 
 `_jsx` vs `_jsxs` farqi — **source-level child count** asosida:
 - `_jsx` — manbada **bitta child expression** (JSX'da `<ul>{products.map(...)}</ul>` — bitta `{}` expression, runtime'da array bersa ham)
-- `_jsxs` — manbada **bir nechta static child element** yonma-yon (`<ul><li/><li/></ul>` — transformer kompilatsiya paytida ko'radi)
+- `_jsxs` — manbada **bir nechta static child element** yonma-yon (`<ul><li/><li/></ul>` — transformer compile paytida ko'radi)
 
-Bu farq dev-mode key validation behaviour'iga ta'sir qiladi: `_jsxs` static children pozitsiyon stable bo'lgani uchun per-child key warning chiqarmaydi; `_jsx`'ga uzatilgan dynamic array (`map` natijasi) uchun React runtime per-element `key` tekshiruvi yoqiladi.
+Bu farq dev-mode key validation behavior'iga ta'sir qiladi: `_jsxs` static children position stable bo'lgani uchun per-child key warning chiqarmaydi; `_jsx`'ga uzatilgan dynamic array (`map` natijasi) uchun React runtime per-element `key` tekshiruvi yoqiladi.
 
 React bu element array'ni Reconciliation paytida ishlatadi:
 
@@ -114,7 +114,7 @@ Old Fiber chain:
 li(key=1) → li(key=2) → li(key=3) → null
               │
               ▼
-   Reconciler key map orqali eshlashtiradi
+   Reconciler key map orqali moslashtiradi
 ```
 
 </details>
@@ -175,7 +175,7 @@ function ActiveUserList({ users }: { users: User[] }) {
 }
 ```
 
-Map bilan inline component — `tbody` ichida `Row` komponentni ishlatish:
+Map bilan inline component — `tbody` ichida `Row` Component'ni ishlatish:
 
 ```tsx
 type Task = { id: number; title: string; done: boolean };
@@ -300,12 +300,12 @@ Natija: 1 ta DOM insertion.
 
 Bu — performance va correctness farqi. Performance — kam DOM operation. Correctness — input value, focus, scroll position, animation state, ref'lar — barchasi to'g'ri item bilan birga "yuradi".
 
-`key` qiymati `string | number | bigint`. JSX transform `key` ni element'ning maxsus internal slot'ga (`ReactElement.key`) saqlaydi va `props` object'idan ajratib qo'yadi. Shuning uchun komponent ichida `props.key` mavjud emas — `key` faqat React Reconciler uchun.
+`key` qiymati `string | number | bigint`. JSX transform `key` ni element'ning maxsus internal slot'ga (`ReactElement.key`) saqlaydi va `props` object'idan ajratib qo'yadi. Shuning uchun Component ichida `props.key` mavjud emas — `key` faqat React Reconciler uchun.
 
 > **`key` xatti-harakati — React versiyalari bo'ylab stable:**
 > - `key` uzatilmasa, dev mode'da console warning chiqadi: `Warning: Each child in a list should have a unique "key" prop`. R16+ versiyalarining barchasida bu warning mavjud.
-> - `key` hech qachon komponent prop'i sifatida uzatilmaydi — JSX transform `props` object'idan ajratib, `_jsx(type, props, key)` chaqirig'idagi uchinchi argument sifatida saqlaydi.
-> - **Sabab:** `key` semantik jihatdan oddiy prop emas — Reconciler uchun internal identity signali. Komponentga uzatilsa, prop sifatida noto'g'ri ishlatish (`<Item key={x}>` ichida `props.key` o'qish urinishi) ehtimoli oshardi.
+> - `key` hech qachon Component prop'i sifatida uzatilmaydi — JSX transform `props` object'idan ajratib, `_jsx(type, props, key)` chaqirig'idagi uchinchi argument sifatida saqlaydi.
+> - **Sabab:** `key` semantik jihatdan oddiy prop emas — Reconciler uchun internal identity signali. Component'ga uzatilsa, prop sifatida noto'g'ri ishlatish (`<Item key={x}>` ichida `props.key` o'qish urinishi) ehtimoli oshardi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -351,7 +351,7 @@ function matchChild(oldFiber: Fiber | null, newChild: ReactElement): boolean {
 }
 ```
 
-`key` `null` bo'lsa (JSX'da `key` berilmagan default holat), Reconciler **index-based positionviy matching**'ga o'tadi — yangi va eski child'lar position bo'yicha (1-1, 2-2, ...) eshlashtiriladi. `key` `null` qiymati Map ichida `null` sifatida saqlanmaydi; o'rniga `existingChildren.set(existingChild.index, existingChild)` (numeric index Map ichida) ishlatiladi. Boshqacha qilib aytganda, key'siz element'ning "key"i — uning positional index'i.
+`key` `null` bo'lsa (JSX'da `key` berilmagan default holat), Reconciler **index-based positional matching**'ga o'tadi — yangi va eski child'lar position bo'yicha (1-1, 2-2, ...) moslashtiriladi. `key` `null` qiymati Map ichida `null` sifatida saqlanmaydi; o'rniga `existingChildren.set(existingChild.index, existingChild)` (numeric index Map ichida) ishlatiladi. Boshqacha qilib aytganda, key'siz element'ning "key"i — uning positional index'i.
 
 </details>
 
@@ -414,7 +414,7 @@ function BadCommentList({ comments }: { comments: Comment[] }) {
 }
 ```
 
-`key` komponentga prop sifatida uzatilmaydi:
+`key` Component'ga prop sifatida uzatilmaydi:
 
 ```tsx
 type ItemProps = { id: number; label: string };
@@ -430,7 +430,7 @@ function ItemList({ items }: { items: ItemProps[] }) {
     <ul>
       {items.map((item) => (
         <Item key={item.id} id={item.id} label={item.label} />
-        //    ↑ React uchun     ↑ Item komponentga uzatiladi
+        //    ↑ React uchun     ↑ Item Component'ga uzatiladi
       ))}
     </ul>
   );
@@ -463,7 +463,7 @@ function ItemList({ items }: { items: ItemProps[] }) {
 </div>
 ```
 
-**Qoida 2 — Stable across renders:** Bir item bir xil `key` ga ega bo'lishi kerak — qancha render bo'lsa ham. Agar item `[A, B, C]` da `key="a", key="b", key="c"` bo'lsa, keyingi render'da ham shunday bo'lishi kerak. Bu — Reconciler'ning eski va yangi Fiber'larni eshlashtirishi uchun yagona signal.
+**Qoida 2 — Stable across renders:** Bir item bir xil `key` ga ega bo'lishi kerak — qancha render bo'lsa ham. Agar item `[A, B, C]` da `key="a", key="b", key="c"` bo'lsa, keyingi render'da ham shunday bo'lishi kerak. Bu — Reconciler'ning eski va yangi Fiber'larni moslashtirishi uchun yagona signal.
 
 **Qoida 3 — Predictable:** `key` deterministic bo'lishi kerak — bir xil input → bir xil output. `Math.random()`, `Date.now()`, va boshqa har render'da yangi qiymat beradigan funksiyalar `key` sifatida **TAQIQ**.
 
@@ -504,7 +504,7 @@ function ItemList({ items }: { items: ItemProps[] }) {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-React `key` qiymatini internal jarayonda `KeyedFragment` yoki Fiber `key` slot'iga saqlaydi. Reconciler taqqoslashda reference emas, **string equality** ishlatadi:
+React `key` qiymatini ikki joyda saqlaydi: element yaratilganda `ReactElement.key` slot'ida (`props`'dan ajratilgan holda), keyin shu element'dan Fiber yaratilganda `fiber.key` field'ida. Reconciler taqqoslashda reference emas, **string equality** ishlatadi:
 
 ```ts
 // React internal (soddalashtirilgan)
@@ -521,7 +521,7 @@ Numeric va string key bir xil bo'lsa qaytadi:
 // Ikkalasi ham bir xil — React internal tomonida string'ga konvert qiladi
 ```
 
-`bigint` key — React internal'da `String(key)` orqali konvert qilinadi (TypeScript'ning `Key` tipida `string | number | bigint` qabul qilinadi). Versiya cheklovi yo'q — `bigint` qo'llab-quvvatlash JS native `String(BigInt)` operation'iga asoslangan:
+`bigint` key — React internal'da boshqa key'lar kabi `'' + key` orqali string'ga o'tkaziladi (TypeScript'ning `Key` tipida `string | number | bigint` qabul qilinadi). `'' + 10n` natijasi `"10"` — JS native bigint-to-string coercion'iga asoslangan:
 
 ```tsx
 {items.map((item) => <li key={item.bigId}>...</li>)}
@@ -663,7 +663,7 @@ function ItemList({ items }: { items: ItemProps[] }) {
 
 1. List static — qo'shilmaydi, o'chirilmaydi, qayta tartiblanmaydi
 2. Item'lar **state'siz** — ichida `useState`, `useRef`, `<input>`, animation yo'q
-3. Item'lar **identity'sga muhtoj emas** — item haqida hech narsa "esda saqlanmasin"
+3. Item'lar **identity'ga muhtoj emas** — item haqida hech narsa "esda saqlanmasin"
 
 Agar uchala shart bajarilsa, index va element positionsi har doim mos keladi va Reconciler hech qachon noto'g'ri matching qilmaydi.
 
@@ -672,13 +672,13 @@ Agar uchala shart bajarilsa, index va element positionsi har doim mos keladi va 
 1. Item qo'shilishi yoki o'chirilishi mumkin (CRUD operationlari)
 2. Item qayta tartiblanishi mumkin (drag-drop, sort)
 3. Item ichida controlled/uncontrolled `<input>`, `<textarea>` bor
-4. Item komponentida `useState` bor
+4. Item Component'ida `useState` bor
 5. Item'da animation, focus, scroll position kabi DOM state mavjud
 
 Bu holatlarda index'dan foydalanish bug keltiradi — chunki Reconciler index'ga ko'ra "bu eski item" deb noto'g'ri xulosa qiladi va eski state'ni yangi item'ga "yopishtiradi".
 
 > **`key={index}` haqida runtime warning yo'q:**
-> React `key={index}` ishlatishni anti-pattern sifatida hujjatlarda ko'rsatadi, lekin runtime warning chiqarmaydi — chunki ba'zi static holatlarda bu pattern to'g'ri ishlaydi. Bu xulq R16'dan beri o'zgarmagan. Static analysis vositasi sifatida `eslint-plugin-react`'ning `react/no-array-index-key` qoidasi (default'da o'chirilgan, manual'da yoqiladi) bu pattern'ni flag qilishi mumkin.
+> React `key={index}` uchun runtime warning chiqarmaydi — chunki static list'larda (dynamic CRUD, sort, reorder yo'q) bu pattern to'g'ri ishlaydi. Rasmiy React docs faqat **dynamic list'lar** uchun index'dan saqlanishni tavsiya qiladi (state/identity bug'lari sababli). Bu xulq R16'dan beri o'zgarmagan. Static analysis vositasi sifatida `eslint-plugin-react`'ning `react/no-array-index-key` qoidasi (default'da o'chirilgan, manual'da yoqiladi) bu pattern'ni flag qilishi mumkin.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -696,7 +696,7 @@ Yangi: [Z(key=0), A(key=1), B(key=2), C(key=3)]
 Reconciler:
   Index 0: eski A (key=0) ↔ yangi Z (key=0) — KEY MOS KELADI
     → A Fiber qayta ishlatiladi, props yangilanadi
-    → A komponent state SAQLANADI, lekin u Z'ga aylanadi
+    → A Component state SAQLANADI, lekin u Z'ga aylanadi
   Index 1: eski B ↔ yangi A — bir xil hikoya
   Index 2: eski C ↔ yangi B
   Index 3: yangi C — yangi yaratiladi
@@ -870,20 +870,20 @@ function LogViewer({ entries }: { entries: LogEntry[] }) {
 
 ---
 
-## `key` va Komponent Identity
+## `key` va Component Identity
 
 ### Nazariya
 
-React'da `key` o'zgarishi — bu **"bu butunlay boshqa komponent"** signali. `key` o'zgarganda, Reconciler eski Fiber'ni topa olmaydi va yangi Fiber yaratadi:
+React'da `key` o'zgarishi — bu **"bu butunlay boshqa Component"** signali. `key` o'zgarganda, Reconciler eski Fiber'ni topa olmaydi va yangi Fiber yaratadi:
 
-1. Eski komponent **unmount** qilinadi (cleanup effect'lar ishga tushadi)
-2. Yangi komponent **mount** qilinadi (mount effect'lar ishga tushadi)
+1. Eski Component **unmount** qilinadi (cleanup effect'lar ishga tushadi)
+2. Yangi Component **mount** qilinadi (mount effect'lar ishga tushadi)
 3. State, ref'lar, DOM — **yangidan** yaratiladi
 4. Animation reset bo'ladi
 
-Bu xulq xato emas — `key` o'zgarishi semantik jihatdan "boshqa narsa" degani. Lekin u ikki tomonlama qilich:
+Bu xulq xato emas — `key` o'zgarishi semantik jihatdan "boshqa narsa" degani. Bu mexanizmning ikki ta'siri bor:
 
-- ✅ **Foyda:** Komponent state'ni majburan reset qilish uchun pattern (`33-optimization.md` da batafsil)
+- ✅ **Foyda:** Component state'ni majburan reset qilish uchun pattern (`33-optimization.md` da batafsil)
 - ❌ **Zarar:** Beixtiyor `key` o'zgartirish state'ni yo'qotadi (xato)
 
 **State reset pattern** — `key` ni props'ga bog'lab, state'ni majburan reset qilish:
@@ -907,7 +907,7 @@ function FormFields() {
 }
 ```
 
-Bu pattern alternativasi — `useEffect` ichida `setName('')` qilishdan ko'ra declarative va xatoga moyilroq emas.
+Bu pattern `useEffect` ichida `setName('')` chaqirib state'ni qo'lda tozalashga qaraganda declarative va kamroq xatoga moyil. Reset logikasi `key` o'zgarishidan avtomatik kelib chiqadi, qo'shimcha effect kerak emas.
 
 **Anti-pattern** — beixtiyor `key` o'zgartirish:
 
@@ -915,7 +915,9 @@ Bu pattern alternativasi — `useEffect` ichida `setName('')` qilishdan ko'ra de
 // ❌ Math.random() har render — Form har render'da reset bo'ladi
 <Form key={Math.random()} />
 
-// ❌ Object reference har render yangi
+// ❌ Object — React key'ni `'' + key` orqali string'ga o'tkazadi:
+//    {user: 'Alice'} → "[object Object]". Har object shu bir xil string'ga
+//    aylanadi, shuning uchun sibling'lar orasida key collision yuzaga keladi
 <Form key={{ user: 'Alice' }} />
 ```
 
@@ -942,30 +944,32 @@ Commit phase:
 4. Mount effect'lar ishga tushadi
 5. Ref'lar attach qilinadi
 
-Bu ish — yangi komponent type bilan bir xil. `type` o'zgarganda ham bir xil hodisa ro'y beradi (cross-ref [`04-reconciliation.md`](04-reconciliation.md) — Type Comparison).
+Bu ish — yangi Component type bilan bir xil. `type` o'zgarganda ham bir xil hodisa ro'y beradi (cross-ref [`04-reconciliation.md`](04-reconciliation.md) — Type Comparison).
 
 `key` Reconciler uchun **Fiber identity** signali. Type bir xil bo'lib, `key` boshqacha bo'lsa — bu butunlay yangi instance.
 
 ```ts
-// Internal pseudo-code
+// Internal pseudo-code (reconcileSingleElement tartibiga mos)
 function reconcile(oldFiber: Fiber | null, newElement: ReactElement): Fiber {
   if (oldFiber === null) {
     return createFiberFromElement(newElement);
   }
 
-  if (oldFiber.type !== newElement.type) {
+  // React avval key'ni tekshiradi — key identity asosiy signal
+  if (oldFiber.key !== newElement.key) {
+    // Key farqli — eski Fiber o'chiriladi (state yo'qoladi)
+    deleteFiber(oldFiber);
+    return createFiberFromElement(newElement);
+  }
+
+  // Key mos keldi, endi type tekshiriladi
+  if (oldFiber.elementType !== newElement.type) {
     // Type farqli — yangi Fiber
     deleteFiber(oldFiber);
     return createFiberFromElement(newElement);
   }
 
-  if (oldFiber.key !== newElement.key) {
-    // Key farqli — yangi Fiber (eski state yo'qoladi)
-    deleteFiber(oldFiber);
-    return createFiberFromElement(newElement);
-  }
-
-  // Type va key bir xil — qayta ishlatish
+  // Key va type bir xil — qayta ishlatish
   return useFiber(oldFiber, newElement.props);
 }
 ```
@@ -1050,13 +1054,17 @@ function TabContent({ tab }: { tab: Tab }) {
 Anti-pattern — beixtiyor reset:
 
 ```tsx
-// ❌ Render'da yangi obyekt — har render Form unmount/remount
+// ❌ Object key — har object `'' + key` orqali "[object Object]" string'iga
+//    aylanadi. Bu yerda yagona Form bo'lgani uchun remount bo'lmaydi
+//    (string har render bir xil), lekin object'ni key sifatida ishlatish
+//    list ichida key collision keltiradi. TypeScript Key tipi object qabul
+//    qilmaydi — bu kod type error beradi
 function BadParent() {
   return <Form key={{ id: 1 }} />;
-  // {} har render'da yangi reference — key har doim "yangi"
 }
 
-// ❌ Math.random() har render
+// ❌ Math.random() har render — har render yangi son, key har doim "yangi",
+//    Form har render unmount/remount bo'ladi
 function BadParent2() {
   return <Form key={Math.random()} />;
 }
@@ -1092,7 +1100,7 @@ function GoodParent() {
 </div>
 ```
 
-Bu — Reconciler'ning sibling-level matching algorithmidan kelib chiqadi: u faqat **bir parent ichidagi child'lar**ni eshlashtiradi (cross-ref [`04-reconciliation.md`](04-reconciliation.md) — `reconcileChildrenArray`). Boshqa parent — alohida child chain.
+Bu — Reconciler'ning sibling-level matching algorithmidan kelib chiqadi: u faqat **bir parent ichidagi child'lar**ni moslashtiradi (cross-ref [`04-reconciliation.md`](04-reconciliation.md) — `reconcileChildrenArray`). Boshqa parent — alohida child chain.
 
 **Nested lists** — list ichida list'lar bo'lsa, har map'ning o'z scope'i bor:
 
@@ -1110,10 +1118,10 @@ function ProductCatalog({ categories }: { categories: Category[] }) {
         <section key={category.id}>
           <h2>{category.name}</h2>
           <ul>
+            {/* product.id faqat bu <ul> ichida unique bo'lishi shart;
+                category.id bilan collision yo'q — boshqa parent */}
             {category.products.map((product) => (
               <li key={product.id}>{product.name}</li>
-              {/* product.id faqat bu <ul> ichida unique bo'lishi shart */}
-              {/* category.id bilan collision yo'q — boshqa parent */}
             ))}
           </ul>
         </section>
@@ -1167,10 +1175,29 @@ function reconcileChildren(parent: Fiber, newChildren: ReactElement[]): Fiber[] 
 
 Bu — har parent uchun alohida `Map<key, Fiber>` — boshqa parent'lardagi key'lar bilan aralashish yo'q.
 
-**`<>` (Fragment) — parent emas:**
+**Fragment — DOM'da node yo'q, lekin Fiber chegarasi bor:**
+
+Fragment (`<>...</>` yoki `<Fragment>`) DOM'da hech qanday wrapper element hosil qilmaydi, lekin reconciliation darajasida o'zining alohida Fiber'iga ega bo'ladi. `reconcileChildrenArray` Fragment element'ni parent child array'ining **bitta slot'i** sifatida ko'radi va `createFiberFromFragment` orqali Fragment Fiber yaratadi; Fragment'ning child'lari esa shu Fiber ostida — nested scope'da — reconcile qilinadi.
 
 ```tsx
-function FragmentInList() {
+<ul>
+  <>
+    <li key="1">A</li>
+    <li key="2">B</li>
+  </>
+  <li key="3">C</li>
+</ul>
+
+// <ul>'ning bevosita child'lari: [Fragment Fiber, <li key="3">]
+// key=1, key=2 esa Fragment Fiber ostidagi nested scope'da.
+// Shu sababli key=1/key=2 va key=3 turli sibling scope'larda —
+// key=3 bilan collision yo'q, garchi key raqamlari yaqin bo'lsa ham.
+```
+
+Component ichiga o'ralgan Fragment ham xuddi shunday chegara hosil qiladi — component'ning o'zi `<ul>` uchun bitta child:
+
+```tsx
+function FragmentRow() {
   return (
     <>
       <li key="1">A</li>
@@ -1179,15 +1206,13 @@ function FragmentInList() {
   );
 }
 
-// Agar bu component <ul> ichida ishlatilsa:
 <ul>
-  <FragmentInList />
-  <li key="3">C</li>
+  <FragmentRow />     {/* ← <ul> uchun bitta child (component Fiber) */}
+  <li key="3">C</li>  {/* ← <ul>'ning ikkinchi child'i */}
 </ul>
 
-// React Fragment'ni "transparent" deb sanaydi — uning child'lari
-// to'g'ridan-to'g'ri <ul>'ning child'lari sifatida hisoblanadi
-// Demak key=1, key=2, key=3 bir scope'da
+// FragmentRow qaytargan child'lar (key=1, key=2) FragmentRow subtree'sida.
+// Ular <ul>'ning bevosita child'lari EMAS — yana turli sibling scope.
 ```
 
 </details>
@@ -1319,9 +1344,9 @@ Natija — state, focus, animation **birinchi** item'da to'g'ri qoladi, qolganla
 
 2. **Numeric ID + string ID aralashganda:** `id: 1` va `id: "1"` Reconciler tomonidan **bir xil** sifatida qabul qilinadi (string conversion).
 
-3. **Generatsiya qilingan ID'lar render ichida:** `Math.random()` yoki `crypto.randomUUID()` har render'da yangi qiymat — collision bo'lmasa ham, identity stableity buziladi.
+3. **Generation qilingan ID'lar render ichida:** `Math.random()` yoki `crypto.randomUUID()` har render'da yangi qiymat beradi — collision bo'lmasa ham, identity stable bo'lmaydi va item har render qayta yaratiladi.
 
-4. **`null` yoki `undefined` ID:** Bir nechta item'da ID bo'lmasa, hammasi `key="undefined"` bo'lib qoladi.
+4. **`null` ID:** `key={null}` React tomonidan `'' + null` orqali `"null"` string'iga aylanadi (`hasValidKey` `config.key !== undefined` tekshiradi, `null` esa `undefined` emas). Bir nechta item'da ID `null` bo'lsa — hammasi `key="null"` bo'lib collision keltiradi. Eslatma: `key={undefined}` esa "key yo'q" deb qabul qilinadi (`element.key = null`), va React index-based positional matching'ga o'tadi — bu collision emas, lekin index'ning o'sha pitfall'lari (reorder/insert/delete'da state buzilishi) yuzaga keladi.
 
 **Yechimlar:**
 
@@ -1374,7 +1399,7 @@ Demak, ikki yangi child bir xil `key` bilan kelsa:
 
 Bu — "birinchi keladi, birinchi xizmat" pattern. Lekin natija foydalanuvchi nuqtai-nazaridan bug — chunki user "ikki bir xil item" deb hisoblamaydi.
 
-Dev mode'da React reconcilation oldidan `validateChildKeys` orqali har element'da key mavjudligini va duplikatlarni tekshiradi. Duplikat aniqlanganda console warning chiqadi:
+Dev mode'da duplikat key tekshiruvi reconciliation paytida amalga oshiriladi: `reconcileChildrenArray` ichida `knownKeys` nomli `Set<string>` ko'rilgan key'larni yig'adi va takror uchraganda `warnOnInvalidKey` console warning chiqaradi (key mavjudligini tekshiradigan `validateChildKeys` esa alohida funksiya — u element yaratilishida key yo'qligini ogohlantiradi). Duplikat warning matni:
 
 ```
 Warning: Encountered two children with the same key, `someKey`.
@@ -1467,7 +1492,10 @@ const articles: Article[] = [
   { title: 'Another' }, // id undefined
 ];
 
-// ❌ Xato — ikki item key=undefined → collision
+// ❌ Xato — id undefined bo'lgan item'larda key={undefined} → "key yo'q"
+//    React index-based positional matching'ga o'tadi (collision emas, lekin
+//    reorder/insert/delete'da index pitfall'lari kuchga kiradi).
+//    Agar id null bo'lganida, hammasi key="null" bo'lib collision berardi.
 function BadArticles() {
   return (
     <ul>
@@ -1478,8 +1506,9 @@ function BadArticles() {
   );
 }
 
-// ✅ Fallback to index'dan ko'ra index bilan composite — chunki list mutate bo'lsa, fallback ham buziladi
-// Eng yaxshi yechim: data'ni normalize qilib, har item uchun ID kafolatlash
+// ⚠️ index'ga fallback — yarim yechim: id bor item'lar stable, lekin
+//    id yo'q item'lar index'ga tayanadi va list mutate bo'lsa o'sha buziladi.
+//    Eng yaxshi yechim — data'ni normalize qilib, har item uchun stable ID kafolatlash
 function FixedArticles() {
   return (
     <ul>
@@ -1492,7 +1521,7 @@ function FixedArticles() {
   );
 }
 
-// ✅✅ Eng yaxshi — data'ni client'da normalize qilish
+// ✅ Data'ni client'da normalize qilish — id yo'q item'larga ID berish
 import { useMemo } from 'react';
 
 function NormalizedArticles({ raw }: { raw: Article[] }) {
@@ -1500,7 +1529,10 @@ function NormalizedArticles({ raw }: { raw: Article[] }) {
     () =>
       raw.map((article, index) => ({
         ...article,
-        id: article.id ?? -(index + 1), // negative id — auto-generated
+        // ⚠️ index'dan kelib chiqqan id — `raw` faqat append qilinsa xavfsiz.
+        //    Reorder yoki o'rtadan o'chirish bo'lsa index pitfall'i qaytadi.
+        //    Stabil yechim manbada ID kafolatlash (DB/server-side).
+        id: article.id ?? -(index + 1),
       })),
     [raw]
   );
@@ -1536,20 +1568,20 @@ Stable `key` bilan, Reconciler `lastPlacedIndex` greedy algorithmi orqali kerakl
 
 - Har item'ning props'i yangilanadi
 - DOM'da har item'ning innerText/attribute'lari qayta yoziladi
-- Komponent state'i positionga "yopishadi", item identity'ga emas
+- Component state'i positionga "yopishadi", item identity'ga emas
 
-10000 element'lik list'da reverse operation:
+Kontrast — `N` element'lik list'ni butunlay reverse qilganda:
 
 ```
 Stable key bilan:
-  10000 ta DOM move (insertBefore)
-  0 ta props update
-  0 ta state loss
+  ~N ta DOM move (insertBefore) — har Fiber qayta ishlatiladi
+  0 ta props update — data o'zgarmadi
+  state SAQLANADI — har item o'z Fiber'i bilan birga ko'chadi
 
 Index key bilan:
-  0 ta DOM move
-  10000 ta props update
-  10000 ta state loss (har item state boshqasiga ko'chdi)
+  0 ta DOM move — DOM node'lar joyida qoladi
+  N ta props update — har li'ning text/attribute qayta yoziladi
+  state POSITION'GA "yopishadi" — item identity buziladi
 ```
 
 Stable `key` ning asosiy foydasi — **state preservation** va **kerakli DOM operationlari soni**ning kamayishi. Index key holatida React har item'ni yangi item deb sanaydi va props/text/attribute'larni qayta yozadi; stable key holatida React faqat haqiqatan ham o'zgargan item'larni yangilaydi va boshqalarini joyida qoldiradi. DOM `insertBefore` reflow trigger qiladi, lekin u props/attribute update + state reset birikmasidan kichik xarajat.
@@ -1623,7 +1655,7 @@ Greedy yechim: 4 ta move (A, B, C, D — chunki E ulardan oldin keldi).
 
 Reverse-friendly **emas** — chunki algorithm "left to right" walk qiladi va `lastPlacedIndex` monoton ortib boradi (kamaymaydi, lekin tenglik mumkin).
 
-LCS (Longest Common Subsequence) algorithmi optimal yechimni topadi (1 move bu misolda), lekin O(n²) kompleksiti — yirik list'larda real sekinroq. React O(n) greedy'ni tanladi: ko'pchilik praktik holatlarda yetarli, va hech qachon hatto eng yomon holatda ham `n` move'dan ortmaydi.
+LCS (Longest Common Subsequence) algorithmi optimal yechimni topadi (1 move bu misolda), lekin O(n²) complexity — yirik list'larda real sekinroq. React O(n) greedy'ni tanladi: ko'pchilik praktik holatlarda yetarli, va hech qachon hatto eng yomon holatda ham `n` move'dan ortmaydi.
 
 </details>
 
@@ -1876,7 +1908,7 @@ Empty array `[]` — JSX engine quyidagicha ishlov beradi:
 ```tsx
 {[]}
 // _jsx ga child sifatida bo'sh array uzatiladi
-// Reconciler: array — yetishtirilmagan bola yo'q
+// Reconciler array'ni traverse qiladi — element yo'q, hech bir child yaratilmaydi
 // DOM'ga hech narsa qo'shilmaydi
 ```
 
@@ -2059,7 +2091,7 @@ const item = { id: 1, name: 'Item', key: 'spread-key' };
 // Natija: element.key = "spread-key" — spread g'olib, explicit `key={item.id}` qoldi
 ```
 
-Bu — confusing bug manbai: foydalanuvchi `<Item key={item.id} />` deb yozayotganda, spread orqali kelgan `key` field uni override qiladi. React source code'idagi izoh ham bu muammoni tan oladi va `key` spread'ni deprecate qilish rejasi bor (R18.3+/R19'da dev warning chiqadi):
+Bu — confusing bug manbai: foydalanuvchi `<Item key={item.id} />` deb yozayotganda, spread orqali kelgan `key` field uni override qiladi. React bu pattern uchun dev mode'da warning chiqaradi:
 
 ```
 Warning: A props object containing a "key" prop is being spread into JSX:
@@ -2145,13 +2177,13 @@ function SplitList({ items }: { items: Item[] }) {
 {items.map((i) => <Item key={i.id} {...i} />)}
 ```
 
-`showHeader` true → false bo'lganda, Header unmount qilinadi. Item'lar positionsi 1 ga siljimaydi (Reconciler key bilan eshlashtiradi). Lekin agar key'siz bo'lsa — index positionsi siljiydi va xato yuz beradi.
+`showHeader` true → false bo'lganda, Header unmount qilinadi. Item'lar positionsi 1 ga siljimaydi (Reconciler key bilan moslashtiradi). Lekin agar key'siz bo'lsa — index positionsi siljiydi va xato yuz beradi.
 
 Conditional element'larda har doim explicit `key` qo'shing.
 
 ---
 
-### Gotcha 5: Sort + `index` `key` da'vosi
+### Gotcha 5: Sort + `index` `key` — state position'ga yopishadi
 
 ```tsx
 const sorted = [...items].sort((a, b) => a.name.localeCompare(b.name));
@@ -2160,15 +2192,16 @@ return (
   <ul>
     {sorted.map((item, index) => (
       <li key={index}>{item.name}</li>
-      // ❌ Sort qilingan, lekin index key — har sort'da har item butunlay yangi
+      // ❌ Sort'dan keyin ham key'lar 0,1,2,... bir xil — Reconciler positional
+      //    match qiladi, DOM/state esa yangi item'ga noto'g'ri bog'lanadi
     ))}
   </ul>
 );
 ```
 
-Sort har item'ning index'ini o'zgartiradi. `key={index}` ishlatilsa, Reconciler **hech qanday match topa olmaydi** va barcha item'lar qayta yaratiladi (state, focus, animation — yo'qoladi).
+Sort item'larning tartibini o'zgartiradi, lekin `key={index}` qiymatlari `0, 1, 2, ...` bir xil qoladi (index ma'lumotga emas, positionga bog'liq). Shuning uchun Reconciler **hech qanday item'ni qayta yaratmaydi** — har positiondagi Fiber qayta ishlatiladi va props yangilanadi. Muammo shu: position 0'dagi DOM input value, focus yoki state eski item'niki bo'lib qoladi, lekin u endi sort natijasidagi boshqa item'ni ko'rsatadi. Ya'ni state item bilan emas, position bilan qoladi — bu `index` key'ning umumiy pitfall'i.
 
-**Yechim:** `key={item.id}` — sort qilgandan keyin ham item identity stable.
+**Yechim:** `key={item.id}` — sort qilgandan keyin ham item identity stable, har Fiber o'z item'i bilan birga ko'chadi.
 
 ---
 
@@ -2251,7 +2284,7 @@ function App() {
 
 ---
 
-### ❌ Xato 3: `key` Ni Komponent Ichida Ishlatishga Urinish
+### ❌ Xato 3: `key` Ni Component Ichida Ishlatishga Urinish
 
 ```tsx
 // ❌ Anti-pattern — key prop sifatida ishlatish
@@ -2281,7 +2314,7 @@ function ItemList({ items }: { items: ItemProps[] }) {
 }
 ```
 
-**Sabab:** `key` JSX transform tomonidan props'dan ajratib olinadi va Reconciler uchun internal slot'ga saqlanadi. Komponent function'iga prop sifatida uzatilmaydi.
+**Sabab:** `key` JSX transform tomonidan props'dan ajratib olinadi va Reconciler uchun internal slot'ga saqlanadi. Component function'iga prop sifatida uzatilmaydi.
 
 ---
 
@@ -2478,7 +2511,7 @@ function Catalog() {
 
 ### Mashq 3: Sortable Todo Saqlash (O'rta)
 
-Todo list'ni sort qilganda, har todo'ning `<input>` value'si saqlanishi kerak. Quyidagi komponent xato — bug'ni toping va tuzating.
+Todo list'ni sort qilganda, har todo'ning `<input>` value'si saqlanishi kerak. Quyidagi Component xato — bug'ni toping va tuzating.
 
 ```tsx
 import { useState } from 'react';
@@ -2517,7 +2550,7 @@ function SortableTodos() {
 <details>
 <summary><strong>Javob</strong></summary>
 
-Bug: `key={index}`. Sort har item'ning index'ini o'zgartiradi va Reconciler eski item'ni topa olmaydi — barcha `<input>` qayta yaratiladi va user yozgani yo'qoladi.
+Bug: `key={index}`. Sort item tartibini o'zgartiradi, lekin key'lar `0, 1, 2, ...` bir xil qoladi — Reconciler har positiondagi Fiber'ni qayta ishlatadi (qayta yaratmaydi). `<input>` uncontrolled bo'lgani uchun uning DOM value'si reused Fiber bilan position'da qoladi: sort'dan keyin foydalanuvchi yozgan matn boshqa todo'ga "yopishadi". State item bilan emas, position bilan qoladi.
 
 ```tsx
 function SortableTodos() {
@@ -2550,7 +2583,7 @@ function SortableTodos() {
 }
 ```
 
-`key={todo.id}` orqali Reconciler har item'ni stable identity bilan eshlashtiradi. Sort natijasida DOM move yuz beradi (`insertBefore`), lekin har `<input>` o'zining state'i bilan birga ko'chadi.
+`key={todo.id}` orqali Reconciler har item'ni stable identity bilan moslashtiradi. Sort natijasida DOM move yuz beradi (`insertBefore`), lekin har `<input>` o'zining state'i bilan birga ko'chadi.
 
 </details>
 
@@ -2558,7 +2591,7 @@ function SortableTodos() {
 
 ### Mashq 4: Filter va Reset State (O'rta)
 
-`UserCard` komponenti — `useState` ichida draft message saqlaydi. User filter qilganda, **boshqa user'larning** draft'i yo'qolmasligi kerak. Quyidagi xato kodni tuzating.
+`UserCard` Component'i — `useState` ichida draft message saqlaydi. User filter qilganda, **boshqa user'larning** draft'i yo'qolmasligi kerak. Quyidagi xato kodni tuzating.
 
 ```tsx
 import { useState } from 'react';
@@ -2620,7 +2653,7 @@ function UserList({ users }: { users: User[] }) {
 }
 ```
 
-Endi filter natijasida React har card'ni `user.id` orqali eshlashtiradi:
+Endi filter natijasida React har card'ni `user.id` orqali moslashtiradi:
 - Filter'da qolgan user'lar — eski Fiber qayta ishlatiladi, draft saqlanadi
 - Filter'dan o'chgan user'lar — unmount, draft yo'qoladi (kutilgan)
 - Filter'ga qaytgan user — agar avval unmount qilingan bo'lsa, yangi mount + bo'sh draft (kutilgan)
@@ -2650,7 +2683,7 @@ function VirtualList() {
 <details>
 <summary><strong>Javob</strong></summary>
 
-Virtualization input value'larni komponent ichida saqlasa, scroll bilan unmount/remount yuz beradi va value yo'qoladi. Yechim — value'larni parent state'da saqlash.
+Virtualization input value'larni Component ichida saqlasa, scroll bilan unmount/remount yuz beradi va value yo'qoladi. Yechim — value'larni parent state'da saqlash.
 
 ```tsx
 import { useState, useMemo, useCallback } from 'react';
@@ -2735,7 +2768,7 @@ function VirtualList() {
 **Asosiy nuqtalar:**
 
 1. **`key={item.id}`** — yangi window'da match topib, item state'i to'g'ri item bilan qoladi
-2. **Value parent state'da** — komponent unmount/remount bo'lsa ham, parent state saqlanadi
+2. **Value parent state'da** — Component unmount/remount bo'lsa ham, parent state saqlanadi
 3. **Buffer** (`startIndex - 2`, `endIndex + 4`) — scroll smooth bo'lsin uchun ko'proq render
 4. **Production** — `react-window` yoki `@tanstack/react-virtual` ishlatish tavsiya qilinadi (chunki bu sodda misol scroll restoration, dynamic height kabi murakkab case'larni qamramaydi)
 
@@ -2751,7 +2784,7 @@ To'liq kursning [`36-virtualization.md`](36-virtualization.md) bo'limi bu mavzun
 - `key` prop — Reconciliation algorithmiga node identity'ni xabarlash mexanizmi; bu — element'ning maxsus internal slot, prop emas
 - 4 ta `key` qoidasi: **unique** (parent ichida), **stable** (render'lar bo'ylab), **predictable** (deterministic), **string/number/bigint** tip
 - Index `key` sifatida **static list**'larda OK; dynamic (qo'shilish/o'chirilish/sort) yoki **stateful** item'larda anti-pattern
-- `key` o'zgarishi → komponent unmount/remount; bu state reset trick uchun foydali, lekin beixtiyor o'zgarish — bug manbai
+- `key` o'zgarishi → Component unmount/remount; bu state reset trick uchun foydali, lekin beixtiyor o'zgarish — bug manbai
 - `key` scope **parent darajasida** — boshqa parent'lardagi `key` qiymatlari bilan collision yo'q
 - Reorder operationlarida stable `key` minimal DOM operation soni va to'g'ri state preservation ta'minlaydi (cross-ref [`04-reconciliation.md`](04-reconciliation.md) — `lastPlacedIndex`)
 - `<>...</>` short Fragment `key` qabul qilmaydi — `<Fragment key="...">` ishlatish kerak

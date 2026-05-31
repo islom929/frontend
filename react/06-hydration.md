@@ -97,7 +97,7 @@ React'da SSR uchun bir nechta API mavjud:
 
 > **Eslatma:** `data-reactroot` attribute R17 va undan oldin emitted edi. R18'dan boshlab olib tashlangan — hydration marker'lar (comment node'lar) ishlatiladi. `renderToStaticMarkup` esa Suspense marker va boshqa hydration metadata'larni umuman emit qilmaydi (faqat statik HTML uchun mo'ljallangan).
 
-**`renderToString` — sinxron:**
+**`renderToString` — sync:**
 
 ```typescript
 import { renderToString } from 'react-dom/server';
@@ -118,7 +118,7 @@ res.send(`
 `);
 ```
 
-`renderToString` — **sinxron, blocking**. Butun tree render qilinmaguncha qaytmaydi. Suspense bilan ishlash cheklangan (R18'gacha umuman ishlamadi).
+`renderToString` — **sync, blocking**. Butun tree render qilinmaguncha qaytmaydi. Suspense bilan ishlash cheklangan (R18'gacha umuman ishlamadi).
 
 **`renderToReadableStream` — Web Streams (modern):**
 
@@ -137,7 +137,7 @@ const stream = await renderToReadableStream(<App />, {
 // 1. Initial shell (sync rendered) — birinchi macrotask'da
 // 2. Resolved Suspense boundary'lari — async data tayyor bo'lganda
 //
-// Promise resolve faqat shell tayyor bo'lganda (onShellReady ekvivalenti).
+// Promise resolve faqat shell tayyor bo'lganda (onShellReady callback bilan birga).
 // Streaming hali davom etadi — boundary'lar resolved bo'lganda chunk qo'shiladi.
 ```
 
@@ -168,7 +168,7 @@ app.get('/', (req, res) => {
 });
 ```
 
-`renderToPipeableStream` — Node.js streams ishlatadi. Streaming SSR'ning real-world implementationsi (Next.js, Remix shu API'ni ishlatadi).
+`renderToPipeableStream` — Node.js streams ishlatadi. Real-world streaming SSR shu API'ga tayanadi (Next.js, Remix).
 
 **Hydration internal:**
 
@@ -584,7 +584,7 @@ Hydration jarayoni quyidagi qadamlarni o'z ichiga oladi:
    ↓
 9. Commit Phase
    - BeforeMutation: snapshot (class component'lar)
-   - Mutation: ref detach (DOM struktura mutation YO'Q — event listener'lar `hydrateRoot` chaqirilganda root container'ga delegatsiya bilan ulangan, per-element emas)
+   - Mutation: ref detach (DOM struktura mutation YO'Q — event listener'lar `hydrateRoot` chaqirilganda root container'ga delegation bilan ulangan, per-element emas)
    - Layout: refs attach, useLayoutEffect, componentDidMount
    - Paint
    - Passive: useEffect
@@ -599,7 +599,7 @@ Hydration jarayoni quyidagi qadamlarni o'z ichiga oladi:
 | Hooks ishga tushishi | Ha | Ha |
 | DOM yaratish | Ha (createElement) | YO'Q (existing reuse) |
 | DOM mutation (Commit) | Ha (appendChild) | YO'Q |
-| Root container event delegation | Ha (`createRoot`'da bir marta) | Ha (`hydrateRoot`'da bir marta) — R17+ event'lar har element'ga emas, root container'ga delegatsiya orqali ulanadi |
+| Root container event delegation | Ha (`createRoot`'da bir marta) | Ha (`hydrateRoot`'da bir marta) — R17+ event'lar har element'ga emas, root container'ga delegation orqali ulanadi |
 | Mount effect'lari | Ha | Ha |
 
 ### Hydration mismatch detection
@@ -943,7 +943,7 @@ function diffHydratedProperties(
 }
 ```
 
-R18'da bu recovery **per-Suspense-boundary**. R19'da yanada yaxshilanish — element-level recovery.
+Mismatch holatda recovery **eng yaqin Suspense boundary** darajasida: shu boundary'ning kontenti client'da qaytadan render qilinadi. Boundary bo'lmasa — butun root client render'ga tushadi. R19'da recovery granularitysi o'zgarmadi, lekin error **reporting** yaxshilandi: bitta hydration error'da server va client kontentining farqi (diff) ko'rsatiladi (avval har mismatch alohida console warning edi).
 
 </details>
 
@@ -1063,7 +1063,7 @@ function App() {
 
 ### Nazariya
 
-**`suppressHydrationWarning`** — DOM element'ga qo'yiladigan **maxsus prop**. Bu prop bo'lgan element uchun React hydration mismatch warning'ni **chiqarmaydi**. Lekin **mismatch hali ham yuz beradi** — faqat warning ko'rsatilmaydi.
+**`suppressHydrationWarning`** — DOM element'ga qo'yiladigan **maxsus prop**. Bu prop bo'lgan element uchun React hydration mismatch warning'ni **chiqarmaydi** va shu element'ning text/attribute farqini **client qiymati bilan tuzatmaydi** — server HTML'dagi qiymat o'z joyida qoladi (`React will not patch mismatched text content`). Ya'ni bu prop nafaqat warning'ni bostiradi, balki shu element uchun client recovery'ni ham o'chiradi: foydalanuvchi server qiymatini ko'rishda davom etadi.
 
 ```tsx
 function CurrentTime() {
@@ -1081,7 +1081,7 @@ function CurrentTime() {
 
 1. **Tasodifiy time/date display** — "X minutes ago" indicator
 2. **A/B test variant** — server va client variant farqli bo'lishi qabul qilinadi
-3. **Critical performance** — alternativalar juda murakkab bo'lganda
+3. **Critical performance** — alternative yondashuvlar juda murakkab bo'lganda
 4. **Third-party widget** — sizning kontrolingizda emas
 
 ### Cheklovlar
@@ -1138,11 +1138,11 @@ function diffHydratedProperties(
 }
 ```
 
-`suppressHydrationWarning` faqat `__DEV__` da effect beradi (production'da warning bormaydi). Lekin developers production'da ham e'tibor berishlari kerak — mismatch hali yuz beradi (silent ravishda).
+Hydration warning'lari faqat `__DEV__`'da chiqadi (production'da prop bor-yo'qligidan qat'i nazar warning emit qilinmaydi). `suppressHydrationWarning`'ning ta'siri ikki qatlamli: (1) `__DEV__`'da bu element uchun text/attribute mismatch warning'i bostiriladi; (2) har ikkala build'da ham React shu element'ning farqli text/attribute qiymatini client render bilan **almashtirmaydi** — server HTML'dagi qiymat saqlanadi. Bu — `diffHydratedProperties` ichida prop ko'rilganda `null` qaytarib, recovery yo'lini erta uzish orqali amalga oshadi. Cheklov: faqat shu element'ning o'zi (children mismatch'lari odatdagidek qayta ishlanadi), va faqat text/attribute farqlari — tag turi (`<span>` o'rnida `<div>`) yoki struktura farqi bo'lsa, bu prop yordam bermaydi va recovery eng yaqin Suspense boundary darajasida ishlaydi.
 
 `suppressContentEditableWarning` ga o'xshash boshqa prop — `contentEditable` bo'lgan element'larda children warning'ni suppress qiladi.
 
-R17 va undan oldin: butun tree client'da qayta render qilinardi. R18+: faqat tegishli Suspense boundary qayta render qilinadi. R19: element-level recovery.
+R17 va undan oldin: mismatch'da butun tree client'da qayta render qilinardi. R18+: faqat eng yaqin Suspense boundary qayta render qilinadi (boundary bo'lmasa root). R19: recovery granularitysi o'sha — yaxshilanish error reporting'da (server/client diff'i bitta error'da ko'rsatiladi).
 
 </details>
 
@@ -1292,7 +1292,7 @@ R18'da hydration uchun maxsus lane'lar (cross-ref `05-scheduler-lanes.md`):
 | `SelectiveHydrationLane` | User interaction priority |
 | `IdleHydrationLane` | Background hydration |
 
-User click'ga `SelectiveHydrationLane` priority beriladi.
+Foydalanuvchi hali hydrate bo'lmagan boundary'ga interaction qilganda, React shu boundary'ning retry lane'ini event priority'siga ko'taradi (discrete click → yuqori priority hydration lane). `SelectiveHydrationLane` esa React boundary'larni priority tartibida birma-bir hydrate qilishini koordinatsiya qiluvchi maxsus marker lane.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1300,56 +1300,63 @@ User click'ga `SelectiveHydrationLane` priority beriladi.
 **Selective hydration mexanizmi:**
 
 ```typescript
-function attemptHydrationAtCurrentPriority(fiber) {
-  if (fiber.tag === SuspenseComponent && fiber.memoizedState !== null) {
-    const lane = pickHighestPriorityLane(fiber.lanes);
-    scheduleUpdateOnFiber(fiber, lane, eventTime);
-  }
-}
-
 function dispatchEventForPluginEventSystem(
   domEventName,
   eventSystemFlags,
   nativeEvent,
   targetInst,
-  targetContainer
+  targetContainer,
 ) {
-  if (targetInst === null) {
-    const fiber = findClosestNonHydratedFiber(targetInst);
-    if (fiber !== null) {
-      attemptToDispatchEvent(domEventName, ...);
-      attemptHydrationAtCurrentPriority(fiber);
-    }
-    return;
+  // attemptToDispatchEvent eng yaqin Fiber'ni native event target'idan topadi.
+  // Agar shu Fiber dehydrated Suspense boundary bo'lsa — null qaytaradi
+  // (event hali handler'ga yetkazib bo'lmaydi, chunki boundary hydrate bo'lmagan)
+  // va o'sha boundary'ning retry lane'ini event priority'siga ko'taradi.
+  const blockedOn = attemptToDispatchEvent(
+    domEventName,
+    eventSystemFlags,
+    targetContainer,
+    nativeEvent,
+  );
+
+  if (blockedOn !== null) {
+    // Boundary hali hydrate bo'lmagan — event'ni replay queue'ga qo'yamiz,
+    // boundary hydrate bo'lgach qayta dispatch qilinadi.
+    queueDiscreteEvent(blockedOn, domEventName, eventSystemFlags, targetContainer, nativeEvent);
   }
-  
-  dispatchEventForLegacyPluginEventSystem(...);
 }
 ```
 
 **Priority elevation example:**
 
+`attemptToDispatchEvent` qaytaruvchi qiymat: event muvaffaqiyatli dispatch qilinsa — `null` (bloklanmadi); target hali hydrate bo'lmagan dehydrated boundary'ga tushsa — o'sha **bloklovchi instance** qaytariladi (yuqoridagi `blockedOn` shu) va event replay queue'ga qo'yiladi.
+
 ```typescript
-function attemptToDispatchEvent(domEventName, eventSystemFlags, nativeEvent) {
+function attemptToDispatchEvent(domEventName, eventSystemFlags, targetContainer, nativeEvent) {
   const targetInst = getClosestInstanceFromNode(nativeEvent.target);
-  
+
   if (targetInst !== null) {
-    if (targetInst.tag === HostComponent) {
-      return targetInst;
+    const nearestMounted = getNearestMountedFiber(targetInst);
+
+    if (nearestMounted === null) {
+      // Hali hydrate bo'lmagan — keyinroq qayta urinish uchun container'ni qaytaramiz
+      return getContainerFromFiber(targetInst);
     }
-    
-    if (targetInst.tag === SuspenseComponent) {
-      const instance = targetInst.memoizedState.dehydrated;
+
+    if (nearestMounted.tag === SuspenseComponent) {
+      const instance = nearestMounted.memoizedState.dehydrated;
       if (instance !== null) {
-        const root = getRootFromHydrationContext(targetInst);
+        // Dehydrated boundary: retry lane'ini event priority'siga ko'taramiz
         const lane = getCurrentEventPriority();
-        markRetryLaneIfNotHydrated(targetInst, lane);
-        ensureRootIsScheduled(root);
-        return null;
+        markRetryLaneIfNotHydrated(nearestMounted, lane);
+        ensureRootIsScheduled(getRootForCommittedEffect(nearestMounted));
+        // Boundary'ni bloklovchi sifatida qaytaramiz — event replay qilinadi
+        return instance;
       }
     }
   }
-  
+
+  // Muvaffaqiyatli dispatch — bloklanmadi
+  dispatchEventForPlugins(domEventName, eventSystemFlags, nativeEvent, targetInst, targetContainer);
   return null;
 }
 ```
@@ -1640,7 +1647,7 @@ Bu script — minified, inline. JS bundle yuklanguncha ishlaydi.
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-Streaming SSR — full app:
+Streaming SSR — full app. `use(fetchUser())` ko'rinishidagi chaqiruvda `fetchUser`/`fetchPosts`/`fetchComments` **bir xil (cache'langan) promise** qaytarishi shart — har render'da yangi promise yaratilsa, client'da boundary cheksiz qayta suspend bo'ladi. Real ilovada bu promise framework darajasida (RSC, yoki module-level cache) barqaror saqlanadi (cross-ref Suspense bobi):
 
 ```tsx
 import { Suspense } from 'react';
@@ -1720,20 +1727,24 @@ React 19 hydration'ni quyidagi yo'nalishlarda yaxshiladi:
 R18 va undan oldin hydration mismatch uchun umumiy warning. R19'da batafsilroq diff:
 
 ```
-Hydration failed because the server rendered HTML didn't match the client.
-As a result this tree will be regenerated on the client. This can happen if
-a SSR-ed Client Component used:
+Uncaught Error: Hydration failed because the server rendered HTML didn't match
+the client. As a result this tree will be regenerated on the client. This can
+happen if an SSR-ed Client Component used:
 
 - A server/client branch `if (typeof window !== 'undefined')`.
-- Variable input such as `Date.now()` or `Math.random()`.
-- Date formatting in a user's locale that doesn't match the server.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
 - External changing data without sending a snapshot of it along with the HTML.
 - Invalid HTML tag nesting.
 
+It can also happen if the client has a browser extension installed which messes
+with the HTML before React loaded.
+
   <App>
-    <div>
-      ^ Server: "Hello"
-        Client: "World"
+    <span>
++    Client
+-    Server
+  at throwOnHydrationMismatch
 ```
 
 ### 2. Recoverable error callbacks
@@ -1762,9 +1773,9 @@ hydrateRoot(container, <App />, {
 | `onUncaughtError` | Hech qanday boundary ushlamadi (rare, fatal) |
 | `onRecoverableError` | Hydration mismatch yoki concurrent restart |
 
-### 3. Element-level recovery (R19)
+### 3. Bitta consolidated error + diff
 
-R18'da hydration mismatch bo'lganda Reconciler **yaqin Suspense boundary**'ni topib, butun shu boundary client'da qayta render qilardi. R19'da text/attribute mismatch holatida **faqat tegishli HostComponent/HostText** client'da almashtiriladi — boundary darajasiga ko'tarish shart emas:
+R18'da bitta mismatch bir nechta alohida console warning chiqarardi ("Text content did not match", "Hydration failed", "There was an error while hydrating"). R19'da bular **bitta error**ga birlashtirildi va shu error'da server hamda client kontentining farqi (diff) ko'rsatiladi — qaysi node, qaysi qiymat farq qilgani aniq:
 
 ```tsx
 function App() {
@@ -1777,65 +1788,47 @@ function App() {
   );
 }
 
-// R18: butun Suspense boundary qayta render (Header, Body, Footer hammasi)
-// R19: faqat farqli HostComponent/HostText qayta render (boundary daxlsiz)
+// R18 console: bir nechta alohida warning, qaysi node ekani noaniq
+// R19 console: bitta error + diff (Server: "..." / Client: "..." qatori bilan)
 ```
 
-> **Eslatma:** Komponent-level mismatch (masalan, server `<Article>`, client `<Comment>`) hamon **boundary-level recovery** talab qiladi. Element-level recovery faqat host-level mismatch (text content, attribute) uchun.
+> **Eslatma:** Recovery **granularitysi o'zgarmadi** — mismatch'da hamon eng yaqin Suspense boundary (boundary bo'lmasa root) client'da qayta render qilinadi. R19 yangiligi — recovery'ning o'zi emas, balki **error reporting** (consolidated message + diff).
 
-### 4. Hydration mismatch — silent recovery
+### 4. Recovery — Suspense boundary darajasida (o'zgarmagan)
 
-R17 va undan oldin hydration mismatch warning + butun tree'ni client'da qayta render edi. R18'da bu **per-Suspense-boundary recovery**'ga o'zgartirildi va `onRecoverableError` callback orqali kuzatish mumkin bo'ldi — app crash qilmaydi. R19'da mexanizm yanada precise: element-level recovery + uchinchi tomon DOM mutation'larni "external" deb tan olish.
+R17 va undan oldin hydration mismatch warning + butun tree'ni client'da qayta render edi. R18'da bu **per-Suspense-boundary recovery**'ga o'zgartirildi va `onRecoverableError` callback orqali kuzatish mumkin bo'ldi — app crash qilmaydi. R19'da bu mexanizm **o'sha**: mismatch bo'lgan boundary `ForceClientRender` flag bilan to'liq client render'ga tushadi. O'zgargani — yuqorida aytilgan error reporting.
 
-### 5. Third-party DOM modifications
+### 5. Third-party script va browser extension'larga bardosh
 
-R19 third-party browser extensions (masalan, Grammarly, AdBlock) DOM'ni o'zgartirsa — bu mismatch'ni "external" deb belgilaydi va silent ravishda recover qiladi.
+Browser extension'lar va third-party script'lar `<head>`/`<body>` ichiga kutilmagan tag'lar qo'shadi (masalan Grammarly element'lari, analytics `<script>`). R18'da bunday qo'shilgan element mismatch error va client render keltirib chiqarardi. R19'da React `<head>` va `<body>` ichidagi **kutilmagan tag'larni o'tkazib yuboradi** (skip) — mismatch hisoblanmaydi. Agar boshqa (asl) mismatch tufayli React butun document'ni qayta render qilsa ham, third-party va extension qo'shgan stylesheet'larni **joyida qoldiradi**.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**R19 hydration error pipeline:**
+**Mismatch recovery pipeline (soddalashtirilgan):**
+
+Hydration paytida mismatch topilganda React `throwOnHydrationMismatch` orqali maxsus error throw qiladi. Bu error work loop'da ushlanadi: eng yaqin **dehydrated Suspense boundary** topiladi va unga `ForceClientRender` flag o'rnatiladi — shu boundary butunlay client'da qaytadan render qilinadi (server HTML reuse qilinmaydi).
 
 ```typescript
-function recoverFromHydrationMismatch(fiber, error) {
-  const root = getRootForFiber(fiber);
-  
-  if (canRecoverElementLevel(fiber)) {
-    fiber.flags |= Placement;
-    return;
-  }
-  
-  const suspenseBoundary = findClosestSuspenseBoundary(fiber);
-  if (suspenseBoundary !== null) {
-    suspenseBoundary.flags |= ForceClientRender;
-  }
-  
-  if (root.onRecoverableError) {
-    root.onRecoverableError(error, {
-      digest: 'HYDRATION_FAILED',
-      componentStack: getComponentStack(fiber),
-    });
-  }
+function throwOnHydrationMismatch(fiber: Fiber) {
+  const error = new Error(
+    'Hydration failed because the server rendered HTML didn\'t match the client.',
+  );
+  // queueHydrationError → keyinroq root.onRecoverableError'ga uzatiladi
+  queueHydrationError(createCapturedValueAtFiber(error, fiber));
+  throw new HydrationMismatchException();
+}
+
+// Boundary darajasida recovery — completeWork / unwind paytida:
+function reenterHydrationStateFromDehydratedSuspenseInstance(suspenseFiber: Fiber) {
+  // Boundary'ni client render rejimiga o'tkazish
+  suspenseFiber.flags |= ForceClientRender;
 }
 ```
 
-**Element-level vs boundary-level recovery:**
+Boundary topilmasa (root darajasidagi mismatch) — butun root client render'ga tushadi. Recovery granularitysi shu: **node-by-node emas, balki boundary-by-boundary** (yoki root). Yagona host node'ni alohida patch qilish mexanizmi yo'q.
 
-```typescript
-function canRecoverElementLevel(fiber: Fiber): boolean {
-  if (fiber.tag === HostComponent || fiber.tag === HostText) {
-    return true;
-  }
-  
-  if (fiber.tag === FunctionComponent || fiber.tag === ClassComponent) {
-    return false;
-  }
-  
-  return false;
-}
-```
-
-DOM-level mismatch (text, attribute) — element-level recovery. Komponent-level mismatch — boundary-level.
+`onRecoverableError` esa hydration recovery sodir bo'lganda chaqiriladi — `errorInfo.componentStack` bilan, lekin app'ni crash qilmasdan.
 
 </details>
 
@@ -1888,23 +1881,25 @@ hydrateRoot(container, <App />, {
 });
 ```
 
-R19 mismatch handling silent:
+R19 mismatch error reporting:
 
 ```tsx
 function CurrentTime() {
   return <span>{new Date().toLocaleTimeString()}</span>;
 }
 
-// R18 console:
+// R18 console: bir nechta alohida warning
 // "Warning: Text content did not match..."
 // "Hydration failed because..."
+// "There was an error while hydrating..."
 
-// R19 console:
-// (silent — faqat onRecoverableError chaqiriladi)
-// User'ga ko'rinmaydi
+// R19 console: bitta consolidated error + diff (qaysi node, qaysi qiymat)
+// va parallel ravishda onRecoverableError chaqiriladi.
+// Eslatma: app crash qilmaydi (boundary client render bilan recover qiladi),
+// lekin error console'da hamon ko'rinadi — "silent" emas.
 ```
 
-Browser extension handling (R19 silent):
+Browser extension attribute'lari hydration'ni buzmaydi:
 
 ```tsx
 function App() {
@@ -1914,7 +1909,8 @@ function App() {
 // Server HTML: <div>Hello, world</div>
 // Client (Grammarly bilan): <div data-gramm="false">Hello, world</div>
 
-// R19: silent — recognize external modification
+// React kontrol qilmaydigan extra attribute → mismatch hisoblanmaydi (R18+).
+// React faqat o'zi render qilgan prop'larni solishtiradi.
 ```
 
 </details>
@@ -1963,11 +1959,14 @@ function App() {
 ### Initial state — server initial bilan mos kelishi
 
 ```tsx
+// ❌ Lazy initializer server va client'da har xil qiymat → text mismatch
 function Counter() {
   const [count, setCount] = useState(() => Math.random());
   return <p>{count}</p>;
 }
 ```
+
+`useState`'ning lazy initializer'i server render'da bir marta, client hydration'da yana bir marta ishlaydi (state SSR'dan uzatilmaydi). Determinatsiyalanmagan qiymat (random, time) bo'lsa — mismatch. Yechim: deterministic seed prop sifatida server'dan uzatish yoki `useEffect`'da set qilish.
 
 ---
 
@@ -1999,7 +1998,7 @@ function App({ user }: { user: User | null }) {
 
 Yechim 1: server'dan client'ga user'ni serialize qilish
 Yechim 2: useEffect ichida fetch user
-Yechim 3: framework (Next.js) — getInitialProps yoki RSC
+Yechim 3: framework (Next.js) — App Router'da Server Component (RSC), Pages Router'da `getServerSideProps`
 
 ---
 
@@ -2235,7 +2234,7 @@ T=100: Hydration boshlanadi
 
 T=150: User Comments tugmasini bosdi
   - React click event'ni "ushlaydi"
-  - Comments boundary'ga SelectiveHydrationLane priority elevation
+  - Comments boundary'ning hydration lane'i click event priority'siga ko'tariladi (priority elevation)
   - Sidebar va Article hydration KECHIKTIRILADI (priority pasayadi, Scheduler interleave qiladi — to'xtatilmaydi)
   - Click event sync dispatch qilinadi (Comments hydration tugaganda)
 
@@ -2265,12 +2264,14 @@ C. R18 Streaming SSR
 <details>
 <summary><strong>Javob</strong></summary>
 
+**Illustrative comparison** (real raqamlar app data hajmi, network, server load'ga bog'liq — quyidagi taxminiy qiymatlar 3G connection + 1.5s server data fetch scenario uchun):
+
 | Metric | A (SPA) | B (Pre-R18 SSR) | C (R18 Streaming) |
 |--------|---------|-----------------|-------------------|
-| FCP | 200ms (skeleton) | 1600ms (to'liq) | 200ms (skeleton) |
-| TTI (initial) | 200ms | 1750ms | 350ms |
-| LCP | 1700ms | 1600ms | 900ms |
-| SEO | ❌ | ✅ | ✅ |
+| FCP | ~200ms (skeleton) | ~1600ms (to'liq HTML) | ~200ms (initial shell) |
+| TTI (initial) | ~200ms | ~1750ms | ~350ms (partial) |
+| LCP | ~1700ms | ~1600ms | ~900ms |
+| SEO | ❌ (JS execute kerak) | ✅ | ✅ |
 
 C — eng yaxshi UX (FCP tez, LCP tez, SEO friendly).
 
@@ -2301,21 +2302,18 @@ R18 va R19'da nima farqli?
 <details>
 <summary><strong>Javob</strong></summary>
 
-**R18 (boundary-level recovery):**
+**R18 error reporting:**
 
-- Console warning: text content mismatch
-- Suspense boundary butunlay client'da qayta render
-- Header, CurrentTime, Footer — barcha unmount + remount
-- Foydalanuvchi flicker ko'radi
+- Bir nechta alohida console warning ("Text content did not match", "Hydration failed", "There was an error while hydrating")
+- Qaysi node mismatch qilgani message'dan aniq emas
+- `onRecoverableError` chaqiriladi
 
-**R19 (element-level recovery):**
+**R19 error reporting:**
 
-- onRecoverableError callback (silent log)
-- Faqat `<p>` element replace qilinadi
-- Header va Footer daxlsiz
-- DOM identity saqlanadi
+- Bitta consolidated error + diff (`<App>` / `<p>` ostida `+ Client` / `- Server` qatori) — qaysi node, qaysi qiymat farq qilgani aniq
+- `onRecoverableError` R18'dagi bilan bir xil chaqiriladi
 
-R19 UX sezilarli yaxshilangan — kichikroq subtree qayta render, foydalanuvchi flicker'ni kamroq ko'radi.
+**Recovery — har ikkalasida bir xil:** `Date.now()` mismatch'i eng yaqin Suspense boundary'ni `ForceClientRender` bilan to'liq client render'ga tushiradi — Header, CurrentTime, Footer hammasi shu boundary ichida client'da qayta quriladi. R19'da recovery granularitysi **o'zgarmadi**; o'zgargani — error'ni o'qib, sababini topish osonlashdi (diff).
 
 </details>
 
@@ -2332,7 +2330,7 @@ Bu bo'limda Hydration mexanizmi yoritildi:
 - **`suppressHydrationWarning`** — aniq nuqtada warning suppress
 - **Selective hydration (R18)** — Suspense boundary'lar mustaqil hydrate
 - **Streaming hydration (R18)** — server qism-qism HTML yuboradi
-- **R19 improvements** — better errors, recoverable callbacks, element-level recovery
+- **R19 improvements** — consolidated error + diff, `onCaughtError`/`onUncaughtError` callbacks, `<head>`/`<body>`'dagi third-party tag'larni skip qilish
 
 **QISM 2 (REACT INTERNALS) TUGADI** ✅
 
@@ -2341,7 +2339,7 @@ Kursning **fundamental qismi** quyidagi fayllarni qamrab oladi:
 - `02-rendering.md` — Render + Commit Phases
 - `03-fiber-architecture.md` — Fiber tree
 - `04-reconciliation.md` — Diffing algorithm
-- `05-scheduler-lanes.md` — Priority sistemasi
+- `05-scheduler-lanes.md` — Priority system
 - `06-hydration.md` — SSR + client attachment
 
 Keyingi qismlardan boshlab — practical React (JSX, Components, State, Hooks). Internals'ni tushungandan keyin, har keyingi mavzu **shu asosga quriladi**.

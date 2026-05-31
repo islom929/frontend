@@ -728,15 +728,14 @@ function Counter() {
 **Strict Mode dev behavior:**
 
 ```tsx
-// Dev:
-// First mount cycle:
+// Dev (StrictMode double-invokes the render function):
 //   1. Render → renderCount = 1
-//   2. (synthetic unmount)
-//   3. Re-render → renderCount = 2
+//   2. Render again (same fiber, no unmount) → renderCount = 2
+//   Only the second render's output commits.
 // → Final UI: 2
 
 // Production:
-//   Mount → renderCount = 1
+//   Render once → renderCount = 1
 // → UI: 1
 ```
 
@@ -1247,8 +1246,8 @@ function Card({ title, children }: CardProps & { children?: ReactNode }) { ... }
 const children = "Hello";          // string
 const children = <p>Hello</p>;     // ReactElement
 const children = [<p key="1" />, <p key="2" />];  // array
-const children = null;              // null — render output bo'sh, lekin Children.count uni hisoblaydi
-const children = false;             // boolean — render output bo'sh, lekin Children.count uni hisoblaydi
+const children = null;              // null — render output bo'sh, Children.count(null) → 0
+const children = false;             // boolean — render output bo'sh, lekin Children.count(false) → 1
 const children = 42;                // number (rendered as text)
 ```
 
@@ -1369,9 +1368,9 @@ Pros/cons:
 
 ### Edge Cases
 
-- **`children` as function**: Not standard JSX (transpiled differently). Render prop pattern.
-- **Multiple `children`**: Always array under hood.
-- **`null` child**: Skipped.
+- **`children` as function**: Standard JSX — funksiya `{...}` expression child sifatida `children` prop'iga uzatiladi. Component uni chaqirib render qiladi (render prop pattern). React.ReactNode emas, `(args) => ReactNode` type.
+- **Multiple `children`**: Bitta child — `children` o'sha qiymat (array emas); ikki yoki undan ortiq child — `children` array bo'ladi.
+- **`null` child**: Render output'da skip qilinadi.
 
 ### Follow-up savollar
 
@@ -2387,7 +2386,7 @@ Class still required for error boundaries. Hooks alternative — `react-error-bo
 
 - "When inheritance OK?" — Almost never in React. Error boundaries class only.
 - "Custom hooks vs HOC?" — Custom hooks preferred (R16.8+). HOC legacy.
-- "Tightly coupled components?" — Compound components pattern (Q23).
+- "Tightly coupled components?" — Compound components pattern (Q27).
 
 </details>
 
@@ -2427,7 +2426,7 @@ function Card({ image, title, description, actions }: CardProps) {
 <Card
   image={<img src="/photo.jpg" alt="" />}
   title={<h2>Product Name</h2>}
-  description={<p>Lorem ipsum...</p>}
+  description={<p>Wireless headphones, 30-hour battery</p>}
   actions={
     <>
       <button>Buy</button>
@@ -2530,7 +2529,7 @@ function Card({ children }: { children: ReactNode }) {
 </Card>
 ```
 
-**Compound components (Q23) — slot variant:**
+**Compound components (Q27) — slot variant:**
 
 ```tsx
 function Card({ children }: { children: ReactNode }) {
@@ -2983,7 +2982,7 @@ function UserBadge({ user, setUser }) {
 }
 
 // "Prop drilling" — mid components forward props they don't use
-// Solution: Context (Q24)
+// Solution: Context (Q16)
 ```
 
 **When NOT to lift:**
@@ -4076,7 +4075,7 @@ function dispatchEvent(nativeEvent: Event) {
 | Delegation root | `document` | root container (`createRoot` element) |
 | Multiple React versions | ❌ Conflicts | ✅ Each app independent |
 | Microfrontends | Hard | Easier |
-| `e.stopPropagation()` outside React | Doesn't stop React handlers | Stops them (root level) |
+| React handler `e.stopPropagation()` effect on native `document` listener | Stops it (React + native both at `document`) | Does NOT stop it (React at root container, native `document` listener still fires) |
 
 ### Kod misoli
 
@@ -4148,21 +4147,16 @@ function listenToAllSupportedEvents(rootContainerElement: Element) {
   ];
 
   supportedEvents.forEach(eventType => {
-    rootContainerElement.addEventListener(
-      eventType,
-      dispatchDiscreteEvent,
-      { capture: false }
-    );
-    rootContainerElement.addEventListener(
-      eventType,
-      dispatchContinuousEvent,
-      { capture: true }  // for some
-    );
+    // Har event type uchun bubble + capture fazasiga listener registratsiya qilinadi.
+    // dispatch funksiyasi event'ning priority class'iga qarab tanlanadi
+    // (discrete/continuous/default) — faza emas, balki priority belgilaydi.
+    rootContainerElement.addEventListener(eventType, dispatchEvent, { capture: false });
+    rootContainerElement.addEventListener(eventType, dispatchEvent, { capture: true });
   });
 }
 ```
 
-R17+ attaches ~70 listeners to root container, not document.
+R17+ delegated listener'larni root container'ga registratsiya qiladi (document emas), har event type uchun bubble va capture fazasida.
 
 **Microfrontends benefit:**
 
@@ -4259,17 +4253,19 @@ function dispatchEvent(nativeEvent: Event) {
     current = current.return;  // up React tree
   }
 
-  // Capture phase (top-down)
-  handlers.reverse().forEach(({ handler }) => {
-    if (syntheticEvent.isPropagationStopped()) return;
-    handler(syntheticEvent);
-  });
+  // handlers — bottom-up order (target fiber first, then .return ancestors)
 
-  // Bubble phase (bottom-up)
-  handlers.forEach(({ handler }) => {
-    if (syntheticEvent.isPropagationStopped()) return;
-    handler(syntheticEvent);
-  });
+  // Capture phase (top-down): iterate ancestors → target
+  for (let i = handlers.length - 1; i >= 0; i--) {
+    if (syntheticEvent.isPropagationStopped()) break;
+    handlers[i].handler(syntheticEvent);
+  }
+
+  // Bubble phase (bottom-up): iterate target → ancestors
+  for (let i = 0; i < handlers.length; i++) {
+    if (syntheticEvent.isPropagationStopped()) break;
+    handlers[i].handler(syntheticEvent);
+  }
 }
 ```
 
@@ -5095,9 +5091,9 @@ useEffect(() => {
   return () => window.removeEventListener("scroll", handler);
 }, []);  // count stale
 
-// ✅ Latest via useRef
+// ✅ Latest via useRef (ref'ni effect ichida yangilash — render body emas)
 const countRef = useRef(count);
-countRef.current = count;
+useEffect(() => { countRef.current = count; });
 useEffect(() => {
   const handler = () => console.log(countRef.current);
   window.addEventListener("scroll", handler);
@@ -5114,7 +5110,7 @@ function useEventListener<K extends keyof WindowEventMap>(
   options?: AddEventListenerOptions
 ) {
   const handlerRef = useRef(handler);
-  handlerRef.current = handler;
+  useLayoutEffect(() => { handlerRef.current = handler; });
 
   useEffect(() => {
     const wrapped = (e: WindowEventMap[K]) => handlerRef.current(e);
@@ -6412,10 +6408,13 @@ const reversed = Children.toArray(children).reverse();
 // - boolean (render output'da ko'rinmaydi)
 
 // Children.map handles all cases
-// MUHIM: Children.toArray va Children.map null/undefined/boolean children'larni
-// natijadan filter qiladi. Children.count esa null/false'ni hisobga olishi mumkin —
-// aniq behavior React versiyasi va children shaklingiga bog'liq.
-Children.map(children, fn)  // safe — null/undefined/boolean'larni avtomatik filter qiladi
+// MUHIM: mapChildren'ning birinchi guard'i `children == null` (loose) — faqat top-level
+// null va undefined erta return qiladi → Children.count(null) va Children.count(undefined) → 0.
+// Top-level `false` esa bu guard'dan o'tadi (false == null → false): mapIntoArray uni
+// boolean sifatida null'ga aylantiradi, lekin callback baribir bir marta chaqiriladi →
+// Children.count(false) → 1. Array ICHIDAGI null/false ham hisoblanadi (har biri count'ga 1).
+// Barcha holatlarda null/false/undefined output array'ga PUSH qilinmaydi (mappedChild == null check).
+Children.map(children, fn)  // null/undefined/boolean output'dan filter qilinadi
 ```
 
 **`Children.toArray` — auto keys:**
@@ -7051,7 +7050,7 @@ class ErrorBoundary extends Component {
 
 - Hooks haven't replicated `getDerivedStateFromError` (returning state from error)
 - React core decision: error boundary needs synchronous state update on render error
-- R19+ root callbacks alternative (Q28)
+- R19+ root callbacks alternative (Q33)
 
 **What error boundaries catch:**
 
@@ -8440,8 +8439,8 @@ export function ClientPortal({ children }: { children: React.ReactNode }) {
 **Why server-side issue:**
 
 - Server: no DOM (`document`, `window` undefined)
-- `createPortal` needs container DOM node
-- React skips portals during `renderToString` (R18+) — but call still throws if we try to access `document`
+- `createPortal` ikkinchi argumentda real DOM container node talab qiladi — server'da bunday node yo'q
+- Portal content server HTML output'iga chiqmaydi (portal client-only konsepsiya); muammo esa odatda undan oldin yuzaga keladi — `createPortal(children, document.body)` chaqirig'idagi `document` access server'da `ReferenceError`/`undefined` beradi
 
 **Hydration with portals:**
 

@@ -8,14 +8,14 @@
 
 ## Mundarija
 
-- [**QISM A: Hooks Fundamentals** (savollar 1-5)](#qism-a)
-- [**QISM B: useState** (savollar 6-9)](#qism-b)
-- [**QISM C: useEffect** (savollar 10-15)](#qism-c)
-- [**QISM D: useLayoutEffect va useInsertionEffect** (savollar 16-18)](#qism-d)
-- [**QISM E: useRef** (savollar 19-23)](#qism-e)
-- [**QISM F: useContext** (savollar 24-27)](#qism-f)
-- [**QISM G: useReducer** (savollar 28-30)](#qism-g)
-- [**QISM H: useMemo va useCallback** (savollar 31-34)](#qism-h)
+- [**QISM A: Hooks Fundamentals** (savollar 1-7)](#qism-a)
+- [**QISM B: useState** (savollar 8-12)](#qism-b)
+- [**QISM C: useEffect** (savollar 13-19)](#qism-c)
+- [**QISM D: useLayoutEffect va useInsertionEffect** (savollar 20-23)](#qism-d)
+- [**QISM E: useRef** (savollar 24-29)](#qism-e)
+- [**QISM F: useContext** (savollar 30-34)](#qism-f)
+- [**QISM G: useReducer** (savollar 35-38)](#qism-g)
+- [**QISM H: useMemo va useCallback** (savollar 39-43)](#qism-h)
 - [**QISM I: Concurrent Hooks (R18)** (savollar 44-49)](#qism-i)
 - [**QISM J: R19 Hooks** (savollar 50-53)](#qism-j)
 - [**QISM K: Custom Hooks** (savollar 54-56)](#qism-k)
@@ -709,7 +709,7 @@ Class state — single object, indexing yo'q (key-based access). Hooks — call 
 
 ### Follow-up savollar
 
-- "Why React doesn't enforce at runtime?" — Performance. Linter sufficient for dev.
+- "Why React doesn't statically prevent conditional hooks at runtime?" — Runtime React faqat hook **soni** mos kelmasligini ushlaydi ("Rendered more/fewer hooks") va throw qiladi, lekin qaysi qoida buzilganini (condition? loop?) aniqlay olmaydi. `rules-of-hooks` ESLint plugin'i statik tahlil bilan sababni dev vaqtida ko'rsatadi.
 - "Conditional rendering after hooks — OK?" — Yes. Hooks always called, then conditional render: `if (loading) return <Spinner />;`
 - "useEffect inside if — alternative?" — Always call hook, conditional logic inside: `useEffect(() => { if (cond) doSomething(); }, [cond]);`
 
@@ -1399,29 +1399,29 @@ function Component() {
 
 // First render:
 // useState — mount path → count = 0
-// setCount(1) called → schedule re-render
+// setCount(1) called → render-phase update queued on WIP hook
 // Continue render (count=0 used in JSX)
-// Render finishes
-// React detects pending update → re-render immediately
-// Second render (within same render batch):
-// useState — UPDATE path (alternate now exists from first WIP commit? actually not yet committed...)
+// Render finishes, React detects render-phase update
+// React re-runs Component synchronously (no commit between):
+// useState — RERENDER path (HooksDispatcherOnRerender)
+//   reads WIP hooks list, applies queued update → count = 1
 ```
 
-This "render-phase update" — React handles by completing first render, then re-rendering with queued state. Pure render constraint important.
+This "render-phase update" — `setState` chaqirilsa current render commit qilinmasdan turib React `Component`'ni qayta ishga tushiradi. Bu rerender uchun alohida dispatcher (`HooksDispatcherOnRerender`) ishlatiladi — u `alternate`'dan emas, **joriy WIP hooks list**'idan o'qiydi va queue'dagi update'ni qo'llaydi. Render-phase update faqat render davomida joriy komponent o'z state'ini yangilaganda ishlaydi; pure render constraint shu sababdan muhim.
 
 **Server Components dispatcher:**
 
 ```typescript
 // React Server Component renderer
 const ServerHooksDispatcher = {
-  useState: () => { throw new Error("useState not available in Server Components"); },
-  useEffect: () => { throw new Error("useEffect not available in Server Components"); },
-  useContext: readServerContext,  // Server Context allowed
-  use: serverUse,  // R19 — `use(promise)` in server
+  useState: () => { throw new Error("useState is not supported in Server Components"); },
+  useEffect: () => { throw new Error("useEffect is not supported in Server Components"); },
+  useContext: readContext,  // default value bilan context o'qish mumkin
+  use: serverUse,  // R19 — `use(promise)` server'da ishlaydi
 };
 ```
 
-Server context — different dispatcher. Most hooks throw (no state in RSC).
+Server Component dispatcher state va effect hooks'ni throw qiladi (server'da state yo'q). `use(promise)` server'da ishlaydi. Context o'qish cheklangan — Provider client tomonda bo'lgani uchun Server Component faqat default value'ni oladi.
 
 **Dispatcher access in module-level code:**
 
@@ -1449,7 +1449,7 @@ function Component() {
 
 - "Why not just check `current === null` per hook?" — Performance. Dispatcher swap once per render vs N times per render.
 - "Custom dispatcher possible?" — `react/__internal` access yes (for testing libraries). Not recommended for app code.
-- "Server-side hooks?" — Limited. RSC has restricted dispatcher. SSR (`react-dom/server`) — most hooks no-op or throw for state.
+- "Server-side hooks?" — Limited. RSC (Server Component) dispatcher state hooks'ni throw qiladi. SSR (`react-dom/server`) — `useState`/`useReducer` initial state'ni qaytaradi (update yo'q, bir martalik render), `useEffect`/`useLayoutEffect` server'da ishlamaydi (no-op), `useId` ishlaydi.
 
 </details>
 
@@ -1869,11 +1869,15 @@ Server render — different dispatcher (no commit, no effects).
 **Multiple React instances (microfrontends) — dispatcher conflict:**
 
 ```javascript
-// 2 React versions in same page — separate ReactCurrentDispatcher refs
+// 2 React versions in same page — separate dispatcher refs
 // Mixed hooks → Error: dispatcher mismatch
 ```
 
 Avoid via single React instance, peer dependencies.
+
+**R18 vs R19 nom:**
+
+R18'da bu field `ReactCurrentDispatcher.current` deb atalgan. R19'da `ReactSharedInternals` qayta tashkil qilindi — dispatcher endi `ReactSharedInternals.H` (`H` — Hooks) orqali ochiladi. Mexanizm bir xil (render time'da swap qilinadigan mutable ref), faqat ichki nomi o'zgargan. Ikkalasi ham `react` paketining ichki `__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE` (R19) maydoni — public API emas.
 
 </details>
 
@@ -2645,15 +2649,17 @@ dispatch({ type: "increment" });  // no closure issue
 **`flushSync` vs functional:**
 
 ```tsx
-// flushSync — sync render between updates
-flushSync(() => setCount(count + 1));
-// After flushSync, count updated
-flushSync(() => setCount(count + 1));  // count from CURRENT render (after first sync)
+// flushSync — har chaqiruvdan keyin sinxron render majburlaydi
+flushSync(() => setCount(count + 1));  // count=0 closure → 1, sinxron commit
+flushSync(() => setCount(count + 1));  // count HALI 0 (closure o'zgarmaydi) → 1
+// Natija: 1, 3 emas — closure binding render orasida yangilanmaydi
 
-// vs functional (no flushSync needed)
-setCount(prev => prev + 1);
-setCount(prev => prev + 1);
+// ✅ functional — flushSync kerak emas, closure trap yo'q
+setCount(prev => prev + 1);  // 0 → 1
+setCount(prev => prev + 1);  // 1 → 2
 ```
+
+`flushSync` render'ni sinxron majburlaydi, lekin joriy handler ichidagi `count` closure o'zgarmaydi — keyingi `count + 1` ham o'sha eski qiymatdan hisoblanadi. Dependent update uchun functional update yagona to'g'ri yo'l.
 
 **TypeScript:**
 
@@ -3745,13 +3751,13 @@ The effect handles all 3 lifecycle methods because it's about **keeping data in 
 
 Ask: "What is this effect synchronizing?"
 
-| Answer | Effect | Notes |
-|--------|--------|-------|
-| Subscription with id | `useEffect(() => sub(id), [id])` | OK |
-| Document title with state | `useEffect(() => { doc.title = x }, [x])` | OK |
-| Computed value | NOT an effect — compute in render |
-| Event response | NOT an effect — event handler |
-| Initial-only setup | NOT an effect (probably) — useState lazy |
+| Nima sinxronlanmoqda? | To'g'ri yechim |
+|------------------------|----------------|
+| Subscription with id | `useEffect(() => sub(id), [id])` — effect |
+| Document title with state | `useEffect(() => { doc.title = x }, [x])` — effect |
+| Computed value | Effect EMAS — render'da hisoblash |
+| Event response | Effect EMAS — event handler |
+| Initial-only setup | Effect EMAS — `useState` lazy initializer |
 
 </details>
 
@@ -3983,18 +3989,18 @@ useEffect(() => {
 
 **Reactive vs non-reactive:**
 
-```tsx
-// Reactive (changes between renders) — must be in deps
-const props.id;       // can change
-state.count;          // can change
-context value;        // can change
-non-stable references; // function/object literals
+```text
+Reactive (render'lar orasida o'zgaradi) — deps'da bo'lishi shart:
+  - props (props.id)
+  - state (count)
+  - context value
+  - render ichida yaratilgan function/object literal (har gal yangi reference)
 
-// Non-reactive (stable) — DON'T add to deps
-useState's setter;   // stable
-useReducer's dispatch; // stable
-useRef's ref object;  // stable
-useRef.current;        // changes but not reactive (ref pattern)
+Non-reactive (stable) — deps'ga QO'SHILMAYDI:
+  - useState setter (setState) — stable identity
+  - useReducer dispatch — stable identity
+  - useRef ref object (ref) — stable identity
+  - ref.current — o'zgaradi, lekin reactive emas (mutatsiya re-render tetiklamaydi)
 ```
 
 **Empty deps `[]` — common errors:**
@@ -4511,7 +4517,7 @@ useEffect(() => {
 
 ### Edge Cases
 
-- **Cleanup throws**: React still continues. Error not caught by error boundary (post-commit).
+- **Cleanup throws**: React xatoni `captureCommitPhaseError` orqali ushlaydi va eng yaqin Error Boundary'ga uzatadi (`getDerivedStateFromError`/`componentDidCatch`). Cleanup xato tashlasa, qolgan cleanup'lar bajarilishini buzishi mumkin — cleanup pure va xatosiz bo'lishi tavsiya etiladi.
 - **Cleanup with `setState`**: Allowed — state queued for next render.
 - **Conditional cleanup**: Return `() => {}` if condition met, otherwise return undefined? Better: always return function.
 
@@ -4620,7 +4626,7 @@ function User({ id }: { id: string }) {
 // 4. New fetch starts
 ```
 
-**Yechim 3: useId / latest pattern:**
+**Yechim 3: latest ref pattern (ref bilan oxirgi id'ni saqlash):**
 
 ```tsx
 function User({ id }: { id: string }) {
@@ -6010,7 +6016,7 @@ Both sync in Layout sub-phase.
 
 **Concurrent rendering implication:**
 
-`useLayoutEffect` blocks paint — long sync work delays UI. Especially bad with concurrent rendering (yieldsiz mid-render).
+`useLayoutEffect` Commit Phase'da sinxron ishlaydi va paint'ni bloklaydi — uzun sync ish UI'ni kechiktiradi. Commit Phase hech qachon interrupt qilinmaydi (Render Phase'dan farqli), shuning uchun layout effect ichidagi og'ir hisoblash to'g'ridan-to'g'ri jank keltiradi.
 
 Best practice: keep `useLayoutEffect` minimal.
 
@@ -6421,10 +6427,10 @@ Yechim: useInsertionEffect Mutation OLDIDAN ishlaydi
 
 ```tsx
 useInsertionEffect(() => {
-  // ❌ NO refs.current — refs not yet attached
-  ref.current?.style.color = "red";
+  // ❌ ref.current — refs hali attach qilinmagan (null bo'ladi)
+  if (ref.current) ref.current.style.color = "red";
 
-  // ❌ NO setState — would trigger re-render
+  // ❌ setState — re-render tetiklaydi, bu fazada taqiqlanadi
   setState(newValue);
 
   // ✅ DOM mutation (style injection)
@@ -6832,7 +6838,7 @@ function MyComponent() {
 
 - "Why ref doesn't trigger render?" — Mutating object property doesn't tell React. Only setState/dispatch trigger.
 - "useRef vs let in component?" — let resets each render. useRef persists.
-- "Multiple refs to same DOM?" — Use ref forwarding or callback refs (see Q23).
+- "Multiple refs to same DOM?" — Use ref forwarding or callback refs (savol 28).
 
 </details>
 
@@ -6845,7 +6851,7 @@ function MyComponent() {
 
 ### Qisqa javob
 
-**R18 `forwardRef`** — `ref` prop'ini child komponentga **forward** qilish uchun wrapper. R18'da ref oddiy prop'dek pass qilinmaydi. **R19 ref as prop** — `forwardRef` kerak emas, `ref` oddiy prop. Mavjud `forwardRef` kod hali ishlaydi (deprecated, lekin olib tashlanmagan), yangi kod ref'ni oddiy prop sifatida qabul qiladi. Migration optional.
+**R18 `forwardRef`** — `ref` prop'ini child komponentga **forward** qilish uchun wrapper. R18'da ref oddiy prop'dek pass qilinmaydi. **R19 ref as prop** — `forwardRef` kerak emas, `ref` oddiy prop. R19'da `forwardRef` deprecated EMAS — console warning yo'q, mavjud kod to'liq ishlaydi. React jamoasi kelajakdagi versiyada deprecate qilishni rejalashtirgan (codemod bilan), lekin R19'da emas. Yangi kod ref'ni oddiy prop sifatida qabul qiladi. Migration optional.
 
 ### Kod misoli
 
@@ -6992,7 +6998,7 @@ function Input({ ref, ...props }: Props & { ref?: React.Ref<{ focus: () => void 
 ### Follow-up savollar
 
 - "Why R19 changed?" — DX, simpler types, no wrapper boilerplate.
-- "forwardRef deprecated?" — R19'da deprecated (console warning). Lekin olib tashlanmagan, mavjud kod ishlaydi. Yangi kod uchun ref as prop tavsiya.
+- "forwardRef deprecated?" — R19'da deprecated EMAS, console warning yo'q, mavjud kod to'liq ishlaydi. Kelajakdagi versiyada deprecate rejalashtirilgan (codemod bilan). Yangi kod uchun ref as prop tavsiya.
 - "Class components ref?" — Class instances accept ref by default — refers to instance.
 
 </details>
@@ -7774,28 +7780,27 @@ function ThemedButton() {
 
 **Internal:**
 
-```typescript
-function createContext<T>(defaultValue: T): React.Context<T> {
+```javascript
+function createContext(defaultValue) {
   const context = {
     $$typeof: REACT_CONTEXT_TYPE,
+    _currentValue: defaultValue,
+    _currentValue2: defaultValue,  // ikkilamchi renderer uchun
+    _threadCount: 0,
     Provider: null,
     Consumer: null,
-    _currentValue: defaultValue,
-    _currentValue2: defaultValue,  // for secondary renderer
-    _threadCount: 0,
   };
-  context.Provider = {
-    $$typeof: REACT_PROVIDER_TYPE,
-    _context: context,
-  };
+  // R19: alohida REACT_PROVIDER_TYPE obyekti olib tashlandi —
+  // context obyektining o'zi renderable, shu sababli Provider === context.
+  // R18'da Provider alohida { $$typeof: REACT_PROVIDER_TYPE, _context } obyekt edi.
+  context.Provider = context;
   context.Consumer = context;
   return context;
 }
 
-function useContext<T>(context: React.Context<T>): T {
-  // Subscribe fiber to this context
+function useContext(context) {
   const dispatcher = ReactCurrentDispatcher.current;
-  return dispatcher.readContext(context);
+  return dispatcher.readContext(context);  // _currentValue'ni o'qiydi
 }
 ```
 
@@ -8175,7 +8180,7 @@ External store + selector = fine-grained subscription.
 
 ### Qisqa javob
 
-**R19 ikki yangilik**: (1) **`<Context value>`** — `<Context.Provider>` o'rniga to'g'ridan-to'g'ri Context as JSX (`<Context.Provider>` R19'da deprecated, console warning chiqadi), (2) **`use(context)`** — `useContext`'dan farqli, **conditional / loop ichida** ishlatilishi mumkin (Rules of Hooks bypass — `use()` hook emas, special function).
+**R19 ikki yangilik**: (1) **`<Context value>`** — `<Context.Provider>` o'rniga to'g'ridan-to'g'ri Context as JSX. R19'da `<Context.Provider>` deprecated EMAS (console warning yo'q) — React jamoasi kelajakdagi versiyada deprecate qilishni e'lon qilgan, codemod bilan, (2) **`use(context)`** — `useContext`'dan farqli, **conditional / loop ichida** ishlatilishi mumkin (Rules of Hooks bypass — `use()` hook emas, special function).
 
 ### Kod misoli
 
@@ -8238,7 +8243,7 @@ Less verbose, JSX cleaner. Functional equivalence.
 
 **`<Context.Provider>` deprecated?**
 
-R19'da deprecated (console warning chiqadi). Lekin hali olib tashlanmagan — ikkala syntax ishlaydi. Yangi kod uchun `<Context value>` tavsiya.
+R19'da deprecated EMAS — console warning yo'q, ikkala syntax to'liq ishlaydi. React jamoasi kelajakdagi versiyada deprecate qilishni rejalashtirgan (codemod bilan). Yangi kod uchun `<Context value>` tavsiya.
 
 **`use(context)` semantics:**
 
@@ -8610,26 +8615,27 @@ memo helps for non-context re-renders, doesn't help context changes.
 
 ```tsx
 // Default value
-const ThemeContext = createContext<"light" | "dark">("light");
+const ThemeContext = createContext<"light" | "dark" | undefined>("light");
 
 function ThemedButton() {
   const theme = useContext(ThemeContext);  // ✅ Provider yo'q bo'lsa "light"
-  return <button className={theme}>Click</button>;
+  return <button className={theme ?? "light"}>Click</button>;
 }
 
-// Without Provider
+// Provider yo'q
 <ThemedButton />  // theme = "light" (default)
 
-// With Provider
+// Provider bilan
 // R19: <ThemeContext value="dark">
 // R18: <ThemeContext.Provider value="dark">
 <ThemeContext value="dark">
   <ThemedButton />  // theme = "dark" (Provider value)
 </ThemeContext>
 
-// Provider value=undefined → STILL undefined (NOT default)
-<ThemeContext value={undefined as any}>
-  <ThemedButton />  // theme = undefined (warning at runtime)
+// Provider value={undefined} → default ISHLATILMAYDI, theme = undefined.
+// undefined — to'liq haqiqiy value, default'ga qaytmaydi (React warning ham chiqmaydi).
+<ThemeContext value={undefined}>
+  <ThemedButton />  // theme = undefined (default "light" emas)
 </ThemeContext>
 ```
 
@@ -8690,11 +8696,12 @@ function MyComponent({ shouldRead }: { shouldRead: boolean }) {
 **Default value gotchas:**
 
 ```tsx
-// ❌ Default with side effects
+// ❌ Default'da real implementation — Provider unutilsa jimgina ishlaydi
 const ApiContext = createContext({
-  fetchUser: () => fetch("/api/user"),  // function executes on default
+  fetchUser: () => fetch("/api/user"),
 });
-// If Provider missing, fetchUser called repeatedly
+// Provider yo'q bo'lsa consumer default fetchUser'ni chaqiradi —
+// xato yashirinadi (Provider unutilgani bilinmaydi). undefined default + throw afzal.
 ```
 
 </details>
@@ -9075,7 +9082,7 @@ function useThunkReducer<S, A, T>(
 
 - "useState bilan multiple values vs useReducer?" — 2-3 unrelated values: useState. Related, complex transitions: useReducer.
 - "Reducer test qilish?" — Pure function — easy: `expect(reducer(state, action)).toEqual(expected)`.
-- "useReducer + Context = global?" — Yes, popular pattern (Q30).
+- "useReducer + Context = global?" — Yes, popular pattern (savol 37).
 
 </details>
 
@@ -10206,7 +10213,7 @@ const handler = useRef(() => action(xRef.current)).current;
 
 **Performance reality:**
 
-`useCallback` overhead — `useMemo` ga teng (ichida `useMemo` orqali implement qilingan: `useMemo(() => fn, deps)`).
+`useCallback` overhead — `useMemo` ga teng. Semantik jihatdan `useMemo(() => fn, deps)` bilan ekvivalent, lekin React source'da alohida funksiya (`updateCallback`/`mountCallback`) sifatida implement qilingan — `useMemo`'ni o'rab chaqirmaydi, faqat factory'ni chaqirmasdan callback'ni to'g'ridan-to'g'ri saqlaydi.
 
 Native DOM event handler (`<button onClick>`)'lar uchun `useCallback` foyda bermaydi — element har render'da qaytadan yaratiladi va handler attribute attach qilinadi. Memo'd child komponentlarga function pass qilinganda `useCallback` muhim — props shallow comparison'da reference o'zgarmasligi kerak.
 
@@ -10622,9 +10629,10 @@ function Comp() {
 }
 
 // Native button:
-// - Doesn't compare onClick reference
-// - Re-attaches listener every render anyway
-// - useCallback wasted
+// - onClick reference'ini React props comparison uchun ishlatmaydi (faqat memo'd child)
+// - SyntheticEvent root container'da delegation orqali ishlaydi —
+//   handler fiber props'da saqlanadi, har render uchun yangi DOM listener attach qilinmaydi
+// - useCallback bu yerda foyda bermaydi
 
 // ✅ Memo'd child — benefit
 function Comp() {
@@ -10717,7 +10725,7 @@ R19+ — manual memo less needed.
 
 ### Qisqa javob
 
-`useCallback(fn, deps)` ≡ `useMemo(() => fn, deps)` — semantik teng. `useCallback` faqat **syntactic sugar** function memoization uchun (DX yaxshilash). Ikkalasi ham `memoizedState`'da deps + value saqlaydi, `Object.is` comparison bilan deps tekshiradi. Farq: `useMemo` callback chaqiradi (`fn()` natijasi), `useCallback` callback'ni qaytaradi (`fn` o'zi).
+`useCallback(fn, deps)` ≡ `useMemo(() => fn, deps)` — **semantik teng** (kuzatiladigan natija bir xil). Lekin React source'da `useCallback` `useMemo` orqali implement qilinmagan — alohida funksiya (`mountCallback`/`updateCallback`). Ikkalasi ham `memoizedState`'da `[value, deps]` saqlaydi, `Object.is` comparison bilan deps tekshiradi. Farq: `useMemo` factory'ni chaqiradi va natijani saqlaydi (`fn()`), `useCallback` callback'ni chaqirmasdan to'g'ridan-to'g'ri saqlaydi (`fn` o'zi).
 
 ### Kod misoli
 
@@ -11419,7 +11427,7 @@ React har render davomida bir xil snapshot'ni qaytaradi. Render davomida store o
 function useSyncExternalStore<T>(
   subscribe: (cb: () => void) => () => void,
   getSnapshot: () => T,
-  getServerSnapshot?: () => T  // SSR uchun majburiy emas, lekin SSR'da chaqirilsa kerak
+  getServerSnapshot?: () => T  // API'da ixtiyoriy, lekin SSR render'da bo'lmasa throw
 ): T {
   // 1. Snapshot olish (har render)
   const value = getSnapshot();
@@ -12595,7 +12603,7 @@ function User({ id }: { id: string }) {
 
 ### Edge Cases
 
-- **`use()` outside Suspense**: Promise rejection → app crash. Wrap in error boundary.
+- **`use()` Suspense'siz**: pending promise THROW qiladi — ushlovchi Suspense boundary bo'lmasa, suspension yuqoriga tarqaladi. Rejection esa Error Boundary'ga boradi (Suspense emas). Ikkalasi ham kerak: Suspense (pending uchun) + Error Boundary (rejection uchun).
 - **`use()` in useEffect**: Error. Hook context required.
 - **Re-creating promise**: Suspense triggers each render. Cache promise.
 
@@ -14443,21 +14451,21 @@ function useEventListener(event, handler) {
 
 Bu faylda quyidagilar yoritildi:
 
-**QISM A — Hooks Fundamentals (1-5)**: Hooks rationale, Rules of Hooks, linked list mexanizmi, mount/update path, dispatcher swap, conditional hook bug.
+**QISM A — Hooks Fundamentals (1-7)**: Hooks rationale, Rules of Hooks, linked list mexanizmi, mount/update path, dispatcher swap, conditional hook bug, dispatcher mexanizmi, stale closure.
 
-**QISM B — useState (6-9)**: API va lazy initializer, functional update vs direct, queue mechanism (circular linked list), state equality bailout.
+**QISM B — useState (8-12)**: API va lazy initializer, functional update vs direct, queue mechanism (circular linked list), state equality bailout, lazy initializer fan-out.
 
-**QISM C — useEffect (10-15)**: Lifecycle EMAS — sinxronizatsiya, dependency array, cleanup function, race conditions + AbortController, Strict Mode 2x effect, "You Might Not Need an Effect" anti-patterns.
+**QISM C — useEffect (13-19)**: Lifecycle EMAS — sinxronizatsiya, dependency array, cleanup function, race conditions + AbortController, Strict Mode 2x effect, "You Might Not Need an Effect" anti-patterns, reference traps.
 
-**QISM D — useLayoutEffect & useInsertionEffect (16-18)**: Timing farq, DOM measurement use cases, useInsertionEffect (CSS-in-JS).
+**QISM D — useLayoutEffect & useInsertionEffect (20-23)**: Timing farq, DOM measurement use cases, useInsertionEffect (CSS-in-JS), SSR warning.
 
-**QISM E — useRef (19-23)**: useRef vs useState, forwardRef R18 vs R19 ref as prop, R19 ref cleanup, useImperativeHandle, callback refs.
+**QISM E — useRef (24-29)**: useRef vs useState, forwardRef R18 vs R19 ref as prop, R19 ref cleanup, useImperativeHandle, callback refs, initial value evaluation.
 
-**QISM F — useContext (24-27)**: Provider, value reference performance, R19 `<Context value>` va `use(context)`, selector pattern.
+**QISM F — useContext (30-34)**: Provider, value reference performance, R19 `<Context value>` va `use(context)`, selector pattern, default value.
 
-**QISM G — useReducer (28-30)**: vs useState, discriminated unions + exhaustive check, Reducer + Context state container.
+**QISM G — useReducer (35-38)**: vs useState, discriminated unions + exhaustive check, Reducer + Context state container, lazy init va action creator.
 
-**QISM H — useMemo & useCallback (31-34)**: useMemo mechanics, useCallback (useMemo wrapper), memo + useCallback paired, when NOT to memoize.
+**QISM H — useMemo & useCallback (39-43)**: useMemo mechanics, useCallback, memo + useCallback paired, when NOT to memoize, semantic equivalence.
 
 **QISM I — Concurrent Hooks R18 (44-49)**: useTransition, useDeferredValue, useSyncExternalStore (tearing prevention), useId, decision tree.
 

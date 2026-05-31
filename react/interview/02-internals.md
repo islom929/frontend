@@ -1246,7 +1246,7 @@ R19 — pre-render or hidden tab content (offscreen).
 
 ### Qisqa javob
 
-**`flags`** — har Fiber'da bitmask — fiber'ning side effect'larini belgilaydi (Placement, Update, Deletion, Passive, Layout, Ref, Snapshot, ...). **`subtreeFlags`** — children'ning flags OR'ed — fast skip optimization (subtree'da effect yo'q bo'lsa, butun subtree skip). R18'da effect linked list (`nextEffect`) o'rniga shu pattern qabul qilindi — saqlash va traverse tezroq.
+**`flags`** — har Fiber'da bitmask — fiber'ning side effect'larini belgilaydi (Placement, Update, ChildDeletion, Passive, Layout, Ref, Snapshot, ...). **`subtreeFlags`** — children'ning flags OR'ed — fast skip optimization (subtree'da effect yo'q bo'lsa, butun subtree skip). R18'da effect linked list (`nextEffect`) o'rniga shu pattern qabul qilindi — saqlash va traverse tezroq.
 
 ### To'liq tushuntirish
 
@@ -1386,10 +1386,11 @@ function completeWork(workInProgress: Fiber) {
 
 ```typescript
 // Mutation phase mask
-const MutationMask = Placement | Update | Deletion | ContentReset | Ref | ...;
+const MutationMask = Placement | Update | ChildDeletion | ContentReset | Ref | ...;
 
 // Layout phase mask
-const LayoutMask = Update | Callback | Ref | Snapshot;
+const LayoutMask = Update | Callback | Ref | Visibility;
+// Snapshot (getSnapshotBeforeUpdate) — BeforeMutationMask'da, Layout emas
 
 // Passive effect mask (useEffect)
 const PassiveMask = Passive | Visibility;
@@ -1451,10 +1452,10 @@ R18 advantages:
 | Error caught in boundary | `DidCapture`, `ShouldCapture` |
 | Hydration | `Hydrating` |
 
-**`Deletion` — special handling:**
+**`ChildDeletion` — special handling:**
 
 ```typescript
-// Deletion stored in parent's deletions array, not flags
+// O'chiriladigan child parent'ning deletions array'ida, alohida Deletion flag yo'q
 parent.deletions = [...(parent.deletions ?? []), deletedFiber];
 parent.flags |= ChildDeletion;
 ```
@@ -1497,7 +1498,7 @@ Bit operations — fastest CPU operations (no allocation, branch prediction-frie
 ### Follow-up savollar
 
 - "Bitmask vs object?" — Bitmask — ikki number field (flags + subtreeFlags). Object {placement: true, update: true, ...} — ko'p property, V8 hidden class overhead. CPU bit ops property access'dan tezroq. Critical hot path.
-- "More than 26 flags?" — Use 64-bit (BigInt) — performance penalty. R team designed flag count carefully.
+- "Bit limiti bormi?" — JS number bitwise operatsiyalar 32-bit signed integer ustida ishlaydi (`|`, `&`, `~` operandlarni `ToInt32` qiladi). Flags shu doirada — agar limitdan oshsa, `BigInt` yoki ikkinchi maydon kerak bo'lardi (performance penalty). React flag sonini shu chegara ichida ehtiyotkorlik bilan loyihalagan.
 - "Effect ordering — flags don't encode?" — Order determined by traversal (depth-first child-first). Flags only encode *what*.
 
 </details>
@@ -2395,10 +2396,14 @@ FiberRoot — outer container. HostRoot Fiber — first node in tree. They refer
 
 ```tsx
 // Microfrontend
-const widgetRoot = createRoot(document.getElementById("widget")!);
+const widgetContainer = document.getElementById("widget");
+const appContainer = document.getElementById("app");
+if (!widgetContainer || !appContainer) throw new Error("Container topilmadi");
+
+const widgetRoot = createRoot(widgetContainer);
 widgetRoot.render(<ChatWidget />);
 
-const appRoot = createRoot(document.getElementById("app")!);
+const appRoot = createRoot(appContainer);
 appRoot.render(<App />);
 
 // 2 FiberRoot'lar — alohida pendingLanes, alohida scheduling
@@ -2536,9 +2541,11 @@ function commitMutation(fiber) {
     // Update DOM properties on stateNode
     updateDOM(fiber.stateNode, fiber.memoizedProps, fiber.pendingProps);
   }
-  if (fiber.flags & Deletion) {
-    // Remove from parent
-    parentFiber.stateNode.removeChild(fiber.stateNode);
+  if (fiber.flags & ChildDeletion) {
+    // O'chiriladigan child'lar parent.deletions array'da — har birini remove
+    for (const deleted of fiber.deletions) {
+      parentFiber.stateNode.removeChild(deleted.stateNode);
+    }
   }
 }
 ```
@@ -2762,12 +2769,12 @@ function renderWithHooks(fiber, Component, props) {
     HooksDispatcher = HooksDispatcherOnUpdate;
   }
 
-  // ReactCurrentDispatcher.current = HooksDispatcher;
+  // ReactSharedInternals.H = HooksDispatcher;  (R18: ReactCurrentDispatcher.current)
   // useState/useEffect chaqiruvi shu dispatcher orqali
 
   const children = Component(props);
 
-  // ReactCurrentDispatcher.current = null;
+  // ReactSharedInternals.H = ContextOnlyDispatcher;  (render tashqarisida hook throw qiladi)
   return children;
 }
 
@@ -3373,7 +3380,7 @@ function reconcileFiber(current: Fiber, newElement: Element) {
 - `Button`, `App` — function reference (FunctionComponent type)
 - `class Foo` — class reference (ClassComponent type)
 - `Symbol(react.fragment)` — Fragment
-- Special: `Symbol(react.memo)`, `Symbol(react.forward_ref)` (R19'da ref oddiy prop, forwardRef deprecated), etc.
+- Special: `Symbol(react.memo)`, `Symbol(react.forward_ref)` (R19'da function component `ref`'ni oddiy prop sifatida oladi; `forwardRef` hali ishlaydi, deprecated emas), etc.
 
 ### Kod misoli
 
@@ -5503,7 +5510,6 @@ Context value o'zgarganda, Reconciler **provider'ning subtree'idagi barcha consu
 function propagateContextChange(
   workInProgress: Fiber,
   context: ReactContext,
-  changedBits: number,
   renderLanes: Lanes
 ) {
   let fiber = workInProgress.child;
@@ -5944,7 +5950,8 @@ function reconcileChildren(parent, oldFirstChild, newChildren) {
     } else if (oldFiber.key === newElement.key) {
       // Same key, different type — should be rare (unmount + mount at same position)
       newFiber = createFiber(newElement);
-      oldFiber.flags |= Deletion;
+      // Eski fiber parent'ning deletions array'iga qo'shiladi, parent'da ChildDeletion flag
+      deleteChild(parent, oldFiber);  // parent.deletions.push(oldFiber); parent.flags |= ChildDeletion
     } else {
       // Key mismatch — bail to keyed pass
       break;
@@ -5976,8 +5983,8 @@ function reconcileChildren(parent, oldFirstChild, newChildren) {
       i++;
     }
 
-    // Remaining old fibers — mark for deletion
-    oldByKey.forEach(fiber => fiber.flags |= Deletion);
+    // Remaining old fibers — parent'ning deletions array'iga, parent'da ChildDeletion flag
+    oldByKey.forEach(fiber => deleteChild(parent, fiber));
   }
 }
 ```
@@ -6329,24 +6336,24 @@ Step 1: First pass (index match)
 Step 2: Build oldByKey map
   oldByKey = { "a": Fiber(a), "b": Fiber(b), "c": Fiber(c), "d": Fiber(d) }
 
-Step 3: Second pass (keyed match)
-  new[0]=b → match Fiber(b) from map → MOVE to index 0, remove from map
-  new[1]=d → match Fiber(d) → MOVE to index 1, remove
-  new[2]=e → no match → CREATE new Fiber(e)
-  new[3]=a → match Fiber(a) → MOVE to index 3, remove
+Step 3: Second pass (keyed match) — lastPlacedIndex bilan move aniqlanadi
+  new[0]=b → match Fiber(b), oldIndex=1 ≥ lastPlaced=0 → joyida qoladi, lastPlaced=1
+  new[1]=d → match Fiber(d), oldIndex=3 ≥ lastPlaced=1 → joyida qoladi, lastPlaced=3
+  new[2]=e → no match → CREATE + Placement flag
+  new[3]=a → match Fiber(a), oldIndex=0 < lastPlaced=3 → Placement (move), remove
 
 Step 4: Remaining in map → DELETE
-  Fiber(c) marked for deletion
+  Fiber(c) marked for deletion (parent.deletions, ChildDeletion flag)
 
 Operations:
-  - Fiber(b): MOVE (DOM: parent.insertBefore(b.stateNode, ...))
-  - Fiber(d): MOVE
-  - Fiber(e): CREATE + INSERT
-  - Fiber(a): MOVE
+  - Fiber(b): Placement flag yo'q (oldIndex lastPlaced'dan katta)
+  - Fiber(d): Placement flag yo'q
+  - Fiber(e): CREATE + Placement (DOM: parent.insertBefore(e.stateNode, ...))
+  - Fiber(a): Placement (DOM: parent.insertBefore(a.stateNode, ...))
   - Fiber(c): DELETE (DOM: parent.removeChild(c.stateNode))
 ```
 
-**Performance: 4 operations (3 moves + 1 create + 1 delete) — optimal.**
+**DOM mutatsiyalari: `lastPlacedIndex` heuristic faqat "orqaga ketgan" element'ga `Placement` qo'yadi — bu yerda `e` (yangi, insert) va `a` (oldIndex=0 < lastPlaced=3, move). `b` va `d` joyida qoladi (oldIndex lastPlaced'dan katta). Plus `c` o'chiriladi. Hammasi O(n).**
 
 ### Tushuntirish
 
@@ -6882,7 +6889,7 @@ function scheduleCallback(priorityLevel: number, callback: Function, options?: {
   switch (priorityLevel) {
     case ImmediatePriority: timeout = -1; break;
     case UserBlockingPriority: timeout = 250; break;
-    case IdlePriority: timeout = MAX_SAFE_INTEGER; break;
+    case IdlePriority: timeout = maxSigned31BitInt; break;  // 1073741823 (≈12.4 kun)
     case LowPriority: timeout = 10000; break;
     case NormalPriority:
     default: timeout = 5000; break;
@@ -7009,13 +7016,16 @@ function shouldYieldToHost() {
 **Scheduler yield constants (React internal):**
 
 ```typescript
-// React 18+ Scheduler internal'da uchta konstanta:
-const frameYieldMs = 5;        // default yield budget
-const continuousYieldMs = 50;  // continuous priority task max work
-const maxYieldMs = 300;        // long-task yield ceiling
+// React 19 Scheduler (SchedulerFeatureFlags.js):
+const frameYieldMs = 5;  // yield budget — frameInterval shu qiymatdan boshlanadi
+
+// Priority timeout konstantalari (expirationTime hisoblash uchun):
+const userBlockingPriorityTimeout = 250;   // ms
+const normalPriorityTimeout = 5000;        // ms
+const lowPriorityTimeout = 10000;          // ms
 ```
 
-"5ms" — `frameYieldMs` default. Continuous va max yieldMs alohida holatlar uchun.
+`shouldYieldToHost()` o'tgan vaqtni `frameInterval` (default `frameYieldMs = 5`) bilan solishtiradi. `frameInterval` `forceFrameRate()` orqali dinamik o'zgartirilishi mumkin.
 
 **Priority comparison:**
 
@@ -7089,7 +7099,7 @@ requestIdleCallback(callback, { timeout: 100 });
 
 - "Why separate scheduler package?" — Reusable for non-React work. Future RFC: standardize browser scheduler API (`postTask`).
 - "`postTask` API replacement?" — Newer browser API for priority-based scheduling. Polyfill for older browsers via `MessageChannel`.
-- "Custom priority?" — Internal scheduler accepts only 5 levels. React lanes — finer-grained (32 lanes), but mapped to 5 priorities.
+- "Custom priority?" — Internal scheduler accepts only 5 levels. React lanes — finer-grained (`TotalLanes = 31`), bir necha priority guruhga map qilinadi.
 
 </details>
 
@@ -7102,7 +7112,7 @@ requestIdleCallback(callback, { timeout: 100 });
 
 ### Qisqa javob
 
-**Lanes** (R18+) — 31-bit bitmap har Fiber'da. Har bit — alohida priority lane: `SyncLane` (highest), `InputContinuousLane`, `DefaultLane`, `TransitionLane` (16 ta), `RetryLane`, `IdleLane` (lowest), va boshqalar. Updates har xil lane'larga belong qiladi (priority bo'yicha). Reconciler render lanes'ni tanlaydi va shu lanes'dagi work'ni bajaradi. **OR/AND** bit operations — fast scheduling.
+**Lanes** (R18+) — 31-bit bitmap har Fiber'da. Har bit — alohida priority lane: `SyncLane` (highest), `InputContinuousLane`, `DefaultLane`, `TransitionLane` (14 ta), `RetryLane`, `IdleLane` (lowest), va boshqalar. Updates har xil lane'larga belong qiladi (priority bo'yicha). Reconciler render lanes'ni tanlaydi va shu lanes'dagi work'ni bajaradi. **OR/AND** bit operations — fast scheduling.
 
 ### To'liq tushuntirish
 
@@ -7116,20 +7126,21 @@ const InputContinuousHydrationLane: Lane = 0b0000000000000000000000000000100;
 const InputContinuousLane: Lane = 0b0000000000000000000000000001000;
 const DefaultHydrationLane: Lane = 0b0000000000000000000000000010000;
 const DefaultLane: Lane = 0b0000000000000000000000000100000;
-// Transition lanes — 16 lanes for granular transitions
-const TransitionHydrationLane: Lane = 0b0000000000000000000000000100000;
-const TransitionLane1: Lane = 0b0000000000000000000000001000000;
-const TransitionLane2: Lane = 0b0000000000000000000000010000000;
+const TransitionHydrationLane: Lane = 0b0000000000000000000000001000000;
+// Transition lanes — 14 lanes for granular transitions
+const TransitionLane1: Lane = 0b0000000000000000000000010000000;
+const TransitionLane2: Lane = 0b0000000000000000000000100000000;
 // ...
-const TransitionLane16: Lane = 0b0000000000000000010000000000000;
+const TransitionLane14: Lane = 0b0000000000100000000000000000000;
 
-const RetryLane1: Lane = 0b0000000000000000100000000000000;
-// ... 4 retry lanes
+const RetryLane1: Lane = 0b0000000001000000000000000000000;
+// ... 4 retry lanes (RetryLane4 = 0b0000010000000000000000000000000)
 
-const SelectiveHydrationLane: Lane = 0b0000000010000000000000000000000;
-const IdleHydrationLane: Lane = 0b0000000100000000000000000000000;
-const IdleLane: Lane = 0b0000001000000000000000000000000;
-const OffscreenLane: Lane = 0b0000010000000000000000000000000;
+const SelectiveHydrationLane: Lane = 0b0000100000000000000000000000000;
+const IdleHydrationLane: Lane = 0b0001000000000000000000000000000;
+const IdleLane: Lane = 0b0010000000000000000000000000000;
+const OffscreenLane: Lane = 0b0100000000000000000000000000000;
+const DeferredLane: Lane = 0b1000000000000000000000000000000;
 ```
 
 ### Kod misoli
@@ -7204,13 +7215,13 @@ InputContinuousLane = 0b1000  // bit 3
 // Default (normal user interactions)
 DefaultLane = 0b100000  // bit 5
 // Transitions (lower priority, can be interrupted)
-TransitionLane1, TransitionLane2, ..., TransitionLane16
+TransitionLane1, TransitionLane2, ..., TransitionLane14
 
-// 16 transition lanes — for handling many concurrent transitions
+// 14 transition lanes — for handling many concurrent transitions
 // Each transition gets a unique lane
 ```
 
-**Why 16 transition lanes:**
+**Why several transition lanes:**
 
 ```tsx
 // Multiple concurrent transitions
@@ -7398,7 +7409,7 @@ function Search() {
 
 - **All lanes empty (`NoLanes`)**: No render scheduled.
 - **Lanes spanning many priorities**: Render highest priority lanes first, then re-render for remaining.
-- **Lane exhaustion**: 16 transition lanes max. Older transitions abandoned if exceeded.
+- **Lane exhaustion**: 14 transition lanes max. Limitdan oshsa, lane'lar qayta ishlatiladi (round-robin).
 
 ### Follow-up savollar
 
@@ -7556,16 +7567,17 @@ function HeavyComponent() {
 const result = useMemo(() => heavyCompute(), [deps]);
 ```
 
-**Yield intervals (React Scheduler internal):**
+**Yield interval (React Scheduler internal):**
 
 ```typescript
-// React Scheduler — three constants:
-const frameYieldMs = 5;         // default yield budget
-const continuousYieldMs = 50;   // continuous priority work cap
-const maxYieldMs = 300;         // ceiling for long-running work
+// React 19 Scheduler — yield budget:
+const frameYieldMs = 5;  // default frameInterval
+
+// shouldYieldToHost(): o'tgan vaqt frameInterval'dan oshsa → yield
+let frameInterval = frameYieldMs;
 ```
 
-Default `5ms` — eng ko'p ishlatiladi. `shouldYield()` shu deadline'ga qaraydi.
+Default `5ms`. `shouldYield()` o'tgan vaqtni `frameInterval`'ga solishtiradi (`forceFrameRate()` bilan o'zgartirsa bo'ladi).
 
 **Concurrent rendering scenario:**
 
@@ -8018,7 +8030,7 @@ function markStarvedLanesAsExpired(root: FiberRoot, currentTime: number) {
 
 function computeExpirationTime(lane: Lane, currentTime: number): number {
   switch (lane) {
-    case SyncLane:
+    // SyncLane — sinxron, darhol ishga tushadi (expiration mexanizmidan o'tmaydi)
     case InputContinuousLane:
       return currentTime + 250;  // 250ms timeout
     case DefaultLane:
@@ -8041,10 +8053,10 @@ function App() {
   const [, startTransition] = useTransition();
   const [data, setData] = useState<Data>(initial);
 
-  // Continuous high-pri updates (e.g., animation, mouse tracking)
+  // Tez-tez takrorlanadigan update (e.g., animation, mouse tracking)
   useEffect(() => {
     const id = setInterval(() => {
-      setMousePos(getMousePosition());  // SyncLane (urgent)
+      setMousePos(getMousePosition());  // DefaultLane (setInterval callback'i)
     }, 16);
     return () => clearInterval(id);
   }, []);
@@ -8132,7 +8144,7 @@ function renderRootSync(root: FiberRoot, lanes: Lanes) {
 When lane expired:
 - Time slicing disabled
 - Sync render to completion
-- Browser may block 50+ms (acceptable trade-off vs starvation)
+- Browser bir muddat bloklanishi mumkin (starvation'ga qaraganda maqbul kelishuv)
 
 **Lane index calculation:**
 
@@ -8141,9 +8153,10 @@ function laneToIndex(lane: Lane): number {
   return 31 - Math.clz32(lane);
 }
 
-// SyncLane (0b1) — index 0
-// InputContinuousLane (0b100) — index 2
-// DefaultLane (0b10000) — index 4
+// SyncHydrationLane (0b1) — index 0
+// SyncLane (0b10) — index 1
+// InputContinuousLane (0b1000) — index 3
+// DefaultLane (0b100000) — index 5
 // ...
 ```
 
@@ -8168,7 +8181,7 @@ function App() {
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      setPos({ x: e.clientX, y: e.clientY });  // continuous SyncLane
+      setPos({ x: e.clientX, y: e.clientY });  // InputContinuousLane (mousemove — continuous event)
     };
     document.addEventListener("mousemove", handler);
     return () => document.removeEventListener("mousemove", handler);
@@ -8182,8 +8195,8 @@ function App() {
   );
 }
 
-// User: setCount(5) (DefaultLane)
-// Mouse moves continuously: SyncLane updates
+// User: setCount(5) (event handler ichida → DefaultLane)
+// Mouse moves continuously: InputContinuousLane updates (DefaultLane'dan yuqori priority)
 // DefaultLane renders deferred...
 // After 5s, DefaultLane expires → forced sync render
 // User sees count update (after up to 5s lag)
@@ -8211,12 +8224,6 @@ function ensureRootIsScheduled(root: FiberRoot) {
 
 When lane expires, priority changes → re-schedule.
 
-**Adaptive timeouts (future):**
-
-R18+ Adaptive scheduling — react to device conditions:
-- High-end device: 5ms slice, 5s transition timeout
-- Low-end: 16ms slice, 10s timeout (more patient)
-
 **Mitigation strategies:**
 
 If starvation observed:
@@ -8241,10 +8248,10 @@ function StarvationDemo() {
   const [, startTransition] = useTransition();
   const [count, setCount] = useState(0);
 
-  // Continuous high-pri
+  // Tez-tez DefaultLane update — transition'dan yuqori priority
   useEffect(() => {
     const id = setInterval(() => {
-      setCount(Date.now());  // forces re-render every tick
+      setCount(Date.now());  // DefaultLane (setInterval) — har tick re-render
     }, 1);
     return () => clearInterval(id);
   }, []);
@@ -8576,9 +8583,9 @@ const NoLanes              = 0b0000000000000000000000000000000;
 const SyncLane             = 0b0000000000000000000000000000010;  // bit 1
 const InputContinuousLane  = 0b0000000000000000000000000001000;  // bit 3
 const DefaultLane          = 0b0000000000000000000000000100000;  // bit 5
-const TransitionLane1      = 0b0000000000000000000001000000000;
-const TransitionLane2      = 0b0000000000000000000010000000000;
-const IdleLane             = 0b0010000000000000000000000000000;
+const TransitionLane1      = 0b0000000000000000000000010000000;  // bit 7
+const TransitionLane2      = 0b0000000000000000000000100000000;  // bit 8
+const IdleLane             = 0b0100000000000000000000000000000;
 
 // Operations
 function mergeLanes(a: Lanes, b: Lanes): Lanes {
@@ -8695,8 +8702,8 @@ root.pendingLanes &= ~SyncLane;
 SyncLane (bit 1)          ← highest, sync render
 InputContinuousLane (bit 3) ← drag, scroll
 DefaultLane (bit 5)       ← generic setState
-TransitionLane1-16        ← useTransition
-RetryLane                 ← Suspense retry
+TransitionLane1-14        ← useTransition
+RetryLane1-4              ← Suspense retry
 IdleLane                  ← lowest, requestIdleCallback-like
 ```
 
@@ -8710,7 +8717,7 @@ JavaScript bitwise ops 32-bit signed integer sifatida ishlaydi. Sign bit (bit 31
 
 - **`includesAllLanes`**: `(set & subset) === subset` — all subset lanes in set.
 - **`isSubsetOfLanes`**: Same as includesAllLanes.
-- **Lane overflow (>31 transitions)**: React reuses transition lanes (round-robin).
+- **Lane overflow (transition lanes tugasa)**: React transition lane'larni qayta ishlatadi (round-robin).
 
 ### Follow-up savollar
 
@@ -8821,9 +8828,9 @@ function pickArbitraryLane(lanes: Lanes): Lane {
   return getHighestPriorityLane(lanes);
 }
 
-// 16 transition lanes available
-const TransitionLane1 = 0b00000000000000000000000001000000;
-const TransitionLane2 = 0b00000000000000000000000010000000;
+// 14 transition lanes available
+const TransitionLane1 = 0b00000000000000000000000010000000;
+const TransitionLane2 = 0b00000000000000000000000100000000;
 // ...
 
 // Multiple useTransition'lar — alohida lanes (parallel transitions)
@@ -8885,7 +8892,7 @@ function Search() {
 ### Follow-up savollar
 
 - "When to use useTransition vs useDeferredValue?" — `useTransition` — control state directly. `useDeferredValue` — derive deferred from existing value.
-- "Performance overhead of transitions?" — Minimal. Lane bookkeeping ~5%, but user-perceived smoothness huge gain.
+- "Performance overhead of transitions?" — Minimal. Lane bookkeeping arzon (bitwise operatsiyalar), user-perceived smoothness esa sezilarli yutuq.
 - "Compiler auto-applies transitions?" — No. Manual `useTransition` for now.
 
 </details>
@@ -8969,7 +8976,9 @@ import { App } from "./App";
 
 // Browser: HTML already rendered
 // Hydrate: attach React to existing DOM
-hydrateRoot(document.getElementById("root")!, <App />);
+const container = document.getElementById("root");
+if (!container) throw new Error("Root container topilmadi");
+hydrateRoot(container, <App />);
 
 // Now interactive: clicks work, state updates DOM
 ```
@@ -9089,16 +9098,16 @@ Hydration time — app size'ga bog'liq (DOM walk + Fiber tree create + listener 
 **`renderToString` vs `renderToStaticMarkup`:**
 
 ```typescript
-// Includes data-reactroot, hydration-required attributes
+// renderToString — hydration uchun mos HTML (R16'dan beri data-reactroot YO'Q)
 renderToString(<App />);
-// → "<div data-reactroot=''>...</div>"
+// → "<div>...</div>"  + useId/Suspense uchun maxsus marker'lar (masalan, <!--$-->)
 
-// Static — no React internals (used for static HTML, no hydration)
+// renderToStaticMarkup — hydration marker'larisiz toza HTML
 renderToStaticMarkup(<App />);
 // → "<div>...</div>"
 ```
 
-`renderToStaticMarkup` — for purely static pages (email templates, marketing content).
+`renderToStaticMarkup` — hydration kerak bo'lmagan static sahifalar uchun (email template, marketing content). `renderToString` esa hydration uchun zarur marker'larni qo'shadi (Suspense boundary kommentlari, `useId` ID'lari).
 
 **Hydration order:**
 
@@ -9193,7 +9202,9 @@ app.listen(3000);
 import { hydrateRoot } from "react-dom/client";
 import { App } from "./App";
 
-hydrateRoot(document.getElementById("root")!, <App />);
+const container = document.getElementById("root");
+if (!container) throw new Error("Root container topilmadi");
+hydrateRoot(container, <App />);
 ```
 
 </details>
@@ -9231,7 +9242,9 @@ hydrateRoot(document.getElementById("root")!, <App />);
 import { createRoot } from "react-dom/client";
 
 // HTML: <div id="root"></div>  ← empty
-const root = createRoot(document.getElementById("root")!);
+const container = document.getElementById("root");
+if (!container) throw new Error("Root container topilmadi");
+const root = createRoot(container);
 root.render(<App />);
 // React creates entire DOM from scratch
 ```
@@ -9242,7 +9255,9 @@ root.render(<App />);
 import { hydrateRoot } from "react-dom/client";
 
 // HTML: <div id="root">...server-rendered content...</div>
-const root = hydrateRoot(document.getElementById("root")!, <App />);
+const container = document.getElementById("root");
+if (!container) throw new Error("Root container topilmadi");
+const root = hydrateRoot(container, <App />);
 // React traverses existing DOM, attaches Fiber tree, doesn't recreate DOM
 ```
 
@@ -9296,7 +9311,8 @@ root.render(<App key="updated" />);
 ```tsx
 // 3. Conditional — detect SSR vs CSR
 function mount() {
-  const container = document.getElementById("root")!;
+  const container = document.getElementById("root");
+  if (!container) throw new Error("Root container topilmadi");
 
   // Detect server-rendered (e.g., look for placeholder or attribute)
   const wasSSR = container.hasAttribute("data-ssr");
@@ -9412,7 +9428,7 @@ function canHydrateInstance(node: Element, type: string): boolean {
 // 3. Attribute mismatch
 // Server: <div className="dark">
 // Client: <div className="light">
-// → no warning by default, client wins (with R19 enhancements)
+// → dev'da warning, DOM node claim qilinadi, client qiymati qo'llanadi (subtree re-render emas)
 
 // 4. Extra/missing children
 // Server: <div><p /><p /></div>
@@ -10409,7 +10425,7 @@ const { pipe } = renderToPipeableStream(<App />, {
 });
 ```
 
-Shell — shrill structure (HTML + head + body skeleton). Flush early for fast TTFB.
+Shell — sahifaning asosiy strukturasi (HTML + head + body skeleton, Suspense fallback'lar). Tez TTFB uchun erta flush qilinadi.
 
 **`onAllReady` callback:**
 
@@ -10494,7 +10510,9 @@ Streaming dramatically improves TTFB and TTI for slow pages.
 import { hydrateRoot } from "react-dom/client";
 import { App } from "./App";
 
-hydrateRoot(document.getElementById("root")!, <App />);
+const container = document.getElementById("root");
+if (!container) throw new Error("Root container topilmadi");
+hydrateRoot(container, <App />);
 
 // Browser:
 // 1. HTML chunk received → DOM updated incrementally
@@ -11355,8 +11373,6 @@ Bu faylda quyidagilar yoritildi:
 **QISM C — Scheduler & Lanes (26-34)**: Concurrent rendering rationale, scheduler package + 5 priority levels, lanes bitmap (31 lanes, OR/AND ops), time slicing (5ms work loop), interruptible rendering (high-pri abort), starvation prevention (lane expiration), MessageChannel vs requestIdleCallback choice, lane operations, useTransition internals.
 
 **QISM D — Hydration (35-42)**: SSR + Hydration concept, `hydrateRoot` vs `createRoot`, hydration mismatch causes + fixes, selective hydration (R18 Suspense), streaming SSR (`renderToReadableStream`/`renderToPipeableStream`), R19 improvements (better errors, document metadata hoisting, stylesheet precedence, root error callbacks), `suppressHydrationWarning`, hydration mismatch bug fix.
-
-**Keyingi:** [03-hooks.md](03-hooks.md) — Hooks fundamentals + 10 ta hook (useState, useEffect, useLayoutEffect, useRef, useContext, useReducer, useMemo, useCallback, concurrent hooks, R19 hooks, custom hooks). Eng katta interview fayli — hooks mexanikasi, Rules of Hooks, linked list internal, real-world patterns.
 
 
 

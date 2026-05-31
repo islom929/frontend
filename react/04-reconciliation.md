@@ -157,24 +157,23 @@ function App() {
 // 1. App() qayta chaqiriladi → yangi JSX qaytariladi (count=1 bilan)
 // 2. reconcileChildren(currentApp, workInProgressApp, newJSX) → update path
 // 3. reconcileChildFibers — eski va yangi children solishtiriladi:
-//    - <div> → eski <div> bilan mos type → Update flag
-//      - <h1> → mos type → Update flag (children o'zgargan: "Count: 0" → "Count: 1")
-//        - Text "Count: 1" → eski text "Count: 0" bilan farqli → Update
+//    - <div> → mos type → Fiber reuse; div props o'zgarmagan → Update flag YO'Q
+//      - <h1> → mos type → Fiber reuse; h1 attribute'lari o'zgarmagan → Update flag YO'Q
+//        - Text "Count: 1" → eski text "Count: 0" bilan farqli → text Fiber'ga Update flag
 //      - <button> → mos type, props bir xil → no flag
 //        - Text "+" → bir xil → no flag
-// 4. Faqat h1'dagi text node uchun Update flag → minimal DOM mutation
+// 4. Faqat text node ("Count: ...") uchun Update flag → minimal DOM mutation
+//    (host element'ga Update flag completeWork'da prop diff bo'lsagina qo'yiladi)
 ```
 
-Reconciler natijasini DevTools "Profiler"'da ko'rish:
+DevTools Profiler "Why did this render?" faqat **komponent**'lar darajasida ishlaydi (host element yoki text node emas). Yuqoridagi `App` uchun:
 
 ```
 Profiler "Why did this render?":
-- App: state changed (count: 0 → 1)
-- div: parent re-rendered
-- h1: parent re-rendered + props changed (children: "Count: 1")
-- text node: changed
-- button: parent re-rendered + props unchanged → bailout if React.memo
+- App: Hook 1 changed (useState: 0 → 1)
 ```
+
+`div`, `h1`, `button` — host element'lar, ular Profiler'da alohida "why" sababiga ega emas; ular `App` render qilingani uchun reconcile qilinadi. Real flag'lar (Update / Placement) Fiber tree'da turadi, Profiler'da emas.
 
 Reconciler DOM'ga tegmaydi — faqat flag'lar:
 
@@ -212,7 +211,7 @@ function Demo() {
 
 **Akademik tree diff muammosi:**
 
-Ikki tree o'rtasidagi minimal "edit distance" (qancha insert/delete/update operatsiya kerak ekanligi) hisoblash — algoritmik nuqtai nazardan murakkab masala. Eng yaxshi ma'lum algoritmlar (Zhang-Shasha, 1989) **O(n³)** komplekslikda ishlaydi.
+Ikki tree o'rtasidagi minimal "edit distance" (qancha insert/delete/update operatsiya kerak ekanligi) hisoblash — algoritmik nuqtai nazardan murakkab masala. Eng yaxshi ma'lum algoritmlar (Zhang-Shasha, 1989) **O(n³)** murakkablikda ishlaydi.
 
 **Amaliy ta'sir (asimptotik):**
 
@@ -222,7 +221,7 @@ Ikki tree o'rtasidagi minimal "edit distance" (qancha insert/delete/update opera
 | 1,000 node | 10⁹ (1 milliard) |
 | 10,000 node | 10¹² (1 trillion) |
 
-10¹² ta operatsiya — har qanday CPU uchun UI rendering'da amaliyotsiz hajm. Aniq wall-clock vaqt CPU IPS, payload va engine optimization'lariga bog'liq, lekin polynomial o'sish bilan O(n³) algorithm interactive UI uchun yaroqsiz.
+10¹² ta operatsiya — har qanday CPU uchun UI rendering'da amaliy emas. Aniq wall-clock vaqt CPU IPS, payload va engine optimization'lariga bog'liq, lekin polynomial o'sish bilan O(n³) algorithm interactive UI uchun yaroqsiz.
 
 **React'ning ikki heuristic'i** bu muammoni hal qiladi:
 
@@ -282,7 +281,7 @@ Jami: **O(n)** — har Fiber bir marta tekshiriladi.
 
 **Trade-off:**
 
-React optimal diff'ni topmaydi — agar `<div>` → `<p>` o'zgarish bo'lsa, child'larni saqlab qolish ehtimoli bor edi (ikkalasi ham container element). Lekin algoritm bu holatni qidirmaydi (ko'p hisob talab qilardi). React **amaliy bo'lgan, optimal bo'lmagan** algoritm tanlagan — natijada tezroq ishlaydi.
+React optimal diff'ni topmaydi — agar `<div>` → `<section>` o'zgarish bo'lsa, ikkalasi ham block-level container bo'lib, child'larni saqlab qolish nazariy jihatdan mumkin edi. Lekin algoritm bu holatni qidirmaydi (ko'p hisob talab qilardi). React **amaliy bo'lgan, optimal bo'lmagan** algoritm tanlagan — natijada tezroq ishlaydi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -516,7 +515,7 @@ Reconciler eski Fiber va yangi React Element'ni solishtirayotganda birinchi navb
 
 **Type reference tenglik:**
 
-React `===` (strict equality) ishlatadi: `child.elementType === elementType` taqqoslashi `react-reconciler/src/ReactChildFiber.js` ichida. Type qiymatlari function yoki object (memo/forwardRef wrappers) bo'lgani uchun bu **reference identity** taqqoslash bilan ekvivalent (`Object.is` ham bir xil natija beradi function/object'lar uchun, faqat `NaN` va `±0` uchun farq qiladi — bunday qiymatlar Fiber type'da uchramaydi). Ya'ni:
+React `===` (strict equality) ishlatadi: `child.elementType === elementType` taqqoslashi `react-reconciler/src/ReactChildFiber.js` ichida. Type qiymatlari function yoki object (memo/forwardRef wrappers) bo'lgani uchun bu **reference identity** taqqoslash bilan teng (`Object.is` ham bir xil natija beradi function/object'lar uchun, faqat `NaN` va `±0` uchun farq qiladi — bunday qiymatlar Fiber type'da uchramaydi). Ya'ni:
 - **Bir xil function reference** — reuse
 - **Yangi function har render'da** — unmount + remount (state yo'qoladi!)
 
@@ -850,7 +849,7 @@ function reconcileChildrenArray(returnFiber, currentFirstChild, newChildren, lan
   let newIdx = 0;
   let lastPlacedIndex = 0;
   
-  // Faza 1: Parallel iteratsiya
+  // Faza 1: Parallel iteration
   for (; oldFiber !== null && newIdx < newChildren.length; newIdx++) {
     if (oldFiber.index > newIdx) {
       // Edge case
@@ -965,18 +964,17 @@ function ItemList() {
 // 
 // "Prepend" bosildi → [NEW, A, B]
 // 
-// Keyless matching:
-// Position 0: <li><input defaultValue="A">  vs  <li><input defaultValue="NEW">
-//   → same type, props farqli → Update
-//   → input.defaultValue ga ta'sir YO'Q (defaultValue faqat mount paytida)
-//   → lekin React internal'da Fiber reuse → focus qoladi (eski input element)
-//   → Lekin input elementi o'sha (eski A pozitsiyasi)
-// Position 1: <li><input defaultValue="B">  vs  <li><input defaultValue="A">
-//   → Update — bir xil
-// Position 2: yangi <li> → Placement
+// Keyless matching (index bo'yicha):
+// Position 0: <li><input> (eski A)  vs  <li><input> (yangi NEW)
+//   → same type → Fiber va DOM node reuse (yangi DOM yaratilmaydi)
+//   → defaultValue faqat mount paytida qo'llanadi, reuse'da DOM value o'zgarmaydi
+//   → DOM input'da hali "A modified" turibdi, focus ham shu node'da
+//   → endi bu node logik jihatdan "NEW" item'ga tegishli — moslik buzilgan
+// Position 1: <li><input> (eski B)  vs  <li><input> (yangi A) → reuse
+// Position 2: yangi <li> → Placement (NEW emas, B uchun qo'shimcha slot)
 //
-// Natija: focus eski "A" pozitsiyada turibdi (endi "NEW" deb yozilgan)
-// User'ning yozgan "A modified" matni yo'qoldi (yangi input mount bo'ldi)
+// Natija: yangi DOM mount bo'lmadi (faqat oxirida 1 ta li qo'shildi), lekin
+// "A modified" matni endi NEW item ostida ko'rinadi — item↔DOM bog'lanishi siljidi
 ```
 
 ```tsx
@@ -1272,7 +1270,7 @@ Greedy: 3 ta MOVE (suboptimal)
 LCS: 1 ta MOVE (optimal, lekin algorithm O(n²))
 ```
 
-React jamoasi greedy'ni tanlagan: O(n) komplekslik > optimal moves count.
+React jamoasi greedy'ni tanlagan: O(n) murakkablik > optimal moves soni.
 
 </details>
 
@@ -1295,7 +1293,7 @@ function ReorderableList() {
 
   function shuffle() {
     // Fisher-Yates uniform shuffle (`[...items].sort(() => Math.random() - 0.5)`
-    // statistik bir tekis emas — illyustratsiya uchun ham yaroqsiz)
+    // statistik bir tekis emas — namuna uchun ham yaroqsiz)
     const shuffled = [...items];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -1923,7 +1921,7 @@ function Parent({ data }) {
 
 **Bailout sababi 2 — React.memo shallow:**
 
-`shallowEqual` implementatsiyasi:
+`shallowEqual` implementation'i:
 
 ```typescript
 function shallowEqual(prevProps, nextProps) {
@@ -1965,7 +1963,7 @@ shallowEqual(prev2, next2);  // true (user reference bir xil)
 
 **Bailout sababi 4 — state equality:**
 
-`useState` setter implementatsiyasi:
+`useState` setter implementation'i:
 
 ```typescript
 function dispatchSetState(fiber, queue, action) {
@@ -1973,6 +1971,7 @@ function dispatchSetState(fiber, queue, action) {
   
   // Eager state computation (optimization)
   const update = { lane, action, eagerState: null, hasEagerState: false };
+  const alternate = fiber.alternate;
   
   if (fiber.lanes === NoLanes && (alternate === null || alternate.lanes === NoLanes)) {
     // Hech qanday pending update yo'q — eager hisoblash
@@ -1984,8 +1983,9 @@ function dispatchSetState(fiber, queue, action) {
     update.hasEagerState = true;
     
     if (Object.is(eagerState, currentState)) {
-      // Bailout — state o'zgarmagan, scheduling kerak emas
-      enqueueUpdate(fiber, queue, update);
+      // Bailout — state o'zgarmagan; React `enqueueConcurrentHookUpdateAndEagerlyBailout`
+      // chaqirib, update'ni queue'ga keyingi commit uchun saqlaydi-yu,
+      // `scheduleUpdateOnFiber`'ni chaqirmaydi — render boshlanmaydi.
       return;
     }
   }
@@ -2339,7 +2339,8 @@ Bu mexanizm `childLanes` orqali Reconciler tree'ni **skip-friendly** qiladi:
 
 ```typescript
 // Manba: react/packages/react-reconciler/src/ReactFiberLane.js
-// 31 ta lane (TotalLanes = 31, V8 smi range'da)
+// TotalLanes = 31 (V8 smi diapazonida bitmask sifatida saqlash uchun)
+// Pastki bit = yuqori priority. Birinchi lane'lar (stabil tartib):
 const SyncHydrationLane     = 0b0000000000000000000000000000001;  // bit 0
 const SyncLane              = 0b0000000000000000000000000000010;  // bit 1
 const InputContinuousHydrationLane
@@ -2347,9 +2348,11 @@ const InputContinuousHydrationLane
 const InputContinuousLane   = 0b0000000000000000000000000001000;  // bit 3
 const DefaultHydrationLane  = 0b0000000000000000000000000010000;  // bit 4
 const DefaultLane           = 0b0000000000000000000000000100000;  // bit 5
-const TransitionLane1       = 0b0000000000000000000000010000000;  // bit 7
-// TransitionLane2..TransitionLane16 — 16 ta rotating lane (starvation oldini olish uchun)
-// ...
+// Yuqoriroq bit'lar: TransitionHydrationLane, TransitionLane1..TransitionLaneN
+// (rotating — starvation oldini olish uchun), RetryLane'lar,
+// SelectiveHydrationLane, IdleHydrationLane, IdleLane, OffscreenLane.
+// To'liq ro'yxat va aniq bit pozitsiyalari React versiyasiga qarab o'zgaradi —
+// 05-scheduler-lanes.md da source bilan birga keltirilgan.
 
 // Bir Fiber'da bir vaqtda bir nechta lane bo'lishi mumkin:
 fiber.lanes = SyncLane | TransitionLane1;
@@ -2461,16 +2464,21 @@ function Counter() {
 //      - Children clone qilinadi alternate'dan
 //      - Sidebar, Main child'lar ko'rib chiqiladi
 //    - Sidebar: lanes=0, childLanes=0 → BUTUN SUBTREE SKIP
-//    - Main: childLanes set → descend
-//      - Main funksiyasi qayta chaqiriladi (props bir xil emas, parent re-rendered)
-//        Aslida Main re-render bo'ladi chunki Layout bailout bo'lgan-u, Main memo emas
+//    - Main: lanes=0, props o'zgarmagan (Layout bailout qilib children'ni
+//        clone qilgan — Main'ning pendingProps === memoizedProps) → bailout candidate
+//      - childLanes set → descend kerak (Counter ostida)
+//      - Main funksiyasi qayta CHAQIRILMAYDI (early bailout)
 //      - Content: lanes=0, childLanes=0 → SKIP
 //      - Counter: lanes set → re-render
 
 // Console log:
-// "Main render"
 // "Counter render"
-// (Layout, Sidebar, Content — render YO'Q)
+// (Layout, Main, Sidebar, Content — render YO'Q: faqat Counter)
+//
+// Muhim: Main memo emas, lekin parent (Layout) bailout qilgani uchun
+// Main'ga clone'langan, o'zgarmagan props yetib keldi va Main'ning o'z lanes'i 0.
+// Non-memo komponent "har doim parent bilan birga render bo'ladi" emas —
+// agar parent funksiyasi qayta chaqirilmasa (bailout), child yangi props olmaydi.
 ```
 
 childLanes context misol:
@@ -2897,7 +2905,7 @@ return <MemoChild config={{ theme: 'dark' }} />;
 
 **Holat 3:** State equality (Object.is). `Object.is(0, 0) === true` → eager bailout, scheduling yo'q. Komponent re-render qilinmaydi.
 
-**Holat 4:** useCallback + React.memo kombinatsiyasi. `handleClick` doim bir xil reference → MemoButton shallow check pass → bailout.
+**Holat 4:** useCallback + React.memo birgalikda. `handleClick` doim bir xil reference → MemoButton shallow check pass → bailout.
 
 **Holat 5:** **Bailout YO'Q.** `{ theme: 'dark' }` har render'da yangi obyekt. ShallowEqual reference farqli → render davom etadi.
 
@@ -2953,36 +2961,38 @@ function Counter() {
 <details>
 <summary><strong>Javob</strong></summary>
 
-`setCount` chaqirilganda:
+`setCount` chaqirilganda faqat **Counter Fiber'ning `lanes`'i** set bo'ladi. Ancestor'larda esa faqat `childLanes` set bo'ladi — ularning o'z `lanes`'i 0 qoladi:
 
 1. **Counter Fiber:** `lanes` set
-2. **Parent'lar:** `childLanes` set:
+2. **Parent'lar:** `childLanes` set (o'z `lanes` emas):
    - Main.childLanes set
-   - Layout.childLanes set (lekin Main child sifatida)
+   - Layout.childLanes set
    - App.childLanes set
    - Root.childLanes set
 
+Asosiy nuqta: ancestor `beginWork`'ga yetilganda, uning `pendingProps === memoizedProps` (clone'langan, o'zgarmagan) va o'z `lanes`'i 0 → **early bailout** path. Bailout `cloneChildFibers` bilan child'larni clone qiladi va `childLanes` orqali pastga tushadi, lekin **komponent funksiyasini qayta CHAQIRMAYDI**. Demak ancestor yangi `children` element ham yaratmaydi — pastdagi memo'd komponentlarning props'i o'zgarmaydi.
+
 Render Phase tree walk:
 
-| Komponent | `lanes` | `childLanes` | `beginWork` chaqiriladi? | Sabab |
-|-----------|---------|--------------|--------------------------|-------|
-| Root | 0 | set | Ha | Subtree'da update bor — descend |
-| App | 0 | set | Ha | Childlanes — descend (App memo emas) |
-| Layout | 0 | set | Ha (re-render) | Memo: lekin App re-render qilganida `children` prop yangi React Element reference → shallowEqual fails |
-| Sidebar | 0 | 0 | **Bailout** | Memo + childLanes 0 → butun subtree skip |
-| Main | 0 | set | Ha | childLanes — descend, props bir xil emas (children prop yangi) |
-| Article | 0 | 0 | Ha | Main re-render qilingan — children re-render (React.memo emas) |
-| Counter | set | 0 | Ha | lanes set — re-render |
+| Komponent | `lanes` | `childLanes` | Funksiya qayta chaqiriladimi? | Sabab |
+|-----------|---------|--------------|-------------------------------|-------|
+| Root | 0 | set | Yo'q (bailout) | props o'zgarmagan + lanes 0 → early bailout; childLanes → clone + descend |
+| App | 0 | set | Yo'q (bailout) | clone'langan props === eski; lanes 0 → early bailout; childLanes → descend |
+| Layout | 0 | set | Yo'q (bailout) | App bailout qilgani uchun `children` prop yangi emas (clone); memo + lanes 0 → bailout; childLanes → descend |
+| Sidebar | 0 | 0 | Yo'q (skip) | Memo + lanes 0 + childLanes 0 → butun subtree skip |
+| Main | 0 | set | Yo'q (bailout) | clone'langan props === eski; lanes 0 → early bailout (memo bo'lmasa ham); childLanes → descend |
+| Article | 0 | 0 | Yo'q (skip) | lanes 0 + childLanes 0 → skip |
+| Counter | set | 0 | **Ha** | lanes set — yagona haqiqiy re-render |
 
-**Eslatma:** Layout — memo'd. Lekin App re-render bo'lganida `<Layout>{children}</Layout>` — `children` element har safar **yangi React Element** (yangi reference). Shu sababli Layout shallowEqual fails → bailout YO'Q. Layout `beginWork` chaqiriladi.
+**Eslatma:** Bu yerda hech bir ancestor funksiyasi qayta chaqirilmaydi. Sababi — `setCount` faqat Counter'ning `lanes`'ini belgilaydi; ancestor'larda esa faqat `childLanes`. Ancestor `beginWork`'da `pendingProps === memoizedProps` (clone) va `lanes === 0` shartlari bajarilib, early bailout sodir bo'ladi: funksiya chaqirilmaydi, faqat child'lar clone qilinib `childLanes` bo'yicha pastga tushiladi. Layout memo'd bo'lishi bu yerda hal qiluvchi emas — App bailout qilgani uchun Layout'ga umuman yangi `children` reference yetib bormaydi.
 
-To'g'rilash: `const layoutChildren = useMemo(() => <>...</>, [...]);` ishlatish kerak Layout'da bailout uchun.
+**Haqiqatan funksiyasi qayta chaqiriladigan (render bo'ladigan) komponent:** faqat **Counter**.
 
-**Render qilinadigan komponentlar:** Root (descend), App (descend), Layout (re-render — children prop farqli), Main (re-render — App re-rendered), Article (re-render — Main re-rendered), Counter (lanes — re-render).
+**Descend qiladi-yu funksiyasi chaqirilmaydigan (bailout + clone):** Root, App, Layout, Main — `childLanes` set bo'lgani uchun child'larga tushadi, lekin o'zlari render bo'lmaydi.
 
-**Bailout:** Sidebar (memo + childLanes 0 → butun subtree skip).
+**To'liq skip qilinadigan (subtree'ga umuman tushilmaydi):** Sidebar, Article — `lanes` ham, `childLanes` ham 0.
 
-Bu — `React.memo` faqat shallow check qilishini va children prop muammosini ko'rsatadi. Optimization patterns `33-optimization.md` da chuqur.
+Bu — `childLanes` mexanizmining mohiyati: bitta chuqur komponentdagi `setState` butun yuqori tree'ni qayta render qilmaydi, balki faqat update bor branch bo'ylab tushib, yagona tegishli komponentni render qiladi. Bir komponentni "har doim parent bilan birga render bo'ladi" deyish noto'g'ri — agar parent funksiyasi bailout tufayli chaqirilmasa, child yangi props olmaydi va o'zi ham bailout qiladi. Optimization patterns `33-optimization.md` da chuqur.
 
 </details>
 
@@ -3025,14 +3035,12 @@ newIdx=4: A → topildi (oldIndex=0)
 **4 ta MOVE** (Placement flag) — D, C, B, A.
 
 LCS analiz:
-- To'liq teskari list'da (`[A,B,C,D,E] → [E,D,C,B,A]`) LCS uzunligi = 1 (faqat o'rta element C tushadi LCS'ga, chunki teskari tartibda bitta uzaytirilgan subsequence yo'q)
-- Demak optimal move count ham = 4 (5 - LCS = 4)
-- To'liq reversal'da greedy va LCS bir xil natija beradi (4 move)
-- Greedy LCS'dan boshqa misol'larda suboptimal bo'ladi (masalan `[A,B,C,D] → [D,A,B,C]` — greedy 3 move, LCS 1 move)
+- To'liq teskari list'da (`[A,B,C,D,E] → [E,D,C,B,A]`) LCS uzunligi = 1. Sabab: ikkala ketma-ketlikda ham tartibni saqlovchi juftlik yo'q — eski'da x dan keyin kelgan y, teskari list'da x dan oldin keladi. Demak uzunligi 2 bo'lgan umumiy subsequence mavjud emas; har qanday bitta element o'zicha uzunlik 1 beradi
+- Optimal move count = 4 (n − LCS = 5 − 1 = 4): LCS'dagi bitta element joyida qoladi, qolgan 4 ta ko'chiriladi
+- To'liq reversal'da greedy ham, optimal ham 4 ta move qiladi — bu yerda ular teng
+- Greedy boshqa misol'larda suboptimal bo'ladi (masalan `[A,B,C,D] → [D,A,B,C]` — greedy 3 move, optimal 1 move)
 
-Yoki yana boshqa tahlil bilan: barcha element'lar joylarini almashtirgani uchun har holda 4 ta move kerak.
-
-Greedy 4 — optimal'ga yaqin yoki ekvivalent. Ko'pchilik holatlarda greedy va LCS farqi kichik. React jamoasi greedy'ni tanlagan: O(n) > O(n²).
+Greedy bu holatda optimal natija bilan teng (4 move). Boshqa holatlarda greedy ko'proq move qilishi mumkin, lekin O(n) murakkablik O(n²) LCS'dan ustun — React jamoasi shu trade-off'ni tanlagan.
 
 </details>
 

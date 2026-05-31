@@ -125,16 +125,16 @@ Boolean shorthand (`disabled`) → `disabled: true`. Children — alohida `child
 `_jsx` natijasi — ReactElement object:
 
 ```ts
-// R19 default (enableRefAsProp = true):
+// R19 (enableRefAsProp = true) — DEV shaklidagi soddalashtirilgan ko'rinish:
 {
-  $$typeof: Symbol(react.element),
+  $$typeof: Symbol(react.transitional.element), // R19'da symbol nomi yangilandi
   type: Greeting,
   key: null,
   props: { name: 'Alice', age: 30, disabled: true, children: 'Welcome' },
   // ref alohida slot YO'Q — `ref` bo'lsa props.ref'da
-  _owner: null,
+  // (_owner, _store kabi qo'shimcha maydonlar faqat DEV build'da mavjud)
 }
-// R18 va undan oldin element.ref alohida slot edi.
+// R18 va undan oldin: $$typeof = Symbol(react.element), element.ref alohida slot edi.
 ```
 
 Reconciler bu element'dan Fiber yaratadi va `pendingProps` slot'iga props object'ni saqlaydi:
@@ -461,8 +461,8 @@ type Props = Readonly<{
 }>;
 
 function Component({ user }: Props) {
-  user.name = 'X'; // ❌? TS check edi, lekin user obyekt nested
-  // Readonly faqat top-level — nested reference bilan o'zgartirish mumkin
+  user.name = 'X'; // ✅ TS xato YO'Q — Readonly faqat top-level
+  // `user` property readonly (qayta tayinlab bo'lmaydi), lekin `user.name` mutable
 }
 ```
 
@@ -513,9 +513,11 @@ function TagList({ items }: { items: string[] }) {
 Nested mutation — readonly bilan oldini olish:
 
 ```tsx
+type OrderItem = { id: number; name: string; price: number };
+
 type Order = {
   id: number;
-  items: { id: number; name: string; price: number }[];
+  items: ReadonlyArray<OrderItem>; // array elementlarini ham readonly qilish
 };
 
 type OrderViewProps = Readonly<{
@@ -523,11 +525,13 @@ type OrderViewProps = Readonly<{
 }>;
 
 function OrderView({ order }: OrderViewProps) {
-  order.id = 99;            // ❌ TS error
-  order.items.push({...});   // ❌ TS error: push not on readonly array
+  order.id = 99;                                  // ❌ TS error: read-only property
+  order.items.push({ id: 9, name: 'X', price: 1 }); // ❌ TS error: push not on ReadonlyArray
   return <div>{order.id}</div>;
 }
 ```
+
+`Readonly<Order>` faqat `order.id` va `order.items` property'larini qayta tayinlashdan to'sadi. `order.items` array'iga `push` qilishni to'sish uchun element tipi `ReadonlyArray<OrderItem>` (yoki `readonly OrderItem[]`) bo'lishi shart — aks holda `push` ruxsat etiladi, chunki `Readonly` shallow.
 
 State derivation — `useMemo` bilan:
 
@@ -720,10 +724,10 @@ _jsxs(Box, {
 
 **`_jsx` vs `_jsxs`:**
 
-- `_jsx(type, props, key?)` — bitta static child (yoki children yo'q)
-- `_jsxs(type, props, key?)` — array children
+- `_jsx(type, props, key?)` — JSX'da yoziluvchi bitta child (yoki children yo'q)
+- `_jsxs(type, props, key?)` — JSX'da literal yoziluvchi bir nechta child (compile-time'da soni ma'lum, static array)
 
-Farq: `_jsxs` development mode'da array key validation qiladi (har element key'ga ega bo'lishi tekshiriladi). `_jsx` esa single child uchun bu validation'siz tezroq.
+Farq — `isStaticChildren` flag'i. `_jsxs`'ga uzatilgan children — kodda qo'lda yozilgan siblinglar (`<div><a/><b/></div>`). Dev build'da React ularning har birini `validated = 1` deb belgilaydi, ya'ni "to'g'ri static pozitsiyada" — natijada bu element'lar uchun "missing key" warning chiqarilmaydi (static siblinglar tartibi kod strukturasi bilan kafolatlangan, key kerak emas). "Missing key" warning faqat dinamik array'larga (odatda `.map()` natijasiga) tegishli — bunday children single child slot'i orqali `_jsx`'ga tushadi va React array element'larida key yo'qligini tekshiradi.
 
 **Single text child:**
 
@@ -881,7 +885,8 @@ function Wrapper({ children }: Props) {
 Element ichidagi children'ni manipulate qilish — props orqali:
 
 ```tsx
-import { cloneElement, isValidElement, ReactElement } from 'react';
+import { cloneElement, isValidElement } from 'react';
+import type { ReactElement } from 'react';
 
 type ItemProps = { active: boolean };
 
@@ -990,17 +995,17 @@ _jsx(DataProvider, {
 // children — function reference, ReactElement EMAS
 ```
 
-`children: function` — JSX engine bu funksiyani **render qilmaydi** (chunki function ReactNode'ning bir qismi emas — agar tip oddiy `ReactNode` bo'lsa). Komponent uni **manual chaqirishi** shart:
+`children: function` — function ReactNode'ning bir qismi emas. Komponent uni **manual chaqirishi** shart, natijasi (ReactNode) keyin render qilinadi:
 
 ```tsx
 function DataProvider({ children }: { children: (state: State) => ReactNode }) {
-  const state = useState(...);
+  const [state] = useState<State>({ loading: true, data: null });
   return <div>{children(state)}</div>;
   //              ↑ chaqirib, natijasini render qilamiz
 }
 ```
 
-Agar komponent function children'ni chaqirmasa — JSX'da hech narsa render qilinmaydi (chunki function'ni React component sifatida chaqirmaydi).
+Agar function children chaqirilmasa va to'g'ridan-to'g'ri render slot'iga qo'yilsa (`<div>{children}</div>`, `children` — function), React xato tashlaydi: `Functions are not valid as a React child`. React function'ni hech qachon avtomatik chaqirmaydi — faqat ReactElement (`type` — komponent function) render paytida chaqiriladi, raw function children esa invalid child hisoblanadi.
 
 **Type-level — `(state) => ReactNode` ReactNode'ga kirmaydi:**
 
@@ -1034,7 +1039,7 @@ type Props = {
 };
 
 function FlexibleProvider({ children }: Props) {
-  const state = useState(...);
+  const [state] = useState<State>({ loading: true, data: null });
   
   if (typeof children === 'function') {
     return <div>{children(state)}</div>;
@@ -1269,7 +1274,7 @@ function ItemList({ children, selectedId }: Props) {
   return (
     <ul>
       {Children.map(children, (child) => {
-        if (!isValidElement(child)) return child;
+        if (!isValidElement<{ id: number }>(child)) return child;
         return cloneElement(child, {
           isSelected: child.props.id === selectedId,
         });
@@ -1374,11 +1379,10 @@ function cloneElement<P>(
   }
 
   return {
-    $$typeof: REACT_ELEMENT_TYPE,
+    $$typeof: REACT_ELEMENT_TYPE, // R19'da Symbol.for('react.transitional.element')
     type: element.type,
     key: element.key,
-    props: newProps,  // ref bo'lsa, props.ref'da
-    _owner: null,
+    props: newProps, // ref bo'lsa, props.ref'da
   };
 }
 
@@ -1409,7 +1413,7 @@ function only<T>(children: ReactElement<T>): ReactElement<T> {
 }
 ```
 
-Bu — komponent bitta element kutsa, ortiqcha bo'lsa runtime error chiqaradi. `forwardRef` ichida ko'p ishlatilgan (eski R'larda).
+Bu — komponent bitta element kutsa (masalan, single-child wrapper yoki `Slot`-uslubidagi komponentlar), ortiqcha yoki noto'g'ri children bo'lsa runtime error chiqaradi.
 
 </details>
 
@@ -1680,7 +1684,7 @@ const props = { key: 'k1', ref: myRef, name: 'X' };
 // R19+: `key` hali ham alohida slot'da (props ichida emas), lekin spread'dan
 //       `key` extract qilinishi dev warning bilan keladi (explicit yozish tavsiya).
 //       `ref` — function component'ning oddiy prop'i sifatida uzatiladi
-//       (forwardRef'siz). 
+//       (forwardRef'siz).
 ```
 
 `key` har doim alohida Element slot'ga ajratiladi va component'ning `props` object'iga kirmaydi (cross-ref [`08-list-rendering.md`](08-list-rendering.md)). `ref` esa: R18 va undan oldin — Element.ref slot'iga ajratilar va `forwardRef` ichida funksiyaning 2-argumenti sifatida uzatilardi; R19'dan boshlab — oddiy prop sifatida `props.ref` orqali olinadi (`forwardRef` HOC kerak emas, cross-ref [`18-useref.md`](18-useref.md)).
@@ -2059,7 +2063,7 @@ function Toolbar() {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Props drilling React architecture'sining natijasi — chunki data flow **explicit** va **unidirectional**. Boshqa framework'larda implicit data sharing mavjud (Vue'ning provide/inject, Angular DI), lekin ular ham hozir Context'ga o'xshash mexanizm.
+Props drilling React architecture'sining natijasi — data flow **explicit** va **unidirectional**. Boshqa framework'larda implicit data sharing mexanizmlari mavjud (Vue provide/inject, Angular DI) — bular React Context bilan bir toifadagi yondashuvlar: komponent ierarxiyasi bo'ylab props'siz data uzatish.
 
 **Composition pattern Reconciliation'da:**
 
@@ -2361,8 +2365,8 @@ interface Window {
 `type` declaration merging qila olmaydi:
 
 ```tsx
-type Foo = { a: string };
-type Foo = { b: string }; // ❌ TS error: Duplicate identifier
+type User = { name: string };
+type User = { email: string }; // ❌ TS error: Duplicate identifier 'User'
 ```
 
 Bu — global type extension uchun foydali (browser API extending), lekin oddiy props uchun zarurat yo'q.
@@ -2381,10 +2385,11 @@ function Button({ label }: ButtonProps) {
 
 `React.FC` (yoki `React.FunctionComponent`) — eski React tip. Muammolari:
 
-1. **Implicit `children`** — har komponent `children` qabul qiladi (R18'gacha edi, R18+'da olib tashlandi, lekin pattern hali yomon)
-2. **`defaultProps` cheklovi** — TS bilan integration noaniq
-3. **Generic component'lar** — `React.FC<Props>` generic argument qabul qila olmaydi
-4. **Return type cheklovi** — string/number return signature noto'g'ri
+1. **Implicit `children`** — har komponent `children` qabul qilardi (`@types/react@<18`), R18+ tiplarida olib tashlandi
+2. **Generic component'lar** — `React.FC<Props>` generic type parametr (`<T>`) qabul qila olmaydi
+3. **`displayName`/`defaultProps` qo'shimcha maydonlari** — function declaration'da kerak emas, ortiqcha shape
+
+(Eski `@types/react@<18` tiplarida `FC<P>` return type `ReactElement | null` edi — string/number/array return rad etilardi. R18+ tiplarida return type `ReactNode` bo'ldi, bu cheklov yo'q.)
 
 Function declaration + explicit props type — modern standart.
 
@@ -2578,7 +2583,7 @@ function List<T>({ items, renderItem }: ListProps<T>) {
 
 ### Nazariya
 
-**Discriminated union** (yoki "tagged union", "algebraic data type") — TypeScript pattern: bir nechta variant tipi, har birida ortiq **literal "discriminant"** maydoni bo'lib, TS tip narrowing'ni shu maydonga qarab amalga oshiradi.
+**Discriminated union** (yoki "tagged union", "algebraic data type") — TypeScript pattern: bir nechta variant tipi, har birida bir xil nomli **literal "discriminant"** maydoni bo'ladi (har variantda turli literal qiymat), TS tip narrowing'ni shu maydonga qarab amalga oshiradi.
 
 ```tsx
 type ButtonProps =
@@ -2620,7 +2625,7 @@ type Notification =
   | { kind: 'alert'; severity: 'low' | 'high'; message: string }
   | { kind: 'system'; code: number; description: string };
 
-function Notification(notif: Notification) {
+function NotificationItem(notif: Notification) {
   switch (notif.kind) {
     case 'message':
       return <div>{notif.from}: {notif.text}</div>;
@@ -3111,7 +3116,7 @@ type Record<K extends keyof any, V> = {
 **`ReturnType<F>` implementation:**
 
 ```ts
-type ReturnType<F extends (...args: any) => any> = F extends (...args: any) => infer R ? R : never;
+type ReturnType<F extends (...args: any) => any> = F extends (...args: any) => infer R ? R : any;
 ```
 
 `infer R` — conditional type'da return tipini "infer qilish". Function tipining return slot'ini extract qiladi.
@@ -3251,7 +3256,7 @@ type Translations = Record<Locale, {
 
 const translations: Translations = {
   en: { greeting: 'Hello', farewell: 'Goodbye' },
-  ru: { greeting: 'Privet', farewell: 'Do svidaniya' },
+  ru: { greeting: 'Привет', farewell: 'До свидания' },
   uz: { greeting: 'Salom', farewell: 'Xayr' },
 };
 
@@ -3324,14 +3329,14 @@ type MyButtonProps = ComponentProps<typeof MyButton>;
 
 | Utility | Foyda | Eslatma |
 |---------|-------|---------|
-| `ComponentProps<E>` | Element/Component props | Class va R19 ref oddiy prop |
-| `ComponentPropsWithoutRef<E>` | Props minus `ref` | `forwardRef` ichida |
-| `ComponentPropsWithRef<E>` | Props plus `ref` | Explicit ref handling |
+| `ComponentProps<E>` | Element/Component props (R19'da `ref` ham kiradi) | Eng oddiy, ko'p holatga yetarli |
+| `ComponentPropsWithoutRef<E>` | Props minus `ref` | Polymorphic'da ref collision'ni oldini olish |
+| `ComponentPropsWithRef<E>` | Props plus `ref` | `ref` tipini explicit kiritish |
 
 > **🕐 Versiya evolyutsiyasi (`ref` and `ComponentProps`):**
 > - **R18 va undan oldin:** Function component'larga `ref` to'g'ridan-to'g'ri uzatilmaydi — `forwardRef` HOC kerak. Wrapper komponentlar polymorphic typing'da `ComponentPropsWithoutRef<E>` ishlatardi (ref collision'ini oldini olish uchun).
-> - **R19+:** `ref` oddiy prop sifatida uzatilishi mumkin (cross-ref [`18-useref.md`](18-useref.md)). `forwardRef` soft-deprecated — hali ishlaydi, warning yo'q, lekin yangi kodda zarurat yo'q. `ComponentProps<E>` to'g'ridan-to'g'ri ishlaydi; polymorphic'da ref forward qilish uchun `ComponentPropsWithoutRef<E>` hali foydali.
-> - **Sabab:** `forwardRef` HOC qo'shimcha wrapper, function declaration'ni murakkab qiladi va generic component'lar bilan boilerplate keltirib chiqarardi. R19'da soddalashtirilgan.
+> - **R19+:** `ref` oddiy prop sifatida uzatilishi mumkin (cross-ref [`18-useref.md`](18-useref.md)). `forwardRef` **deprecated EMAS** — to'liq ishlaydi, deprecation warning yo'q (R19 RC'dagi warning stable'gacha bekor qilindi), lekin yangi kodda `ref` oddiy prop bo'lgani uchun zarurat yo'q. `ComponentProps<E>` to'g'ridan-to'g'ri ishlaydi; polymorphic'da ref forward qilish uchun `ComponentPropsWithoutRef<E>` hali foydali.
+> - **Sabab:** `forwardRef` HOC qo'shimcha wrapper, function declaration'ni murakkab qiladi va generic component'lar bilan boilerplate keltirib chiqarardi. R19'da `ref`'ni oddiy prop sifatida olish bu boilerplate'ni yo'qotadi.
 
 **Ishlatish — wrapper komponent:**
 
@@ -3725,21 +3730,29 @@ function Dictionary<K extends string, V>({ data, renderEntry }: DictionaryProps<
 **Generic + utility — flexible select:**
 
 ```tsx
-type SelectProps<T extends { id: string | number }, K extends keyof T> = {
+type SelectProps<
+  T extends { id: string | number },
+  DisplayKey extends keyof T,
+  ValueKey extends keyof T
+> = {
   items: T[];
-  selected: T[K];
+  selected: T[ValueKey];
   onSelect: (item: T) => void;
-  displayKey: K;
-  valueKey: K;
+  displayKey: DisplayKey;
+  valueKey: ValueKey;
 };
 
-function Select<T extends { id: string | number }, K extends keyof T>({
+function Select<
+  T extends { id: string | number },
+  DisplayKey extends keyof T,
+  ValueKey extends keyof T
+>({
   items,
   selected,
   onSelect,
   displayKey,
   valueKey,
-}: SelectProps<T, K>) {
+}: SelectProps<T, DisplayKey, ValueKey>) {
   return (
     <select
       value={String(selected)}
@@ -3759,10 +3772,11 @@ function Select<T extends { id: string | number }, K extends keyof T>({
 
 type Country = { id: number; name: string; code: string };
 
-<Select<Country, 'id'>
+// displayKey va valueKey — alohida tip parametr, turli maydon bo'lishi mumkin
+<Select
   items={countries}
   selected={selectedId}
-  onSelect={(c) => setSelectedId(c.id)}
+  onSelect={(country) => setSelectedId(country.id)}
   displayKey="name"
   valueKey="id"
 />
@@ -3810,17 +3824,28 @@ getProperty(user, 'age');  // ❌ TS error: 'age' is not assignable to 'id' | 'n
 type ListProps<T> = {
   items: T[];
   renderItem: (item: T) => ReactNode;
+  keyExtractor: (item: T) => string | number;
 };
 
-function List<T>({ items, renderItem }: ListProps<T>) {
-  return <ul>{items.map((item) => <li>{renderItem(item)}</li>)}</ul>;
+function List<T>({ items, renderItem, keyExtractor }: ListProps<T>) {
+  return (
+    <ul>
+      {items.map((item) => (
+        <li key={keyExtractor(item)}>{renderItem(item)}</li>
+      ))}
+    </ul>
+  );
 }
 ```
 
 JSX'da generic'ni ishlatish:
 
 ```tsx
-<List items={users} renderItem={(u) => <span>{u.name}</span>} />
+<List
+  items={users}
+  renderItem={(u) => <span>{u.name}</span>}
+  keyExtractor={(u) => u.id}
+/>
 ```
 
 TypeScript inference algoritmi:
@@ -3833,9 +3858,9 @@ TypeScript inference algoritmi:
 **`React.FC` va generic muammo:**
 
 ```tsx
-// ❌ React.FC generic argument qabul qila olmaydi
-const List: React.FC<ListProps<???>> = ...
-// React.FC<T> — T mustaqil generic argument bo'la olmaydi
+// ❌ React.FC generic argument qabul qila olmaydi —
+//    `<T>` ni komponent darajasida bog'laydigan joy yo'q:
+// const List: React.FC<ListProps<T>> = (props) => { ... }  // T — bog'lanmagan
 ```
 
 Function declaration generic friendly:
@@ -3901,8 +3926,8 @@ function List<T>({ items, renderItem, keyExtractor, emptyMessage = 'No items' }:
 type User = { id: number; name: string };
 type Product = { sku: string; name: string; price: number };
 
-const users: User[] = [...];
-const products: Product[] = [...];
+const users: User[] = [{ id: 1, name: 'Alice' }];
+const products: Product[] = [{ sku: 'KB-01', name: 'Keyboard', price: 49 }];
 
 <List
   items={users}                                   // T = User (inferred)
@@ -4031,7 +4056,7 @@ const orderColumns: Column<Order>[] = [
 > - **Pre-R19 (function component):** `MyComponent.defaultProps = { name: 'Guest' }` — props yetishmasa, default qo'yilardi.
 > - **R19+ (function component):** Olib tashlandi. JS default parameter ishlatiladi: `function MyComponent({ name = 'Guest' })`.
 > - **Class component:** `defaultProps` saqlanib qoldi (legacy).
-> - **Sabab:** JS default parameter native, declarative, va aniqroq. R19 Compiler optimization uchun ham yaxshi (defaults compile-time'da resolve qilinadi).
+> - **Sabab:** JS default parameter native, declarative, va aniqroq. React Compiler (opt-in build-time tool) statik tahlili uchun ham qulay — default qiymat funksiya signature'ida ko'rinadi.
 
 **Migration patterns:**
 
@@ -4135,8 +4160,8 @@ function Greeting({ name }: { name: string }) {
   return <h1>{name}</h1>;
 }
 
-Greeting.propTypes = { name: PropTypes.string }; // R19: ignored (silent)
-Greeting.defaultProps = { name: 'Guest' };       // R19: ignored (warning if dev)
+Greeting.propTypes = { name: PropTypes.string }; // R19: ignored
+Greeting.defaultProps = { name: 'Guest' };       // R19: ignored — default qo'llanilmaydi
 ```
 
 Dev mode'da R18.3 va undan keyingi versiyalarda warning chiqarilgan:
@@ -4148,14 +4173,20 @@ Warning: Support for defaultProps will be removed from function components in a 
 
 **`defaultProps` Compiler optimization muammosi:**
 
-R19 Compiler (`react-compiler`) auto-memoization qiladi (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). `defaultProps` runtime'da merge qilinardi:
+React Compiler (`babel-plugin-react-compiler`, opt-in build-time tool — React'ga bundle qilinmaydi) auto-memoization qiladi (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). `defaultProps` runtime'da merge qilinardi:
 
 ```ts
-// Render paytida
-const finalProps = { ...Component.defaultProps, ...userProps };
+// Render paytida (resolveDefaultProps, soddalashtirilgan)
+const finalProps = { ...userProps };
+for (const key in Component.defaultProps) {
+  if (finalProps[key] === undefined) {
+    finalProps[key] = Component.defaultProps[key];
+  }
+}
+// default faqat prop `undefined` bo'lganda qo'llaniladi
 ```
 
-Bu — har render'da merge object yaratiladi. Compiler optimization'i uchun static analysis qiyin.
+Bu — har render'da yangi merge object yaratiladi. Compiler statik tahlili uchun bu runtime merge qiyin: default qiymatlar funksiya signature'ida emas, alohida static maydonda.
 
 JS default parameter — compile-time resolve qilinadi:
 
@@ -4376,13 +4407,15 @@ const overrideProps = { className: 'override' };
 // overrideProps oxirida — className "override" g'olib
 ```
 
-Spread chiroli (`...`) order'i muhim. Eslab qoling: **oxirgi qiymat g'olib**.
+Spread operatori (`...`) order'i muhim: **oxirgi qiymat g'olib**.
 
 ---
 
 ### Gotcha 4: Children Function vs ReactNode Type
 
 ```tsx
+type State = { value: string };
+
 type Props = {
   children: ReactNode;
 };
@@ -4393,7 +4426,7 @@ function Wrapper({ children }: Props) {
 
 // ❌ Function children — TS error
 <Wrapper>
-  {(state) => <p>{state.value}</p>}
+  {(state: State) => <p>{state.value}</p>}
 </Wrapper>
 // children: (state) => ReactNode — bu ReactNode tipida yo'q
 ```
@@ -4414,6 +4447,7 @@ type Props = {
 };
 
 function Wrapper({ children }: Props) {
+  const [state] = useState<State>({ value: '' });
   if (typeof children === 'function') {
     return <div>{children(state)}</div>;
   }
@@ -4469,24 +4503,37 @@ function Card({ user }: { user: User }) {
 ### ❌ Xato 2: `React.FC` Bilan Generic Component
 
 ```tsx
-// ❌ React.FC generic argument qabul qila olmaydi
-const List: React.FC<ListProps<???>> = ...
+// ❌ React.FC generic argument qabul qila olmaydi —
+//    `<T>` ni komponent darajasida e'lon qiladigan joy yo'q:
+// const List: React.FC<ListProps<T>> = (props) => { ... }  // T — bog'lanmagan
 
 // ✅ Function declaration generic
-function List<T>({ items }: ListProps<T>) {
-  return <ul>{items.map((i) => <li>{i}</li>)}</ul>;
+type ListProps<T> = {
+  items: T[];
+  renderItem: (item: T) => ReactNode;
+  keyExtractor: (item: T) => string | number;
+};
+
+function List<T>({ items, renderItem, keyExtractor }: ListProps<T>) {
+  return (
+    <ul>
+      {items.map((item) => (
+        <li key={keyExtractor(item)}>{renderItem(item)}</li>
+      ))}
+    </ul>
+  );
 }
 ```
 
-**Sabab:** `React.FC<P>` — fixed generic, mustaqil parametr qabul qila olmaydi. Function declaration esa o'z generic'larini erkin e'lon qilishi mumkin.
+**Sabab:** `React.FC<P>` — fixed generic, mustaqil parametr qabul qila olmaydi (`<T>` ni qayerda e'lon qilish kerakligi yo'q). Function declaration esa o'z generic'larini erkin e'lon qilishi mumkin.
 
 ---
 
 ### ❌ Xato 3: `defaultProps` Function Component'da (R19+)
 
 ```tsx
-// ❌ R19+ ignored + warning
-function Greeting({ name }) {
+// ❌ R19+ — defaultProps e'tiborga olinmaydi, `name` undefined qoladi
+function Greeting({ name }: { name?: string }) {
   return <h1>Hello, {name}</h1>;
 }
 
@@ -4653,8 +4700,8 @@ function Notification(props: NotificationProps) {
 <Notification variant="success" message="Saved" autoCloseMs={3000} />   // ✅
 
 <Notification variant="info" />                              // ❌ message majburiy
-<Notification variant="error" message="X" />                 // ❌ onRetry majburiy
-<Notification variant="success" onRetry={...} />             // ❌ onRetry success'da yo'q
+<Notification variant="error" message="Failed" />            // ❌ onRetry majburiy
+<Notification variant="success" message="Saved" onRetry={retry} /> // ❌ onRetry success'da yo'q
 ```
 
 `switch` + `never` — exhaustiveness check. Yangi variant qo'shilsa va switch'da ko'rilmasa, TS error.
@@ -4937,8 +4984,6 @@ R19+ uchun bu migration majburiy — `propTypes` va `defaultProps` (function com
   - Class component'larda hali saqlangan (legacy)
 - **`React.FC` anti-pattern** — function declaration + explicit props type afzal
 
-Keyingi bo'limda Composition pattern: composition vs inheritance, slots (children as object), polymorphic components (`as` prop, `ElementType`), va inversion of control yoritiladi.
-
 ---
 
-**Keyingi bo'lim:** [11-composition.md](11-composition.md) — Composition vs Inheritance (React nima uchun inheritance tavsiya qilmaydi), slots pattern (named children, children as object), render props va Compound Components preview, polymorphic components TypeScript bilan (`as` prop, `ElementType`, `ComponentPropsWithoutRef<E>`).
+**Keyingi bo'lim:** [11-composition.md](11-composition.md) — Composition deep dive: composition vs inheritance (React nima uchun inheritance tavsiya qilmaydi), children composition asoslari, named slots pattern, children as object, render props va Compound Components preview, Inversion of Control, polymorphic components (`as` prop), TypeScript `ElementType` + generic polymorphic + polymorphic ref typing.

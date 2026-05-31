@@ -1,6 +1,6 @@
 # Bo'lim 31: React Compiler
 
-> React Compiler — React kodini **build-time**'da tahlil qilib, **automatic memoization** qo'shadigan compiler. Bu fayl Compiler'ning qanday ishlashini, source kod va compile qilingan output orasidagi farqni, va manual `useMemo`/`useCallback`/`React.memo`'larning kelajakdagi rolini o'rganadi. Compiler avval "React Forget" deb atalgan, 2024-yil May'da React Conf'da public experimental release sifatida chiqdi (R19 hali beta edi), 2024-yil Oktabr'da RC1, va 2025-yil Aprel'da `babel-plugin-react-compiler@1.0.0` stable sifatida release qilindi (R19.1+ ekosistemasi bilan to'liq matured). **Concurrent rendering — runtime mexanizm** (cross-ref `30-concurrent-react.md`), **Compiler — build-time tool**: ikki tushuncha alohida lekin bir-birini to'ldiradi (Compiler Concurrent invariants ustiga quriladi).
+> React Compiler — React kodini **build-time**'da tahlil qilib, **automatic memoization** qo'shadigan compiler. Bu fayl Compiler'ning qanday ishlashini, source kod va compile qilingan output orasidagi farqni, va manual `useMemo`/`useCallback`/`React.memo`'larning kelajakdagi rolini o'rganadi. Compiler avval "React Forget" deb atalgan, 2024-yil May'da React Conf'da public experimental release sifatida chiqdi (R19 hali beta edi), 2024-yil Oktabr'da public Beta, 2025-yil Aprel'da Release Candidate (RC), va 2025-yil Oktabr'da `babel-plugin-react-compiler@1.0.0` stable sifatida release qilindi. **Concurrent rendering — runtime mexanizm** (cross-ref `30-concurrent-react.md`), **Compiler — build-time tool**: ikki tushuncha alohida lekin bir-birini to'ldiradi (Compiler Concurrent invariants ustiga quriladi).
 
 ---
 
@@ -11,8 +11,8 @@
 - [Internal Cache Mechanism — `$` Cache Array](#internal-cache-mechanism--%24-cache-array)
 - [Static Analysis: HIR va Dataflow](#static-analysis-hir-va-dataflow)
 - [Rules of React — Compliance Talablar](#rules-of-react--compliance-talablar)
-- [`eslint-plugin-react-compiler` — Static Check](#eslint-plugin-react-compiler--static-check)
-- [`babel-plugin-react-compiler` — Setup va Konfiguratsiya](#babel-plugin-react-compiler--setup-va-konfiguratsiya)
+- [Compiler-powered Linting — Static Check](#compiler-powered-linting--static-check)
+- [`babel-plugin-react-compiler` — Setup va Configuration](#babel-plugin-react-compiler--setup-va-configuration)
 - [Compiler Output Misollari](#compiler-output-misollari)
 - [Migration Path 6 Qadam](#migration-path-6-qadam)
 - [Compiler Cheklovlari va Bail-Out](#compiler-cheklovlari-va-bail-out)
@@ -56,19 +56,20 @@ Optimized AST → Generated JavaScript (memoization bilan)
 Bundler (Vite/Webpack) → bundle.js → Browser
 ```
 
-> **Versiya evolyutsiyasi (Compiler):**
+> **Versiya tarixi (Compiler):**
 > - **2021–2023:** Loyihaning ichki kod-nom: "**React Forget**". Meta'da Instagram va Quest store'da ichki ishlatildi.
 > - **2024 May:** React Conf 2024 — public experimental release. `babel-plugin-react-compiler@beta` npm'ga chiqarildi.
-> - **2024 Oktabr:** RC1 (Release Candidate) status, eslint-plugin-react-compiler RC1.
-> - **2025 April:** `babel-plugin-react-compiler@1.0.0` — birinchi stable release. R19 ekosistemasi bilan to'liq integration. Production ishlatish tavsiya etiladi.
-> - **Compiler React versiyasidan mustaqil:** `babel-plugin-react-compiler` `target` opsiyasi orqali R17, R18, R19 (va kelajak versiyalar) bilan ishlay oladi — runtime'da `react/compiler-runtime` paketi mos kelishi yetarli. Compiler R19'ga bog'lanmagan, faqat R19 ekosistemasi bilan stable matured.
+> - **2024 Oktabr:** public Beta (`babel-plugin-react-compiler@beta`), `eslint-plugin-react-compiler@beta`.
+> - **2025 Aprel:** Release Candidate (`babel-plugin-react-compiler@rc`) — qoidalarga rioya qiluvchi aksariyat ilovalar uchun muammosiz ishlaydi.
+> - **2025 Oktabr:** `babel-plugin-react-compiler@1.0.0` — birinchi stable release. ESLint qoidalari `eslint-plugin-react-hooks`'ga ko'chdi. Production ishlatish tavsiya etiladi.
+> - **Compiler React versiyasidan mustaqil:** `babel-plugin-react-compiler` `target` opsiyasi orqali R17, R18, R19 (va kelajak versiyalar) bilan ishlay oladi. `target: '19'` (default) uchun runtime helper React 19'ning o'zida (`react/compiler-runtime`) — qo'shimcha paket shart emas. `target: '18'` yoki `'17'` uchun alohida `react-compiler-runtime` paketi o'rnatiladi. Compiler R19'ga bog'lanmagan, faqat R19 ekosistemasi bilan stable matured.
 > - **Sabab:** Manual memoization (useMemo/useCallback/React.memo) — code clutter, error-prone, performance regression manbai. Compiler bu masalani **build-time'da hal qiladi** — dasturchi memoization haqida o'ylamaydi.
 
 NIMA UCHUN Compiler kerak:
 
 1. **Manual memoization yopiq dunyo** — har dasturchi qachon `useMemo` ishlatishni o'zicha qaror qiladi. Profile qilmasdan, premature optimization (har joyda `useMemo`) yoki under-optimization (kerakli joyda yo'q) keng tarqalgan.
 2. **Reference identity gotcha'lari** — har render yangi object/array literal yangi reference, child re-render trigger. `React.memo` Context dependency'ga sezgir, Context value har render yangi bo'lsa — memo bypass.
-3. **Code noise** — `useMemo`/`useCallback` chaqiriqlari logic'dan ko'p hajmni egallaydi (Idiomatik komponentda 30-50% memoization wrapper bo'lishi mumkin).
+3. **Code noise** — og'ir optimallashtirilgan komponentda `useMemo`/`useCallback` wrapper'lar va dependency array'lar amaliy logic'dan ko'ra ko'proq joy egallashi mumkin.
 4. **Maintenance burden** — komponent o'zgarganda dependency array'ni qo'lda yangilash kerak (linter exhaustive-deps yordam beradi, lekin to'liq emas).
 5. **Granularity issue** — `useMemo` bir qiymatni cache qiladi, lekin **Compiler komponent ichidagi har computation'ni alohida slot'da cache qiladi** (granular).
 
@@ -76,7 +77,7 @@ QANDAY ishlatiladi:
 
 - **Build-time integration**: Babel plugin (`babel-plugin-react-compiler`) yoki SWC plugin (kelajakda).
 - **Runtime overhead nol**: compile qilingan kod oddiy JavaScript — `react/compiler-runtime` modulidagi `c()` helper bilan cache slot'ga kirish.
-- **Opt-in**: default emas — babel plugin loyihaga qo'shilishi kerak (R17/R18/R19+), `eslint-plugin-react-compiler` violations yo'q deb tasdiqlanganda enable qilinadi.
+- **Opt-in**: default emas — babel plugin loyihaga qo'shilishi kerak (R17/R18/R19+), Compiler-powered linter (`eslint-plugin-react-hooks`) violations yo'q deb tasdiqlanganda enable qilinadi.
 - **Backward compatible**: manual `useMemo`/`useCallback`/`React.memo` hali ishlaydi (Compiler ularni override qilmaydi, lekin ortiqcha bo'ladi).
 
 <details>
@@ -159,7 +160,7 @@ StoreLocal "total", %t5
 
 **Reactive Scope:**
 
-Compiler "reactive scope" deb ataladigan **cache boundaries**'ni aniqlaydi. Har scope — bir reactive computation va uning depencency'lari:
+Compiler "reactive scope" deb ataladigan **cache boundaries**'ni aniqlaydi. Har scope — bir reactive computation va uning dependency'lari:
 
 ```javascript
 // Scope 1: total depends on items
@@ -423,55 +424,55 @@ function Component(props) {
 }
 ```
 
-`useMemoCache` — Compiler-generated kod uchun maxsus internal hook. `useMemo` kabi Hook chain'da bitta slot ajratadi, lekin bitta cache array (N slot) qaytaradi (`useMemo` esa bitta value qaytaradi):
+`useMemoCache` — Compiler-generated kod uchun maxsus internal Hook. `useMemo` har chaqiriqda Hook chain'da alohida slot ajratib bitta value qaytaradi; `useMemoCache(N)` esa butun komponent uchun bitta `N` slotli array qaytaradi va undan barcha reactive scope'lar foydalanadi.
+
+Source'da (`react-reconciler/src/ReactFiberHooks.js`) `useMemoCache` cache'ni Hook chain'dagi `memoizedState`'da emas, balki **fiber'ning `updateQueue.memoCache`'sida** saqlaydi — bu alohida `MemoCache` struktura (`{ data, index }`):
 
 ```javascript
 // React internal (oddiylashtirilgan)
 function useMemoCache(size) {
-  const dispatcher = ReactCurrentDispatcher.current;
-  return dispatcher.useMemoCache(size);
-}
+  let memoCache = null;
+  let updateQueue = currentlyRenderingFiber.updateQueue;
+  if (updateQueue !== null) {
+    memoCache = updateQueue.memoCache;
+  }
+  // Mount: cache hali yo'q — yangi MemoCache yaratiladi
+  if (memoCache === null) {
+    memoCache = { data: [], index: 0 };
+    if (updateQueue === null) {
+      updateQueue = createFunctionComponentUpdateQueue();
+      currentlyRenderingFiber.updateQueue = updateQueue;
+    }
+    updateQueue.memoCache = memoCache;
+  }
 
-// mountMemoCache
-function mountMemoCache(size) {
-  const cache = new Array(size).fill(REACT_MEMO_CACHE_SENTINEL);
-  // Sentinel value — har slot uchun "uninitialized" marker
-  
-  const hook = mountWorkInProgressHook();
-  hook.memoizedState = cache;
-  return cache;
-}
-
-// updateMemoCache
-function updateMemoCache(size) {
-  const hook = updateWorkInProgressHook();
-  return hook.memoizedState; // Saqlangan cache array
+  // Har render boshida index reset; har useMemoCache chaqiriq navbatdagi slice oladi
+  let data = memoCache.data[memoCache.index];
+  if (data === undefined) {
+    data = memoCache.data[memoCache.index] = new Array(size);
+    for (let i = 0; i < size; i++) {
+      data[i] = REACT_MEMO_CACHE_SENTINEL;
+    }
+  }
+  memoCache.index++;
+  return data;
 }
 ```
 
 Cache lifecycle:
 
-1. **Mount:** `useMemoCache(N)` chaqiriladi, `N` ta slot ajratiladi, hammasi `MEMO_CACHE_SENTINEL` (sentinel value).
-2. **First render:** har scope uchun `if ($[i] === SENTINEL || dep mismatch) → compute, store; else → use cached`.
-3. **Update:** `updateMemoCache` saqlangan cache'ni qaytaradi, har scope cache hit/miss check.
-4. **Unmount:** Hook chain bilan birga GC.
+1. **Mount:** birinchi render'da `updateQueue.memoCache` yo'q — yaratiladi, `N` slotli array hammasi `REACT_MEMO_CACHE_SENTINEL` bilan to'ldiriladi.
+2. **First render:** har scope uchun generated kod `if ($[i] === sentinel) → compute, store; else → use cached`. Birinchi render'da hamma slot sentinel, demak hammasi compute.
+3. **Update:** keyingi render'da `memoCache.index` qayta `0`'ga tushadi, har `useMemoCache` chaqiriq o'sha array'ni qaytaradi; generated kod dependency slot'larini joriy qiymatlar bilan solishtiradi (cache hit/miss).
+4. **Unmount:** cache fiber'ning `updateQueue`'si bilan birga GC.
 
-Sentinel value — `Symbol.for('react.memo_cache_sentinel')` (o'xshash). Birinchi render'da `$[i] !== sentinel` — har doim true, scope compute. Keyingi render'larda — saqlangan dep value bilan solishtirish.
+Sentinel value — `Symbol.for('react.memo_cache_sentinel')`. Faqat birinchi initialization belgisi: bir marta slot sentinel'dan boshqa qiymat olgach, keyingi solishtirishlar dependency qiymatlari ustida boradi.
 
 **Comparison strategy:**
 
-Compiler default `Object.is` ishlatadi (cross-ref `04-reconciliation.md`):
+Compiler dependency tekshiruvini generated kod ichiga **inline `!==` (strict inequality)** sifatida yozadi — alohida helper funksiya yoki `Object.is` chaqiruvi yo'q (yuqoridagi `$[0] !== items` pattern). `!==` `Object.is`'dan ikki holatda farq qiladi: `NaN !== NaN` `true` qaytaradi (`Object.is(NaN, NaN)` `true`), va `+0 !== -0` `false` (`Object.is(+0, -0)` `false`). Amalda reactive dependency'lar object/array/primitive reference'lari bo'lgani uchun bu chetki holatlar memoization to'g'riligiga ta'sir qilmaydi.
 
-```javascript
-function $arePropsEqual($, deps) {
-  for (let i = 0; i < deps.length; i++) {
-    if (!Object.is($[i], deps[i])) return false;
-  }
-  return true;
-}
-```
-
-Custom equality — Compiler hozircha qo'llab-quvvatlamaydi (manual `useMemo` bilan custom comparator hali kerak bo'lishi mumkin).
+Custom equality — Compiler qo'llab-quvvatlamaydi: dependency solishtiruvi har doim reference-level. Custom comparator kerak bo'lsa manual `useMemo` (yoki `React.memo` ikkinchi argumenti) hali yagona yo'l.
 
 </details>
 
@@ -679,9 +680,8 @@ Cache slot turlari:
 
 NIMA UCHUN array (object emas):
 
-- **Performance** — array index access O(1), object property lookup property descriptor traversal.
-- **Memory locality** — array contiguous heap allocation (V8 SMI optimization).
-- **Build-time deterministic** — slot'lar build-time'da indekslanadi, runtime'da yangi slot qo'shilmaydi.
+- **Performance** — integer index bo'yicha element o'qish doimiy vaqt; string property lookup hidden class / shape orqali boradi.
+- **Build-time deterministic** — slot'lar build-time'da fixed integer index oladi, runtime'da yangi slot qo'shilmaydi — bu V8'ga array'ni stabil packed elements shaklida saqlash imkonini beradi.
 
 Slot count — Compiler statik analiz natijasi. Misol uchun 3 ta reactive scope bo'lsa va har biri 2 ta slot (deps + output) ishlatsa: `_c(6)`.
 
@@ -690,36 +690,50 @@ Slot count — Compiler statik analiz natijasi. Misol uchun 3 ta reactive scope 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`useMemoCache` Hook chain integration:
+`useMemoCache` cache storage — fiber `updateQueue.memoCache`:
 
 ```javascript
-// React internal
-const HooksDispatcherOnMount = {
-  // ...
-  useMemoCache(size) {
-    const cache = new Array(size).fill(REACT_MEMO_CACHE_SENTINEL);
-    const hook = mountWorkInProgressHook();
-    hook.memoizedState = cache;
-    return cache;
-  },
-  // ...
-};
-
-const HooksDispatcherOnUpdate = {
-  // ...
-  useMemoCache(size) {
-    const hook = updateWorkInProgressHook();
-    let cache = hook.memoizedState;
-    // Concurrent: workInProgress.alternate'dan clone qilish
-    if (cache.length !== size) {
-      // Cache size o'zgarsa (HMR/Fast Refresh) — yangi cache
-      cache = new Array(size).fill(REACT_MEMO_CACHE_SENTINEL);
-      hook.memoizedState = cache;
+// React internal (react-reconciler/src/ReactFiberHooks.js, oddiylashtirilgan)
+function useMemoCache(size) {
+  let memoCache = null;
+  let updateQueue = currentlyRenderingFiber.updateQueue;
+  if (updateQueue !== null) {
+    memoCache = updateQueue.memoCache;
+  }
+  if (memoCache === null) {
+    // Update'da alternate fiber'dan clone qilinadi (concurrent-safe)
+    const current = currentlyRenderingFiber.alternate;
+    if (current !== null && current.updateQueue !== null) {
+      const currentMemoCache = current.updateQueue.memoCache;
+      if (currentMemoCache != null) {
+        memoCache = {
+          data: currentMemoCache.data.map((slots) => slots.slice()),
+          index: 0,
+        };
+      }
     }
-    return cache;
-  },
-  // ...
-};
+    if (memoCache === null) {
+      memoCache = { data: [], index: 0 };
+    }
+    if (updateQueue === null) {
+      updateQueue = createFunctionComponentUpdateQueue();
+      currentlyRenderingFiber.updateQueue = updateQueue;
+    }
+    updateQueue.memoCache = memoCache;
+  }
+
+  let data = memoCache.data[memoCache.index];
+  if (data === undefined) {
+    data = memoCache.data[memoCache.index] = new Array(size).fill(
+      REACT_MEMO_CACHE_SENTINEL,
+    );
+  } else if (data.length !== size) {
+    // Fast Refresh/HMR: cache size o'zgardi — qayta yaratiladi
+    data = new Array(size).fill(REACT_MEMO_CACHE_SENTINEL);
+  }
+  memoCache.index++;
+  return data;
+}
 ```
 
 Cache lifecycle ASCII:
@@ -763,17 +777,19 @@ if ($[0] !== name) { // strict inequality (===/!== reference yoki primitive valu
 
 Compiler default `!==` ishlatadi (strict inequality). Bu `Object.is` bilan **deyarli ekvivalent** lekin **bir xil emas**: `Object.is(NaN, NaN) === true` lekin `NaN !== NaN`; `Object.is(+0, -0) === false` lekin `+0 === -0`. Cache value NaN bo'lsa (`Math.sqrt(-1)`), `!==` har doim true qaytaradi — bu cache miss bo'lib qoladi va recompute har gal sodir bo'ladi (potentsial issue, lekin amaliyotda kamdan-kam). Object uchun esa `!==` reference inequality — bu `Object.is` ekvivalent (object reference uchun).
 
-Hook chain'da `useMemoCache` slot:
+Cache fiber `updateQueue`'sida (Hook linked list'dan tashqarida):
 
 ```
-Fiber.memoizedState (Hook linked list):
-[useState] → [useEffect] → [useMemoCache] → [useState] → ...
-                                ↓
-                          memoizedState = [_, _, _, _, _]
-                                          (cache array)
+Fiber
+ ├─ memoizedState (Hook linked list):
+ │     [useState] → [useEffect] → [useState] → ...
+ │
+ └─ updateQueue.memoCache:
+       { data: [ [ _, _, _, _, _ ] ], index: <render boshida 0'ga reset> }
+                  └─ bitta useMemoCache(5) slice'i
 ```
 
-`useMemoCache` 1 ta hook slot ishlatadi (boshqa hook'lar kabi). Cache array — uning `memoizedState` ichidagi N elementli array.
+`useMemoCache` boshqa Hook'lar kabi Hook linked list'da slot olmaydi — shuning uchun u Rules of Hooks tartibiga bog'liq emas va conditional/loop ichida ham generatsiya qilinishi mumkin. Cache komponent fiber'ining `updateQueue.memoCache.data`'sida saqlanadi; `index` har render boshida `0`'ga tushadi, shuning uchun ketma-ket `useMemoCache` chaqiriqlari har render'da bir xil array slice'larini oladi.
 
 </details>
 
@@ -1019,22 +1035,29 @@ Inline'ning qarori — Compiler heuristic'iga bog'liq (qiymat hajmi, side effect
 Compiler mutation'ni track qiladi:
 
 ```typescript
-// Compiler analiz: items mutation qilinmagan, immutable
+// Compiler analiz: items komponent ichida yaratilgan, faqat o'qiladi — immutable
 const items = [1, 2, 3];
 const total = items.reduce((s, x) => s + x, 0);
 return <div>{total}</div>;
 
-// Compiler analiz: items mutation qilingan ❌
+// Compiler analiz: items komponent ichida yaratilgan va shu yerda mutate qilingan —
+// bu local mutation, output (length) mutation tugagach o'qiladi. Memoize qilinadi.
 const items = [1, 2, 3];
-items.push(4); // Mutation
+items.push(4);
 return <div>{items.length}</div>;
-// Compiler: bail-out — bu komponentda memoization qilolmaydi
+
+// ❌ Props mutation: items komponentga tashqaridan keladi va shu yerda o'zgartiriladi.
+// Bu Rules of React buzilishi — Compiler bu computation'ni memoize qilmaydi.
+function badRender({ items }: { items: number[] }) {
+  items.push(4); // tashqi value mutation
+  return <div>{items.length}</div>;
+}
 ```
 
-Mutation aniqlanganda Compiler **ikki yo'l** tanlaydi:
+Mutation aniqlanganda Compiler manba bo'yicha farqlaydi:
 
-1. **Local mutation** — value komponent ichida yaratilgan va faqat ichida ishlatilgan. Compiler buni **local effect** deb biladi va memoize qila oladi (mutation'ni hisobga olib).
-2. **Non-local mutation** — props/state/global mutation. Compiler bu komponentni **bail-out** qiladi (memoization yo'q).
+1. **Local mutation** — value komponent ichida yaratilgan va faqat ichida ishlatilgan. Compiler mutation tartibini hisobga olib (mutation tugagandan keyingi qiymatga bog'lab) baribir memoize qila oladi.
+2. **Non-local mutation** — props/state/Context'dan kelgan yoki module-level value mutation. Bu Rules of React buzilishi; Compiler bunday qiymatga bog'liq scope'ni memoize qilmaydi (mutation natijasi statik analizda noaniq).
 
 Misol:
 
@@ -1229,7 +1252,7 @@ function PriceListMutating({ items }: { items: Item[] }): ReactElement {
   );
 }
 // Compiler: bail-out, bu komponentda manual yoki Compiler memoization yo'q.
-// eslint-plugin-react-compiler error: "Mutating prop is forbidden"
+// Compiler linter error: "Mutating prop is forbidden"
 ```
 
 </details>
@@ -1378,7 +1401,7 @@ useEffect(() => {
 QANDAY Compiler bu qoidalarni majburlaydi:
 
 1. **Statik analiz** — mutation/side effect detection HIR + dataflow.
-2. **`eslint-plugin-react-compiler`** — compile'dan oldin warning/error.
+2. **Compiler-powered linter** (`eslint-plugin-react-hooks`) — compile'dan oldin warning/error.
 3. **Bail-out** — qoidalar buzilsa Compiler shu komponentni memoize qilmaydi (fallback to manual or no memoization).
 
 <details>
@@ -1432,7 +1455,7 @@ function shouldMemoize(component) {
 ESLint plugin detection:
 
 ```javascript
-// eslint-plugin-react-compiler core rule
+// Compiler-powered ESLint rule core (eslint-plugin-react-hooks)
 const rule = {
   create(context) {
     return {
@@ -1621,46 +1644,51 @@ function FeatureFlag({ enabled }: { enabled: boolean }): ReactElement {
 
 ---
 
-## `eslint-plugin-react-compiler` — Static Check
+## Compiler-powered Linting — Static Check
 
 ### Nazariya
 
-`eslint-plugin-react-compiler` — Compiler'ning **statik tekshirish** plagini. ESLint pipeline'iga qo'shiladi va **compile'dan oldin** Rules of React violations'ni topadi. Bu plagin Compiler enable qilishdan oldin **majburiy** — kodni mos qilish ishlash.
+Compiler **statik tekshirish** qoidasini ham beradi — ESLint pipeline'iga qo'shiladi va **compile'dan oldin** Rules of React violations'ni topadi. Linter compiler o'rnatilishini talab qilmaydi: kompiler hali enable qilinmagan bo'lsa ham mustaqil ishlatish mumkin va Compiler'ga o'tishdan oldin kodni mos qilishga yordam beradi.
+
+**Paket holati:** dastlab qoidalar alohida `eslint-plugin-react-compiler` paketida edi. 2025 Oktabr'dagi React Compiler 1.0 e'loni bilan ular `eslint-plugin-react-hooks`'ga ko'chirildi (`recommended` / `recommended-latest` preset). Rasmiy tavsiya: `eslint-plugin-react-compiler` o'rnatilgan bo'lsa olib tashlash va `eslint-plugin-react-hooks@latest`'ga o'tish. Quyida joriy (`eslint-plugin-react-hooks`) yo'l ko'rsatilgan.
 
 ### Install
 
 ```bash
-npm install -D eslint-plugin-react-compiler
+npm install -D eslint-plugin-react-hooks@latest
 ```
 
-### Konfiguratsiya
+### Configuration
 
 ```javascript
 // eslint.config.js (flat config — ESLint 9+)
-import reactCompiler from 'eslint-plugin-react-compiler';
+import reactHooks from 'eslint-plugin-react-hooks';
+
+export default [
+  // recommended preset compiler-powered qoidalarni o'z ichiga oladi
+  reactHooks.configs['recommended-latest'],
+];
+```
+
+Yoki qoidalarni qo'lda yoqish:
+
+```javascript
+// eslint.config.js
+import reactHooks from 'eslint-plugin-react-hooks';
 
 export default [
   {
     plugins: {
-      'react-compiler': reactCompiler,
+      'react-hooks': reactHooks,
     },
     rules: {
-      'react-compiler/react-compiler': 'error',
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      // Compiler-powered qoidalar (eslint-plugin-react-hooks v6+)
+      'react-hooks/react-compiler': 'error',
     },
   },
 ];
-```
-
-Yoki classic format:
-
-```javascript
-// .eslintrc.json
-{
-  "plugins": ["react-compiler"],
-  "rules": {
-    "react-compiler/react-compiler": "error"
-  }
-}
 ```
 
 ### Plugin Tomonidan Aniqlanadigan Violations
@@ -1686,7 +1714,7 @@ Yoki classic format:
 ┌──────────────────┐
 │ ESLint checks    │
 │ - eslint-plugin- │
-│   react-compiler │
+│   react-hooks    │
 └──────┬───────────┘
        │
        ├─ No violations → Compiler can memoize
@@ -1714,7 +1742,7 @@ function Counter({ count }: { count: number }) {
 ESLint output:
 
 ```
-react-compiler/react-compiler:
+react-hooks/react-compiler:
   Cannot mutate non-local value 'document.title' during render.
   Move this side effect to useEffect or an event handler.
   
@@ -1729,7 +1757,7 @@ Plagin barcha violations'ni report qiladi va dasturchi har birini qo'lda tuzatad
 ESLint plugin internals:
 
 ```javascript
-// eslint-plugin-react-compiler (oddiylashtirilgan)
+// Compiler-powered ESLint rule (eslint-plugin-react-hooks, oddiylashtirilgan)
 const rule = {
   meta: {
     type: 'problem',
@@ -1835,7 +1863,6 @@ ESLint config (Vite + TypeScript loyihada):
 // eslint.config.js
 import js from '@eslint/js';
 import typescript from 'typescript-eslint';
-import reactCompiler from 'eslint-plugin-react-compiler';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 export default [
@@ -1844,13 +1871,13 @@ export default [
   {
     files: ['**/*.{ts,tsx}'],
     plugins: {
-      'react-compiler': reactCompiler,
       'react-hooks': reactHooks,
     },
     rules: {
-      'react-compiler/react-compiler': 'error',
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
+      // Compiler-powered qoida (eslint-plugin-react-hooks v6+)
+      'react-hooks/react-compiler': 'error',
     },
   },
 ];
@@ -1958,7 +1985,7 @@ function useCounterMutatingRef(): { count: number; increment: () => void } {
 
 ---
 
-## `babel-plugin-react-compiler` — Setup va Konfiguratsiya
+## `babel-plugin-react-compiler` — Setup va Configuration
 
 ### Nazariya
 
@@ -1970,7 +1997,7 @@ function useCounterMutatingRef(): { count: number; increment: () => void } {
 npm install -D babel-plugin-react-compiler
 ```
 
-### Vite Konfiguratsiya
+### Vite Configuration
 
 ```typescript
 // vite.config.ts
@@ -1996,7 +2023,7 @@ export default defineConfig({
 });
 ```
 
-### Webpack Konfiguratsiya
+### Webpack Configuration
 
 ```javascript
 // webpack.config.js
@@ -2024,7 +2051,7 @@ module.exports = {
 };
 ```
 
-### Next.js Konfiguratsiya
+### Next.js Configuration
 
 ```javascript
 // next.config.js
@@ -2041,7 +2068,7 @@ Yoki options bilan:
 module.exports = {
   experimental: {
     reactCompiler: {
-      compilationMode: 'annotation', // Faqat 'use memo' direktivasi bor fayllarni compile
+      compilationMode: 'annotation', // Faqat 'use memo' directive bor fayllarni compile
     },
   },
 };
@@ -2149,18 +2176,18 @@ File source code
                             └─ No React → SKIP
 ```
 
-`panicThreshold` semantics:
+`panicThreshold` — Compiler diagnostic topganda build'ni **to'xtatadimi yoki shu komponentni skip qilib davom etadimi** boshqaradi (default `'none'`):
 
-- **`'all_errors'`** (default development) — har bail-out warning sifatida log qilinadi va Compiler komponent'ni skip qiladi.
-- **`'critical_errors'`** — faqat kritik bail-out (data loss xavfi) report qilinadi, oddiy bail-out silently skip.
-- **`'none'`** (production) — hech qanday warning yoki error, Compiler "best-effort" rejimida ishlaydi.
+- **`'none'`** (default, tavsiya etilgan) — Compiler hech qachon throw qilmaydi. Compile qilib bo'lmaydigan komponent oddiygina optimallashtirilmaydi, build davom etadi.
+- **`'critical_errors'`** — faqat kutilmagan ichki invariant xatosida throw qiladi; oddiy "bu kodni optimallashtirib bo'lmaydi" diagnostikasida skip.
+- **`'all_errors'`** — har qanday diagnostikada build to'xtaydi (throw). Debug paytida — qaysi komponent compile bo'lmayotganini topish uchun.
 
 </details>
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-To'liq Vite konfiguratsiya (TypeScript + React 19):
+To'liq Vite configuration (TypeScript + React 19):
 
 ```typescript
 // vite.config.ts
@@ -2171,7 +2198,8 @@ import path from 'path';
 const ReactCompilerConfig = {
   target: '19' as const,
   compilationMode: 'infer' as const,
-  panicThreshold: 'all_errors' as const,
+  // panicThreshold default 'none' — build resilient. 'all_errors' faqat
+  // debug paytida (qaysi komponent compile bo'lmayotganini topish).
 };
 
 export default defineConfig({
@@ -2210,8 +2238,7 @@ export default defineConfig({
     "@vitejs/plugin-react": "^4.3.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9.0.0",
-    "eslint-plugin-react-compiler": "^1.0.0",
-    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-hooks": "^6.0.0",
     "typescript": "^5.5.0",
     "vite": "^5.4.0"
   }
@@ -2551,7 +2578,7 @@ console.warn(
 );
 ```
 
-`panicThreshold: 'all_errors'` da bail-out — error sifatida loglanadi. `panicThreshold: 'none'` da silent skip.
+`panicThreshold: 'all_errors'` da diagnostic build'ni to'xtatadi (throw). `panicThreshold: 'none'` (default) da komponent jimgina skip qilinadi, build davom etadi.
 
 </details>
 
@@ -2643,12 +2670,11 @@ DevTools'da Compiler-generated komponent ko'rish:
 
 ```
 React DevTools (Components tab):
-   ⚛ Memo(Greeting)
+   ⚛ Greeting   ✨  ← "Memo ✨" badge: Compiler optimized
      props: { user, count }
-     hooks: 1 (useMemoCache)
 ```
 
-Hooks tab'da `useMemoCache` 1 ta hook sifatida ko'rinadi.
+React DevTools Compiler-optimized komponentni maxsus badge (✨) bilan belgilaydi. `useMemoCache` Hook linked list'da slot olmagani uchun u Hooks panelida alohida Hook bo'lib ko'rinmaydi — cache fiber'ning `updateQueue`'sida yashaydi.
 
 </details>
 
@@ -2660,19 +2686,21 @@ Hooks tab'da `useMemoCache` 1 ta hook sifatida ko'rinadi.
 
 Mavjud loyihaga React Compiler qo'shish — **incremental** jarayon. To'satdan butun loyihada enable qilish — ko'p violations va potential breaking changes. Tavsiya etilgan migration path 6 qadam:
 
-### Qadam 1: ESLint Plugin O'rnatish
+### Qadam 1: Compiler Linter O'rnatish
 
 ```bash
-npm install -D eslint-plugin-react-compiler
+npm install -D eslint-plugin-react-hooks@latest
 ```
 
 ```javascript
 // eslint.config.js
+import reactHooks from 'eslint-plugin-react-hooks';
+
 export default [
   {
-    plugins: { 'react-compiler': reactCompiler },
+    plugins: { 'react-hooks': reactHooks },
     rules: {
-      'react-compiler/react-compiler': 'warn', // Birinchi marta — warn
+      'react-hooks/react-compiler': 'warn', // Birinchi marta — warn
     },
   },
 ];
@@ -2720,7 +2748,7 @@ Barcha violations tuzatilgandan keyin:
 // eslint.config.js
 {
   rules: {
-    'react-compiler/react-compiler': 'error', // Endi error
+    'react-hooks/react-compiler': 'error', // Endi error
   },
 }
 ```
@@ -2737,7 +2765,7 @@ npm install -D babel-plugin-react-compiler
 // vite.config.ts
 const ReactCompilerConfig = {
   target: '19',
-  compilationMode: 'annotation', // Faqat 'use memo' direktivasi bor fayllar
+  compilationMode: 'annotation', // Faqat 'use memo' directive bor fayllar
 };
 ```
 
@@ -3088,61 +3116,45 @@ Bail-out detection algorithm:
 
 ```javascript
 // Compiler internals (oddiylashtirilgan)
-function shouldCompile(component) {
+function compileComponent(component) {
   const hir = buildHIR(component);
-  
-  // Validation passes
-  const violations = [];
-  
+  const diagnostics = [];
+
   for (const inst of hir.instructions) {
-    // 1. Mutation detection
     if (isMutation(inst) && !isLocalMutation(inst)) {
-      violations.push({
-        kind: 'NonLocalMutation',
-        location: inst.loc,
-      });
+      diagnostics.push({ kind: 'NonLocalMutation', location: inst.loc });
     }
-    
-    // 2. Side effect detection
     if (isSideEffect(inst) && isInRenderPhase(inst)) {
-      violations.push({
-        kind: 'RenderSideEffect',
-        location: inst.loc,
-      });
+      diagnostics.push({ kind: 'RenderSideEffect', location: inst.loc });
     }
-    
-    // 3. Conditional hook
     if (isHookCall(inst) && isInsideConditional(inst)) {
-      violations.push({
-        kind: 'ConditionalHook',
-        location: inst.loc,
-      });
+      diagnostics.push({ kind: 'ConditionalHook', location: inst.loc });
     }
-    
-    // 4. Ref render-time access
     if (isRefAccess(inst) && isInRenderPhase(inst)) {
-      violations.push({
-        kind: 'RefInRender',
-        location: inst.loc,
-      });
+      diagnostics.push({ kind: 'RefInRender', location: inst.loc });
     }
   }
-  
-  // Decide based on panicThreshold
-  const criticalViolations = violations.filter((v) => isCritical(v));
-  
-  switch (config.panicThreshold) {
-    case 'all_errors':
-      return violations.length === 0;
-    case 'critical_errors':
-      return criticalViolations.length === 0;
-    case 'none':
-      return true; // Best-effort, ignore violations
+
+  // Diagnostic bo'lsa — komponent HAR DOIM skip qilinadi (memoize qilinmaydi),
+  // panicThreshold'dan qat'i nazar. Bu Compiler'ning safe-by-default printsipi.
+  if (diagnostics.length > 0) {
+    // panicThreshold faqat build'ning reaksiyasini boshqaradi:
+    switch (config.panicThreshold) {
+      case 'all_errors':
+        throw new CompilerError(diagnostics); // build to'xtaydi
+      case 'critical_errors':
+        if (diagnostics.some(isInternalInvariant)) throw new CompilerError(diagnostics);
+        return component; // skip, optimallashtirilmagan
+      case 'none':
+        return component; // jimgina skip, build davom etadi
+    }
   }
+
+  return generateMemoizedCode(hir);
 }
 ```
 
-`'none'` mode'da Compiler **best-effort** — violations bo'lsa ham memoize qilishga harakat qiladi, lekin natija noto'g'ri bo'lishi mumkin (mutation propagation, stale references).
+`panicThreshold` Compiler **qaysi komponentni optimallashtirishni** emas, balki **diagnostic chiqqanda build'ning reaksiyasini** boshqaradi. Compile qilib bo'lmaydigan (Rules of React buzilgan) komponent har doim oddiygina optimallashtirilmaydi — `'none'` mode'da ham Compiler "baribir memoize qilib qo'yaman" demaydi. Compiler safe-by-default: semantikani saqlay olmasligi aniqlangan joyda u memoization qo'shmaydi, shuning uchun noto'g'ri memoization holati yuzaga kelmaydi.
 
 </details>
 
@@ -3379,8 +3391,8 @@ Compiler-generated memoization vs manual:
 |--------|-------------------|------------------|
 | Granularity | Per `useMemo` call | Per reactive scope (finer) |
 | Deps array | Manual (error-prone) | Auto-inferred |
-| Cache slot | Hook chain'da slot | Single `_c` array |
-| Hook overhead | 1 hook per `useMemo` | 1 `useMemoCache` total |
+| Saqlash joyi | Har `useMemo` Hook chain'da alohida slot | Bitta `_c` array (fiber `updateQueue.memoCache`) |
+| Overhead | Har `useMemo`/`useCallback` Hook chain'da slot oladi | Komponent uchun bitta `useMemoCache(N)` |
 | Comparison | `Object.is` (React `areHookInputsEqual`) | `!==` strict inequality (NaN/±0 farqi `Object.is`'dan) |
 | Custom equality | Argument'siz support | Yo'q (kelajakda?) |
 
@@ -3534,7 +3546,7 @@ export function ProductCard({ product, onAdd }: ProductCardProps): ReactElement 
   );
 }
 
-// Hajm: ~20 qator manual memoization wrapper olib tashlandi
+// Hajm: manual memoization wrapper'lar (useMemo/useCallback/memo) olib tashlandi
 // Behavior: ekvivalent (Compiler granular memoization)
 ```
 
@@ -3578,7 +3590,7 @@ Compiler bu `LegacyComponent`'ni bail-out qiladi (mutation traced through librar
 
 ### Workaround: Library Boundary
 
-Library chaqiriqlari'ni komponent boundary'sida izolatsiya qilish:
+Library chaqiriqlari'ni komponent boundary'sida ajratish:
 
 ```tsx
 // ✅ Library chaqirig'i useEffect'da
@@ -3786,7 +3798,7 @@ function onRenderCallback(
 
 Compiler cache memory — sifat-darajadagi taqqoslash:
 
-- **Compiler approach:** komponent instance bo'yicha bitta `useMemoCache(N)` hook slot va N elementli cache array (har slot V8 heap pointer hajmida). Cached value'lar — chiqish hajmiga bog'liq (object/JSX).
+- **Compiler approach:** komponent instance bo'yicha bitta N elementli cache array (fiber `updateQueue.memoCache`'da; har slot V8 heap pointer hajmida). Cached value'lar — chiqish hajmiga bog'liq (object/JSX).
 - **Manual `useMemo`:** har `useMemo` chaqiriq alohida hook slot va `[value, deps]` saqlash. K ta `useMemo` chaqirig'ida K ta hook slot.
 
 **Memory efficiency:** Compiler approach odatda kichikroq overhead — bitta cache array ko'p hook slot'lar o'rniga. Aniq baytlar V8 build, scope hajmi va cached value tipiga bog'liq, lekin order of magnitude — bir komponent instance uchun bir necha KB.
@@ -3914,7 +3926,8 @@ Compiler stable bo'lgan paytda **manual memoization yo'q bo'lib ketishi** kutilm
 | Vaqt | Holat |
 |------|-------|
 | 2024 | Compiler beta, Meta production'da |
-| 2025 April | `babel-plugin-react-compiler@1.0` stable |
+| 2025 Aprel | `babel-plugin-react-compiler@rc` (Release Candidate) |
+| 2025 Oktabr | `babel-plugin-react-compiler@1.0` stable |
 | 2025–2026 | Major library/framework adoption (Next.js, Vite ecosystem) |
 | 2027+ | Default-on (Compiler standart React app'da) |
 | 2028+ | Manual `useMemo`/`useCallback` legacy (deprecation hali ehtimoldan uzoq, lekin idiomatic emas) |
@@ -3966,8 +3979,8 @@ Compiler + Concurrent — **synergic** — ikkalasi ham kodga bir xil kafolat (p
 RSC (cross-ref `39-rsc-server-actions.md`) ham Compiler bilan ishlay oladi:
 
 - Server Component — server'da render, client bundle'siz.
-- Compiler server'da ishlamaydi (memoization runtime React faqat client'da).
-- Client Component — Compiler memoize qiladi.
+- Compiler Server Component kodini ham transform qiladi, lekin uning asosiy foydasi (re-render'larni skip qilish) Server Component'ga taalluqli emas — Server Component client'da re-render bo'lmaydi, har so'rovda bir marta render qilinadi.
+- Client Component — Compiler memoize qiladi, re-render skip foydasi shu yerda namoyon bo'ladi.
 - `'use client'` boundary'da Compiler activate.
 
 <details>
@@ -3983,7 +3996,7 @@ Roadmap (taxminiy):
 
 ```
 2025:
-- Stable v1.0 release ✅ (April 2025)
+- Stable v1.0 release ✅ (Oktabr 2025)
 - Next.js native integration
 - ESLint rule expansion
 - Source map improvements
@@ -4119,7 +4132,7 @@ function Form() {
 
 **Yechim:** ref read'ni event handler/effect'ga ko'chirish, yoki state ishlatish.
 
-### Gotcha 2: `'use memo'` va `'use no memo'` Direktivalar
+### Gotcha 2: `'use memo'` va `'use no memo'` Directive'lar
 
 Fayl boshida directive yozish — fayl faqat string emas, file-level pragma:
 
@@ -4137,7 +4150,7 @@ function Comp() {
 
 ### Gotcha 3: Compiler + React DevTools Hooks Tab
 
-Compiler komponent'da `useMemoCache` 1 hook sifatida ko'rinadi. Manual `useMemo`/`useCallback` ko'rinmaydi (chunki yo'q). Hook count manual versiyaga qaraganda kamroq.
+Compiler-generated komponentda Hooks tab manual versiyadan **soddaroq** ko'rinadi: `useMemo`/`useCallback` yozilmagani uchun ular ro'yxatda yo'q. `useMemoCache` Hook linked list'da slot olmaydi (cache fiber `updateQueue`'sida saqlanadi), shuning uchun Hooks tab'da alohida Hook bo'lib chiqmaydi — faqat haqiqiy state/effect Hook'lar ko'rinadi:
 
 ```
 Manual Counter component:
@@ -4149,7 +4162,8 @@ Manual Counter component:
 Compiler Counter component:
    Hooks tab:
      1. State (count: 0)
-     2. MemoCache [4] (cache slots)
+   (doubled/handleIncrement Hook bo'lmay, Compiler cache'ida)
+   Components tab: "Counter ✨" badge — Compiler optimized
 ```
 
 ### Gotcha 4: Hot Module Replacement (HMR)
@@ -4161,48 +4175,47 @@ HMR Compiler-generated kod bilan ba'zan muammo:
 
 **Yechim:** development'da component kodini katta o'zgartirilganda full reload (`Cmd+R`/`Ctrl+R`).
 
-### Gotcha 5: Inline JSX'da Reference Identity
+### Gotcha 5: Inline Object/Array Prop — Compiler bilan vs Compiler'siz
+
+Compiler'siz, JSX'da inline object/array literal har render yangi reference yaratadi — `memo` bilan o'ralgan child'ni keraksiz re-render qiladi:
+
+```tsx
+// Compiler'siz
+function Parent() {
+  return <Child config={{ debounce: 300 }} />;
+  // Har render {{ debounce: 300 }} yangi reference — memo(Child) re-render
+}
+```
+
+Compiler enabled bo'lsa bu aynan Compiler hal qiladigan holat: u inline `{{ debounce: 300 }}`'ni cache slot'ga oladi, reference render'lar orasida barqaror qoladi:
 
 ```tsx
 'use memo';
 
 function Parent() {
   return <Child config={{ debounce: 300 }} />;
-  // Compiler: <Child> JSX scope ichida {{ debounce: 300 }} har render yangi
-  // Compiler 1.0 hozircha JSX prop literal'ini alohida scope'ga ajratmaydi
-  // Child re-render'da config har gal yangi reference
+  // Compiler {{ debounce: 300 }}'ni alohida scope'da cache qiladi —
+  // Parent dependency'lari o'zgarmasa config reference barqaror
 }
 ```
 
-**Yechim:** module-level constant yoki extract qilish:
-
-```tsx
-'use memo';
-
-const CHILD_CONFIG = { debounce: 300 };
-
-function Parent() {
-  return <Child config={CHILD_CONFIG} />; // Stable reference
-}
-```
-
-Bu cheklov kelajakda Compiler tomonidan tuzatilishi kutilmoqda.
+Demak Compiler kontekstida inline literal'ni qo'lda module-level constant'ga ajratish shart emas. Gotcha — Compiler **yoqilmagan** fayllarda (`'use no memo'` yoki opt-in qilinmagan) eski reference identity tuzog'i saqlanib qoladi.
 
 ---
 
 ## Common Mistakes
 
-### ❌ Xato 1: ESLint Plugin'siz Compiler Enable
+### ❌ Xato 1: Compiler Linter'siz Compiler Enable
 
 ```typescript
 // ❌ Faqat Compiler plugin
 const ReactCompilerConfig = { target: '19' };
-// ESLint plugin yo'q — violations silent bail-out
+// Compiler linter yo'q — violations silent skip (optimallashmagan komponentlar ko'rinmaydi)
 ```
 
 ```typescript
-// ✅ Birinchi ESLint, keyin Compiler
-// 1. eslint-plugin-react-compiler enable
+// ✅ Birinchi linter, keyin Compiler
+// 1. eslint-plugin-react-hooks (recommended preset) — react-compiler qoidasi enable
 // 2. Violations fix
 // 3. babel-plugin-react-compiler enable
 ```
@@ -4261,20 +4274,24 @@ function Wrapper({ data }: { data: Data }) {
 }
 ```
 
-### ❌ Xato 4: `panicThreshold: 'none'` Production'da
+### ❌ Xato 4: `panicThreshold: 'all_errors'`'ni Production Build'da Qoldirish
 
 ```typescript
-// ❌ Bail-out warning'lar yo'qoladi, debug qiyin
+// ❌ Har diagnostic'da build to'xtaydi — bitta compile bo'lmaydigan
+// komponent butun production build'ni sindiradi
 const ReactCompilerConfig = {
-  panicThreshold: 'none',
+  panicThreshold: 'all_errors',
 };
 ```
 
 ```typescript
-// ✅ Development'da `'all_errors'`, production'da `'critical_errors'`
+// ✅ Default 'none' — build resilient (uncompilable komponent jimgina skip).
+// 'all_errors' faqat debug paytida (qaysi komponent compile bo'lmayotganini topish)
 const ReactCompilerConfig = {
-  panicThreshold: process.env.NODE_ENV === 'production' ? 'critical_errors' : 'all_errors',
+  // panicThreshold default 'none' — odatda o'zgartirish shart emas
 };
+// Qaysi komponentlar optimallashmaganini ko'rish — Compiler linter ishi,
+// panicThreshold emas.
 ```
 
 ### ❌ Xato 5: Compiler Performance Profile'siz Enable
@@ -4295,7 +4312,7 @@ const ReactCompilerConfig = { compilationMode: 'annotation' };
 
 ## Amaliy Mashqlar
 
-### Mashq 1: Manual Memo'dan Compiler'ga Migratsiya (Oson)
+### Mashq 1: Manual Memo'dan Compiler'ga Migration (Oson)
 
 Quyidagi komponentni Compiler-friendly shaklga o'tkazing — manual `useMemo`/`useCallback`/`memo`'larni olib tashlang.
 
@@ -4550,7 +4567,7 @@ function UserCard({ user, theme }: { user: User; theme: 'light' | 'dark' }): Rea
 import { c as _c } from 'react/compiler-runtime';
 
 function UserCard(t0) {
-  const $ = _c(11);
+  const $ = _c(12);
   const { user, theme } = t0;
   
   // Scope 1: fullName depends on user.firstName, user.lastName
@@ -4600,18 +4617,18 @@ function UserCard(t0) {
     $[8] = className;
     $[9] = fullName;
     $[10] = ageGroup;
-    // Note: real Compiler'da output ham slot'da saqlanadi (qo'shimcha slot kerak)
+    $[11] = t4; // output slot
   } else {
-    t4 = /* output saqlash uchun qo'shimcha slot */;
+    t4 = $[11];
   }
   
   return t4;
 }
 ```
 
-Eslatma: real Compiler output yanada oddiy, har scope output uchun alohida slot ajratadi. Bu yerdagi format konsept ko'rsatish uchun.
+Eslatma: bu format konsept ko'rsatish uchun. Real Compiler output dep tekshiruvini biroz boshqacha guruhlashi mumkin, lekin har scope o'z output'i uchun alohida slot oladi.
 
-Jami: 4 ta reactive scope, ~11 cache slot.
+Jami: 4 ta reactive scope, 12 cache slot (3 + 2 + 3 + 4).
 
 Granularity benefit:
 - `user.id` o'zgarsa — barcha scope'lar cached.
@@ -4823,7 +4840,7 @@ Test (Compiler bail-out check):
 
 ```bash
 npm run lint
-# eslint-plugin-react-compiler natija:
+# Compiler linter (eslint-plugin-react-hooks) natija:
 # ✅ No violations in useDebounce.ts
 # ✅ No violations in SearchBox.tsx
 ```
@@ -4832,17 +4849,16 @@ DevTools'da check:
 
 ```
 React DevTools (Components tab):
-   ⚛ SearchBox
+   ⚛ SearchBox ✨   ← Compiler optimized badge
      hooks:
        1. State (query: '')
        2. Debounce (custom hook)
          a. State (debouncedValue: '')
          b. Effect (setTimeout/clearTimeout)
-       3. MemoCache [N]
-       4. Effect (fetch)
+       3. Effect (fetch)
 ```
 
-`useMemoCache` Compiler-injected hook sifatida ko'rinadi.
+Compiler-injected `useMemoCache` Hook linked list'da slot olmagani uchun Hooks panelida alohida Hook bo'lib chiqmaydi — komponent fiber'ining `updateQueue`'sida saqlanadi. Compiler optimallashtirgan komponent Components tab'da ✨ badge bilan belgilanadi.
 
 </details>
 
@@ -4852,16 +4868,16 @@ React DevTools (Components tab):
 
 React Compiler — **build-time tool** bo'lib, source kod statik analiz natijasida automatic memoization qo'shadi. Bu fayl shu mexanizmni o'rgandi:
 
-- **Compiler Concept** — build-time tool (avval React Forget), Babel plugin orqali AST → HIR → reactivity inference → cache slot allocation → memoized output. R19 bilan birga `babel-plugin-react-compiler@1.0.0` stable (2025 April).
+- **Compiler Concept** — build-time tool (avval React Forget), Babel plugin orqali AST → HIR → reactivity inference → cache slot allocation → memoized output. R19 bilan birga `babel-plugin-react-compiler@1.0.0` stable (2025-oktyabr-7).
 - **Auto-Memoization** — `useMemo`/`useCallback`/`React.memo` kerak emas, Compiler komponent ichidagi har reactive scope alohida cache slot'da saqlaydi (granular per-property tracking).
 - **Internal `_c` Array** — `useMemoCache(N)` chaqiriq build-time'da hisoblangan slot count'da array ajratadi, har scope `if ($[i] !== dep) { recompute; cache; } else { use cached; }` pattern.
 - **Static Analysis** — HIR (SSA form, CFG), reactivity inference (props/state/context/hook returns reactive vs refs/module-level non-reactive), dataflow analysis, mutability inference, reactive scope grouping.
 - **Rules of React** — komponent va hook'lar pure (mutation yo'q, side effect yo'q, top-level hooks, refs render-time yozilmaydi, effect cleanup symmetry). Bu qoidalar runtime invariants — Compiler build-time'da majburlaydi (cross-ref `30-concurrent-react.md`).
-- **`eslint-plugin-react-compiler`** — compile'dan oldin violation'larni topish, ESLint pipeline integration'i, CI/CD'ga qo'shish.
+- **Compiler-powered linter** — `eslint-plugin-react-hooks` (1.0'dan oldin alohida `eslint-plugin-react-compiler` edi) compile'dan oldin violation'larni topadi, ESLint pipeline integration'i, CI/CD'ga qo'shish.
 - **`babel-plugin-react-compiler`** — Vite/Webpack/Next.js Babel pipeline'iga qo'shiladi, opsiyalar (target, compilationMode, panicThreshold, sources).
 - **Migration Path 6 Qadam** — ESLint plugin → violations fix → ESLint error mode → Babel plugin (annotation mode) → per-file opt-in (`'use memo'`) → manual memo'ni gradual olib tashlash. Yangi kod default Compiler-friendly.
 - **Cheklovlar va Bail-out** — mutation, side effects, conditional hooks, ref render-time access, async hooks, complex closures. Bail-out qilingan komponent manual memoization'ga qaytadi.
-- **Library Compatibility** — modern library'lar mos (React Router, TanStack Query, Zustand, Redux Toolkit), legacy library mutation'i bo'lsa effect boundary bilan izolatsiya.
+- **Library Compatibility** — modern library'lar mos (React Router, TanStack Query, Zustand, Redux Toolkit), legacy library mutation'i bo'lsa effect boundary bilan ajratish.
 - **Performance** — granular memoization, default-on optimization, single `useMemoCache` overhead `useMemo`+`useCallback`+`memo` chain'idan kichik. Bundle hajmi biroz kattaroq, runtime ko'pincha tezroq. Profile birinchi.
 - **Future Paradigm** — manual memoization (`useMemo`/`useCallback`/`React.memo`) yo'q bo'lib ketadi (idiomatic emas), backward compatibility saqlanadi, kod clarity yaxshilanadi, Concurrent invariants bilan synergic.
 

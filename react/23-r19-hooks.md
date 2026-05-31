@@ -18,7 +18,7 @@
 - [`useActionState()` Validation Pattern](#useactionstate-validation-pattern)
 - [`useOptimistic()` — Optimistic UI Updates](#useoptimistic--optimistic-ui-updates)
 - [`useOptimistic()` Real-World Patterns](#useoptimistic-real-world-patterns)
-- [R19 Forms Ekosistema — Hookslar Birgalikda](#r19-forms-ekosistema--hookslar-birgalikda)
+- [R19 Forms Ekosistema — Hook'lar Birgalikda](#r19-forms-ekosistema--hooklar-birgalikda)
 - [Decision Guide — Qaysi Hook Qachon](#decision-guide--qaysi-hook-qachon)
 - [Edge Cases va Gotchas](#edge-cases-va-gotchas)
 - [Common Mistakes](#common-mistakes)
@@ -674,7 +674,7 @@ Bu pattern'da `userPromise` va `feedPromise` parallel boshlanadi (waterfall yo'q
 `use()` bilan dynamic import (code splitting):
 
 ```tsx
-import { use, Suspense, lazy } from 'react';
+import { use, Suspense } from 'react';
 
 // Lazy import promise
 const moduleImportPromise = import('./HeavyChart');
@@ -913,7 +913,7 @@ function SafeConsumer() {
 }
 ```
 
-`useContext` bilan switch case (oldin TAQIQ, endi OK):
+Switch case ichida Context (oldin `useContext` bilan TAQIQ, endi `use()` bilan OK):
 
 ```tsx
 import { use, createContext } from 'react';
@@ -935,6 +935,8 @@ function DynamicConsumer({ which }: { which: 'a' | 'b' | 'c' }) {
     case 'c':
       value = use(ContextC);
       break;
+    default:
+      value = '';
   }
   
   return <div>Value: {value}</div>;
@@ -1160,9 +1162,9 @@ function MyForm() {
 }
 ```
 
-NIMA UCHUN: bu Context-like pattern. R19 internal'da har form atrofida implicit Context Provider yaratiladi (`FormStatusContext` deb ataladi). Form submit boshlanganda Provider value `{pending: true, ...}` bo'ladi. Child component'lar `useFormStatus()` bilan bu Context'ni o'qiydi.
+NIMA UCHUN: bu Context-like pattern. R19 internal'da `<form action>` element'i submit qilinganda host transition status orqali state tarqaladi (React source'da bu internal context `HostTransitionContext` deb nomlanadi). Form submit boshlanganda status value `{pending: true, ...}` bo'ladi. Child component'lar `useFormStatus()` bilan bu status'ni o'qiydi.
 
-QANDAY ISHLAYDI: form action chaqirilganda React internal `FormStatusContext` Provider value'ni o'zgartiradi — `pending: true`. Action tugagach (`Promise` resolve), `pending: false` qaytadi. Bu pattern alohida `useState` boshqarish kerak emas — React avtomatik.
+QANDAY ISHLAYDI: form action chaqirilganda React internal transition status value'ni o'zgartiradi — `pending: true`. Action tugagach (`Promise` resolve), `pending: false` qaytadi. Bu pattern alohida `useState` boshqarish kerak emas — React avtomatik.
 
 > **Versiya evolyutsiyasi (Form Status):**
 > - **Avval (R18 va eski):** Form pending state — manual `useState` + onSubmit handler. Submit button alohida prop drilling. `<form onSubmit={async (e) => { setPending(true); await submit(e); setPending(false); }}>`.
@@ -1172,15 +1174,15 @@ QANDAY ISHLAYDI: form action chaqirilganda React internal `FormStatusContext` Pr
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-R19 internal — `<form action>` element'i atrofida implicit Provider:
+R19 internal — `<form action>` submit qilinganda host transition status o'zgaradi (simplified pseudocode — real internal nomlar farqli):
 
 ```javascript
-// react-dom-bindings/src/client/ReactDOMHostConfig.js (simplified pseudocode — real internal nomlar farqli bo'lishi mumkin)
+// react-dom-bindings/src/client (simplified pseudocode)
 function dispatchFormAction(form, formData) {
   const action = getInternalFormAction(form);  // form'ga biriktirilgan action reference
   
-  // Set pending state
-  setFormStatusContextValue({
+  // Set pending status
+  setHostTransitionStatus({
     pending: true,
     data: formData,
     method: form.method,
@@ -1191,7 +1193,7 @@ function dispatchFormAction(form, formData) {
   Promise.resolve(action(formData))
     .then(() => {
       // Reset pending
-      setFormStatusContextValue({
+      setHostTransitionStatus({
         pending: false,
         data: null,
         method: null,
@@ -1199,7 +1201,7 @@ function dispatchFormAction(form, formData) {
       });
     })
     .catch((error) => {
-      setFormStatusContextValue({
+      setHostTransitionStatus({
         pending: false,
         data: null,
         method: null,
@@ -1210,19 +1212,17 @@ function dispatchFormAction(form, formData) {
 }
 ```
 
-`useFormStatus` o'zi — Context reader:
+`useFormStatus` o'zi — host transition status reader (`useContext` ga o'xshash mexanizm, lekin maxsus internal dispatcher method orqali):
 
 ```javascript
 // react-dom/src/ReactDOMHooks.js (simplified)
-import { FormStatusContext } from './FormStatusContext';
-
 function useFormStatus() {
   const dispatcher = resolveDispatcher();
-  return dispatcher.readContext(FormStatusContext);
+  return dispatcher.useHostTransitionStatus();
 }
 ```
 
-`useFormStatus()` aslida `useContext(FormStatusContext)` ga teng — lekin `FormStatusContext` private (export qilinmaydi). Hook public API.
+`useHostTransitionStatus` internal'da `HostTransitionContext`'ni o'qiydi (`useContext(HostTransitionContext)` ga teng) — lekin bu context private (export qilinmaydi). Hook public API. Default qiymat (form yo'q yoki submit yo'q): `pending: false`.
 
 ASCII — Form lifecycle bilan FormStatus:
 
@@ -1232,7 +1232,7 @@ User clicks Submit
        ▼
 <form action={fn}>
        │
-       ├─ FormStatusContext.value = {pending: true, data, method, action}
+       ├─ HostTransitionStatus = {pending: true, data, method, action}
        │
        ▼
 Action chaqirilmoqda
@@ -1243,7 +1243,7 @@ Action chaqirilmoqda
 Action tugadi
        │
        ▼
-FormStatusContext.value = {pending: false, data: null, ...}
+HostTransitionStatus = {pending: false, data: null, ...}
        │
        ▼
 Children re-render (useFormStatus consumers)
@@ -1593,7 +1593,7 @@ Multiple forms — har form mustaqil status:
 ```tsx
 'use client';
 
-function LikeButton({ postId }: { postId: string }) {
+function LikeButton() {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={pending}>
@@ -1610,7 +1610,7 @@ function PostCard({ post }: { post: Post }) {
       
       {/* Har post o'z form'i — useFormStatus alohida */}
       <form action={async () => likePost(post.id)}>
-        <LikeButton postId={post.id} />
+        <LikeButton />
       </form>
     </article>
   );
@@ -1790,31 +1790,25 @@ function updateActionState(action, initialState) {
 }
 
 async function dispatchActionState(fiber, action, stateHook, pendingHook, payload) {
-  // Set pending
-  scheduleUpdateOnFiber(fiber, () => {
-    pendingHook.memoizedState = true;
-  });
+  // Set pending — pendingHook update'i dispatch qilinadi (re-render scheduled)
+  dispatchSetState(fiber, pendingHook, true);
   
   try {
     // Run action
     const prevState = stateHook.memoizedState;
     const newState = await action(prevState, payload);
     
-    // Update state
-    scheduleUpdateOnFiber(fiber, () => {
-      stateHook.memoizedState = newState;
-      pendingHook.memoizedState = false;
-    });
+    // Update state + clear pending (har biri dispatch → re-render)
+    dispatchSetState(fiber, stateHook, newState);
+    dispatchSetState(fiber, pendingHook, false);
   } catch (error) {
-    scheduleUpdateOnFiber(fiber, () => {
-      pendingHook.memoizedState = false;
-    });
+    dispatchSetState(fiber, pendingHook, false);
     throw error;  // ErrorBoundary
   }
 }
 ```
 
-`useActionState` 2 ta Hook slot ishlatadi (state + isPending). State immutability invariant — `stateHook.memoizedState` har action chaqiruvida yangi reference bo'ladi (yoki bir xil bo'lsa, bailout).
+State va isPending alohida Hook slot'larda saqlanadi (real implementation'da action'larni ketma-ket bajarish uchun qo'shimcha action queue ham bor). State immutability invariant — yangi state action natijasidan keladi; agar oldingi state bilan bir xil bo'lsa (`Object.is`), bailout.
 
 ASCII — Action lifecycle:
 
@@ -2074,10 +2068,11 @@ async function submitForm(form, action, formData) {
 }
 
 // runtime — server handler
-async function handleAction(actionId, formData) {
+async function handleAction(actionId, prevState, formData) {
   const fn = serverActionRegistry[actionId];
   if (!fn) throw new Error('Action not found');
   
+  // prevState formData bilan birga encode qilingan holda keladi
   return await fn(prevState, formData);
 }
 ```
@@ -2228,8 +2223,8 @@ export function CheckoutForm() {
     step: 1,
   });
   
-  if (state.step === 2) {
-    return <PaymentStep data={state.data!} />;
+  if (state.step === 2 && state.data) {
+    return <PaymentStep data={state.data} />;
   }
   
   return (
@@ -2348,9 +2343,9 @@ NIMA UCHUN: validation logic — universal pattern. `useActionState` action sign
 
 Optimization: agar action `prevState` ni qaytarsa (o'zgarish yo'q), bailout (cross-ref [`12-state-and-usestate.md`](12-state-and-usestate.md)). Lekin amaliy validation'da har submit unique state qaytaradi (`errors` object yangi).
 
-`values` saqlash strategiyasi memory cost — har submit'da formData copy. Lekin amaliy ko'p emas (form data odatda kichik — < 10KB). Big payload (file upload) `values` ga saqlanmasligi kerak (memory leak).
+`values` saqlash strategiyasi memory cost — har submit'da formData copy. Lekin amaliy ko'p emas (form data odatda kichik). Big payload (file upload) `values` ga saqlanmasligi kerak (memory leak).
 
-Race condition: foydalanuvchi tezda 2 marta submit qilsa, R19 internal'da serialize qilinadi — birinchi action tugagunch, ikkinchisi kutib turadi (queue). `useFormStatus` bilan `pending: true` bo'lganda submit button disable bo'lib turadi.
+Race condition: foydalanuvchi tezda 2 marta submit qilsa, R19 internal'da serialize qilinadi — birinchi action tugaguncha, ikkinchisi kutib turadi (queue). `useFormStatus` bilan `pending: true` bo'lganda submit button disable bo'lib turadi.
 
 </details>
 
@@ -2592,7 +2587,7 @@ Return:
 - **`optimisticState`** — UI'ga ko'rsatiladigan state (real state + optimistic updates)
 - **`addOptimistic`** — optimistic update qo'shish funksiyasi
 
-NIMA UCHUN: UX. Like button, comment add, vote — bu actionlar tez bo'lishi kerak. Server response 500ms kutilsa, foydalanuvchi "ishlamadi" deb fikr qiladi. Optimistic update — UI darrov o'zgaradi (like qo'shildi), server async ishlaydi. Server tugagach — real state yangilanadi (success bo'lsa optimistic = real, fail bo'lsa optimistic rollback).
+NIMA UCHUN: UX. Like button, comment add, vote — bu actionlar darrov javob berishi kutiladi. Server response sezilarli kechiksa, foydalanuvchi "ishlamadi" deb fikr qiladi. Optimistic update — UI darrov o'zgaradi (like qo'shildi), server async ishlaydi. Server tugagach — real state yangilanadi (success bo'lsa optimistic = real, fail bo'lsa optimistic rollback).
 
 QANDAY ISHLAYDI:
 
@@ -2605,7 +2600,7 @@ QANDAY ISHLAYDI:
 - Success holat: `state` real qiymatga yangilanadi → `optimisticState` real `state` bilan moslashadi (sync).
 - Error holat: action throw qilsa, `state` o'zgarmaydi (parent yangilanmaydi). Optimistic queue tozalanadi → `optimisticState` eski `state`'ga qaytadi (rollback). **Lekin** error message'ni ko'rsatish uchun qo'shimcha state kerak (`useActionState` yoki `useState`) — `useOptimistic` o'zi error display qilmaydi.
 
-Bu **transition context'ida ishlaydi** — `useOptimistic` `<form action>` yoki `startTransition` bilan birga. Transition tashqarida `addOptimistic` chaqirilsa, optimistic value darrov bekor bo'ladi (transition lifecycle bog'lanmagan — React optimistic queue'ni tozalashi uchun "transition complete" eventi yo'q).
+Bu **transition context'ida ishlaydi** — `addOptimistic` `<form action>` (Action) yoki `startTransition` ichida chaqirilishi shart. Oddiy `onClick` handler ichida (transition tashqarida) chaqirilsa, React warning beradi ("An optimistic state update occurred outside a Transition or Action") va optimistic value darrov bekor bo'ladi — chunki optimistic queue'ni qaysi async ish tugaganda tozalash kerakligi React'ga ma'lum bo'lmaydi. Shuning uchun form tashqarisidagi optimistic update'larni `startTransition(async () => { ... })` ichiga o'rash kerak.
 
 ```tsx
 'use client';
@@ -2871,7 +2866,7 @@ Vote — counter increment/decrement:
 
 ```tsx
 'use client';
-import { useOptimistic } from 'react';
+import { useOptimistic, startTransition } from 'react';
 
 interface Vote {
   postId: string;
@@ -2912,9 +2907,12 @@ function applyVote(state: Vote, action: VoteAction): Vote {
 export function VoteWidget({ vote }: { vote: Vote }) {
   const [optimisticVote, addOptimistic] = useOptimistic(vote, applyVote);
   
-  async function handleVote(action: VoteAction) {
-    addOptimistic(action);
-    await submitVote(vote.postId, action);
+  function handleVote(action: VoteAction) {
+    // onClick'dan chaqiriladi — optimistic update startTransition ichida
+    startTransition(async () => {
+      addOptimistic(action);
+      await submitVote(vote.postId, action);
+    });
   }
   
   return (
@@ -3067,7 +3065,7 @@ Todo list — to'liq CRUD:
 
 ```tsx
 'use client';
-import { useOptimistic } from 'react';
+import { useOptimistic, startTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 
 interface Todo {
@@ -3118,14 +3116,19 @@ export function TodoList({ todos }: { todos: Todo[] }) {
     await saveTodo(text);
   }
   
-  async function toggleTodo(id: string) {
-    dispatchOptimistic({ type: 'toggle', id });
-    await toggleTodoOnServer(id);
+  function toggleTodo(id: string) {
+    // Form tashqarisida — optimistic update startTransition ichida bo'lishi shart
+    startTransition(async () => {
+      dispatchOptimistic({ type: 'toggle', id });
+      await toggleTodoOnServer(id);
+    });
   }
   
-  async function deleteTodo(id: string) {
-    dispatchOptimistic({ type: 'delete', id });
-    await deleteTodoFromServer(id);
+  function deleteTodo(id: string) {
+    startTransition(async () => {
+      dispatchOptimistic({ type: 'delete', id });
+      await deleteTodoFromServer(id);
+    });
   }
   
   return (
@@ -3248,7 +3251,7 @@ Bookmark toggle:
 
 ```tsx
 'use client';
-import { useOptimistic } from 'react';
+import { useOptimistic, startTransition } from 'react';
 
 interface Article {
   id: string;
@@ -3265,9 +3268,12 @@ export function ArticleCard({ article }: { article: Article }) {
     })
   );
   
-  async function handleBookmark() {
-    toggleOptimistic('toggle');
-    await fetch(`/api/articles/${article.id}/bookmark`, { method: 'POST' });
+  function handleBookmark() {
+    // onClick handler — startTransition shart (form action emas)
+    startTransition(async () => {
+      toggleOptimistic('toggle');
+      await fetch(`/api/articles/${article.id}/bookmark`, { method: 'POST' });
+    });
   }
   
   return (
@@ -3288,7 +3294,7 @@ export function ArticleCard({ article }: { article: Article }) {
 
 ---
 
-## R19 Forms Ekosistema — Hookslar Birgalikda
+## R19 Forms Ekosistema — Hook'lar Birgalikda
 
 ### Nazariya
 
@@ -3380,7 +3386,7 @@ Bu pattern'da:
 6. Server action tugadi → real comments yangilanadi → optimistic real ga sync
 7. `useFormStatus` `pending: false` → submit button enabled
 
-NIMA UCHUN: Har hook bir narsa qiladi (single responsibility). Birga ishlaganda — to'liq form UX. Avval bu pattern'ni qurish 100+ qator manual code edi (`useState` for error, useState for pending, useState for optimistic, manual sync).
+NIMA UCHUN: Har hook bir narsa qiladi (single responsibility). Birga ishlaganda — to'liq form UX. Avval bu pattern'ni qurish ancha ko'p manual code talab qilardi (`useState` for error, useState for pending, useState for optimistic, manual sync).
 
 QANDAY ISHLAYDI: Har hook mustaqil — boshqa hooklarni "bilmaydi". Ular bir xil `<form action>` lifecycle'iga bog'lanadi (form submission). React internal coordinatsiya qiladi.
 
@@ -3394,10 +3400,10 @@ R19 forms internal lifecycle (simplified):
 ```
 1. <form action={action}>
    ├─ form element registered with form action
-   └─ FormStatusContext value initialized
+   └─ HostTransitionStatus initialized
 
 2. User submits
-   ├─ FormStatusContext.value = { pending: true, data: formData, ... }
+   ├─ HostTransitionStatus = { pending: true, data: formData, ... }
    ├─ action(formData) chaqirilmoqda
    │   ├─ useOptimistic addOptimistic
    │   │   └─ TransitionLane render
@@ -3408,7 +3414,7 @@ R19 forms internal lifecycle (simplified):
    └─ ...
 
 3. Action complete
-   ├─ FormStatusContext.value = { pending: false, ... }
+   ├─ HostTransitionStatus = { pending: false, ... }
    ├─ useActionState state updated with result
    ├─ Optimistic queue cleared (Transition done)
    └─ Real state from props/server replaces optimistic
@@ -3620,7 +3626,7 @@ Async data render'da kerakmi?
 
 **Avoiding overuse:**
 
-`useOptimistic` — har action uchun emas. Faqat **fast actions** (< 1 second expected) uchun. Long-running actions (file upload, complex computation) uchun progress bar yaxshiroq.
+`useOptimistic` — har action uchun emas. Faqat tez yakunlanishi kutiladigan action'lar uchun (like, comment, toggle). Uzoq davom etadigan action'lar (file upload, complex computation) uchun progress bar yaxshiroq — optimistic update tez sync bo'lishidan foyda bo'lmaydi.
 
 `useActionState` — har form uchun emas. Oddiy form (no validation, no error) `<form action={fn}>` kifoya. State kerak bo'lganda hook qo'shilishi.
 
@@ -3704,13 +3710,14 @@ function ProductPageLegacy({ id }: { id: string }) {
 
 // Option 3: TanStack Query (production-grade)
 function ProductPageQuery({ id }: { id: string }) {
-  const { data: product, isLoading } = useQuery({
+  const { data: product, isPending, isError } = useQuery({
     queryKey: ['product', id],
     queryFn: () => fetchProduct(id),
   });
   
-  if (isLoading) return <div>Loading...</div>;
-  return <ProductDetail product={product!} />;
+  if (isPending) return <div>Loading...</div>;
+  if (isError) return <div>Xato yuz berdi</div>;
+  return <ProductDetail product={product} />;
 }
 ```
 
@@ -3828,7 +3835,7 @@ function Bad() {
   const [optimistic, add] = useOptimistic(real, reducer);
   
   function handleClick() {
-    add(newValue);  // ❌ Transition tashqarida — error or no-op
+    add(newValue);  // ❌ Transition tashqarida — React warning + darrov rollback
     saveAsync();
   }
   
@@ -3925,7 +3932,7 @@ function MyForm() {
 }
 ```
 
-**Sabab:** Hook parent form'dan Context o'qiydi. Form'ning o'zida Provider hali yo'q (form children render bo'lmagan).
+**Sabab:** Hook `<form>` host element o'rnatadigan transition status'ni o'qiydi, va bu status faqat form'ning **descendant** (ichkaridagi) component'lariga yetadi. `useFormStatus` form'ni render qilayotgan component'da chaqirilsa, u tree'da form'dan **yuqorida** turadi — status manbasidan tashqarida, shuning uchun `pending` har doim `false`.
 
 ### ❌ Xato 2: `use(promise)` — har render'da yangi promise
 
@@ -3977,7 +3984,7 @@ function LikeButton({ post }: { post: Post }) {
 }
 ```
 
-**Sabab:** `useOptimistic` Transition lane'ga bog'langan. Transition tashqarida — warning yoki no-op.
+**Sabab:** `useOptimistic` Transition lane'ga bog'langan. Transition tashqarida `addOptimistic` chaqirilsa, React warning beradi va optimistic value darrov bekor bo'ladi (rollback) — `<form action>` yoki `startTransition` ichiga o'rash kerak.
 
 ### ❌ Xato 4: `useActionState` — input default reset
 
@@ -4247,7 +4254,9 @@ export function PostLikeButton({ post }: { post: Post }) {
   // <form action> handler signature (formData: FormData) => void | Promise<void>
   async function handleLike(_formData: FormData) {
     toggleOptimistic('toggle');
-    await toggleLikeAction(post.id, optimisticPost.likedByMe);
+    // Server'ga toggle'dan OLDINGI holatni uzatamiz (post — real state).
+    // optimisticPost bu yerda hali eski qiymat: closure render paytidagi value.
+    await toggleLikeAction(post.id, post.likedByMe);
   }
   
   return (
@@ -4506,7 +4515,7 @@ R19 4 ta yangi hook taqdim qildi va form ekosistemasini standartlashtirdi:
 - **`useActionState` validation pattern** — Zod/Valibot integration, per-field errors, values preservation (`defaultValue` saqlash failed submit'da).
 - **`useOptimistic()`** — optimistic UI updates. `[optimistic, addOptimistic] = useOptimistic(state, reducer)`. Action davomida UI darrov yangilanadi (Transition lane). Action tugagandan keyin real state replace qiladi (auto-rollback). `<form action>` yoki `useTransition` ichida chaqirilishi shart.
 - **`useOptimistic` real-world patterns** — add/update/delete list items, toggle (like, follow, bookmark), counter (vote), reorder. Pending visual hint (`opacity-50`, spinner) UX uchun muhim.
-- **R19 forms ekosistema** — `<form action>` + `useActionState` + `useFormStatus` + `useOptimistic` birga ishlaydi. Har hook single responsibility, coordinatsiya React internal'da. Manual `useState` orqali 100+ qator code endi 30-40 qator.
+- **R19 forms ekosistema** — `<form action>` + `useActionState` + `useFormStatus` + `useOptimistic` birga ishlaydi. Har hook single responsibility, coordinatsiya React internal'da. Avval manual `useState` bilan yozilgan ko'p hajmli boilerplate endi bir nechta hook chaqiruviga qisqaradi.
 - **Decision Guide** — async data render → `use(promise)`, conditional Context → `use(context)`, submit pending → `useFormStatus`, action state → `useActionState`, optimistic UI → `useOptimistic`. Avoid overuse — oddiy form'lar `<form action={fn}>` kifoya.
 
 Versiya evolyutsiyasi:

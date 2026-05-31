@@ -67,7 +67,7 @@ React Render Lifecycle (R18+):
 - `useLayoutEffect` ichidan DOM o'qish (`getBoundingClientRect`, `offsetWidth`) **ishonchli** — yangi layout
 - `useLayoutEffect` ichidan DOM yozish (style change, scroll set) — paint'dan oldin → flicker yo'q
 
-`useLayoutEffect` — **synchron**. Browser paint qilolmaydi `useLayoutEffect` tugaguncha. Demak agar effect og'ir bo'lsa (5ms+ ish) — paint kechikadi → user UI freeze deb sezadi.
+`useLayoutEffect` — **synchron**. Browser paint qilolmaydi `useLayoutEffect` tugaguncha. Demak agar effect og'ir bo'lsa (uzoq CPU ish) — paint kechikadi → user UI freeze deb sezadi.
 
 **`useEffect` bilan farq jadval:**
 
@@ -611,27 +611,27 @@ Foydalanuvchi avval 1-natijani, keyin 2-natijani ko'radi. Visible o'zgarish bor.
 
 **Browser paint timing:**
 
-Browser har 16.67ms (60fps) frame'da paint qiladi. JavaScript single-threaded — agar Layout phase 5ms ishlatsa, paint 5ms kechikadi (jank potensial). Ko'p Layout effect bo'lsa — frame budget tugashi mumkin.
+60fps display'da browser har frame uchun ~16.67ms (1000ms / 60) vaqtga ega. JavaScript single-threaded — Layout phase ish vaqti shu budjetga qo'shiladi. Layout phase uzoq cho'zilsa, paint kechikadi (jank potensial). Ko'p Layout effect bo'lsa — frame budget tugashi mumkin.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
 **Browser frame budget:**
 
-Standart 60fps: 16.67ms per frame. Bu vaqt ichida:
+60fps display'da bitta frame ~16.67ms (1000ms / 60). Bu vaqt ichida frame to'liq tayyorlanishi kerak:
 
 ```
-Frame 16.67ms
-├─ JavaScript (script execution) — ~6-8ms ideal
-├─ Style calculation — ~1ms
-├─ Layout (browser layout calc) — ~1-3ms
-├─ Paint — ~2-4ms
-└─ Composite — ~1-2ms
+Frame ~16.67ms (60fps)
+├─ JavaScript (event handler, effect, render)
+├─ Style calculation (CSS qoidalarini element'larga moslash)
+├─ Layout (browser geometriya hisobi — reflow)
+├─ Paint (piksel chizish)
+└─ Composite (layer'larni birlashtirish)
 ```
 
-JavaScript ortib ketsa (e.g., 20ms), browser paint qila olmaydi → frame drop → user "jank" sezadi.
+Google'ning RAIL model'i bo'yicha JavaScript bitta frame ichida ~10ms'dan oshmasligi tavsiya etiladi — qolgan vaqt browser'ning style/layout/paint ishiga qoladi. JavaScript bu budjetdan oshib ketsa, browser frame'ni o'z vaqtida tayyorlay olmaydi → frame drop → user "jank" sezadi.
 
-`useLayoutEffect` JavaScript executionda. Layout phase 5ms+ ish olsa — frame drop xavfi.
+`useLayoutEffect` JavaScript execution'da, paint'dan oldin sinxron ishlaydi. Layout phase uzoq cho'zilsa — frame drop xavfi.
 
 **Concurrent rendering bilan synergiya:**
 
@@ -653,8 +653,8 @@ Development'da Strict Mode 2x cycle Layout effect uchun ham qo'llaniladi.
 
 **Source citation:**
 
-- Browser frame budget — Chrome DevTools Performance docs
-- Concurrent rendering — facebook/react `packages/scheduler/src/forks/SchedulerDOM.js`
+- RAIL model / frame budget — web.dev "Measure performance with the RAIL model"
+- Concurrent rendering / `frameYieldMs` — facebook/react `packages/scheduler/src/Scheduler.js`
 
 </details>
 
@@ -898,15 +898,16 @@ interface DOMRect {
 // ❌ Polling (sekin)
 useLayoutEffect(() => {
   const interval = setInterval(() => {
-    setSize(ref.current!.getBoundingClientRect());
+    if (ref.current) setSize(ref.current.getBoundingClientRect());
   }, 100);
   return () => clearInterval(interval);
 }, []);
 
 // ✅ ResizeObserver (efficient)
 useLayoutEffect(() => {
+  if (!ref.current) return;
   const observer = new ResizeObserver(...);
-  observer.observe(ref.current!);
+  observer.observe(ref.current);
   return () => observer.disconnect();
 }, []);
 ```
@@ -1038,7 +1039,8 @@ function useElementPosition<T extends HTMLElement>() {
     if (!ref.current) return;
     
     const update = () => {
-      const rect = ref.current!.getBoundingClientRect();
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
       setPosition({
         x: rect.x,
         y: rect.y,
@@ -1343,7 +1345,8 @@ function StickyTooltip({ targetRef, content }: {
     if (!targetRef.current) return;
     
     const updatePosition = () => {
-      const rect = targetRef.current!.getBoundingClientRect();
+      if (!targetRef.current) return;
+      const rect = targetRef.current.getBoundingClientRect();
       setPos({
         x: rect.x + rect.width / 2,
         y: rect.bottom + 4,
@@ -1728,13 +1731,14 @@ Har vaqt bitta element fokusda. `document.activeElement` — joriy fokusdagi ele
 **Focus event ordering:**
 
 ```ts
-// element.focus() chaqirilganida:
-// 1. Avvalgi fokusdagi element'da `blur` event
-// 2. Yangi element'ga `focus` event
-// 3. `focusout` (bubble), `focusin` (bubble) event'lar
+// Focus A'dan B'ga ko'chganda event tartibi (MDN FocusEvent "Order of events"):
+// 1. `blur`     — A focus'ni yo'qotadi (bubble qilmaydi)
+// 2. `focusout` — A'da, `blur`'dan keyin (bubble qiladi)
+// 3. `focus`    — B focus oladi (bubble qilmaydi)
+// 4. `focusin`  — B'da, `focus`'dan keyin (bubble qiladi)
 ```
 
-React event'lari (`onBlur`, `onFocus`) — focus event'lar bilan birga.
+`blur`/`focus` bubble qilmaydi; `focusout`/`focusin` esa bubble qiladi (delegation uchun). React `onBlur`/`onFocus` — SyntheticEvent sifatida bubble bo'ladigan variantga (`focusout`/`focusin`) bog'lanadi, shuning uchun React'da `onBlur`/`onFocus` parent'ga bubble bo'ladi.
 
 **Focus trap implementation:**
 
@@ -1996,27 +2000,22 @@ function GlobalSearch() {
 
 **Frame budget — 60fps va 120fps:**
 
-| Refresh rate | Frame budget | JavaScript ideal |
-|--------------|--------------|------------------|
-| 60Hz (default) | 16.67ms | ~6-8ms |
-| 120Hz (modern displays) | 8.33ms | ~3-4ms |
+Frame budget refresh rate'dan kelib chiqadi: `1000ms / refresh_rate`.
 
-`useLayoutEffect` 5ms ish olsa — 60Hz'da OK, 120Hz'da frame drop. 10ms+ ish — har joyda jank.
+| Refresh rate | Frame budget |
+|--------------|--------------|
+| 60Hz (default) | ~16.67ms (1000 / 60) |
+| 120Hz (modern displays) | ~8.33ms (1000 / 120) |
 
-**Performance ko'rsatkichlari:**
+Bu budjet ichida JavaScript, style, layout, paint, composite — barchasi sig'ishi kerak. Refresh rate qancha baland bo'lsa, budget shuncha qisqa, demak `useLayoutEffect` ishiga toqat shuncha kam. 120Hz display'da paint'ni bloklamaslik uchun Layout phase ishi 60Hz'dagidan ham qisqaroq bo'lishi kerak.
 
-```
-Stress test: useLayoutEffect ichida 10000 element querySelectorAll + measurement
-- Cold cache: ~25ms
-- Warm cache: ~8ms
-- Layout thrashing (read-write-read): ~80ms+ (16x sekin)
-```
+**Layout phase'ni og'irlashtirmaslik:**
 
-Real raqamlar device va kontentga bog'liq — DevTools Profiler bilan o'lchash kerak.
+`useLayoutEffect` ichidagi ish (querySelectorAll, ko'p element measurement, layout thrashing) frame budget'ni yeydi. Aniq ms qiymatlar device, brauzer va kontentga bog'liq — taxminiy raqamga tayanmaslik, har bir holatni DevTools Performance tab bilan o'lchash kerak. Asosiy printsip: layout thrashing (read-write aralash) bir xil ishni read-then-write pattern'idan sezilarli darajada sekinlashtiradi.
 
 **Paint bloklash signal'lari:**
 
-1. Click → 100ms+ kechikish (paint javobi)
+1. Click javobi sezilarli kechikish bilan ko'rinadi (RAIL model'i interaktiv javob uchun ~100ms budjetni tavsiya etadi)
 2. Scroll → uzilish (har frame Layout effect)
 3. Animation → frame drop (transition glitch)
 4. Input typing → kechikish (har keystroke)
@@ -2069,15 +2068,16 @@ useLayoutEffect(() => {
 ```tsx
 // ❌ Har render'da measure
 useLayoutEffect(() => {
-  setSize(ref.current!.getBoundingClientRect());
+  if (ref.current) setSize(ref.current.getBoundingClientRect());
 });
 
 // ✅ Browser API — efficient
 useLayoutEffect(() => {
+  if (!ref.current) return;
   const observer = new ResizeObserver(([entry]) => {
     setSize(entry.contentRect);
   });
-  observer.observe(ref.current!);
+  observer.observe(ref.current);
   return () => observer.disconnect();
 }, []);
 ```
@@ -2102,12 +2102,12 @@ Cross-ref [`34-profiling.md`](34-profiling.md) — DevTools Profiler chuqur.
 
 ```
 JavaScript → Style → Layout → Paint → Composite
-   ↓           ↓        ↓       ↓        ↓
-  V8       Style       LCP   Painting   GPU
-                   recalc
+   ↓           ↓        ↓        ↓         ↓
+  V8       Style    Geometriya  Piksel    GPU
+           recalc   (reflow)    chizish   layer
 ```
 
-JavaScript bloklasa — keyingi qadamlar kechikadi. Pipeline har frame (16.67ms)'da takrorlanadi.
+JavaScript bloklasa — keyingi qadamlar kechikadi. Pipeline har frame'da takrorlanadi (60Hz'da ~16.67ms'da bir marta).
 
 `useLayoutEffect`:
 - JavaScript stage'da
@@ -2217,12 +2217,13 @@ function HeavyAnimation({ active }: { active: boolean }) {
   useLayoutEffect(() => {
     if (!active || !ref.current) return;
     
+    const node = ref.current;
     let frameId: number;
     let progress = 0;
     
     const animate = () => {
       progress += 0.01;
-      ref.current!.style.transform = `translateX(${progress * 100}px)`;
+      node.style.transform = `translateX(${progress * 100}px)`;
       
       if (progress < 1) {
         frameId = requestAnimationFrame(animate);
@@ -2331,7 +2332,7 @@ fixes.
 
 **Sabab:**
 
-`useLayoutEffect` ko'pincha DOM measurement qilib, state'ni yangilaydi. Server'da effect chaqirilmasa — SSR HTML state'ning boshlang'ich qiymatini ishlatadi (e.g., `width = 0`). Client hydration paytida `useLayoutEffect` chaqiriladi → yangi state (e.g., `width = 150`). Server HTML va client mismatch → flicker yoki hydration error.
+`useLayoutEffect` ko'pincha DOM measurement qilib, state'ni yangilaydi. Server'da effect chaqirilmasa — SSR HTML state'ning boshlang'ich qiymatini ishlatadi (e.g., `width = 0`). Client'ning initial hydration render'i ham shu boshlang'ich qiymatni ishlatadi (effect hali ishlamagan), demak server HTML va client initial render **mos keladi** — DOM hydration mismatch yo'q. Mismatch keyin yuzaga keladi: hydration tugagach `useLayoutEffect` ishlaydi → yangi state (`width = 150`) → re-render. Foydalanuvchi `0` dan `150` ga o'tishni ko'radi — bu **flicker**. React bu holatda hydration error emas, balki `useLayoutEffect`'ga oid alohida warning beradi (yuqoridagi xabar): server output "intended UI" bilan mos kelmaydi.
 
 **Misol — mismatch potensial:**
 
@@ -2348,9 +2349,9 @@ function MeasuredBox() {
 }
 
 // Server HTML: <div>Width: 0</div>
-// Client mount: useLayoutEffect → setWidth(150)
-// Client render: <div>Width: 150</div>
-// Hydration mismatch warning (R18+) yoki silent flicker
+// Client initial hydration render: <div>Width: 0</div> — server bilan MOS (mismatch yo'q)
+// Hydration tugagach: useLayoutEffect → setWidth(150) → re-render
+// Yangi render: <div>Width: 150</div> — foydalanuvchi 0 → 150 o'zgarishini ko'radi (flicker)
 ```
 
 **Yechim 1 — Client-only render:**
@@ -2405,9 +2406,11 @@ function MeasuredBox() {
 
 `'use client'` — komponent server'da render qilinmaydi (faqat client). Warning yo'q.
 
-**Hydration mismatch — quyidagilarda warning kuchli:**
+**`useLayoutEffect` SSR warning va haqiqiy hydration mismatch — farq:**
 
-R18'dan boshlab `<div>Width: 0</div>` (server) vs `<div>Width: 150</div>` (client) — hydration error. R19'da yumshoqroq (silent recovery), lekin hali ham warning.
+Yuqoridagi `useLayoutEffect` scenariysida DOM **hydration mismatch yo'q** — server HTML (`Width: 0`) va client'ning initial hydration render'i (`Width: 0`) mos keladi. React beradigan warning bu yerda `useLayoutEffect`'ga xos ("does nothing on the server") — DOM mismatch warning emas. Natija — post-hydration flicker.
+
+Haqiqiy hydration mismatch boshqa narsa: server HTML va client'ning **birinchi** render'i bir-biriga mos kelmasligi (masalan `Date.now()`, `Math.random()` yoki `typeof window` ga bog'liq render). Bunday holatda React (R18+) DOM farqini topib, ogohlantirish beradi va shu subtree'ni client'da qaytadan render qilib tuzatadi (client recovery). Bu mexanizm `useLayoutEffect` flicker'iga emas, render output farqiga tegishli.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2499,8 +2502,9 @@ function MeasuredText({ text }: { text: string }) {
 }
 
 // Server: <p>Width: 0px</p>
-// Client (after hydration): <p>Width: 150px</p>
-// Hydration mismatch (R18 strict)
+// Client initial hydration render: <p>Width: 0px</p> — mos (mismatch yo'q)
+// Hydration tugagach effect ishlaydi → <p>Width: 150px</p> (post-hydration flicker)
+// React useLayoutEffect SSR warning'i (DOM mismatch emas)
 ```
 
 **Misol 2 — ClientOnly wrapper:**
@@ -2687,9 +2691,9 @@ Render orasida hook o'zgarishi — ya'ni, "Render 1: useEffect, Render 2: useLay
 
 **Edge case — Hydration mismatch:**
 
-Agar `useIsomorphicLayoutEffect` server'da `useEffect` (chaqirilmaydi) va client'da `useLayoutEffect` (chaqiriladi) — bu farq mismatch keltirib chiqarishi mumkin (state SSR HTML'da boshqa, hydration'dan keyin boshqa).
+`useIsomorphicLayoutEffect` server'da `useEffect`'ga teng (chaqirilmaydi), client'da `useLayoutEffect`'ga teng (chaqiriladi). Initial render output ikkala tomonda bir xil bo'lgani uchun (effect hali ishlamagan) — DOM hydration mismatch yo'q. Agar effect state'ni yangilasa, o'zgarish hydration'dan keyin yuzaga keladi.
 
-Lekin client'da `useLayoutEffect` chaqirilishi paint'dan oldin → user faqat oxirgi natijani ko'radi. SSR HTML va initial client paint o'rtasida farq bo'lsa — hydration warning bo'ladi (cross-ref [`06-hydration.md`](06-hydration.md)).
+Client'da `useLayoutEffect` paint'dan oldin ishlagani uchun bu state o'zgarishi flicker bermaydi (user faqat oxirgi natijani ko'radi). Agar `useEffect` ishlatilsa — o'zgarish paint'dan keyin → flicker. Shu sababli library author'lar client'da `useLayoutEffect` semantikasini saqlash uchun bu pattern'ni ishlatadi (cross-ref [`06-hydration.md`](06-hydration.md)).
 
 **`canUseDOM` ishonchli check:**
 
@@ -2743,7 +2747,8 @@ function useElementSize<T extends HTMLElement>(): [
     if (!ref.current) return;
     
     const update = () => {
-      const rect = ref.current!.getBoundingClientRect();
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
       setSize({ width: rect.width, height: rect.height });
     };
     
@@ -2826,12 +2831,14 @@ export default useIsomorphicLayoutEffect;
 ```
 Commit Phase tartib:
 1. Before Mutation
-2. useInsertionEffect (R18+) ← bu yerda
-3. DOM Mutation (insert/update/remove)
-4. Refs detach (old)
-5. Refs attach (new)
-6. useLayoutEffect (cleanup → setup)
-7. componentDidMount/Update
+2. Mutation sub-phase:
+   ├─ useInsertionEffect (R18+) ← bu yerda
+   ├─ Refs detach (old)
+   └─ DOM Mutation (insert/update/remove)
+3. Layout sub-phase:
+   ├─ Refs attach (new)
+   ├─ useLayoutEffect (cleanup → setup)
+   └─ componentDidMount/Update
 ```
 
 **Sabab — CSS injection layout calculation'dan oldin:**
@@ -2902,7 +2909,7 @@ React docs aniq aytadi: `useInsertionEffect` — CSS-in-JS library author'lar uc
 **Library misollari:**
 
 - **emotion** — `useInsertionEffect` ichida CSS rule injection
-- **styled-components v6** — qo'llab-quvvatlash qo'shilmoqda
+- **styled-components v6** — `useInsertionEffect` qo'llab-quvvatlashi bilan chiqdi
 - **stitches** — yangi versiyalarda
 - **vanilla-extract** — build-time CSS, runtime hook kerak emas
 
@@ -2937,15 +2944,15 @@ function commitMutationEffects(root, finishedWork) {
     finishedWork
   );
   
-  // 2. DOM mutation (insert/update/remove)
+  // 2. Eski refs detach (old)
   // ...
   
-  // 3. Refs detach (old)
+  // 3. DOM mutation (insert/update/remove)
   // ...
 }
 ```
 
-`useInsertionEffect` — Mutation sub-phase boshida, DOM mutation'dan oldin.
+`useInsertionEffect` — Mutation sub-phase boshida, DOM mutation'dan oldin. Yangi refs esa keyingi (Layout) sub-phase'da attach qilinadi.
 
 **Nima uchun "insertion":**
 
@@ -2961,7 +2968,7 @@ CSS-in-JS library'lar shu kabi API ishlatadi (yoki `<style>` tag'ga `textContent
 
 **Source citation:**
 
-- `useInsertionEffect` RFC — reactjs/rfcs `0202-useinsertioneffect.md`
+- `useInsertionEffect` — react.dev "useInsertionEffect" reference; React 18 Working Group (reactwg/react-18) Library Upgrade Guide muhokamasi
 - emotion implementation — emotion-js/emotion repo
 
 </details>
@@ -3065,19 +3072,20 @@ function DoThis() {
 
 ```tsx
 // Hypothetical CSS-in-JS library
-function css(styles: string): string {
-  // Return unique class name
+// Ichida hook chaqirgani uchun bu funksiya o'zi ham hook — Rules of Hooks
+// amal qiladi: nomi `use` bilan boshlanadi, component top level'ida chaqiriladi.
+function useCss(styles: string): string {
   const hash = simpleHash(styles);
   const className = `css-${hash}`;
   
-  // Hook'ni return qiladi (closure ichida)
+  // useInsertionEffect'ni ichida chaqiradi (hook return qilmaydi, chaqiradi)
   useDynamicCSS(className, styles);
   
   return className;
 }
 
 function StyledButton() {
-  const className = css(`
+  const className = useCss(`
     background: blue;
     color: white;
     padding: 8px 16px;
@@ -3116,7 +3124,7 @@ Quyidagi savollar bilan to'g'ri hook tanlash:
 
 **Default tanlov — `useEffect`:**
 
-90%+ holatlarda `useEffect` to'g'ri tanlov. `useLayoutEffect` faqat:
+Aksariyat holatlarda `useEffect` to'g'ri tanlov (React docs `useLayoutEffect`'ni `useEffect`'dan kamroq ishlatilishini ta'kidlaydi). `useLayoutEffect` faqat:
 
 - DOM measurement → state update → re-render kerak
 - Tooltip/popover/modal positionlash
@@ -3161,8 +3169,8 @@ Application developer'lar uchun `useInsertionEffect` kerak emas. Faqat CSS-in-JS
 Ko'p `useLayoutEffect` paint'ni sekinlashtiradi. Profiling:
 
 1. DevTools Performance tab → "Long Tasks" qidirish
-2. `useLayoutEffect` callback duration
-3. 5ms+ → optimize qilish (read-then-write, ResizeObserver, useEffect ga ko'chirish)
+2. `useLayoutEffect` callback duration o'lchash
+3. Layout phase frame budget'ga sezilarli ulush qo'shsa → optimize qilish (read-then-write, ResizeObserver, useEffect ga ko'chirish)
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -3173,10 +3181,13 @@ Ko'p `useLayoutEffect` paint'ni sekinlashtiradi. Profiling:
 Schedule timing:
 1. Render Phase — concurrent (interruptible)
 2. Commit Phase — sync (atomic)
-   - useInsertionEffect (R18+) — Mutation start
-   - DOM mutation
-   - Refs detach + attach
-   - useLayoutEffect — Layout sub-phase
+   - Mutation sub-phase:
+     - useInsertionEffect (R18+) — Mutation start
+     - Refs detach (old)
+     - DOM mutation
+   - Layout sub-phase:
+     - Refs attach (new)
+     - useLayoutEffect
 3. Browser Paint
 4. Passive Effects Phase — async (MessageChannel)
    - useEffect
@@ -3343,18 +3354,18 @@ useLayoutEffect(() => {
 
 ### Gotcha 2 — Strict Mode 2x cycle paint kechikishi
 
-Strict Mode'da `useLayoutEffect` 2x cycle (setup → cleanup → setup). Development'da bu paint kechikishini ikki barobariga oshiradi:
+Strict Mode'da `useLayoutEffect` 2x cycle (setup → cleanup → setup). Development'da effect ichidagi ish ikki marta bajariladi, demak paint kechikishi shunga mos ravishda oshadi:
 
 ```tsx
 useLayoutEffect(() => {
-  // 50ms work
+  // CPU-intensive ish (measurement, hisoblash)
 });
 
-// Production: 50ms paint kechikish
-// Development (Strict Mode): ~100ms paint kechikish (cleanup + setup ikki marta)
+// Production: ish bir marta → paint shuncha kechikadi
+// Development (Strict Mode): ish ikki marta (cleanup + setup) → paint ko'proq kechikadi
 ```
 
-Production'da bu yo'q — Strict Mode dev only.
+Production'da bu yo'q — Strict Mode dev only. Demak Strict Mode'dagi qo'shimcha kechikish development artefakti, real performance o'lchovi emas.
 
 ### Gotcha 3 — `useLayoutEffect` ichida portal child measurement
 
@@ -3402,11 +3413,13 @@ R19'da ref callback cleanup function qo'shildi (cross-ref [`18-useref.md`](18-us
 
 ### Gotcha 5 — `useLayoutEffect` Suspense fallback bilan
 
-Component Suspense fallback'ga tushsa (suspend qilsa) — `useLayoutEffect` cleanup chaqirilmaydi. Component "tirik", lekin pause holatda:
+Ikki holatni ajratish kerak:
+
+**1. Initial suspend** — component birinchi marta render paytida suspend qilsa (`use(promise)` yoki throw promise), u **hali commit qilinmagan**. Effect setup ham, cleanup ham chaqirilmaydi, chunki effect umuman ro'yxatdan o'tmagan:
 
 ```tsx
 function UserCard({ userId }: { userId: string }) {
-  const user = use(fetchUser(userId));  // R19 — promise throw
+  const user = use(fetchUser(userId));  // R19 — suspend (render phase)
   
   useLayoutEffect(() => {
     console.log('Setup');
@@ -3416,10 +3429,20 @@ function UserCard({ userId }: { userId: string }) {
   return <div>{user.name}</div>;
 }
 
-// Suspense fallback paytida cleanup chaqirilmaydi
+// Birinchi render'da suspend: Setup ham, Cleanup ham chaqirilmaydi
+// (component commit bosqichiga yetib bormagan)
 ```
 
-Sync invariant'i Suspense'da ham qo'llanadi — agar effect resurslar yaratsa va Suspense pause qilsa, cleanup paytida muammo bo'lishi mumkin.
+**2. Re-suspend** — allaqachon ko'rsatilgan (commit qilingan) content qayta suspend qilib, fallback'ga qaytsa. R18'dan boshlab React bu content'ning **Layout effect'larini cleanup qiladi** (destroy), keyin content qaytadan ko'rsatilganda ularni **qaytadan yaratadi**. Bu R18 upgrade guide'da aniq hujjatlangan o'zgarish — komponent library'lar Suspense bilan layout'ni to'g'ri o'lchashi uchun kerak bo'lgan.
+
+```tsx
+// Content ko'rsatilgan → re-suspend → fallback:
+// 1. useLayoutEffect cleanup chaqiriladi (effect destroy)
+// 2. Fallback ko'rsatiladi
+// 3. Content qaytib kelganda — useLayoutEffect setup qaytadan chaqiriladi
+```
+
+Demak resurs yaratuvchi Layout effect (event listener, subscription) Suspense bilan birga to'g'ri cleanup/re-setup tsiklidan o'tadi.
 
 ---
 
@@ -3774,7 +3797,8 @@ function useTooltipPosition(
     if (!show || !triggerRef.current) return;
     
     const update = () => {
-      const rect = triggerRef.current!.getBoundingClientRect();
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
       const tooltipHeight = 32;  // Approximate yoki ref bilan o'lchash
       const margin = 8;
       
@@ -3894,11 +3918,11 @@ Production'da `react-textarea-autosize` library ishlatish tavsiya (cross-browser
 
 - **`useLayoutEffect`** Commit Phase'ning Layout sub-phase'ida sync chaqiriladi — DOM yangilangandan keyin, browser paint'dan oldin. DOM measurement, tooltip positioning, scroll restoration, focus management, layout-dependent calculation uchun.
 - **API `useEffect` bilan bir xil** — `useLayoutEffect(setup, deps?)`. Cleanup, deps semantikasi, Strict Mode 2x cycle (R18+), exhaustive-deps linter — barchasi bir xil ishlaydi.
-- **Sinxron — paint bloklaydi.** Effect ichida og'ir ish bo'lsa, browser paint kechikadi → user "jank" sezadi. Performance critical: 5ms+ ish bo'lsa optimize qilish kerak (read-then-write pattern, ResizeObserver, useEffect'ga ko'chirish).
+- **Sinxron — paint bloklaydi.** Effect ichida og'ir ish bo'lsa, browser paint kechikadi → user "jank" sezadi. Layout phase ishi frame budget'ga sezilarli ulush qo'shsa optimize qilish kerak (read-then-write pattern, ResizeObserver, useEffect'ga ko'chirish).
 - **`useEffect` default tanlov** — `useLayoutEffect` faqat visual flicker oldini olish kerak bo'lganda. React docs: *"This Hook is used less often than `useEffect`."*
 - **Layout thrashing** — read va write aralashtirilsa, browser har read uchun layout recalculate qiladi (Forced Synchronous Layout). Read-then-write pattern: avval barcha read, keyin barcha write.
 - **DOM measurement API'lari** — `offsetWidth`/`offsetHeight` (with padding+border), `getBoundingClientRect` (full DOMRect), `getComputedStyle`, `ResizeObserver` (efficient o'lcham track), `IntersectionObserver` (visibility track).
-- **SSR cheklov** — `useLayoutEffect` server'da chaqirilmaydi va React warning beradi. SSR HTML va client mismatch potensial. Yechimlar: `ClientOnly` wrapper, `useEffect`'ga o'tish, Next.js `'use client'` directive, `useIsomorphicLayoutEffect` workaround (library code uchun).
+- **SSR cheklov** — `useLayoutEffect` server'da chaqirilmaydi va React `useLayoutEffect`'ga xos warning beradi ("does nothing on the server" — DOM hydration mismatch emas). Server HTML va client initial render mos keladi; effect state'ni yangilasa, o'zgarish hydration'dan keyin yuzaga keladi (post-hydration flicker). Yechimlar: `ClientOnly` wrapper, `useEffect`'ga o'tish, Next.js `'use client'` directive, `useIsomorphicLayoutEffect` workaround (library code uchun).
 - **`useIsomorphicLayoutEffect` pattern** — `typeof window !== 'undefined' ? useLayoutEffect : useEffect`. Library author'lar (framer-motion, react-use, mantine, chakra-ui) ishlatadi. Application code'da odatda `ClientOnly` wrap afzal.
 - **`useInsertionEffect` (R18)** — Mutation sub-phase'da, DOM mutation'dan **oldin** chaqiriladi. **Faqat CSS-in-JS library'lar uchun** (emotion, styled-components v6+). Application code'da ishlatish anti-pattern. SSR-safe (warning yo'q). DOM kirish yo'q (`ref.current` null).
 - **Decision Guide:** CSS-in-JS rule injection → `useInsertionEffect` | DOM measure/scroll/focus → `useLayoutEffect` | Boshqa hammasi → `useEffect`.
@@ -3908,4 +3932,4 @@ Keyingi bo'lim: `useRef` — mutable container, DOM access, ref forwarding evolu
 
 ---
 
-**Keyingi bo'lim:** [18-useref.md](18-useref.md) — `useRef` mutable container (re-render trigger qilmaydi), DOM refs element access, mutable values (timer ID, prev value, latest closure), ref vs state decision guide, **`forwardRef` evolyutsiyasi (R16.3 → R19)** — R19'da ref oddiy prop bo'ldi, `forwardRef` esa soft-deprecated (hali ishlaydi, warning yo'q), **ref cleanup functions (R19)** — DOM node o'chirilganda chaqiriladi, `useImperativeHandle` chuqur (imperative API expose, video player/modal/focus management misol), callback refs (dynamic attachment).
+**Keyingi bo'lim:** [18-useref.md](18-useref.md) — `useRef` mutable container (re-render trigger qilmaydi), DOM refs element access, mutable values (timer ID, prev value, latest closure), ref vs state decision guide, **`forwardRef` evolyutsiyasi (R16.3 → R19)** — R19'da ref oddiy prop bo'ldi, `forwardRef` esa hali to'liq ishlaydi (deprecated emas, warning yo'q; kelajakda deprecate rejalashtirilgan), **ref cleanup functions (R19)** — DOM node o'chirilganda chaqiriladi, `useImperativeHandle` chuqur (imperative API expose, video player/modal/focus management misol), callback refs (dynamic attachment).

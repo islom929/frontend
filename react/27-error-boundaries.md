@@ -1,6 +1,6 @@
 # Bo'lim 27: Error Boundaries
 
-> Error Boundary — React komponentlar daraxtida (subtree) yuz beradigan render xatoliklarini ushlab oladigan, fallback UI ko'rsatadigan, va error reporting service'ga uzatadigan maxsus class komponent. JavaScript'dagi `try/catch` bloklari komponent render davomidagi xatoliklarni ushlay olmaydi — Error Boundary shu cheklov'ni hal qiladi. Hozirgacha kursda **faqat function komponentlar** ishlatilgan, lekin Error Boundary'ni R19'da ham hooks bilan amalga oshirib bo'lmaydi (`getDerivedStateFromError` va `componentDidCatch` lifecycle method'lar class shart, RFC ostida). Bu fayl **class komponent minimal primer**ni va Error Boundary'ning to'liq hayot tsiklini qamrab oladi.
+> Error Boundary — React komponentlar daraxtida (subtree) yuz beradigan render xatoliklarini ushlab oladigan, fallback UI ko'rsatadigan, va error reporting service'ga uzatadigan maxsus class komponent. JavaScript'dagi `try/catch` bloklari komponent render davomidagi xatoliklarni ushlay olmaydi — Error Boundary shu cheklovni hal qiladi. Hozirgacha kursda **faqat function komponentlar** ishlatilgan, lekin Error Boundary R19'da ham faqat class komponent orqali yoziladi: `getDerivedStateFromError` va `componentDidCatch` lifecycle method'larning hook ekvivalenti yo'q. Bu fayl **class komponent minimal primer**ni va Error Boundary'ning to'liq lifecycle'ini qamrab oladi.
 
 ---
 
@@ -136,7 +136,7 @@ function performWork(workInProgress) {
 
 Error Boundary mexanizmi — Fiber traversal. Xato yuz bergan Fiber'dan parent chain bo'ylab tepaga (root'gacha) Error Boundary qidiriladi. `flags |= DidCapture` — Commit Phase'da boundary fallback'ni render qilishini bildiradi.
 
-`componentDidCatch` Commit Phase'da chaqiriladi (asynchronous error reporting), `getDerivedStateFromError` Render Phase'da (state update — re-render trigger).
+`componentDidCatch` Commit Phase'da sinxron chaqiriladi (error logging, side effect ruxsat etilgan), `getDerivedStateFromError` Render Phase'da (state update — re-render trigger).
 
 </details>
 
@@ -149,8 +149,8 @@ Bug komponent — render error:
 import React from 'react';
 
 function BuggyComponent({ data }: { data: { name: string } | null }) {
-  // ❌ data null bo'lsa, .name TypeError
-  return <h1>{data.name.toUpperCase()}</h1>;
+  // ❌ null-check yo'q — data null bo'lsa render Phase'da TypeError
+  return <h1>{(data as { name: string }).name.toUpperCase()}</h1>;
 }
 
 // Without ErrorBoundary
@@ -279,7 +279,7 @@ class BadComponent extends React.Component {
 // ✅ Arrow method — `this` auto-bound
 class GoodComponent extends React.Component {
   handleClick = () => {
-    this.setState(...);  // ✅ `this` referances class instance
+    this.setState(...);  // ✅ `this` class instance'ga bog'langan
   };
   render() {
     return <button onClick={this.handleClick}>Click</button>;
@@ -541,7 +541,7 @@ Class komponent **lifecycle methods** — har bir bosqichda chaqiriladigan maxsu
 > **Versiya evolyutsiyasi (Class Lifecycle Methods → Hooks):**
 > - **Pre-R16.8 (2018):** Class lifecycle methods majburiy (`componentDidMount`, `componentDidUpdate`, `componentWillUnmount`, `componentWillMount`, `componentWillReceiveProps`, `componentWillUpdate`).
 > - **R16.8+ (Hooks):** `useEffect`, `useLayoutEffect`, `useState`, `useReducer` lifecycle method'larning aksariyatini almashtirdi. **Sabab:** lifecycle method'lar logic reuse'ni qiyinlashtirardi (HOC, render props bilan kurashish), `this` binding murakkab edi, lifecycle "soup" — bir method'da turli concerns aralash. **MUHIM:** `useEffect` lifecycle method'ning **mexanik almashtiruvi emas** — sync model (cross-ref [`16-useeffect.md`](16-useeffect.md)).
-> - **R19+:** Error boundaries hali class shart (`getDerivedStateFromError`/`componentDidCatch`). Hooks-only kelajak — kuting (RFC discussions).
+> - **R19+:** Error boundaries hali class shart (`getDerivedStateFromError`/`componentDidCatch`). Hook ekvivalenti yo'q — `react-error-boundary` kutubxonasi function komponentlar uchun wrapper beradi (ichida class ishlatadi).
 
 NIMA UCHUN `useEffect` lifecycle equivalent EMAS:
 
@@ -661,22 +661,27 @@ Class va hooks lifecycle taxminan ekvivalent, lekin mental model boshqacha:
 Lifecycle method'lar va hooks ekvivalent:
 
 ```tsx
-// === Class version ===
-interface RiskyActionButtonState {
-  data: any[];
+interface Product {
+  id: string;
+  name: string;
+}
+
+interface ProductListState {
+  products: Product[];
   loading: boolean;
 }
 
-class MyClass extends React.Component<{ url: string }, RiskyActionButtonState> {
-  state: RiskyActionButtonState = { data: [], loading: true };
+// === Class version ===
+class ProductListClass extends React.Component<{ url: string }, ProductListState> {
+  state: ProductListState = { products: [], loading: true };
   
   componentDidMount() {
-    this.fetchData();
+    this.fetchProducts();
   }
   
   componentDidUpdate(prevProps: { url: string }) {
     if (prevProps.url !== this.props.url) {
-      this.fetchData();
+      this.fetchProducts();
     }
   }
   
@@ -684,22 +689,22 @@ class MyClass extends React.Component<{ url: string }, RiskyActionButtonState> {
     // No subscriptions in this example
   }
   
-  fetchData = async () => {
+  fetchProducts = async () => {
     this.setState({ loading: true });
     const response = await fetch(this.props.url);
-    const data = await response.json();
-    this.setState({ data, loading: false });
+    const products: Product[] = await response.json();
+    this.setState({ products, loading: false });
   };
   
   render() {
     if (this.state.loading) return <p>Loading...</p>;
-    return <ul>{this.state.data.map((d, i) => <li key={i}>{d.name}</li>)}</ul>;
+    return <ul>{this.state.products.map(product => <li key={product.id}>{product.name}</li>)}</ul>;
   }
 }
 
 // === Hooks version ===
-function MyFunction({ url }: { url: string }) {
-  const [data, setData] = React.useState<any[]>([]);
+function ProductListHooks({ url }: { url: string }) {
+  const [products, setProducts] = React.useState<Product[]>([]);
   const [loading, setLoading] = React.useState(true);
   
   React.useEffect(() => {
@@ -707,10 +712,10 @@ function MyFunction({ url }: { url: string }) {
     
     setLoading(true);
     fetch(url)
-      .then(r => r.json())
-      .then(data => {
+      .then(response => response.json())
+      .then((data: Product[]) => {
         if (!cancelled) {
-          setData(data);
+          setProducts(data);
           setLoading(false);
         }
       });
@@ -719,7 +724,7 @@ function MyFunction({ url }: { url: string }) {
   }, [url]);
   
   if (loading) return <p>Loading...</p>;
-  return <ul>{data.map((d, i) => <li key={i}>{d.name}</li>)}</ul>;
+  return <ul>{products.map(product => <li key={product.id}>{product.name}</li>)}</ul>;
 }
 ```
 
@@ -740,7 +745,11 @@ class ScrollList extends React.Component<{ items: string[] }, { scrollTop: numbe
     return null;
   }
   
-  componentDidUpdate(_prev: any, _prevState: any, snapshot: number | null) {
+  componentDidUpdate(
+    _prevProps: { items: string[] },
+    _prevState: { scrollTop: number },
+    snapshot: number | null,
+  ) {
     if (snapshot !== null && this.listRef.current) {
       this.listRef.current.scrollTop = this.listRef.current.scrollHeight - snapshot;
     }
@@ -834,7 +843,7 @@ function commitClassComponent(workInProgress, instance) {
 }
 ```
 
-R18+ Strict Mode `UNSAFE_*` chaqiruvlarni 2 marta qiladi (development'da) — buggy behavior'ni ko'rsatish uchun.
+StrictMode `UNSAFE_*` lifecycle method'lar ishlatilganda development'da console warning beradi — migration kerakligini bildirish uchun.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -847,7 +856,7 @@ class BadComponent extends React.Component {
   UNSAFE_componentWillMount() {
     fetch('/api/data').then(r => this.setState({ data: r }));
     // Concurrent rendering interrupts → restart → fetch called again
-    // Result: 2x or 3x API calls per "mount"
+    // Result: bir "mount" uchun fetch bir necha marta chaqiriladi
   }
   
   componentDidMount() {
@@ -889,30 +898,37 @@ Modern alternative — `componentDidUpdate` + AbortController, yoki `useEffect` 
 Migration `UNSAFE_*` → modern:
 
 ```tsx
+interface User {
+  id: string;
+  name: string;
+}
+
 // ❌ Pre-R16.3 — UNSAFE
-class OldComponent extends React.Component<{ userId: string }, { user: any }> {
+class OldUserCard extends React.Component<{ userId: string }, { user: User | null }> {
+  state = { user: null };
+  
   UNSAFE_componentWillMount() {
     fetch(`/api/users/${this.props.userId}`)
-      .then(r => r.json())
+      .then(response => response.json())
       .then(user => this.setState({ user }));
   }
   
   UNSAFE_componentWillReceiveProps(nextProps: { userId: string }) {
     if (nextProps.userId !== this.props.userId) {
       fetch(`/api/users/${nextProps.userId}`)
-        .then(r => r.json())
+        .then(response => response.json())
         .then(user => this.setState({ user }));
     }
   }
   
   render() {
-    return <div>{this.state?.user?.name}</div>;
+    return <div>{this.state.user?.name}</div>;
   }
 }
 
 // ✅ R16.3+ — Modern class
-class NewComponent extends React.Component<{ userId: string }, { user: any }> {
-  state = { user: null };
+class NewUserCard extends React.Component<{ userId: string }, { user: User | null }> {
+  state: { user: User | null } = { user: null };
   controller: AbortController | null = null;
   
   componentDidMount() {
@@ -936,7 +952,7 @@ class NewComponent extends React.Component<{ userId: string }, { user: any }> {
       const response = await fetch(`/api/users/${this.props.userId}`, { 
         signal: this.controller.signal 
       });
-      const user = await response.json();
+      const user: User = await response.json();
       this.setState({ user });
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
@@ -950,16 +966,16 @@ class NewComponent extends React.Component<{ userId: string }, { user: any }> {
 }
 
 // ✅ R16.8+ — Hooks
-function HooksComponent({ userId }: { userId: string }) {
-  const [user, setUser] = React.useState<any>(null);
+function UserCardHooks({ userId }: { userId: string }) {
+  const [user, setUser] = React.useState<User | null>(null);
   
   React.useEffect(() => {
     const controller = new AbortController();
     
     fetch(`/api/users/${userId}`, { signal: controller.signal })
-      .then(r => r.json())
-      .then(setUser)
-      .catch(err => {
+      .then(response => response.json())
+      .then((data: User) => setUser(data))
+      .catch((err: Error) => {
         if (err.name !== 'AbortError') throw err;
       });
     
@@ -983,7 +999,7 @@ Hooks variant — eng qisqa, race condition handling tabiiy (cleanup return), Co
 **Error Boundary** — ikki lifecycle method'dan biri yoki ikkalasini implement qiluvchi class komponent:
 
 1. **`static getDerivedStateFromError(error)`** — Render Phase'da chaqiriladi. Yangi state qaytaradi (re-render trigger).
-2. **`componentDidCatch(error, info)`** — Commit Phase'dan keyin chaqiriladi. Error logging uchun.
+2. **`componentDidCatch(error, info)`** — Commit Phase'da chaqiriladi (browser paint'idan oldin, sinxron). Error logging uchun.
 
 ```tsx
 class ErrorBoundary extends React.Component<
@@ -1029,7 +1045,7 @@ Ikkala method'ning vazifalari farq:
 | Method | Phase | Vazifa | SSR |
 |--------|-------|--------|-----|
 | `getDerivedStateFromError` | Render | State update | ✅ Ishlaydi |
-| `componentDidCatch` | Commit (post-paint) | Logging | ❌ Server'da chaqirilmaydi |
+| `componentDidCatch` | Commit (paint'dan oldin, sinxron) | Logging | ❌ Server'da chaqirilmaydi |
 
 NIMA UCHUN ikki method:
 
@@ -1050,7 +1066,7 @@ Find nearest ErrorBoundary up the tree
        ├─ Found:
        │   ├─ Call getDerivedStateFromError(error) → state update
        │   ├─ Re-render with hasError: true → fallback UI
-       │   └─ Call componentDidCatch(error, info) → logging (post-paint)
+       │   └─ Call componentDidCatch(error, info) → logging (commit, paint'dan oldin)
        │
        └─ Not found:
            ├─ R15 va eski: silent corruption (boundaries yo'q edi)
@@ -1061,7 +1077,7 @@ Find nearest ErrorBoundary up the tree
 > **Versiya evolyutsiyasi (Error Boundary API):**
 > - **R16 (2017):** `componentDidCatch(error, info)` kiritildi.
 > - **R16.6 (2018):** `getDerivedStateFromError(error)` qo'shildi — SSR-compatible state update.
-> - **R18 (2022):** Default uncaught error behavior — entire tree unmount (was silent in R17). `digest` field for hydration mismatch errors.
+> - **R18 (2022):** `digest` field SSR error'lari uchun (hydration mismatch). `onRecoverableError` root option qo'shildi.
 > - **R19 (2024):** Root-level callbacks (`onCaughtError`/`onUncaughtError`/`onRecoverableError`) — application-wide error reporting.
 
 <details>
@@ -1090,8 +1106,10 @@ function handleError(workInProgress, error) {
   }
   
   if (boundary !== null) {
-    const newState = boundary.type.getDerivedStateFromError(error);
-    boundary.memoizedState = { ...boundary.memoizedState, ...newState };
+    if (typeof boundary.type.getDerivedStateFromError === 'function') {
+      const newState = boundary.type.getDerivedStateFromError(error);
+      boundary.memoizedState = { ...boundary.memoizedState, ...newState };
+    }
     boundary.flags |= DidCapture;
     
     boundary.deferredErrorInfo = {
@@ -1183,11 +1201,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
   
   render() {
-    if (this.state.hasError) {
+    if (this.state.hasError && this.state.error) {
       const { fallback } = this.props;
       
       if (typeof fallback === 'function') {
-        return fallback(this.state.error!);
+        return fallback(this.state.error);
       }
       
       return fallback ?? <DefaultFallback error={this.state.error} />;
@@ -1387,7 +1405,9 @@ class DetailedErrorBoundary extends React.Component<{ children: React.ReactNode 
         <div role="alert">
           <h2>Error</h2>
           <p>{this.state.error?.message}</p>
-          <small>At: {new Date(this.state.errorTimestamp!).toLocaleString()}</small>
+          {this.state.errorTimestamp !== null && (
+            <small>At: {new Date(this.state.errorTimestamp).toLocaleString()}</small>
+          )}
         </div>
       );
     }
@@ -1445,7 +1465,7 @@ Error type categorization in static method — pure logic OK.
 
 ### Nazariya
 
-`componentDidCatch(error, info)` — instance method, Commit Phase'dan keyin chaqiriladi. **Side effects ruxsat etilgan** — logging, analytics, error reporting.
+`componentDidCatch(error, info)` — instance method, Commit Phase'da sinxron chaqiriladi (browser paint'idan oldin). **Side effects ruxsat etilgan** — logging, analytics, error reporting.
 
 ```tsx
 componentDidCatch(error: Error, info: React.ErrorInfo) {
@@ -1508,7 +1528,7 @@ NIMA UCHUN ikkita method (`getDerivedStateFromError` + `componentDidCatch`):
 
 | Aspect | `getDerivedStateFromError` | `componentDidCatch` |
 |--------|----------------------------|---------------------|
-| Phase | Render | Commit (post-paint) |
+| Phase | Render | Commit (paint'dan oldin) |
 | `this` | ❌ Static (no `this`) | ✅ Instance |
 | Side effects | ❌ Pure | ✅ OK |
 | SSR | ✅ Ishlaydi | ❌ Skip |
@@ -1526,16 +1546,15 @@ getDerivedStateFromError(error) ← state update (Render Phase)
 Re-render boundary with hasError: true → fallback UI
        │
        ▼
-Commit fallback to DOM
+Commit Phase:
+   ├─ fallback DOM'ga yoziladi
+   └─ componentDidCatch(error, info) ← logging (sinxron, commit ichida)
        │
        ▼
-Browser paints
-       │
-       ▼
-componentDidCatch(error, info) ← logging (post-paint)
+Browser paints (fallback UI ko'rinadi)
 ```
 
-`componentDidCatch` post-paint — UI darrov ko'rinadi, logging keyin (UX prioritet).
+`componentDidCatch` Commit Phase'da, fallback DOM mutation'idan keyin va paint'dan oldin sinxron chaqiriladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1553,14 +1572,16 @@ function commitErrorBoundary(boundary, errorInfo) {
         componentStack: errorInfo.componentStack,
         digest: errorInfo.digest,
       });
-    } catch (err) {
-      console.error('Error in componentDidCatch:', err);
+    } catch (errorInCommit) {
+      // captureCommitPhaseError — yangi xatoni yuqoridagi eng yaqin
+      // boundary'ga ko'taradi (topilmasa root'da uncaught)
+      captureCommitPhaseError(boundary, boundary.return, errorInCommit);
     }
   }
 }
 ```
 
-`componentDidCatch` o'zi xato bersa — silent log, propagation yo'q (recursive error oldini olish).
+`componentDidCatch` o'zi xato bersa, React uni yutib yubormaydi — `captureCommitPhaseError` orqali shu boundary'ning **yuqorisidagi** eng yaqin Error Boundary'ga ko'tariladi. Topilmasa root darajasiga (uncaught) yetadi. Boundary o'z xatosini o'zi ushlay olmaydi.
 
 R18+ `digest` — hydration mismatch error'lar uchun unique ID (server stack vs client stack farqi).
 
@@ -1613,7 +1634,7 @@ class ProductionErrorBoundary extends React.Component<
     }
     
     if (process.env.NODE_ENV === 'development') {
-      console.group('🔥 Error Boundary');
+      console.group('Error Boundary');
       console.error(error);
       console.error('Component Stack:', info.componentStack);
       console.groupEnd();
@@ -1640,24 +1661,23 @@ class LoggedErrorBoundary extends React.Component<
     return { hasError: true };
   }
   
-  async componentDidCatch(error: Error, info: React.ErrorInfo) {
-    try {
-      await fetch('/api/error-log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: error.message,
-          stack: error.stack,
-          componentStack: info.componentStack,
-          url: window.location.href,
-          userAgent: navigator.userAgent,
-          userId: this.props.userId,
-          timestamp: new Date().toISOString(),
-        }),
-      });
-    } catch (logError) {
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    // React componentDidCatch return qiymatini await qilmaydi — fetch fire-and-forget
+    fetch('/api/error-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: error.message,
+        stack: error.stack,
+        componentStack: info.componentStack,
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        userId: this.props.userId,
+        timestamp: new Date().toISOString(),
+      }),
+    }).catch((logError: unknown) => {
       console.error('Failed to log error:', logError);
-    }
+    });
   }
   
   render() {
@@ -1692,14 +1712,14 @@ Quyidagi vaziyatlarda **NOT caught**:
 | Event handlers | ❌ | Render Phase tashqarisida |
 | Async (`setTimeout`, `Promise.then`) | ❌ | Async — render Phase tashqarisida |
 | Server-Side Rendering errors | ❌ (mostly) | SSR'da `componentDidCatch` skip |
-| Errors in error boundary itself | ❌ | Recursive error oldini olish |
+| Errors in error boundary itself | ❌ | Boundary qidiruvi parent'dan boshlanadi — yuqoridagi boundary'ga ko'tariladi |
 
 NIMA UCHUN bu cheklov:
 
-1. **Event handlers async tabiat** — click event React render lifecycle'dan keyin firing qiladi.
+1. **Event handler render/commit'dan tashqarida** — handler React'ning render/commit work loop'idan keyin, alohida call stack'da chaqiriladi. Shu sababli throw qilingan xato boundary capture path'iga kirmaydi.
 2. **Async code execution context** — `setTimeout(callback, 1000)` callback'i React stack tashqarida bajariladi.
-3. **SSR Commit Phase yo'q** — `componentDidCatch` post-commit chaqiriladi.
-4. **Recursive prevention** — boundary o'zi xato bersa va ushlasa — infinite loop.
+3. **SSR'da Commit Phase yo'q** — `componentDidCatch` faqat Commit Phase'da ishlaydi, server'da Commit Phase bo'lmagani uchun chaqirilmaydi (`getDerivedStateFromError` esa Render Phase'da, SSR'da fallback HTML beradi).
+4. **Boundary o'z xatosini o'zi ushlamaydi** — boundary qidiruvi parent fiber'dan (`fiber.return`) boshlanadi, shuning uchun boundary hech qachon o'zining ancestor zanjirida bo'lmaydi. Render yoki `componentDidCatch` xatosi yuqoridagi keyingi boundary'ga ko'tariladi (agar o'zini o'zi ushlasa, fallback render xatosi cheksiz tsiklga olib kelardi).
 
 QANDAY ISHLAYDI: caught/not caught misollar:
 
@@ -1747,24 +1767,23 @@ function BuggyEffect() {
 Hooks lifecycle xatolari (Render Phase + Commit Phase) caught. Async tashqi (setTimeout, Promise.then) — caught EMAS.
 
 > **Versiya evolyutsiyasi (Error Catching Scope):**
-> - **R16 (2017):** Render Phase + lifecycle errors caught. Event handlers, async — not caught.
-> - **R18 (2022):** Default uncaught error behavior — entire tree unmounts.
+> - **R16 (2017):** Render Phase + lifecycle errors caught. Event handlers, async — not caught. Boundary yo'q bo'lsa — butun daraxt unmount.
+> - **R18 (2022):** `useTransition` transition funksiyasi ichidagi xato boundary'ga yetadi.
 > - **R19 (2024):** `onUncaughtError` root callback for errors that no boundary catches.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Event handlers — React's synthetic event system runs in **isolated execution context**:
+Event handler React synthetic event system tomonidan chaqiriladi — bu render/commit work loop'idan tashqarida, alohida call stack'da bo'ladi:
 
 ```javascript
-// react-dom-bindings/src/events/DOMPluginEventSystem.js (simplified)
-function dispatchEventForPluginEventSystem(event) {
-  try {
-    invokeGuardedCallback(handler, event);
-  } catch (error) {
-    // ❌ React doesn't propagate this to Error Boundaries
-    throw error;
-  }
+// react-dom-bindings/src/events/DOMPluginEventSystem.js (conceptual)
+function dispatchEvent(event) {
+  // Handler render/commit fiber traversal'idan tashqarida chaqiriladi.
+  // Bu yerda throw qilingan xato Error Boundary capture path'iga
+  // (throwException / DidCapture flag) kirmaydi — oddiy JS xato sifatida
+  // window.onerror'ga ketadi.
+  listener(event);
 }
 ```
 
@@ -1780,7 +1799,7 @@ fetch('/api').then(() => {
 });
 ```
 
-React render lifecycle'i sinxron (R18+ Concurrent ham — task per yield). Async callback'lar React stack tashqarisida → boundary ushlamaydi.
+React render va commit ishini o'z call stack'ida bajaradi (R18+ Concurrent rendering interrupt qilinsa ham, har bir ish birligi shu stack'da ishlaydi). `setTimeout`/`Promise.then` callback'lari esa keyinroq, React stack'idan tashqarida ishga tushadi — shu sababli throw qilingan xato boundary'ga yetib bormaydi.
 
 **Workaround**: manual try/catch + setState:
 
@@ -1832,9 +1851,9 @@ class ErrorBoundary extends React.Component<
 
 // === Caught ===
 
-function CaughtRender() {
-  const data: any = null;
-  return <h1>{data.toUpperCase()}</h1>;  // ✅ Caught
+function CaughtRender({ title }: { title: string | null }) {
+  // title=null bilan chaqirilsa, render Phase'da TypeError
+  return <h1>{(title as string).toUpperCase()}</h1>;  // ✅ Caught
 }
 
 function CaughtLazyInit() {
@@ -2798,7 +2817,6 @@ function GlobalErrorFallback({ error, reset }: FallbackProps) {
   
   return (
     <div className="global-error" role="alert">
-      <div className="error-icon">⚠️</div>
       <h1>Application Error</h1>
       <p>We're sorry, something went wrong. Please try again.</p>
       <div className="actions">
@@ -2828,7 +2846,7 @@ function RouteErrorFallback({ error, reset }: FallbackProps) {
 function WidgetErrorFallback({ name }: { name: string }) {
   return (
     <div className="widget-error" role="alert">
-      <p>📊 {name} unavailable</p>
+      <p>{name} unavailable</p>
     </div>
   );
 }
@@ -2936,7 +2954,7 @@ NIMA UCHUN library'dan foydalanish:
 | `resetKeys` | Manual `componentDidUpdate` | Built-in |
 | Hook integration | Manual `useErrorHandler` | `useErrorBoundary` |
 | TypeScript | Manual types | Library types |
-| Bundle | 0 (own code) | ~3KB gzipped |
+| Bundle | 0 (own code) | Kichik qo'shimcha (dependency'siz) |
 
 Production'da library afzal — battle-tested, edge cases handled, hooks-friendly.
 
@@ -2995,9 +3013,9 @@ class ErrorBoundary extends React.Component {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`react-error-boundary` bundle size:
+`react-error-boundary` xususiyatlari:
 
-- Core library: ~2KB gzipped
+- Kichik hajmli (kichik bundle qo'shimchasi)
 - TypeScript types included
 - No external dependencies
 
@@ -3130,7 +3148,10 @@ R19 (2024) `createRoot` API'ga uchta error callback qo'shdi — boundary'larsiz 
 ```tsx
 import { createRoot } from 'react-dom/client';
 
-const root = createRoot(document.getElementById('root')!, {
+const container = document.getElementById('root');
+if (!container) throw new Error('Root container topilmadi');
+
+const root = createRoot(container, {
   onCaughtError: (error, errorInfo) => {
     console.error('Caught:', error);
     Sentry.captureException(error, { extra: errorInfo });
@@ -3191,11 +3212,11 @@ Hydration mismatch
 ```
 
 > **Versiya evolyutsiyasi (Root Callbacks):**
-> - **R16:** Error Boundary `componentDidCatch` only.
-> - **R18:** Default uncaught error behavior — app crashes (was silent in R17). Hydration auto-recovery added.
-> - **R19:** Root callbacks (`onCaughtError`/`onUncaughtError`/`onRecoverableError`) — centralized error handling.
+> - **R16:** Error Boundary (`componentDidCatch`). Boundary yo'q bo'lsa — butun daraxt unmount.
+> - **R18:** `onRecoverableError` root option (hydration auto-recovery reporting). `digest` field SSR error'lari uchun.
+> - **R19:** Root callbacks to'liq to'plami (`onCaughtError`/`onUncaughtError`/`onRecoverableError`) — centralized error handling.
 
-`errorInfo` argument — `{ componentStack: string, errorBoundary?: React.Component }`. Boundary callbacks'da `errorBoundary` mavjud (qaysi boundary instance ushladi).
+`errorInfo` argument — `{ componentStack: string }` (xato yuz bergan komponent yo'li). `onRecoverableError`'da ba'zi holatlarda asl sabab `error.cause`'da bo'ladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -3230,7 +3251,6 @@ function handleError(workInProgress, error) {
     if (root.onCaughtError) {
       root.onCaughtError(error, {
         componentStack: getComponentStack(workInProgress),
-        errorBoundary: boundary.stateNode,
       });
     }
   } else {
@@ -3262,7 +3282,8 @@ Sentry.init({
   environment: process.env.NODE_ENV,
 });
 
-const container = document.getElementById('root')!;
+const container = document.getElementById('root');
+if (!container) throw new Error('Root container topilmadi');
 
 const root = createRoot(container, {
   onCaughtError: (error, errorInfo) => {
@@ -3351,20 +3372,19 @@ Development debugging:
 ```tsx
 const root = createRoot(container, {
   onCaughtError: (error, info) => {
-    console.group('🟡 Caught Error');
+    console.group('Caught Error');
     console.error(error);
     console.error('Stack:', info.componentStack);
-    console.error('Boundary:', info.errorBoundary?.constructor.name);
     console.groupEnd();
   },
   onUncaughtError: (error, info) => {
-    console.group('🔴 Uncaught Error');
+    console.group('Uncaught Error');
     console.error(error);
     console.error('Stack:', info.componentStack);
     console.groupEnd();
   },
   onRecoverableError: (error) => {
-    console.warn('🟢 Recovered:', error.message);
+    console.warn('Recovered:', error.message);
   },
 });
 ```
@@ -3406,21 +3426,21 @@ Production'da fallback UI **simple va safe** bo'lishi shart.
 
 ### Gotcha 2: `componentDidCatch` o'zi xato bersa
 
-`componentDidCatch` xato bersa — silent log, propagation yo'q.
+`componentDidCatch` ichida throw qilingan xatoni React yutib yubormaydi — `captureCommitPhaseError` orqali shu boundary'ning **yuqorisidagi** eng yaqin Error Boundary'ga ko'tariladi. Topilmasa root darajasiga (uncaught) yetadi.
 
 ```tsx
 class Boundary extends React.Component {
   componentDidCatch(error: Error) {
-    throw new Error('Logging failed');  // ❌ Silent — React swallows
+    throw new Error('Logging failed');  // ❌ Yuqoridagi boundary'ga ko'tariladi (yoki uncaught)
   }
 }
 ```
 
-Recursive error oldini olish. Logging code defensive yozilishi kerak.
+Boundary o'z `componentDidCatch` xatosini o'zi ushlay olmaydi. Logging code defensive (`.catch(() => {})`) yozilishi kerak.
 
 ### Gotcha 3: Hooks bilan amalga oshirib bo'lmaydi (R19'da ham)
 
-`getDerivedStateFromError`/`componentDidCatch` lifecycle method'lari hooks ekvivalenti yo'q (RFC ostida, community discussion). `react-error-boundary` library `useErrorBoundary` qaytaradi — lekin **programmatic trigger** (xatoni qo'lda ko'tarish), boundary'ning o'zi hali class komponent sifatida implement qilingan.
+`getDerivedStateFromError`/`componentDidCatch` lifecycle method'larining hook ekvivalenti yo'q — R19'da ham Error Boundary class komponent sifatida yoziladi. `react-error-boundary` library `useErrorBoundary` hook'i `showBoundary` beradi — bu **programmatic trigger** (xatoni qo'lda boundary'ga ko'tarish), lekin boundary'ning o'zi (library ichida) hali class komponent.
 
 ### Gotcha 4: Boundary `key` o'zgarishi children'larni ham unmount qiladi
 
@@ -3521,19 +3541,21 @@ function SubmitButton() {
 </ErrorBoundary>
 ```
 
-### ❌ Xato 4: `componentDidCatch` boundary'ning o'zi'da xato
+### ❌ Xato 4: `componentDidCatch` ichida xatoni handle qilmaslik
 
 ```tsx
-// ❌ componentDidCatch xato bersa — silent
+// ❌ Sync throw — yuqoridagi boundary'ga ko'tariladi (yoki uncaught)
 componentDidCatch(error) {
-  fetch('/api/log').then(() => { throw new Error('failed'); });
+  throw new Error('Logging failed');
 }
 
-// ✅ Defensive
+// ✅ Defensive — log xatosi yutiladi, boundary buzilmaydi
 componentDidCatch(error) {
   fetch('/api/log').catch(() => {});
 }
 ```
+
+`fetch(...).then(() => { throw ... })` — rejection async bo'lgani uchun `componentDidCatch` stack'idan tashqarida, `unhandledrejection`'ga ketadi. Sync throw esa `captureCommitPhaseError` orqali yuqoriga ko'tariladi.
 
 ### ❌ Xato 5: SSR'da `componentDidCatch`'ga tayanish
 
@@ -3607,16 +3629,15 @@ export class SimpleErrorBoundary extends React.Component<ErrorBoundaryProps, Err
   }
 }
 
-function BuggyComponent() {
-  const data: any = null;
-  return <h1>{data.name}</h1>;
+function BuggyComponent({ user }: { user: { name: string } | null }) {
+  return <h1>{(user as { name: string }).name}</h1>;  // user=null bilan render Phase TypeError
 }
 
 <SimpleErrorBoundary 
   fallback={(err) => <p>Error: {err.message}</p>}
   onError={(err, info) => console.error('Caught:', err, info)}
 >
-  <BuggyComponent />
+  <BuggyComponent user={null} />
 </SimpleErrorBoundary>
 ```
 
@@ -3868,7 +3889,7 @@ function ComponentWithAsyncError() {
 import React from 'react';
 
 const mockSentry = {
-  captureException: (error: Error, context?: any) => {
+  captureException: (error: Error, context?: Record<string, unknown>) => {
     console.log('[Sentry] Captured:', error, context);
   },
 };
@@ -4020,7 +4041,10 @@ function App() {
 
 import { createRoot } from 'react-dom/client';
 
-const root = createRoot(document.getElementById('root')!, {
+const container = document.getElementById('root');
+if (!container) throw new Error('Root container topilmadi');
+
+const root = createRoot(container, {
   onCaughtError: (error, info) => {
     mockSentry.captureException(error, {
       level: 'warning',
@@ -4058,28 +4082,28 @@ root.render(<App />);
 
 ## Xulosa
 
-Error Boundaries — React'ning xato handling fundamentalini ifodalovchi pattern. Class komponent shart (R19'da ham hooks ekvivalenti yo'q, RFC ostida). Asosiy fikrlar:
+Error Boundaries — React'ning xato handling fundamentalini ifodalovchi pattern. Class komponent shart (R19'da ham `getDerivedStateFromError`/`componentDidCatch` hook ekvivalenti yo'q). Asosiy fikrlar:
 
 - **Error Boundary Concept** — class komponent `getDerivedStateFromError` (static, Render Phase, pure) + `componentDidCatch` (instance, Commit Phase, side effects OK) implement qiladi. Render Phase xatolar boundary'ga "ko'tarilib", state update + fallback UI ko'rsatadi. R16+ fundamental pattern.
 - **Class Component Minimal Primer** — `extends React.Component`, `state` (class field yoki constructor), `render()` (majburiy), event handlers (arrow methods auto-bind), `setState` (async, batched, partial). R16.8+ aksariyat use case'lar hooks bilan almashtirildi, faqat Error Boundary uchun class shart.
 - **Class Lifecycle Methods → Hooks Equivalents** — `componentDidMount` ≈ `useEffect([])`, `componentDidUpdate` ≈ `useEffect([deps])`, `componentWillUnmount` ≈ cleanup return. Error boundary methods (`getDerivedStateFromError`/`componentDidCatch`) hooks bilan **ekvivalent yo'q**.
 - **`UNSAFE_*` Lifecycle Methods Deprecated** — R16.3'da `componentWillMount`, `componentWillReceiveProps`, `componentWillUpdate` `UNSAFE_*` prefix bilan deprecated. **Sabab:** Concurrent rendering bilan mos emas. Modern alternative: `componentDidMount`, `getDerivedStateFromProps`, `getSnapshotBeforeUpdate`.
 - **`getDerivedStateFromError`** — static method, Render Phase, pure (side effect TAQIQ), SSR-compatible. State update via return value.
-- **`componentDidCatch`** — instance method, Commit Phase post-paint, side effects OK (logging, Sentry, fetch). `React.ErrorInfo` (componentStack, R18+ digest). SSR'da skip.
+- **`componentDidCatch`** — instance method, Commit Phase'da sinxron (paint'dan oldin), side effects OK (logging, Sentry, fetch). `React.ErrorInfo` (componentStack, R18+ digest). SSR'da skip.
 - **Error Catching Scope** — **Caught:** render method, lifecycle methods, constructor, hooks render Phase, children render. **NOT Caught:** event handlers, async (`setTimeout`/`Promise.then`), SSR-specific paths, error boundary itself errors.
 - **Event Handlers va Async Errors** — manual try/catch + `setState` callback throw → render Phase error → boundary catches. `unhandledrejection` window event for global async error capture.
 - **Error Boundary Placement Strategy** — granular boundaries afzal (per-route, per-feature, per-widget) + top-level safety net. Localized failure, better UX, recovery mechanisms.
 - **Error Recovery — `key` Prop Reset** — boundary `key` change → unmount + mount → state reset → children re-render. `componentDidUpdate` ichida `resetKeys` comparison (`react-error-boundary` library pattern).
 - **Fallback UI Patterns** — skeleton-style, detailed (development), retry with exponential backoff, contextual (global/route/widget). Accessibility (`role="alert"`, focus management).
-- **`react-error-boundary` Library** — community library (~3KB). `ErrorBoundary` (class), `useErrorBoundary` (hook), `withErrorBoundary` (HOC). `resetKeys`, `onReset`, `onError` props.
+- **`react-error-boundary` Library** — community library (kichik, dependency'siz). `ErrorBoundary` (class), `useErrorBoundary` (hook, `showBoundary`), `withErrorBoundary` (HOC). `resetKeys`, `onReset`, `onError` props.
 - **R19 Root Callbacks** — `createRoot(container, { onCaughtError, onUncaughtError, onRecoverableError })` application-wide error handling. Boundary'larsiz centralized error reporting.
-- **Edge Cases** — boundary o'zi xato bersa upper boundary catches, `componentDidCatch` xato silent (recursive prevention), R19 hooks API yo'q hali, async errors manual handling shart.
+- **Edge Cases** — boundary o'zi (render yoki `componentDidCatch`) xato bersa, React uni yutmaydi — `captureCommitPhaseError` orqali yuqoridagi eng yaqin boundary'ga ko'tariladi (topilmasa uncaught), R19 hooks API yo'q hali, async errors manual handling shart.
 
 Versiya evolyutsiyasi:
 - R16 (2017): `componentDidCatch` introduced
 - R16.3 (2018): `UNSAFE_*` deprecated, `getDerivedStateFromProps`/`getSnapshotBeforeUpdate` added
 - R16.6 (2018): `getDerivedStateFromError` added (SSR-compatible)
-- R18 (2022): Default uncaught error behavior — entire tree unmounts. `digest` field for hydration errors
+- R18 (2022): `onRecoverableError` root option + `digest` field SSR error'lari uchun
 - R19 (2024): Root-level error callbacks (`onCaughtError`/`onUncaughtError`/`onRecoverableError`)
 
 Cross-references:

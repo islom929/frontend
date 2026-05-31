@@ -28,7 +28,7 @@
 
 ### Qisqa javob
 
-Sync rendering — render fazasi to'liq bajarilmaguncha browser'ning main thread bloklanadi. Katta tree (1000+ komponent) yoki qimmat hisoblash render — frame budget'i (16ms) oshib ketsa, **jank** (UI muzlash, kechiktirilgan input) yuzaga keladi. R17 va R18 dan oldingi versiyalar to'liq sync edi: state update → render → commit (uzilmaydi). Concurrent rendering bu muammolarni hal qiladi: render uziladi, priority bo'yicha yield, browser tasks (paint, input) priority oladi.
+Sync rendering — render fazasi to'liq bajarilmaguncha browser'ning main thread bloklanadi. Katta tree (1000+ komponent) yoki qimmat hisoblash render — frame budget'i (60fps'da ~16.67ms) oshib ketsa, **jank** (UI muzlash, kechiktirilgan input) yuzaga keladi. R17 va R18 dan oldingi versiyalar to'liq sync edi: state update → render → commit (uzilmaydi). Concurrent rendering bu muammolarni hal qiladi: render uziladi, priority bo'yicha yield, browser tasks (paint, input) priority oladi.
 
 ### To'liq tushuntirish
 
@@ -259,7 +259,7 @@ ReactDOM.render(<App />, root); // Legacy mode — sync
 
 // R18+:
 import { createRoot } from "react-dom/client";
-createRoot(root).render(<App />); // Concurrent mode — opt-in
+createRoot(root).render(<App />); // Concurrent features — opt-in
 ```
 
 R17 → R18 migration: `createRoot` switch — Concurrent features enabled.
@@ -566,11 +566,16 @@ function ensureRootIsScheduled(root: FiberRoot) {
   const nextLanes = getNextLanes(root, ...);
   const newCallbackPriority = getHighestPriorityLane(nextLanes);
 
-  if (newCallbackPriority > currentCallbackPriority) {
-    // Cancel current work
-    Scheduler.cancelCallback(existingCallback);
-    // Schedule with higher priority
-    Scheduler.scheduleCallback(newCallbackPriority, performWork);
+  // Agar yangi callback priority joriy schedule qilingan'dan farq qilsa —
+  // eski callback bekor qilinadi, yangisi to'g'ri priority bilan qo'yiladi.
+  // (lane qiymati kichikroq = priority yuqoriroq; getHighestPriorityLane
+  //  eng kichik set bit'ni qaytaradi)
+  if (newCallbackPriority !== currentCallbackPriority) {
+    if (existingCallback !== null) {
+      Scheduler.cancelCallback(existingCallback);
+    }
+    const schedulerPriority = lanesToSchedulerPriority(newCallbackPriority);
+    Scheduler.scheduleCallback(schedulerPriority, performWork);
   }
 }
 ```
@@ -942,7 +947,7 @@ function PureComponent() {
 
 - "Concurrent rendering — render N times?" — Aniq son kafolatlanmaydi. Abort + restart natijasida bir necha marta render bo'lishi mumkin. Pure components — abort-safe (side effect yo'q).
 - "Strict Mode production'da bormi?" — Yo'q. Faqat dev. Production single render.
-- "How to detect impurity?" — ESLint `react-compiler/react-compiler` rule, Strict Mode dev (visual check), Profiler (suspicious behavior).
+- "How to detect impurity?" — `eslint-plugin-react-hooks` (React Compiler diagnostics shu plugin'da, compiler o'rnatilmagan bo'lsa ham ishlaydi), Strict Mode dev (visual check), Profiler (suspicious behavior).
 
 </details>
 
@@ -1246,15 +1251,13 @@ function UserProfile({ userId }: { userId: string }) {
 
 **Eslint rules — automated detection:**
 
-```json
-{
-  "plugins": ["react-hooks", "react-compiler"],
-  "rules": {
-    "react-hooks/rules-of-hooks": "error",
-    "react-hooks/exhaustive-deps": "warn",
-    "react-compiler/react-compiler": "error"
-  }
-}
+```js
+// eslint.config.js (flat config) — eslint-plugin-react-hooks@latest
+// React Compiler diagnostics shu plugin orqali surface qilinadi
+// (eski eslint-plugin-react-compiler endi kerak emas)
+import reactHooks from "eslint-plugin-react-hooks";
+
+export default [reactHooks.configs.flat.recommended];
 ```
 
 **Migration checklist (R17 → R18 Concurrent):**
@@ -1930,15 +1933,15 @@ function checkIfSnapshotChanged<T>(inst: StoreInstance<T>): boolean {
 // - Each render: 1x
 // - Each external update: 1x per subscriber
 
-// getSnapshot must be stable reference (or cached via memoization)
-// If returns new object each call → infinite re-render!
+// getSnapshot bir xil data uchun bir xil reference qaytarishi shart.
+// Yangi object qaytarsa → Object.is har safar false → cheksiz re-render.
 
-// ❌ Wrong:
-useSyncExternalStore(subscribe, () => ({ ...store.state })); // New object each call!
+// ❌ Wrong: har chaqiruvda yangi object
+useSyncExternalStore(subscribe, () => ({ ...store.state }));
 
-// ✅ Cache:
-const memoizedSnapshot = useMemo(() => store.state, [store.state]);
-useSyncExternalStore(subscribe, () => memoizedSnapshot);
+// ✅ Store o'zi barqaror snapshot saqlaydi — getSnapshot shu reference'ni qaytaradi.
+// Yangi snapshot faqat data o'zgarganda yaratiladi (setValue ichida).
+useSyncExternalStore(subscribe, store.getSnapshot);
 ```
 
 **`useSyncExternalStoreWithSelector` (selector hook):**
@@ -2744,15 +2747,18 @@ function updateSuspenseComponent(...) {
 }
 ```
 
-**Hidden tree (Offscreen):**
+**Offscreen tree:**
 
-When Suspense shows fallback, primary children rendered as **Offscreen** (hidden but state preserved). After Promise resolves, hidden tree revealed.
+Suspense'ning primary children'i `OffscreenComponent` ostida joylashadi. Ikki holatni ajratish kerak:
+
+- **Initial mount suspend** — children hali commit qilinmagan. Fallback DOM'ga commit qilinadi, primary children commit qilinmaydi. Promise resolve bo'lgach primary children birinchi marta mount qilinadi.
+- **Update suspend** (allaqachon ko'rsatilgan content qayta suspend bo'lsa) — mavjud DOM `display: none` bilan yashiriladi, Offscreen tree state'i (component instance, hook state) saqlanadi. Resolve bo'lgach o'sha tree remount'siz qayta ko'rsatiladi.
 
 ```typescript
-// R18+ Offscreen mode
-// Hidden subtree: rendered but display: none
-// State preserved (component instances kept)
-// Re-mounted on reveal
+// OffscreenComponent (react-reconciler)
+// Update-suspend holatida: subtree DOM-da qoladi, display: none bilan yashiriladi
+// State (instance, hooks) saqlanadi — remount yo'q
+// Reveal: visibility tiklanadi, yangi mount emas
 ```
 
 **Promise tracking:**
@@ -2810,7 +2816,7 @@ If multiple lazy components, each throws Promise. Suspense boundary collects all
 
 **Concurrent integration:**
 
-In R18 Concurrent mode:
+R18 Concurrent rendering'da:
 - Suspense rendering is interruptible
 - Higher priority updates can interrupt Suspense fallback render
 - Once unsuspended, primary children render with appropriate priority
@@ -3074,6 +3080,7 @@ function trackUsedThenable<T>(thenable: Thenable<T>): T {
       // React internal: Promise object'ga status/value property qo'shadi
       // (bu React engine internal — user code'da bunday qilmaslik kerak)
       const tracked = thenable as Record<string, unknown>;
+      tracked.status = "pending";
       thenable.then(
         (value) => {
           tracked.status = "fulfilled";
@@ -3084,7 +3091,6 @@ function trackUsedThenable<T>(thenable: Thenable<T>): T {
           tracked.reason = reason;
         },
       );
-      tracked.status = "pending";
     }
   }
   return thenable as T;
@@ -3397,18 +3403,20 @@ function findSuspenseBoundary(returnFiber: Fiber): Fiber | null {
 
 Reconciler traverses from suspended Fiber up the tree (return chain), stops at first SuspenseComponent.
 
-**Hidden tree preservation (R18+):**
+**Offscreen tree preservation (R18+):**
 
 ```tsx
 <Suspense fallback={<Spinner />}>
   <ComponentWithState />  {/* useState, useEffect */}
 </Suspense>
 
-// First render: ComponentWithState mounts, state initialized
-// Suspends → fallback shown
-// ComponentWithState's Fiber preserved in hidden tree
-// On resume: same Fiber, state preserved
-// Effects re-run? No — hidden tree state untouched
+// Initial mount suspend: children commit qilinmaydi, shuning uchun
+//   useState init va useEffect umuman ishlamaydi. Resolve bo'lgach birinchi mount.
+// Update suspend (allaqachon ko'rsatilgan content qayta suspend bo'lsa):
+//   - Fiber va hook state (memoizedState) saqlanadi
+//   - Tree Offscreen sifatida yashiriladi (display: none)
+//   - Yashirilganda effect'lar destroy qilinadi (cleanup)
+//   - Reveal'da effect'lar qayta setup qilinadi — state saqlanib qoladi
 ```
 
 **Multiple suspenders coordination:**
@@ -3454,21 +3462,15 @@ function App() {
 //    Once new chunk loaded → swap to new tab
 ```
 
-**`Suspense` fallback as full replacement:**
+**`Suspense` fallback as replacement:**
 
-When suspense triggered, fallback **replaces** primary children. Primary tree hidden but state preserved.
+Suspense ishga tushganda fallback primary children o'rnida ko'rsatiladi. Allaqachon commit qilingan content qayta suspend bo'lsa — u DOM'da qoladi, Offscreen orqali `display: none` bilan yashiriladi.
 
 ```typescript
-// Hidden tree props:
-{
-  display: "none",
-  visibility: "hidden",
-  // OR completely off-DOM (Offscreen)
-}
-
-// State preserved:
-// Hooks state in Fiber preserved
-// Effects: cleanup runs, then setup again on reveal
+// Yashirilgan Offscreen tree:
+// - DOM node display: none bilan qoladi (off-DOM emas)
+// - Hook state (memoizedState) Fiber'da saqlanadi
+// - Effect'lar yashirilganda destroy qilinadi, reveal'da qayta setup qilinadi
 ```
 
 **Performance ta'siri:**
@@ -3954,10 +3956,13 @@ function Dashboard() {
 
 ```tsx
 import { ErrorBoundary } from "react-error-boundary";
-import { useState } from "react";
+import { useState, useMemo, use, Suspense } from "react";
 
 function DataView({ retryKey }: { retryKey: number }) {
-  const data = use(fetchData(retryKey)); // retryKey changes → new fetch
+  // Promise faqat retryKey o'zgarganda qayta yaratiladi — aks holda
+  // har render yangi promise → cheksiz suspend
+  const dataPromise = useMemo(() => fetchData(retryKey), [retryKey]);
+  const data = use(dataPromise);
   return <div>{data}</div>;
 }
 
@@ -4180,7 +4185,7 @@ R18+ streaming SSR — graceful error handling per chunk.
 
 ### Follow-up savollar
 
-- "ErrorBoundary functional components'da yo'qmi?" — Hozircha class only. RFC bor (`useErrorBoundary` Hook), lekin stable emas.
+- "ErrorBoundary functional components'da yo'qmi?" — Native ErrorBoundary faqat class komponent orqali (`getDerivedStateFromError` + `componentDidCatch`). Hook-based ErrorBoundary uchun React'da rasmiy RFC yo'q. `react-error-boundary` library funksional wrapper beradi, lekin u ham ichida class komponent ishlatadi.
 - "Async error handler — how?" — Try-catch in handler, then `showBoundary(err)` (`react-error-boundary` library) yoki `setState`'da error.
 - "Network error retry'ni qanday qilaman?" — `react-query` autoRetry (with backoff). Suspense + retry — manual `retryKey` pattern.
 
@@ -4653,7 +4658,7 @@ function App() {
 // 5. setCount runs: count = 1
 ```
 
-R18 — `discreteUpdates` — captures user input pre-hydration, replays after.
+R18 — event replaying tizimi (`ReactDOMEventReplaying`) — hydration tugamagan boundary'ga tushgan discrete event'larni (click, keydown) navbatga qo'yadi, boundary hydrate bo'lgach `retryIfBlockedOn` orqali replay qiladi.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
@@ -4826,7 +4831,7 @@ R18 selective hydration:
 - Shell tezkor hydrate bo'ladi
 - User interaction → shu boundary prioritize qilinadi
 - Total vaqt biroz ko'proq (yield overhead), lekin TTI yaxshi
-- Click pre-hydration → replay qilinadi (R18 discreteUpdates)
+- Click pre-hydration → navbatga qo'yiladi va boundary hydrate bo'lgach replay qilinadi (event replaying tizimi)
 ```
 
 **Best practices:**
@@ -4846,7 +4851,7 @@ R18 selective hydration:
 
 ### Follow-up savollar
 
-- "Selective hydration — Concurrent Mode'ga bog'liqmi?" — Ha. `createRoot`/`hydrateRoot` (Concurrent) majburiy.
+- "Selective hydration — Concurrent rendering'ga bog'liqmi?" — Ha. `createRoot`/`hydrateRoot` (Concurrent root) majburiy.
 - "Hydration mismatch'ni qanday minimize qilish?" — Server va client'da bir xil source of truth. Date.now/Math.random — `useEffect` ichida.
 - "`useId` hydration uchun?" — Server va client'da bir xil ID generate qiladi (Fiber tree position based) — hydration-safe.
 
@@ -4872,7 +4877,7 @@ Full hydration (R17):
 - Entire app hydrated at once
 - All event listeners attached upfront
 - TTI = total hydration time
-- 1MB JS → 200ms hydration
+- Hydration vaqti tree hajmiga proporsional o'sadi
 
 Progressive (R18+):
 - Critical paths hydrate first
@@ -5122,8 +5127,7 @@ const root = hydrateRoot(container, <App />, {
 **Web Vitals maqsadlari (Google tavsiya):**
 
 ```
-First Input Delay (FID): < 100ms (Google "good" threshold)
-Interaction to Next Paint (INP): < 200ms (Google "good" threshold)
+Interaction to Next Paint (INP): < 200ms (Google "good" threshold; 2024-mart'dan beri Core Web Vital, eski First Input Delay o'rnida)
 Largest Contentful Paint (LCP): < 2.5s (Google "good" threshold)
 ```
 
@@ -5166,7 +5170,7 @@ RSC reduces hydration cost:
 
 - "Progressive vs Suspense — bir narsami?" — Suspense — mechanism. Progressive hydration — strategy. Suspense — building block, you compose for progressive.
 - "Bundle size impact'ni qanday o'lchash?" — Webpack/Vite Bundle Analyzer. Bundle visualizer. Per-chunk size tracking.
-- "Browser native lazy hydration?" — Yo'q. React abstraction'i. Standardlashtirish RFC bor.
+- "Browser native lazy hydration?" — Yo'q. Hydration framework abstraktsiyasi (React/Vue/Svelte), browser'da native primitive yo'q. Lazy hydration application kodi yoki framework orqali amalga oshiriladi.
 
 </details>
 
@@ -6331,7 +6335,7 @@ function ContactForm() {
 **To'liq integratsiya — `useActionState` + `useFormStatus` + `useOptimistic`:**
 
 ```tsx
-import { useActionState, useOptimistic } from "react";
+import { useOptimistic, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 interface Comment {
@@ -6365,7 +6369,7 @@ function SubmitButton() {
 }
 
 function CommentSection({ initial }: { initial: Comment[] }) {
-  const [comments, formAction] = useActionState(addComment, initial);
+  const [comments, setComments] = useState(initial);
 
   // Optimistic — UI tezroq update bo'ladi
   const [optimisticComments, addOptimistic] = useOptimistic(
@@ -6376,10 +6380,12 @@ function CommentSection({ initial }: { initial: Comment[] }) {
     ],
   );
 
-  async function handleSubmit(formData: FormData) {
+  // Form action: optimistic update darhol, keyin real mutation
+  async function formAction(formData: FormData) {
     const text = formData.get("text") as string;
-    addOptimistic(text); // Optimistic immediate
-    // formAction will fire from form action prop
+    addOptimistic(text); // Optimistic immediate (transition ichida)
+    const saved = await addComment(comments, formData);
+    setComments(saved); // Real state — optimistic value bekor qilinadi
   }
 
   return (
@@ -6403,10 +6409,10 @@ function CommentSection({ initial }: { initial: Comment[] }) {
 
 Workflow:
 1. User types text → submit
-2. `useOptimistic` darhol `addOptimistic(text)` — UI new comment ko'rsatadi (sending)
-3. `formAction` chaqiriladi — `addComment` async ishlatadi
-4. Server response keladi — `useActionState` `comments` yangilaydi
-5. `useOptimistic` real state'ga align bo'ladi (sending flag yo'qoladi)
+2. React `formAction`'ni transition ichida chaqiradi
+3. `addOptimistic(text)` darhol ishlaydi — UI yangi comment'ni ko'rsatadi (sending)
+4. `addComment` async server mutation bajaradi
+5. Server response keladi → `setComments(saved)` — real state o'rnatiladi, optimistic qiymat avtomatik bekor qilinadi (sending flag yo'qoladi)
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
@@ -6604,7 +6610,7 @@ function Form() {
 
 ### Qisqa javob
 
-Suspense fallback'lar **immediate** ko'rinadi (default) — fast network'da "flicker" (loading appears for ~50ms). Yechim: **`useTransition`** wrap (transition fallback'ni delay qiladi), **min display time** custom hook (fallback minimum 200ms ko'rinadi), yoki **stale content** (eski content + isPending indicator).
+Suspense fallback'lar **immediate** ko'rinadi (default) — tez resolve bo'lganda fallback bir lahzaga ko'rinib yo'qoladi ("flicker"). Yechim: **`useTransition`** wrap (transition fallback'ni keyingi commit'gacha ushlab turadi), **min display time** custom hook (fallback minimum belgilangan vaqt ko'rinadi), yoki **stale content** (eski content + isPending indicator).
 
 ### Kod misoli
 
@@ -6617,7 +6623,7 @@ function Tabs({ active }: { active: string }) {
     </Suspense>
   );
 }
-// Click tab → Spinner flash (50-100ms) → content
+// Click tab → Spinner bir lahzaga ko'rinib yo'qoladi → content
 // Annoying
 
 // ✅ Transition wrap — keep old content during loading
@@ -6721,7 +6727,7 @@ const { data } = useQuery({
 ### Follow-up savollar
 
 - "Why doesn't React auto-delay fallback?" — Implementation complexity. Library territory.
-- "TanStack Query handles this?" — Yes — `keepPreviousData`, `placeholderData` patterns.
+- "TanStack Query handles this?" — Yes — `placeholderData: keepPreviousData` (v5; eski `keepPreviousData: true` opsiyasi v5'da olib tashlandi).
 
 </details>
 

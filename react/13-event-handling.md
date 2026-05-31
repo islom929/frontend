@@ -250,6 +250,12 @@ function ItemList({ items }: { items: Item[] }) {
 Multiple handlers — alohida funksiyalar:
 
 ```tsx
+type FormButtonsProps = {
+  onSave: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
+};
+
 function FormButtons({ onSave, onCancel, onDelete }: FormButtonsProps) {
   const handleSave = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -269,11 +275,11 @@ function FormButtons({ onSave, onCancel, onDelete }: FormButtonsProps) {
   };
   
   return (
-    <Inline gap={8}>
+    <div style={{ display: 'flex', gap: 8 }}>
       <button onClick={handleSave}>Save</button>
       <button onClick={handleCancel}>Cancel</button>
       <button onClick={handleDelete}>Delete</button>
-    </Inline>
+    </div>
   );
 }
 ```
@@ -283,6 +289,7 @@ Anti-pattern — function call:
 ```tsx
 function HandlerCallAntiPattern() {
   const handleClick = () => console.log('hello');
+  const handleClickWithArg = (id: string) => console.log('id:', id);
   
   return (
     <>
@@ -326,8 +333,8 @@ function Button() {
 
 1. **Cross-browser consistency** — IE, Safari, Chrome, Firefox API farq'larini bir xil qiladi
 2. **W3C compliance** — modern API'ga moslash (eski browser'larda emulation)
-3. **React-specific features** — `e.persist()` (R16), event pooling (eskirgan, R17)
-4. **Type safety** — TypeScript `SyntheticEvent<E>` generic E (element type)
+3. **Delegation bilan integratsiya** — event root container'ga delegate qilingani uchun (R17+), `currentTarget` handler attach qilgan Fiber element'ga to'g'ri ko'rsatadi
+4. **Type safety** — TypeScript `SyntheticEvent<T>` generic `T` (element type)
 
 **SyntheticEvent ierarxiya:**
 
@@ -384,10 +391,10 @@ Lekin TypeScript types va `currentTarget` typing — React-specific, ishlatish d
 SyntheticEvent definition (`@types/react`):
 
 ```ts
-interface SyntheticEvent<E = Element, T = Event> extends BaseSyntheticEvent<T, EventTarget & E, EventTarget> {
+interface SyntheticEvent<T = Element, E = Event> extends BaseSyntheticEvent<E, EventTarget & T, EventTarget> {
 }
 
-interface BaseSyntheticEvent<E = Event, C = any, T = any> {
+interface BaseSyntheticEvent<E = object, C = any, T = any> {
   nativeEvent: E;
   currentTarget: C;
   target: T;
@@ -397,8 +404,8 @@ interface BaseSyntheticEvent<E = Event, C = any, T = any> {
   eventPhase: number;
   isTrusted: boolean;
   preventDefault(): void;
-  stopPropagation(): void;
   isDefaultPrevented(): boolean;
+  stopPropagation(): void;
   isPropagationStopped(): boolean;
   persist(): void;  // R17+ no-op (deprecated)
   timeStamp: number;
@@ -441,39 +448,53 @@ interface KeyboardEvent<T = Element> extends UIEvent<T, NativeKeyboardEvent> {
 
 **SyntheticEvent creation — internal:**
 
+React `createSyntheticEvent(Interface)` factory'sini chaqiradi — u `SyntheticBaseEvent` **constructor function** qaytaradi. Har event `new SyntheticBaseEvent(...)` bilan instansiya qilinadi (plain object literal emas). `Interface` — qaysi property'lar native event'dan ko'chirilishini aniqlovchi table. `currentTarget` constructor'da `null` qilib o'rnatiladi; uning qiymati dispatch paytida har bubble bosqichida joriy listener element'iga set qilinadi:
+
 ```ts
-// react-dom internal (soddalashtirilgan)
-function createSyntheticEvent<E extends Event>(
-  reactName: string,
-  reactEventType: string,
-  targetInst: Fiber,
-  nativeEvent: E,
-  nativeTarget: EventTarget
-): SyntheticEvent {
-  const event: SyntheticEvent = {
-    type: reactEventType,
-    target: nativeTarget,
-    currentTarget: nativeTarget,
-    nativeEvent,
-    timeStamp: nativeEvent.timeStamp,
-    defaultPrevented: nativeEvent.defaultPrevented,
-    isTrusted: nativeEvent.isTrusted,
-    
+// react-dom-bindings/src/events/SyntheticEvent.js (soddalashtirilgan)
+function createSyntheticEvent(Interface) {
+  function SyntheticBaseEvent(
+    reactName: string,
+    reactEventType: string,
+    targetInst: Fiber,
+    nativeEvent: Event,
+    nativeEventTarget: EventTarget,
+  ) {
+    this.type = reactEventType;
+    this.nativeEvent = nativeEvent;
+    this.target = nativeEventTarget;
+    this.currentTarget = null;  // dispatch paytida set qilinadi
+
+    // Interface table bo'yicha native event property'larini ko'chirish
+    for (const propName in Interface) {
+      this[propName] = Interface[propName]
+        ? Interface[propName](nativeEvent)
+        : nativeEvent[propName];
+    }
+
+    this.isDefaultPrevented = nativeEvent.defaultPrevented
+      ? functionThatReturnsTrue
+      : functionThatReturnsFalse;
+    this.isPropagationStopped = functionThatReturnsFalse;
+    return this;
+  }
+
+  Object.assign(SyntheticBaseEvent.prototype, {
     preventDefault() {
       this.defaultPrevented = true;
-      nativeEvent.preventDefault();
+      this.nativeEvent.preventDefault();
+      this.isDefaultPrevented = functionThatReturnsTrue;
     },
-    
     stopPropagation() {
-      nativeEvent.stopPropagation();
+      this.nativeEvent.stopPropagation();
+      this.isPropagationStopped = functionThatReturnsTrue;
     },
-    
-    persist() {},  // No-op (R17+)
-    
-    // ... copy specific properties from nativeEvent
-  };
-  
-  return event;
+    persist() {
+      // Modern event system pooling ishlatmaydi — no-op (R17+)
+    },
+  });
+
+  return SyntheticBaseEvent;
 }
 ```
 
@@ -583,7 +604,7 @@ function LoginForm() {
   
   return (
     <form onSubmit={handleSubmit}>
-      <Stack gap={8}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <input
           type="email"
           value={email}
@@ -595,7 +616,7 @@ function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
         />
         <button type="submit">Login</button>
-      </Stack>
+      </div>
     </form>
   );
 }
@@ -612,7 +633,7 @@ function PointerTracker() {
     
     // Native-only API'lar — SyntheticEvent'da yo'q
     console.log(e.nativeEvent.composedPath());  // Event method
-    console.log((e.nativeEvent as any).layerX);  // Non-standard, ba'zi browser'larda
+    console.log(e.nativeEvent.pointerType);  // Native PointerEvent property
   };
   
   return <div onPointerMove={handlePointerMove}>Track</div>;
@@ -776,13 +797,14 @@ const handleClick = (e: React.MouseEvent) => {
   
   setTimeout(() => {
     console.log('Async:', e.currentTarget.tagName);
-    // ⚠️ R16'da: e.currentTarget = null (event pooled)
-    // R17+: e.currentTarget hali ham reference, lekin DOM'dan chiqarilgan bo'lishi mumkin
+    // ⚠️ R16'da: e.currentTarget = null (event pooled — butun event tozalanadi)
+    // R17+: e.currentTarget = null (dispatch tugagach React uni null qiladi —
+    //        executeDispatch listener'dan keyin event.currentTarget = null)
   }, 0);
 };
 ```
 
-R17+ event pooling olib tashlandi (keyingi section). Lekin `currentTarget` mutation handler chaqiruvi davomida — async kontekstda eski qiymat saqlanmaydi:
+R17+ event pooling olib tashlandi (keyingi section), shuning uchun `e.target`, `e.clientX` kabi property'lar async kontekstda ham o'qiladi. Lekin `currentTarget` istisno: React uni har listener'dan keyin `null` qiladi, shuning uchun async kontekstda kerak bo'lsa — snapshot oling:
 
 ```tsx
 const handleClick = (e: React.MouseEvent) => {
@@ -980,8 +1002,8 @@ function ReactComponent() {
 
 **R17+ (yangi):**
 - Native listener `document`'da
-- React listener root container'da
-- Click button → React handler birinchi (root → ... → button bubble), keyin native handler (document'gacha bubble)
+- React listener root container'da (document'ning child'i)
+- Click button → event root container'ga yetganda React listener trigger bo'ladi va React Fiber chain bo'ylab handler'larni chaqiradi; event keyin document'gacha bubble qilib native handler'ni trigger qiladi. Natijada React handler native document handler'dan oldin ishlaydi
 
 **`stopPropagation` semantikasi farqli:**
 
@@ -1239,7 +1261,7 @@ const handleButtonClick = (e: React.MouseEvent) => {
 
 **Event pooling** — R16 va undan oldingi versiyalardagi mexanizm: SyntheticEvent object'lar **pool**'da saqlanardi va re-use qilinardi. Memory optimization (har event uchun yangi object yaratmaslik).
 
-**Muammo:** Pooled object'lar event handler tugaganidan keyin **null** qilinardi. Async kontekstda — `e.target`, `e.currentTarget` undefined.
+**Muammo:** Pooled object'lar event handler tugaganidan keyin property'lari **null** qilinardi. Async kontekstda — `e.target`, `e.currentTarget` null.
 
 ```tsx
 // R16 anti-pattern
@@ -1320,10 +1342,8 @@ R16 event pooling internal:
 const eventPool: SyntheticEvent[] = [];
 
 function getPooledEvent(...) {
-  if (eventPool.length > 0) {
-    return eventPool.pop()!;
-  }
-  return new SyntheticEvent();
+  const pooled = eventPool.pop();
+  return pooled ?? new SyntheticEvent();
 }
 
 function releaseEvent(event: SyntheticEvent) {
@@ -1391,9 +1411,10 @@ function FetchOnClick() {
       const response = await fetch('/api/data');
       const data = await response.json();
       
-      // Async kontekst — e.target hali ham accessible
+      // Async kontekst — e.target hali ham accessible (pooling yo'q)
       console.log('Source button:', e.target);
-      console.log('Handler attached to:', e.currentTarget);
+      // e.currentTarget — async paytida null (React dispatch tugagach null qiladi)
+      console.log('Handler attached to:', button);  // ✅ Snapshot ishlatiladi
     } finally {
       button.disabled = false;  // Snapshot reference
     }
@@ -1688,7 +1709,7 @@ function ProductCard({ product, onProductSelect, onProductFavorite, onProductSha
     onProductFavorite(product.id);
   };
   
-  const handleShareClick = async (e: React.MouseEvent) => {
+  const handleShareClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onProductShare(product.id);
   };
@@ -1696,10 +1717,10 @@ function ProductCard({ product, onProductSelect, onProductFavorite, onProductSha
   return (
     <div onClick={handleSelectClick}>
       <h3>{product.name}</h3>
-      <Inline gap={4}>
+      <div style={{ display: 'flex', gap: 4 }}>
         <button onClick={handleFavoriteClick}>♥ Favorite</button>
         <button onClick={handleShareClick}>↗ Share</button>
-      </Inline>
+      </div>
     </div>
   );
 }
@@ -1818,10 +1839,10 @@ return <form onSubmit={handleSubmit}>...</form>;
 
 **Performance — myth vs reality:**
 
-"Inline handler — performance yomon" — ko'pincha o'rta-tashqari claim. Real impact:
+"Inline handler — performance yomon" — ko'pincha asossiz umumlashtirilgan claim. Real impact:
 
 1. **DOM listener attach/detach yo'q** — React delegation orqali (root container'da single listener)
-2. **Function creation cost** — minimal (V8 inline allocation, GC tezda yiqiladi)
+2. **Function creation cost** — minimal (short-lived function object, GC tezda yig'ib oladi)
 3. **Object identity** — `React.memo` ishlatilmasa, ta'sir yo'q
 
 Real performance impact — `React.memo` + child component'lar ko'p bo'lganda. Bu aniq holatlarda `useCallback` orqali optimize qilinadi.
@@ -1838,19 +1859,19 @@ Real performance impact — `React.memo` + child component'lar ko'p bo'lganda. B
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-V8 (Chrome) inline arrow function — Hidden Class:
+Inline arrow function — har render'da yangi function object:
 
 ```ts
 // JSX render
 <button onClick={() => setOpen(true)}>Open</button>
 
-// Compiled
+// Transform (automatic runtime)
 const onClickHandler = () => setOpen(true);
-React.createElement('button', { onClick: onClickHandler }, 'Open');
+_jsx('button', { onClick: onClickHandler, children: 'Open' });
 
-// Har render: yangi function object
-// Hidden class: same shape (same closure variables)
-// V8 optimize qiladi — function instantiation modern engine'larda tez
+// Har render: yangi function object yaratiladi (closure: setOpen)
+// Function instantiation modern engine'larda tez (kichik allocation)
+// short-lived bo'lgani uchun GC tezda yig'ib oladi
 ```
 
 `useCallback` overhead:
@@ -1903,14 +1924,14 @@ function ToggleButton() {
   const [open, setOpen] = useState(false);
   
   return (
-    <Stack gap={4}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {/* Inline OK — sodda action */}
       <button onClick={() => setOpen(true)}>Open</button>
       <button onClick={() => setOpen(false)}>Close</button>
       <button onClick={() => setOpen((o) => !o)}>Toggle</button>
       
       {open && <p>Content</p>}
-    </Stack>
+    </div>
   );
 }
 ```
@@ -1960,7 +1981,7 @@ function PaymentForm() {
   
   return (
     <form onSubmit={handleSubmit}>
-      <Stack gap={8}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <input
           type="number"
           value={amount}
@@ -1970,7 +1991,7 @@ function PaymentForm() {
         <button type="submit" disabled={submitting}>
           {submitting ? 'Processing...' : 'Pay'}
         </button>
-      </Stack>
+      </div>
     </form>
   );
 }
@@ -2114,15 +2135,15 @@ Capture — kam ishlatiladi, lekin advanced patterns'da foydali (e.g. global eve
 
 **Passive event listeners:**
 
-Modern DOM API — `addEventListener('scroll', handler, { passive: true })` — handler `preventDefault()` chaqirmasligini va'da qiladi, browser scroll smoothness'ni saqlaydi:
+Modern DOM API — `addEventListener('wheel', handler, { passive: true })` — handler `preventDefault()` chaqirmasligini va'da qiladi, browser scroll smoothness'ni saqlaydi. React `wheel`, `touchstart`, `touchmove` event'larini default passive qilib root'ga qo'yadi (`scroll` passive emas):
 
 ```tsx
-// React DOM scroll event'larida default passive: true
-<div onScroll={(e) => {
-  // e.preventDefault();  // ❌ Ignore qilinadi (passive)
+// React onWheel — default passive: true qilib root'ga registratsiya qilingan
+<div onWheel={(e) => {
+  // e.preventDefault();  // ❌ Ishlamaydi (passive listener)
 }}>...</div>
 
-// Native API bilan non-passive:
+// Native API bilan non-passive (preventDefault kerak bo'lsa):
 useEffect(() => {
   const el = ref.current;
   el?.addEventListener('wheel', handler, { passive: false });
@@ -2180,39 +2201,43 @@ function dispatchEventForPlugins(domEventName, eventSystemFlags, nativeEvent) {
 }
 ```
 
-`stopPropagation` — listener chain'da break:
+`stopPropagation` — listener chain'da break. React `isPropagationStopped`'ni `functionThatReturnsTrue`'ga qayta tayinlaydi (boolean field emas):
 
 ```ts
-SyntheticEvent.prototype.stopPropagation = function() {
-  this._stopPropagation = true;
+SyntheticBaseEvent.prototype.stopPropagation = function() {
   this.nativeEvent.stopPropagation();  // Native bilan ham
-};
-
-SyntheticEvent.prototype.isPropagationStopped = function() {
-  return this._stopPropagation;
+  this.isPropagationStopped = functionThatReturnsTrue;
 };
 ```
+
+Listener loop har handler'dan keyin `syntheticEvent.isPropagationStopped()` ni tekshiradi — `true` qaytarsa break.
 
 `preventDefault` — native event'ga qaytariladi:
 
 ```ts
-SyntheticEvent.prototype.preventDefault = function() {
-  this._defaultPrevented = true;
+SyntheticBaseEvent.prototype.preventDefault = function() {
+  this.defaultPrevented = true;
   this.nativeEvent.preventDefault();  // Browser default to'xtatish
+  this.isDefaultPrevented = functionThatReturnsTrue;
 };
 ```
 
 **Passive event listeners — performance:**
 
-Modern browser'larda scroll/wheel listener'lar default passive (chunki preventDefault scroll'ni to'sib qoladi). React `onScroll`, `onWheel`, `onTouchMove` — passive=true tomonidan o'rnatiladi:
+React `wheel`, `touchstart`, `touchmove` native event'larini default passive qilib root'ga qo'yadi (bu uchta event uchun `preventDefault` ko'pincha scroll'ni to'sib qoladi, shuning uchun passive — performance afzal). `scroll` bu ro'yxatga kirmaydi:
 
 ```ts
-// react-dom internal
-const PASSIVE_EVENTS = new Set(['scroll', 'wheel', 'touchstart', 'touchmove']);
-
-function listenToNativeEvent(eventName, target) {
-  const passive = PASSIVE_EVENTS.has(eventName);
-  target.addEventListener(eventName, dispatcher, { passive });
+// react-dom-bindings/src/events/DOMPluginEventSystem.js (soddalashtirilgan)
+function addTrappedEventListener(targetContainer, domEventName, ...) {
+  let isPassiveListener: boolean | void = undefined;
+  if (
+    domEventName === 'touchstart' ||
+    domEventName === 'touchmove' ||
+    domEventName === 'wheel'
+  ) {
+    isPassiveListener = true;
+  }
+  // ... addEventListener(domEventName, listener, { passive: isPassiveListener })
 }
 ```
 
@@ -2272,11 +2297,11 @@ function ContactForm() {
   
   return (
     <form onSubmit={handleSubmit}>
-      <Stack gap={8}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <input value={name} onChange={(e) => setName(e.target.value)} />
         <input value={email} onChange={(e) => setEmail(e.target.value)} />
         <button type="submit">Send</button>
-      </Stack>
+      </div>
     </form>
   );
 }
@@ -2465,7 +2490,8 @@ Pointer events — modern unified API (mouse + touch + pen). Mobile-friendly.
 
 ```tsx
 <div onScroll={(e) => { console.log(e.currentTarget.scrollTop); }}>...</div>
-// Passive (default) — preventDefault ignore qilinadi
+// scroll event cancelable emas — preventDefault ta'sir qilmaydi.
+// Scroll'ni to'sish uchun overflow/touch-action CSS yoki wheel/touchmove (non-passive)
 ```
 
 <details>
@@ -2887,7 +2913,7 @@ return (
 );
 ```
 
-Reset xohlamasangiz — controlled inputs ishlating (state React'da boshqariladi, `form.reset()` uncontrolled DOM input'larga ta'sir qiladi, controlled state'ga emas) yoki action ichida `requestFormReset` API'ni boshqaring.
+Auto-reset faqat action **muvaffaqiyatli tugaganda** va action function bo'lganda yuz beradi (URL action'da emas). Reset xohlamasangiz — controlled inputs ishlating (state React'da boshqariladi, auto-reset faqat uncontrolled DOM input'larni tozalaydi, controlled state'ga ta'sir qilmaydi). Reset vaqtini qo'lda nazorat qilish uchun `react-dom`'ning `requestFormReset(formElement)` funksiyasidan foydalaniladi.
 
 **`formAction` button'da — multi-action form:**
 
@@ -2936,11 +2962,13 @@ function handleFormSubmit(form: HTMLFormElement, action: string | ((fd: FormData
     if (result instanceof Promise) {
       // Pending state — useFormStatus uchun
       setFormPending(form, true);
-      result.finally(() => setFormPending(form, false));
+      result.then(() => {
+        // Faqat muvaffaqiyatli tugaganda uncontrolled fields reset
+        requestFormReset(form);
+      }).finally(() => setFormPending(form, false));
+    } else {
+      requestFormReset(form);  // sync action — darhol reset
     }
-    
-    // Reset uncontrolled fields
-    form.reset();
     
     return true;  // preventDefault — native submit'ni to'xtatish
   }
@@ -3021,10 +3049,10 @@ function NewsletterForm() {
   
   return (
     <form action={submitAction}>
-      <Stack gap={8}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <input name="email" type="email" placeholder="Email" required />
         <button type="submit">Subscribe</button>
-      </Stack>
+      </div>
     </form>
   );
 }
@@ -3052,12 +3080,12 @@ function ContactForm() {
   
   return (
     <form action={submitAction}>
-      <Stack gap={8}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <input name="name" placeholder="Name" required />
         <input name="email" type="email" placeholder="Email" required />
         <textarea name="message" placeholder="Message" required />
         <SubmitButton>Send Message</SubmitButton>
-      </Stack>
+      </div>
     </form>
   );
 }
@@ -3079,13 +3107,13 @@ function LoginForm() {
     prevState: FormState,
     formData: FormData
   ): Promise<FormState> => {
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
+    const email = String(formData.get('email') ?? '');
+    const password = String(formData.get('password') ?? '');
     
     const errors: { [key: string]: string } = {};
     if (!email) errors.email = 'Email required';
     if (!password) errors.password = 'Password required';
-    if (password.length < 8) errors.password = 'Min 8 characters';
+    else if (password.length < 8) errors.password = 'Min 8 characters';
     
     if (Object.keys(errors).length > 0) {
       return { success: false, errors };
@@ -3111,7 +3139,7 @@ function LoginForm() {
   
   return (
     <form action={formAction}>
-      <Stack gap={8}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div>
           <input name="email" type="email" placeholder="Email" />
           {state.errors?.email && <span className="error">{state.errors.email}</span>}
@@ -3126,7 +3154,7 @@ function LoginForm() {
         {state.message && (
           <p className={state.success ? 'success' : 'error'}>{state.message}</p>
         )}
-      </Stack>
+      </div>
     </form>
   );
 }
@@ -3188,7 +3216,9 @@ React event'lari TypeScript'da **generic types** orqali typed. Element type bila
 | Animation | `React.AnimationEvent<HTMLDivElement>` | div, ... |
 | Transition | `React.TransitionEvent<HTMLDivElement>` | div, ... |
 
-**Generic E parameter — element type:**
+**Generic `T` parameter — element type:**
+
+`React.MouseEvent<T = Element>` generic'ining birinchi parametri `T` — handler attach qilingan element tipi (`currentTarget` shu tip bilan typed). Native event tipi alohida (`E`) ikkinchi parametr.
 
 ```tsx
 function handleClick(e: React.MouseEvent<HTMLButtonElement>) {
@@ -3251,7 +3281,7 @@ function Item({ id, onSelect }: { id: number; onSelect: Props['onSelect'] }) {
 ```tsx
 type Props = {
   onClick: React.MouseEventHandler<HTMLButtonElement>;
-  // ↑ MouseEventHandler<E> = (event: MouseEvent<E>) => void
+  // ↑ MouseEventHandler<T> = EventHandler<MouseEvent<T>> ≈ (event: MouseEvent<T>) => void
   
   onChange: React.ChangeEventHandler<HTMLInputElement>;
 };
@@ -3264,19 +3294,19 @@ function Button({ onClick }: Props) {
 // ↑ TS infer: e: MouseEvent<HTMLButtonElement>
 ```
 
-`React.MouseEventHandler<E>` — alias for `(e: MouseEvent<E>) => void`. Convention pattern.
+`React.MouseEventHandler<T>` — `EventHandler<MouseEvent<T>>` alias'i (samarali `(e: MouseEvent<T>) => void`). Convention pattern.
 
 **Conditional types:**
 
 ```tsx
-type EventHandler<E extends keyof JSX.IntrinsicElements> = E extends 'button'
+type HandlerFor<E extends keyof JSX.IntrinsicElements> = E extends 'button'
   ? React.MouseEventHandler<HTMLButtonElement>
   : E extends 'input'
     ? React.ChangeEventHandler<HTMLInputElement>
-    : React.SyntheticEventHandler;
+    : React.ReactEventHandler;  // umumiy fallback (SyntheticEvent handler)
 ```
 
-Advanced — JSX element name'ga qarab handler tip avtomatik aniqlanadi.
+Advanced — JSX element name'ga qarab handler tip avtomatik aniqlanadi. `React.ReactEventHandler<T>` — `@types/react`'dagi umumiy SyntheticEvent handler alias'i (`SyntheticEventHandler` nomli tip mavjud emas).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -3286,7 +3316,7 @@ Advanced — JSX element name'ga qarab handler tip avtomatik aniqlanadi.
 ```ts
 // react/index.d.ts (soddalashtirilgan)
 
-interface SyntheticEvent<T = Element, E = Event> extends BaseSyntheticEvent<E, T, EventTarget> {}
+interface SyntheticEvent<T = Element, E = Event> extends BaseSyntheticEvent<E, EventTarget & T, EventTarget> {}
 
 interface UIEvent<T = Element, E = NativeUIEvent> extends SyntheticEvent<T, E> {
   detail: number;
@@ -3630,12 +3660,16 @@ function isInput(target: EventTarget): target is HTMLInputElement {
 **Generic event handler types:**
 
 ```ts
-type GenericHandler<E extends HTMLElement, Ev extends Event = Event> = (
-  e: React.SyntheticEvent<E, Ev>
-) => void;
+// Element tipiga parametrizatsiya qilingan keyboard handler alias
+type KeyHandler<E extends HTMLElement> = (e: React.KeyboardEvent<E>) => void;
 
-function ButtonHandler(e: React.MouseEvent<HTMLButtonElement>) {}
-const handler: GenericHandler<HTMLButtonElement, MouseEvent> = ButtonHandler;
+const onInputKey: KeyHandler<HTMLInputElement> = (e) => {
+  e.currentTarget.value;  // ✅ HTMLInputElement (E = HTMLInputElement)
+};
+
+const onAreaKey: KeyHandler<HTMLTextAreaElement> = (e) => {
+  e.currentTarget.value;  // ✅ HTMLTextAreaElement
+};
 ```
 
 </details>
@@ -3829,7 +3863,7 @@ const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
   
   setTimeout(() => {
     console.log('Async currentTarget:', e.currentTarget);
-    // R17+ — null yoki stale (currentTarget mutation handler chaqiruvi davomida)
+    // R17+ — null (React dispatch tugagach har listener'dan keyin currentTarget = null)
   }, 0);
 };
 ```
@@ -3847,17 +3881,17 @@ const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
 
 ---
 
-### Gotcha 5: `onScroll` Passive — preventDefault Ignore
+### Gotcha 5: `onWheel`/`onTouchMove` Passive — preventDefault Ishlamaydi
 
 ```tsx
-<div onScroll={(e) => {
-  e.preventDefault();  // ❌ Ignore qilinadi (passive default true)
+<div onWheel={(e) => {
+  e.preventDefault();  // ❌ Ishlamaydi (React wheel listener'i passive)
 }}>
   ...
 </div>
 ```
 
-R DOM `onScroll`, `onWheel`, `onTouchMove` — default passive. `preventDefault` ishlamaydi. Native `addEventListener('wheel', handler, { passive: false })` orqali workaround.
+React `wheel`, `touchstart`, `touchmove` native event'larini root'ga **default passive** qilib qo'yadi, shuning uchun `onWheel`/`onTouchStart`/`onTouchMove` ichida `preventDefault` ta'sir qilmaydi. `scroll` bu ro'yxatga kirmaydi — lekin `scroll` event allaqachon `cancelable: false`, shuning uchun u uchun ham `preventDefault` ma'nosiz. Scroll/wheel'ni to'sish kerak bo'lsa: native `addEventListener('wheel', handler, { passive: false })` (`useEffect` ichida) yoki `touch-action`/`overflow` CSS.
 
 ---
 
@@ -4012,10 +4046,10 @@ function Counter() {
   return (
     <div tabIndex={0} onKeyDown={handleKeyDown}>
       <p>Count: {count}</p>
-      <Inline gap={4}>
+      <div style={{ display: 'flex', gap: 4 }}>
         <button onClick={() => setCount((c) => c + 1)}>+</button>
         <button onClick={() => setCount((c) => c - 1)}>-</button>
-      </Inline>
+      </div>
       <p>Or use ↑/↓ keys</p>
     </div>
   );
@@ -4056,12 +4090,12 @@ function ContactForm() {
   
   return (
     <form onSubmit={handleSubmit}>
-      <Stack gap={8}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <input name="name" placeholder="Name" required />
         <input name="email" type="email" placeholder="Email" required />
         <button type="submit">Submit</button>
         {submitted && <p>Thanks!</p>}
-      </Stack>
+      </div>
     </form>
   );
 }
@@ -4080,12 +4114,12 @@ function ContactFormR19() {
   
   return (
     <form action={submitAction}>
-      <Stack gap={8}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <input name="name" placeholder="Name" required />
         <input name="email" type="email" placeholder="Email" required />
         <button type="submit">Submit</button>
         {submitted && <p>Thanks!</p>}
-      </Stack>
+      </div>
     </form>
   );
 }
@@ -4257,8 +4291,9 @@ import { useEffect, useRef } from 'react';
 
 function useClickOutside<T extends HTMLElement>(
   callback: () => void
-): React.RefObject<T> {
+): React.RefObject<T | null> {
   const ref = useRef<T>(null);
+  // useRef<T>(null) → RefObject<T | null> (R19 @types) — `ref` DOM ref prop'iga mos
   
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -4337,9 +4372,9 @@ R17+ event delegation context: native `addEventListener('mousedown', ...)` ishla
 - **Propagation** — `stopPropagation` (bubble to'xtatish, R17+ native bilan ham), `preventDefault` (browser default to'xtatish)
 - **Capture phase** — `onClickCapture` (root → target traversal), kam ishlatiladi
 - **Common events** — Mouse, Keyboard, Form, Touch, Pointer (modern unified), Drag, Clipboard, Animation
-- **TypeScript event types** — `MouseEvent<E>`, `ChangeEvent<E>`, `FormEvent<E>`, `KeyboardEvent<E>`, generic E element type
+- **TypeScript event types** — `MouseEvent<T>`, `ChangeEvent<T>`, `FormEvent<T>`, `KeyboardEvent<T>` (birinchi generic `T` — element tipi, `currentTarget` shu tip bilan typed)
 - **Event narrowing** — `instanceof` (runtime check), type predicate function (`target is HTMLInputElement`), `closest()` ancestor matching
-- **Generic event handlers** — `<E extends HTMLElement>` element type generic
+- **Generic event handlers** — `<T extends HTMLElement>` element type generic
 
 Keyingi bo'limda Lifting State up va Controlled vs Uncontrolled inputs yoritiladi: state ko'tarish (sibling components share data), controlled (React owns state) vs uncontrolled (DOM owns state) trade-off, hybrid pattern (uncontrolled + ref read on submit), va decision guide (qachon lift, qachon Context).
 

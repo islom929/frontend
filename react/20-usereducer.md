@@ -402,15 +402,16 @@ Har shakl mumkin — reducer signature bilan moslashishi kerak.
 function Component() {
   const [state, dispatch] = useReducer(reducer, initialState);
   
-  // dispatch chaqirilganda:
-  // 1. reducer(state, action) chaqiriladi
-  // 2. Yangi state hisoblanadi
-  // 3. Object.is(state, newState) — bir xil bo'lsa skip (bailout)
-  // 4. Aks holda re-render
+  // dispatch chaqirilganda (dispatchReducerAction):
+  // 1. Action update queue'ga qo'shiladi
+  // 2. Re-render schedule qilinadi (scheduleUpdateOnFiber)
+  // 3. Render fazasida updateReducer queue'ni reducer orqali process qiladi
+  // 4. Object.is(newState, prevState) — bir xil reference bo'lsa
+  //    markWorkInProgressReceivedUpdate chaqirilmaydi → bailout (re-render bekor)
 }
 ```
 
-`Object.is` comparison — agar reducer bir xil reference qaytarsa (e.g., conditional skip), re-render yo'q. Bu — eager bailout (cross-ref [`12-state-and-usestate.md`](12-state-and-usestate.md)).
+`useReducer`'da bailout **render fazasida** sodir bo'ladi: `dispatch` action'ni queue'ga qo'shib re-render schedule qiladi, so'ng `updateReducer` queue'ni reducer orqali yangi state'ga aylantiradi va `Object.is(newState, hook.memoizedState)` bilan solishtiradi — teng bo'lsa `markWorkInProgressReceivedUpdate` chaqirilmaydi va component bailout qiladi. `useState`'dagi eager bailout (`dispatch` paytida, `dispatchSetState` ichida reducer'ni oldindan chaqirib solishtirish) `useReducer`'da yo'q — `dispatchReducerAction` har doim queue'ga qo'shadi (Section "Under the Hood — `basicStateReducer`"; cross-ref [`12-state-and-usestate.md`](12-state-and-usestate.md)).
 
 ```tsx
 function reducer(state, action) {
@@ -1083,7 +1084,7 @@ function reducer(state: State, action: Action): State {
 
 function Toggle() {
   const [state, dispatch] = useReducer(reducer, { isOpen: false });
-  // ❌ 15 qator boilerplate bitta toggle uchun
+  // ❌ type'lar + reducer + 3 case bitta toggle uchun — ortiqcha boilerplate
 }
 
 // ✅ useState
@@ -1606,8 +1607,8 @@ const actions = {
 dispatch(actions.add(item));
 dispatch(actions.remove('1'));
 
-// Yana ham clean — generic helper
-type ActionCreator<A extends Action> = (...args: any[]) => A;
+// Yana ham clean — generic helper (args tiplari parametrizatsiya qilingan)
+type ActionCreator<Args extends unknown[], A extends Action> = (...args: Args) => A;
 ```
 
 </details>
@@ -1806,7 +1807,7 @@ Ikki layer protection.
 **Source citation:**
 
 - TypeScript "Exhaustiveness Checking" — typescriptlang.org
-- "Effective TypeScript" Item 35 (Brett Sutter) — `never` type usage
+- "Effective TypeScript" (Dan Vanderkam) — `never` type bilan exhaustiveness
 
 </details>
 
@@ -1892,7 +1893,7 @@ type Theme = 'light' | 'dark' | 'auto' | 'high-contrast';
 
 ```ts
 // Throw o'rniga warning + default
-function exhaustiveCheck(value: never, defaultValue: any) {
+function exhaustiveCheck<T>(value: never, defaultValue: T): T {
   console.warn(`Unhandled value:`, value);
   return defaultValue;
 }
@@ -2221,12 +2222,11 @@ function init(rawData: RawData): State {
   
   rawData.nodes.forEach(node => {
     graph.set(node.id, node);
+    const neighbors: string[] = index.get(node.id) ?? [];
     rawData.edges
       .filter(e => e.from === node.id)
-      .forEach(e => {
-        if (!index.has(node.id)) index.set(node.id, []);
-        index.get(node.id)!.push(e.to);
-      });
+      .forEach(e => neighbors.push(e.to));
+    index.set(node.id, neighbors);
   });
   
   return { graph, index };
@@ -2568,7 +2568,7 @@ function CartCount() {
 }
 ```
 
-Splitted Context + `useReducer` — Redux-like pattern, React core'da, bundle size 0.
+Splitted Context + `useReducer` — Redux-like pattern faqat React core API'lari bilan, qo'shimcha kutubxona (dependency) talab qilmaydi.
 
 **Misol 4 — Action creators with dispatch:**
 
@@ -3122,7 +3122,7 @@ function Counter() {
 
 **Cheklov:**
 
-1. **Bundle size** — Immer ~12-15KB (gzipped ~5KB)
+1. **Bundle size** — Immer qo'shimcha dependency, bundle'ga o'z hajmini qo'shadi
 2. **Learning curve** — Immer Proxy semantics
 3. **Class instances** — Immer plain objects bilan (Map/Set Immer 6+'da qo'llab-quvvatlanadi)
 4. **External library** — React core emas
@@ -3183,7 +3183,7 @@ function produce<T>(state: T, recipe: (draft: T) => void): T {
 }
 ```
 
-Immer — Proxy API ishlatadi (ES2015+, IE'da yo'q). Browser support: barcha modern (Chrome 49+, Firefox 18+, Safari 10+, Edge).
+Immer — `Proxy` API ishlatadi (ES2015, barcha modern browser'larda mavjud; faqat eski IE'da yo'q, chunki `Proxy` polyfill qilib bo'lmaydi).
 
 **Structural sharing:**
 
@@ -3529,9 +3529,9 @@ function dispatchSetState(fiber, queue, action) {
 }
 ```
 
-`basicStateReducer` synchron chaqiriladi (action function bo'lsa). Agar yangi state bir xil bo'lsa — re-render skip.
+`dispatchSetState` `basicStateReducer`'ni dispatch paytida sinxron chaqiradi (reducer doimo o'zgarmas). Natija joriy state bilan bir xil bo'lsa — re-render umuman schedule qilinmaydi.
 
-`useReducer`'da ham eager bailout, lekin reducer arbitrary bo'lishi mumkin (har gal pure deb hisoblanmaydi).
+`useReducer`'ning `dispatch`'ida (`dispatchReducerAction`) bu eager bailout **yo'q** — caller bergan reducer render'dan render'ga o'zgarishi mumkin, shuning uchun React natijani dispatch paytida oldindan hisoblamaydi va action'ni to'g'ridan-to'g'ri queue'ga qo'shadi. Bailout faqat render fazasida (`updateReducer` ichida `Object.is(newState, hook.memoizedState)`) sodir bo'ladi.
 
 **Mental model:**
 
@@ -3578,18 +3578,21 @@ Farqi:
 
 ```ts
 function dispatchSetState(fiber, queue, action) {
-  // Eager bailout — basicStateReducer pure deb taxmin qiladi
-  // ... bailout check ...
+  // Eager bailout: reducer doimo basicStateReducer (o'zgarmas), shuning uchun
+  // dispatch paytida natijani oldindan hisoblab Object.is bilan solishtirish xavfsiz.
+  // fiber.lanes === NoLanes bo'lsa va eagerState === currentState bo'lsa — schedule yo'q.
   scheduleUpdate(fiber);
 }
 
 function dispatchReducerAction(fiber, queue, action) {
-  // Custom reducer — eager bailout yo'q (reducer pure ekanligi noma'lum)
+  // Eager bailout yo'q: caller'ning reducer'i render'dan render'ga o'zgarishi mumkin
+  // (queue.lastRenderedReducer har render qayta yoziladi), shuning uchun React
+  // natijani dispatch paytida oldindan hisoblamaydi — action queue'ga qo'shiladi.
   scheduleUpdate(fiber);
 }
 ```
 
-`useState` — eager bailout (performance optimization). `useReducer` — render time'da bailout (Object.is comparison).
+`useState` — eager bailout (`dispatch` paytida, `dispatchSetState` ichida). `useReducer` — render fazasida bailout (`updateReducer` ichida `Object.is(newState, prevState)`).
 
 **Source citation:**
 
@@ -3611,9 +3614,11 @@ function basicStateReducer<S>(state: S, action: ((prev: S) => S) | S): S {
 
 // `useState` ekvivalenti
 function useStateLike<S>(initialState: S | (() => S)) {
-  return useReducer(basicStateReducer as React.Reducer<S, ((prev: S) => S) | S>, undefined as any, () => {
-    return typeof initialState === 'function' ? (initialState as () => S)() : initialState;
-  });
+  return useReducer(
+    basicStateReducer as React.Reducer<S, ((prev: S) => S) | S>,
+    undefined,
+    () => (typeof initialState === 'function' ? (initialState as () => S)() : initialState),
+  );
 }
 
 // Usage
@@ -3623,7 +3628,7 @@ setCount(c => c + 1);
 // Identik useState bilan
 ```
 
-`useState` aslida `useReducer + basicStateReducer` mintimal abstraction.
+`useState` aslida `useReducer + basicStateReducer` minimal abstraction.
 
 **Misol 2 — Functional update equivalence:**
 
@@ -3699,7 +3704,7 @@ function Component() {
 // Output: nothing (no "Render" log)
 ```
 
-`useState` eager bailout `useReducer`'dan kuchliroq (reducer pure deb taxmin).
+`useState` eager bailout re-render'ni `dispatch` paytidayoq bekor qiladi — `useReducer`'dan oldinroq, chunki uning reducer'i (`basicStateReducer`) o'zgarmas va natijani dispatch paytida xavfsiz hisoblash mumkin.
 
 **Misol 5 — `useReducer` bailout (render time):**
 
@@ -3789,18 +3794,18 @@ Features:
 - **Redux DevTools** — time-travel, action replay
 - **Multiple stores** — `combineReducers`, slices
 - **Type safety** — RTK type inference
-- **Bundle** — ~12KB (gzipped)
+- **Bundle** — qo'shimcha dependency (Redux + React-Redux + RTK)
 
 **Decision matrix:**
 
 | App size | Tanlov |
 |----------|--------|
-| Small (1-10 component) | `useState` |
-| Small-medium | `useState` + Context (theme, auth) |
-| Medium (10-50) | `useReducer + Context` |
-| Medium (selectors kerak) | Zustand (1KB, selector built-in) |
-| Large (50-200) | Redux Toolkit yoki Jotai |
-| Enterprise | Redux Toolkit + RTK Query (server state) |
+| Small (lokal komponent state) | `useState` |
+| Small-medium (bir nechta shared value) | `useState` + Context (theme, auth) |
+| Medium (kompleks shared state, selector shart emas) | `useReducer + Context` |
+| Medium (granular selector kerak) | Zustand (kichik bundle, selector built-in) |
+| Large (ko'p domen, middleware/DevTools) | Redux Toolkit yoki Jotai |
+| Enterprise (server state alohida) | Redux Toolkit + RTK Query |
 
 **Migration path:**
 
@@ -3864,6 +3869,7 @@ Store — single state, dispatch function, subscribers list.
 **`useSelector` selector pattern:**
 
 ```ts
+// Soddalashtirilgan model
 function useSelector<T>(selector: (state: RootState) => T): T {
   return useSyncExternalStore(
     store.subscribe,
@@ -3872,7 +3878,7 @@ function useSelector<T>(selector: (state: RootState) => T): T {
 }
 ```
 
-`useSyncExternalStore` (R18+) — Concurrent Mode safe, tearing-free. Selector — faqat selected slice o'zgarsa re-render.
+`useSyncExternalStore` (R18+) — Concurrent Mode safe, tearing-free. Bu sodda model'da selector natijasi `Object.is` bilan solishtiriladi: store har o'zgarganda snapshot qayta o'qiladi va reference o'zgarsa re-render bo'ladi. Real `react-redux` esa `useSyncExternalStoreWithSelector` ishlatadi — u selector natijasini saqlab, ixtiyoriy `equalityFn` (default `referenceEquality`) bilan solishtiradi, shuning uchun object qaytaruvchi selector'lar har snapshot'da yangi reference yaratsa ham, faqat tanlangan qiymat haqiqatan o'zgarganda re-render bo'ladi.
 
 **Middleware:**
 
@@ -3949,7 +3955,7 @@ function TodoProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// 10-50 components, simple state — yetarli
+// Medium app, kompleks lekin selector talab qilmaydigan state — yetarli
 ```
 
 **Misol 2 — Redux Toolkit (large app):**
@@ -4009,7 +4015,7 @@ function TodoCount() {
   return <span>{count}</span>;
 }
 
-// No Provider, no Context, ~1KB bundle
+// No Provider, no Context, kichik bundle
 ```
 
 Zustand — middle ground (selector + small bundle).
@@ -4065,8 +4071,11 @@ function badReducer(state, action) {
   return state;
 }
 
-// React: Object.is(state, state) → true → bailout → re-render yo'q
-// State o'zgargan, lekin UI eski
+// dispatch re-render schedule qiladi, lekin render fazasida updateReducer:
+//   newState === hook.memoizedState (bir xil reference)
+//   Object.is(newState, prevState) → true
+//   → markWorkInProgressReceivedUpdate chaqirilmaydi → component bailout qiladi
+// Natija: mutatsiya UI'da ishonchli aks etmaydi
 ```
 
 Mutation — bailout trap. Yangi obyekt qaytarish shart:
@@ -4087,13 +4096,18 @@ type Action = { type: 'set'; payload?: number };
 dispatch({ type: 'set' });          // payload: undefined
 dispatch({ type: 'set', payload: 0 });  // payload: 0
 
-// Reducer
+// Reducer — ✅ nullish coalescing
 case 'set':
-  return { ...state, count: action.payload ?? 0 };  // ?? OK
-  return { ...state, count: action.payload || 0 };  // ❌ 0 falsy → 0 ishlatilmaydi
+  return { ...state, count: action.payload ?? 0 };
+  // payload === undefined → 0; payload === 0 → 0 saqlanadi
+
+// Reducer — ❌ falsy OR
+case 'set':
+  return { ...state, count: action.payload || 0 };
+  // payload === 0 ham falsy → 0 default bilan almashtiriladi (bug)
 ```
 
-Optional payload — `??` (nullish coalescing) `||` (falsy)'dan farqli.
+Optional payload — `??` faqat `null`/`undefined`'da default beradi, `||` esa har qanday falsy qiymatda (`0`, `''`, `false`). `payload: 0` legal qiymat bo'lsa `??` to'g'ri.
 
 ### Gotcha 4 — Dispatch event handler ichida `e.persist()` (R17+ no-op)
 
@@ -4621,7 +4635,7 @@ type HistoryState<T> = {
 // Implement historyReducer va useHistory hook
 
 function Counter() {
-  const { state, dispatch, undo, redo, canUndo, canRedo } = useHistory(0);
+  const { state, dispatch, undo, redo, canUndo, canRedo } = useHistory(counterReducer, 0);
   // ...
 }
 ```
@@ -4777,9 +4791,9 @@ Performance considerations: `past`/`future` array — har action grow. Limit qo'
 - **Lazy initialization** — `useReducer(reducer, arg, init)` 3-argument. `init(arg)` faqat birinchi render'da. Reset action bilan reuse pattern. Strict Mode 2x cycle (purity test).
 - **Dispatch stable reference** — `useReducer` kafolat: dispatch har doim bir xil reference. `useCallback` shart emas, deps array'da kerak emas (clean dependencies). Splitted Context Provider value memo kerak emas (dispatch stable).
 - **`useReducer + Context` pattern** — Redux'gacha scaling (mini state container, React core). Splitted Context (state + dispatch alohida) — performance optimization. Custom hooks (`useStoreState`, `useStoreDispatch`) — encapsulation.
-- **Immer integration** — `useImmerReducer` (use-immer library), mutate-like syntax immutable updates. Deep nested updates uchun. Bundle ~12KB. Redux Toolkit Immer built-in.
+- **Immer integration** — `useImmerReducer` (use-immer library), mutate-like syntax immutable updates. Deep nested updates uchun. Qo'shimcha dependency. Redux Toolkit Immer built-in.
 - **Under the Hood — `basicStateReducer`** — `useState` aslida `useReducer + basicStateReducer = (state, action) => typeof action === 'function' ? action(state) : action`. Ikki hook bir xil internal infrastructure. Functional update — `useReducer`'ning maxsus shakli. Eager bailout `useState`'da, render time bailout `useReducer`'da.
-- **Redux vs `useReducer` Decision Guide** — `useReducer + Context` middle-scale (10-50 components). Redux/Zustand/Jotai — selector pattern, middleware, DevTools, time-travel. Bosqichma-bosqich migration: useState → useReducer → useReducer+Context → state library.
+- **Redux vs `useReducer` Decision Guide** — `useReducer + Context` middle-scale (kompleks shared state, selector talab qilmaydigan). Redux/Zustand/Jotai — selector pattern, middleware, DevTools, time-travel. Bosqichma-bosqich migration: useState → useReducer → useReducer+Context → state library.
 
 Keyingi bo'lim: `useMemo` va `useCallback` — memoization mexanikasi, deps comparison, qachon ishlatish (va qachon emas), R19 React Compiler ta'siri (auto-memoization), `useCallback(fn, deps) ≡ useMemo(() => fn, deps)` semantik ekvivalent.
 

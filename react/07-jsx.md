@@ -89,6 +89,8 @@ const element = <h1 className="title">Salom, dunyo!</h1>;
 const element = _jsx('h1', { className: 'title', children: 'Salom, dunyo!' });
 ```
 
+> `_jsx` — JSX transform chiqaradigan funksiya. Classic transform `React.createElement`, Automatic transform (R17+) esa `_jsx`/`_jsxs` ishlatadi. To'liq farq quyida ["JSX Transform — Classic vs Automatic"](#jsx-transform--classic-vs-automatic) bo'limida.
+
 **Asosiy printsiplar:**
 
 1. **JSX ham JS expression** — JS o'zgaruvchisiga assign qilish, return qilish, argument
@@ -248,7 +250,7 @@ JSX HTML'ga o'xshash, lekin **JavaScript reserved keyword'lar** va **camelCase c
 
 **Diqqat qiling:**
 
-- `style` — JavaScript object (**string TAQIQ**: `style="color: red"` React DOM dev mode'da error throws — `"The 'style' prop expects a mapping from style properties to values, not a string"`)
+- `style` — JavaScript object (**string TAQIQ**: `style="color: red"` React DOM dev mode'da warning chiqaradi — `"The 'style' prop expects a mapping from style properties to values, not a string"`)
 - Property nomlari camelCase (`fontSize`, not `font-size`)
 - Number → ko'pchilik dimension property'lari uchun `px` avtomatik qo'shiladi, lekin **unitless property'lar bundan istisno**: `lineHeight`, `opacity`, `zIndex`, `flex`, `flexGrow`, `flexShrink`, `order`, `fontWeight`, `gridRow`, `gridColumn`, `columnCount`, `aspectRatio`, `tabSize`, `zoom`, SVG opacity property'lari (`fillOpacity`, `stopOpacity`, `strokeOpacity`) va boshqalar. To'liq ro'yxat React'ning `isUnitlessNumber` jadvalida.
 - CSS custom properties (`--my-var`) — to'g'ridan-to'g'ri qo'llab-quvvatlanadi, `px` qo'shilmaydi: `style={{ '--accent': '#f00', color: 'var(--accent)' }}`
@@ -423,7 +425,7 @@ function EmailInput() {
 
 ### Nazariya
 
-JSX kompilyator tomonidan JavaScript funksiya chaqiruvlariga aylantiriladi. Ikki turdagi transform:
+JSX compiler tomonidan JavaScript funksiya chaqiruvlariga aylantiriladi. Ikki turdagi transform:
 
 ### Classic Transform (R16 va undan oldin)
 
@@ -663,10 +665,10 @@ const age = 25;
 
 ### Render qilingan qiymatlar
 
-| Qiymat | Render qiyoslash |
+| Qiymat | Render natijasi |
 |--------|------------------|
 | `string`, `number` | Text node |
-| `bigint` | R18.3+: Text node (`String(bigint)` orqali); R18.2 va oldin: **Error** |
+| `bigint` | Text node (`number` kabi `String(bigint)` orqali render qilinadi). Diqqat: ba'zi `@types/react` versiyalarida `bigint` `ReactNode` type union'iga kirmaydi — TS xatosi chiqsa `.toString()` ishlating |
 | `JSX element` | Nested element |
 | `JSX array` | Lists (key kerak) |
 | `null`, `undefined`, `false`, `true` | **Hech narsa** (skip) |
@@ -914,7 +916,7 @@ _jsxs(_Fragment, {
 
 Fragment fiber **stateNode = null**. DOM mutation paytida Fragment skip qilinadi — child'lar bevosita parent host'ga `appendChild` qilinadi.
 
-**`<></>` va `<Fragment>` farqi:** Ikkalasi ham `_jsxs(_Fragment, ...)` chaqirig'iga compile bo'ladi — bundle va Reconciler narxi bir xil. Farq syntax ergonomicssida: `<></>` qisqaroq, lekin `key` qabul qilmaydi; `<Fragment key="...">` to'liq syntax `key` ishlatilganda kerak. Ikkalasi ham DOM'da hech qanday element yaratmaydi.
+**`<></>` va `<Fragment>` farqi:** Ikkalasi ham `_jsxs(_Fragment, ...)` chaqirig'iga compile bo'ladi — bundle va Reconciler narxi bir xil. Farq faqat syntax qulayligida: `<></>` qisqaroq, lekin `key` qabul qilmaydi; `<Fragment key="...">` to'liq syntax `key` ishlatilganda kerak. Ikkalasi ham DOM'da hech qanday element yaratmaydi.
 
 </details>
 
@@ -924,7 +926,7 @@ Fragment fiber **stateNode = null**. DOM mutation paytida Fragment skip qilinadi
 Single root vs Fragment:
 
 ```tsx
-// ❌ Multiple root — kompilatsiya xatosi
+// ❌ Multiple root — compile xatosi
 function ArticleHeaderBroken() {
   return (
     <h1>Title</h1>
@@ -1234,6 +1236,8 @@ function CircleIcon({ size = 24, color = 'currentColor' }: IconProps) {
 
 ### Nazariya
 
+JSX'da child'siz element'lar self-close shaklida yopiladi, boolean attribute'lar esa `true`/`false` qiymat orqali yoki shorthand sifatida beriladi. Bu — HTML'dan ikkita aniq farq.
+
 ### Self-Closing Tags
 
 JSX'da **child'siz element'lar self-close** bo'lishi shart:
@@ -1337,6 +1341,7 @@ Boolean attribute'lar:
 function FormControls() {
   const [isLoading, setIsLoading] = useState(false);
   const [isAccepted, setIsAccepted] = useState(false);
+  const orderId = useId();
 
   return (
     <form>
@@ -1350,7 +1355,7 @@ function FormControls() {
         onChange={(e) => setIsAccepted(e.target.checked)}
       />
 
-      <input type="text" value={generatedId} readOnly />
+      <input type="text" value={orderId} readOnly />
       <input type="email" required autoFocus autoComplete="email" />
       <input type="file" multiple accept="image/*" />
     </form>
@@ -1452,14 +1457,17 @@ function Card({ title, ...rest }: CardProps) {
 ### 1. Unintended props forwarding
 
 ```tsx
-// ❌ Custom prop DOM'ga
-function Button({ isActive, ...rest }: { isActive: boolean }) {
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { isActive: boolean };
+
+// ❌ Custom prop DOM'ga forward qilinmoqda
+function Button({ isActive, ...rest }: ButtonProps) {
   return <button {...rest} isActive={isActive} />;
-  // <button isactive="true">  ← warning
+  // React warning: Unknown prop `isActive` on <button> tag.
+  // DOM: <button isactive="true">  ← unknown attribute
 }
 
-// ✅ Filter qilish
-function Button({ isActive, ...rest }: { isActive: boolean }) {
+// ✅ Custom prop'ni DOM'ga uzatmasdan, className orqali aks ettirish
+function Button({ isActive, ...rest }: ButtonProps) {
   return (
     <button
       {...rest}
@@ -1544,7 +1552,7 @@ JSX transform `key` va `ref` attribute'larini props object'idan **alohida ajrati
 //   ↑ key 3-argument, props ichida emas
 ```
 
-Agar spread'dagi `obj` ichida `key` field bo'lsa, JSX transform uni 3-argument sifatida ajratmaydi (faqat explicit `key="..."` 3-argumentga aylanadi). `_jsx` runtime esa config object'ida `key` ko'rsa, uni `RESERVED_PROPS` ro'yxati bilan props'dan chiqarib, `element.key` ga ko'chiradi — ya'ni Reconciler aslida `key` ni oladi va ishlatadi. Lekin bu **brittle pattern**: agar keyingi render'da spread manbai (`obj.key`) yo'qolsa yoki o'zgarsa, element identity buziladi. Dev mode bu xavf uchun warning chiqaradi:
+Agar spread'dagi `obj` ichida `key` field bo'lsa, JSX transform uni 3-argument sifatida ajratmaydi (faqat explicit `key="..."` 3-argumentga aylanadi). `_jsx` runtime esa config object'ida `key` ko'rsa, uni `element.key` ga ko'chiradi va yangi props object'ga `key`'dan tashqari barcha field'larni nusxalaydi (`key` props ichiga tushmaydi) — ya'ni Reconciler aslida `key` ni oladi va ishlatadi. Lekin bu **brittle pattern**: agar keyingi render'da spread manbai (`obj.key`) yo'qolsa yoki o'zgarsa, element identity buziladi. Dev mode bu xavf uchun warning chiqaradi:
 
 ```
 Warning: A props object containing a "key" prop is being spread into JSX:
@@ -1559,7 +1567,7 @@ React keys must be passed directly to JSX without using spread:
 
 **Performance:**
 
-JSX compilationsi har render'da `_jsx(type, props, key)` chaqirig'i ichida yangi `props` object yaratadi (spread bo'lsa ham, bo'lmasa ham). Spread'ning o'zi qo'shimcha overhead emas — `Object.assign` equivalent tezligi. `React.memo` shallow compare qiymatlarni `Object.is` bilan tekshiradi: agar spread orqali uzatiladigan barcha qiymatlar (function reference, object reference) avvalgi render bilan teng bo'lsa, `memo` re-render qilmaydi. Lekin har render'da yangi inline object/function spread'ga tushsa — reference farq sababli memo bypass qilinadi.
+JSX transform natijasidagi `_jsx(type, props, key)` chaqirig'i har render'da yangi `props` object yaratadi (spread bo'lsa ham, bo'lmasa ham). Spread'ning o'zi qo'shimcha overhead emas — `Object.assign` equivalent tezligi. `React.memo` shallow compare qiymatlarni `Object.is` bilan tekshiradi: agar spread orqali uzatiladigan barcha qiymatlar (function reference, object reference) avvalgi render bilan teng bo'lsa, `memo` re-render qilmaydi. Lekin har render'da yangi inline object/function spread'ga tushsa — reference farq sababli memo bypass qilinadi.
 
 </details>
 
@@ -1706,7 +1714,7 @@ DOMPurify:
 - `javascript:` URL'lar bloklanadi
 - Whitelist asosida xavfsiz tag'lar qoldiriladi
 
-### Alternativalar
+### Alternatives
 
 ```tsx
 // ❌ Avoid — raw HTML
@@ -1831,7 +1839,7 @@ interface MarkdownContentProps {
 
 function MarkdownContent({ source }: MarkdownContentProps) {
   const sanitizedHtml = useMemo(() => {
-    const rawHtml = marked.parse(source);
+    const rawHtml = marked.parse(source, { async: false });
     return DOMPurify.sanitize(rawHtml, {
       ALLOWED_TAGS: ['p', 'h1', 'h2', 'h3', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'code', 'pre'],
       ALLOWED_ATTR: ['href', 'class'],
@@ -1865,8 +1873,8 @@ function UserBio({ bio }: { bio: FormattedBio }) {
   return (
     <div>
       <p>{bio.text}</p>
-      {bio.links.map((link, i) => (
-        <a key={i} href={link.url} target="_blank" rel="noopener noreferrer">
+      {bio.links.map(link => (
+        <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer">
           {link.text}
         </a>
       ))}

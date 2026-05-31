@@ -116,7 +116,7 @@ Optimization benefit = render time saved × render frequency
 Decision: benefit > cost → optimize
 ```
 
-Misol: Komponent har 16ms render'da 0.1ms saving — 1000 render'da 100ms. Lekin kod 20 qator memoization wrapper'i qo'shsa va 5 ta dasturchi har refactor'da deps array'ni yangilashi kerak bo'lsa — cost katta.
+Misol: arzon komponentda memoization render vaqtidan tejaydigan ulush juda kichik bo'lsa, lekin kod bir nechta memoization wrapper qatori qo'shsa va keyingi har refactor'da deps array qo'lda yangilanishi kerak bo'lsa — cost benefit'dan oshadi.
 
 </details>
 
@@ -154,19 +154,19 @@ function OrderSummary({ orders }: { orders: Order[] }): ReactElement {
 }
 
 function App(): ReactElement {
-  const [orders] = useState<Order[]>([/* ... 100 orders ... */]);
+  const [orders] = useState<Order[]>([/* ... orders ... */]);
   return <OrderSummary orders={orders} />;
 }
-// Initial mount: ~1ms (100 orders) — cheap
-// No re-renders unless orders changes
-// Premature optimization (useMemo har joyda) — code noise, no measurable benefit
+// Kichik ro'yxatda reduce arzon — initial mount tez
+// orders o'zgarmasa re-render yo'q
+// Premature optimization (useMemo har joyda) — code noise, o'lchanadigan benefit yo'q
 ```
 
 ```tsx
-// === Stage 2: Profile sodir bo'lgan muammo ===
-// User reports: "Adding new order causes 1-second freeze"
-// Profile: OrderSummary re-render takes 800ms
-// Root cause: orders array yangi push'da har order uchun complex computation
+// === Stage 2: Profile aniqlagan muammo ===
+// User reports: yangi order qo'shishda sezilarli freeze
+// Profile: OrderSummary re-render eng katta vaqt sarflovchi qism
+// Root cause: orders juda katta bo'lganda har render'da og'ir reduce qayta hisoblanadi
 // Optimization needed!
 
 import { useState, useMemo } from 'react';
@@ -185,8 +185,8 @@ function OrderSummary({ orders }: { orders: Order[] }): ReactElement {
   
   return (/* ... */);
 }
-// Profile after: re-render 800ms → 50ms (16x improvement)
-// useMemo justified by measurement
+// Profile after: re-render vaqti sezilarli kamaydi (orders o'zgarmaganda reduce skip)
+// useMemo o'lchov bilan asoslandi
 ```
 
 Compiler era — manual optimization ortiqcha:
@@ -211,7 +211,7 @@ function OrderSummary({ orders }: { orders: Order[] }): ReactElement {
   return (/* ... */);
 }
 // Compiler: totalRevenue va totalItems cache (deps: orders)
-// orders o'zgarmasa — cached, 800ms freeze yo'q.
+// orders o'zgarmasa — cached, og'ir reduce qayta hisoblanmaydi, freeze yo'q.
 ```
 
 </details>
@@ -222,7 +222,7 @@ function OrderSummary({ orders }: { orders: Order[] }): ReactElement {
 
 ### Nazariya
 
-Optimization workflow 5 qadam:
+Optimization workflow 7 qadam:
 
 ### Qadam 1: Symptom Identification
 
@@ -230,7 +230,7 @@ User report yoki monitoring:
 - "Search box typing laggy"
 - "Modal open animation slow"
 - "List scroll janky"
-- p95 commit duration > 50ms (production telemetry)
+- p95 commit duration frame budget'dan oshadi (production telemetry)
 
 ### Qadam 2: Reproduce
 
@@ -281,8 +281,8 @@ Targeted — faqat bottleneck'ga:
 Bir xil scenario'ni profile — improvement aniqlash:
 
 ```
-Before: actualDuration ~ 50ms
-After:  actualDuration ~ 5ms (sezilarli improvement) ✅
+Before: actualDuration frame budget'dan katta
+After:  actualDuration frame budget ichida (sezilarli improvement) ✅
 ```
 
 Agar improvement yo'q yoki regression — optimization olib tashlanadi.
@@ -294,8 +294,10 @@ Agar improvement yo'q yoki regression — optimization olib tashlanadi.
 ```tsx
 import { Profiler } from 'react';
 
+const FRAME_BUDGET_MS = 1000 / 60; // 60fps: bir frame ~16.67ms
+
 const onRender = (id, phase, actualDuration) => {
-  if (actualDuration > 50) {
+  if (actualDuration > FRAME_BUDGET_MS) {
     monitoring.recordSlowRender({ id, actualDuration });
   }
 };
@@ -344,16 +346,17 @@ Efficiency = (baseDuration - actualDuration) / baseDuration
 0% — hech qanday memoization
 ```
 
-Production'da p95 metric:
+Production'da p95 metric — sorted durations'dan 95-percentile:
 
 ```javascript
-// 100 ta render durations: [1, 2, 3, ..., 100]
-// p95 = sorted[Math.floor(durations.length * 0.95)]
-// p95 = 95
-// Bu degani 95% renders < 95ms
+// durations'ni o'sish tartibida sort qilamiz
+const sorted = [...durations].sort((a, b) => a - b);
+const index = Math.ceil(sorted.length * 0.95) - 1;
+const p95 = sorted[index];
+// p95 — render'larning 95% shu qiymatdan past bo'lgan duration
 ```
 
-p95 commit duration target: < 16ms (1 frame at 60fps). Agar p95 > 50ms — visible jank.
+p95 commit duration target: bitta frame budget ichida (60fps'da ~16.67ms). p95 frame budget'dan sezilarli oshsa — visible jank.
 
 </details>
 
@@ -376,6 +379,7 @@ interface Metric {
 
 const buffer: Metric[] = [];
 const FLUSH_INTERVAL_MS = 10000;
+const FRAME_BUDGET_MS = 1000 / 60; // 60fps: bir frame ~16.67ms
 
 const onRender: ProfilerOnRenderCallback = (
   id,
@@ -391,8 +395,8 @@ const onRender: ProfilerOnRenderCallback = (
     timestamp: Date.now(),
   });
   
-  // Slow render warning
-  if (actualDuration > 16) {
+  // Slow render warning — commit frame budget'dan oshganda
+  if (actualDuration > FRAME_BUDGET_MS) {
     console.warn(`[Slow render] ${id}: ${actualDuration.toFixed(2)}ms`);
   }
 };
@@ -455,7 +459,7 @@ function SearchableList({ products }: { products: Product[] }): ReactElement {
 }
 
 // === Step 2: Profile says ===
-// 1000+ products, typing causes 100ms+ commits
+// Katta products ro'yxati, har keystroke'da commit frame budget'dan oshadi
 // "Why did this render?" — Hooks changed (query)
 // Bottleneck: filter + map per keystroke
 
@@ -496,7 +500,7 @@ function SearchableList({ products }: { products: Product[] }): ReactElement {
 
 // === Step 4: Re-profile ===
 // Input responsive (sync), filter Transition Lane interruptible
-// p95 commit duration ~ 10ms (sezilarli improvement)
+// p95 commit duration frame budget ichiga tushdi (sezilarli improvement)
 
 // === Step 5: Production monitoring ===
 import { Profiler } from 'react';
@@ -725,7 +729,7 @@ Memo cost (per render):
 - Object comparison: O(1) (`Object.is`).
 - Function comparison: O(1) (`Object.is`).
 
-Total: 5-10 props uchun ~0.01ms (negligible). Memo overhead ahamiyatli faqat very cheap render uchun.
+Total: bir nechta prop uchun comparison amaliy jihatdan negligible. Memo overhead faqat juda arzon render uchun render saving'dan oshib ketadi.
 
 </details>
 
@@ -922,7 +926,7 @@ interface ProductCardProps {
   product: Product;
 }
 
-// User reference o'zgarsa lekin id bir xil → bailout
+// product reference o'zgarsa lekin id bir xil → bailout
 const ProductCard = memo(
   function ProductCard({ product }: ProductCardProps) {
     return <div>{product.name}</div>;
@@ -1016,17 +1020,17 @@ function updateMemoComponent(current, workInProgress, Component, nextProps) {
 }
 ```
 
-Custom comparator chaqiriladi har render'da (parent re-render, props o'zgarmasa ham). Comparator overhead = comparator complexity × render frequency.
+Custom comparator parent re-render bo'lganda (props o'zgarmasa ham) har safar chaqiriladi. Comparator total overhead = comparator complexity × render frequency.
 
-Misol:
+Comparator murakkabligiga qarab:
 
 ```
-Default shallow: ~0.01ms per render
-Custom (id check): ~0.001ms (faster!)
-Custom (deep equal): ~0.5ms (50x slower)
+Default shallow:   prop'lar soni bo'yicha O(N), Object.is solishtirish
+Custom (id check): bitta primitiv solishtirish — eng arzon
+Custom (deep equal): nested struktura bo'yicha rekursiya — eng qimmat
 ```
 
-Deep equal har 1000 ta render'da 500ms total — visible jank.
+Deep equality comparator tez-tez re-render bo'luvchi tree'da har render'da chaqirilsa, comparison cost'i o'zi memo tejaydigan render'dan oshib ketishi mumkin — bu holda memo'ning o'zi regression manbai.
 
 </details>
 
@@ -1216,8 +1220,8 @@ function ReportPage({ data }: { data: ReportData[] }): ReactElement {
 Lekin "expensive" — relative. Profile bilan tasdiqlanadi:
 
 ```typescript
-// 100 element data — reduce ~0.05ms — useMemo cost ~0.02ms — barely worth it
-// 10000 element data — reduce ~5ms — useMemo cache ~0.02ms hit — very worth it
+// Kichik data — reduce arzon — useMemo cost computation'ga yaqin — foydasi kam
+// Katta data — reduce sezilarli — cache hit recompute'ni butunlay skip qiladi — foydali
 ```
 
 ### Pattern 3: Filtered/Sorted Data
@@ -1330,13 +1334,13 @@ function updateMemo(factory, deps) {
 Cost-benefit hisoblash:
 
 ```
-useMemo overhead per render: ~0.01ms
+useMemo overhead per render: kichik, doimiy
    (allocation + Object.is per dep + cache lookup)
 
-Computation saving (cache hit): variable
-   - String concat: 0.001ms saving — useMemo MORE expensive
-   - Reduce 1000 items: 0.5ms saving — worth it
-   - Heavy SVG generation: 5ms saving — definitely worth it
+Computation saving (cache hit): computation'ga bog'liq, o'zgaruvchan
+   - String concat: saving overhead'dan kichik — useMemo qimmatroq
+   - Katta reduce: saving sezilarli — foydali
+   - Og'ir SVG generation: saving katta — aniq foydali
 ```
 
 </details>
@@ -1781,8 +1785,9 @@ import { useParams } from 'react-router-dom';
 
 function ProductPage(): ReactElement {
   const { productId } = useParams<{ productId: string }>();
-  
-  return <ProductDetail key={productId} productId={productId!} />;
+  if (productId === undefined) return <NotFound />;
+
+  return <ProductDetail key={productId} productId={productId} />;
 }
 // Route /products/123 → /products/456: productId o'zgaradi → ProductDetail unmount + mount
 // Hover state, expand state, scroll position — barchasi reset
@@ -1853,12 +1858,12 @@ New Fiber (key=B):
 
 Performance cost:
 
-- DOM element create + insert: ~1-5ms (browser)
-- useEffect cleanup + setup: variable (network, event listener)
+- DOM element create + insert: browser layout/paint ishi
+- useEffect cleanup + setup: variable (network request, event listener)
 - Hook initial state: cheap
-- Children mount: depends on subtree size
+- Children mount: subtree hajmiga bog'liq
 
-Misol: large form key reset — 10-50ms (form fields, validation, listeners). Bu visible jank, lekin user expectation bilan moslashadi (yangi user tanlanganda fresh form).
+Misol: katta form key reset — barcha form field, validation va listener qayta o'rnatilganda sezilarli ish. Bu visible jank bo'lishi mumkin, lekin user expectation bilan moslashadi (yangi user tanlanganda fresh form).
 
 </details>
 
@@ -2163,44 +2168,23 @@ function ContactForm(): ReactElement {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-State splitting — re-render scope mathematical:
+State splitting — re-render scope symbolik tahlil. Komponent render vaqtlari `T_a`, `T_b`, `T_c`, va frequent o'zgaruvchi state `f` martda tetiklanadi:
 
 ```
-Komponent A render time = T_a
-Komponent B render time = T_b
-Komponent C render time = T_c
+Bitta state parent'da, har update top-down propagatsiya:
+   Har update: T_a + T_b + T_c
+   f update'da: f × (T_a + T_b + T_c)
 
-Bitta state, parent A re-render har 100ms'da:
-   Total render = T_a + T_b + T_c (har 100ms)
-   Per second: 10 × (T_a + T_b + T_c)
+Split state — faqat A frequent o'zgaradi, B/C memo bailout:
+   A re-render: f × T_a
+   B re-render: 0 (props bir xil — bailout)
+   C re-render: 0
+   Jami: f × T_a
 
-Split state — A o'zgaradi har 100ms, B o'zgarmaydi, C har 1s:
-   A re-render: 10 × T_a (per second)
-   B re-render: 0 (memo bailout)
-   C re-render: 1 × T_c
-   Total: 10*T_a + T_c
-   
-Saving: 10*(T_b + T_c) - T_c = 10*T_b + 9*T_c
+Saving: f × (T_b + T_c)
 ```
 
-Real misol — search box:
-
-```
-T_a (SearchBar) = 1ms
-T_b (UserList 1000 items) = 50ms
-T_c (Stats) = 5ms
-
-Bitta state — 10 keystroke/sec:
-   Total: 10 × (1 + 50 + 5) = 560ms/sec — 56% CPU
-
-Split:
-   SearchBar re-render: 10 × 1 = 10ms
-   UserList re-render: 0 (props bir xil)
-   Stats re-render: 0
-   Total: 10ms/sec — 1% CPU
-   
-Saving: 56% → 1% (50x improvement)
-```
+Frequent o'zgaruvchi state (search box typing) bilan tez-tez re-render bo'luvchi og'ir tree (katta list, og'ir aggregatsiya) bir parent'da bo'lsa, har keystroke butun tree'ni qayta render qiladi. State'ni ajratganda faqat input komponenti re-render bo'ladi, og'ir list memo orqali bailout qiladi — `T_b` va `T_c` har keystroke'dan butunlay chiqib ketadi. Tejov shu o'zgarmaydigan komponentlarning render vaqtiga teng, frequency'ga ko'paytirilgan.
 
 </details>
 
@@ -2680,7 +2664,10 @@ const PreferencesContext = createContext<Preferences>({});
 // use-context-selector library
 import { createContext, useContextSelector } from 'use-context-selector';
 
-const StoreContext = createContext<{ users: User[]; products: Product[] }>(null!);
+const StoreContext = createContext<{ users: User[]; products: Product[] }>({
+  users: [],
+  products: [],
+});
 
 function UserCount(): ReactElement {
   // Faqat users.length'ga subscribe — products o'zgarsa re-render bo'lmaydi
@@ -2718,11 +2705,11 @@ Store update:
    Selector pattern: faqat slice'ni qayta hisoblash
 ```
 
-Misol: 100 consumer, store o'zgaradi:
+Ko'p consumer'li tree'da, store o'zgarganda:
 
-- Context default: 100 re-render (har consumer).
-- Context selector: ~10 re-render (faqat tegishli slice'ga subscribe qilganlar).
-- Zustand selector: ~10 re-render (selector returns same reference for same slice).
+- Context default: barcha consumer re-render (value o'zgargani uchun har biri).
+- Context selector: faqat o'zgargan slice'ga subscribe qilgan consumer'lar re-render.
+- Zustand selector: faqat selector qaytaradigan slice o'zgarganlar re-render (selector bir xil slice uchun bir xil reference qaytaradi).
 
 </details>
 
@@ -2872,13 +2859,13 @@ function AddProductButton({ product }: { product: Omit<CartItem, 'id'> }): React
 
 ### Nazariya
 
-**Virtualization** — faqat **ko'rinadigan** list items'ni DOM'ga render. 1000+ item list — 10-20 ta visible item (scroll'siz). Boshqalar virtual sifatida hisoblanadi (DOM emas).
+**Virtualization** — faqat **ko'rinadigan** list items'ni DOM'ga render. Katta ro'yxatda bir vaqtda faqat viewport'ga sig'adigan oz sonli item ko'rinadi; qolganlari virtual sifatida hisoblanadi (DOM'da yo'q).
 
 NIMA UCHUN kerak:
 
-- **DOM size** — 10000 ta `<li>` DOM hajmi ~50MB browser memory.
-- **Initial mount time** — 10000 React Element create + reconciliation = 500ms+.
-- **Scroll performance** — har scroll event Reconciler ishlaydi (event throttling bilan), lekin DOM update'lar ko'p.
+- **DOM size** — har bir item DOM node yaratadi; o'n minglab item DOM tree'ni o'stiradi va browser memory'ni egallaydi.
+- **Initial mount time** — har item uchun React Element create + reconciliation; element soni o'sgani sari mount vaqti chiziqli ortadi.
+- **Scroll performance** — katta DOM tree'da scroll paytidagi layout va paint ishi sezilarli sekinlashadi.
 
 Virtualization solution:
 
@@ -2930,9 +2917,9 @@ function VirtualizedList({ items }: { items: ItemData[] }): ReactElement {
     </FixedSizeList>
   );
 }
-// 1000+ items: faqat ~12 row visible at any time
-// DOM: ~12 elements (vs 1000+)
-// Scroll: smooth 60fps
+// Katta ro'yxat: bir vaqtda faqat ~12 row visible (height 600 / itemSize 50)
+// DOM: ~12 elements (butun ro'yxat o'rniga)
+// Scroll: viewport ichidagi window qayta render bo'ladi — smooth scroll
 ```
 
 Vanilla React virtualization (manual, simplified):
@@ -3018,15 +3005,15 @@ Scroll position = 250px
 Start index = floor(250 / 50) = 5
 End index = 5 + 12 + 1 = 18 (overscan: 1)
 
-Render: items[5..18] (14 items)
-DOM elements: 14
-Total items: 10000
+Render: items.slice(5, 18) → indekslar 5..17 (13 items)
+DOM elements: 13
+Total items: katta (masalan o'n minglab)
 
 Memory (sifat-darajada):
-   Without virtualization: 10000 DOM elementlari + listener'lar + layout state — barchasi heap'da.
-   With virtualization: ~14 DOM elementlari (visible + overscan) — qolgan item'lar JS array'da metadata sifatida.
+   Without virtualization: barcha item uchun DOM element + listener + layout state — hammasi heap'da.
+   With virtualization: faqat visible + overscan DOM element (bu yerda 13) — qolgan item'lar JS array'da metadata sifatida.
 
-Saving: DOM element soni 10000 → 14 (visible window'da), katta ro'yxatlar uchun memory va layout/paint cost order of magnitude past tushadi (aniq raqamlar item complexity va browser engine'ga bog'liq).
+Saving: DOM element soni butun ro'yxatdan visible window'gacha qisqaradi; katta ro'yxatlar uchun memory va layout/paint cost order of magnitude past tushadi (aniq raqamlar item complexity va browser engine'ga bog'liq).
 ```
 
 Scroll handling:
@@ -3129,9 +3116,9 @@ function Greeting({ name }: { name: string }): ReactElement {
 ```
 
 Cost:
-- useMemo overhead: ~0.01ms
-- Computation: ~0.001ms (string concat)
-- Net: useMemo bilan sezilarli SLOWER (overhead asl computation'dan ko'p)
+- useMemo overhead: hook slot allocation + deps comparison + cache lookup.
+- Computation: bitta string concat — deyarli bepul.
+- Net: useMemo bilan sekinroq — overhead asl computation'dan oshib ketadi.
 
 ### Anti-Pattern 2: `useCallback` `React.memo`'siz
 
@@ -3241,27 +3228,26 @@ function Parent({ items }: { items: Item[] }): ReactElement {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Anti-patterns cost analysis:
+Anti-patterns cost analysis (sifat-darajada):
 
 ```
 Pattern: useMemo on primitive computation
-   Without: 1 string concat ~0.001ms
-   With: useMemo overhead ~0.01ms
-   Net: sezilarli SLOWER (string concat'dan useMemo overhead ko'proq)
+   Without: bitta string concat — deyarli bepul
+   With: useMemo hook slot + deps comparison + cache lookup
+   Net: sekinroq — overhead computation'dan oshadi
 
 Pattern: useCallback for non-memoized child
-   Without: function literal allocation ~0.0001ms
-   With: useCallback overhead + deps comparison ~0.005ms
-   Net: 50x SLOWER (negligible absolute)
+   Without: function literal allocation — arzon
+   With: useCallback overhead + deps comparison
+   Net: sekinroq — child memo'siz bo'lgani uchun foyda umuman yo'q
 
 Pattern: memo with always-changing props
-   Without: render ~0.5ms
-   With: shallow comparison + render ~0.51ms
-   Net: 0.01ms slower per render
-   1000 renders: 10ms wasted
+   Without: faqat render
+   With: shallow comparison (har gal fail) + render
+   Net: render ustiga doimo behuda comparison qo'shiladi
 ```
 
-Memoization tax accumulates — bundle size, parse time, runtime overhead.
+Absolute qiymatlar har bittada juda kichik, lekin memoization tax to'planadi — bundle size, parse time, runtime overhead. Asosiy zarari measurable performance emas, balki o'qilmaydigan kod va deps array maintenance burden.
 
 </details>
 
@@ -3489,7 +3475,7 @@ Per-component decisions:
 
 - File-level: `'use memo'` directive enables Compiler.
 - Function-level: Compiler auto-detects component vs hook.
-- Bail-out: silently skip per component, log warning in dev.
+- Bail-out: shu komponent uchun optimization'ni xavfsiz skip qiladi (app behavior o'zgarmasligi uchun); Rules of React buzilishlari build-time diagnostics va `eslint-plugin-react-hooks` orqali yuzaga chiqadi.
 
 </details>
 
@@ -3541,7 +3527,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
     if (!video) return;
     
     function handleTimeUpdate() {
-      onProgress(video!.currentTime);
+      onProgress(video.currentTime);
     }
     
     video.addEventListener('timeupdate', handleTimeUpdate);
@@ -4173,7 +4159,7 @@ function AddNotificationButton(): ReactElement {
 Avantajlar:
 - `useReducer` dispatch automatically stable.
 - Notifications consumer va dispatch consumer mustaqil re-render scope.
-- ~50% fewer re-renders typical app'da (dispatch consumer'lar ko'p — buttons).
+- Faqat dispatch ishlatadigan consumer'lar (masalan tugmalar) notifications o'zgarganda umuman re-render bo'lmaydi — bunday consumer'lar ko'p bo'lsa, behuda re-render'lar sezilarli kamayadi.
 
 </details>
 
@@ -4244,7 +4230,7 @@ function DataDashboard(): ReactElement {
 }
 ```
 
-Profile natijasi: filter typing — 200ms+ commits, 1000+ DataPoint'lar.
+Profile natijasi: katta DataPoint to'plamida har filter keystroke commit frame budget'dan sezilarli oshadi.
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -4348,11 +4334,11 @@ function DataDashboard(): ReactElement {
 // - Filter typing: input sync responsive
 // - Heavy filter + render: Transition Lane interruptible
 // - Chart/Table memo: faqat data o'zgarsa re-render
-// - p95 commit duration: 200ms → 20ms (sezilarli improvement)
+// - p95 commit duration frame budget ichiga tushdi (sezilarli improvement)
 
-// 5. Future: Virtualization (cross-ref `36-virtualization.md`) for DataTable agar 10000+ rows
+// 5. Future: Virtualization (cross-ref `36-virtualization.md`) for DataTable juda katta rows uchun
 import { FixedSizeList } from 'react-window';
-// 10000 rows: ~12 visible items, smooth scroll
+// Juda katta ro'yxat: bir vaqtda faqat viewport'dagi oz row visible, smooth scroll
 
 // 6. Compiler era:
 // 'use memo';
@@ -4360,13 +4346,12 @@ import { FixedSizeList } from 'react-window';
 // Manual hooks olib tashlash mumkin
 ```
 
-5 ta optimization step:
+Qo'llanilgan optimization step'lar:
 
 1. ✅ `React.memo` for Chart, Table — top-down propagation block.
 2. ✅ `useMemo` for filtered — expensive computation cache.
-3. ✅ `useTransition` — input sync, filter non-urgent (Concurrent rendering).
-4. ✅ `useDeferredValue` alternative pattern — value defer.
-5. ⚠ Virtualization (cross-ref [`36-virtualization.md`](36-virtualization.md)) — 10000+ rows uchun.
+3. ✅ `useTransition` — input sync, filter non-urgent (Concurrent rendering). Alternativa: `useDeferredValue` bilan bir xil natija (alohida state'siz value defer qiladi).
+4. ⚠ Virtualization (cross-ref [`36-virtualization.md`](36-virtualization.md)) — juda katta rows uchun keyingi qadam.
 
 </details>
 

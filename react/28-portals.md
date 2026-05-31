@@ -105,56 +105,59 @@ DOM tree:
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`createPortal` source code (simplified):
+`createPortal` source code (soddalashtirilgan, source bilan moslangan):
 
 ```javascript
-// react/src/ReactPortal.js
-function createPortal(children, containerInfo, key) {
+// react-reconciler/src/ReactPortal.js
+export function createPortal(children, containerInfo, implementation, key = null) {
   return {
+    // Bu tag element'ni React Portal sifatida noyob identifikatsiya qiladi
     $$typeof: REACT_PORTAL_TYPE,
     key: key == null ? null : '' + key,
     children,
     containerInfo,
-    implementation: null,
+    implementation,
   };
 }
 ```
 
-`REACT_PORTAL_TYPE` — `Symbol.for('react.portal')`. React Reconciler'ga signal — "bu element boshqa container'ga render qilinadi".
+Public `react-dom` API `createPortal(children, domNode, key?)` — 3 argument. Ichki reconciler funksiyasi 4-argument `implementation` ham qabul qiladi (cross-renderer uchun, DOM renderer'da `null`). `REACT_PORTAL_TYPE` — `Symbol.for('react.portal')`. React Reconciler'ga signal — "bu element boshqa container'ga render qilinadi".
 
-Reconciler Portal handling:
+Reconciler Portal handling — Portal Fiber'i `tag: HostPortal`, `updatePortalComponent` orqali ishlanadi:
 
 ```javascript
 // react-reconciler/src/ReactFiberBeginWork.js (simplified)
-function beginWork(workInProgress) {
-  switch (workInProgress.tag) {
-    case HostPortal: {
-      // Portal Fiber'i
-      pushHostContainer(workInProgress, workInProgress.stateNode.containerInfo);
-      reconcileChildren(workInProgress, workInProgress.pendingProps);
-      return workInProgress.child;
-    }
-    // ... other cases
+function updatePortalComponent(current, workInProgress, renderLanes) {
+  pushHostContainer(workInProgress, workInProgress.stateNode.containerInfo);
+  const nextChildren = workInProgress.pendingProps;
+  if (current === null) {
+    // Portal'lar maxsus: children mount paytida append qilinmaydi,
+    // commit paytida append qilinadi. Shu sabab mount paytida insertion track qilinadi.
+    workInProgress.child = reconcileChildFibers(
+      workInProgress, null, nextChildren, renderLanes,
+    );
+  } else {
+    reconcileChildren(current, workInProgress, nextChildren, renderLanes);
   }
+  return workInProgress.child;
 }
 ```
 
-Portal Fiber'i `tag: HostPortal`. Render paytida `containerInfo` (DOM element) push qilinadi va children shu container'ga commit qilinadi.
+Render (begin work) paytida `containerInfo` (DOM element) host container stack'iga push qilinadi va children reconcile qilinadi. Lekin **DOM'ga insert mount paytida emas, commit paytida** bo'ladi.
 
-Commit Phase:
+Commit Phase: Portal children oddiy commit placement effect orqali container ichiga insert qilinadi. Host parent — Portal Fiber'ning `stateNode.containerInfo`'si:
 
 ```javascript
-// react-dom-bindings/src/client/ReactDOMHostConfig.js (simplified)
-function commitPortal(portalFiber) {
-  const container = portalFiber.stateNode.containerInfo;
-  
-  portalFiber.children.forEach(child => {
-    container.appendChild(child.stateNode);
-  });
+// react-reconciler/src/ReactFiberCommitWork.js (simplified)
+// HostPortal Fiber commit paytida hostParent = containerInfo bo'ladi:
+case HostPortal: {
+  hostParent = parent.stateNode.containerInfo;
+  // ... so'ng placement effect bu container'ga
+  // insertOrAppendPlacementNodeIntoContainer orqali node'larni insert qiladi
 }
 ```
 
-Portal children DOM'ga `container` ichiga append qilinadi (default `document.body` yoki user-provided element).
+Portal children DOM'ga `containerInfo` ichiga insert qilinadi (default `document.body` yoki user-provided element). Alohida `commitPortal` funksiyasi yo'q — bu oddiy placement effect mexanizmining bir tarmog'i, container faqat default DOM parent o'rniga `containerInfo`.
 
 Performance impact:
 - Portal Fiber'i bir qo'shimcha Fiber node sifatida tree'da turadi (har Fiber'ning struktura overhead'i: tag, stateNode, child/sibling/return pointer'lari, alternate, va h.k.).
@@ -325,7 +328,7 @@ function NotificationList({ messages }: { messages: string[] }) {
 
 Multiple Portals bir parent'da — `key` Reconciliation uchun kerak (cross-ref [`04-reconciliation.md`](04-reconciliation.md)).
 
-QANDAY ISHLAYDI: `createPortal` chaqirilganda — React Element yaratiladi (`$$typeof: REACT_PORTAL_TYPE`). React Reconciler bu element'ni boshqa Fiber tag (`HostPortal`) bilan markup qiladi. Render paytida children container'ga DOM API orqali insert qilinadi.
+QANDAY ISHLAYDI: `createPortal` chaqirilganda — React Element yaratiladi (`$$typeof: REACT_PORTAL_TYPE`). React Reconciler bu element'ni alohida Fiber tag (`HostPortal`) bilan ifodalaydi. Render (begin work) paytida `containerInfo` host container stack'iga push qilinadi va children reconcile qilinadi, lekin DOM'ga insert **commit phase**'da bo'ladi (render phase side-effect'siz).
 
 ```tsx
 // JSX
@@ -341,7 +344,7 @@ createPortal(<div>Hello</div>, document.body, 'my-key');
 }
 ```
 
-`containerInfo` — target DOM element. React Reconciler render paytida `containerInfo` ichiga children'ni mount qiladi.
+`containerInfo` — target DOM element. React Reconciler commit phase'da `containerInfo` ichiga children'ni insert qiladi (render phase'da faqat reconcile).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -582,53 +585,54 @@ QANDAY ISHLAYDI: React Reconciler Portal Fiber'ini boshqa Fiber'lar kabi travers
 Fiber Portal type — `tag: HostPortal`:
 
 ```javascript
-// react-reconciler/src/ReactFiber.js (simplified)
-const FiberTags = {
-  FunctionComponent: 0,
-  ClassComponent: 1,
-  HostRoot: 3,
-  HostPortal: 4,        // ← Portal Fiber tag
-  HostComponent: 5,     // div, span, etc.
-  HostText: 6,
-  // ...
-};
+// react-reconciler/src/ReactWorkTags.js
+export const FunctionComponent = 0;
+export const ClassComponent = 1;
+export const HostRoot = 3;
+export const HostPortal = 4;        // ← Portal Fiber tag
+export const HostComponent = 5;     // div, span, etc.
+export const HostText = 6;
+// ...
 ```
 
 Portal Fiber `containerInfo` — DOM target element:
 
 ```javascript
-function createFiberFromPortal(element) {
-  return {
-    tag: HostPortal,
-    type: null,
-    pendingProps: element.children,
-    stateNode: {
-      containerInfo: element.containerInfo,
-      pendingChildren: null,
-      implementation: element.implementation,
-    },
-    // ... other Fiber fields
+// react-reconciler/src/ReactFiber.js (simplified)
+function createFiberFromPortal(portal, mode, lanes) {
+  const pendingProps = portal.children !== null ? portal.children : [];
+  const fiber = createFiber(HostPortal, pendingProps, portal.key, mode);
+  fiber.lanes = lanes;
+  fiber.stateNode = {
+    containerInfo: portal.containerInfo,
+    pendingChildren: null, // persistent updates uchun
+    implementation: portal.implementation,
   };
+  return fiber;
 }
 ```
 
-`stateNode.containerInfo` — DOM element, render paytida children shu yerga insert qilinadi.
+`stateNode.containerInfo` — DOM element. Children render (begin work) paytida reconcile qilinadi, lekin shu container'ga DOM insert commit phase'da bo'ladi.
 
-Reconciliation Portal:
+Begin work paytida Portal `updatePortalComponent` orqali ishlanadi:
 
 ```javascript
-function reconcileChildrenForPortal(workInProgress) {
-  const containerInfo = workInProgress.stateNode.containerInfo;
-  
-  // Push container — child Fibers'lar shu container'ga DOM commit qilinadi
-  pushHostContainer(workInProgress, containerInfo);
-  
-  // Normal Fiber traversal
-  reconcileChildren(workInProgress, workInProgress.pendingProps);
+// react-reconciler/src/ReactFiberBeginWork.js (simplified)
+function updatePortalComponent(current, workInProgress, renderLanes) {
+  pushHostContainer(workInProgress, workInProgress.stateNode.containerInfo);
+  const nextChildren = workInProgress.pendingProps;
+  if (current === null) {
+    workInProgress.child = reconcileChildFibers(
+      workInProgress, null, nextChildren, renderLanes,
+    );
+  } else {
+    reconcileChildren(current, workInProgress, nextChildren, renderLanes);
+  }
+  return workInProgress.child;
 }
 ```
 
-`pushHostContainer` — host context stack'ga container'ni push qilish. Ichki HostComponent'lar (div, span) shu container'ga commit qilinadi.
+`pushHostContainer` — host context stack'ga container'ni push qilish. Ichki HostComponent'lar (div, span) commit phase'da shu container'ga insert qilinadi.
 
 Memory layout:
 
@@ -828,13 +832,14 @@ QANDAY ISHLAYDI: React event delegation (R17+):
 5. Portal Fiber `return` pointer'i parent komponent'iga ulangan — bubble parent'larga.
 
 ```javascript
-// React internal (simplified)
-function dispatchEvent(event, targetFiber) {
+// React internal (kontseptual soddalashtirilgan)
+function dispatchEvent(syntheticEvent, targetFiber) {
   let fiber = targetFiber;
   while (fiber !== null) {
-    const handler = fiber.memoizedProps?.[`on${event.type}`];
-    if (handler && !event.cancelBubble) {
-      handler(event);
+    // React event nomini React prop nomiga map qiladi: 'click' → 'onClick'
+    const handler = getListener(fiber, syntheticEvent.type);
+    if (handler && !syntheticEvent.isPropagationStopped()) {
+      handler(syntheticEvent);
     }
     fiber = fiber.return;  // ← Parent Fiber (React tree)
   }
@@ -888,8 +893,10 @@ function dispatchEventForPluginEventSystem(nativeEvent, rootContainerElement) {
   const targetInst = getInstanceFromNode(nativeEvent.target);
   // targetInst — Fiber for the target DOM element
   
+  // native event nomini React prop nomiga map: 'click' → 'onClick'
+  const reactEventName = 'on' + capitalize(nativeEvent.type);
   // Traverse Fiber tree (React tree, not DOM tree)
-  let listeners = collectListenersForFiber(targetInst, nativeEvent.type);
+  let listeners = collectListenersForFiber(targetInst, reactEventName);
   
   // Dispatch in parent chain order
   for (const listener of listeners) {
@@ -898,11 +905,12 @@ function dispatchEventForPluginEventSystem(nativeEvent, rootContainerElement) {
   }
 }
 
-function collectListenersForFiber(fiber, eventType) {
+function collectListenersForFiber(fiber, reactEventName) {
+  // reactEventName — React prop nomi, masalan 'onClick' (native 'click' dan map qilingan)
   const listeners = [];
   let node = fiber;
   while (node !== null) {
-    const handler = node.memoizedProps?.[`on${eventType}`];
+    const handler = getListener(node, reactEventName);
     if (handler) {
       listeners.push({ fiber: node, handler });
     }
@@ -931,7 +939,7 @@ root.addEventListener('click', /* ... */);
 
 R17+ fix — **microfrontends compatibility** (cross-ref [`13-event-handling.md`](13-event-handling.md)).
 
-R18+ Concurrent rendering — Portal ham concurrent-aware. Suspense Boundary Portal ichidan oshib o'tadi.
+R18+ Concurrent rendering — Portal ham concurrent-aware. Portal children React tree'da parent ichida qolgani uchun, Portal ichidagi suspend qiluvchi component React tree'dagi ota Suspense boundary tomonidan ushlanadi (DOM joyi ahamiyatsiz).
 
 </details>
 
@@ -1078,7 +1086,7 @@ Modal — Portal'ning eng klassik use case. Production-grade Portal-based Modal:
 3. **Escape key close** — keyboard accessibility (manual listener — `<dialog>`'da native).
 4. **Focus trap** — Tab key Modal ichida cycle (manual — `<dialog>` modern browser'da native).
 5. **Focus return** — close paytida triggering element'ga focus qaytarish.
-6. **Body scroll lock** — Modal ochiq paytida arqa scroll bloklash.
+6. **Body scroll lock** — Modal ochiq paytida orqa fon scroll'ini bloklash.
 7. **ARIA** — `role="dialog"`, `aria-modal="true"`, `aria-labelledby`.
 8. **Animation** — open/close transitions.
 
@@ -1150,7 +1158,7 @@ Modal lifecycle:
 Body scroll lock cross-platform issue:
 
 ```tsx
-// ⚠️ Eski iOS Safari (pre-15) momentum scroll'ni hammasini bloklamaydi
+// ⚠️ Eski iOS Safari versiyalari momentum scroll'ni to'liq bloklamaydi
 document.body.style.overflow = 'hidden';
 
 // ✅ Universal — position: fixed scroll position'ni ham saqlaydi
@@ -1170,7 +1178,7 @@ function unlockBodyScroll() {
 }
 ```
 
-iOS Safari'ning eski versiyalari (pre-15.4) `overflow: hidden` momentum scroll'ni to'liq bloklamaydi. Joriy iOS (16+) ko'p holatda to'g'ri ishlaydi, lekin `position: fixed` workaround universal — har platforma va versiyada scroll position'ni saqlab tiklaydi. Production'da `body-scroll-lock` library tavsiya etiladi (edge case'larni qamrab oladi).
+iOS Safari'ning eski versiyalari `overflow: hidden` orqali momentum scroll'ni to'liq bloklamaydi. Joriy iOS ko'p holatda to'g'ri ishlaydi, lekin `position: fixed` workaround universal — har platforma va versiyada scroll position'ni saqlab tiklaydi. Production'da `body-scroll-lock` library tavsiya etiladi (edge case'larni qamrab oladi).
 
 </details>
 
@@ -1678,9 +1686,11 @@ export function ProductionTooltip({ content, placement = 'top', children, delay 
   const calculatePosition = () => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    
-    // ... same as basic version
-    setPosition(/* calculated */);
+
+    // placement bo'yicha top/left hisoblash (sodda versiyadagi switch bilan bir xil)
+    const top = placement === 'bottom' ? rect.bottom + 8 : rect.top - 8;
+    const left = rect.left + rect.width / 2;
+    setPosition({ top, left });
   };
   
   useLayoutEffect(() => {
@@ -2488,8 +2498,8 @@ Modern alternative — **`<dialog>` element + top layer** (CSS):
 - **Top layer** — barcha stacking context'lardan ustun (`transform`/`opacity`/`filter` parent'lardan ozod), z-index management kerak emas
 - **`::backdrop`** — pseudo-element backdrop styling uchun (`dialog::backdrop { background: rgba(0,0,0,0.5); }`)
 - **Avtomatik focus** — birinchi focusable element'ga focus qo'yiladi (`autofocus` attribute orqali boshqarish mumkin)
-- **Focus trap** — Tab key dialog ichida cycle (Chrome 90+, Firefox 118+, Safari 17+)
-- **ESC key** — native handling: `close` event fire qiladi (preventDefault bilan to'sish mumkin; HTML 2024 `closedby` attribute fine-grained nazorat beradi)
+- **Focus trap** — Tab key dialog ichida cycle (modern browser'larda native)
+- **ESC key** — native handling: `cancel` keyin `close` event fire qiladi (`cancel`'da `preventDefault` bilan to'sish mumkin; so'nggi spec'dagi `closedby` attribute light-dismiss nazorat beradi)
 - **Stack** — bir nechta `.showModal()` chaqirig'i stack hosil qiladi, oxirgi ochilgan eng tepada
 - **`return value`** — `<form method="dialog">` yoki `dialog.close('value')` orqali natija qaytarish
 
@@ -2607,9 +2617,9 @@ function NativeModal({ isOpen, onClose, children }: ModalProps) {
   );
 }
 
-// Avzaliklari:
+// Afzalliklari:
 // - Top layer (z-index management yo'q)
-// - Native ESC (manual listener kerak emas)  
+// - Native ESC (manual listener kerak emas)
 // - Native focus trap (modern browser'larda)
 // - aria-modal="true" implicit
 // Browser support: Chrome 37+, Firefox 98+, Safari 15.4+ (cross-browser 2022-mart)
@@ -2623,7 +2633,7 @@ dialog::backdrop {
   backdrop-filter: blur(4px);
 }
 
-/* Open animation — @starting-style (Chrome 117+, Firefox 129+, Safari 17.5+) */
+/* Open animation — @starting-style (so'nggi browser versiyalarida) */
 dialog {
   opacity: 0;
   transform: scale(0.95);
@@ -2767,7 +2777,7 @@ Edge cases:
 
 `element.focus({ preventScroll: true })` — focus without scroll (avoid jumping).
 
-R18+ Strict Mode 2x effect cycle — focus trap ikki marta setup. Initial focus 2x. UX'da farq yo'q (deterministic), lekin metric'larda visible.
+R18+ StrictMode **development'da** effect'ni qo'sh chaqiradi (mount → unmount → mount) — focus trap setup va initial focus ikki marta ishlaydi. Production'da StrictMode no-op, qo'sh chaqiruv yo'q. Shu sabab focus trap effect cleanup'i to'g'ri yozilishi shart (listener remove), aks holda development'da qo'sh listener qoladi.
 
 </details>
 
@@ -3085,25 +3095,36 @@ export default function Modal({ children }: { children: React.ReactNode }) {
   return createPortal(<div className="modal">{children}</div>, document.body);
 }
 
-// app/page.tsx
+// app/components/ModalLoader.tsx — Client Component
+'use client';
+
 import dynamic from 'next/dynamic';
 
-const Modal = dynamic(() => import('./components/Modal'), {
+// App Router'da { ssr: false } FAQAT Client Component ichida ruxsat etiladi.
+// Server Component'da ishlatilsa Next.js error beradi.
+const Modal = dynamic(() => import('./Modal'), {
   ssr: false,
   loading: () => null,
 });
+
+export function ModalLoader({ children }: { children: React.ReactNode }) {
+  return <Modal>{children}</Modal>;
+}
+
+// app/page.tsx — Server Component
+import { ModalLoader } from './components/ModalLoader';
 
 export default function Page() {
   return (
     <main>
       <h1>Page</h1>
-      <Modal>Modal content</Modal>
+      <ModalLoader>Modal content</ModalLoader>
     </main>
   );
 }
 ```
 
-`{ ssr: false }` — komponent server'da render qilinmaydi. Bundle'da alohida chunk (lazy-loaded).
+`{ ssr: false }` — komponent server'da render qilinmaydi. Bundle'da alohida chunk (lazy-loaded). App Router'da `ssr: false` faqat Client Component (`'use client'`) ichida ishlaydi — Server Component'da `next/dynamic`'ga `ssr: false` berish error.
 
 </details>
 
@@ -3179,44 +3200,36 @@ Component unmounts
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-React Reconciler unmount:
+React Reconciler unmount — deletion effect Portal Fiber'iga yetganda, host parent'ni Portal `containerInfo`'siga almashtiradi va shu container'dan host node'larni remove qiladi:
 
 ```javascript
 // react-reconciler/src/ReactFiberCommitWork.js (simplified)
-function commitDeletion(fiber) {
-  if (fiber.tag === HostPortal) {
-    const container = fiber.stateNode.containerInfo;
-    
-    // Remove all children from container
-    fiber.children?.forEach(child => {
-      container.removeChild(child.stateNode);
-    });
-    
-    // Cleanup Portal Fiber
-    fiber.stateNode = null;
-  }
+// commitDeletionEffectsOnFiber ichidagi HostPortal case:
+case HostPortal: {
+  const prevHostParent = hostParent;
+  // Portal'ga kirilganda — remove qilinadigan parent containerInfo bo'ladi
+  hostParent = deletedFiber.stateNode.containerInfo;
+  recursivelyTraverseDeletionEffects(root, nearestMountedAncestor, deletedFiber);
+  hostParent = prevHostParent;  // recursion'dan keyin tiklash
+  break;
 }
 ```
 
-Reconciler children'larni container'dan remove qiladi. Custom container — manual cleanup `useEffect` da.
+Recursion ichida har bir host node `removeChildFromContainer(containerInfo, node)` orqali olib tashlanadi. Portal Fiber'ning o'zida alohida `removeChild` chaqirig'i yo'q — u faqat host parent'ni container'ga almashtiradi, ichki HostComponent'lar esa shu container'dan o'chiriladi. Custom (manual yaratilgan) container'ni o'chirish — `useEffect` cleanup'da developer zimmasida.
 
-Memory profiler trace:
+Mount/unmount delta:
 
 ```
-Before mount:
-  - DOM nodes: 100
-  - React Fibers: 50
+Portal mount paytida tree'ga qo'shiladi:
+  - 1 ta Portal Fiber (tag: HostPortal)
+  - Portal children Fiber'lari + ularning DOM node'lari (containerInfo ichida)
 
-After mount Portal:
-  - DOM nodes: 105 (+5 portal children)
-  - React Fibers: 51 (+1 portal Fiber)
-
-After unmount:
-  - DOM nodes: 100 (back to original)
-  - React Fibers: 50
+Portal unmount paytida:
+  - children DOM node'lari containerInfo'dan removeChildFromContainer
+  - Portal Fiber va children Fiber'lari deletion effect orqali tozalanadi
 ```
 
-Memory cleanup — automatic (React handles).
+Memory cleanup — React boshqaradi (managed container uchun). Faqat manual yaratilgan container va manual qo'shilgan listener'lar developer cleanup'iga muhtoj.
 
 </details>
 
@@ -3921,9 +3934,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         <div 
           className="toast-container"
           role="region"
-          aria-live="polite"
+          aria-label="Notifications"
           style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999 }}
         >
+          {/* aria-live container'da emas — har toast role="alert"/"status" o'z live
+              semantikasini olib yuradi. Container'ga ham aria-live qo'yish ikki marta
+              e'lon qilinishiga (nested live region) olib keladi. */}
           {toasts.map(t => (
             <div 
               key={t.id} 
@@ -4195,7 +4211,7 @@ function App() {
 **Tushuntirish:**
 - Portal'da body'ga render — z-index, transform, overflow constraints'dan qutulish.
 - Focus management: initial focus + Tab key trap + return focus.
-- Body scroll lock — Drawer ochiq paytida arqa scroll bloklash.
+- Body scroll lock — Drawer ochiq paytida orqa fon scroll'ini bloklash.
 - ARIA: `role="dialog"`, `aria-modal="true"`, `aria-labelledby`.
 - CSS animations: backdrop fade + drawer slide.
 - Placement-aware styles + animations (left/right/top/bottom).
@@ -4231,7 +4247,7 @@ Portal — React'ning component'larni DOM tree boshqa joyiga render qiluvchi mex
 Versiya evolyutsiyasi:
 - **Pre-R16:** Portal mavjud emas, manual DOM manipulation workarounds.
 - **R16 (2017):** `createPortal` API kiritildi.
-- **R18 (2022):** Concurrent rendering bilan ishlaydi, Suspense Boundary va Error Boundary Portal ichidan oshib o'tadi.
+- **R18 (2022):** Concurrent rendering bilan ishlaydi. Portal children React tree'da parent ichida qolgani uchun, Portal ichidagi suspend yoki xato React tree'dagi ota Suspense/Error Boundary tomonidan ushlanadi (DOM joyi ahamiyatsiz).
 - **R19 (2024):** `<title>`/`<meta>`/`<link>` document metadata Portal'siz `<head>`'ga hoist (cross-ref [`37-react-19-document-apis.md`](37-react-19-document-apis.md)).
 
 Cross-references:

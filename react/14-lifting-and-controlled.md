@@ -521,7 +521,7 @@ function UserCardEffectSync({ user }: { user: User }) {
 
 // ✅ key reset — komponent unmount/mount
 function App() {
-  const [user, setUser] = useState<User>(...);
+  const [user, setUser] = useState<User>({ id: 1, name: 'Alice' });
   return <Card key={user.id} user={user} />;
   // user.id o'zgarsa — Card unmount/mount, fresh state
 }
@@ -550,7 +550,13 @@ State ikki joyda bo'lsa — bu cycle buziladi: ikki state independently update q
 
 ```tsx
 // ❌ Cycle xavfli pattern
-function MirroredCounterCycle({ value }: { value: number }) {
+function MirroredCounterCycle({
+  value,
+  onLocalChange,
+}: {
+  value: number;
+  onLocalChange: (next: number) => void;
+}) {
   const [localValue, setLocalValue] = useState(value);
   
   useEffect(() => {
@@ -560,7 +566,7 @@ function MirroredCounterCycle({ value }: { value: number }) {
   useEffect(() => {
     // Local update parent'ga propagate (callback)
     onLocalChange(localValue);
-  }, [localValue]);
+  }, [localValue, onLocalChange]);
   
   // Cycle: parent → effect → local set → effect → parent → ...
 }
@@ -714,7 +720,7 @@ function App() {
   ]);
   const [selectedId, setSelectedId] = useState(1);
   
-  const selectedUser = users.find((u) => u.id === selectedId)!;
+  const selectedUser = users.find((u) => u.id === selectedId) ?? users[0];
   
   return (
     <Stack gap={8}>
@@ -765,7 +771,7 @@ function Child({ value, onChange }: { value: string; onChange: (v: string) => vo
 }
 ```
 
-Child uchun `onChange` — read-only function reference (boshqa prop kabi). Lekin chaqirilganda — parent state'iga ta'sir qiladi.
+Child uchun `onChange` — boshqa har qanday prop bilan bir xil: read-only function reference. Lekin chaqirilganda — parent state'iga ta'sir qiladi.
 
 **Naming convention:**
 
@@ -821,7 +827,7 @@ type CartItemProps = {
 // 4 level chain: App → Layout → Sidebar → Profile
 
 function App() {
-  const [user, setUser] = useState<User>(...);
+  const [user, setUser] = useState<User>({ id: 1, name: 'Alice' });
   return <Layout user={user} setUser={setUser} />;
 }
 
@@ -1179,12 +1185,12 @@ Context — read-mostly identity. Lift — temporary edit/UI state.
 
 **Qachon library kerak:**
 
-- 50+ komponent global state'ni o'qiydi
+- Tree bo'ylab ko'p sonli komponent bitta global state'ni o'qiydi
 - Optimistic updates, undo/redo, complex async
 - DevTools (Redux DevTools, time-travel)
 - Cross-route persistence
 
-State management library — kursdan tashqari mavzu (`/state-mgmt/` kursi).
+State management library (Zustand, Redux) — bu kursdan tashqari mavzu.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1216,7 +1222,7 @@ function Parent() {
 const Context = createContext<Value | null>(null);
 
 function Provider({ children }: { children: ReactNode }) {
-  const [value, setValue] = useState(...);
+  const [value, setValue] = useState('light');
   return <Context.Provider value={{ value, setValue }}>{children}</Context.Provider>;
 }
 
@@ -1884,21 +1890,22 @@ React Commit Phase'da DOM'ga write qiladi:
 
 ```ts
 // react-dom internal — soddalashtirilgan
-function mountInput(node: HTMLInputElement, props: any) {
+type InputProps = { value?: string; defaultValue?: string };
+
+function mountInput(node: HTMLInputElement, props: InputProps) {
   // Mount paytida bir marta apply qilinadi
-  if ('value' in props && props.value != null) {
+  if (props.value != null) {
     node.value = props.value;
-  } else if ('defaultValue' in props && props.defaultValue != null) {
-    node.value = props.defaultValue;
+  } else if (props.defaultValue != null) {
+    // value attribute'iga (node.defaultValue), node.value property'siga emas
+    node.defaultValue = props.defaultValue;
   }
 }
 
-function updateInput(node: HTMLInputElement, prevProps: any, nextProps: any) {
+function updateInput(node: HTMLInputElement, prevProps: InputProps, nextProps: InputProps) {
   // Update — faqat 'value' (controlled) tracked
-  if ('value' in nextProps) {
-    if (node.value !== nextProps.value) {
-      node.value = nextProps.value;
-    }
+  if (nextProps.value != null && node.value !== nextProps.value) {
+    node.value = nextProps.value;
   }
   // 'defaultValue' update'da ignore qilinadi (mount-only)
 }
@@ -2040,8 +2047,8 @@ function R19ContactForm() {
       </Stack>
     </form>
   );
-  // R19 — action function tugagandan keyin React form.reset() chaqiradi:
-  //   uncontrolled inputs bo'shatiladi, controlled state'ga ta'sir qilmaydi
+  // R19 — action muvaffaqiyatli tugagach React uncontrolled inputs'ni
+  //   defaultValue'ga qaytaradi, controlled state'ga ta'sir qilmaydi
 }
 ```
 
@@ -2183,7 +2190,7 @@ Yoki nullable handling:
 // undefined → '' fallback
 ```
 
-**`defaultValue` o'zgarmaganidan ko'r ko'r — key trick:**
+**`defaultValue` keyingi render'larda e'tiborga olinmaydi — key trick bilan reset:**
 
 ```tsx
 // ❌ defaultValue keyingi render'larda ignore
@@ -2245,16 +2252,22 @@ function setControlledValue(node: HTMLInputElement, value: string) {
 }
 
 // Mount: value yoki defaultValue dan birini apply qilish
-function mountInputValue(node: HTMLInputElement, props: any) {
+function mountInputValue(node: HTMLInputElement, props: { value?: string; defaultValue?: string }) {
   if (props.value != null) {
     node.value = props.value;
   } else if (props.defaultValue != null) {
-    node.value = props.defaultValue;
+    // defaultValue → element'ning value *attribute*'iga (node.defaultValue),
+    // ishlovchi node.value property'siga emas
+    node.defaultValue = props.defaultValue;
   }
 }
 
 // Update: faqat controlled tracked, defaultValue update'da ignore
-function updateInputValue(node: HTMLInputElement, prevProps: any, nextProps: any) {
+function updateInputValue(
+  node: HTMLInputElement,
+  prevProps: { value?: string },
+  nextProps: { value?: string },
+) {
   if (nextProps.value != null) {
     setControlledValue(node, nextProps.value);
   }
@@ -2262,7 +2275,7 @@ function updateInputValue(node: HTMLInputElement, prevProps: any, nextProps: any
 }
 ```
 
-`value` — har commit'da apply (idempotent check bilan), `defaultValue` — mount commit'da bir marta. Update Phase'da `defaultValue` prop o'zgarishi DOM'ga ta'sir qilmaydi.
+`value` — har commit'da `node.value` property'siga apply (idempotent check bilan), `defaultValue` — mount commit'da `value` attribute'iga bir marta. Update Phase'da `defaultValue` prop o'zgarishi DOM'ga ta'sir qilmaydi.
 
 **Controlled → Uncontrolled switch warning:**
 
@@ -2294,7 +2307,7 @@ React'ning warning'i — controlled vs uncontrolled lifecycle bo'ylab tutarli bo
 </StrictMode>
 ```
 
-Strict Mode 2x render — komponent ikki marta render qilinadi (cross-ref [`02-rendering.md`](02-rendering.md), [`09-component-basics.md`](09-component-basics.md)). Lekin `defaultValue` set qiladigan logic — `dataset.reactDefaultValueSet` flag bilan idempotent. 2x render ham bir marta DOM'ga yozadi.
+Strict Mode 2x render — komponent ikki marta render qilinadi (cross-ref [`02-rendering.md`](02-rendering.md), [`09-component-basics.md`](09-component-basics.md)). Lekin `defaultValue` DOM'da idempotent ishlaydi, chunki React uni element'ning `value` *attribute*'iga map qiladi (`node.defaultValue = ...`), ishlovchi `node.value` property'siga emas. `defaultValue` attribute'ni bir necha marta o'rnatish — DOM'da bir xil natija (oxirgi qiymat g'olib). Bundan tashqari React har input'ni mount paytida `value` property'sini bir marta set qilib *detach* qiladi: shundan keyin `defaultValue` attribute o'zgarishi ishlovchi qiymatga ta'sir qilmaydi. Strict Mode'ning takroriy render'i shu sababli DOM holatini buzmaydi.
 
 **Cursor preservation:**
 
@@ -2952,7 +2965,9 @@ Checkbox/Radio internal:
 
 ```ts
 // react-dom internal — soddalashtirilgan
-function mountCheckedValue(node: HTMLInputElement, props: any) {
+type CheckedProps = { checked?: boolean; defaultChecked?: boolean };
+
+function mountCheckedValue(node: HTMLInputElement, props: CheckedProps) {
   if (props.checked != null) {
     node.checked = props.checked;
   } else if (props.defaultChecked != null) {
@@ -2960,7 +2975,7 @@ function mountCheckedValue(node: HTMLInputElement, props: any) {
   }
 }
 
-function updateCheckedValue(node: HTMLInputElement, prevProps: any, nextProps: any) {
+function updateCheckedValue(node: HTMLInputElement, prevProps: CheckedProps, nextProps: CheckedProps) {
   // Faqat controlled (checked) tracked
   if (nextProps.checked != null && node.checked !== nextProps.checked) {
     node.checked = nextProps.checked;
@@ -2984,10 +2999,11 @@ Browser native — same `name` radio'lar exclusive (faqat bittasi checked). Reac
 ```ts
 input.indeterminate = true;
 // HTML attribute yo'q (`<input indeterminate>` invalid)
-// JSX'da `indeterminate` prop yo'q (React 18'gacha)
+// JSX'da `indeterminate` prop ham yo'q — React'ning hech bir versiyasida
+// `<input>` uchun maxsus indeterminate prop qo'shilmagan
 ```
 
-R18+'da ham — ref orqali set qilinadi. Yoki custom property:
+`indeterminate` har doim — DOM property orqali imperativ set qilinadi (JSX prop emas), shuning uchun ref kerak. Reusable komponent:
 
 ```tsx
 function CheckboxWithIndeterminate({ indeterminate, ...rest }: { indeterminate?: boolean }) {
@@ -3272,7 +3288,7 @@ function HybridConditional({ showAdvanced }: { showAdvanced: boolean }) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
-    const data: any = {
+    const data: Record<string, FormDataEntryValue | null> = {
       basic: formData.get('basic'),
     };
     
@@ -3383,7 +3399,8 @@ FormData browser native API. React'ning normal pattern'i — uncontrolled fields
 // Method 1: Ref
 const formRef = useRef<HTMLFormElement>(null);
 const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-  const formData = new FormData(formRef.current!);
+  if (!formRef.current) return;
+  const formData = new FormData(formRef.current);
 };
 
 // Method 2: currentTarget (afzal)
@@ -3397,22 +3414,24 @@ const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
 **R19 form action — internal FormData:**
 
 ```ts
-// react-dom internal
+// react-dom internal (soddalashtirilgan)
 function handleFormAction(form: HTMLFormElement, action: (fd: FormData) => unknown) {
   const formData = new FormData(form);
   // Inputs auto-collected
-  
+
   const result = action(formData);
+
   if (result instanceof Promise) {
-    // Pending state for useFormStatus
+    // Async action: pending state useFormStatus uchun, reset success'dan keyin
+    result.then(() => requestFormReset(form));
+  } else {
+    // Sync action: darhol reset
+    requestFormReset(form);
   }
-  
-  // Reset uncontrolled fields
-  form.reset();
 }
 ```
 
-R19 form action FormData avtomatik yig'adi va reset — uncontrolled fields uchun yaxshi pattern.
+`requestFormReset` — React uncontrolled field'larni `defaultValue`'ga qaytaradi. Controlled input'lar bunga ta'sir qilmaydi: React har render'da ularning `value` attribute'ini qayta o'rnatadi, shuning uchun ular eski display qiymatiga qaytmaydi (native `form.reset()` faqat `defaultValue`'ga revert qiladi, controlled input esa har commit'da `value`'ni qayta yozadi). Reset faqat action **muvaffaqiyatli tugagandan** keyin ishlaydi — async action'da Promise resolve bo'lgach.
 
 </details>
 
@@ -3628,7 +3647,7 @@ function CommonForm() {
     <form onSubmit={handleSubmit}>
       <Stack gap={8}>
         {/* Controlled — accountType UI conditional */}
-        <select value={accountType} onChange={(e) => setAccountType(e.target.value as any)}>
+        <select value={accountType} onChange={(e) => setAccountType(e.target.value as 'free' | 'pro')}>
           <option value="free">Free</option>
           <option value="pro">Pro</option>
         </select>
@@ -3678,40 +3697,42 @@ R18'da:
 - **Formik** — controlled-first, Redux-like state management
 - **TanStack Form** — modern, both pattern'larni qo'llab-quvvatlaydi
 
-Bu library'lar — kursdan tashqari (`/form-validation/` kursi).
+Bu library'lar — bu kursdan tashqari mavzu.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Performance benchmark — controlled vs uncontrolled:**
+**Performance taqqoslash — controlled vs uncontrolled:**
 
 ```
-Form: 20 input field, har biri 50 character text
-Controlled: 20 fields × 50 keystrokes = 1000 re-renders (har biri full tree)
-Uncontrolled: 0 re-renders (faqat submit)
+Form: 20 input field, har birida 50 ta belgi yoziladi
+Controlled: 20 field × 50 keystroke = 1000 ta state update → har biri render trigger
+Uncontrolled: keystroke'larda render yo'q (faqat submit)
 
-Controlled overhead:
-- Render Phase: Component tree iteration (~ms ranges)
+Controlled har keystroke'da:
+- Render Phase: komponent tree iteratsiyasi
 - Reconciliation diff
-- DOM updates
+- DOM update
 
-Uncontrolled overhead:
-- 0 (DOM native)
+Uncontrolled keystroke'da:
+- React ishi yo'q (DOM native)
 
-Submit time:
-- Controlled: state allaqachon to'plangan, instant
-- Uncontrolled: FormData iteration (~microseconds)
+Submit paytida:
+- Controlled: state allaqachon to'plangan, qo'shimcha o'qish yo'q
+- Uncontrolled: FormData bir marta input'larni iteratsiya qiladi
 ```
 
-Yirik form'larda — uncontrolled sezilarli tezroq. Lekin real-time UX cheklov.
+Yirik form'larda — uncontrolled keystroke render'larini umuman keltirib chiqarmagani uchun tezroq. Trade-off: real-time UX (validation, transform) qurbon bo'ladi.
 
 **`useReducer` — controlled bog'liq state'lar:**
 
 Ko'p bog'liq state — `useReducer` afzal:
 
 ```tsx
-type State = { name: string; email: string; ... };
+type State = { name: string; email: string };
 type Action = { type: 'SET_FIELD'; field: keyof State; value: string };
+
+const initialState: State = { name: '', email: '' };
 
 function reducer(state: State, action: Action): State {
   if (action.type === 'SET_FIELD') {
@@ -4284,7 +4305,7 @@ function SubmitButton() {
 }
 ```
 
-R19 `<form action>` — uncontrolled fields, FormData avtomatik. `useFormStatus` pending button. Action function resolve bo'lgandan keyin React `form.reset()` chaqiradi (uncontrolled fields bo'shatiladi).
+R19 `<form action>` — uncontrolled fields, FormData avtomatik. `useFormStatus` pending button. Action function muvaffaqiyatli resolve bo'lgandan keyin React uncontrolled field'larni `defaultValue`'ga qaytaradi (controlled state'ga ta'sir qilmaydi).
 
 </details>
 
@@ -4505,7 +4526,7 @@ Real-world `react-hook-form` library — uncontrolled-first variant (refs orqali
 **Form Inputs:**
 - **`<input>`/`<textarea>`/`<select>`** — `value`/`defaultValue` prop (React unifies HTML)
 - **`<input type="checkbox/radio">`** — `checked`/`defaultChecked` prop, `e.target.checked` (boolean)
-- **Multi-select** — array value
+- **Multi-select** — `multiple` + array value, `e.target.selectedOptions` orqali o'qiladi
 - **Number input** — string state ko'p case'larda afzal
 - **Indeterminate checkbox** — DOM property (ref orqali)
 
@@ -4519,8 +4540,6 @@ Real-world `react-hook-form` library — uncontrolled-first variant (refs orqali
 - **Real-time UX kerak** — controlled
 - **Yirik form / performance** — uncontrolled hybrid
 - **Library'lar** (react-hook-form, Formik, TanStack Form) — kursdan tashqari
-
-Keyingi bo'limda Hooks Fundamentals — Hooks rules (Rules of Hooks), Under the Hood (`memoizedState` linked list, dispatcher swap), va custom hooks pattern'lari yoritiladi. Bu — QISM 6 (Hooks Mastery) ning birinchi va eng muhim fayli.
 
 ---
 

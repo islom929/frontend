@@ -166,7 +166,7 @@ Bu method'lar Render Phase'da chaqirilgani uchun Concurrent rendering bilan mos 
 
 **2. Strict Mode 2x effect (R18+) — sync invariant'ini test qilish:**
 
-Strict Mode'da React har effect'ni mount, unmount, va yana mount qilib chaqiradi. Sabab: `Offscreen` komponentlar (kelajakdagi feature) yoki Fast Refresh holatlarida effect remount bo'lishi mumkin. Agar effect "lifecycle" mental model'da yozilgan bo'lsa, remount uni buzadi. Sync mental model'da effect cleanup to'liq bo'lishi shart, demak remount muammosiz o'tadi.
+Strict Mode'da React har effect'ni mount, unmount, va yana mount qilib chaqiradi. Sabab: `Activity` (avval `Offscreen`) komponentlar (kelajakdagi feature) yoki Fast Refresh holatlarida effect remount bo'lishi mumkin. Agar effect "lifecycle" mental model'da yozilgan bo'lsa, remount uni buzadi. Sync mental model'da effect cleanup to'liq bo'lishi shart, demak remount muammosiz o'tadi.
 
 **3. Effect — render natijasi:**
 
@@ -176,7 +176,7 @@ React'ning fundamental modeli: UI = `f(state)`. Effect ham shu funksiyaning bir 
 
 Dan Abramov'ning "A Complete Guide to useEffect" (2019, overreacted.io) postida bu fikr aniq aytilgan: *"useEffect is closer to data flow than to lifecycle."* React official docs'ning "Synchronizing with Effects" (2023) sahifasi shu fikrni rasmiylashtiradi.
 
-Bu fikr falsafa emas — texnik zaruriyat. Concurrent rendering, Strict Mode 2x effect, future Offscreen API — barchasi sync invariant'ini taxmin qiladi.
+Bu fikr falsafa emas — texnik zaruriyat. Concurrent rendering, Strict Mode 2x effect, kelajakdagi `Activity` (avval `Offscreen`) API — barchasi sync invariant'ini taxmin qiladi.
 
 </details>
 
@@ -351,7 +351,7 @@ Hamma side effect'lar uchun `useEffect` zaruriy emas — React boshqa mexanizmla
 2. **Strict Mode** — Development'da render 2x chaqiriladi (R16.3+) test uchun
 3. **Memoization** — `React.memo`, `useMemo` purity'ga tayanadi
 4. **DevTools Profiler** — render hisoblash uchun
-5. **Server Components** — render server'da, side effect'lar mumkin emas (ba'zi cheklov bilan)
+5. **Server Components** — render server'da bo'ladi; `useEffect` umuman ishlamaydi (effect faqat client'da chaqiriladi), DOM/browser API yo'q. Server'da `async/await` bilan to'g'ridan-to'g'ri data fetch qilinadi — `useEffect`'siz
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -860,9 +860,9 @@ useEffect(() => {
 
 Lekin tashqi resurs yaratilganda cleanup **shart**. Yo'qsa memory leak, double subscription, ghost listener'lar paydo bo'ladi.
 
-**Idempotent cleanup:**
+**Symmetric (idempotent) cleanup:**
 
-Cleanup function bir necha marta chaqirilmaslik kerak. Lekin Strict Mode'da R18+ effect cycle (mount→unmount→mount) cleanup'ni 1 marta, keyin setup, keyin yana cleanup oxirida — chaqiradi. Cleanup idempotent bo'lishi uchun:
+Cleanup setup'ni to'liq teskari qilishi shart: setup nima yaratgan bo'lsa, cleanup aynan o'shani bekor qiladi. Bu xususiyat zaruriy, chunki React effect'ni bir necha marta setup → cleanup → setup qilishi mumkin. Strict Mode'da R18+ effect cycle aynan shuni keltirib chiqaradi: mount paytida setup, so'ng cleanup, so'ng yana setup. Agar cleanup setup'ni to'liq kompensatsiya qilsa, bu cycle tashqi tizimni buzmaydi:
 
 ```tsx
 let count = 0;
@@ -1118,7 +1118,7 @@ function ChatConnection({ roomId }: { roomId: string }) {
 
 - DOM yangilangan
 - Foydalanuvchi yangi UI'ni ko'rgan
-- Endi (asynxron tarzda) effect ishlaydi
+- Endi (asinxron tarzda) effect ishlaydi
 
 Bu paint'ni bloklamaslik uchun. Agar effect og'ir bo'lsa (network so'rov, hisoblash), foydalanuvchi UI'ni darrov ko'radi, og'ir ish background'da ketadi.
 
@@ -1146,7 +1146,7 @@ Commit Phase tartib:
 
 **Scheduling — MessageChannel:**
 
-Passive effect'lar `MessageChannel` orqali keyingi task'ga rejalashtiriladi. Bu — paint dan keyin, lekin tezroq mumkin. `setTimeout(fn, 0)` ham ishlatilmaydi (4ms minimum delay), `requestIdleCallback` ham ishlatilmaydi (Safari'da yo'q).
+Passive effect'lar `MessageChannel` orqali keyingi task'ga rejalashtiriladi. Bu — paint dan keyin, lekin tezroq mumkin. `setTimeout(fn, 0)` ishlatilmaydi (nested timer'lar uchun HTML spec'dagi 4ms minimum clamp bor), `requestIdleCallback` ham ishlatilmaydi (juda kam va kechikib chaqiriladi — idle vaqt bo'lmasa starve bo'lishi mumkin).
 
 ```
 Browser paint
@@ -1247,7 +1247,7 @@ function schedulePerformWorkUntilDeadline() {
 }
 ```
 
-`MessageChannel` — `setTimeout(fn, 0)`'dan tezroq (4ms minimum delay yo'q) va `requestIdleCallback`'dan ko'ra cross-browser (Safari support).
+`MessageChannel` — `setTimeout(fn, 0)`'dan tezroq (nested timer 4ms clamp yo'q) va `requestIdleCallback`'dan ishonchli (rIC idle vaqt bo'lmasa kechikadi yoki umuman chaqirilmaydi).
 
 **HookPassive flag:**
 
@@ -1348,8 +1348,9 @@ function UserCard({ userId }: { userId: string }) {
 }
 
 // Visible: avval "Loading..." ko'rinadi (paint), keyin user ma'lumoti (yangi paint)
-// useLayoutEffect bo'lsa — "Loading..." ko'rinmasdan, faqat user ma'lumoti
-// Lekin loading state UX uchun yaxshi — useEffect to'g'ri
+// useLayoutEffect bu yerda foyda bermaydi: fetch baribir asinxron — javob
+// paint dan keyin keladi, "Loading..." baribir ko'rinadi. Faqat effect chaqiruvini
+// paint dan oldinga suradi, lekin network javobini emas. Network uchun useEffect to'g'ri
 ```
 
 </details>
@@ -1423,7 +1424,7 @@ function Component() {
 // Effect 3
 ```
 
-Cleanup esa **reverse order** (ohirgisidan birinchisigacha)? Aslida React source code'ga ko'ra, hookchain'da effect'lar circular linked list'da. Cleanup ham declaration order'da (bir xil `next` pointer iteratsiyasi). Bu ba'zi developer'lar uchun kutilmagan — boshqa kontekstlarda (e.g., Python `__del__`) cleanup reverse order'da bo'ladi.
+Cleanup ham **declaration order'da** ishlaydi — reverse order'da emas. Bir component'ning effect'lari fiber'ning `updateQueue`'sida circular singly-linked list sifatida saqlanadi, `next` pointer declaration tartibida ulanadi. React commit paytida ro'yxatni birinchi effect'dan `next` bo'ylab yuradi — ham setup, ham cleanup uchun bir xil yo'nalish. Demak Effect 3'ning cleanup'i Effect 1'nikidan keyin chaqiriladi, teskari emas.
 
 **Concurrent Mode va effect tartibi:**
 
@@ -2102,7 +2103,8 @@ useEffect(async () => {
 }, []);
 
 // Sabab: useEffect callback void yoki cleanup function qaytarishi kerak
-// Async function Promise qaytaradi — React buni cleanup deb tushunadi → bug
+// Async function Promise qaytaradi — Promise function emas, React typeof === 'function'
+// tekshiruvidan o'tmaydi → cleanup umuman ishlamaydi (race condition oldini olib bo'lmaydi)
 
 // ✅ TO'G'RI — async function ichida e'lon qilinadi
 useEffect(() => {
@@ -2136,7 +2138,7 @@ class AbortSignal {
 }
 ```
 
-`fetch` API standart `signal` qabul qiladi. Boshqa API'lar (axios, custom) `signal` ni o'z implementatsiyasida tekshirishi kerak.
+`fetch` API standart `signal` qabul qiladi. Boshqa API'lar (axios, custom) `signal`'ni o'z implementation'ida tekshirishi kerak.
 
 **Browser support:** Chrome 66+, Firefox 57+, Safari 11.1+, Node.js 15+. Bugungi kunda universal.
 
@@ -2305,7 +2307,8 @@ useEffect(async () => {
 // Bu kodda React quyidagi muammolar:
 // 1. Callback Promise qaytaradi
 // 2. React Promise'ni cleanup deb tushunmaydi (Promise function emas) — cleanup ishlamaydi
-// 3. Dev mode'da React rasmiy warning beradi: "Effect callbacks are synchronous..."
+// 3. Dev mode'da React warning beradi: "useEffect must not return anything besides
+//    a function, which is used for clean-up. ... you returned a Promise"
 // 4. TypeScript signature `() => void | (() => void)` async function'ni rad etadi
 // 5. Race condition (cleanup yo'q) — eski response yangini bosib ketadi
 
@@ -2508,23 +2511,38 @@ useEffect(() => {
 
 ```ts
 // React internal (soddalashtirilgan):
-function dispatchSetState(fiber: Fiber, queue: Queue, action: any) {
-  const update = { action, lane: ..., next: null };
-  enqueueUpdate(queue, update);
-  scheduleUpdate(fiber);
+// Update'lar queue.pending'da circular singly-linked list sifatida turadi:
+// pending — oxirgi update, pending.next — birinchi update.
+type Update = { action: unknown; lane: Lane; next: Update };
+
+function dispatchSetState(fiber: Fiber, queue: UpdateQueue, action: unknown) {
+  const update = { action, lane: requestUpdateLane(fiber) } as Update;
+  const pending = queue.pending;
+  if (pending === null) {
+    update.next = update;  // O'z-o'ziga ulanadi (circular)
+  } else {
+    update.next = pending.next;  // Birinchiga ulanadi
+    pending.next = update;
+  }
+  queue.pending = update;  // Yangi oxirgi
+  scheduleUpdateOnFiber(fiber);
 }
 
-// Render paytida:
-function processUpdateQueue(queue: Queue, prevState: any): any {
+// Render paytida (updateReducer ichida):
+function processQueue(queue: UpdateQueue, prevState: any): any {
   let state = prevState;
-  let update = queue.first;
-  while (update !== null) {
-    if (typeof update.action === 'function') {
-      state = update.action(state);  // Functional update — joriy state
-    } else {
-      state = update.action;          // Direct update
-    }
-    update = update.next;
+  const pending = queue.pending;
+  if (pending !== null) {
+    const first = pending.next;  // Circular ro'yxatning birinchisi
+    let update = first;
+    do {
+      if (typeof update.action === 'function') {
+        state = update.action(state);  // Functional update — joriy state
+      } else {
+        state = update.action;          // Direct update
+      }
+      update = update.next;
+    } while (update !== first);  // To'liq aylanib chiqilgach to'xtaydi
   }
   return state;
 }
@@ -2543,7 +2561,7 @@ Functional update closure'ga bog'liq emas — har doim joriy state'ni ishlatadi.
    - Non-reactive: module-level, ref.current, setter funksiyalar
 4. Reactive identifier'larni deps bilan solishtirish
 
-Ba'zi false-positive bor (e.g., setter functions deps'da kerak emas, lekin linter ba'zan warning beradi). Lekin umuman warning'larni jiddiy qabul qilish kerak.
+Linter `useState`/`useReducer` setter'larini stable deb biladi va ularni deps talab qilmaydi (setter identity re-render'da o'zgarmaydi). Ba'zi murakkab holatlarda (masalan, ref orqali uzatilgan callback) linter chegaraviy noaniqlik ko'rsatishi mumkin, lekin umuman warning'larni jiddiy qabul qilish kerak.
 
 **Source citation:**
 
@@ -3031,10 +3049,10 @@ function Parent() {
 function IdentityTest() {
   const [count, setCount] = useState(0);
   
-  // Har render'da yangi
+  // Render orasida bir xil reference saqlanadi
   const a = useRef({ value: 1 });
   
-  // Re-render — yangi object?
+  // Har render'da yangi object literal
   const b = { value: count };
   
   useEffect(() => {
@@ -3133,7 +3151,7 @@ function Component() {
 
 R18 dan kelajakdagi feature'lar uchun React effect remount'ni qo'llab-quvvatlashi kerak:
 
-1. **Offscreen API** — komponent vaqtinchalik ekrandan yashiriladi (state saqlanadi), keyin qaytadan ko'rsatiladi. Effect remount kerak.
+1. **Activity API** (avval `Offscreen` deb atalgan) — komponent vaqtinchalik ekrandan yashiriladi (state saqlanadi), keyin qaytadan ko'rsatiladi. Effect remount kerak.
 2. **Fast Refresh** — development'da hot reload paytida component state saqlanib, effect remount.
 3. **Error recovery** — error boundary error tutsa, component remount qilinishi mumkin.
 
@@ -3239,22 +3257,21 @@ if (__DEV__) {
 
 **Strict Mode invariants:**
 
-1. Function components ikki marta render
-2. Effect ikki marta cycle (R18+)
-3. State setter ikki marta chaqiriladi (R18+, lekin React deduplicate qiladi)
-4. Refs callback'lar ikki marta (R18+)
-5. Hooks (excluding state) ikki marta chaqiriladi
+1. Function component body ikki marta chaqiriladi (render purity test)
+2. Effect setup → cleanup → setup cycle (R18+)
+3. `useState`/`useMemo`/`useReducer`'ga uzatilgan initializer va updater funksiyalari ikki marta chaqiriladi (impurity'ni topish uchun; natija deduplicate qilinadi)
+4. Ref callback'lar setup → cleanup → setup cycle (R18+)
 
 Hammasi development'da bug'larni topish uchun. Production'da no-op.
 
-**`Offscreen` API (kelajakdagi):**
+**`Offscreen` API (kelajakdagi, hozir `<Activity>`):**
 
-R18 RFC'da `Offscreen` component qo'shildi (hali stable emas):
+R18 RFC'da `Offscreen` component sifatida taklif qilingan API keyinchalik `<Activity>` deb nomlandi (hali stable emas):
 
 ```tsx
-<Offscreen mode="hidden">
+<Activity mode="hidden">
   <ExpensiveComponent />
-</Offscreen>
+</Activity>
 
 // State saqlanadi, lekin DOM yo'q
 // Effect cleanup chaqiriladi (component "yashirildi")
@@ -3767,7 +3784,7 @@ Bu — `useEffect` + `useState` kombinatsiyasi'dan ko'ra Concurrent Mode'da xavf
 **Source citation:**
 
 - "You Might Not Need an Effect" — react.dev/learn/you-might-not-need-an-effect
-- `useSyncExternalStore` — facebook/react RFC #211
+- `useSyncExternalStore` — facebook/react `packages/react-reconciler/src/ReactFiberHooks.js`, React docs "useSyncExternalStore"
 
 </details>
 
@@ -3920,7 +3937,7 @@ function CartCount() {
 
 ### Gotcha 1 — Async function `useEffect` callback'ida TAQIQ
 
-`useEffect` callback `void` yoki cleanup function qaytarishi kerak. Async function har doim Promise qaytaradi — bu cleanup function emas, lekin React Promise'ni "cleanup" deb tushunmaydi (Promise function emas) → cleanup ishlamaydi va dev mode'da React warning beradi: *"Effect callbacks are synchronous to prevent race conditions. Put the async function inside."*
+`useEffect` callback `void` yoki cleanup function qaytarishi kerak. Async function har doim Promise qaytaradi — Promise function emas, shuning uchun React `typeof === 'function'` tekshiruvidan o'tmaydi va uni cleanup sifatida ishlatmaydi → cleanup umuman ishlamaydi. Dev mode'da React warning beradi: *"useEffect must not return anything besides a function, which is used for clean-up. ... you returned a Promise. Instead, write the async function inside your effect and call it immediately."*
 
 ```tsx
 // ❌ Bug — async callback Promise qaytaradi (cleanup yo'q)
@@ -3948,7 +3965,7 @@ R16-R17'da component unmount bo'lganidan keyin `setState` chaqirilsa, "Can't per
 ```tsx
 useEffect(() => {
   fetchData().then(data => {
-    setData(data);  // R16'da unmount keyin warning, R17+ no-op
+    setData(data);  // R16-17'da unmount keyin warning, R18+ warning yo'q
   });
 }, []);
 ```

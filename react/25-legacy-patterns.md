@@ -32,7 +32,7 @@
 
 R16.8 (2019-yil fevral) Hooks chiqquncha React'da **logic reuse** muammosi murakkab edi. Class komponentlarda `this`, lifecycle methods, va state — barcha logic class ichida. Bir xil logic'ni ikki komponentda ishlatish uchun yechimlar:
 
-1. **Mixins** (R0.13'gacha) — `React.createClass({mixins: [...]})`. Deprecated R0.13'da: name collision, dependency unclear.
+1. **Mixins** — `React.createClass({mixins: [...]})`. `createClass` R15.5'da (2017-aprel) deprecated, R16'da to'liq olib tashlandi (`create-react-class` package'ga ko'chirildi). Muammolar: name collision, dependency unclear.
 2. **Higher-Order Components (HOC)** — `withAuth(Component)` wrapper pattern (R0.14+).
 3. **Render Props** — function-as-children yoki `render` prop (R16+).
 
@@ -40,16 +40,16 @@ R16.8'da **Hooks** kiritildi va aksariyat use case'larda HOC va Render Props o'r
 
 | Pattern | Vaqt | Maqsad | Hozirgi holat |
 |---------|------|--------|---------------|
-| Mixins | R0.13- | Logic reuse | ❌ Deprecated R0.13 |
+| Mixins | createClass | Logic reuse | ❌ Deprecated R15.5, removed R16 |
 | HOC | R0.14+ | Logic reuse, props injection | ⚠️ Legacy, kam ishlatiladi |
 | Render Props | R16+ | Logic reuse, ergonomic | ⚠️ Niche use case'larda |
 | Hooks | R16.8+ | Logic reuse, modern standart | ✅ Default tanlov |
 | Custom Hooks | R16.8+ | Hook'lardan composition | ✅ Tavsiya etiladi |
 
 > **Versiya evolyutsiyasi (Logic Reuse Pattern'lar):**
-> - **R0.13 (2015) va eski:** `Mixins` — `React.createClass`. Deprecated R0.13'da.
+> - **R0.13 (2015) — R15:** `Mixins` — `React.createClass`. R15.5'da (2017-aprel) `createClass` deprecated, R16'da olib tashlandi.
 > - **R0.14 — R16.7 (2015-2018):** HOC dominant pattern. Redux `connect`, React Router `withRouter`, Material UI `withStyles`.
-> - **R16+ (2017):** Render Props paydo bo'ldi (Michael Jackson'ning React Router v4'da introduced). HOC alternativa, deyarli teng.
+> - **R16+ (2017):** Render Props keng tarqaldi (React Router v4 va Michael Jackson'ning ishlari orqali popularized). HOC alternativa, deyarli teng.
 > - **R16.8 (2019):** Hooks. HOC va Render Props'ning aksariyat use case'lari hooks bilan almashtiriladi.
 > - **R19 (2024+):** Hooks va custom hooks — default standart. Legacy pattern'lar maxsus holatlarda.
 
@@ -95,32 +95,28 @@ Hooks (R16.8+):
   ✅ Linear, debugging oson, performance optimized
 ```
 
-`React.createClass` Mixins source code (R0.13 minimal):
+`React.createClass` mixin'larni `mixSpecIntoComponent` orqali spec'ga qo'shgan. Mexanizmi oddiy `Object.assign` emas edi: lifecycle method'lar (`componentDidMount` va h.k.) bir-birining ustiga yozilmasdan **avtomatik zanjirlanardi** (hammasi navbat bilan chaqirilardi), lekin ikki mixin bir xil **oddiy** (non-lifecycle) method nomini bersa — `createClass` invariant error tashlardi (silent override emas). Asosiy muammo shu edi: mixin qaysi method/state'ni qo'shishi spec'dan ko'rinmas, dependency yashirin, va konflikt faqat runtime'da aniqlanardi.
 
 ```javascript
-// React 0.13 source (simplified)
-React.createClass = function(spec) {
-  if (spec.mixins) {
-    spec.mixins.forEach(mixin => {
-      Object.assign(spec, mixin);  // ❌ override silent
-    });
-  }
-  // ... class creation
-};
+// Konflikt xulqi (model — haqiqiy kod mixSpecIntoComponent'da)
+// Mixin A: { fetchData() {...} }
+// Mixin B: { fetchData() {...} }
+// createClass({ mixins: [A, B] })
+//   → Invariant: "fetchData defined more than once" (throw, silent emas)
 ```
 
-R16.8+ Hooks o'rniga `React.createClass` ham removed bo'ldi (`create-react-class` package'ga ko'chirildi).
+`React.createClass` R15.5'da deprecated, R16'da React core'dan olib tashlandi (`create-react-class` package'ga ko'chirildi).
 
 Pattern'lar evolution timeline:
 
 ```
 2013: React.createClass + Mixins
 2015 (R0.14): React.Component class API
-2016 (R15): Mixins fully deprecated
-2017 (R16): Render Props popularized
+2017 (R15.5): createClass + Mixins deprecated (create-react-class package'ga)
+2017 (R16): createClass + Mixins core'dan olib tashlandi; Render Props popularized
 2019 (R16.8): Hooks
-2024 (R19): Stable release — ref oddiy prop, Server Actions, async transitions
-2025-aprel (R19.1): React Compiler 1.0 stable (R17/18/19 mos, opt-in Babel plugin)
+2024-dekabr (R19): Stable release — ref oddiy prop, Server Actions, async transitions
+2025-oktyabr (React Compiler 1.0): stable (R17/18/19 mos, opt-in Babel plugin)
 ```
 
 </details>
@@ -590,7 +586,7 @@ Ikkalasi **functional teng** — faqat syntactic farq. Children-as-function aksa
 
 - **JSX-native** — children pattern React'da standart (har komponent children oladi).
 - **Visual hierarchy** — JSX nesting parent-child munosabatini ko'rsatadi.
-- **Multiple children** ham ishlatilsa — ko'p function'lar `<Provider>`'da `<Provider header={...} body={...} footer={...}>` namunasi.
+- **Bitta render slot** — bitta function bilan ishlaganda children eng tabiiy: `<Provider>{(state) => ...}</Provider>`.
 
 `render` prop afzal vaziyatlar:
 
@@ -663,7 +659,7 @@ Bu pattern **flexibility** beradi, lekin **complexity** ham qo'shadi. Library'la
 JSX children turini aniqlash:
 
 ```tsx
-function getChildrenType(children: any): 'function' | 'array' | 'element' | 'string' | 'null' {
+function getChildrenType(children: unknown): 'function' | 'array' | 'element' | 'string' | 'null' {
   if (children == null) return 'null';
   if (typeof children === 'function') return 'function';
   if (Array.isArray(children)) return 'array';
@@ -846,13 +842,15 @@ QANDAY ISHLAYDI: Render Props ko'pincha **Provider pattern**ga aylanadi — komp
 ```tsx
 <Provider>
   {(state) => (
-    <Consumer1 state={state} />
-    <Consumer2 state={state} />
+    <>
+      <Consumer1 state={state} />
+      <Consumer2 state={state} />
+    </>
   )}
 </Provider>
 ```
 
-Bu pattern Context API alternativi sifatida ishlatilgan (R16'gacha `React.createContext` minimal API edi). Hozir Context + hooks bilan tabiiy.
+Bu pattern Context API alternativi sifatida ishlatilgan (`React.createContext` faqat R16.3'da chiqdi; undan oldin legacy context API beqaror va discouraged edi). Hozir Context + hooks bilan tabiiy.
 
 NIMA UCHUN bu real misollar muhim: legacy codebase'larda bu pattern'larni o'qib, hooks bilan refactor qilish ko'nikmasi kerak.
 
@@ -1368,17 +1366,20 @@ type RenderProp<T> =
   | { children: (state: T) => React.ReactElement; render?: never };
 
 type ProviderProps<T> = RenderProp<T> & {
-  initial?: T;
+  initial: T;
 };
 
 class Provider<T> extends React.Component<ProviderProps<T>, { value: T }> {
-  state = { value: this.props.initial as T };
+  constructor(props: ProviderProps<T>) {
+    super(props);
+    this.state = { value: props.initial };
+  }
   
   render() {
     if (this.props.render) {
       return this.props.render(this.state.value);
     }
-    return this.props.children!(this.state.value);
+    return this.props.children(this.state.value);
   }
 }
 
@@ -1746,9 +1747,9 @@ Type identity Object reference comparison (`===`). HOC har chaqiruvda yangi func
 // Simplified (hoist-non-react-statics v3 manbasiga asosan)
 // REACT_STATICS — React'ning class komponent maxsus property'lari (skip):
 const REACT_STATICS = [
-  'childContextTypes', 'contextTypes', 'defaultProps', 'displayName',
-  'getDefaultProps', 'getDerivedStateFromError', 'getDerivedStateFromProps',
-  'mixins', 'propTypes', 'type',
+  'childContextTypes', 'contextType', 'contextTypes', 'defaultProps',
+  'displayName', 'getDefaultProps', 'getDerivedStateFromError',
+  'getDerivedStateFromProps', 'mixins', 'propTypes', 'type',
 ];
 
 // KNOWN_STATICS — JavaScript function/class built-in static'lar (skip):
@@ -1911,7 +1912,7 @@ QANDAY ISHLAYDI: har HOC original komponentni wrap qiladi va o'z mas'uliyatini b
 - **`withAuth`** — auth check, user injection.
 - **`withLoading`** — loading state UI.
 - **`withTheme`** — Context'dan theme inject.
-- **`withErrorBoundary`** — try/catch wrapper (hooks bilan amalga oshib bo'lmaydi, error boundary class shart, cross-ref [`27-error-boundaries.md`](27-error-boundaries.md)).
+- **`withErrorBoundary`** — error boundary'ni komponent atrofiga o'raydi. Error boundary `getDerivedStateFromError`/`componentDidCatch` lifecycle method'lariga tayanadi (try/catch emas — render fazasidagi xatoni React reconciler ushlab, shu method'larni chaqiradi). Hook-based error boundary yo'q, class shart (cross-ref [`27-error-boundaries.md`](27-error-boundaries.md)).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2039,17 +2040,13 @@ function withLoading<P>(Component: React.ComponentType<P>) {
 }
 
 // Usage
-const UserCardWithLoading = withLoading(UserCard);
+const UserCardWithLoading = withLoading<{ user: User }>(UserCard);
 
 function UserPage() {
   const { data: user, loading } = useFetch<User>('/api/user');
-  return (
-    <UserCardWithLoading 
-      isLoading={loading} 
-      loadingMessage="User yuklanmoqda..." 
-      user={user!} 
-    />
-  );
+  if (loading) return <Spinner />;
+  if (!user) return <ErrorMsg error={new Error('User topilmadi')} />;
+  return <UserCardWithLoading isLoading={false} user={user} />;
 }
 ```
 
@@ -2163,7 +2160,7 @@ Bu **"Wrapper Hell"** — komponent atrofida ko'p wrapping. DevTools'da:
 Muammolar:
 
 1. **Debug murakkab** — error stack trace 5+ wrapper orqali.
-2. **Props collision** — ikki HOC bir xil prop name ishlatsa, oxirgisi g'olib (silent override).
+2. **Props collision** — ikki HOC bir xil prop name inject qilsa, innermost (eng ichki) HOC'ning explicit prop'i g'olib, chunki u render path'da oxirgi yoziladi (silent override).
 3. **Performance** — har wrapper Fiber + render cycle.
 4. **TypeScript** — generic'lar zanjiri murakkab, infer qiyin.
 5. **Testing** — har test uchun barcha HOC mock kerak.
@@ -2244,12 +2241,12 @@ const ABCD = withD(ABC);           // 4 wrappers
 // 5 Fiber nodes vs hooks 1 Fiber node
 ```
 
-Performance overhead — 5 Fiber'lar har render'da reconcile'ga uchraydi. Hooks 1 Fiber + 5 hook slot. Reconciler effort'i deyarli teng (har element diff'i bir xil work), lekin memory:
+Performance overhead — 5 Fiber'lar har render'da reconcile'ga uchraydi. Hooks 1 Fiber + 4 hook slot. Reconciler effort'i deyarli teng (har element diff'i bir xil work), lekin memory:
 
 | Approach | Fiber count | Memory cost |
 |----------|-------------|-------------|
-| HOC chain (5) | 6 (wrappers + original) | 6 × Fiber object |
-| Hooks (5 hooks) | 1 (komponent) | 1 × Fiber + 5 × Hook slot |
+| HOC chain (4 HOC) | 5 (4 wrapper + original) | 5 × Fiber object |
+| Hooks (4 hook) | 1 (komponent) | 1 × Fiber + 4 × Hook slot |
 
 Hook slot Fiber object'dan kichikroq (faqat memoizedState + queue + next).
 
@@ -2265,13 +2262,14 @@ function withB<P>(Component: React.ComponentType<P & { value: string }>) {
 }
 
 const Enhanced = withB(withA(UserDashboard));
-//                       └─ value: 1 (number)
-//                  └─ value: "hello" (string) overrides 1
+// withB: A'ga value="hello" beradi
+// withA: o'ziga kelgan value="hello"'ni e'tiborsiz qoldiradi,
+//        UserDashboard'ga value={1} beradi (spread'dan keyin yozilgan)
 
-// Inside UserDashboard: value === "hello" (silent collision)
+// Inside UserDashboard: value === 1 (number) — innermost HOC g'olib
 ```
 
-TypeScript bu collision'ni catch qilmasligi mumkin — props spread'da type widening.
+Har JSX element ichida spread'dan keyingi explicit prop g'olib. HOC zanjirida innermost (eng ichki) HOC oxirgi render qiladi, shuning uchun uning explicit prop'i UserDashboard'ga yetadi. TypeScript bu collision'ni catch qilmasligi mumkin — props spread'da type kengaytiriladi.
 
 </details>
 
@@ -2310,7 +2308,7 @@ const UserPageEnhanced = enhance(UserPage);
 HOC vs Hooks comparison example:
 
 ```tsx
-// HOC approach (~20 lines wrapper boilerplate)
+// HOC approach — wrapper boilerplate + compose
 interface UserPageProps {
   user: User;
   theme: Theme;
@@ -2330,7 +2328,7 @@ const UserPageHOC = compose(
   withErrorBoundary
 )(UserPageBase);
 
-// Hooks approach (~10 lines, no wrappers)
+// Hooks approach — no wrappers, logic inline
 function UserPageHooks() {
   const user = useAuth();
   const theme = useTheme();
@@ -2477,8 +2475,9 @@ function withProps<TInjected>(getProps: () => TInjected) {
   };
 }
 
-// Usage
-const withCurrentUser = withProps(() => ({ user: useAuth() }));
+// Usage — inject `use*` nomi bilan (hook Wrapped render'ida chaqiriladi)
+const useCurrentUserProps = () => ({ user: useAuth() });
+const withCurrentUser = withProps(useCurrentUserProps);
 const ProtectedPage = withCurrentUser(ProfilePage);
 ```
 
@@ -2510,7 +2509,7 @@ Inference works because:
 
 Generic constraint `P extends { user: User }` — original component **must** have `user: User` prop. Aks holda compile error.
 
-`React.ComponentType<P>` = `React.ClassComponent<P> | React.FunctionComponent<P>` — har ikkala turdagi komponent.
+`React.ComponentType<P>` = `React.ComponentClass<P> | React.FunctionComponent<P>` — har ikkala turdagi komponent.
 
 R19 ref forwarding TypeScript:
 
@@ -2572,15 +2571,16 @@ function withInjectedProps<TInjected extends object>(
   };
 }
 
-// Usage
-const withTheme = withInjectedProps(() => ({
-  theme: useContext(ThemeContext),
-}));
+// Usage — inject function `use*` nomi bilan (rules-of-hooks: hook chaqiruvchi
+// function `use` prefiksiga ega bo'lishi kerak, u Wrapped render'ida ishlaydi)
+const useThemeProps = () => ({ theme: useContext(ThemeContext) });
+const withTheme = withInjectedProps(useThemeProps);
 
-const withAuth = withInjectedProps(() => {
+const useAuthProps = () => {
   const [user] = useUserStore();
   return { user };
-});
+};
+const withAuth = withInjectedProps(useAuthProps);
 
 // Compose
 interface ProfilePageProps {
@@ -2689,37 +2689,32 @@ Eski codebase migration?
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Memory va Fiber tree solishtirish:
+Memory va Fiber tree solishtirish (qiymatlar nisbiy — Fiber object aniq hajmi React versiyasiga bog'liq, doc'da fiksatsiyalanmagan):
 
 ```
 Component with useState (1 hook):
   Fiber: 1
   Hook slots: 1
-  Memory: ~200 bytes (Fiber + Hook)
 
 HOC wrap (1 wrapper, 1 useState inside):
   Fiber: 2 (wrapper + original)
-  Hook slots: 1 (in wrapper)
-  Memory: ~400 bytes (2 Fibers + Hook)
+  Hook slots: 1 (wrapper'da)
 
 Render Props provider (class with state):
   Fiber: 2 (provider + child)
-  Class instance: 1
-  Memory: ~500 bytes (2 Fibers + class instance)
+  Class instance: 1 (provider'ning instance'i)
 
 5 hooks in 1 component:
   Fiber: 1
   Hook slots: 5
-  Memory: ~600 bytes
 
-5 HOC chain:
-  Fiber: 6
-  Memory: ~1200 bytes
+4 HOC chain:
+  Fiber: 5 (4 wrapper + original)
 ```
 
-Memory'da hooks afzal. Performance jihatdan reconciliation cost har Fiber bo'yicha kichik (`O(1)` per Fiber match), lekin total work proportional Fiber count'ga.
+Memory hisobida hook'lar afzal: bitta Fiber + linked list hook slot, har slot Fiber object'dan kichik. HOC zanjiri har bosqichda alohida Fiber yaratadi. Performance jihatdan har Fiber'ni reconcile qilish ishi kichik va konstanta, lekin umumiy ish Fiber soniga proporsional.
 
-React Compiler (1.0 stable, R19.1+ bilan birga 2025-aprel'da chiqdi; R17/18/19 mos) — hooks code'ni statik analyze qiladi va auto-memoize qiladi (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). HOC va Render Props uchun Compiler optimization yo'q.
+React Compiler 1.0 stable 2025-oktyabr'da chiqdi (R17/18/19 mos, opt-in Babel plugin) — hook'lar code'ni statik analyze qilib auto-memoize qiladi (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). HOC va Render Props uchun Compiler bunday memoization bermaydi.
 
 </details>
 
@@ -3093,7 +3088,7 @@ const EnhancedLegacy = withX(LegacyComponent);
 
 **2. Error Boundaries:**
 
-`getDerivedStateFromError`/`componentDidCatch` faqat class komponentda. Error boundary'ni hooks bilan to'liq amalga oshirib bo'lmaydi (R19'gacha).
+`getDerivedStateFromError`/`componentDidCatch` faqat class komponentda. Error boundary'ni hook bilan amalga oshirib bo'lmaydi — R19'da ham hook-based error boundary yo'q, class komponent (yoki `react-error-boundary`) shart. R19 `createRoot` `onCaughtError`/`onUncaughtError` callback'larini qo'shdi, lekin bular root-level callback, error boundary o'rnini bosmaydi.
 
 ```tsx
 class ErrorBoundary extends React.Component<{
@@ -3181,32 +3176,26 @@ NIMA UCHUN bu use case'lar muhim: hooks "everything" emas — pattern'lar trade-
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Class komponent + hooks limitation:
+Class komponent + hooks limitation reconciler'da function va class komponent'lar uchun **alohida code path** orqali ishlaydi. Reconciler `Component.prototype.isReactComponent` flag'i bilan ikkalasini ajratadi:
+
+- **Function component** — `react-reconciler/src/ReactFiberHooks.js` ichidagi `renderWithHooks` chaqiriladi. Bu function hook dispatcher'ni o'rnatadi (mount yoki update variant), keyin komponent function'ni chaqiradi. Hook chaqiruvlari shu o'rnatilgan dispatcher orqali ishlaydi.
+- **Class component** — `ReactFiberClassComponent.js` ichida instance yaratiladi (`new Component(props)`) va `instance.render()` chaqiriladi. Bu path `renderWithHooks`'dan o'tmaydi, shuning uchun hook dispatcher o'rnatilmaydi.
 
 ```javascript
-// React internal
-function renderWithHooks(current, workInProgress, Component, props, ...) {
-  // Hooks dispatcher set
-  ReactCurrentDispatcher.current = HooksDispatcherOnMount;
-  
-  let children;
-  if (typeof Component === 'function' && !Component.prototype.isReactComponent) {
-    // Function component — hooks allowed
-    children = Component(props);
-  } else if (Component.prototype.isReactComponent) {
-    // Class component — hooks dispatcher disallows
-    ReactCurrentDispatcher.current = ContextOnlyDispatcher;
-    const instance = new Component(props);
-    children = instance.render();
-  }
-  
-  return children;
+// Reconciler darajasidagi sodda modeli (haqiqiy kod ikkala path alohida modulda)
+if (Component.prototype && Component.prototype.isReactComponent) {
+  // Class — ReactFiberClassComponent.js
+  const instance = new Component(props);
+  children = instance.render();
+} else {
+  // Function — ReactFiberHooks.js renderWithHooks
+  children = renderWithHooks(current, workInProgress, Component, props, ...);
 }
 ```
 
-Class komponent render paytida hook'lar `ContextOnlyDispatcher` (faqat `useContext` ruxsat etilgan, qolganlar throw).
+`ContextOnlyDispatcher` — function komponent **render'dan tashqarida** hook chaqirilsa o'rnatilgan default dispatcher: barcha public hook'lar (`useState`, `useEffect`, hatto `useContext` ham) `throwInvalidHookError` orqali throw qiladi. Faqat internal `readContext` va `use` real implementatsiyaga ulangan (`react-reconciler/src/ReactFiberHooks.js` — `ContextOnlyDispatcher` ob'ekti). U class komponentlar uchun maxsus emas; class komponent shunchaki hook dispatcher path'iga umuman kirmaydi. React 19'da dispatcher `ReactSharedInternals.H` orqali o'qiladi (eski nom `ReactCurrentDispatcher.current` edi).
 
-`Component.prototype.isReactComponent` — class komponent identifier (true if `extends React.Component`).
+`Component.prototype.isReactComponent` — class komponent identifier (`React.Component`'dan extend qilingan bo'lsa `true`).
 
 </details>
 
@@ -3257,9 +3246,9 @@ const ThemedLegacyChart = withTheme(LegacyChart);
 react-error-boundary integration:
 
 ```tsx
-import { ErrorBoundary } from 'react-error-boundary';
+import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 
-function ErrorFallback({ error, resetErrorBoundary }: any) {
+function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
   return (
     <div role="alert">
       <p>Xato yuz berdi:</p>
@@ -3292,7 +3281,10 @@ const SafeDashboard = withErrorBoundary(Dashboard, {
 R19 root error callbacks alternative (cross-ref [`27-error-boundaries.md`](27-error-boundaries.md)):
 
 ```tsx
-const root = createRoot(document.getElementById('root')!, {
+const container = document.getElementById('root');
+if (!container) throw new Error('Root element topilmadi');
+
+const root = createRoot(container, {
   onCaughtError: (error, errorInfo) => logError(error, errorInfo),
   onUncaughtError: (error, errorInfo) => reportToSentry(error, errorInfo),
   onRecoverableError: (error, errorInfo) => console.warn('Recoverable:', error),
@@ -3362,7 +3354,7 @@ Lekin amaliy farq kichik — chunki MouseProvider o'zi re-render bo'ladi mouse c
 
 ### Gotcha 3: HOC props collision
 
-Ikki HOC bir xil prop nom ishlatsa — silent override (oxirgisi g'olib).
+Ikki HOC bir xil prop nom ishlatsa — silent override (innermost HOC'ning explicit prop'i g'olib, chunki render path'da oxirgi yoziladi).
 
 ```tsx
 function withCounter<P>(Component: React.ComponentType<P & { count: number }>) {
@@ -3374,7 +3366,10 @@ function withTheme<P>(Component: React.ComponentType<P & { count: number }>) {
 }
 
 const Enhanced = withTheme(withCounter(UserDashboard));
-// Inside UserDashboard: count === 42 (not 1) — collision
+// withTheme (outer): withCounter-wrapper'ga count={42} beradi
+// withCounter (inner): o'ziga kelgan count={42}'ni e'tiborsiz qoldirib
+//                      UserDashboard'ga count={1} beradi (spread'dan keyin)
+// Inside UserDashboard: count === 1 (not 42) — innermost g'olib
 ```
 
 Yechim — naming convention (prefix HOC nomi):
@@ -3927,10 +3922,14 @@ export function withInjectedProps<TInjected extends object>(
   };
 }
 
-// Usage — har hook'dan HOC yaratish
-const withCurrentUser = withInjectedProps(() => ({ user: useCurrentUser() }));
-const withTheme = withInjectedProps(() => ({ theme: useTheme() }));
-const withRouter = withInjectedProps(() => ({ navigate: useNavigate() }));
+// Usage — har hook'dan HOC yaratish (inject function `use*` nomida)
+const useUserProps = () => ({ user: useCurrentUser() });
+const useThemeProps = () => ({ theme: useTheme() });
+const useRouterProps = () => ({ navigate: useNavigate() });
+
+const withCurrentUser = withInjectedProps(useUserProps);
+const withTheme = withInjectedProps(useThemeProps);
+const withRouter = withInjectedProps(useRouterProps);
 
 interface DashboardProps {
   pageId: string;        // caller
@@ -3992,7 +3991,7 @@ Har ikkalasi ishlaydi, lekin hooks variant — kamroq boilerplate, debug oson.
 
 Render Props va Higher-Order Components — Hooks oldidan dominant logic reuse pattern'lari. Hozir aksariyat use case'larda hooks afzal, lekin bu pattern'lar legacy codebase'larda mavjud va ba'zi vaziyatlarda hali kerak. Asosiy fikrlar:
 
-- **Pre-Hooks Era** — Mixins (R0.13'gacha, deprecated), HOC (R0.14+ dominant), Render Props (R16+ ergonomic). Hooks (R16.8) aksariyat use case'larni almashtirdi.
+- **Pre-Hooks Era** — Mixins (`React.createClass`, R15.5'da deprecated, R16'da olib tashlandi), HOC (R0.14+ dominant), Render Props (R16+ ergonomic). Hooks (R16.8) aksariyat use case'larni almashtirdi.
 - **Render Props** — komponent prop sifatida function qabul qiladi, render output'da chaqiradi. **Inversion of control** — komponent data, parent rendering. Ikki syntactic shakl: `render` prop vs Children-as-Function (functional teng, children-as-function aksariyat kontekstda preferable).
 - **Render Props Real-World** — DataFetcher, Toggle, FormField, GeolocationProvider, Subscription, Wizard. Library misollar (React Router v4, Apollo Client v2, Downshift, react-motion) — ko'pi hooks API'ga ko'chdi.
 - **Render Props TypeScript** — `React.ReactElement` (strict) vs `React.ReactNode` (loose), generic `<T>` provider, discriminated union state pattern (status-based narrowing), polymorphic XOR (`render` yoki `children`).
@@ -4006,11 +4005,10 @@ Render Props va Higher-Order Components — Hooks oldidan dominant logic reuse p
 - **Qachon Legacy Pattern'lar Hali Kerak** — class komponent integration, error boundaries (`getDerivedStateFromError`/`componentDidCatch` class shart), library author API, conditional logic JSX'da, backward compatibility.
 
 Versiya evolyutsiyasi:
-- R0.13: Mixins deprecated
-- R0.14 — R16.7: HOC dominant
+- R0.14 — R16.7: HOC dominant; Mixins (`createClass`) R15.5'da deprecated, R16'da olib tashlandi
 - R16+: Render Props popularized
 - R16.8: Hooks (logic reuse standart)
-- R19: ref oddiy prop (HOC `forwardRef` kerak emas)
+- R19 (2024-dekabr): ref oddiy prop (HOC `forwardRef` kerak emas)
 
 Cross-references:
 

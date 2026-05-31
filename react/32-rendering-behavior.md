@@ -273,7 +273,9 @@ function dispatchSetState(fiber, queue, action) {
 }
 ```
 
-Eager bailout — `useState` va `useReducer` ikkalasida ham mavjud (ikkala dispatcher — `dispatchSetState` va `dispatchReducerAction` — bir xil eager check ishlatadi: `queue.lastRenderedReducer` chaqiriladi va natija `Object.is` bilan `currentState` ga teng bo'lsa, render schedule qilinmaydi). Farq: `useState` `basicStateReducer` ishlatadi (action function yoki value), `useReducer` esa user-provided reducer'ni chaqiradi. Reducer logic-heavy bo'lsa, eager call CPU sarflaydi, lekin bailout natija saqlanadi.
+Dispatch-time eager bailout faqat `dispatchSetState`'da mavjud — `useState` setter shu funksiyaga bog'lanadi. `useReducer` dispatch (`dispatchReducerAction`) bu eager check'ni o'tkazmaydi: u update'ni queue'ga qo'yib, to'g'ridan-to'g'ri `scheduleUpdateOnFiber` chaqiradi. Sabab — `dispatchSetState` `basicStateReducer` (action function yoki value) ishlatadi va uni render'dan tashqari xavfsiz chaqira oladi; `useReducer` esa ixtiyoriy side-effect'li bo'lishi mumkin bo'lgan user-provided reducer'ni ishlatadi, shuning uchun uni dispatch paytida eager chaqirish o'tkazib yuboriladi.
+
+`useReducer` uchun "teng state → bailout" render Phase'da sodir bo'ladi: `updateReducer` yangi state'ni hisoblaganda, agar natija joriy state bilan `Object.is` true bo'lsa, fiber `didReceiveUpdate = false` bilan belgilanib, child re-render'lar bailout qilinadi. Ya'ni `useReducer`'da reducer baribir render paytida chaqiriladi, shunchaki dispatch paytidagi tezkor qisqartirish yo'q.
 
 </details>
 
@@ -609,7 +611,7 @@ function DashboardWithInlineChild(): ReactElement {
   );
 }
 
-// ✅ Composition: ExpensiveChild App'da yaratilgan, Counter'ga children sifatida uzatilgan
+// ✅ Composition: ExpensiveChild Counter'ning tashqarisida yaratilib, children sifatida uzatilgan
 function Counter({ children }: { children: ReactNode }): ReactElement {
   const [count, setCount] = useState(0);
   return (
@@ -623,7 +625,7 @@ function Counter({ children }: { children: ReactNode }): ReactElement {
 function DashboardWithComposition(): ReactElement {
   return (
     <Counter>
-      <ExpensiveChild /> {/* Parent (App) ichida yaratilgan */}
+      <ExpensiveChild /> {/* Element Counter'ning tashqarisida (DashboardWithComposition) yaratilgan */}
     </Counter>
   );
 }
@@ -632,7 +634,7 @@ function App(): ReactElement {
   return <DashboardWithComposition />;
 }
 // Counter state o'zgarsa — Counter re-render, lekin children ExpensiveChild
-// reference App ichida yaratilgan va bir xil — Reconciler bailout.
+// reference Counter'ning tashqarisida yaratilgan va o'zgarmaydi — Reconciler bailout.
 // ExpensiveChild renders: 1 (o'zgarmaydi).
 ```
 
@@ -800,7 +802,7 @@ function propagateContextChange(workInProgress, context, renderLanes) {
 
 Har consumer Fiber'ning `dependencies.firstContext` linked list'i bor — qaysi Context'larga subscribe qilingan. Provider value o'zgarsa, propagation algorithm subtree'ni traverse qilib, har subscriber'ga lane priority qo'shadi.
 
-`React.memo` bypass — chunki Reconciler avval **Context dep**'ni tekshiradi (`hasContextChanged()`), keyin shallow props comparison. Context o'zgargan bo'lsa, memo bailout skip qilinadi.
+`React.memo` bypass — chunki `propagateContextChange` consumer Fiber'ga **render lane** qo'shadi (`fiber.lanes = mergeLanes(...)`). `updateMemoComponent` shallow props comparison'ga o'tishdan oldin Fiber'da kutilayotgan ish borligini tekshiradi (`checkScheduledUpdateOrContext`); lane mavjud bo'lsa, shallow bailout o'tkazib yuboriladi va consumer re-render bo'ladi. Shu sababli props bir xil bo'lsa ham, Context o'zgargani memo'ni "yengadi".
 
 </details>
 
@@ -868,7 +870,7 @@ function LoginButton(): ReactElement {
     </button>
   );
 }
-// LoginButton dispatch context faqat'ga subscribe — user o'zgarsa LoginButton re-render bo'lmaydi.
+// LoginButton faqat dispatch context'ga subscribe — user o'zgarsa LoginButton re-render bo'lmaydi.
 // UserDisplay user context'ga subscribe — faqat user o'zgarsa re-render.
 ```
 
@@ -959,7 +961,7 @@ function useForceUpdate(): () => void {
 
 NIMA UCHUN ishlaydi:
 
-- `useReducer((x) => x + 1, 0)` — har dispatch'da yangi number, eager bailout false → render.
+- `useReducer((x) => x + 1, 0)` — har dispatch render'ni schedule qiladi; render Phase'da reducer yangi number qaytaradi va avvalgisi bilan teng chiqmaydi → render.
 - `useState({})` — `{}` har gal yangi reference, `Object.is({}, {})` false → render.
 
 QACHON force update kerak:
@@ -1003,24 +1005,24 @@ function useExternalCount(): number {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`useReducer({})` mexanizmi:
+`useReducer` increment mexanizmi (reducer render Phase'da chaqiriladi):
 
 ```javascript
 // reducer: (x) => x + 1
 // initial: 0
 
-// First dispatch:
+// First dispatch → render Phase (updateReducer):
 //   state = 0
 //   newState = reducer(0) = 1
-//   Object.is(0, 1) === false → render
+//   Object.is(0, 1) === false → didReceiveUpdate = true → render
 
-// Second dispatch:
+// Second dispatch → render Phase:
 //   state = 1
 //   newState = reducer(1) = 2
 //   Object.is(1, 2) === false → render
 ```
 
-Har dispatch'da yangi state — eager bailout o'tmaydi. Reconciler render schedule qiladi.
+`useReducer` dispatch'da eager bailout yo'q — har dispatch render'ni schedule qiladi. Reducer render Phase'da chaqirilib, natija avvalgi state bilan `Object.is` solishtiriladi; increment har gal yangi qiymat bergani uchun teng chiqmaydi va render bo'ladi.
 
 `useState({})`:
 
@@ -1119,9 +1121,10 @@ function NotificationListModern(): ReactElement {
     </ul>
   );
 }
-// Eslatma: getSnapshot har chaqiruvda bir xil reference qaytarishi shart.
+// Eslatma: getSnapshot ma'lumot o'zgarmaganda bir xil reference, o'zgarganda yangi
+// reference qaytarishi kerak (React natijani Object.is bilan solishtiradi).
 // globalNotifications.push() mutation reference'ni saqlaydi — Object.is true →
-// React tear detection bo'lmaydi. Yaxshiroq — immutable copy:
+// React update'ni sezmaydi. Yaxshiroq — immutable copy:
 
 function addNotificationImmutable(msg: string) {
   globalNotifications = [...globalNotifications, msg]; // Yangi reference
@@ -1174,8 +1177,8 @@ function ChartComponent({ store }: { store: ExternalStore }): ReactElement {
 
 Bailout 3 ta asosiy mexanizm orqali sodir bo'ladi (cross-ref `04-reconciliation.md`):
 
-1. **Eager bailout (dispatch vaqtida)** — `setState(sameValue)` chaqirilsa, `dispatchSetState`/`dispatchReducerAction` darhol `Object.is(eagerState, currentState)` tekshiradi va teng bo'lsa render schedule qilmaydi. Ikkala `useState` va `useReducer` da mavjud.
-2. **Reference bailout (`bailoutOnAlreadyFinishedWork`)** — render walk paytida `prevProps === nextProps && !hasContextChanged() && fiber.lanes === NoLanes` bo'lsa bailout. Default `FunctionComponent` Fiber'da kamdan-kam (parent re-render JSX yangi reference yaratadi), `MemoComponent`/`ForwardRef` Fiber'da `React.memo` shallow check muvaffaqiyatli bo'lsa sodir bo'ladi.
+1. **Eager bailout (dispatch vaqtida)** — `setState(sameValue)` chaqirilsa, `dispatchSetState` darhol `Object.is(eagerState, currentState)` tekshiradi va teng bo'lsa render schedule qilmaydi. Bu dispatch-time qisqartirish faqat `useState`'da mavjud; `useReducer` dispatch'ida (`dispatchReducerAction`) yo'q — `useReducer`'da "teng state → bailout" render Phase'da, `updateReducer` reducer'ni chaqirib natijani `Object.is` bilan solishtirgach sodir bo'ladi.
+2. **Reference bailout (`bailoutOnAlreadyFinishedWork`)** — render walk paytida `prevProps === nextProps && !hasContextChanged() && fiber.lanes === NoLanes` bo'lsa bailout. Default `FunctionComponent` Fiber'da kamdan-kam (parent re-render JSX yangi reference yaratadi); `SimpleMemoComponent`/`MemoComponent` Fiber'da (`React.memo` natijasi) shallow check muvaffaqiyatli bo'lsa sodir bo'ladi. `forwardRef` o'zi shallow comparison qilmaydi — bailout uchun `memo(forwardRef(...))` kerak.
 3. **Element identity bailout** — JSX element reference parent ichida saqlanib qolsa (`useMemo(() => <Child />, deps)` yoki composition orqali `children` prop sifatida uzatilsa), Reconciler `oldElement === newElement` ko'radi va shu subtree'ni qayta diff qilmaydi (faqat element identity bailout, props o'zgarmagani sababli).
 
 `useMemo`/`useCallback` o'zlari bailout emas — ular **stable reference berib bailout sodir bo'lishiga sharoit yaratadigan vositalar** (props/element reference bir xil bo'lishi uchun).
@@ -1724,7 +1727,7 @@ const Memoized = memo(function Memoized() {
 // Context value o'zgarsa — Memoized re-render bo'ladi (memo bypass).
 ```
 
-Bu memo'ning fundamental cheklov: Context dep memo'dan kuchliroq (cross-ref `32-rendering-behavior.md` Trigger 3).
+Bu memo'ning fundamental cheklovi: Context dep memo'dan kuchliroq (yuqoridagi Trigger 3 bo'limi).
 
 ### Scenario 3: Children Prop O'zgarishi
 
@@ -2021,7 +2024,7 @@ const a = { x: 1 };
 const b = { x: 1 };
 
 a === b;          // false — ikki alohida heap object
-Object.is(a, b);  // false — bir xil
+Object.is(a, b);  // false — reference farqli (shape bir xil bo'lsa ham)
 
 const c = a;
 c === a;          // true — bir xil reference
@@ -2139,7 +2142,7 @@ Variables:
    a === b → 0x100 === 0x200 → false
 ```
 
-`Object.is` — `===` ekvivalenti object'lar uchun (NaN va +0/-0 farqi primitive uchun, object reference uchun bir xil). React har joyda `Object.is` ishlatadi (Reconciler bailout, useState eager bailout, useMemo/useCallback deps).
+`Object.is` object'lar uchun `===` bilan bir xil ishlaydi (reference identity solishtiradi). Farq faqat primitive'larda: `Object.is(NaN, NaN)` true (lekin `NaN === NaN` false), `Object.is(+0, -0)` false (lekin `+0 === -0` true). React reference solishtirish kerak bo'lgan joylarda `Object.is` ishlatadi: `useState` eager bailout, `React.memo` shallow check, `useMemo`/`useCallback` deps. Reconciler'ning props bailout check'i esa `!==` reference inequality ishlatadi.
 
 JSX transform va React Element identity:
 
@@ -2151,21 +2154,19 @@ JSX transform va React Element identity:
 import { jsx as _jsx } from 'react/jsx-runtime';
 _jsx(Child, { value: 1 })
 
-// _jsx aslida React.createElement variant
+// _jsx React Element obyektini quradi (oddiylashtirilgan, R19)
 function jsx(type, props, key) {
   return {
-    $$typeof: Symbol.for('react.element'),
+    $$typeof: Symbol.for('react.transitional.element'),
     type,
-    props,
     key,
-    ref: null,
-    _owner: null,
+    props, // R19: ref props ichida (alohida element field emas)
   };
 }
 // Har chaqiriq yangi obyekt qaytaradi
 ```
 
-Har JSX expression React.createElement chaqiriqiga aylanadi va yangi obyekt qaytaradi. Shu sababdan inline JSX `<Child />` har render yangi reference.
+Har JSX expression `jsx()` (R17+ automatic runtime) yoki `React.createElement` chaqiriqiga aylanadi va yangi obyekt qaytaradi. Shu sababdan inline JSX `<Child />` har render yangi reference.
 
 </details>
 
@@ -2176,6 +2177,7 @@ Reference vs value comparison:
 
 ```tsx
 import { useEffect, useState } from 'react';
+import type { ReactElement } from 'react';
 
 function ReferenceDemo(): ReactElement {
   const [count, setCount] = useState(0);
@@ -2199,7 +2201,8 @@ function ReferenceDemo(): ReactElement {
 Stable reference patterns:
 
 ```tsx
-import { useMemo, useCallback, useRef } from 'react';
+import { useMemo, useCallback, useRef, useState } from 'react';
+import type { ReactElement } from 'react';
 
 // Pattern 1: useMemo for stable object
 function Pattern1(): ReactElement {
@@ -2345,7 +2348,7 @@ Type identity rules:
 - **String type (HTML element)** — `'div' === 'div'` (string equality).
 - **Function/Class component** — referential identity (`UserCard === UserCard`).
 - **`memo`-wrapped** — `MemoComponent` Fiber tag, internal `Component.type` reference.
-- **`forwardRef`-wrapped** (R18) — `ForwardRef` Fiber tag.
+- **`forwardRef`-wrapped** — `ForwardRef` Fiber tag (R19'da ref oddiy prop, lekin `forwardRef` hali ishlaydi).
 
 Anonymous nested komponent — anti-pattern:
 
@@ -2454,7 +2457,7 @@ function updateElement(returnFiber, current, element, lanes) {
 }
 ```
 
-`current.elementType === element.type` — bu `Object.is` semantics. Function reference identity.
+`current.elementType === element.type` — bu **`===` strict equality** (`Object.is` emas). Function/class komponent uchun referential identity, HTML element uchun string equality (`'div' === 'div'`).
 
 `useFiber` — Fiber'ning copy-on-write yangilash:
 
@@ -2578,7 +2581,8 @@ function App3(): ReactElement {
 Anonymous nested anti-pattern:
 
 ```tsx
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
+import type { ReactElement } from 'react';
 
 interface Item {
   id: string;
@@ -2725,7 +2729,7 @@ function SubmitForm() {
   async function handleSubmit() {
     await fetch('/api/save', { method: 'POST', body: JSON.stringify(data) });
     
-    // ❌ Stale: data fetch boshlangan vaqtdagi snapshot
+    // data — handler yaratilgan render'dagi snapshot (await'dan keyin ham o'sha).
     console.log('Saved:', data);
   }
   
@@ -2739,9 +2743,11 @@ function SubmitForm() {
     </form>
   );
 }
-// User type qilib turganda submit bosadi: fetch boshlangan vaqtdagi data ishlatiladi.
-// Lekin async context aslida OK chunki React event'ni user click vaqtidagi snapshot
-// bilan ishlatadi — yangi data fetch tugagandan keyin yo'q (event handler scope).
+// handleSubmit submit bosilgan render'dagi `data`'ni closure'da ushlaydi.
+// Agar user submit'dan keyin (await davom etayotganda) yana yozsa, yangi keystroke'lar
+// re-render qiladi va yangi `data` yaratadi — lekin ishlab turgan handleSubmit eski
+// snapshot'ni saqlaydi. Bu form submit uchun odatda kutilgan xulq (submit paytidagi
+// qiymat). Latest qiymat kerak bo'lsa — useRef latest pattern (Scenario 2 yechimi).
 ```
 
 ### Scenario 4: useReducer Closure
@@ -2886,6 +2892,7 @@ Re-render bilan stale closure interplay:
 
 ```tsx
 import { useState, useEffect } from 'react';
+import type { ReactElement } from 'react';
 
 interface Notification {
   id: string;
@@ -3113,8 +3120,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      // Production build'da profiling instrumentation'ni yoqadi.
       'react-dom$': 'react-dom/profiling',
-      'scheduler/tracing': 'scheduler/tracing-profiling',
     },
   },
 });
@@ -3331,8 +3338,8 @@ Hypothesis: SearchResults re-rendering on every keystroke
 
 Step 1: Highlight Updates ON
 - Type in search box
-- SearchResults: red rectangle (frequent)
-- ResultItem: yellow (Strict Mode)
+- SearchResults: red rectangle (frequent re-render)
+- ResultItem: yellow (parent triggered, o'rta frequency)
 
 Step 2: Profiler Record
 - Type 5 chars in search box
@@ -3401,7 +3408,7 @@ Bypass scenarios Compiler era:
 | Inline object prop | Compiler: avtomatik cache. Manual: `useMemo` kerak. |
 | Inline function prop | Compiler: avtomatik cache. Manual: `useCallback` kerak. |
 | Context dep | Compiler: hali ham bypass (semantic). Manual: bir xil. |
-| Children prop | Compiler: cache, lekin children o'zi yangi yangi reference bo'lsa — bypass. Manual: bir xil. |
+| Children prop | Compiler: cache, lekin children o'zi yangi reference bo'lsa — bypass. Manual: bir xil. |
 | Ref prop | Compiler: memo bypass. Manual: bir xil. |
 
 **Compiler'ning re-render impact** — production'da:
@@ -3594,15 +3601,16 @@ const [data] = useState(() => loadData());
 
 ### Gotcha 5: `Suspense` fallback re-render
 
-Suspense `fallback` ko'rsatilganda, primary children komponent'lari hali Fiber tree'da bor (R18+ "hidden mode") va effect'lar cleanup qilinadi:
+Suspense `fallback` ko'rsatilganda, primary children komponent'lari Fiber tree'dan o'chirilmaydi — ular hidden (offscreen) holatda saqlanadi (R18+). State saqlanadi, lekin effect'lar (layout va passive) vaqtincha cleanup qilinadi:
 
 ```tsx
 <Suspense fallback={<Loading />}>
   <DataView /> {/* Throw promise — fallback ko'rsatiladi */}
 </Suspense>
-// DataView Fiber saqlanadi (state preservation kelajakdagi mount uchun).
-// useEffect cleanup chaqiriladi (R18+).
-// Promise resolve bo'lsa — DataView qayta render bo'ladi, mount lifecycle qayta.
+// DataView Fiber tree'da qoladi (unmount emas) — Hook state (useState) saqlanadi.
+// useEffect/useLayoutEffect cleanup chaqiriladi (effect'lar vaqtincha uziladi, R18+).
+// Promise resolve bo'lsa — DataView qayta ko'rinadi, effect'lar qayta setup bo'ladi.
+// State o'zgarmaydi (to'liq remount emas — faqat effect lifecycle qayta tiklanadi).
 ```
 
 ---
@@ -4254,8 +4262,8 @@ Bu fayl re-render trigger'lar va debugging'ni practical perspective'dan o'rgandi
 
 - **Re-render** = komponent funksiyasi qayta chaqirilishi + Reconciler diff. **DOM update bilan teng emas** — bailout bo'lsa DOM mutation yo'q.
 - **4 ta asosiy trigger** — state change (setState/dispatch), parent re-render (top-down propagation, default), Context value change (har consumer mustaqil), force update (rare patterns).
-- **Top-down propagation** — parent re-render → children default re-render. To'xtatish: `React.memo`, children prop, `<Suspense>`, Compiler.
-- **Reconciler bailout** — re-render bo'lgan komponent'da DOM mutation yo'q (Reconciler element-by-element check). 4 turdagi (element identity, React.memo, useMemo/useCallback, eager bailout setState).
+- **Top-down propagation** — parent re-render → children default re-render. To'xtatish: `React.memo`, children prop / composition, `useMemo` bilan element cache, Compiler. (`<Suspense>` propagation'ni to'xtatmaydi — u loading/error state vositasi.)
+- **Reconciler bailout** — komponent funksiyasini umuman chaqirmaslik. 3 ta mexanizm: eager bailout (faqat `useState` dispatch'ida), reference bailout (`bailoutOnAlreadyFinishedWork` + `React.memo` shallow check), element identity bailout. `useMemo`/`useCallback` o'zi bailout emas — stable reference berib bailout sharoitini yaratadi.
 - **`React.memo`** — shallow props comparison, default `Object.is` per property. Custom comparator `(prev, next) => boolean`. Compiler era — ortiqcha lekin ishlaydi.
 - **5 ta `React.memo` bypass scenarios** — inline literals (object/array/function), Context dep (semantic), children prop (yangi React Element), spread props (har property check), ref prop (reference change).
 - **Reference equality gotchas** — JavaScript `===`/`Object.is` reference identity, JSX transform har gal yangi React Element. Stable references via `useMemo`/`useCallback`/module-level constants/Compiler.

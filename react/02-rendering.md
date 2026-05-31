@@ -100,7 +100,7 @@ Birinchi `root.render(<App />)` chaqirilganda:
 ```
 1. updateContainer(<App />, fiberRoot, ...)
    ↓
-2. requestUpdateLane() — priority hisoblanadi (initial render = SyncLane)
+2. requestUpdateLane() — priority hisoblanadi (createRoot initial render = DefaultLane; eski ReactDOM.render esa SyncLane ishlatardi)
    ↓
 3. createUpdate() — update obyekt yaratiladi
    ↓
@@ -359,19 +359,19 @@ Production'da:
 
 Bu cycle **faqat dev mode'da** va **faqat mount paytida**. Update yoki unmount holatlarida normal sikl ishlaydi.
 
-**Strict Mode'ning ichki implementation'i:**
+**Strict Mode'ning ichki implementation:**
 
 `<StrictMode>` Fiber'da `StrictLegacyMode | StrictEffectsMode` bayroqlari bilan belgilanadi. Reconciler render paytida Fiber'ning `mode` flag'ini tekshirib, ushbu Fiber subtree uchun double-invocation qoidalarini qo'llaydi.
 
 ```typescript
 // React internal (soddalashtirilgan — manba: react/packages/react-reconciler/src/ReactTypeOfMode.js)
-const NoMode = 0b000000;
-const ConcurrentMode = 0b000001;
-const ProfileMode = 0b000010;
-// DebugTracingMode (0b000100) — R18.3+'da olib tashlangan (kommentariyada qoldirilgan)
-const StrictLegacyMode = 0b001000;   // bit 3
-const StrictEffectsMode = 0b010000;  // bit 4
-const NoStrictPassiveEffectsMode = 0b100000;  // bit 5
+const NoMode = 0b0000000;
+const ConcurrentMode = 0b0000001;
+const ProfileMode = 0b0000010;
+const DebugTracingMode = 0b0000100;   // bit 2 — enableDebugTracing experimental flag uchun
+const StrictLegacyMode = 0b0001000;   // bit 3
+const StrictEffectsMode = 0b0010000;  // bit 4
+const NoStrictPassiveEffectsMode = 0b1000000;  // bit 6
 
 if (fiber.mode & StrictLegacyMode && __DEV__) {
   // Komponent funksiyasini ikki marta chaqirish
@@ -583,7 +583,7 @@ Initial render jarayoni:
    ↓
 8. Recursive ravishda har child uchun 4-7 qadamlar
    ↓
-9. completeWork() — har Fiber uchun host instance (DOM node) yaratiladi
+9. completeWork() — host fiber'lar uchun host instance (DOM node) yaratiladi
    - createInstance() — react-dom Host Config
    - properties set qilinadi (className, onClick, ...)
    ↓
@@ -613,13 +613,15 @@ Re-render jarayoni:
    ↓
 7. Yangi JSX qaytariladi
    ↓
-8. Reconciliation: yangi JSX vs eski Fiber children
+8. Reconciliation (beginWork ichida): yangi JSX vs eski Fiber children
    - Same type → update existing fiber
    - Different type → unmount old, mount new
    - Keyed list → match by key
+   - Placement/ChildDeletion flag'lari shu yerda o'rnatiladi
+     (placeChild yangi/ko'chgan child uchun, deleteChild esa parent'ga)
    ↓
-9. completeWork() — har Fiber uchun update flag o'rnatiladi
-   - Placement, Update, Deletion
+9. completeWork() — host fiber uchun Update flag o'rnatiladi (markUpdate),
+   agar props o'zgargan bo'lsa; subtreeFlags pastdan yuqoriga bubble qilinadi
    ↓
 10. Commit Phase
    - Mutation: faqat o'zgargan DOM operations
@@ -830,8 +832,9 @@ Lekin bu pattern kamdan-kam kerak — odatda derived state'ni hisob-kitob orqali
    ↓
 6. completeWork() — har Fiber uchun:
    - Host element bo'lsa (DOM node) — instance yaratish (yo'q bo'lsa)
-   - Properties prepare qilish (yangi vs eski props diff)
-   - Effect flag o'rnatish (Placement, Update, ...)
+   - Properties diff (yangi vs eski props), update payload tayyorlash
+   - Host'da props o'zgargan bo'lsa Update flag (markUpdate); subtreeFlags bubble
+   - (Placement/ChildDeletion flag'lari beginWork/reconciliation'da o'rnatilgan)
    ↓
 7. Yuqoriga qaytish (sibling yoki parent.return)
    ↓
@@ -894,7 +897,9 @@ Concurrent mode'da:
 1. Render boshlanadi → `fetch` chaqiriladi (request 1)
 2. High-priority update keladi → render uziladi
 3. Render qayta boshlanadi → `fetch` qayta chaqiriladi (request 2)
-4. Strict Mode'da har biri yana 2x → 4 ta network request
+4. Uzilish necha marta yuz bersa, request soni ham shuncha oshadi — son
+   oldindan aniqlanmaydi (concurrent restart soni o'zgaruvchan). Strict Mode dev'da
+   komponent body 2x chaqirilgani uchun request soni yana ko'payadi.
 
 ```tsx
 // ✅ To'g'ri pattern — useEffect (yoki R19 `use()` + Suspense)
@@ -913,7 +918,7 @@ function UserProfile({ userId }: { userId: string }) {
 
 **Reconciliation render phase ichida:**
 
-Render Phase'da **diffing** ishi ham bajariladi (Reconciler algoritmi). Lekin bu **DOM'ga tegmaydi** — faqat workInProgress Fiber tree'da `flags` (Placement, Update, Deletion) bayroqlari o'rnatiladi. Real DOM mutation Commit Phase'da bo'ladi.
+Render Phase'da **diffing** ishi ham bajariladi (Reconciler algoritmi). Lekin bu **DOM'ga tegmaydi** — faqat workInProgress Fiber tree'da `flags` (Placement, Update, ChildDeletion) bayroqlari o'rnatiladi. Real DOM mutation Commit Phase'da bo'ladi.
 
 Reconciliation algoritmi `04-reconciliation.md` da chuqur yoritiladi.
 
@@ -1093,7 +1098,7 @@ Bu sub-phase'da **real DOM o'zgaradi**:
 
 - `Placement` flag'li Fiber'lar uchun: yangi DOM element yaratiladi va parent'ga `appendChild` qilinadi
 - `Update` flag'li Fiber'lar uchun: properties yangilanadi (`element.className = newValue`)
-- `Deletion` flag'li Fiber'lar uchun: parent'dan `removeChild` qilinadi va cleanup'lar (effects) chaqiriladi
+- `ChildDeletion` flag'li parent'lar uchun: o'chiriladigan child'lar `deletions` ro'yxatidan olinib, `removeChild` qilinadi va cleanup'lar (effects) chaqiriladi
 - **Refs detach** — eski DOM node'lardan ref'lar yechiladi (`ref.current = null`)
 
 Bu phase'da DOM **inconsistent state'da** bo'ladi — ba'zi node'lar yangi, ba'zilari hali eski. Shuning uchun bu phase'da DOM'ni o'qish (masalan, `getBoundingClientRect`) **xatarli** — siz nimani o'qiyapsiz aniq emas.
@@ -1121,13 +1126,17 @@ Commit Phase to'liq pipeline:
 Render Phase tugadi → workInProgress tree tayyor
 
 ┌─────────────────────────────────────────┐
+│  0. commitRootImpl boshida               │
+│  - Oldingi commit'ning pending passive   │
+│    effect'lari flush qilinadi (agar      │
+│    bo'lsa) — flushPassiveEffects()       │
+│    sub-phase'lardan OLDIN, eng yuqorida  │
+└──────────────┬──────────────────────────┘
+               ↓
+┌─────────────────────────────────────────┐
 │  1. BEFORE MUTATION PHASE               │
 │  - commitBeforeMutationEffects()        │
 │  - getSnapshotBeforeUpdate (class)      │
-│  - Oldingi commit'ning pending passive  │
-│    effect'lari flush qilinadi (agar     │
-│    bo'lsa) — yangi commit boshlanishidan│
-│    oldin tozalanish kafolati uchun      │
 └──────────────┬──────────────────────────┘
                ↓
 ┌─────────────────────────────────────────┐
@@ -1135,7 +1144,7 @@ Render Phase tugadi → workInProgress tree tayyor
 │  - commitMutationEffects()              │
 │  - Placement: appendChild, insertBefore │
 │  - Update: setAttribute, textContent    │
-│  - Deletion: removeChild + cleanup      │
+│  - ChildDeletion: removeChild + cleanup │
 │  - Refs detach (eski → null)            │
 │  ↓                                      │
 │  current = workInProgress (tree swap)   │
@@ -1165,26 +1174,25 @@ Render Phase tugadi → workInProgress tree tayyor
 React har sub-phase'da **effect list** bo'ylab yuradi. Effect list — fiber tree ichidagi `flags` (effect bayroqlari) bo'lgan Fiber'larning ro'yxati. Bu list `subtreeFlags` orqali optimize qilingan — effect yo'q subtree butunlay skip qilinadi.
 
 ```typescript
-// React internal (soddalashtirilgan)
-function commitMutationEffects(root, finishedWork) {
-  let nextEffect = finishedWork;
-  while (nextEffect !== null) {
-    if (nextEffect.subtreeFlags & MutationMask) {
-      // Subtree'da mutation effect bor — pastga tushish
-      nextEffect = nextEffect.child;
-    } else {
-      // Subtree'da hech narsa yo'q — keyingi sibling
-      nextEffect = nextEffect.sibling || nextEffect.return;
+// React internal (soddalashtirilgan — R18+ recursive traversal)
+function commitMutationEffectsOnFiber(finishedWork: Fiber) {
+  // subtreeFlags — child'lar ichida mutation bormi? Bo'lmasa butun subtree skip
+  if (finishedWork.subtreeFlags & MutationMask) {
+    let child = finishedWork.child;
+    while (child !== null) {
+      commitMutationEffectsOnFiber(child);
+      child = child.sibling;
     }
-    
-    if (nextEffect.flags & Placement) {
-      commitPlacement(nextEffect);
-    }
-    if (nextEffect.flags & Update) {
-      commitUpdate(nextEffect);
-    }
-    // ...
   }
+
+  // Shu fiber'ning o'z flag'lari
+  if (finishedWork.flags & Placement) {
+    commitPlacement(finishedWork);
+  }
+  if (finishedWork.flags & Update) {
+    commitUpdate(finishedWork);
+  }
+  // ChildDeletion, Ref, ...
 }
 ```
 
@@ -1847,36 +1855,36 @@ async function handleAsync() {
 **Functional update queue:**
 
 ```typescript
-// React internal
-function dispatchSetState(fiber, action) {
-  const update = {
-    action,  // function yoki value
-    next: null,
-  };
-  
-  // Linked list ga qo'shish
-  enqueueUpdate(fiber, update);
+// React internal (soddalashtirilgan — manba: ReactFiberHooks.js, updateReducer)
+// queue.pending — CIRCULAR singly-linked list. `pending` oxirgi update'ga,
+// `pending.next` esa birinchi update'ga ishora qiladi.
+
+function dispatchSetState(fiber, queue, action) {
+  const update = { action, next: null };  // action: function yoki value
+  // queue.pending circular list'iga qo'shish (pending = oxirgi, pending.next = birinchi)
+  enqueueConcurrentHookUpdate(fiber, queue, update);
 }
 
-function processUpdateQueue(fiber) {
-  let newState = fiber.memoizedState;
-  
-  // Linked list bo'ylab yurish
-  let update = fiber.updateQueue.first;
-  while (update !== null) {
-    if (typeof update.action === 'function') {
-      newState = update.action(newState);  // functional
-    } else {
-      newState = update.action;  // value
-    }
+function updateReducer(queue, baseState, reducer) {
+  const pending = queue.pending;
+  if (pending === null) return baseState;
+
+  const first = pending.next;   // circular list — birinchi update
+  let newState = baseState;
+  let update = first;
+  do {
+    const action = update.action;
+    newState = typeof action === 'function'
+      ? action(newState)    // functional updater
+      : action;             // value
     update = update.next;
-  }
-  
-  fiber.memoizedState = newState;
+  } while (update !== first);  // circular: birinchiga qaytguncha
+
+  return newState;
 }
 ```
 
-Functional updater'lar **render paytida** chaqiriladi, value updater'lar esa **dispatch paytida** belgilangan qiymatni saqlaydi. Shu sababli functional updater'lar har doim oxirgi qiymatga asoslangan.
+Functional updater'lar **render paytida** (`updateReducer` ichida) chaqiriladi, value updater'lar esa **dispatch paytida** belgilangan qiymatni saqlaydi. Shu sababli functional updater'lar har doim oxirgi qiymatga asoslangan.
 
 </details>
 
@@ -2465,20 +2473,20 @@ createRoot(container).render(<App />);
 ```tsx
 interface Product { id: string; name: string; price: number; }
 
-// ❌ Render ichida setState — infinite loop
+// ❌ Props'ni state'ga ko'chirish — derived state anti-pattern
 function ProductListBuggy({ products }: { products: Product[] }) {
   const [items, setItems] = useState<Product[]>([]);
 
   if (items.length === 0 && products.length > 0) {
-    setItems(products);  // ❌ render davomida — har render'da yana setItems chaqiriladi
-  }
+    setItems(products);  // guard tufayli infinite loop YO'Q, lekin keyin
+  }                      // products o'zgarsa items eskirib qoladi (sync yo'q)
 
   return <ProductGrid items={items} />;
 }
 ```
 
 ```tsx
-// ✅ useEffect bilan — props o'zgarsa state sinxronlanadi
+// ✅ useEffect bilan — props o'zgarsa state sync qilinadi
 function ProductListWithEffect({ products }: { products: Product[] }) {
   const [items, setItems] = useState<Product[]>([]);
 
@@ -2833,7 +2841,7 @@ Bu bo'limda React'ning rendering pipeline'ining ichki mexanikasi yoritildi:
 
 Bu mechanism'ni tushunish keyingi bo'limlardagi har bir hook va pattern'ning xatti-harakatini oydinlashtiradi. Misol uchun, `useEffect`ning "lifecycle hook EMAS, synchronization mechanism" g'oyasi (`16-useeffect.md`) — concurrent rendering + Strict Mode 2x effect cycle'idan kelib chiqadi.
 
-Keyingi bo'limda Reconciler'ning ichki tuzilmasi — Fiber architecture'si — chuqur yoritiladi. Bu render+commit pipeline'ning **qanday** ishlashining texnik tafsiloti.
+Keyingi bo'lim — [`03-fiber-architecture.md`](03-fiber-architecture.md): Reconciler'ning ichki tuzilmasi (Fiber architecture) chuqur yoritiladi. Bu render+commit pipeline'ning **qanday** ishlashining texnik tafsiloti.
 
 ---
 

@@ -157,36 +157,29 @@ function App() {
 
 Composition idiomatic React pattern, lekin barcha holatlarni qoplay olmaydi. Context — ko'p joydan o'qiluvchi global qiymatlar uchun.
 
-**Context "tunnel" mental model:**
+**Context tree bo'ylab uzatish:**
 
 ```
 App
 └─ Provider value={X}
-   └─ ...100 ta komponent...
+   └─ ...ko'p oraliq komponent...
       └─ Consumer (X o'qiydi)
 ```
 
-Provider va Consumer orasidagi 100 ta komponent X'ni bilmaydi va uzatmaydi. Bu — "tunnel" — React tree'da virtual yo'l.
+Provider va Consumer orasidagi oraliq komponentlar X'ni bilmaydi va uzatmaydi. Subtree'dagi har consumer X'ni to'g'ridan-to'g'ri o'qiy oladi.
 
-Internal'da React Fiber tree'ni traverse qilib, eng yaqin Provider'ni topadi:
+Mexanizm consumer paytida tree traversal qilmaydi. Provider Fiber'iga kirilganda (`beginWork`) React `context._currentValue`'ni Provider value'siga set qiladi (stack push). Consumer `readContext` chaqirganda shu `_currentValue`'ni o'qiydi — bu render paytida eng yaqin Provider o'rnatgan qiymat:
 
 ```ts
 // React internal (soddalashtirilgan)
 function readContext(context) {
-  let fiber = currentlyRenderingFiber.return;  // Parent
-  
-  while (fiber !== null) {
-    if (fiber.tag === ContextProvider && fiber.type === context.Provider) {
-      return fiber.memoizedProps.value;
-    }
-    fiber = fiber.return;
-  }
-  
-  return context._currentValue;  // Default
+  // _currentValue render paytida eng yaqin Provider tomonidan o'rnatilgan
+  // (pushProvider stack push). Provider yo'q bo'lsa — boshlang'ich default.
+  return context._currentValue;
 }
 ```
 
-Chuqurroq Section "Performance" da batafsil.
+"Eng yaqin Provider" semantikasi traversal bilan emas, stack push/pop bilan ta'minlanadi: nested Provider'lar bir-birini stack'da shadow qiladi (batafsil quyida `pushProvider`/`popProvider`).
 
 **Source citation:**
 
@@ -373,7 +366,7 @@ function App() {
 // Pattern 1 — Default value bilan
 const ThemeContext = createContext<'light' | 'dark'>('light');
 
-// Pattern 2 — null default + non-null assertion
+// Pattern 2 — null default + custom hook null check
 const UserContext = createContext<User | null>(null);
 
 // Pattern 3 — Strict (no default — throw)
@@ -425,7 +418,7 @@ type ReactContext<T> = {
 // chunki `context.Provider = context` assignment orqali backward compat saqlangan.
 ```
 
-`_currentValue` — Provider tomonidan render paytida mutate qilinadi. Render paytida `useContext` shu mutated value'ni o'qiydi. Render tugagandan keyin (Commit Phase'da) `_currentValue` avvalgi qiymatga qaytariladi (stack pop semantic).
+`_currentValue` — Provider Fiber'iga kirilganda (`beginWork`) mutate qilinadi. Provider subtree'si render qilinayotgan paytda `useContext` shu mutated value'ni o'qiydi. Provider subtree'si to'liq tugagach (`completeWork`) `_currentValue` avvalgi qiymatga qaytariladi (stack pop semantic). Push va pop ikkalasi ham Render Phase ichida — Commit Phase'da emas.
 
 **Default value faqat Provider yo'q paytida:**
 
@@ -440,13 +433,13 @@ function readContext<T>(context: ReactContext<T>): T {
 `_currentValue` Provider tomonidan stack-based push/pop bilan boshqariladi:
 
 ```ts
-// Provider mount paytida (Render Phase)
+// Provider Fiber'iga kirilganda — beginWork (Render Phase)
 function pushProvider<T>(providerFiber: Fiber, context: ReactContext<T>, nextValue: T) {
   push(valueCursor, context._currentValue, providerFiber);  // Stack push
   context._currentValue = nextValue;                         // Mutate
 }
 
-// Provider unmount paytida (Commit Phase)
+// Provider subtree'si tugagach — completeWork (Render Phase)
 function popProvider(context: ReactContext<T>, providerFiber: Fiber) {
   const currentValue = valueCursor.current;
   pop(valueCursor, providerFiber);
@@ -454,7 +447,7 @@ function popProvider(context: ReactContext<T>, providerFiber: Fiber) {
 }
 ```
 
-Stack-based — nested provider'lar uchun. Inner Provider qiymati outer Provider qiymatini "yashiradi" (shadow), pop bilan original qaytariladi.
+Push (`beginWork`) va pop (`completeWork`) har render'da bajariladi — faqat unmount'da emas. Bu stack semantic nested provider'lar uchun: inner Provider qiymati outer Provider qiymatini "yashiradi" (shadow), pop bilan original qaytariladi.
 
 **Source citation:**
 
@@ -589,10 +582,10 @@ AuthContext.displayName = 'AuthContext';
 
 **Lifecycle:**
 
-1. Provider mount: `_currentValue = someValue` (stack push)
+1. Provider Fiber'iga kiriladi (`beginWork`): `_currentValue = someValue` (stack push)
 2. Subtree render: consumer'lar `someValue` o'qiydi
-3. Provider value o'zgaradi: subtree consumer'lari re-render trigger qilinadi
-4. Provider unmount: `_currentValue` avvalgi qiymatga qaytariladi (stack pop)
+3. Provider subtree'si tugaydi (`completeWork`): `_currentValue` avvalgi qiymatga qaytariladi (stack pop)
+4. Provider value o'zgarib qayta render bo'lsa: subtree consumer'lari re-render trigger qilinadi
 
 **Misol — sodda Provider:**
 
@@ -744,7 +737,7 @@ function propagateContextChange(workInProgress, context, renderLanes) {
         }
       }
       nextFiber = fiber.child;
-    } else if (fiber.type === ContextProvider && fiber.type._context === context) {
+    } else if (fiber.tag === ContextProvider && fiber.type._context === context) {
       // Nested Provider bir xil Context — to'xtash (shadow qiladi)
       nextFiber = null;
     } else {
@@ -1030,7 +1023,8 @@ function Component() {
 
 ```ts
 function useContext<T>(context: ReactContext<T>): T {
-  const dispatcher = ReactCurrentDispatcher.current;
+  // R19: dispatcher ReactSharedInternals.H'da (eski ReactCurrentDispatcher.current)
+  const dispatcher = ReactSharedInternals.H;
   return dispatcher.useContext(context);
 }
 
@@ -1065,9 +1059,9 @@ function readContext<T>(context: ReactContext<T>): T {
 
 **Hook bilan farq:**
 
-`useContext` boshqa hook'lardan farq — **state yo'q** (Hook obyekt yo'q), faqat dependency tracking. Lekin Rules of Hooks bo'yicha top-level chaqirilishi shart (linked list integrity emas, conditional hook xulq-atvor inconsistent bo'ladi).
+`useContext` boshqa hook'lardan farq — `fiber.memoizedState` hooks linked list'iga node qo'shmaydi (state yo'q), faqat `fiber.dependencies` list'iga Context qo'shadi. Shu sababli, texnik jihatdan conditional chaqirilsa hooks linked list buzilmaydi (boshqa hook'lar pozitsiyasi siljimaydi). Lekin Rules of Hooks va `eslint-plugin-react-hooks` baribir top-level talab qiladi: conditional chaqiruv consumer dependency subscription'ini render'dan render'ga beqaror qiladi va kodni boshqa hook'lar bilan bir xil cheklovga bo'ysundirib, predictable saqlaydi.
 
-R19 `use(context)` — bu cheklovni hal qiladi (use hook conditional chaqiriladi).
+R19 `use(context)` — bu cheklovni rasman hal qiladi: `use` shart ichida ham chaqirilishi mumkin (Section "use(context)").
 
 **Source citation:**
 
@@ -1275,17 +1269,16 @@ Use case: Provider majburiy (production code), Provider'siz silent bug emas, dar
 **Default value Object'lar uchun:**
 
 ```tsx
-// ❌ Default har gal yangi reference
+// Default object bir marta yaratiladi (createContext chaqirilganda, module-level)
 const StoreContext = createContext({ items: [] });
+// Provider'siz har consumer aynan SHU bitta { items: [] } reference'ni oladi —
+// re-yaratilmaydi, shuning uchun reference identity barqaror
 
-// Default value har gal { items: [] } (new) — ko'pincha muammo emas
-// Lekin default ishlatilsa har consumer bir xil reference (createContext bir marta chaqirildi)
-
-// ✅ Strict tavsiya
+// ✅ Production'da strict pattern aniqroq
 const StoreContext = createContext<StoreValue | null>(null);
 ```
 
-Object default — bir marta yaratiladi (`createContext` chaqirilganda). Lekin shadowed bo'lsa Provider value ustun. Strict pattern aniqroq.
+Default object — `createContext` chaqiruvida bir marta yaratiladi, har consumer uchun bir xil reference. Muammo Provider value bilan boshqacha: Provider value har render inline `{...}` bo'lsa, har gal yangi reference → barcha consumer re-render (Section "Object Value Gotcha"). Default'ning o'zi esa qayta yaratilmaydi. Production'da strict (`null` + throw) pattern aniqroq — Provider'siz ishlatish silent fallback emas, darrov xato beradi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1300,8 +1293,8 @@ function createContext<T>(defaultValue: T) {
     _currentValue: defaultValue,  // Default
     _currentValue2: defaultValue,  // SSR
     _threadCount: 0,
-    Provider: null as any,
-    Consumer: null as any,
+    Provider: null,   // pastda context'ning o'ziga set qilinadi
+    Consumer: null,
   };
   
   // R19: Context o'zi Provider sifatida ishlaydi
@@ -1314,16 +1307,16 @@ function createContext<T>(defaultValue: T) {
 }
 ```
 
-`_currentValue` — boshlang'ich default. Provider mount paytida o'zgartiriladi (push), unmount paytida qaytariladi (pop).
+`_currentValue` — boshlang'ich default. Provider Fiber'iga kirilganda o'zgartiriladi (`beginWork` → push), subtree'si tugagach qaytariladi (`completeWork` → pop). Ikkalasi ham Render Phase ichida.
 
 ```ts
-// Provider mount
+// Provider Fiber'iga kirilganda (beginWork)
 function pushProvider(providerFiber, context, nextValue) {
   push(valueCursor, context._currentValue);  // Stack push
   context._currentValue = nextValue;          // Mutate
 }
 
-// Provider unmount
+// Provider subtree'si tugagach (completeWork)
 function popProvider(context) {
   const previous = valueCursor.current;
   pop(valueCursor);
@@ -1794,7 +1787,7 @@ function App() {
 }
 ```
 
-`<ThemeContext value={...}>` — bir xil semantika, qisqaroq. JSX transform avtomatik Provider sifatida render qiladi.
+`<ThemeContext value={...}>` — bir xil semantika, qisqaroq. JSX transform Context obyekt'ni element `type`'iga qo'yadi (`_jsx(ThemeContext, {...})`); reconciler `$$typeof === REACT_CONTEXT_TYPE`'ni ko'rib uni Provider sifatida ishlaydi.
 
 **Migration:**
 
@@ -1805,7 +1798,7 @@ R19'da ikkala variant ishlaydi. Yangi kod uchun shorthand tavsiya. Mavjud kodlar
 npx codemod@latest react/19/migration-recipe
 
 # Yoki specific codemod (faqat <Context.Provider> → <Context>):
-npx codemod@latest react/19/replace-context-provider
+npx codemod react/19/remove-context-provider
 ```
 
 **TypeScript types:**
@@ -1825,11 +1818,11 @@ declare const Context: React.Context<T> & {
 
 `<Context value={...}>` ham `<Context.Provider value={...}>` bilan bir xil:
 
-- Mount paytida value subtree'ga ekspoz qilinadi
+- Provider Fiber'iga kirilganda value subtree'ga ekspoz qilinadi (stack push)
 - Value o'zgarsa subtree consumer'lari re-render
-- Unmount paytida value cleanup
+- Provider subtree'si tugagach `_currentValue` qaytariladi (stack pop)
 
-Internal mexanizm o'zgarmagan — JSX transform shorthand'ni Provider'ga aylantiradi.
+Internal mexanizm o'zgarmagan — JSX transform Context obyekt'ni element `type`'i sifatida uzatadi, reconciler esa uni Provider deb ishlaydi. Shorthand `<Context.Provider>`'ga "aylantirilmaydi" — ikkalasi ham bir xil reconciler yo'liga tushadi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2135,7 +2128,7 @@ Lekin React linter `useContext` uchun Rules of Hooks majbur qilardi (consistency
 ```ts
 // React internal — use() hook chain'ga qo'shilmaydi
 function useContextInternal(context) {
-  const dispatcher = ReactCurrentDispatcher.current;
+  const dispatcher = ReactSharedInternals.H;  // R19 dispatcher
   return dispatcher.useContext(context);  // Hook order matters
 }
 
@@ -2183,10 +2176,12 @@ function FeaturePage({ feature }: { feature: string }) {
 const itemContexts = new Map<string, React.Context<Item>>();
 
 function getItemContext(id: string): React.Context<Item> {
-  if (!itemContexts.has(id)) {
-    itemContexts.set(id, createContext<Item>({ id, name: '' }));
-  }
-  return itemContexts.get(id)!;
+  const existing = itemContexts.get(id);
+  if (existing) return existing;
+
+  const created = createContext<Item>({ id, name: '' });
+  itemContexts.set(id, created);
+  return created;
 }
 
 function ItemList({ ids }: { ids: string[] }) {
@@ -2208,14 +2203,14 @@ Bu pattern niche — kamdan-kam ishlatiladi, lekin `use()` imkonini beradi.
 ```tsx
 function Layout({ variant }: { variant: 'admin' | 'user' | 'guest' }) {
   switch (variant) {
-    case 'admin':
+    case 'admin': {
       const adminCtx = use(AdminContext);
       return <AdminLayout context={adminCtx} />;
-    
-    case 'user':
+    }
+    case 'user': {
       const userCtx = use(UserContext);
       return <UserLayout context={userCtx} />;
-    
+    }
     case 'guest':
       return <GuestLayout />;
   }
@@ -2508,39 +2503,36 @@ const NonConsumer = React.memo(function NonConsumer() {
 
 ```tsx
 function App() {
-  const [theme, setTheme] = useState('light');
-  
   return (
-    <div>
+    <ThemeProvider>
+      <Consumer />
+      <NonConsumer />  {/* children — App tomonidan yaratiladi, stabil */}
+    </ThemeProvider>
+  );
+}
+
+// State ThemeProvider ichida — toggle faqat ThemeProvider'ni re-render qiladi
+function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setTheme] = useState('light');
+
+  return (
+    <ThemeContext.Provider value={theme}>
       <button onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
         Toggle
       </button>
-      <Layout>
-        <Consumer />
-        <NonConsumer />
-      </Layout>
-    </div>
-  );
-}
-
-function Layout({ children }: { children: React.ReactNode }) {
-  return (
-    <ThemeContext.Provider value={useContext(ThemeContext)}>
-      <main>{children}</main>
+      {children}
     </ThemeContext.Provider>
   );
 }
-
-// Bu pattern children props orqali NonConsumer'ni stabilize qilishi mumkin
-// Lekin Layout o'z Provider yaratadi — kompleks
 ```
 
-Children prop pattern (cross-ref [`11-composition.md`](11-composition.md)) Context bilan bog'liq emas, lekin re-render scope'ni cheklashda foydali.
+State'ni `ThemeProvider` ichiga ko'chirish kaliti: `children` (`<Consumer />`, `<NonConsumer />`) `App` render'ida yaratiladi va `App` re-render bo'lmaganligi uchun referentially stabil qoladi. `setTheme` faqat `ThemeProvider`'ni re-render qiladi; `children` element'lari o'zgarmaganligi uchun `NonConsumer` bailout bo'ladi, `Consumer` esa Context dependency tufayli re-render bo'ladi. Bu — children prop orqali re-render scope'ni cheklash (cross-ref [`11-composition.md`](11-composition.md)).
 
 **Misol 4 — Performance bug:**
 
 ```tsx
-const StoreContext = createContext<{ items: Item[]; addItem: (item: Item) => void }>(null!);
+type StoreValue = { items: Item[]; addItem: (item: Item) => void };
+const StoreContext = createContext<StoreValue | null>(null);
 
 function StoreProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<Item[]>([]);
@@ -2690,9 +2682,9 @@ function StoreProvider({ children }: { children: React.ReactNode }) {
 
 `useMemo` inline — bir xil pattern, qisqaroq syntax.
 
-**Compiler optimization (R19):**
+**Compiler optimization:**
 
-R19 React Compiler — automatic memoization (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). Compiler bilan `useMemo` manual yozish kerak emas — Compiler avtomatik qo'yadi:
+React Compiler — automatic memoization (cross-ref [`31-react-compiler.md`](31-react-compiler.md)). Compiler bilan `useMemo`/`useCallback` manual yozish kerak emas — Compiler avtomatik qo'yadi:
 
 ```tsx
 // Compiler bilan — useMemo manual yozish shart emas
@@ -2712,7 +2704,7 @@ function StoreProvider({ children }: { children: React.ReactNode }) {
 // const add = useCallback(...);
 ```
 
-Compiler hali eksperimental (R19'da opt-in). Standart React'da useMemo manual.
+React Compiler 1.0 stabil bo'ldi, lekin opt-in — Babel/SWC plugin'ni o'rnatish kerak. Plugin'siz standart React'da `useMemo`/`useCallback` qo'lda yoziladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2786,18 +2778,18 @@ const ConfigContext = createContext<{ apiUrl: string; timeout: number }>({ apiUr
 
 function App() {
   const [apiUrl, setApiUrl] = useState('https://api.example.com');
-  const [timeout, setTimeout] = useState(5000);
+  const [timeoutMs, setTimeoutMs] = useState(5000);
   
   // ❌ Har render'da yangi obyekt
   return (
-    <ConfigContext.Provider value={{ apiUrl, timeout }}>
+    <ConfigContext.Provider value={{ apiUrl, timeout: timeoutMs }}>
       <Page />
     </ConfigContext.Provider>
   );
 }
 
 // App.parent re-render → App re-render → value yangi → ConfigContext consumer'lar re-render
-// Hatto apiUrl/timeout o'zgarmagan bo'lsa ham
+// Hatto apiUrl/timeoutMs o'zgarmagan bo'lsa ham
 ```
 
 **Misol 2 — Fix (`useMemo`):**
@@ -2805,11 +2797,11 @@ function App() {
 ```tsx
 function App() {
   const [apiUrl, setApiUrl] = useState('https://api.example.com');
-  const [timeout, setTimeout] = useState(5000);
+  const [timeoutMs, setTimeoutMs] = useState(5000);
   
   const config = useMemo(
-    () => ({ apiUrl, timeout }),
-    [apiUrl, timeout]
+    () => ({ apiUrl, timeout: timeoutMs }),
+    [apiUrl, timeoutMs]
   );
   
   return (
@@ -2819,7 +2811,7 @@ function App() {
   );
 }
 
-// apiUrl/timeout o'zgarmasa — config bir xil reference → consumer'lar re-render emas
+// apiUrl/timeoutMs o'zgarmasa — config bir xil reference → consumer'lar re-render emas
 ```
 
 **Misol 3 — Function value gotcha:**
@@ -3087,7 +3079,7 @@ function useCallback(callback, deps) {
 
 `useCallback(fn, deps)` ↔ `useMemo(() => fn, deps)`. Convenience hook.
 
-**Compiler optimization (R19):**
+**Compiler optimization:**
 
 React Compiler avtomatik memoization qo'yadi:
 
@@ -3127,7 +3119,7 @@ function StoreProvider({ children }) {
 }
 ```
 
-Compiler — `useMemo`/`useCallback` manual yozish ehtiyoji yo'q. Lekin hali stable emas (R19 opt-in). Cross-ref [`31-react-compiler.md`](31-react-compiler.md).
+Compiler — `useMemo`/`useCallback` manual yozish ehtiyoji yo'q. React Compiler 1.0 stabil, lekin opt-in (Babel/SWC plugin'ni o'rnatish kerak). Cross-ref [`31-react-compiler.md`](31-react-compiler.md).
 
 **Source citation:**
 
@@ -3335,9 +3327,16 @@ function CartProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Custom hook — Provider'siz ishlatilsa darrov xato
+function useCartActions() {
+  const actions = useContext(CartActionsContext);
+  if (!actions) throw new Error('useCartActions must be used within CartProvider');
+  return actions;
+}
+
 // Consumer 1 — actions
 function AddButton() {
-  const { add } = useContext(CartActionsContext)!;
+  const { add } = useCartActions();
   return <button onClick={() => add(newItem)}>Add</button>;
 }
 
@@ -3672,20 +3671,21 @@ State library'lar selector pattern'ni first-class qilib qabul qiladi. Bu kursdan
 
 **`useSyncExternalStore` (R18+):**
 
-`useSyncExternalStore` — external store subscription primitive. Custom selector hook qurish mumkin:
+`useSyncExternalStore` — external store subscription primitive. Store'ni Context'siz, module-level obyekt sifatida saqlab, custom selector hook qurish mumkin:
 
 ```tsx
+// Module-level store — Provider yo'q, har consumer to'g'ridan-to'g'ri o'qiydi
+const appStore = createAppStore();  // { subscribe, getState }
+
 function useStoreSelector<T>(selector: (state: AppState) => T): T {
-  const store = useContext(StoreContext);
-  
   return useSyncExternalStore(
-    store.subscribe,
-    () => selector(store.getState())
+    appStore.subscribe,
+    () => selector(appStore.getState()),
   );
 }
 ```
 
-Lekin bu — Context'siz pure store implementation. Cross-ref [`22-concurrent-hooks.md`](22-concurrent-hooks.md).
+Store Context'da emas, module-level — shuning uchun null guard kerak emas va Provider re-render scope muammosi yo'q. Bu yondashuv aslida state library'lar (Zustand) asosi. Cross-ref [`22-concurrent-hooks.md`](22-concurrent-hooks.md).
 
 **Decision:**
 
@@ -3699,49 +3699,47 @@ Lekin bu — Context'siz pure store implementation. Cross-ref [`22-concurrent-ho
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**`useContextSelector` implementation (soddalashtirilgan):**
+**`useContextSelector` mexanizmi (soddalashtirilgan model):**
+
+Asosiy g'oya: Context value'ni komponent state'i orqali emas, balki o'zgarmas (stable) "store" obyekti orqali tarqatish. Store value'ni saqlaydi va subscriber callback'larni chaqiradi. Provider faqat store'ni Context orqali pastga uzatadi — Provider value'ning o'zi har render'da o'zgarmaydi, shuning uchun `useContext` consumer'lari Provider sababli re-render bo'lmaydi. Re-render qarori har consumer'da selector natijasi asosida qabul qilinadi.
 
 ```ts
-function createContext<T>(defaultValue: T) {
-  const context = React.createContext<T>(defaultValue);
-  const subscribers = new Set<(state: T) => void>();
-  
-  // Provider'ni override
-  context.Provider = function Provider({ value, children }) {
-    const [state, setState] = useState(value);
-    
-    useEffect(() => {
-      // Notify subscribers
-      subscribers.forEach(cb => cb(value));
-    }, [value]);
-    
-    return <context.Provider value={state}>{children}</context.Provider>;
-  };
-  
-  return context;
+type Store<T> = {
+  getValue: () => T;
+  subscribe: (listener: () => void) => () => void;
+};
+
+function useSelectorStore<T>(value: T): Store<T> {
+  const valueRef = useRef(value);
+  const listeners = useRef(new Set<() => void>()).current;
+
+  // Render'dan keyin yangi value'ni saqlash va subscriber'larni xabardor qilish
+  useEffect(() => {
+    valueRef.current = value;
+    listeners.forEach(listener => listener());
+  }, [value]);
+
+  // store o'zgarmas reference — har render bir xil
+  return useMemo<Store<T>>(() => ({
+    getValue: () => valueRef.current,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  }), []);
 }
 
-function useContextSelector<T, R>(context: Context<T>, selector: (state: T) => R): R {
-  const value = useContext(context);
-  const [selected, setSelected] = useState(() => selector(value));
-  
-  useEffect(() => {
-    const cb = (newValue: T) => {
-      const newSelected = selector(newValue);
-      if (!Object.is(newSelected, selected)) {
-        setSelected(newSelected);
-      }
-    };
-    
-    subscribers.add(cb);
-    return () => subscribers.delete(cb);
-  }, [value, selector, selected]);
-  
-  return selected;
+function useContextSelector<T, R>(store: Store<T>, selector: (value: T) => R): R {
+  // useSyncExternalStore selector natijasini Object.is bilan solishtiradi —
+  // faqat slice o'zgarsa re-render
+  return useSyncExternalStore(
+    store.subscribe,
+    () => selector(store.getValue()),
+  );
 }
 ```
 
-Real implementation murakkabroq (Concurrent rendering, tearing prevention, etc.). Library — `use-context-selector` source.
+Real `use-context-selector` murakkabroq: u Provider value'ni `useRef` + manual subscription bilan tarqatadi, har consumer render natijasini taqqoslaydi va Concurrent rendering'da tearing'ni oldini olish uchun qo'shimcha kafolatlar beradi. Bu yerda — faqat asosiy g'oya. To'liq kod: `use-context-selector` source.
 
 **`useSyncExternalStore` advantages:**
 
@@ -3864,7 +3862,7 @@ function UserAvatar() {
 }
 
 // Selector pattern built-in, no Context, no Provider
-// Library bundle size kichik (~3KB)
+// Library bundle size kichik
 ```
 
 Zustand — Context'ga alternative. Provider yo'q, selector built-in. Production'da ko'p hollarda afzal.
@@ -3913,15 +3911,15 @@ Context React core'da, free, built-in. State library (Redux, Zustand, Jotai) —
 
 **Bundle size farq:**
 
-| Library | Bundle (gzipped) |
-|---------|------------------|
-| Context (built-in) | 0 |
-| Zustand | ~1KB |
-| Jotai | ~3KB |
-| Redux Toolkit | ~12KB |
-| MobX | ~16KB |
+| Library | Bundle (gzipped, nisbiy) |
+|---------|--------------------------|
+| Context (built-in) | 0 — React'ning o'zida |
+| Zustand | juda kichik |
+| Jotai | kichik |
+| Redux Toolkit | o'rta |
+| MobX | kattaroq |
 
-Context — eng yengil. Lekin features kamroq.
+Context — eng yengil (qo'shimcha bundle yo'q). Lekin features kamroq. Aniq KB qiymatlari versiyadan versiyaga o'zgaradi — joriy o'lcham uchun [bundlephobia.com](https://bundlephobia.com) tekshiriladi.
 
 **Migration path:**
 
@@ -3945,15 +3943,15 @@ const ThemeContext = createContext<'light' | 'dark'>('light');
 const AuthContext = createContext<User | null>(null);
 
 // ⚠️ Context cheklov — cart (frequent updates)
-const CartContext = createContext<{
+type CartValue = {
   items: CartItem[];
   add: (item: CartItem) => void;
-  // ...
-}>(null!);
-// 100 ta product card cart o'zgarganda — har biri re-render
+};
+const CartContext = createContext<CartValue | null>(null);
+// Ko'p product card cart o'zgarganda — har biri re-render
 // → use-context-selector yoki Zustand
 
-// ❌ Context yaroqsiz — real-time chat (1000 messages/min)
+// ❌ Context yaroqsiz — real-time chat (juda tez-tez keladigan xabarlar)
 // → State library + WebSocket integration
 ```
 
@@ -4021,8 +4019,14 @@ function App() {
 // Context bilan
 const CartContext = createContext<CartValue | null>(null);
 
+function useCartContext() {
+  const ctx = useContext(CartContext);
+  if (!ctx) throw new Error('useCartContext must be used within CartProvider');
+  return ctx;
+}
+
 function ProductCard({ product }: { product: Product }) {
-  const { items, add } = useContext(CartContext)!;
+  const { items, add } = useCartContext();
   const inCart = items.some(i => i.id === product.id);
   
   return (
@@ -4032,8 +4036,8 @@ function ProductCard({ product }: { product: Product }) {
   );
 }
 
-// 100 ta ProductCard bo'lsa: items o'zgarsa har biri re-render
-// Performance — har action yangi cart array, 100 re-render
+// Ko'p ProductCard bo'lsa: items o'zgarsa har biri re-render
+// Performance — har action yangi cart array → barcha card re-render
 ```
 
 ```tsx
@@ -4352,7 +4356,7 @@ const ThemeContext = createContext<'light' | 'dark'>('light');
 class ThemedButton extends React.Component {
   static contextType = ThemeContext;
   
-  context!: React.ContextType<typeof ThemeContext>;  // TS
+  declare context: React.ContextType<typeof ThemeContext>;  // TS — definite assignment
   
   render() {
     return <button className={this.context}>Click</button>;
@@ -4438,11 +4442,11 @@ function Component() {
   // ✅ Optional chaining
   console.log(auth?.user?.name);
   
-  // ✅ Non-null assertion (xatarli — Provider yo'q bo'lsa runtime error)
+  // ⚠️ Non-null assertion — Provider yo'q bo'lsa runtime crash, type guard berilmaydi
   console.log(auth!.user.name);
   
   // ✅ Best — strict pattern bilan custom hook
-  const { user } = useAuth();  // Throws if no Provider
+  const { user } = useAuth();  // Provider yo'q bo'lsa throw
 }
 ```
 
@@ -4627,8 +4631,8 @@ function MouseProvider({ children }: { children: React.ReactNode }) {
   return <MouseContext.Provider value={pos}>{children}</MouseContext.Provider>;
 }
 
-// 60fps mouse move → 60 re-render/sec → barcha consumer
-// → Performance disaster
+// mousemove juda tez-tez ishga tushadi → har event'da Provider value yangi →
+// barcha consumer re-render → sezilarli performance yo'qotish
 
 // ✅ State library (Zustand) yoki local state + ref
 ```
@@ -4932,7 +4936,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data: User = await response.json();
       setUser(data);
     } catch (err) {
-      setError((err as Error).message);
+      setError(err instanceof Error ? err.message : 'Login failed');
       throw err;
     } finally {
       setLoading(false);
@@ -5077,7 +5081,7 @@ Type-safe lekin verbose. Standart `compose` ko'p hollarda yetadi.
 - **`useContext`** — component'da Context value o'qish. Top-level chaqirilishi shart (Rules of Hooks). Custom hook bilan encapsulation tavsiya.
 - **Default value** — faqat Provider topilmagan paytda. Strategiyalar: sensible default (Provider ixtiyoriy), null + guard, strict undefined + throw (production).
 - **Multiple Contexts** — Provider hell muammosi → encapsulation (`AppProviders` component) yoki `compose` helper. Inner Provider outer'dan o'qishi mumkin (tartib muhim).
-- **R19 `<Context value={...}>` shorthand** (versiya callout) — `<Context.Provider>` qisqartmasi, deprecated emas. JSX transform avtomatik Provider sifatida.
+- **R19 `<Context value={...}>` shorthand** (versiya callout) — `<Context.Provider>` qisqartmasi, deprecated emas. JSX transform Context obyekt'ni element `type`'iga qo'yadi; reconciler `$$typeof === REACT_CONTEXT_TYPE`'ni ko'rib uni Provider sifatida ishlaydi.
 - **R19 `use(context)` conditional** (versiya callout) — `useContext` Rules of Hooks top-level kerak edi, `use()` `if`/`switch`/`for` ichida ishlaydi. Performance optimization (early return + conditional Context read).
 - **Performance — re-render scope:** Provider value o'zgarsa barcha consumer re-render. Non-consumer'lar — parent re-render bilan birga (lekin `React.memo` bilan skip qilish mumkin, Context dep memo'ni bypass qiladi).
 - **Object value gotcha** — har render yangi reference → har consumer re-render. Yechim: `useMemo` Provider value memoize.

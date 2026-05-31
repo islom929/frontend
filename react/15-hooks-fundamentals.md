@@ -489,8 +489,8 @@ const [c] = useState(3);   // hook[1] ❌ — eski b'ning slot'iga keldi
 ```
 
 React'ning runtime check'i:
-- "Rendered fewer hooks than during the previous render" — hook count past
-- "Rendered more hooks than during the previous render" — hook count yuqori
+- "Rendered fewer hooks than expected. This may be caused by an accidental early return statement." — hook count past
+- "Rendered more hooks than during the previous render." — hook count yuqori
 
 **Qoida tegishli context:**
 
@@ -583,7 +583,7 @@ function throwInvalidHookError() {
 // Hook chaqirilsa — throw
 ```
 
-Render paytida — `HooksDispatcherOnMount` yoki `HooksDispatcherOnUpdate`. Tashqarisida — `ContextOnlyDispatcher` (faqat `useContext` ishlatilishi mumkin, qolganlar throw).
+Render paytida — `HooksDispatcherOnMount` yoki `HooksDispatcherOnUpdate`. Tashqarisida — `ContextOnlyDispatcher`, unda har hook (`useContext` ham) `throwInvalidHookError`'ga map qilingan — render tashqarisida hook chaqiruvi har doim throw qiladi.
 
 **`use` prefix convention:**
 
@@ -796,13 +796,9 @@ fiber.memoizedState
 
 **Linked list — array emas:**
 
-Nima uchun linked list, array emas? Performance va memory:
+React internal'da hook'lar array'da emas, har biri `next` pointer bilan ulangan node sifatida saqlanadi. Linked list traversal model `next` orqali ketma-ket o'tishga tayanadi: mount'da har chaqiruv yangi node yaratib oxiriga ulaydi, update'da `current` Fiber'ning node'lari `next` bo'yicha kechib clone qilinadi. Index'ni alohida saqlash shart emas — pozitsiya `next` zanjiridagi o'rin bilan aniqlanadi.
 
-- Linked list — har hook alohida allocation (V8 hidden class friendly)
-- Array — barcha hook'lar contiguous memory (cache friendly), lekin resize cost
-- React internal — linked list (per-Fiber memory layout)
-
-Praktik perspektivada: array kabi qarash mumkin (`hooks[0]`, `hooks[1]`, ...), lekin internal'da linked list.
+Praktik perspektivada array kabi qarash mumkin (`hooks[0]`, `hooks[1]`, ...) — bu mental model to'g'ri, chunki tartib har render'da bir xil. Lekin internal struktura — `next`-bilan ulangan linked list, JavaScript array emas.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -838,45 +834,53 @@ Har hook chaqiruvi — yangi obyekt yaratiladi va list'ga ulanadi. `workInProgre
 
 ```ts
 function updateWorkInProgressHook(): Hook {
-  let nextWorkInProgressHook: Hook | null;
-  
-  if (workInProgressHook === null) {
-    // Birinchi hook
+  // 1. current (alternate) Fiber'dan keyingi hook'ni top
+  let nextCurrentHook: Hook | null;
+  if (currentHook === null) {
     const current = currentlyRenderingFiber.alternate;
-    if (current !== null) {
-      nextWorkInProgressHook = current.memoizedState;
-    } else {
-      throw new Error('Should have a work-in-progress.');
-    }
+    nextCurrentHook = current !== null ? current.memoizedState : null;
+  } else {
+    nextCurrentHook = currentHook.next;
+  }
+
+  // 2. workInProgress Fiber'da allaqachon node bormi?
+  let nextWorkInProgressHook: Hook | null;
+  if (workInProgressHook === null) {
+    nextWorkInProgressHook = currentlyRenderingFiber.memoizedState;
   } else {
     nextWorkInProgressHook = workInProgressHook.next;
   }
-  
+
   if (nextWorkInProgressHook !== null) {
-    // Mavjud hook — clone (workInProgress fiber uchun)
+    // Render esnasida re-render (bailout retry) — mavjud node'ni qayta ishlat
+    workInProgressHook = nextWorkInProgressHook;
+    currentHook = nextCurrentHook;
+  } else {
+    // Odatiy update — current'dan clone qil
+    if (nextCurrentHook === null) {
+      throw new Error('Rendered more hooks than during the previous render.');
+    }
+    currentHook = nextCurrentHook;
     const clone: Hook = {
-      memoizedState: nextWorkInProgressHook.memoizedState,
-      baseState: nextWorkInProgressHook.baseState,
-      baseQueue: nextWorkInProgressHook.baseQueue,
-      queue: nextWorkInProgressHook.queue,
+      memoizedState: currentHook.memoizedState,
+      baseState: currentHook.baseState,
+      baseQueue: currentHook.baseQueue,
+      queue: currentHook.queue,
       next: null,
     };
-    
     if (workInProgressHook === null) {
       currentlyRenderingFiber.memoizedState = workInProgressHook = clone;
     } else {
       workInProgressHook.next = clone;
       workInProgressHook = clone;
     }
-  } else {
-    throw new Error('Rendered more hooks than during the previous render.');
   }
-  
+
   return workInProgressHook;
 }
 ```
 
-Update'da — har hook clone qilinadi (immutability). `current.memoizedState`'dan o'qib, `workInProgress`'ga ko'chiriladi.
+Odatiy update'da har hook `currentHook` (eski Fiber node)'dan clone qilinadi (immutability). `currentHook` — `next` bo'ylab eski zanjirni kechadigan pointer. `nextWorkInProgressHook !== null` holati — render esnasida sodir bo'lgan re-render (bailout retry), unda allaqachon yaratilgan node qayta ishlatiladi. Hook'lar tugab `nextCurrentHook === null` bo'lsa — "Rendered more hooks than during the previous render" throw qilinadi.
 
 **Memory layout visualization:**
 
@@ -1130,42 +1134,41 @@ function updateState<S>(...): [S, ...] {
 }
 ```
 
-`updateWorkInProgressHook` — linked list'da keyingi hook:
+`updateWorkInProgressHook` — `current` (alternate) Fiber zanjirini `currentHook` pointer bilan kechib, har node'ni clone qiladi (to'liq versiya yuqoridagi "Hooks Linked List" bo'limida):
 
 ```ts
 function updateWorkInProgressHook(): Hook {
-  let nextWorkInProgressHook: Hook | null;
-  
-  if (workInProgressHook === null) {
-    // Birinchi hook — current.memoizedState (head)
+  // current Fiber zanjiridan keyingi node'ni ol
+  let nextCurrentHook: Hook | null;
+  if (currentHook === null) {
     const current = currentlyRenderingFiber.alternate;
-    nextWorkInProgressHook = current?.memoizedState ?? null;
+    nextCurrentHook = current?.memoizedState ?? null;  // head
   } else {
-    // Keyingi hook — workInProgressHook.next
-    nextWorkInProgressHook = workInProgressHook.next;
+    nextCurrentHook = currentHook.next;
   }
-  
-  if (nextWorkInProgressHook === null) {
+
+  if (nextCurrentHook === null) {
     throw new Error('Rendered more hooks than during the previous render.');
   }
-  
-  // Clone (immutability)
-  const clone: Hook = { ...nextWorkInProgressHook, next: null };
-  
+
+  // current node'dan clone qil (immutability)
+  currentHook = nextCurrentHook;
+  const clone: Hook = { ...currentHook, next: null };
+
   if (workInProgressHook === null) {
     currentlyRenderingFiber.memoizedState = workInProgressHook = clone;
   } else {
     workInProgressHook.next = clone;
     workInProgressHook = clone;
   }
-  
+
   return workInProgressHook;
 }
 ```
 
 Pointer pattern:
-- 1-hook: `current.memoizedState` (head)
-- N-hook: oldingi `hook.next`
+- 1-hook: `current.memoizedState` (eski zanjir head'i)
+- N-hook: oldingi `currentHook.next`
 
 **Conditional hook violation — runtime check:**
 
@@ -1317,7 +1320,7 @@ function MapItemList({ items }: { items: Item[] }) {
 }
 ```
 
-Har `<ItemRow>` — alohida Fiber. Har Fiber — alohida hooks linked list. `useState(false)` — har item uchun mustaqil.
+Har `<CollapsibleRow>` — alohida Fiber. Har Fiber — alohida hooks linked list. `useState(false)` — har item uchun mustaqil.
 
 </details>
 
@@ -1509,31 +1512,42 @@ function updateReducer<S, I, A>(
     throw new Error('Should have a queue.');
   }
   
-  // Pending updates'ni base'ga ko'chirish
+  // pending (circular) queue'ni baseQueue'ga splice qilish
   let baseQueue = hook.baseQueue;
-  let pendingQueue = queue.pending;
+  const pendingQueue = queue.pending;
   
   if (pendingQueue !== null) {
-    // ... merge logic
+    if (baseQueue !== null) {
+      // Ikki circular list'ni birlashtirish — head'larni almashtirish
+      const baseFirst = baseQueue.next;
+      const pendingFirst = pendingQueue.next;
+      baseQueue.next = pendingFirst;
+      pendingQueue.next = baseFirst;
+    }
+    hook.baseQueue = baseQueue = pendingQueue;
     queue.pending = null;
   }
   
-  // Iterate queue va state hisoblash
-  let newState = hook.baseState;
-  let update = baseQueue;
-  
-  while (update !== null) {
-    newState = reducer(newState, update.action);
-    update = update.next;
+  if (baseQueue !== null) {
+    // baseQueue — circular list (oxirgi update); first = baseQueue.next
+    const first = baseQueue.next;
+    let newState = hook.baseState;
+    let update = first;
+    
+    // do...while: circular list, first'ga qaytguncha aylanadi
+    do {
+      newState = reducer(newState, update.action);
+      update = update.next;
+    } while (update !== null && update !== first);
+    
+    hook.memoizedState = newState;
   }
   
-  hook.memoizedState = newState;
-  
-  return [newState, queue.dispatch];
+  return [hook.memoizedState, queue.dispatch];
 }
 ```
 
-Update path — eski state'ni baseline sifatida olib, queue'dan apply qiladi (cross-ref [`12-state-and-usestate.md`](12-state-and-usestate.md)).
+Update path — `baseState`ni baseline sifatida olib, pending circular queue'dagi har update'ni `reducer` orqali apply qiladi (cross-ref [`12-state-and-usestate.md`](12-state-and-usestate.md)). Queue circular bo'lgani uchun iteratsiya `first`'ga qaytib kelguncha davom etadi.
 
 **Mount → Unmount → Mount lifecycle:**
 
@@ -1686,7 +1700,7 @@ function useState<S>(initialState: S): [...] {
 
 1. **`HooksDispatcherOnMount`** — birinchi render
 2. **`HooksDispatcherOnUpdate`** — keyingi render'lar
-3. **`ContextOnlyDispatcher`** — render tashqarisida (faqat `useContext` ruxsat)
+3. **`ContextOnlyDispatcher`** — render tashqarisida; har hook (`useContext` ham) throw qiladi
 
 **Render flow:**
 
@@ -1718,11 +1732,12 @@ Module yuklanganda — render aktiv emas. `ReactCurrentDispatcher.current = Cont
 
 ```ts
 const ContextOnlyDispatcher = {
+  readContext,  // internal API — public useContext EMAS
   useState: throwInvalidHookError,
   useEffect: throwInvalidHookError,
   useReducer: throwInvalidHookError,
-  // ... barcha
-  useContext: readContext,  // ← Faqat useContext ishlaydi
+  useContext: throwInvalidHookError,  // ← public hook ham throw qiladi
+  // ... barcha hook'lar throwInvalidHookError'ga map qilingan
 };
 
 function throwInvalidHookError() {
@@ -1783,6 +1798,8 @@ function resolveDispatcher(): Dispatcher {
 
 react paket — Hooks API'ning **shell**. Real implementation — react-reconciler paketda.
 
+> **Versiya eslatma:** `ReactCurrentDispatcher.current` — R19'gacha bo'lgan nom. R19'da bu maydon `ReactSharedInternals.H`'ga ko'chirildi (internal struktura konsolidatsiyasi). Mexanizm bir xil: global mutable slot render boshida tegishli dispatcher'ga set qilinadi. Bu bo'limda konseptual `ReactCurrentDispatcher` nomidan foydalaniladi.
+
 **Cross-package dispatcher:**
 
 ```
@@ -1821,20 +1838,22 @@ Bu — "more than one copy of React" warning sababi. Yechim:
 - bundler `resolve.alias`
 - peerDependency'lar to'g'ri set qilish
 
-**Dispatcher invalidation — Server Components:**
+**Dispatcher — Server Components:**
 
-R19'da Server Components alohida dispatcher ishlatadi (`HooksDispatcherOnServer`):
+R19'da Server Component'lar alohida server dispatcher ishlatadi (`react-server` runtime'da, react-reconciler'dan ajratilgan). Stateful va effect hook'lar bu dispatcher'da mavjud emas:
 
 ```ts
-const HooksDispatcherOnServer: Dispatcher = {
-  useState: throwInvalidHookError,  // Server'da state yo'q
-  useEffect: throwInvalidHookError,
-  // ...
-  useId: serverUseId,  // Faqat ba'zilar ishlaydi
-};
+// Server dispatcher (konseptual)
+{
+  useState: undefined,    // Server'da state yo'q
+  useEffect: undefined,   // Server'da effect yo'q
+  useContext: ...,        // RSC context o'qish
+  useId: ...,             // ID generatsiya ishlaydi
+  // use, useMemo, useCallback — render-only hook'lar mavjud
+}
 ```
 
-Server Component'da `useState` chaqirilsa — throw. Cross-ref [`39-rsc-server-actions.md`](39-rsc-server-actions.md).
+Server Component'da `useState` yoki `useEffect` chaqirilsa — bunday hook server uchun export qilinmaganligi sababli xato. Cross-ref [`39-rsc-server-actions.md`](39-rsc-server-actions.md).
 
 </details>
 
@@ -1854,13 +1873,13 @@ function App() {
 }
 ```
 
-useContext outside render — Server Components yoki specific tools:
+useContext — faqat render ichida:
 
 ```tsx
-// useContext — ContextOnlyDispatcher'da ishlaydi (lekin invariants bilan)
-// Bu — internal mexanizm, oddiy code'da ishlatilmaydi
+// ❌ Render tashqarisida useContext ham throw qiladi
+// ContextOnlyDispatcher.useContext = throwInvalidHookError
 
-// Standard pattern:
+// ✅ Standard pattern — custom hook ichida
 function useTheme() {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error('useTheme must be inside ThemeProvider');
@@ -2065,8 +2084,8 @@ Bir-biriga ulanadigan oddiy linked list. Har hook chaqiruvi — bir node.
 ```ts
 function mountEffect(create: () => () => void, deps: any[] | null): void {
   return mountEffectImpl(
-    Passive | PassiveStatic,  // Fiber flags (ReactFiberFlags.js exports)
-    HookPassive,              // Hook tag (ReactHookEffectTags.js)
+    PassiveEffect | PassiveStaticEffect,  // Fiber flags (ReactFiberFlags.js exports)
+    HookPassive,                          // Hook tag (ReactHookEffectTags.js)
     create,
     deps
   );
@@ -2274,13 +2293,19 @@ function Counter() {
    // workInProgress.memoizedState = hook0_clone
    // workInProgressHook = hook0_clone
    
-   // Pending update'lar process qilinadi
+   // Pending update'lar process qilinadi.
+   // queue.pending — CIRCULAR singly-linked list:
+   //   pending = oxirgi update, pending.next = birinchi update
    const queue = hook.queue;
    let newState = hook.baseState;
-   let update = queue.pending;
-   while (update !== null) {
-     newState = basicStateReducer(newState, update.action);
-     update = update.next;
+   const last = queue.pending;
+   if (last !== null) {
+     const first = last.next;  // circular list'ning boshi
+     let update = first;
+     do {
+       newState = basicStateReducer(newState, update.action);
+       update = update.next;
+     } while (update !== first);  // first'ga qaytguncha (circular)
    }
    
    hook.memoizedState = newState;
@@ -2302,12 +2327,14 @@ function Counter() {
 **Hook count check:**
 
 ```ts
-// Update tugagandan keyin
-if (didFinishSilently) {
-  // OK
-} else if (currentHook !== null && currentHook.next !== null) {
-  // Eski hook'lar qoldi — fewer hooks called
-  throw new Error('Rendered fewer hooks than during the previous render.');
+// finishRenderingHooks ichida — render tugagach
+const didRenderTooFewHooks = currentHook !== null && currentHook.next !== null;
+if (didRenderTooFewHooks) {
+  // Eski zanjirda ishlatilmagan hook qoldi — fewer hooks called
+  throw new Error(
+    'Rendered fewer hooks than expected. This may be caused by an accidental ' +
+    'early return statement.'
+  );
 }
 ```
 
@@ -2323,18 +2350,27 @@ Update render'da har hook ikki references — eski (read) va yangi (write).
 Eager bailout (cross-ref [`12-state-and-usestate.md`](12-state-and-usestate.md)):
 
 ```ts
-function dispatchSetState(...) {
-  if (queue.pending === null) {
-    const eagerState = basicStateReducer(lastRenderedState, action);
-    if (Object.is(eagerState, lastRenderedState)) {
-      return;  // Bailout — render trigger qilinmaydi
+function dispatchSetState(fiber, queue, action) {
+  // Update'ni har doim queue'ga qo'shadi
+  const update = { action, eagerState: null, hasEagerState: false, next: null };
+  enqueueUpdate(fiber, queue, update);
+
+  // Fiber'da pending ish yo'q bo'lsagina eager eval qiladi
+  if (fiber.lanes === NoLanes &&
+      (fiber.alternate === null || fiber.alternate.lanes === NoLanes)) {
+    const lastRenderedReducer = queue.lastRenderedReducer;
+    const eagerState = lastRenderedReducer(queue.lastRenderedState, action);
+    update.hasEagerState = true;
+    update.eagerState = eagerState;
+    if (Object.is(eagerState, queue.lastRenderedState)) {
+      return;  // Bailout — render schedule qilinmaydi
     }
   }
-  // ... enqueue + schedule
+  // ... scheduleUpdateOnFiber
 }
 ```
 
-`setCount(0)` chaqirilsa va eski state ham 0 — render umuman boshlanmaydi.
+Update har doim queue'ga qo'shiladi, lekin Fiber'da boshqa pending ish yo'q (`fiber.lanes === NoLanes`) bo'lsagina natija oldindan hisoblanadi. `setCount(0)` chaqirilsa va eski state ham 0 — `Object.is(0, 0)` true, render schedule qilinmaydi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -2555,7 +2591,7 @@ hook[1] = b (state: 0)
 ```
 useState(0) → hook[0]  // React: bu a edi! Lekin endi b ishlatadi
 // b — eski a'ning state'iga ega bo'ladi (silent bug)
-// Yoki React detect qiladi va throw: "Rendered fewer hooks"
+// Yoki React detect qiladi va throw: "Rendered fewer hooks than expected..."
 ```
 
 **Yana misol — silent state corruption:**
@@ -2660,8 +2696,8 @@ function renderWithHooks(...) {
     
     if (nextHookCount < prevHookCount) {
       throw new Error(
-        'Rendered fewer hooks than during the previous render. ' +
-        'This is likely caused by an unintentional early return statement.'
+        'Rendered fewer hooks than expected. This may be caused by an accidental ' +
+        'early return statement.'
       );
     }
     
@@ -2716,18 +2752,21 @@ useState(1);     // hook[1] = ??? (eski useEffect slot)
 
 Hook count match (2 = 2), lekin **type mismatch**. Effect data state sifatida interpret qilinadi → undefined behavior.
 
-Modern React — dev mode'da hook type check:
+Modern React — dev mode'da hook type check. `Hook` obyektida `type` maydon yo'q; o'rniga dev mode alohida `hookTypesDev` array'ida har hook'ning nomini (string) saqlaydi va index bo'yicha solishtiradi:
 
 ```ts
-// Dev mode validation
+// Dev mode validation (soddalashtirilgan)
 if (__DEV__) {
-  if (workInProgressHook?.type !== currentHook?.type) {
-    console.warn('Hook order changed.');
+  // mount: hookTypesDev.push('useState' | 'useEffect' | ...)
+  // update: joriy hook nomini oldingi render'dagi bilan solishtirish
+  const prevHookName = hookTypesDev[currentHookNameIndex];
+  if (prevHookName !== undefined && prevHookName !== currentHookName) {
+    console.error('React has detected a change in the order of Hooks.');
   }
 }
 ```
 
-Production'da hook **type** check yo'q (faqat dev mode'da `mountHookTypesDev` array tracks qiladi). Hook **count** check production'da ham ishlaydi va throw beradi. Lekin type swap (e.g., `useState` ↔ `useEffect` bir xil index'da, count o'zgarmasa) — production'da silent bug bo'lib qoladi.
+Production'da hook nomi (type) check yo'q — faqat dev mode'da `hookTypesDev` array tracks qiladi. Hook **count** check production'da ham ishlaydi va throw beradi. Lekin type swap (masalan, `useState` ↔ `useEffect` bir xil index'da, count o'zgarmasa) — production'da silent bug bo'lib qoladi.
 
 **ESLint plugin — static check:**
 
@@ -2879,7 +2918,7 @@ function FeatureB() {
 
 ### Nazariya
 
-**Custom hook** — `use` prefix bilan boshlanadigan funksiya. Boshqa hook'larni chaqiradi va logic'ni capsulate qiladi.
+**Custom hook** — `use` prefix bilan boshlanadigan funksiya. Boshqa hook'larni chaqiradi va logic'ni bitta qayta ishlatiladigan birlikka jamlaydi.
 
 ```tsx
 function useCounter(initial = 0) {
@@ -3528,7 +3567,7 @@ useAsync — fetch wrapper:
 ```tsx
 function useAsync<T, P extends unknown[]>(
   fn: (...args: P) => Promise<T>,
-  immediate = true
+  immediateArgs?: P
 ) {
   const [state, setState] = useState<{
     data: T | null;
@@ -3536,7 +3575,7 @@ function useAsync<T, P extends unknown[]>(
     error: Error | null;
   }>({
     data: null,
-    loading: immediate,
+    loading: immediateArgs !== undefined,
     error: null,
   });
   
@@ -3553,28 +3592,27 @@ function useAsync<T, P extends unknown[]>(
   }, [fn]);
   
   useEffect(() => {
-    if (immediate) {
-      execute(...([] as unknown as P));
+    if (immediateArgs !== undefined) {
+      execute(...immediateArgs);
     }
   }, []);
   
   return { ...state, execute };
 }
 
-// Usage 1: immediate
+// Usage 1: immediate (argument'larni immediateArgs orqali uzatish)
 function UserPage({ userId }: { userId: number }) {
   const fetchUser = useCallback(() => fetch(`/api/users/${userId}`).then(r => r.json()), [userId]);
-  const { data, loading } = useAsync(fetchUser);
+  const { data, loading } = useAsync(fetchUser, []);
   
   if (loading) return <p>Loading...</p>;
   return <h1>{data?.name}</h1>;
 }
 
-// Usage 2: manual trigger
+// Usage 2: manual trigger (immediateArgs uzatilmaydi — auto-run yo'q)
 function ManualFetch() {
   const { data, loading, execute } = useAsync(
-    () => fetch('/api/data').then(r => r.json()),
-    false
+    () => fetch('/api/data').then(r => r.json())
   );
   
   return (
@@ -3896,7 +3934,7 @@ function isStable(variable) {
 
 `eslint-plugin-react-hooks` — React komandasi ishlab chiqaradi. R18, R19 yangi hook'lar bilan plugin yangilanadi:
 
-- **R18:** yangi hook'lar (`useTransition`, `useDeferredValue`, `useId`, `useSyncExternalStore`, `useInsertionEffect`) plugin tomonidan hook deb tanildi. `useSyncExternalStore`'ning `subscribe`/`getSnapshot` argument'lari deps-like — stale reference muammosi flag qilinadi.
+- **R18:** yangi hook'lar (`useTransition`, `useDeferredValue`, `useId`, `useSyncExternalStore`, `useInsertionEffect`) plugin tomonidan hook deb tanildi — Rules of Hooks tartibi ular uchun ham tekshiriladi. `exhaustive-deps` esa faqat deps array oladigan hook'larni (`useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`, `useImperativeHandle`) tekshiradi; `useSyncExternalStore`'da deps array yo'q, shuning uchun uning argument'lari `exhaustive-deps` tomonidan tekshirilmaydi.
 - **R19:** `use()` hook — Rules of Hooks uchun **istisno** (conditional/loop ichida chaqirilishi mumkin, Promise yoki Context unwrap qiladi). Plugin uni hisobga oladi va boshqa hook'lardek strict tekshirmaydi.
 
 </details>
@@ -4317,7 +4355,7 @@ function SearchPage() {
 
 **Mexanizm:**
 
-1. User typing — query her keystroke o'zgaradi
+1. User typing — query har keystroke'da o'zgaradi
 2. useEffect har query change'da timer set qiladi (300ms)
 3. Cleanup — query keyingi keystroke'da o'zgarsa, eski timer cancel
 4. 300ms tinch tursa — timer fire, debounced yangilanadi

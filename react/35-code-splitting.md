@@ -31,14 +31,14 @@
 
 Code Splitting — JavaScript bundle'ini bir nechta `.js` fayl (chunk)'ga ajratish jarayoni. Brauzer initial sahifa yuklash paytida faqat **kritik chunk**'larni yuklaydi, qolganlari kerak bo'lgan paytda asinxron tarzda yuklanadi.
 
-**Muammo — single bundle:** Modern SPA application'lar 1-5 MB JavaScript bundle'iga ega bo'lishi mumkin. Brauzer bu bundle'ni:
+**Muammo — single bundle:** Feature-boy SPA application'lar bir necha megabaytlik JavaScript bundle'iga yetishi mumkin. Brauzer bu bundle'ni:
 
 1. **Yuklab olishi** kerak (network bandwidth)
 2. **Parse qilishi** kerak (V8/SpiderMonkey AST yaratish)
 3. **Compile qilishi** kerak (bytecode)
 4. **Execute qilishi** kerak (initial render)
 
-Har bir bosqich vaqt sarflaydi. Mobile qurilma'larda (low-end CPU + 3G/4G) 3 MB bundle parse vaqti foydalanuvchining birinchi kontent'ni ko'rishini kechiktiradi. Web Vitals metrikalariga (cross-ref `34-profiling.md`) ta'sir qiladi:
+Har bir bosqich vaqt sarflaydi. Mobile qurilma'larda (low-end CPU + 3G/4G) katta bundle'ni parse qilish foydalanuvchining birinchi kontent'ni ko'rishini kechiktiradi. Web Vitals metrikalariga (cross-ref `34-profiling.md`) ta'sir qiladi:
 
 - **TTFB (Time to First Byte)** — server javob vaqti, bundle hajmi bevosita ta'sir qilmaydi, lekin SSR rendering vaqtiga ta'sir qiladi.
 - **FCP (First Contentful Paint)** — birinchi kontent ko'rinishi. Katta bundle parse → kechikish.
@@ -52,7 +52,7 @@ Har bir bosqich vaqt sarflaydi. Mobile qurilma'larda (low-end CPU + 3G/4G) 3 MB 
 - **Async chunk**'lar — alohida sahifalar, kam ishlatiladigan feature'lar (admin panel, settings, modals, charts), heavy library'lar (rich text editor, video player).
 - **Vendor chunk** — kam o'zgaradigan third-party library'lar (React, lodash, dayjs) — uzoq cache'lanadi.
 
-Chunk'larga ajratishning samarasi: foydalanuvchi initial pay-load 200 KB ko'radi, qolgan 800 KB faqat tegishli sahifa ochilganda yuklanadi.
+Chunk'larga ajratishning samarasi: foydalanuvchi initial yuklanishda faqat kichik kritik payload'ni oladi, qolgan kod esa faqat tegishli sahifa yoki feature ochilganda yuklanadi.
 
 **Bundler ishi:** Modern bundler'lar (Webpack, Rollup, Vite, Esbuild) `import()` dynamic syntax'ini topadi va shu joyda chunk boundary o'rnatadi. Build vaqtida har bir dynamic import alohida `.js` fayl sifatida emit qilinadi. Manifest fayl chunk nomlari va hash'larini yozadi.
 
@@ -68,7 +68,7 @@ Haqiqiy chunk emit qilish, manifest yaratish, prefetch/preload mexanizmlari — 
 > - **R16.6 (2018):** `React.lazy` + `<Suspense>` rasmiy API. Faqat client-side rendering uchun (SSR'da ishlamasdi).
 > - **R18 (2022):** Streaming SSR + Concurrent + automatic batching → `React.lazy` SSR'da to'liq qo'llab-quvvatlanadi (`renderToPipeableStream` / `renderToReadableStream`).
 > - **R19 (2024+):** Preloading APIs (`preload`, `preinit`, `prefetchDNS`, `preconnect`) + Document Metadata API (`<link rel="modulepreload">` JSX'dan `<head>`'ga avtomatik hoist).
-> - **Sabab:** Bundle hajmi o'sishi (modern app'lar 2-5 MB), Web Vitals'ga e'tibor (Google Page Experience ranking 2021), Network heterogeneity (mobile 3G/4G low-end devices).
+> - **Sabab:** Bundle hajmi o'sishi (feature-boy SPA'lar bir necha megabaytga yetishi mumkin), Web Vitals'ga e'tibor (Google Page Experience ranking 2021), Network heterogeneity (mobile 3G/4G low-end devices).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -200,24 +200,24 @@ function App() {
 }
 ```
 
-Bundle hajmi taqqoslash (taxminiy real loyiha):
+Bundle tarkibi taqqoslash (illyustrativ chunk taqsimoti):
 
 ```
 WITHOUT code splitting:
-  main.js — 1.8 MB (gzipped: 480 KB)
-  Initial parse vaqti: ~300ms (mid-range mobile)
-  TTI: ~3.5s
+  main.js — barcha sahifa va feature bitta bundle'da
+  Initial parse: butun bundle main thread'da
+  TTI: bundle to'liq execute bo'lguncha kechikadi
 
 WITH code splitting (route-based):
-  main.js — 240 KB (gzipped: 80 KB)   [router + home page]
-  admin.js — 320 KB (lazy)             [admin dashboard chunk]
-  charts.js — 580 KB (lazy)            [recharts library + charts]
-  settings.js — 180 KB (lazy)          [settings page]
-  vendor-react.js — 130 KB             [react + react-dom]
-  vendor-utils.js — 95 KB              [lodash + dayjs]
+  main.js              [router + home page — kritik]
+  admin.js (lazy)      [admin dashboard chunk]
+  charts.js (lazy)     [chart library + charts]
+  settings.js (lazy)   [settings page]
+  vendor-react.js      [react + react-dom]
+  vendor-utils.js      [lodash + dayjs]
 
-  Initial parse vaqti: ~50ms
-  TTI: ~1.2s (foydalanuvchi home page'da)
+  Initial parse: faqat main.js + vendor (kichikroq)
+  TTI: home page'da faqat kritik chunk execute bo'ladi
 ```
 
 </details>
@@ -279,13 +279,13 @@ function lazyInitializer(payload) {
     // Promise'ni Pending state'ga ko'chirish
     thenable.then(
       (moduleObject) => {
-        if (payload._status === Pending) {
+        if (payload._status === Pending || payload._status === Uninitialized) {
           payload._status = Resolved;
           payload._result = moduleObject;
         }
       },
       (error) => {
-        if (payload._status === Pending) {
+        if (payload._status === Pending || payload._status === Uninitialized) {
           payload._status = Rejected;
           payload._result = error;
         }
@@ -337,7 +337,7 @@ Initial render (route '/admin'):
   9. Suspense fallback render qilinadi (PageSkeleton)
   10. Promise.then(handleResolved) ulanadi
 
-Network — chunk yuklanmoqda (~150ms):
+Network — chunk yuklanmoqda:
   11. <script src="admin-chunk-abc123.js"> insert
   12. Module factory execute
   13. AdminDashboard module export qiladi { default: AdminDashboard }
@@ -767,9 +767,9 @@ function NavMenu() {
 Feature-based splitting — komponent darajasida (route emas) chunk yaratish. Foydalanuvchining barcha sahifa functionality'lari kerak emas — ba'zi feature'lar conditional, lazy, on-demand:
 
 - **Modal va dialog'lar** — ochilmaguncha kerak emas (`HeavyModal`, `ConfirmDialog`)
-- **Heavy library wrappers** — RichTextEditor (Slate, Tiptap, Lexical) 200-500 KB, faqat edit mode'da
+- **Heavy library wrappers** — RichTextEditor (Slate, Tiptap, Lexical) — katta bundle, faqat edit mode'da
 - **Charts va visualizations** — recharts, d3, Chart.js — faqat dashboard'da
-- **Code editors** — Monaco Editor 2 MB, Prism syntax highlighting kichikroq
+- **Code editors** — Monaco Editor (yirik bundle), Prism syntax highlighting (kichikroq)
 - **Video/Audio players** — video.js, plyr — faqat media kontent bo'lganda
 - **PDF viewers, image gallery** — kerak bo'lgan interaction'da
 - **Admin/Owner-only feature'lar** — `if (user.role === 'admin') ...`
@@ -1024,7 +1024,7 @@ function App() {
 
 Vendor splitting — `node_modules`'dan kelgan third-party library'larni alohida chunk(lar)ga ajratish strategiyasi. Sabab:
 
-1. **Kam o'zgaradi** — React 19.0.0 → 19.1.0 yangilanishi yiliga 1-2 marta. Application kod har deploy'da o'zgaradi.
+1. **Kam o'zgaradi** — third-party library versiyasi nisbatan kam yangilanadi. Application kod esa har deploy'da o'zgaradi.
 2. **Long-term cache** — vendor chunk hash deploy'lar orasida saqlanadi (immutable cache 1 yil).
 3. **Parallel download** — brauzer parallel `<script>` yuklashi mumkin (HTTP/2 multiplexing).
 4. **Tree shaking samarasi** — vendor chunk faqat ishlatilgan import'larni o'z ichiga oladi.
@@ -1265,13 +1265,14 @@ npm run build
 Heavy library aniqlash (vendor splitting kerakligi):
 
 ```typescript
-// Misol output (rollup-plugin-visualizer dan):
-// vendor-charts: 480 KB (recharts: 380 KB, d3-array: 50 KB, d3-shape: 50 KB)
-// vendor-react: 130 KB (react: 8 KB, react-dom: 122 KB)
-// vendor-utils: 95 KB (lodash-es: 70 KB, dayjs: 25 KB)
-// vendor: 65 KB (qolgan modullar)
+// rollup-plugin-visualizer treemap'da har chunk hajmi va tarkibi ko'rinadi:
+// vendor-charts — eng yirik (recharts + d3 modullari)
+// vendor-react  — react + react-dom (react-dom ko'p qismni egallaydi)
+// vendor-utils  — lodash-es + dayjs
+// vendor        — qolgan kichik modullar
 
-// Qaror: vendor-charts alohida split foydali — 480 KB faqat dashboard'da kerak
+// Qaror: eng yirik library (vendor-charts) alohida split foydali —
+// u faqat dashboard route'ida kerak, har sahifada emas
 ```
 
 </details>
@@ -1298,7 +1299,7 @@ Magic Comments — Webpack'ning maxsus comment syntax'i, dynamic `import()` chaq
 
 - **`lazy` (default)** — alohida chunk, dynamic talab paytida yuklanadi.
 - **`eager`** — chunk yaratilmaydi, asosiy bundle'ga qo'shiladi (Promise lekin instant resolve).
-- **`weak`** — chunk talab qilinadi faqat agar boshqa joyda allaqachon yuklangan bo'lsa.
+- **`weak`** — hech qachon network request yubormaydi. Modul allaqachon yuklangan bo'lsa Promise resolve bo'ladi, aks holda reject qilinadi.
 - **`lazy-once`** — bir nechta dynamic import bitta chunk'ga birlashtiriladi.
 
 <details>
@@ -1404,7 +1405,7 @@ const Charts = lazy(() =>
 Prefetch — keyingi navigatsiya bashorati:
 
 ```tsx
-// Foydalanuvchi home page'da. Ko'pchilik admin'ga kelgusi 30 sek ichida o'tadi.
+// Foydalanuvchi home page'da. Ko'pchilik tez orada admin'ga o'tishi kutilmoqda.
 // Idle vaqtda admin chunk yuklab qo'yamiz.
 const AdminDashboard = lazy(() =>
   import(
@@ -1538,7 +1539,7 @@ Preloading — chunk'ni **kerak bo'lgan paytdan oldin** yuklab qo'yish strategiy
 3. **Touch preload** — `onTouchStart` event'da. Mobile'da tap event va click event orasidagi qisqa interval ichida chunk yuklash boshlanadi.
 4. **Viewport intersection** — `IntersectionObserver` orqali element viewport'ga kirgan paytda preload.
 5. **Idle preload** — `requestIdleCallback` orqali brauzer bo'sh vaqtida preload.
-6. **Predictive preload** — analytics asosida bashorat (50%+ user'lar `/home`'dan `/products`'ga o'tadi).
+6. **Predictive preload** — analytics asosida bashorat (foydalanuvchilarning katta qismi `/home`'dan `/products`'ga o'tsa, shu chunk'ni oldindan yuklash).
 
 **Trade-off'lar:**
 
@@ -1566,7 +1567,7 @@ requestIdleCallback(
 );
 ```
 
-`deadline.timeRemaining()` — frame'da qancha vaqt qoldi. Brauzer 16ms frame budget ichida idle vaqt qoldirsa callback chaqiradi.
+`deadline.timeRemaining()` — joriy idle period'da callback uchun qancha vaqt qolganini millisekundda qaytaradi. Brauzer frame'lar orasidagi yoki yuqori prioritetli ish bo'lmagan bo'sh vaqtda callback'ni chaqiradi; `timeRemaining()` shu period tugashiga qancha qolganini bildiradi.
 
 **Browser support:**
 
@@ -1577,10 +1578,10 @@ requestIdleCallback(
 **`IntersectionObserver` performance:**
 
 ```javascript
-// Native API — brauzer compositor/internal thread'da kuzatadi (Web Worker EMAS).
-// Callback main thread'da (microtask queue) chaqiriladi, lekin intersection o'lchash
-// layout/paint flow bilan birga bo'ladi va getBoundingClientRect kabi sync layout
-// reads'ga muqobil — main thread block qilmaydi.
+// Native API — intersection'ni brauzer o'zi kuzatadi, main thread'dagi
+// sinxron getBoundingClientRect loop kerak emas. Callback main thread'da,
+// event loop'ning rendering bosqichidan keyingi "notify intersection observers"
+// qadamida chaqiriladi (microtask emas) — scroll handler'ni bloklamaydi.
 const observer = new IntersectionObserver(
   (entries) => {
     entries.forEach((entry) => {
@@ -1629,7 +1630,7 @@ import { Link } from 'react-router-dom';
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 function NavMenu() {
-  // Module-level cache: ikkinchi chaqirig instant
+  // Module-level cache: ikkinchi chaqiriq instant
   const preloadAdmin = () => import('./pages/AdminDashboard');
 
   return (
@@ -1798,8 +1799,8 @@ function MobileNavItem({ to, label, loader }: {
 Predictive preload (analytics asosida):
 
 ```tsx
-// Analytics: home → products (52%), home → about (28%)
-// Home page'da 2 sek idle bo'lsa products preload qilamiz
+// Analytics: home'dan keyin eng ko'p products route ochiladi (about ikkinchi o'rinda)
+// Home page'da qisqa idle interval'dan keyin products preload qilamiz
 function HomePage() {
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1903,30 +1904,22 @@ R19 `<link>`, `<script async>`, `<title>`, `<meta>` element'larni komponent rend
 **`preload` source code (taxminiy soddalashtirilgan):**
 
 ```javascript
-// react-dom/src/Preload.js (taxminiy)
+// react-dom/src/shared/ReactDOMFloat.js (soddalashtirilgan)
 export function preload(href, options) {
-  if (typeof href !== 'string') return;
-
-  const dispatcher = ReactDOMSharedInternals.dispatcher;
-
-  // SSR'da streaming queue'ga qo'shadi
-  // Client'da <head>'ga <link> inject qiladi
-  if (dispatcher) {
-    dispatcher.preload(href, options.as, options);
-  } else {
-    // Fallback — direct DOM manipulation
-    if (typeof document !== 'undefined') {
-      const link = document.createElement('link');
-      link.rel = 'preload';
-      link.href = href;
-      link.as = options.as;
-      if (options.crossOrigin) link.crossOrigin = options.crossOrigin;
-      if (options.integrity) link.integrity = options.integrity;
-      document.head.appendChild(link);
-    }
+  // href va options.as string bo'lishi tekshiriladi, aks holda silent bailout
+  if (typeof href === 'string' && options && typeof options.as === 'string') {
+    // Aktiv dispatcher ReactDOMSharedInternals.d orqali olinadi.
+    // preload metodi qisqartirilgan nom — `.L` (L = Load).
+    // Dispatcher SSR'da streaming queue'ga, client'da
+    // <head>'ga <link> inject qiluvchi implementation'ga ishora qiladi.
+    const dispatcher = ReactDOMSharedInternals.d;
+    dispatcher.L(href, options.as, options);
   }
+  // Validation o'tmasa React jim bailout qiladi (optimistik, kritik emas).
 }
 ```
+
+> Real source'da har resource hint qisqartirilgan dispatcher metodiga map qilinadi: `prefetchDNS` → `.D`, `preconnect` → `.C`, `preload` → `.L`, `preinit` (style) → `.S`, `preinit` (script) → `.X`.
 
 **SSR streaming integration:**
 
@@ -2033,7 +2026,7 @@ function ProductCard({ product }: { product: Product }) {
   return (
     <div>
       <h3>{product.name}</h3>
-      <button onClick={() => openModal(product.id)}>Detalar</button>
+      <button onClick={() => openModal(product.id)}>Batafsil</button>
     </div>
   );
 }
@@ -2116,15 +2109,16 @@ function App() {
   );
 }
 
+// lazy() module-level — har render'da yangi state machine yaratilmasligi uchun
+const AdminDashboard = lazy(() => import('./admin/Dashboard'));
+const AdminUsers = lazy(() => import('./admin/Users'));
+
 // Admin guard — preload kerakli chunk va stylesheet'lar
 function AdminRoutes() {
   // Admin ichida render paytida — qolgan admin chunk'lar preload
   preload('/chunks/admin-charts.js', { as: 'script' });
   preload('/chunks/admin-users.js', { as: 'script' });
   preinit('/styles/admin.css', { as: 'style' });
-
-  const AdminDashboard = lazy(() => import('./admin/Dashboard'));
-  const AdminUsers = lazy(() => import('./admin/Users'));
 
   return (
     <Suspense fallback={<AdminSkeleton />}>
@@ -2452,7 +2446,7 @@ Bundle Analyzer — build natijasidagi chunk'lar tarkibini tahlil qiluvchi tool.
 
 **Asosiy savol'lar Bundle Analyzer hal qiladi:**
 
-1. **Qaysi modul katta hajm egallaydi?** — `lodash` 70 KB, `moment.js` 230 KB, `recharts` 380 KB.
+1. **Qaysi modul katta hajm egallaydi?** — masalan `moment.js`, `recharts` kabi library'lar bundle'ning katta qismini egallashi mumkin.
 2. **Tree shaking qanday ishlayapti?** — Named import'lar to'g'ri shake bo'ladimi yoki barcha library yuklanadimi?
 3. **Duplicate dependencies bormi?** — Bir xil library 2 marta turli versiya'lardan?
 4. **Vendor splitting samarali bo'ladimi?** — Hech katta library mavjudmi alohida split uchun?
@@ -2484,34 +2478,34 @@ Bundle Analyzer — build natijasidagi chunk'lar tarkibini tahlil qiluvchi tool.
 Hierarchy:
   Bundle
     ├── chunks
-    │   ├── main.js (240 KB)
-    │   │   ├── src/App.tsx (15 KB)
-    │   │   ├── src/components/* (45 KB)
+    │   ├── main.js
+    │   │   ├── src/App.tsx
+    │   │   ├── src/components/*
     │   │   └── ...
-    │   ├── vendor-react.js (130 KB)
-    │   │   ├── react (8 KB)
-    │   │   ├── react-dom (122 KB)
-    │   ├── vendor-charts.js (480 KB)
-    │   │   ├── recharts (380 KB)
-    │   │   └── d3-* (100 KB)
+    │   ├── vendor-react.js
+    │   │   ├── react        (kichik qism)
+    │   │   └── react-dom    (asosiy hajm)
+    │   ├── vendor-charts.js
+    │   │   ├── recharts     (asosiy hajm)
+    │   │   └── d3-*
 ```
 
 Har bir rectangle proportional area = file size. Klik → zoom → detal'lar.
 
 **Source map o'qish:**
 
-Bundle Analyzer source map'ni o'qib, har mining bundle'da egallagan baytlarini hisoblaydi. Tree shake yo'qotgan eksport'lar — hisoblanmaydi.
+Bundle Analyzer source map'ni o'qib, har bir modul bundle'da egallagan baytlarini hisoblaydi. Tree shake olib tashlagan eksport'lar — hisoblanmaydi.
 
 **Gzip vs Brotli vs Raw:**
 
 ```
-Recharts library:
-  Raw (uncompressed): 380 KB
-  Gzip: 95 KB
-  Brotli: 78 KB
+Bir library uchun transfer hajmi:
+  Raw (uncompressed) — eng katta
+  Gzip               — raw'dan ancha kichik
+  Brotli             — odatda gzip'dan ham kichik
 ```
 
-Production'da gzip yoki brotli ishlatiladi. CDN auto-compression'i o'rnatish kerak.
+Brauzer'ga uzatiladigan haqiqiy hajm — compressed o'lcham. Production'da gzip yoki brotli ishlatiladi; CDN auto-compression'i yoqilishi kerak. Bundle budget'ni compressed o'lcham bo'yicha o'lchash to'g'ri.
 
 </details>
 
@@ -2676,43 +2670,33 @@ jobs:
 bundlephobia integration (npm install oldidan tekshirish):
 
 ```bash
-# Library hajmini bilish:
-npx bundle-phobia-cli react
-# react@19.0.0
-# Min: 8 KB
-# Min+Gzip: 3.2 KB
+# Library hajmini install'dan oldin bilish.
+# CLI har paket uchun versiya, minified va min+gzip o'lchamni chiqaradi:
+npx bundle-phobia-cli moment   # date library — yirik, tree-shake qiyin
+npx bundle-phobia-cli dayjs    # moment alternativasi — ancha kichik
+npx bundle-phobia-cli date-fns # modular, named import bilan tree-shake-friendly
 
-npx bundle-phobia-cli moment
-# moment@2.30.1
-# Min: 230 KB  (juda katta!)
-# Min+Gzip: 70 KB
-
-# Alternative — dayjs (lighter):
-npx bundle-phobia-cli dayjs
-# dayjs@1.11.10
-# Min: 7 KB
-# Min+Gzip: 3 KB
+# Qaror: yangi dependency qo'shishdan oldin uning min+gzip hajmini va
+# tree-shaking xususiyatini taqqoslab, eng yengilini tanlash.
 ```
 
 Tree shaking aniqlash — dead code elimination:
 
 ```typescript
-// Anti-pattern: barcha lodash import qilish
+// Anti-pattern: butun lodash import qilish (CommonJS, tree-shake bo'lmaydi)
 import _ from 'lodash';
-const result = _.debounce(fn, 100);
+const debouncedSave = _.debounce(saveDraft, 300);
+// Bundle: butun lodash kiradi — faqat bitta funksiya ishlatilsa ham
 
-// Bundle: 70 KB (gzip)
-
-// Yaxshi: faqat kerakli funksiya
+// Yaxshi: faqat kerakli funksiyaning sub-path import'i
 import debounce from 'lodash/debounce';
-const result = debounce(fn, 100);
+const debouncedSave = debounce(saveDraft, 300);
+// Bundle: faqat debounce va uning bog'liqliklari
 
-// Bundle: 5 KB (gzip)
-
-// Eng yaxshi: ESM-friendly library
+// Eng yaxshi: ESM build — bundler to'liq tree-shake qiladi
 import { debounce } from 'lodash-es';
-const result = debounce(fn, 100);
-// Bundle: 5 KB (gzip), to'liq tree-shake
+const debouncedSave = debounce(saveDraft, 300);
+// Bundle: ishlatilmagan eksport'lar butunlay olib tashlanadi
 ```
 
 </details>
@@ -2727,13 +2711,13 @@ Code splitting noto'g'ri qo'llanilsa **performance regressiyasi** keltirib chiqa
 
 **1. Critical above-the-fold lazy loading:** Foydalanuvchi sahifaga kelganda darhol ko'radigan komponent (header, hero, asosiy content) lazy bo'lsa — initial chunk yuklangach yana boshqa chunk yuklash kerak. LCP regressiyasi.
 
-**2. Too granular splits:** Har kichik komponent alohida chunk → 50+ HTTP request → HTTP/2 multiplexing bo'lsa ham overhead (har request uchun parsing/execution context). Webpack default `splitChunks.minSize` 20 KB — undan kichikroq modul'lar odatda alohida chunk qilinmaydi. Amaliy tavsiya: tiny chunk'larni guruhlash, hatto 5-10 KB komponent'larni bitta `ui` yoki `dialogs` chunk'ida birlashtirish.
+**2. Too granular splits:** Har kichik komponent alohida chunk → ko'plab HTTP request → HTTP/2 multiplexing bo'lsa ham overhead (har request uchun parsing/execution context). Webpack default `splitChunks.minSize` 20 KB — undan kichikroq modul'lar odatda alohida chunk qilinmaydi. Amaliy tavsiya: mayda chunk'larni guruhlash, kichik komponent'larni bitta `ui` yoki `dialogs` chunk'ida birlashtirish.
 
 **3. Missing prefetch — UX waterfall:** Foydalanuvchi navigatsiya qiladi → chunk request → pending → content render. Bu sequential. Hover/idle preload bilan parallel qilinadi.
 
-**4. Unbalanced chunks:** Bitta tiny chunk (5 KB) + bitta katta (1 MB). Splitting samarasi yo'q. Vendor chunk'lar singari tabiiy guruhlar tuzish kerak.
+**4. Unbalanced chunks:** Bitta arzimas hajmli chunk + bitta juda yirik chunk. Splitting samarasi yo'q. Vendor chunk'lar singari tabiiy, hajm jihatdan muvozanatli guruhlar tuzish kerak.
 
-**5. Lazy loading har joyda:** Hatto kichik komponent'lar (5-10 KB) ham lazy. Boilerplate va Suspense overhead manfiy keltiradi.
+**5. Lazy loading har joyda:** Hatto mayda komponent'lar ham lazy. Boilerplate va Suspense overhead foydadan ko'p bo'lib qoladi.
 
 **6. Server-side fallback yo'q:** SSR'da React.lazy ishlatilsa fallback Suspense bilan, lekin SSR streaming yoqilmagan bo'lsa — server'da fallback HTML yuboriladi va client'da hydration mismatch.
 
@@ -2779,21 +2763,22 @@ function HomePage() {
 Anti-pattern 2: Too granular splitting:
 
 ```tsx
-// ❌ NOTO'G'RI — har kichik komponent alohida chunk
-const Button = lazy(() => import('./Button'));      // 2 KB chunk
-const Input = lazy(() => import('./Input'));        // 3 KB chunk
-const Label = lazy(() => import('./Label'));        // 1 KB chunk
-const FormField = lazy(() => import('./FormField')); // 4 KB chunk
+// ❌ NOTO'G'RI — har kichik primitive komponent alohida chunk
+const Button = lazy(() => import('./Button'));       // mayda chunk
+const Input = lazy(() => import('./Input'));         // mayda chunk
+const Label = lazy(() => import('./Label'));         // mayda chunk
+const FormField = lazy(() => import('./FormField')); // mayda chunk
 
-// HTTP request: 4 ta, har biri ~100ms RTT
-// Total wait: 400ms (sequential dependency)
+// Har chunk uchun alohida HTTP request va modul factory execution overhead.
+// Mayda fayl'ni alohida yuklash foydadan ko'ra ko'proq overhead beradi —
+// transfer hajmi kichik, lekin request boshqaruvi va parse konteksti qo'shiladi.
 
 // ✅ TO'G'RI — primitive komponent'lar bitta UI bundle'da
 import { Button, Input, Label, FormField } from './ui';
 
 // Lazy faqat heavy/conditional komponent'lar uchun:
-const RichEditor = lazy(() => import('./RichEditor')); // 200+ KB chunk
-const ChartsWidget = lazy(() => import('./ChartsWidget')); // 300+ KB chunk
+const RichEditor = lazy(() => import('./RichEditor'));     // yirik chunk
+const ChartsWidget = lazy(() => import('./ChartsWidget')); // yirik chunk
 ```
 
 Anti-pattern 3: Missing prefetch — sequential waterfall:
@@ -2825,7 +2810,7 @@ function ProductList() {
         >
           Product 1
         </Link>
-        {/* User hover → preload start → user click (~300ms later) → instant render */}
+        {/* User hover → preload start → click → chunk allaqachon yuklangan → instant render */}
       </li>
     </ul>
   );
@@ -2837,40 +2822,45 @@ Anti-pattern 4: Unbalanced chunks:
 ```typescript
 // ❌ NOTO'G'RI — random splitting, dis-balanced sizes
 manualChunks: {
-  'small-chunk': ['./src/utils/string-helper.ts'], // 2 KB
-  'huge-chunk': ['./src/everything-else'],          // 1.2 MB
+  'small-chunk': ['./src/utils/string-helper.ts'], // arzimas hajm
+  'huge-chunk': ['./src/everything-else'],          // qolgan hammasi — juda yirik
 }
 
 // ✅ TO'G'RI — logical grouping, balanced sizes
-// Comment'larda ko'rsatilgan hajmlar — versiya va tree-shake'ga qarab taxminiy.
-// Aniq raqamlar uchun `rollup-plugin-visualizer` yoki `bundlephobia.com` orqali tekshiring.
+// Har guruh hajmini `rollup-plugin-visualizer` yoki `bundlephobia.com` orqali tekshiring.
 manualChunks: {
-  'vendor-react': ['react', 'react-dom'],          // taxminan 100+ KB (react-dom dominant)
-  'vendor-router': ['react-router-dom'],            // taxminan 20-30 KB
-  'vendor-utils': ['lodash-es', 'dayjs'],          // 30-50 KB (lodash-es tree-shake'ga bog'liq)
-  'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'], // 50-100 KB
+  'vendor-react': ['react', 'react-dom'],          // react-dom asosiy hajm
+  'vendor-router': ['react-router-dom'],            // o'rtacha hajm
+  'vendor-utils': ['lodash-es', 'dayjs'],          // lodash-es tree-shake'ga bog'liq
+  'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'], // o'rtacha hajm
 }
 ```
 
 Anti-pattern 5: Excessive lazy:
 
 ```tsx
-// ❌ NOTO'G'RI — har dialog lazy
-const ConfirmDialog = lazy(() => import('./ConfirmDialog'));     // 5 KB
-const InfoDialog = lazy(() => import('./InfoDialog'));           // 4 KB
-const WarningDialog = lazy(() => import('./WarningDialog'));     // 3 KB
+// ❌ NOTO'G'RI — har dialog alohida lazy
+const ConfirmDialog = lazy(() => import('./ConfirmDialog'));   // mayda chunk
+const InfoDialog = lazy(() => import('./InfoDialog'));         // mayda chunk
+const WarningDialog = lazy(() => import('./WarningDialog'));   // mayda chunk
 
-// 3 ta tiny chunk + Suspense boilerplate har biri uchun.
+// 3 ta mayda chunk + har biri uchun alohida Suspense boilerplate.
 
-// ✅ TO'G'RI — kichik komponent'lar guruhi bitta chunk'ga
-const Dialogs = lazy(() => import('./dialogs'));
+// ✅ TO'G'RI — kichik komponent'lar bitta chunk'da, har biri named export'dan wrap
 // dialogs/index.ts:
 //   export { ConfirmDialog, InfoDialog, WarningDialog }
+// Uch import bir xil './dialogs' modul'iga ishora qiladi → bitta chunk yuklanadi.
+const ConfirmDialog = lazy(() =>
+  import('./dialogs').then((m) => ({ default: m.ConfirmDialog }))
+);
+const InfoDialog = lazy(() =>
+  import('./dialogs').then((m) => ({ default: m.InfoDialog }))
+);
 
 function App() {
   return (
     <Suspense fallback={null}>
-      <Dialogs.ConfirmDialog />
+      <ConfirmDialog />
     </Suspense>
   );
 }
@@ -3126,9 +3116,9 @@ function App() {
 }
 ```
 
-### Default Export Sirti
+### Default Export Talabi
 
-`React.lazy` `default` export'ni kutadi. Library yoki named export'larni wrap qilish kerak:
+`React.lazy` loader Promise'i `{ default: Component }` shaklini qaytarishi kerak. Named export'larni wrap qilib `default` ga aylantirish lozim:
 
 ```tsx
 // ❌ Bo'lmaydi — named export
@@ -3161,9 +3151,9 @@ export function B() { return <A />; }
 
 ### Strict Mode + `lazy` 2x Render
 
-Strict Mode dev'da effect 2x ishlaydi (R18+). Lekin `React.lazy` `_init` funksiyasi `payload._status` orqali idempotent. Network request 2 marta yuborilmaydi (browser HTTP cache deduplicate).
+Strict Mode dev'da render funksiyasi va effect 2x ishlaydi (R18+). Lekin `React.lazy` `_init` funksiyasi idempotent: `ctor()` (`import()`) faqat status `Uninitialized` bo'lganda chaqiriladi. Birinchi chaqiriqdan keyin status `Pending` ga o'tadi, shuning uchun ikkinchi render `ctor()`ni qayta chaqirmaydi — `import()` faqat bir marta yuboriladi.
 
-Lekin Strict Mode'da `<Suspense>` fallback ham 2x render qilinadi, console'da log 2 marta. Bu development-only behavior.
+Strict Mode'da `<Suspense>` fallback va render log'lari 2 marta ko'rinishi mumkin — bu development-only behavior, chunk yuklash mexanizmiga ta'sir qilmaydi.
 
 ### SSR Hydration va Lazy Chunk
 
@@ -3323,7 +3313,7 @@ function HelpButton() {
 
 - `HelpModal` module-level konstant — har render'da bir xil lazy state machine.
 - Conditional render (`{open && ...}`) — modal yopiq bo'lsa lazy `_init` chaqirilmaydi, chunk yuklanmaydi.
-- Birinchi marta `setOpen(true)` chaqirilganda — `import()` trigger, Suspense fallback `null` (ya'ni modal pajdo bo'lguncha hech narsa ko'rinmaydi).
+- Birinchi marta `setOpen(true)` chaqirilganda — `import()` trigger, Suspense fallback `null` (ya'ni modal paydo bo'lguncha hech narsa ko'rinmaydi).
 - Subsequent open — chunk allaqachon cache'da, instant render.
 
 </details>
@@ -3762,7 +3752,7 @@ function App() {
 
 ## Xulosa
 
-- **Code Splitting** — bundle hajmi (1-5 MB) va parse vaqti muammolarini hal qiluvchi fundamental texnika. JavaScript bundle alohida chunk'larga ajratiladi va kerak bo'lgan paytda yuklanadi.
+- **Code Splitting** — katta bundle hajmi va parse vaqti muammolarini hal qiluvchi fundamental texnika. JavaScript bundle alohida chunk'larga ajratiladi va kerak bo'lgan paytda yuklanadi.
 - **`React.lazy(loader)`** — komponent darajasidagi splitting uchun rasmiy API. State machine (Uninitialized → Pending → Resolved/Rejected), Promise throw → Suspense boundary fallback, default export shart.
 - **Bundler ishi** — Webpack/Rollup/Vite `import()` syntax'ini topadi va chunk boundary o'rnatadi. React faqat lazy() + Suspense API'ni ta'minlaydi.
 - **Splitting strategy'lari:** Route-based (har sahifa alohida chunk), Feature-based (modal/editor/charts conditional), Vendor splitting (long-cache `node_modules`).
