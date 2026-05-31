@@ -129,17 +129,17 @@ TypeScript da 7 ta primitive type: `string`, `number`, `boolean`, `bigint`, `sym
 
 - `string` — primitive type, `typeof "x" === "string"`
 - `String` — wrapper object class. `new String("x")` yaratadi (`typeof === "object"`)
-- Wrapper class lar (`String`, `Number`, `Boolean`) ko'p hollarda kerak emas. JavaScript auto-boxing qiladi (`"hello".toUpperCase()` da `"hello"` vaqtinchalik `String` object ga o'raladi)
+- Wrapper class'lar (`String`, `Number`, `Boolean`) ko'p hollarda kerak emas. JavaScript auto-boxing qiladi (`"hello".toUpperCase()` da `"hello"` vaqtinchalik `String` object'ga o'raladi)
 
 ### Kod misol
 
 ```typescript
-// ✅ Primitive type — annotation da kichik harf
+// ✅ Primitive type — annotation'da kichik harf
 let name: string = "Ali";
 let age: number = 25;
 let active: boolean = true;
 
-// ❌ Wrapper class — annotation da ishlatmang
+// ❌ Wrapper class — annotation'da ishlatmang
 let badName: String = "Ali"; // ⚠️ Eslatma yo'q, lekin best practice emas
 
 // Farq runtime da
@@ -172,7 +172,7 @@ console.log(Number.isNaN(NaN)); // → true (xavfsiz check)
 
 ### Follow-up savollar
 
-1. **"`bigint` qachon kerak?"** — `Number.MAX_SAFE_INTEGER` (2^53-1) dan katta integer kerak bo'lganda (financial calculation, blockchain, ID lar). Sintaksis: `42n` yoki `BigInt(42)`. `bigint` va `number` orasida implicit conversion yo'q.
+1. **"`bigint` qachon kerak?"** — `Number.MAX_SAFE_INTEGER` (2^53-1) dan katta integer kerak bo'lganda (financial calculation, blockchain, ID'lar). Sintaksis: `42n` yoki `BigInt(42)`. `bigint` va `number` orasida implicit conversion yo'q.
 2. **"`symbol` qachon kerak?"** — Unique object key yaratish uchun (`Symbol("id")`). Library da private/internal property uchun foydali. ES iterator protocol (`Symbol.iterator`) va metaprogramming uchun.
 
 </details>
@@ -228,7 +228,7 @@ function getLength(str: string | null): number {
   // str.length; ❌ 'str' is possibly 'null'
 
   if (str !== null) {
-    return str.length; // ✅ narrowing dan keyin xavfsiz
+    return str.length; // ✅ narrowing'dan keyin xavfsiz
   }
   return 0;
 }
@@ -265,7 +265,7 @@ if (input !== null && input instanceof HTMLInputElement) {
 ### Follow-up savollar
 
 1. **"Optional property (`?`) va `undefined` farqi bormi?"** — `exactOptionalPropertyTypes: true` bilan farqlanadi. `{ name?: string }` — property bo'lmasligi mumkin. `{ name: string | undefined }` — property bo'lishi shart, lekin qiymat `undefined` bo'lishi mumkin.
-2. **"`null` o'rniga doim `undefined` ishlatish mumkinmi?"** — Ko'p loyihalarda ha — bitta nullish qiymat oson. Lekin DOM API, JSON, va ko'p library lar `null` qaytaradi — convention ga moslashish kerak.
+2. **"`null` o'rniga doim `undefined` ishlatish mumkinmi?"** — Ko'p loyihalarda ha — bitta nullish qiymat oson. Lekin DOM API, JSON, va ko'p library'lar `null` qaytaradi — convention ga moslashish kerak.
 
 </details>
 
@@ -289,7 +289,7 @@ if (input !== null && input instanceof HTMLInputElement) {
 | Type safety | ❌ Yo'q | ✅ Bor |
 | Asosiy use case | JS → TS migration | API boundary, `catch(e)`, tashqi data |
 
-`any` "viral" — `any` ga assign qilingan qiymat ham `any` bo'ladi. `unknown` "non-viral" — narrowing dan o'tmasa, operatsiya mumkin emas.
+`any` "viral" — `any` ga assign qilingan qiymat ham `any` bo'ladi. `unknown` "non-viral" — narrowing'dan o'tmasa, operatsiya mumkin emas.
 
 `unknown` TS 3.0 da kiritilgan. Type theory tilida "top type" — barcha tiplar `unknown` ga assignable, lekin `unknown` faqat `any` va `unknown` ga.
 
@@ -314,7 +314,7 @@ function processUnknown(data: unknown) {
   // data.name; ❌ 'data' is of type 'unknown'
 
   if (typeof data === "object" && data !== null && "name" in data) {
-    console.log(data.name); // ✅ narrowing dan keyin
+    console.log(data.name); // ✅ narrowing'dan keyin
   }
 }
 
@@ -332,8 +332,8 @@ try {
 ### Edge Cases
 
 - `any` `never` dan tashqari har tipga assignable
-- `unknown | string` → `unknown` (`unknown` boshqa tip larni "yutadi")
-- TypeScript ning ba'zi API lari `any` qaytaradi (`JSON.parse`, `fetch().then(r => r.json())`) — manual `unknown` cast tavsiya
+- `unknown | string` → `unknown` (`unknown` boshqa tiplarni "yutadi")
+- TypeScript ning ba'zi API'lari `any` qaytaradi (`JSON.parse`, `fetch().then(r => r.json())`) — manual `unknown` cast tavsiya
 - `Function` type ham `any` ga o'xshash xavfli — aniq function signature yozish kerak
 
 ### Follow-up savollar
@@ -344,11 +344,11 @@ try {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-TypeScript checker da `unknown` "top type" sifatida `getUnknownType()` orqali aniqlanadi. `any` esa "any type" — top va bottom type kabi xulq qiladi: `any <: T` va `T <: any` har T uchun. Bu type system soundness'ini buzadi — `unknown` aynan shu muammoni hal qilish uchun kiritildi.
+`unknown` type theory tilida "top type" — barcha tip unga assignable, lekin `unknown` faqat `any` va `unknown` ga assignable. `any` bir vaqtda top va bottom type xususiyatini birga oladi: `any <: T` va `T <: any` har `T` uchun bajariladi (faqat `never` istisno — `any` `never` ga assignable emas). Aynan shu `T <: any` yo'nalishi type system soundness'ini buzadi — `unknown` bu yo'nalishni yopib, "avval narrow qil" majburiyatini kiritadi.
 
 `useUnknownInCatchVariables` (TS 4.4) sababi — JavaScript da `throw "string"` yoki `throw 42` qonuniy, shuning uchun `e: any` semantically noto'g'ri edi. `unknown` to'g'riroq: har `throw` qiymati `unknown` deb qaraladi.
 
-Narrowing `unknown` da `typeof`, `instanceof`, `in` operator, type predicate orqali. Control flow analysis `getNarrowedType()` orqali — TS branch larni izlab union type larni filter qiladi.
+`unknown`'ni narrowing — `typeof`, `instanceof`, `in` operator, user-defined type predicate orqali. Checker control flow graph'ni binder bosqichida quradi, keyin reference nuqtasida `getFlowTypeOfReference` orqali lazily hisoblaydi — har branch'dan keyin qiymat tipini torroq variantga qisqartiradi.
 
 </details>
 
@@ -363,7 +363,7 @@ Narrowing `unknown` da `typeof`, `instanceof`, `in` operator, type predicate orq
 
 ### Qisqa javob
 
-`void` — funksiya normal tugaydi, qiymat qaytarmaydi (aslida `undefined`). `never` — funksiya **hech qachon** normal tugamaydi — yoki `throw`, yoki cheksiz loop, yoki impossible type. `never` exhaustive checking, error type, va impossible state lar uchun ishlatiladi.
+`void` — funksiya normal tugaydi, qiymat qaytarmaydi (aslida `undefined`). `never` — funksiya **hech qachon** normal tugamaydi — yoki `throw`, yoki cheksiz loop, yoki impossible type. `never` exhaustive checking, error type, va impossible state'lar uchun ishlatiladi.
 
 ### To'liq tushuntirish
 
@@ -383,12 +383,12 @@ Narrowing `unknown` da `typeof`, `instanceof`, `in` operator, type predicate orq
 | Boshqa tipga assign | `void` ga `any`/`undefined` mumkin | `never` har tipga assignable |
 | Use case | Side effect funksiya | Exhaustive check, error, impossible |
 
-`never` ning use case lari:
+`never` ning use case'lari:
 
 1. **Throw funksiya** — `function fail(msg: string): never { throw new Error(msg); }`
 2. **Infinite loop** — `function loop(): never { while (true) {} }`
-3. **Exhaustive check** — discriminated union da barcha holatlar qamrab olinganini tekshirish
-4. **Conditional type da impossible branch** — `T extends ... ? X : never`
+3. **Exhaustive check** — discriminated union'da barcha holatlar qamrab olinganini tekshirish
+4. **Conditional type'da impossible branch** — `T extends ... ? X : never`
 5. **Filter / type subtraction** — `Exclude<T, U>` `never` orqali
 
 ### Kod misol
@@ -434,7 +434,7 @@ function area(shape: Shape): number {
 }
 ```
 
-Conditional type da `never`:
+Conditional type'da `never`:
 
 ```typescript
 type NonNull<T> = T extends null | undefined ? never : T;
@@ -482,7 +482,7 @@ Literal type uch xil:
 2. **Number literal** — `0`, `1`, `200`, `404`
 3. **Boolean literal** — `true`, `false`
 
-Use case lar:
+Use case'lar:
 
 1. **Discriminated union** — switch da exhaustive check
 2. **Enum alternativasi** — `type Status = "active" | "inactive"`
@@ -553,7 +553,7 @@ let b = "hello";                // string (widened)
 let c = "hello" as const;       // "hello" (literal saqlanadi, faqat "hello" ga qayta assign mumkin)
 
 const obj1 = { x: 10, y: "hi" };
-// type: { x: number; y: string } — property lar widened
+// type: { x: number; y: string } — property'lar widened
 
 const obj2 = { x: 10, y: "hi" } as const;
 // type: { readonly x: 10; readonly y: "hi" }
@@ -562,9 +562,9 @@ const obj2 = { x: 10, y: "hi" } as const;
 ### Edge Cases
 
 - **Template literal type** (TS 4.1+) — `` type Greeting = `Hello, ${string}` ``
-- **Numeric literal range** — TS literal lar ranges qo'llab-quvvatlamaydi (`1..10` yo'q). Union bilan `1 | 2 | 3 | ...` yozish kerak
+- **Numeric literal range** — TS literal'lar ranges qo'llab-quvvatlamaydi (`1..10` yo'q). Union bilan `1 | 2 | 3 | ...` yozish kerak
 - **Boolean literal** kamdan-kam useful — odatda `boolean` yetadi. `true` literal flag pattern uchun foydali
-- **`as const` array** — element lar literal va `readonly`: `["a", "b"] as const` → `readonly ["a", "b"]`
+- **`as const` array** — element'lar literal va `readonly`: `["a", "b"] as const` → `readonly ["a", "b"]`
 
 ### Follow-up savollar
 
@@ -575,14 +575,14 @@ const obj2 = { x: 10, y: "hi" } as const;
 
 ---
 
-### Savol 7: `as const` qanday ishlaydi va `as` type assertion dan farqi nima? [Middle]
+### Savol 7: `as const` qanday ishlaydi va `as` type assertion'dan farqi nima? [Middle]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-`as const` — expression ning barcha qiymatlarini **literal type** va **readonly** qiladi (widening to'xtatadi). `as Type` — type assertion, compiler ga "men bilaman, bu shu tip" deyish. `as const` xavfsiz (faqat narrowing), `as Type` xavfli (runtime tekshirilmaydi).
+`as const` — expression'ning barcha qiymatlarini **literal type** va **readonly** qiladi (widening to'xtatadi). `as Type` — type assertion, compiler'ga "men bilaman, bu shu tip" deyish. `as const` xavfsiz (faqat narrowing), `as Type` xavfli (runtime tekshirilmaydi).
 
 ### To'liq tushuntirish
 
@@ -590,7 +590,7 @@ const obj2 = { x: 10, y: "hi" } as const;
 
 1. **String/Number/Boolean literal** — widening to'xtatiladi (`"hello"` → `"hello"`, emas `string`)
 2. **Object property** — barcha property `readonly`
-3. **Array** — `readonly` tuple, element lar literal
+3. **Array** — `readonly` tuple, element'lar literal
 4. **Nested struktura** — to'liq frozen (recursive readonly + literal)
 
 `as Type` (type assertion):
@@ -657,7 +657,7 @@ console.log(obj.y); // → undefined, runtime da crash bo'lishi mumkin
 
 ### Follow-up savollar
 
-1. **"`as const` array `readonly` bo'lganda `.map()` ishlaydimi?"** — Ha. `map`, `filter`, `slice` — read-only method lar (yangi array qaytaradi). `push`, `pop`, `sort` (mutate) — yo'q.
+1. **"`as const` array `readonly` bo'lganda `.map()` ishlaydimi?"** — Ha. `map`, `filter`, `slice` — read-only method'lar (yangi array qaytaradi). `push`, `pop`, `sort` (mutate) — yo'q.
 2. **"`as` bilan tip yo'qotmasdan widening qilish mumkinmi?"** — Ha, `as string`: `const x = "hello" as string` → `string`. Lekin bu inverse use case — odatda `as const` (narrow) ishlatiladi.
 
 </details>
@@ -671,7 +671,7 @@ console.log(obj.y); // → undefined, runtime da crash bo'lishi mumkin
 
 ### Qisqa javob
 
-**Type assertion** (`as`, `<>`) — developer compiler ga "men bilaman, bu shu tip" deydi. Runtime da hech narsa o'zgarmaydi. Noto'g'ri bo'lsa — runtime crash. **Type guard** — runtime tekshiruv (`typeof`, `instanceof`, `in`, user-defined predicate) orqali compiler ga tipni isbotlaydi. Xavfsiz.
+**Type assertion** (`as`, `<>`) — developer compiler'ga "men bilaman, bu shu tip" deydi. Runtime da hech narsa o'zgarmaydi. Noto'g'ri bo'lsa — runtime crash. **Type guard** — runtime tekshiruv (`typeof`, `instanceof`, `in`, user-defined predicate) orqali compiler'ga tipni isbotlaydi. Xavfsiz.
 
 ### To'liq tushuntirish
 
@@ -684,7 +684,7 @@ console.log(obj.y); // → undefined, runtime da crash bo'lishi mumkin
 
 Type guard turlari:
 
-1. **`typeof`** — primitive type lar uchun: `typeof x === "string"`
+1. **`typeof`** — primitive type'lar uchun: `typeof x === "string"`
 2. **`instanceof`** — class instance: `x instanceof Error`
 3. **`in` operator** — property existence: `"name" in obj`
 4. **Discriminated union** — literal tag: `if (shape.kind === "circle")`
@@ -773,17 +773,17 @@ function double(x: unknown): number {
 ### To'liq tushuntirish
 
 `!` operator faqat compile-time:
-- TypeScript `null`/`undefined` ni union dan olib tashlaydi
+- TypeScript `null`/`undefined` ni union'dan olib tashlaydi
 - Runtime da hech narsa o'zgarmaydi
 - Aslida qiymat `null` bo'lsa — keyingi property access da `TypeError`
 
-Use case lar:
+Use case'lar:
 
 1. **Map / cache** — siz qo'ygan key ekanligini bilasiz
 2. **Initialization order** — class field setup pattern
 3. **Optional callback** — `onClick!()` agar callback aniq mavjud bo'lsa
 
-Xavfli use case lar:
+Xavfli use case'lar:
 - API javob — har doim tekshirilishi kerak
 - DOM query — element yo'q bo'lishi mumkin
 - Array index — `arr[i]!` agar `noUncheckedIndexedAccess: true`
@@ -865,8 +865,8 @@ Double assertion — `value as unknown as TargetType` pattern. Normal `as` ikki 
 ### To'liq tushuntirish
 
 Normal `as` qoidalari:
-- Source va target tip lar **ba'zi mosligi bo'lishi shart** (`Subtype` yoki `Supertype` aloqasi)
-- Butunlay yot tip lar uchun xato: `"hello" as number` → "Type 'string' is not assignable to type 'number'"
+- Source va target tiplar **ba'zi mosligi bo'lishi shart** (`Subtype` yoki `Supertype` aloqasi)
+- Butunlay yot tiplar uchun xato: `"hello" as number` → "Type 'string' is not assignable to type 'number'"
 
 Double assertion qanday ishlaydi:
 1. `value as unknown` — har tipni `unknown` ga aylantirish (yuqori cast)
@@ -874,10 +874,10 @@ Double assertion qanday ishlaydi:
 
 Bu compiler check'ni butunlay chetlab o'tadi — runtime da hech qanday tekshirish yo'q.
 
-Use case lar:
+Use case'lar:
 
-1. **Test mock** — interface ning faqat ba'zi method larini implement qilish
-2. **Legacy migration** — eski JavaScript API ni TypeScript type ga sig'dirish
+1. **Test mock** — interface'ning faqat ba'zi method'larini implement qilish
+2. **Legacy migration** — eski JavaScript API ni TypeScript type'ga sig'dirish
 3. **Generic constraint workaround** — TypeScript type system cheklovini chetlab o'tish
 
 ### Kod misol
@@ -937,13 +937,13 @@ const mockService: UserService = {
 
 - Double assertion bilan TypeScript hech qanday tekshirish qilmaydi — `"" as unknown as Date` ham ruxsat
 - `unknown` o'rniga `any` ham ishlaydi (`as any as T`), lekin `unknown` aniqroq niyat ko'rsatadi
-- Some linter (ESLint) — `@typescript-eslint/no-explicit-any` va `@typescript-eslint/consistent-type-assertions` rule lari double assertion ni cheklaydi
-- Generic da double assertion — type parameter inference ni buzishi mumkin
+- Some linter (ESLint) — `@typescript-eslint/no-explicit-any` va `@typescript-eslint/consistent-type-assertions` rule'lari double assertion'ni cheklaydi
+- Generic da double assertion — type parameter inference'ni buzishi mumkin
 
 ### Follow-up savollar
 
-1. **"Type assertion ni butunlay taqiqlash kerakmi?"** — Yo'q, faqat ehtiyot bilan. Test, library boundary, DOM query — assertion zaruriy. Lekin har joyda `as` — kod smell.
-2. **"`satisfies` bilan double assertion ni almashtirish mumkinmi?"** — Ba'zan ha. `satisfies` type check qiladi va inference saqlaydi. Lekin `satisfies` faqat aniq type'ga moslikni tekshiradi, double assertion esa har qanday tipga "cast" qiladi.
+1. **"Type assertion'ni butunlay taqiqlash kerakmi?"** — Yo'q, faqat ehtiyot bilan. Test, library boundary, DOM query — assertion zaruriy. Lekin har joyda `as` — kod smell.
+2. **"`satisfies` bilan double assertion'ni almashtirish mumkinmi?"** — Ba'zan ha. `satisfies` type check qiladi va inference saqlaydi. Lekin `satisfies` faqat aniq type'ga moslikni tekshiradi, double assertion esa har qanday tipga "cast" qiladi.
 
 </details>
 
@@ -956,7 +956,7 @@ const mockService: UserService = {
 
 ### Qisqa javob
 
-**Widening** — TypeScript literal type'ni kengaytirib base type qiladi (`"hello"` → `string`). `let` declaration, function parameter passing, object property da avtomatik. **Narrowing** — union type ni control flow analysis orqali aniq tipga qisqartirish (`string | null` → `string`).
+**Widening** — TypeScript literal type'ni kengaytirib base type qiladi (`"hello"` → `string`). `let` declaration, function parameter passing, object property'da avtomatik. **Narrowing** — union type'ni control flow analysis orqali aniq tipga qisqartirish (`string | null` → `string`).
 
 ### To'liq tushuntirish
 
@@ -1050,26 +1050,24 @@ function getLength(str: string | null): number {
 
 - **Truthiness narrowing** `""`, `0`, `false`, `null`, `undefined`, `NaN` ni hisobga oladi. `string | null` da `if (str)` — `""` ham filter qilinadi (kerak bo'lsa `str !== null` aniqroq)
 - **Aliased narrowing** — `const isString = typeof x === "string"` → keyingi `if (isString)` da narrowing ishlaydi (TS 4.4+)
-- **Narrowing closure ichida yo'qoladi** — `() => x.length` callback ichida narrowing saqlanmaydi (TS 5.4+ ba'zi pattern lar yaxshilangan)
+- **Narrowing closure ichida yo'qoladi** — `() => x.length` callback ichida narrowing saqlanmaydi (TS 5.4+ ba'zi pattern'lar yaxshilangan)
 - **Type predicate inference** (TS 5.5+) — funksiya tanasidan avtomatik `value is T` predicate hosil bo'lishi mumkin
 
 ### Follow-up savollar
 
-1. **"Closure ichida narrowing nima uchun yo'qoladi?"** — Variable closure orqali ulanganda value o'zgarishi mumkin — TS conservative bo'lib type ni keng saqlaydi. Yechim: local variable ga ko'chirish (`const local = obj.value; if (local) { setTimeout(() => local.length) }`).
+1. **"Closure ichida narrowing nima uchun yo'qoladi?"** — Variable closure orqali ulanganda value o'zgarishi mumkin — TS conservative bo'lib type'ni keng saqlaydi. Yechim: local variable ga ko'chirish (`const local = obj.value; if (local) { setTimeout(() => local.length) }`).
 2. **"Narrowing va widening bir vaqtda ishlay oladimi?"** — Ha. Funksiya parametri widened (literal `"a"` → `string`), funksiya ichida `typeof === "a"` bilan narrow qilish mumkin (lekin `"a"` literal type bo'lsa parameter literal bo'lishi kerak).
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-TypeScript ning narrowing engine `getNarrowedType()` funksiyasida ishlaydi (`checker.ts`). Control flow graph quriladi — har statement uchun "in scope" type lar set hisoblanadi.
+TypeScript narrowing'ni control flow graph orqali amalga oshiradi. Graph binder bosqichida (`binder.ts`) quriladi — har statement uchun flow node hosil bo'ladi. Checker reference nuqtasida `getFlowTypeOfReference` (`checker.ts`) ni chaqiradi: bu funksiya flow graph bo'ylab orqaga (reference'dan declaration tomon) yurib, har `if`/`switch`/`&&`/`||` branch'i qo'ygan refinement'ni qiymat tipiga qo'llaydi.
 
-Pre-narrowing: variable declaration scope da `getTypeOfSymbol()` orqali base type olinadi. Har `if`, `switch`, `&&`, `||` da branch graph hosil bo'ladi.
+Discriminated union narrowing — TS literal tag (`kind`, `type`, `_tag`) ni `===` solishtirish orqali union member'larini filter qiladi. Strukturaviy tekshiruvdan farqi: har variant'ning butun shape'ini emas, faqat bitta tag property literal'ini taqqoslash yetadi.
 
-Discriminated union narrowing eng aniq — TS literal tag (`kind`, `type`, `_tag`) ni topib, union'ni filter qiladi (linear scan union member'lari bo'yicha). Tag-based discrimination structural check'ga nisbatan sezilarli tez, chunki har tag literal'ni `===` solishtirish yetadi.
+TS 4.4 ning "aliased conditions" yaxshilanishi — `const isUserPresent = user !== null` pattern bilan boolean variable saqlanib, keyingi `if (isUserPresent)` da narrowing qo'llanadi.
 
-TS 4.4 ning "aliased conditions" yaxshilanishi — `const isString = typeof x === "string"` pattern bilan boolean variable orqali narrowing. Bu Boolean refinement deb ataladi.
-
-TS 5.4 closure narrowing improvements — agar variable closure tashqarisida `const` deklaratsiya bo'lsa va closure type ni saqlasa, TS narrowing'ni saqlaydi.
+TS 5.4 closure narrowing yaxshilanishi — `const` va hech qachon assign qilinmaydigan parameter uchun narrowing closure ichida avval ham saqlanardi; 5.4 buni `let` variable va parameter'ga ham kengaytirdi, agar closure ularning oxirgi assignment'idan keyin yaratilgan bo'lsa (nested function ichida assign bo'lsa — ishlamaydi).
 
 </details>
 
@@ -1084,18 +1082,18 @@ TS 5.4 closure narrowing improvements — agar variable closure tashqarisida `co
 
 ### Qisqa javob
 
-Type inference TypeScript checker'da ikki bosqichda: **best common type** (`getCommonSupertype`) array/union elementlari uchun, **contextual typing** (`getContextualType`) function parameter va object literal uchun. Contextual type berilgan joyda inference uni hisobga oladi, yo'q joyda — best common type orqali element type'larini birlashtiradi.
+Type inference ikki yo'nalishda ishlaydi: **best common type** — array literal yoki bir nechta candidate'dan umumiy tipni hisoblash (`getUnionType` orqali union qilish), **contextual typing** (`getContextualType`) — function parameter, callback, object literal uchun tipni "tashqaridan" yuborish. Context mavjud joyda inference uni hisobga oladi, yo'q joyda — element type'larini birlashtirib base type chiqaradi.
 
 ### To'liq tushuntirish
 
-TS checker har expression uchun **getTypeOfExpression** chaqiradi. Lekin ba'zi joylarda — function argument, return statement, callback parameter — checker contextual type ni "tashqaridan" yuboradi.
+TS checker har expression uchun tipni `getTypeOfExpression` orqali hisoblaydi. Lekin ba'zi joylarda — function argument, return statement, callback parameter — checker contextual type'ni "tashqaridan" yuboradi.
 
 **Inference algoritm bosqichlari:**
 
 1. **Contextual type collection**: TS expression joylashgan joyni topadi (assignment target, function parameter, return type). Agar context'da type mavjud bo'lsa — bu "contextual type" sifatida saqlanadi.
-2. **Inference candidate'lar**: Har expression uchun base type aniqlanadi (`getTypeOfNode`).
-3. **Best common type** (union va array uchun): `[1, "x", true]` → common supertype `number | string | boolean`. Algoritm: union member'larni birga to'plash (`getUnionType`) yoki structural common type topish.
-4. **Widening**: literal type'lar context yo'q joyda widening ga uchraydi (`getWidenedType`): `"hello"` → `string`, `10` → `number`. `as const` yoki context contextual literal type bo'lsa — widening to'xtatiladi.
+2. **Inference candidate'lar**: Har expression uchun tip aniqlanadi.
+3. **Best common type** (array va bir nechta candidate uchun): `[1, "x", true]` element type'lari `number | string | boolean` ga birlashtiriladi (`getUnionType`).
+4. **Widening**: literal type'lar context yo'q joyda widening'ga uchraydi (`getWidenedType`): `"hello"` → `string`, `10` → `number`. `as const` yoki contextual literal type bo'lsa — widening to'xtatiladi.
 5. **Final type assignment**: Variable/parameter ga aniqlangan type biriktiriladi.
 
 **Contextual typing misol:**
@@ -1144,7 +1142,7 @@ class Base {
   process(): string { return "base"; }
 }
 class Child extends Base {
-  process() { return "child"; } // Inferred: "child", lekin overrides → string
+  process() { return "child"; } // return type: string — literal "child" widening'ga uchraydi
 }
 
 // === Generic inference ===
@@ -1160,29 +1158,27 @@ const r2 = identity<string>("hello"); // T explicit: string
 
 - **Widening literal context'da to'xtaydi**: `const config: Config = { method: "GET" }` — `"GET"` literal saqlanadi (context literal union talab qiladi).
 - **Generic inference cheklovlari**: `function f<T extends string>(x: T)` — argument literal bo'lsa T literal, widened bo'lsa T base type.
-- **Inference from usage** (TS 4.0+): IDE quick fix — function tanasidagi `x.toUpperCase()` ga qarab `x: string` taklif qiladi (lekin actual inference emas, suggestion).
+- **Inference from usage**: IDE quick fix (codefix) — function tanasidagi `x.toUpperCase()` ga qarab `x: string` annotation'ini taklif qiladi (bu actual type inference emas, balki tahrir taklifi).
 - **Reverse inference**: `const x: number[] = [...]` — array literal type kontekstdan `number[]` ga widened (har element literal saqlanmaydi).
 - **`satisfies` (TS 4.9+)**: type-check qiladi, lekin inference saqlanadi — `{ a: 1 } satisfies Record<string, number>` → type `{ a: 1 }`, `Record<string, number>` emas.
 
 ### Follow-up savollar
 
-1. **"Generic inference da `T` aniqlanmasa nima bo'ladi?"** — TS `unknown` yoki default constraint'ni oladi. `function f<T>(x?: T)` da argument yo'q bo'lsa, T `unknown`.
+1. **"Generic inference'da `T` aniqlanmasa nima bo'ladi?"** — TS `unknown` yoki default constraint'ni oladi. `function f<T>(x?: T)` da argument yo'q bo'lsa, T `unknown`.
 2. **"Contextual typing nima uchun har joyda ishlamaydi?"** — Context aniq bo'lishi kerak. `let x; x = (a) => a * 2` — `let x` da context yo'q, callback `any` parameter oladi. Yechim: `let x: (a: number) => number = ...`.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-TypeScript checker'da inference asosan `inferTypes` (`checker.ts`) funksiyasida amalga oshiriladi. Generic inference algoritmi "inference candidate" collection bilan ishlaydi: har generic parameter uchun candidate set yig'iladi (covariant/contravariant position'larga qarab).
+TypeScript checker'da generic inference `inferTypes` (`checker.ts`) funksiyasi orqali boshlanadi: argument va parameter tiplarini taqqoslab, har type parameter uchun candidate'lar to'plami yig'iladi (covariant/contravariant position'larga qarab). `inferTypeArguments` bu jarayonni boshqaradi.
 
-`getInferredType(inference)` bosqichi: candidate'lardan eng yaxshi tipni tanlaydi. Covariant position'da — supertype (union), contravariant'da — subtype (intersection).
+`getInferredTypes` bosqichi: har type parameter uchun yig'ilgan candidate massivini bitta tipga sig'diradi — covariant position'da candidate'lar `getUnionType` orqali birlashtiriladi.
 
-Widening algoritm `getWidenedType()` orqali: literal types (`StringLiteral`, `NumberLiteral`, `BooleanLiteral`) base type'iga aylantiriladi. Exception: `as const`, contextual literal type, fresh literal type.
+Widening `getWidenedType` orqali: literal type'lar (`StringLiteral`, `NumberLiteral`, `BooleanLiteral`) base type'iga aylantiriladi. Istisno: `as const`, contextual literal type, va "fresh literal type" hali widening'ga uchramagan holatda.
 
-"Fresh literal type" — TS internal concept. Object literal'da har property dastlab "fresh literal" — context yo'q bo'lsa widening, context bor bo'lsa saqlanadi. Bu rejim TypeScript 1.x'dan beri evolve qilingan.
+"Fresh literal type" — TS internal concept. Object literal'da har property dastlab "fresh literal": context yo'q bo'lsa widening'ga uchraydi, context bor bo'lsa literal saqlanadi.
 
-Contextual type propagation — recursive: `f({ x: g() })` da `f` parameter type'i `{ x: T }` bo'lsa, `g()` ham `T` contextual type'ni oladi (nested propagation).
-
-Performance: inference O(n*m) — n: union member, m: candidate count. Katta union'lar (50+ member) `tsc --noEmit` tezligini sezilarli ta'sir qiladi.
+Contextual type propagation recursive ishlaydi: `register({ port: getPort() })` da `register` parameter type'i `{ port: T }` bo'lsa, `getPort()` ham `T` contextual type'ni oladi (nested propagation).
 
 </details>
 
@@ -1223,10 +1219,10 @@ let b = "hello";
 // TS type: string — widened (let qayta assign mumkin)
 
 let c = "hello" as const;
-// TS type: "hello" — as const widening ni to'xtatdi
+// TS type: "hello" — as const widening'ni to'xtatdi
 
 const obj = { x: 10, y: "hi" };
-// TS type: { x: number; y: string } — property lar widened
+// TS type: { x: number; y: string } — property'lar widened
 
 const obj2 = { x: 10, y: "hi" } as const;
 // TS type: { readonly x: 10; readonly y: "hi" } — literal + readonly
@@ -1239,7 +1235,7 @@ obj.x = 20;    // ✅ Ishlaydi — property mutable
 
 ### Edge Cases
 
-- `const obj = { ... }` — object reference const, lekin property lar mutable
+- `const obj = { ... }` — object reference const, lekin property'lar mutable
 - `Object.freeze(obj)` — runtime da property mutate qilinmaydi (silent fail yoki throw in strict mode)
 - `as const` ichidagi array — `readonly` tuple bo'ladi
 - `as const` nested object — recursive readonly + literal
@@ -1303,14 +1299,14 @@ let g = null;
 
 ### Edge Cases
 
-- `let a = [].push(1)` — `push` `number` qaytaradi, `a: number`
-- `const empty = []` — `never[]` (const, evolve qila olmaydi). Lekin TS amalda `any[]` qiladi compatibility uchun
-- `let x: null = null` — type aniq `null`, evolve qilmaydi
-- `noImplicitAny: true` evolving any ni to'xtatmaydi, faqat parameter implicit any ni
+- `[].push(1)` — bu yerda `[]` inline `never[]` literal: u biror variable'ga bog'lanmagani uchun evolve qilmaydi. `push` parametri `never` bo'lgani uchun `1` argumenti xato beradi: `Argument of type '1' is not assignable to parameter of type 'never'`. Evolving array faqat `[]` biror variable'ga (`let a = []` yoki `const empty = []`) assign qilinganda hosil bo'ladi
+- `const empty = []` — `noImplicitAny: true` da evolving `any[]`: keyingi `push`/element assign'lar tipni aniqlamasa, o'qishda `TS7034 'empty' implicitly has type 'any[]'` xatosi chiqadi. `noImplicitAny: false` da esa evolving mexanizmi yo'q — `never[]`. `const` reassign qila olmaydi, lekin push orqali mutate qilib evolve qilishi mumkin
+- `let x: null = null` — type aniq `null`, evolve qilmaydi (annotation evolving any'ni to'xtatadi)
+- `noImplicitAny: true` evolving any/array'ni to'xtatmaydi (`let a = []` baribir `any[]`), faqat parameter implicit any'ni ushlaydi
 
 ### Follow-up savollar
 
-1. **"Evolving array dan qutulish uchun nima qilish kerak?"** — Annotation yozish: `let a: number[] = []`. Bu best practice — type ni boshidan aniq belgilash.
+1. **"Evolving array'dan qutulish uchun nima qilish kerak?"** — Annotation yozish: `let a: number[] = []`. Bu best practice — type'ni boshidan aniq belgilash.
 
 </details>
 
@@ -1384,13 +1380,13 @@ function logAllConfig(): void {
 
 ### Edge Cases
 
-- `as const` nested object da ham ishlaydi — to'liq frozen
+- `as const` nested object'da ham ishlaydi — to'liq frozen
 - `Object.keys` return type `string[]` (TypeScript design choice) — manual cast kerak
 - Generic constraint `K extends ConfigKey` instead of `K extends keyof typeof CONFIG` — ikkalasi bir xil, lekin alias aniqroq
 
 ### Follow-up savollar
 
-1. **"Runtime'da config'ni o'zgartirish mumkinmi?"** — `as const` faqat compile-time. Runtime'da `Object.freeze(CONFIG)` ishlatish kerak haqiqiy immutability uchun.
+1. **"Runtime da config'ni o'zgartirish mumkinmi?"** — `as const` faqat compile-time. Runtime da `Object.freeze(CONFIG)` ishlatish kerak haqiqiy immutability uchun.
 
 </details>
 
@@ -1495,7 +1491,7 @@ function parseUser(data: unknown): User | null {
 
 ### Savol 17: Discriminated union va exhaustive check [Middle+]
 
-**Savol:** `Result<T>` discriminated union yozing va `handleResult` funksiyasi exhaustive bo'lsin — barcha variant lar qamrab olinishi shart:
+**Savol:** `Result<T>` discriminated union yozing va `handleResult` funksiyasi exhaustive bo'lsin — barcha variant'lar qamrab olinishi shart:
 
 ```typescript
 type Result<T> = /* implement */;
@@ -1548,14 +1544,14 @@ console.log(handleResult(r3)); // "Loading..."
 ### To'liq tushuntirish
 
 - Discriminated union `kind` (yoki `type`, `tag`) literal field bilan — narrowing tag asosida
-- `switch (result.kind)` har case da TS aniq narrowing qiladi
+- `switch (result.kind)` har case'da TS aniq narrowing qiladi
 - `default` block da `_exhaustive: never = result` — agar barcha variant qamrab olinmagan bo'lsa, `result` `never` emas qoldiqqa teng bo'ladi va compile error chiqadi
 - Yangi variant qo'shilganda (`{ kind: "cancelled" }`) avtomatik xato chiqadi — refactoring xavfsiz
 
 ### Edge Cases
 
 - `never` exhaustive pattern faqat compile-time — runtime da `_exhaustive: never = result` har doim "qiymat" assign bo'ladi (lekin TS compile da to'xtatadi)
-- Tag field bir xil bo'lishi shart har variant da (`kind`, emas `kind` va `type` aralash)
+- Tag field bir xil bo'lishi shart har variant'da (`kind`, emas `kind` va `type` aralash)
 - TS 4.x — narrowing closure ichida saqlanmaydi, lekin switch case ichida ishlaydi
 - Tag literal — string yoki numeric literal bo'lishi mumkin
 
@@ -1746,7 +1742,7 @@ To'g'ri yondashuv:
 
 - `localStorage` server-side rendering da yo'q (Next.js) — `typeof window === "undefined"` check
 - `localStorage` SecurityError otishi mumkin (private mode, third-party context)
-- Large data — `localStorage` 5-10 MB cheklov
+- Large data — `localStorage` origin'iga odatda ~5 MiB cheklov (browser'ga qarab farq qiladi, aniq spec'da belgilanmagan), limitdan oshsa `QuotaExceededError`
 - Stale data — schema o'zgarsa eski data invalid bo'lishi mumkin (versioning kerak)
 
 ### Follow-up savollar
@@ -1764,17 +1760,13 @@ Bu bo'limdagi savollar TypeScript ning type system asoslarini qamrab oldi:
 - **Type annotations va inference** — qachon yozish kerak, qachon inference ishonchli
 - **Primitive types** — string/number/boolean/bigint/symbol/null/undefined, `string` vs `String`
 - **null va undefined** — semantic farqi, `strictNullChecks` ta'siri
-- **any vs unknown** — type safety, viral vs non-viral, use case lar
+- **any vs unknown** — type safety, viral vs non-viral, use case'lar
 - **never va void** — exhaustive check, throw funksiya, side effect
 - **Literal types** — discriminated union, enum alternativasi, widening qoidalari
-- **as const** — literal + readonly, type assertion dan farqi
+- **as const** — literal + readonly, type assertion'dan farqi
 - **Type assertion va guards** — `as` vs `typeof`/`instanceof`/`in`/predicate
 - **Non-null assertion (`!`)** — qachon xavfsiz, qachon xavfli
 - **Double assertion** — test mock, legacy migration
 - **Widening va narrowing** — control flow analysis, type predicate
 - **Type inference algoritmi** — best common type, contextual typing, generic inference
 - **Bug fix patterns** — `fetch` async handling, type assertion abuse, JSON validation
-
----
-
-[Asosiy bo'limga qaytish →](../02-primitive-types.md)

@@ -58,9 +58,9 @@ let matrix2: Array<Array<number>> = [[1, 2], [3, 4]];
 
 ### Edge Cases
 
-- `Array<T>` generic constraint da ishlatish kerak: `function f<T extends Array<unknown>>(arr: T)` — `T[]` bu yerda parse qilinmaydi
-- `string[]` ASI (automatic semicolon insertion) muammosi: `array[0]` keyingi qatorda bo'lsa, parser chalkashishi mumkin
-- Empty array literal — `const arr = []` `never[]` deb inference olinishi mumkin (const + strict); odatda `any[]` (let). Annotation kerak
+- Constraint da ikkala syntax ham ishlaydi: `T extends unknown[]` ham, `T extends Array<unknown>` ham bir xil parse bo'ladi va compile dan o'tadi
+- `Array<T>` o'qish murakkab element tip larda aniqroq: `Array<(e: Event) => void>` qavslarsiz `((e: Event) => void)[]` dan tushunarliroq
+- Empty array literal type inference: `let arr = []` `any[]` deb olinadi (keyin element qo'shilsa evolving array), `const arr: number[] = []` annotation tavsiya etiladi
 
 ### Follow-up savollar
 
@@ -255,7 +255,7 @@ const u2: UserTuple = ["Ali", 25, "a@t.com"]; // ✅
 ### Edge Cases
 
 - Optional element undefined qiymat bilan berilsa: `[10, 20, undefined]` — ✅
-- Length union — `if (tuple.length === 3)` narrowing: TS tuple ni `[number, number, number]` deb biladi
+- Length union — `if (tuple.length === 3)` ichida `tuple.length` `3` ga narrow bo'ladi, lekin optional slot tipi narrow bo'lmaydi: `tuple[2]` hali ham `number | undefined` (length check optional element undefined'ligini olib tashlamaydi)
 - `?` faqat tuple element uchun — array elementlarda yo'q
 - Rest element optional bilan birga: `[string, number?, ...boolean[]]` — optional avval, rest oxirida
 
@@ -513,9 +513,9 @@ Object.values(Method); // ["GET", "POST"] (string enum — clean)
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Numeric enum reverse mapping JS native object'da emas — alohida `value → key` mapping faylga compile bo'ladi. Bu pattern history: TypeScript birinchi versiyalarida enum C# style ishlashini xohladi, lekin JavaScript da plain object dan boshqa ifoda yo'q edi.
+Numeric enum reverse mapping alohida object ga emas — aynan shu enum object ining o'ziga yoziladi. `Direction[Direction["Up"] = 0] = "Up"` ifodasi bir vaqtning o'zida forward (`Up: 0`) va reverse (`0: "Up"`) entry larni bitta object ga qo'shadi, shuning uchun `Direction.Up === 0` va `Direction[0] === "Up"` ham ishlaydi. Numeric uchun reverse mapping kerak: runtime'da integer qiymatdan nomga qaytish C# enum semantic'iga yaqinlashtiradi. String enum da bu yo'q — string key reverse mapping plain object da nomlarni ustma-ust qo'yib yuborardi.
 
-`const enum` Babel/esbuild bilan muammoli — chunki per-file compilation tools butun loyihani ko'ra olmaydi. TS 4.x da `--isolatedModules` flag `const enum` ni export qilishni cheklaydi.
+`const enum` Babel/esbuild bilan muammoli — chunki per-file compilation tools butun loyihani ko'ra olmaydi. `--isolatedModules` rejimida ambient `const enum` (`.d.ts` dan) ga murojaat error TS2748 beradi — har fayl alohida transpile qilingani uchun inline qiymat boshqa fayldagi declaration'dan olinmaydi.
 
 TS 5.0 da pure literal enum union narrowing yaxshilandi — numeric enum `Color` literal union `0 | 1 | 2` deb qaraladi, type safety oshdi.
 
@@ -545,7 +545,7 @@ TS 5.0 da pure literal enum union narrowing yaxshilandi — numeric enum `Color`
 - TS native (per-file) `--isolatedModules` rejimida cheklov
 
 Cheklovlar:
-- Re-export `isolatedModules` bilan: `export const enum` taqiqlangan
+- `isolatedModules` rejimida ambient `const enum` (`.d.ts` yoki `declare const enum`) ga murojaat — error TS2748, chunki har fayl alohida transpile qilinadi va inline qiymat boshqa fayldagi declaration'dan ko'rinmaydi
 - Babel/esbuild: butun loyihani ko'rmaydi, inline qilolmaydi
 - Library: import qiluvchi paket boshqa `tsc` versiyada bo'lishi mumkin → broken inline
 
@@ -568,15 +568,15 @@ console.log("DOWN");
 // Direction object hosil bo'lmaydi
 ```
 
-Re-export muammosi:
+Ambient `const enum` muammosi:
 
 ```typescript
-// utils.ts
-export const enum Theme { Light = "LIGHT", Dark = "DARK" }
+// theme.d.ts (ambient declaration)
+declare const enum Theme { Light = "LIGHT", Dark = "DARK" }
 
 // app.ts (isolatedModules: true)
-import { Theme } from "./utils";
-// ❌ Cannot access ambient const enums when 'isolatedModules' is enabled
+const t = Theme.Light;
+// ❌ TS2748: Cannot access ambient const enums when 'isolatedModules' is enabled
 ```
 
 `as const` object alternativasi:
@@ -599,7 +599,7 @@ const t: Theme = Theme.Light; // "LIGHT"
 
 - `preserveConstEnums: true` flag — `const enum` ni oddiy `enum` kabi compile qiladi (runtime object hosil bo'ladi). Library yozish uchun yechim
 - `const enum` faqat numeric/string literal qiymatlar qabul qiladi — `compute()` taqiqlangan
-- TS 5.0+ `const enum` semantic o'zgarmagan, lekin `--isolatedModules` qattiqlashdi
+- Oddiy (non-ambient) `export const enum` ni bitta `tsc` program ichida bir nechta `.ts` fayl birga compile qilinsa `isolatedModules` bilan ham ishlaydi — muammo asosan ambient declaration va per-file transpiler (Babel/esbuild/swc) holatida
 
 ### Follow-up savollar
 
@@ -626,7 +626,7 @@ Asosiy xavflar: (1) numeric enum old "intentional unsoundness" (TS <5.0), (2) re
 2. **Computed member bilan** — `enum Mixed { A = 1, B = compute() }` — hali ham xavfli, `let m: Mixed = 999` ruxsat
 3. **Reverse mapping iteration** — `Object.keys(Color)` 6 ta key qaytaradi (3 forward + 3 reverse)
 4. **`const enum` cross-package** — Babel/esbuild bilan ishlamaydi
-5. **`isolatedModules`** — `const enum` re-export taqiqlangan
+5. **`isolatedModules`** — ambient `const enum` ga murojaat error TS2748 (per-file transpile inline qilolmaydi)
 6. **`erasableSyntaxOnly`** (TS 5.8) — enum butunlay taqiqlangan
 7. **String enum literal assign** — `enum Status { A = "ACTIVE" }`, `const s: Status = "ACTIVE"` ❌
 8. **Tree-shaking** — bundler IIFE ni dead code deb tushunmasligi mumkin
@@ -661,10 +661,9 @@ console.log(Object.keys(Color));
 enum Status { Active = "ACTIVE" }
 const s: Status = "ACTIVE"; // ❌ Type '"ACTIVE"' is not assignable
 
-// 3. const enum + isolatedModules
-// (different file)
-export const enum Theme { Light = "LIGHT" }
-// import { Theme } from "./theme"; // ❌ with isolatedModules
+// 3. ambient const enum + isolatedModules
+// theme.d.ts: declare const enum Theme { Light = "LIGHT" }
+// const t = Theme.Light; // ❌ TS2748 with isolatedModules
 
 // 4. Bit flags pattern (legitimate enum use)
 enum Permission {
@@ -810,21 +809,22 @@ const value = map["c"];
 
 ### Qisqa javob
 
-`satisfies` (TS 4.9) — expression ning type ga mosligini tekshiradi, lekin inference saqlanadi (widening yo'q). `as const` literal va readonly qiladi (widening to'xtatadi, mutate'siz). `satisfies` type check + inference, `as const` immutability + literal.
+`satisfies` (TS 4.9) — expression ning type ga mosligini tekshiradi, lekin o'zgaruvchining tipini target type ga collapse qilmaydi: expression'ning **inference qilingan tipi** saqlanadi. Inference oddiy object literal uchun string/number literal larni `string`/`number` ga widen qiladi — `satisfies` buni o'zgartirmaydi. Literal saqlash kerak bo'lsa `as const` bilan birga ishlatiladi. `as const` — literal va recursive readonly. `satisfies` type check + tor inference, `as const` immutability + literal.
 
 ### To'liq tushuntirish
 
 | Aspect | `as Type` | `as const` | `satisfies` |
 |--------|-----------|------------|-------------|
 | Type check | ❌ Force cast | ✅ N/A | ✅ Validate |
-| Inference saqlanadi | ❌ Cast'ga aylanadi | ✅ Literal | ✅ Literal |
+| Tip natijasi | Target type | Recursive literal | Expression inference |
+| Literal saqlaydi | ❌ | ✅ | ❌ (oddiy literal widen bo'ladi) |
 | Readonly | ❌ | ✅ Recursive | ❌ |
-| Use case | Force assertion | Immutable config | Validate + keep type |
+| Use case | Force assertion | Immutable config | Validate + tor tip saqlash |
 
 `satisfies` pattern:
-- Type validation kerak, lekin inference saqlash
-- Object literal har property aniq tipga ega (inference yaxshi)
-- Property qiymat literal saqlanadi
+- Type validation kerak, lekin tipni target ga collapse qilmaslik
+- Inference target dan torroq bo'lgan joyni saqlash (union member, aniq tuple, mavjud key lar)
+- Literal kerak bo'lsa `as const` bilan birga
 
 ### Kod misol
 
@@ -848,13 +848,20 @@ const red2: Color = {
 };
 red2.hex; // string — literal yo'q
 
-// ✅ satisfies — inference saqlanadi
+// ✅ satisfies — expression inference saqlanadi, target ga collapse bo'lmaydi
 const red3 = {
   rgb: [255, 0, 0],
   hex: "#FF0000",
 } satisfies Color;
-red3.hex; // "#FF0000" — literal!
-red3.rgb; // [number, number, number] — tuple, lekin widened element
+red3.hex; // string — oddiy object literal property widen bo'ladi, satisfies buni o'zgartirmaydi
+red3.rgb; // [number, number, number] — target tuple contextual type [255,0,0] ni tuple ga moslaydi (element widen)
+
+// Literal kerak bo'lsa as const bilan
+const red4 = {
+  rgb: [255, 0, 0],
+  hex: "#FF0000",
+} as const satisfies Color;
+red4.hex; // "#FF0000" — literal (as const tufayli)
 ```
 
 `satisfies` + `as const` birga:
@@ -900,8 +907,8 @@ actions.inc.amount; // number (saqlandi, narrowing ishlaydi)
 
 ### Follow-up savollar
 
-1. **"`satisfies` ni har joyda ishlatish kerakmi?"** — Ko'p hollarda ha — annotation o'rniga. Lekin function parameter da kerak emas (parameter type allaqachon validatsiya qiladi).
-2. **"`satisfies` va explicit annotation farqi qachon ahamiyatli?"** — Annotation widening qiladi (`hex: string` literal saqlamaydi). `satisfies` inference saqlaydi. Object literal config lar uchun `satisfies` afzal.
+1. **"`satisfies` ni har joyda ishlatish kerakmi?"** — Ko'p hollarda ha — annotation o'rniga. Lekin function parameter da kerak emas (parameter type allaqachon validation qiladi).
+2. **"`satisfies` va explicit annotation farqi qachon ahamiyatli?"** — Annotation o'zgaruvchi tipini target type ga collapse qiladi (`const x: Record<string, Action>` — har value `Action` union, `.amount` ga to'g'ridan-to'g'ri kirib bo'lmaydi). `satisfies` expression'ning torroq inference qilingan tipini saqlaydi, shuning uchun `actions.inc.amount` `number` bo'lib qoladi. Ikkalasi ham literal saqlamaydi — buning uchun `as const` kerak.
 
 </details>
 
@@ -1196,7 +1203,7 @@ Yaxshilanishlar:
 
 - `Object.values` return type `string[]` (TS design choice) — cast kerak
 - `as const` bilan property `readonly` — runtime'da `Object.freeze` qo'shish mumkin
-- TS 5.5+ — `isValidMethod` funksiya tanasidan avtomatik type predicate (`value is HttpMethod`) inference bo'lishi mumkin
+- TS 5.5 inferred type predicates bu funksiyaga yordam bermaydi — `.includes(value)` oddiy `boolean` qaytaradi, parametrni narrow qiluvchi ifoda emas. Inferred predicate faqat `value !== null`, `typeof value === "..."`, `Array.isArray(value)` kabi to'g'ridan-to'g'ri narrowing return larida ishlaydi. Bu yerda `value is HttpMethod` ni qo'lda yozish shart
 
 ### Follow-up savollar
 
@@ -1291,7 +1298,7 @@ Agar `Widen` ishlatmasak, faqat `"light"` qabul qilinadi (literal), `"dark"` xat
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-`as const` semantics — `ConstAssertion` AST node. TypeScript checker uchun bu uch ta'sirga ega:
+`as const` — `const` type reference ga assertion (`as` expression). TypeScript checker uchun bu uch ta'sirga ega:
 1. Object property'lar `readonly` modifier oladi (`{ readonly theme: "light"; ... }`)
 2. String/number/boolean literal qiymatlar literal type sifatida saqlanadi (widening yo'q)
 3. Array literal `readonly` tuple'ga aylanadi (`[1, 2]` → `readonly [1, 2]`)
@@ -1436,7 +1443,7 @@ function logUsers2(): void {
 // ⚠️ Yechim 3: Non-null assertion (riskli, lekin to'g'ri kontekstda OK)
 function logUsers3(): void {
   for (let i = 0; i < users.length; i++) {
-    const name = users[i]!; // We know i is valid
+    const name = users[i]!; // i < users.length tekshirildi, shuning uchun mavjud
     console.log(name.toUpperCase());
   }
 }

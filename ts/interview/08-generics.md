@@ -6,7 +6,7 @@
 
 ## Nazariy savollar
 
-### Savol 1: Generics nima va nima uchun kerak? `any` dan farqi nima? [Junior+]
+### Savol 1: Generics nima va nima uchun kerak? `any`'dan farqi nima? [Junior+]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -73,7 +73,7 @@ userResponse.data.name; // ✅ string
 
 ### Qisqa javob
 
-TS argument'lar type'idan generic parametr'ni infer qiladi. Inference fail bo'ladigan holatlar: T faqat return type'da, ambiguous union, contextual type yo'q. Bunda `fn<Type>(args)` explicit beriladi.
+TS argument'lar type'idan generic parameter'ni infer qiladi. Inference fail bo'ladigan holatlar: T faqat return type'da, ambiguous union, contextual type yo'q. Bunda `fn<Type>(args)` explicit beriladi.
 
 ### To'liq tushuntirish
 
@@ -119,14 +119,14 @@ getValue({ name: "Ali", age: 25 }, "name"); // T inferred, K = "name"
 ### Edge Cases
 
 - **Excess type argument** — `identity<string, number>(42)` xato (TS expecting 1, got 2).
-- **Partial type argument** — TS 4.7+ — `<T1 = number>` default berilsa, qolganini infer qilish mumkin.
+- **Partial type argument yo'q** — TS type argument'larni yo hammasini explicit talab qiladi, yo hech birini (hammasi inference). Faqat bir qismini berib qolganini infer qildirib bo'lmaydi. Default'li trailing parameter'larni tushirib qoldirsa, ular **default qiymatga** tushadi (argument'dan infer bo'lmaydi): `function box<Value, Meta = string>(...)`'da `box<number>(...)` — `Meta = string` (default), inference emas.
 - **`NoInfer<T>`** (TS 5.4) — type parameter ikki joyda ishlatilganda inference'ni bir tomondan o'chiradi.
 - **Inference + literal widening** — `identity("hello")` → `T = string` (widening). `identity("hello" as const)` yoki `identity<const T>("hello")` → `T = "hello"`.
 
 ### Follow-up savollar
 
 1. **"`NoInfer` qachon foydali?"** — `function fn<T>(value: T, fallback: NoInfer<T>)` — fallback inference uchun ishlatilmaydi, faqat value'dan T infer bo'ladi. Asymmetric API'lar uchun.
-2. **"Inference algoritmi qanday?"** — TS `inferFromTypes` algoritmi: source/target type'larini juftlikda solishtiradi, candidate'larni yig'adi, oxirida `getCommonSupertype` (yoki union) bilan birlashtiradi.
+2. **"Inference algoritmi qanday?"** — TS har argument uchun `inferTypes` bilan source/target type'larni juftlikda solishtirib candidate'lar yig'adi. Candidate'lar inference priority bo'yicha tartiblanadi: lone type variable eng yuqori priority, return type position'dagi T eng past. So'ng `getInferredTypes` har type parameter candidate'larini bitta type'ga birlashtiradi (odatda `getUnionType` orqali union).
 
 </details>
 
@@ -139,7 +139,7 @@ getValue({ name: "Ali", age: 25 }, "name"); // T inferred, K = "name"
 
 ### Qisqa javob
 
-Generic constraint — `<T extends SomeType>` bilan type parametrini cheklash. Constraint'siz T da hech qanday operation qilib bo'lmaydi (TS `T` ni unknown deb hisoblaydi).
+Generic constraint — `<T extends SomeType>` bilan type parameter'ini cheklash. Constraint'siz T'da hech qanday operation qilib bo'lmaydi (TS `T`'ni unknown deb hisoblaydi).
 
 ### To'liq tushuntirish
 
@@ -196,7 +196,7 @@ format(42);       // ✅
 
 ### Follow-up savollar
 
-1. **"`extends keyof T` bilan property union'ni qanday olamiz?"** — `T[keyof T]` — barcha value type'larining union'i. `<T, K extends keyof T>` da `K` bitta key.
+1. **"`extends keyof T` bilan property union'ni qanday olamiz?"** — `T[keyof T]` — barcha value type'larining union'i. `<T, K extends keyof T>`'da `K` bitta key.
 2. **"Constraint juda strict bo'lsa qanday?"** — Constraint juda keng (`object`) — type safety past. Juda strict (`{ length: number; charAt: ... }`) — caller kam. Optimal — kerakli minimum shape.
 
 </details>
@@ -214,7 +214,7 @@ format(42);       // ✅
 
 ### To'liq tushuntirish
 
-`keyof` ikki kontekstda:
+`keyof` ikki context'da:
 
 1. **Object type** — `keyof { a: 1; b: 2 }` = `"a" | "b"`
 2. **Index signature** — `keyof { [k: string]: T }` = `string | number` (JS'da `obj[0]` = `obj["0"]`)
@@ -281,7 +281,7 @@ type PersonKeys = keyof Person; // "name" | "age" | "greet"
 
 ### Qisqa javob
 
-Index Access Type — type darajasida property type olish, JS'dagi `obj["key"]` ga o'xshash. `T[K]` — bitta property type, `T[keyof T]` — barcha value type'lari union'i, `T[number]` — array/tuple element type.
+Index Access Type — type darajasida property type olish, JS'dagi `obj["key"]`'ga o'xshash. `T[K]` — bitta property type, `T[keyof T]` — barcha value type'lari union'i, `T[number]` — array/tuple element type.
 
 ### To'liq tushuntirish
 
@@ -337,7 +337,7 @@ function getValue<T, K extends keyof T>(obj: T, key: K): T[K] {
 ### Follow-up savollar
 
 1. **"`Pick<T, K>` qanday implement qilingan?"** — `type Pick<T, K extends keyof T> = { [P in K]: T[P] }` — mapped type + index access.
-2. **"`T[K]` da K union bo'lsa nima?"** — TS distributive: `User["name" | "age"]` = `User["name"] | User["age"]` = `string | number`.
+2. **"`T[K]`'da K union bo'lsa nima?"** — TS distributive: `User["name" | "age"]` = `User["name"] | User["age"]` = `string | number`.
 
 </details>
 
@@ -479,7 +479,7 @@ const user = merge({ name: "Ali" }, { age: 25 });
 
 ### Edge Cases
 
-- **Single T ikki argument** — `function merge<T>(a: T, b: T)` — TS T'ni union qilib infer qiladi yoki xato beradi (literal'lar uchun). Farqli object'lar uchun `<T, U>` afzal.
+- **Single T ikki argument** — `function pair<T>(a: T, b: T)` — TS ikki candidate'ni union qilib infer qiladi (`pair(1, "x")` → T = `string | number`), call xato bermaydi. Farqli object'lar uchun union foydasiz natija beradi, `<T, U>` afzal.
 - **`<T, U extends T>`** — U T'ning sub-type'i bo'lishi shart.
 - **Type parameter order** — caller side'da explicit type argument tartibi muhim. `pair<string, number>("a", 1)` — birinchi T, ikkinchi U.
 - **Reusing type parameter** — `<T>(a: T, b: T) => T[]` — TS source/target'larni union qilib oladi.
@@ -611,7 +611,7 @@ const cfg4 = defineConst({ env: "prod" });          // bir xil natija, caller'si
 - **`const T` mutable type'ga mos kelmasligi** — `<const T>` readonly modifier qo'shadi. Caller mutable type kutsa, `Readonly<...>` cast kerak.
 - **`const T` + `extends`** — `<const T extends string[]>` ishlaydi, lekin `<const T extends string>` kam foydali (string allaqachon literal infer bo'ladi explicit'da).
 - **Object property modifier** — `<const T>` har property'ga `readonly` qo'shadi. Method shorthand'lar — `readonly` ta'sir qilmaydi (callable bo'lib qoladi).
-- **Performance** — `const T` bilan TS literal type ko'p saqlaydi (memory), katta object'larda checker secondary'ga ta'sir qilishi mumkin.
+- **Performance** — `const T` bilan TS har property uchun literal type va `readonly` modifier saqlaydi. Katta nested object'larda bu ko'proq type yaratadi, checker ishini biroz og'irlashtiradi.
 
 ### Follow-up savollar
 
@@ -629,7 +629,7 @@ const cfg4 = defineConst({ env: "prod" });          // bir xil natija, caller'si
 
 ### Qisqa javob
 
-`Object.keys()` `string[]` qaytaradi, `(keyof T)[]` emas. Sabab — structural typing: `T` da qo'shimcha property'lar bo'lishi mumkin (subtype'larda), `Object.keys()` runtime'da ko'proq key qaytarishi mumkin → unsafe.
+`Object.keys()` `string[]` qaytaradi, `(keyof T)[]` emas. Sabab — structural typing: `T`'da qo'shimcha property'lar bo'lishi mumkin (subtype'larda), `Object.keys()` runtime'da ko'proq key qaytarishi mumkin → unsafe.
 
 ### To'liq tushuntirish
 
@@ -675,7 +675,7 @@ for (const key in admin) {
 - **`Object.entries()`** — `[string, any][]` qaytaradi (worse than keys).
 - **`Object.fromEntries()`** — type information yo'qoladi. TS 4.0+ overload qo'shilgan, lekin literal tuple kerak.
 - **`for...in` loop** — JS spec'ga ko'ra enumerable property'lar, inheritance ham qamraydi. Type ham `string`.
-- **`Record<K, V>` bilan ishlash** — `Record<"a" | "b", number>` da `Object.keys()` `(keyof typeof obj)[]` deb cast qilish nisbatan xavfsiz (literal record'da extra property'lar yo'q).
+- **`Record<K, V>` bilan ishlash** — `Record<"a" | "b", number>`'da `Object.keys()` `(keyof typeof obj)[]` deb cast qilish nisbatan xavfsiz (literal record'da extra property'lar yo'q).
 
 ### Follow-up savollar
 
@@ -732,7 +732,7 @@ TS type'lari va runtime `typeof` farq qilishi mumkin (`number[]` TS — `"object
 
 - `typeof null` = `"object"` JS bug — backward compatibility.
 - `typeof undefined` = `"undefined"`.
-- `wrap(null)` — T = `null` (literal), `a.type` runtime = `"object"`.
+- `wrap(null)` — `strictNullChecks` bilan T = `null`. Natija `.type` runtime'da `"object"` (`typeof null` JS bug).
 
 ### Follow-up savollar
 
@@ -759,20 +759,24 @@ merge({ name: "Ali" }, { age: 25 });
 
 ### Qisqa javob
 
-Bitta T ikki parameter'da — ikkalasi bir xil shape bo'lishi kerak. Birinchi argument'dan T = `{ name: string }` infer, ikkinchida `name` yo'q → xato.
+Bitta T ikki parameter'da. TS T'ga ikki candidate beradi — `{ name: string }` va `{ age: number }` — va ularni union qilib infer qiladi: T = `{ name: string } | { age: number }`. Call xato bermaydi, lekin return type ham shu union — clean `{ name; age }` merge yo'qoladi va `b` parameter ikkala shape'ni qabul qiladi. Yechim — ikki alohida type parameter.
 
 ### To'liq tushuntirish
 
 ```typescript
-// ❌ T = { name: string } — { age: 25 } mos emas
-merge({ name: "Ali" }, { age: 25 });
+// T = { name: string } | { age: number } — union infer, call XATO BERMAYDI
+const broken = merge({ name: "Ali" }, { age: 25 });
+// broken type: { name: string } | { age: number } — merged shape emas
+// broken.name; // ❌ Property 'name' does not exist on '{ age: number }'
 
 // ✅ Yechim 1: ikki alohida type parameter
 function merge<T, U>(a: T, b: U): T & U {
   return { ...a, ...b };
 }
-merge({ name: "Ali" }, { age: 25 });
+const ok = merge({ name: "Ali" }, { age: 25 });
 // { name: string } & { age: number }
+ok.name; // ✅ string
+ok.age;  // ✅ number
 
 // ✅ Yechim 2: Partial<T> (a strict, b qisman)
 function merge2<T extends object>(a: T, b: Partial<T>): T {
@@ -782,14 +786,14 @@ function merge2<T extends object>(a: T, b: Partial<T>): T {
 
 ### Edge Cases
 
-- **TS ba'zan T'ni union qilib infer qiladi** — `merge({ name: "Ali" }, { age: 25 })` ba'zi versions'da `{ name: string } | { age: number }` infer qilishi mumkin (TS evolution).
-- **Spread va `&` farqi** — `{ ...a, ...b }` runtime'da o'zgaruvchini birlashtiradi (oxirgi yutadi). `T & U` type system'da union.
-- **Key collision** — agar T va U'da bir xil key bor bo'lsa, intersection type bir xil property bo'lsa OK, har xil bo'lsa `never`.
+- **Single T — union inference mexanizmi** — TS har T-position'dan candidate yig'adi; candidate'lar bir-birining subtype'i bo'lmasa, union'ga birlashtiradi. Shu sababli call o'tib ketadi, lekin natija aralash union bo'ladi.
+- **Spread va `&` farqi** — `{ ...a, ...b }` runtime'da property'larni birlashtiradi (oxirgi key yutadi). `T & U` type system'da intersection — ikkala shape'ning barcha property'lari.
+- **Key collision** — agar T va U'da bir xil key bor lekin type'lar mos kelmasa, `T & U`'da o'sha property type'i `never` bo'ladi.
 
 ### Follow-up savollar
 
 1. **"Type parameter bittasidan ikki argument'da infer qilingani — TS'ning xatosi?"** — Yo'q, intentional. `<T>(a: T, b: T)` API'da ikkalasi bir xil type bo'lishini ifodalaydi (`Array.prototype.includes(value: T)`).
-2. **"Bir xil T va `<T, U extends T>` farqi?"** — `<T>` ikkalasini union qiladi yoki xato beradi. `<T, U extends T>` U strictly T'ning sub-type.
+2. **"Bir xil T va `<T, U extends T>` farqi?"** — `<T>(a: T, b: T)` ikki argument candidate'ini union qiladi (alohida shape'lar saqlanmaydi). `<T, U extends T>`'da U strictly T'ning sub-type bo'lishi shart, alohida.
 
 </details>
 
@@ -845,7 +849,7 @@ type E = { readonly env: "prod" };          // <const T> readonly + literal
 
 ### Follow-up savollar
 
-1. **"Widening qachon kerak (`as const` ishlatmaslik)?"** — Mutable konfiguratsiya, dynamic values, runtime'da o'zgaradigan state. `as const` immutable kontekst.
+1. **"Widening qachon kerak (`as const` ishlatmaslik)?"** — Mutable configuration, dynamic values, runtime'da o'zgaradigan state. `as const` immutable context.
 
 </details>
 
@@ -968,7 +972,7 @@ if (result2 !== undefined) {
 - **`noUncheckedIndexedAccess: true`** — array index access avtomatik `T | undefined`. Strict safety, lekin kod ko'p narrowing talab qiladi.
 - **Tuple bilan farq** — `function first<T extends unknown[]>(arr: [...T]): T[0]` — tuple shape'ni saqlaydi. Bo'sh tuple xato beradi.
 - **`never` bottom type** — TS'da har type'ning sub-type'i. `never` qiymat yaratib bo'lmaydi (faqat `throw`, infinite loop, exhaustiveness).
-- **`T[0]` tuple type — tuple'ning birinchi element** — `[]` ga `T[0]` `undefined` qaytaradi (`noUncheckedIndexedAccess` mustaqil). Bu non-empty tuple constraint uchun yaxshi pattern.
+- **Tuple `[0]` index — array `[0]` farqi** — `[string, number][0]` = `string` (aniq element). Lekin empty tuple type `[]`'da `[][0]` compile xato (TS2493: "Tuple type '[]' of length '0' has no element at index '0'"), `undefined` emas. Array `T[]`'da esa `T[0]` doim `T` (yoki `noUncheckedIndexedAccess` bilan `T | undefined`).
 
 ### Follow-up savollar
 
@@ -982,8 +986,8 @@ if (result2 !== undefined) {
 
 - Bottom type — har type'ning sub-type
 - `never` value mavjud emas — faqat `throw`, `while(true)`, recursive `never` qaytaruvchi function
-- `never` har joyga assignable (`const x: string = throwError()`)
-- Hech narsa `never`'ga assignable emas (`unknown`'dan tashqari `never extends unknown`)
+- `never` har type'ga assignable (`const x: string = throwError()`)
+- Hech qanday type `never`'ga assignable emas — faqat `never`'ning o'zi `never`'ga assignable
 
 **Bottom type'ning xavfli unsoundness:**
 
@@ -1060,7 +1064,7 @@ grouped.user;     // ✅ array
 ### Edge Cases
 
 - **`keyFn` `string` qaytarsa (non-literal)** — K = `string`, return `Record<string, T[]>` — har string key, type safety past.
-- **Empty array** — `groupBy([], fn)` — return `{}` (bo'sh Record). `Record<K, T[]>` da K hech qachon ishlatilmagan.
+- **Empty array** — `groupBy([], fn)` — return `{}` (bo'sh Record). `Record<K, T[]>`'da K hech qachon ishlatilmagan.
 - **`keyFn` `undefined`/`null` qaytarsa** — runtime'da `result[undefined]` = `"undefined"` string key. TS bunga ruxsat bermaydi (`PropertyKey` constraint).
 - **`<const K>` (TS 5.0+)** — caller `as const` yozmasa ham literal saqlash uchun.
 
@@ -1082,7 +1086,7 @@ TS lib'da `type PropertyKey = string | number | symbol` — har JS object key tu
 
 **Inference + `as const`:**
 
-Caller `as const` yozmasa, `u.role` type `string` infer bo'ladi (literal widening). `as const` array literal'larini `readonly` qiladi va string'larni literal saqlaydi. Alternative — `keyFn` parametr'ga `<const K>` (TS 5.0+) qo'shish:
+Caller `as const` yozmasa, `u.role` type `string` infer bo'ladi (literal widening). `as const` array literal'larini `readonly` qiladi va string'larni literal saqlaydi. Alternative — `keyFn` parameter'iga `<const K>` (TS 5.0+) qo'shish:
 
 ```typescript
 function groupByConst<T, const K extends PropertyKey>(

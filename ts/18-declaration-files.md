@@ -35,7 +35,7 @@ Declaration file lar quyidagi hollarda kerak:
 
 1. **JavaScript kutubxona uchun type** — kutubxona JS da yozilgan, lekin TypeScript project da ishlatmoqchisiz
 2. **Library distribute qilish** — `.js` + `.d.ts` sifatida distribute qilinadi
-3. **Global type lar** — `window`, `document`, `process` kabi global object lar (`lib.d.ts`)
+3. **Global type lar** — global object lar: `window`, `document`, `process` (`lib.d.ts`)
 4. **Non-TS fayl lar** — CSS, JSON, image fayllar import qilganda type berish ([Bo'lim 17](17-modules.md#ambient-modules))
 
 Kompilator `.d.ts` fayllarni **faqat type-checking** uchun o'qiydi. Ular JS ga compile **qilinmaydi** — allaqachon faqat type ma'lumot.
@@ -121,13 +121,13 @@ Kompilator `declare` li declaration larni type-check qiladi (parametr type lari,
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator parser bosqichida `declare` modifier'ni ko'rgach, AST node'ga `NodeFlags.Ambient` flag o'rnatadi. Type-checker bu node'ni standart node bilan bir xil tahlil qiladi (signature matching, type compatibility), lekin emit bosqichida `transformDeclarations.ts` (declaration emit) va `transformTypeScript.ts` (JS emit) ambient node'larni **butunlay tashlab ketadi**.
+Kompilator parser bosqichida `declare` modifier'ni ko'rgach, AST node'ga `NodeFlags.Ambient` flag o'rnatadi. Type-checker bu node'ni standart node bilan bir xil tahlil qiladi (signature matching, type compatibility), lekin emit bosqichida ikkala transformer ham — declaration emit (`.d.ts` yaratuvchi) va JS emit (TypeScript syntax'ini olib tashlovchi) — ambient node'larni **butunlay tashlab ketadi**.
 
 Natijada `declare const x: number` source code'dan **na `.js` ga**, **na `.d.ts` ga** alohida `declare` keyword bilan yozilmaydi (`.d.ts` content'i `declare` o'rniga implicit ambient — chunki butun `.d.ts` fayl ambient kontekst). Lekin `.ts` faylda yozilgan `declare const` `.d.ts` emit'da `declare const` saqlanadi (top-level statement bo'lsa).
 
 `declare global { ... }` blok faqat **module** kontekstida (fayl `import` yoki `export` ga ega) ishlaydi. Script kontekstida (no import/export) `declare global` syntactic xato — chunki butun fayl zaten global. Shu sababli ko'p misol'larda `export {};` qo'shiladi — fayl module'ga aylantirish uchun.
 
-Internal'da `declare module "name" { ... }` bilan ambient module yaratilgach, type resolution algoritmi (`tryFindAmbientModule` `resolver.ts`'da) bu nomni `node_modules` resolution'dan oldin tekshiradi. Wildcard pattern (`"*.svg"`) maxsus `PatternAmbientModule` strukturasiga saqlanadi — resolver string match orqali tanlaydi.
+Internal'da `declare module "name" { ... }` bilan ambient module yaratilgach, type resolution algoritmi (`tryFindAmbientModule` `checker.ts`'da) bu nomni `node_modules` resolution'dan oldin tekshiradi. Wildcard pattern (`"*.svg"`) maxsus `PatternAmbientModule` strukturasiga saqlanadi — checker string match orqali tanlaydi.
 
 </details>
 
@@ -402,9 +402,9 @@ declare namespace google.maps {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Standart `declaration: true` da declaration emit cross-file type inference'ga tayanadi. Masalan `function getUser() { return fetchUser(); }` deklaratsiyasi yaratilganda kompilator `fetchUser` return type'ini izlaydi, kerak bo'lsa boshqa fayldagi import zanjirini kuzatadi. Bu type graph'ning to'liq qurilishini talab qiladi — har bir fayl boshqalardan **bog'liq** bo'ladi va parallel ishlash imkonsiz.
+Standart `declaration: true` da declaration emit cross-file type inference'ga tayanadi. Masalan `function getUser() { return fetchUser(); }` declaration'i yaratilganda kompilator `fetchUser` return type'ini izlaydi, kerak bo'lsa boshqa fayldagi import zanjirini kuzatadi. Bu type graph'ning to'liq qurilishini talab qiladi — har bir fayl boshqalardan **bog'liq** bo'ladi va parallel ishlash imkonsiz.
 
-`isolatedDeclarations: true` qoidasi kompilatorga "har bir export'ning type'ini fayldagi ma'lumotdan **yagona o'qish bilan** aniqlash mumkin bo'lsin" deb majburlaydi. Inferred return type, inferred property type, va boshqa cross-file inference talab qiladigan pattern'lar uchun explicit annotation talab qilinadi. Kompilator yetishmagan annotation'ni `error TS9007` va boshqa `9xxx` seriyadagi diagnostika orqali bildiradi.
+`isolatedDeclarations: true` qoidasi kompilatorga "har bir export'ning type'ini fayldagi ma'lumotdan **yagona o'qish bilan** aniqlash mumkin bo'lsin" deb majburlaydi. Inferred return type, inferred property type, va boshqa cross-file inference talab qiladigan pattern'lar uchun explicit annotation talab qilinadi. Kompilator yetishmagan annotation'ni `error TS9007` va boshqa `9xxx` seriyadagi diagnostics orqali bildiradi.
 
 Bu cheklov tashqi tool'larga (esbuild, SWC, Bun) declaration emit'ni `tsc`'siz, fayl-fayl, parallel oqimda amalga oshirish imkonini beradi. Faqat syntactic information yetarli — semantic resolver kerak emas. Natija: monorepo'da yuzlab paketning declaration'larini `tsc` ishlatishdan tezroq generate qilish mumkin. TypeScript jamoasi bu xususiyatni 5.5 da kiritgan (2024-iyun).
 
@@ -446,7 +446,7 @@ function helper(n: number) { return n * 2; } // OK — exported emas
 
 ### Nazariya
 
-**DefinitelyTyped** — community tomonidan boshqariladigan eng katta TypeScript declaration file lari repositoriyasi. JavaScript kutubxonalar uchun type definition lar. `@types/` scope da npm package sifatida install qilinadi:
+**DefinitelyTyped** — community tomonidan boshqariladigan eng katta TypeScript declaration file lari repository'si. JavaScript kutubxonalar uchun type definition lar. `@types/` scope da npm package sifatida install qilinadi:
 
 ```bash
 npm install --save-dev @types/node       # Node.js API type lari
@@ -585,7 +585,7 @@ const today = create().format("YYYY-MM-DD");
 const todayGlobal = dateLib.create().format("YYYY-MM-DD");
 ```
 
-`export as namespace dateLib` qo'shimcha `UMDModuleDeclaration` yaratadi — bu kompilatorga: "agar consumer module sifatida import qilmasa, `dateLib` global nomi orqali ham bu paketga murojaat qila oladi" degan signal.
+`export as namespace dateLib` — UMD global export declaration. Kompilatorga: "agar consumer module sifatida import qilmasa, `dateLib` global nomi orqali ham bu paketga murojaat qila oladi" degan signal. Faqat `.d.ts` faylda yozilishi mumkin — `.ts` faylda `error TS1315` beradi.
 
 **Global Library:**
 
@@ -659,7 +659,7 @@ Augmentation ishlashi uchun ikki shart bajarilishi kerak:
 
 Declaration merging algoritmi (`mergeSymbol` `checker.ts`'da) bir xil nomli `InterfaceDeclaration` symbol'larni topadi va ularning member'larini **yagona symbol table** ga birlashtiradi. Bir xil property turli type bilan ikki interface'da bo'lsa — `Subsequent property declarations must have the same type` xatosi.
 
-Module augmentation uchun maxsus rule: `declare module "x"` blok'i fayl **ExternalModule** kontekstida bo'lganda kompilator uni **augmenting module declaration** sifatida belgilab, asl `"x"` module symbol'iga merge qiladi. Aks holda (fayl script bo'lsa) — yangi `AmbientModuleDeclaration` yaratiladi.
+Module augmentation uchun maxsus rule: `declare module "x"` blok'i module faylda (top-level `import`/`export` bor) bo'lganda kompilator uni augmenting declaration sifatida belgilab, asl `"x"` module symbol'iga merge qiladi. Aks holda (fayl script bo'lsa) — yangi mustaqil ambient module declaration sifatida qaraladi, merge bo'lmaydi.
 
 Global augmentation (`declare global { ... }`) faqat module faylda ruxsat etiladi. Kompilator `declare global` blok'ini script context'ga ko'tarib, ichidagi interface/var/function'larni global scope'ga qo'shadi. Bu mexanizm orqali `@types/jest` `describe`, `it`, `expect` global'larni qo'shadi.
 
@@ -824,11 +824,11 @@ declare class User {
 ### 3. `@types` va library o'z type lari conflict
 
 ```bash
-npm install axios         # Axios — o'z type lari bor
-npm install @types/axios  # ❌ CONFLICT!
+npm install axios         # Axios — o'z type lari bor (bundled .d.ts)
+npm install @types/axios  # ❌ Keraksiz — deprecated stub
 ```
 
-Agar library `package.json` da `"types"` field bor bo'lsa — `@types` **kerak emas**. Ikkalasi install bo'lsa, kompilator qaysi birini ishlatishni bilmasligi mumkin.
+Agar library `package.json` da `"types"` field bor bo'lsa — `@types` **kerak emas**. `@types/axios` deprecated stub paket (bo'sh declaration) — axios o'z type'larini ship qiladi. Resolution tartibida package o'zining `"types"` field'i `@types`'dan ustun keladi, shuning uchun `@types/axios` faqat keraksiz dependency bo'lib qoladi, real conflict emas.
 
 ### 4. `exports` da `types` tartib muhim
 
@@ -878,10 +878,10 @@ export declare function formatDate(date: Date): string;
 
 ```bash
 npm install axios         # o'z type lari bor
-npm install @types/axios  # ❌ — kerak emas!
+npm install @types/axios  # ❌ — kerak emas (deprecated stub)
 ```
 
-**Nima uchun:** Ikki turli type definition conflict yaratadi.
+**Nima uchun:** Library `package.json` da `"types"` field bilan o'z declaration'ini ship qilsa, resolution shu field'ni `@types`'dan oldin oladi. `@types/axios` esa deprecated bo'sh stub — keraksiz dependency, lekin agar `@types` paketi real (eskirgan) type'lar olib kelsa, ular library'ning yangi type'laridan farq qilib stale type error berishi mumkin.
 
 ### ❌ Xato 3: `isolatedDeclarations` da explicit type yozmaslik
 

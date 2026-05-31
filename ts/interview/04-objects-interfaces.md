@@ -44,7 +44,7 @@ Ikkalasi ham object shape'ni tavsiflaydi. `interface` declaration merging va `ex
 
 ### To'liq tushuntirish
 
-Ikkalasi ham bir xil structural typing'ni ifodalaydi, lekin compiler ularni boshqacha hisoblaydi. `interface` lazy resolution bilan ishlaydi — har ishlatilganda qayta hisoblanadi va declaration merging'ga ruxsat beradi. `type alias` esa eager resolution — yaratilganda darhol hisoblanadi va qayta declare qilib bo'lmaydi.
+Ikkalasi ham bir xil structural typing'ni ifodalaydi. Asosiy farq — `interface` declaration merging'ga ruxsat beradi: bir xil nomli bir nechta `interface` bitta type'ga birlashadi. `type alias` esa bir nomga bitta marta bog'lanadi — qayta declare qilinsa duplicate identifier error. Bundan tashqari `interface` faqat object/function shape'ni ifodalay oladi, `type alias` esa union, tuple, primitive alias, mapped va conditional type'ni ham ifodalaydi.
 
 | Xususiyat | Interface | Type Alias |
 |-----------|-----------|------------|
@@ -89,7 +89,7 @@ type Config = { host: string };
 
 - **Class implements**: `interface` va `type alias` ikkalasini ham `implements` qilish mumkin, lekin `type alias` da union bo'lsa — error.
 - **Recursive types**: ikkalasida ham ishlaydi, lekin `interface` self-reference'ni tabiiy qabul qiladi.
-- **Performance**: katta union/conditional type'larda `interface` cache'lash tufayli compile tezroq.
+- **Performance**: `interface extends` natijasini compiler nomlangan type sifatida cache qiladi, intersection (`&`) esa har ishlatilganda qayta yoyilishi mumkin — shuning uchun katta object shape'larda `interface extends` odatda type-check'ni yengillashtiradi.
 - **Tuple labels**: `[name: string, age: number]` faqat `type alias` da ishlaydi.
 
 ### Follow-up savollar
@@ -167,7 +167,7 @@ window.__APP_VERSION__ = "1.0.0"; // ✅
 - **Conflict detection**: merge qilinayotgan property tiplari mos kelmasa — compile error.
 - **Class merging**: `class` va `interface` bir xil nomli bo'lsa, interface class'ga property qo'shadi.
 - **Namespace + class**: namespace class'ga static property qo'shadi.
-- **`declare module` ichida `export {}` shart** — aks holda ambient module deb hisoblanmaydi.
+- **Augmentation uchun fayl module bo'lishi shart** — fayl top-level `import`/`export` ga ega bo'lishi kerak (kerak bo'lsa `export {}` qo'shiladi). Aks holda fayl script deb qaraladi va `declare module "X"` mavjud modulni augment qilmasdan, **yangi ambient module** e'lon qiladi — augmentation ishlamaydi.
 
 ### Follow-up savollar
 
@@ -178,11 +178,11 @@ window.__APP_VERSION__ = "1.0.0"; // ✅
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Spec mexanizmi**: TypeScript compiler symbol table'da bir xil nomli `InterfaceDeclaration` node'larni topib, ularning `members` array'ini birlashtiradi. `getDeclaredTypeOfSymbol` har bir merge qatnashchisini iterate qilib, single resolved type yaratadi.
+**Mexanizm**: merging binding bosqichida yuz beradi — bir xil nomli `interface` declaration'lar symbol table'da bitta symbol ostida to'planadi va ularning member'lari shu symbol'ga yig'iladi. Type resolution bosqichida bu birlashgan symbol bitta object type'ga aylanadi.
 
-**Conflict resolution**: ikki interface'da bir xil property nomi va mos kelmaydigan tip bo'lsa — `error TS2717`. Bir xil tip bo'lsa — silently merge. Function signature bo'lsa — overload qatorlar yaratadi (order: file order, keyin declaration order).
+**Conflict resolution**: ikki interface'da bir xil property nomi va mos kelmaydigan tip bo'lsa — `error TS2717` ("Subsequent property declarations must have the same type"). Bir xil tip bo'lsa — silently merge. Function signature bo'lsa — overload qatorlar yaratadi (order: fayl tartibi, keyin declaration tartibi).
 
-**`declare module` namespace**: module augmentation faqat shu spell'ni qamrab oladigan modullarga ta'sir qiladi. `declare module "*.svg"` kabi wildcard pattern'lar — ambient module declaration (augmentation emas).
+**`declare module` namespace**: module augmentation faqat shu module specifier bilan resolve bo'ladigan modulga ta'sir qiladi. `declare module "*.svg"` kabi wildcard pattern'lar — ambient module declaration (augmentation emas).
 
 </details>
 
@@ -201,7 +201,7 @@ Excess property checking — object literal'da kutilgan type'da mavjud bo'lmagan
 
 ### To'liq tushuntirish
 
-Strukturaviy tipizatsiya qoidasi bo'yicha, qo'shimcha property'lar mavjud bo'lishi tipga zid emas. Lekin object literal'da qo'shimcha property odatda typo yoki noto'g'ri kalit nomi — TS bu xatolarni ushlash uchun maxsus tekshiruv qo'shadi. Bu tekshiruv literal'ning "fresh" holatida (bevosita assign yoki argument sifatida) ishlaydi. Variable orqali berilgan object esa "fresh" emas — tekshiruv o'tkazib yuboriladi.
+Structural typing qoidasi bo'yicha, qo'shimcha property'lar mavjud bo'lishi tipga zid emas. Lekin object literal'da qo'shimcha property odatda typo yoki noto'g'ri kalit nomi — TS bu xatolarni ushlash uchun maxsus tekshiruv qo'shadi. Bu tekshiruv literal'ning "fresh" holatida (bevosita assign yoki argument sifatida) ishlaydi. Variable orqali berilgan object esa "fresh" emas — tekshiruv o'tkazib yuboriladi.
 
 ### Kod misol
 
@@ -243,7 +243,7 @@ const user5: User = tmp;
 - **Function argument'da ham ishlaydi**: `fn({ name: "x", extra: 1 })` — fresh literal, error beradi.
 - **Spread bilan**: `{ ...other, name: "x" }` — natija fresh emas, check ishlamaydi.
 - **Return value'da**: function return literal'i ham fresh deb hisoblanadi.
-- **Generic parameter'da**: generic ga inferred type berilsa, fresh check qo'llanadi.
+- **Generic parameter'da**: generic'ga inferred type berilsa, fresh check qo'llanadi.
 - **Optional property emas**: optional property mavjud bo'lmasligi mumkin, lekin noma'lum property — error.
 
 ### Follow-up savollar
@@ -328,7 +328,7 @@ const frozen: DeepReadonly<Config> = config;
 
 **`as const` mexanizmi**: TypeScript literal'ga `as const` qo'yilganda — `widening` ni bloklaydi va recursive `readonly` qo'shadi. `{ a: 1, b: [2, 3] } as const` → `{ readonly a: 1; readonly b: readonly [2, 3] }`.
 
-**Compiler implementation**: `readonly` flag `Symbol.Readonly` orqali tracked, `getModifierFlagsNoCache` da tekshiriladi. Assign operatsiyada `checkReadonlyAssignment` har property write'da invoked.
+**Compiler implementation**: `readonly` — `ModifierFlags.Readonly` bit'i orqali property declaration'da belgilanadi. Assign ifoda tekshirilganda compiler chap tomon property read-only ekanini aniqlasa, write'ni rad etadi (`error TS2540`: "Cannot assign to '...' because it is a read-only property"). Bu butunlay compile-time tekshiruv — emit qilingan JavaScript'da `readonly` izi qolmaydi.
 
 </details>
 
@@ -402,7 +402,7 @@ interface Bad {
 
 - **`noUncheckedIndexedAccess`**: tsconfig'da yoqilsa, index access har doim `V | undefined` qaytaradi (xavfsizroq).
 - **Number index**: JavaScript'da numeric key string'ga konvert bo'ladi — TypeScript number index signature'ni alohida tip sifatida ko'radi (asosan tuple/array uchun).
-- **Template literal key**: `[key: \`api_${string}\`]: unknown` — kalit pattern bilan cheklanadi.
+- **Template literal key**: ``[key: `api_${string}`]: unknown`` — kalit pattern bilan cheklanadi.
 - **Symbol index**: `[key: symbol]: V` — symbol kalit uchun, alohida namespace.
 - **Record'da partial qilish**: `Partial<Record<K, V>>` — har property optional bo'ladi.
 
@@ -449,7 +449,7 @@ console.log(Object.keys(b2)); // ["x"]
 interface Strict { x?: string }
 const c: Strict = { x: undefined };
 // ❌ Type 'undefined' is not assignable to type 'string'
-// Optional bo'lsa — property ni butunlay tushirib qoldirish, undefined bermaslik
+// Optional bo'lsa — property'ni butunlay tushirib qoldirish, undefined bermaslik
 
 const c2: Strict = {};           // ✅
 const c3: Strict = { x: "Aziz" }; // ✅
@@ -519,8 +519,8 @@ const handler: EventHandler = {
 };
 
 const keyboardEvent: KeyboardEvent = new KeyboardEvent("keydown");
-handler.onClick(keyboardEvent); // ❌ Runtime crash — clientX yo'q!
-// TS bivariant tufayli compile-time'da ushlay olmadi
+handler.onClick(keyboardEvent); // ❌ e.clientX → undefined (KeyboardEvent'da clientX yo'q)
+// TS bivariant tufayli compile-time'da ushlay olmadi — yashirin logic bug
 
 // Best practice — har doim property function
 interface SafeHandler {
@@ -550,7 +550,7 @@ interface SafeHandler {
 
 **Method bivariance origin**: TypeScript 2.6'gacha `strictFunctionTypes` yo'q edi — barcha parametr tiplari bivariant. Migration'ni osonlashtirish uchun method syntax bivariant qoldirilgan, lekin `=>` syntax strict bo'ldi.
 
-**`callbackVariance` checker**: compiler `isFunctionTypeRelatedTo` ichida method va property function'larni alohida tekshiradi. `SyntaxKind.MethodSignature` — bivariant path, `SyntaxKind.PropertySignature` (with function type) — strict path.
+**Method vs property ajrimi**: compiler signature'larni taqqoslaganda method shorthand'dan kelib chiqqan signature'larni "bivariant callback" sifatida belgilab, parametr'larni ikki tomonlama tekshiradi. Property position'dagi function type (`=>`) bunday belgisiz qoladi, shuning uchun `strictFunctionTypes` ostida parametr'lari contravariant tekshiriladi. Shu sababli farq syntax tanlovidan kelib chiqadi, type'ning mazmunidan emas.
 
 </details>
 
@@ -569,7 +569,7 @@ Recursive interface — o'z-o'ziga reference qiluvchi tip (`children: Tree[]` ka
 
 ### To'liq tushuntirish
 
-TypeScript interface yoki type alias'ni e'lon qilishda uning ichida o'ziga reference qila oladi, agar reference object property yoki array element position'ida bo'lsa. Direct reference (`type X = X`) — circular error. Recursive struktura tree, linked list, JSON, AST, file system kabi self-similar ma'lumotlarni modellashtirishda kerak. Discriminated union qo'shilsa, har sub-shape uchun aniq property set beradi va type narrowing'ni soddalashtiradi.
+TypeScript interface yoki type alias'ni e'lon qilishda uning ichida o'ziga reference qila oladi, agar reference object property yoki array element position'ida bo'lsa. Direct reference (`type X = X`) — circular error. Recursive struktura tree, linked list, JSON, AST, file system kabi o'z-o'ziga o'xshash ma'lumotlarni modellashtirishda kerak. Discriminated union qo'shilsa, har sub-shape uchun aniq property set beradi va type narrowing'ni soddalashtiradi.
 
 ### Kod misol
 
@@ -631,8 +631,8 @@ interface AstNode {
 - **Direct circular**: `type X = X` — error, `type X = { x: X }` — ishlaydi (object position).
 - **Mutual recursion**: ikki interface bir-biriga reference qilsa ham ishlaydi.
 - **Generic recursive**: `Tree<T>` — generic parametr bilan ishlaydi.
-- **Conditional recursive**: TS 4.1+ da conditional type'da recursive expansion (chuqurlik chegarasi: ~50).
-- **Type instantiation excessively deep**: chuqurlik 50+ bo'lsa — error.
+- **Conditional recursive**: TS 4.1+ da conditional type'da recursive expansion qo'llab-quvvatlanadi (TS 4.5+ da tail-recursive conditional type optimizatsiyasi bilan).
+- **Type instantiation excessively deep**: type instantiation depth ~50 darajadan oshsa — `error TS2589` ("Type instantiation is excessively deep and possibly infinite").
 
 ### Follow-up savollar
 
@@ -657,7 +657,7 @@ interface AstNode {
 
 ### To'liq tushuntirish
 
-`readonly` modifier property write protection beradi (faqat compile-time). Optional property `?` — property mavjud bo'lmasligi ham, keyin set qilinishi ham mumkin. Excess property checking esa fresh object literal'da har declared property dan tashqari nomlarni error sifatida ushlaydi — bu typo va eski API kalit nomlarini darhol ko'rsatish uchun. Variable orqali assign qilinganda esa structural typing qoidasi qo'llanadi — qo'shimcha property'lar ruxsat etiladi.
+`readonly` modifier property write protection beradi (faqat compile-time). Optional property `?` — property mavjud bo'lmasligi ham, keyin set qilinishi ham mumkin. Excess property checking esa fresh object literal'da har declared property'dan tashqari nomlarni error sifatida ushlaydi — bu typo va eski API kalit nomlarini darhol ko'rsatish uchun. Variable orqali assign qilinganda esa structural typing qoidasi qo'llanadi — qo'shimcha property'lar ruxsat etiladi.
 
 ### Kod misol
 
@@ -767,7 +767,7 @@ const o: Open = { a: 1, b: "x", c: true, d: { nested: 1 } }; // ✅ har narsa
 
 - **`noUncheckedIndexedAccess`**: index access har doim `T | undefined` qaytaradi.
 - **Symbol index**: `[key: symbol]: V` — alohida namespace, string/number'dan ajralgan.
-- **Template literal index**: `[key: \`prefix_${string}\`]: V` — pattern bilan cheklash.
+- **Template literal index**: ``[key: `prefix_${string}`]: V`` — pattern bilan cheklash.
 
 ### Follow-up savollar
 
@@ -866,7 +866,7 @@ findFile(root, "math.ts");   // { name: "math.ts", type: "file", size: 256 }
 
 ### To'liq tushuntirish
 
-Generic parametr `K` bilan kalit set'ini cheklash, `V` bilan qiymat tipini. `Partial<Record<K, V>>` har property optional qiladi — `delete` operatsiyasi uchun. `Object.keys` har doim `string[]` qaytaradi (JavaScript runtime cheklovi) — `as K[]` assertion zarur, lekin xavfsiz, chunki TypeScript invariant'ni kafolatlaydi.
+Generic parametr `K` bilan kalit set'ini cheklash, `V` bilan qiymat tipini. `Partial<Record<K, V>>` har property optional qiladi — `delete` operatsiyasi uchun. `Object.keys` type'i har doim `string[]` (JavaScript runtime'da kalitlar string, type-level'da `K` info `Object.keys` signature'iga o'tmaydi) — shuning uchun `as K[]` assertion kerak. Bu assertion class invariant'iga tayanadi: storage'ga faqat `set(key: K, ...)` orqali `K` kalit kiritiladi, demak runtime kalitlar haqiqatan ham `K`.
 
 ### Kod misol
 
@@ -952,7 +952,7 @@ flags.entries(); // [Feature, boolean][]
 
 **`Partial<Record<K, V>>` vs `Record<K, V | undefined>`**: birinchisi property optional qiladi (`{x?: V}`), ikkinchisi property MAJBURIY lekin qiymati `undefined` bo'lishi mumkin (`{x: V | undefined}`). `delete` operatsiyasi uchun birinchi variant to'g'ri.
 
-**Iteration protocol**: `Symbol.iterator` method qo'shilsa, `for (const [k, v] of map)` ishlaydi. Generator funksiya bilan implement qilish — `function* [Symbol.iterator]()`.
+**Iteration protocol**: `Symbol.iterator` method qo'shilsa, `for (const [k, v] of map)` ishlaydi. Class ichida generator method syntax'i — `*[Symbol.iterator]() { yield* this.entries(); }` (computed generator method, `function*` emas).
 
 </details>
 
@@ -1021,7 +1021,7 @@ console.log(config.metadata.get("version")); // ✅
 
 - **Function property'lar**: `T extends Function` — function reference o'zgarmas (har doim), lekin closure ichidagi state mutable.
 - **Class instance'lar**: `extends object` true qaytaradi, lekin private property'lar accessible bo'lmasligi mumkin.
-- **Branded types**: nominal typing bilan ishlaydi (extra branding property saqlanadi).
+- **Branded types**: `string & { __brand: ... }` kabi branded primitive `extends object` shoxiga tushadi (intersection'da object qismi bor) va mapped type uni `{ readonly __brand: ... }` ga aylantirib, primitive base'ni yo'qotadi — branded type'lar uchun alohida shox (`T extends string | number | boolean ? T : ...`) qo'shish kerak.
 - **Tuple labels**: `readonly [name: string, age: number]` — label'lar saqlanadi.
 - **Recursion limit**: 50+ chuqurlik — error.
 
@@ -1038,7 +1038,7 @@ console.log(config.metadata.get("version")); // ✅
 
 **Variance**: `ReadonlyArray<T>` `Array<T>`ning **supertype**'i. Mutable array'ni readonly'ga assign mumkin (read uchun yetarli), teskari emas.
 
-**TypeScript depth limit**: `instantiationDepth` 50, `instantiationCount` 500000 — bu chegaralar conditional/mapped type expansion'da. Tail recursion optimization TS 4.5+ da — accumulator pattern bilan chuqurroq recursion mumkin.
+**TypeScript depth limit**: `checker.ts`'da hardcoded — instantiation depth chegarasi 50, instantiation count chegarasi 5 000 000. Bu chegaralar conditional/mapped type expansion'da ishlaydi va oshirilsa `error TS2589`. Tail-recursive conditional type optimizatsiyasi TS 4.5+ da — accumulator pattern bilan chuqurroq recursion mumkin.
 
 </details>
 
@@ -1108,13 +1108,13 @@ interface DogC extends AnimalC<number> {
 ### Edge Cases
 
 - **Intersection bilan farq**: `Animal & { sound: number }` — error bermaydi, lekin `sound: never` bo'ladi (compile bermaydi ishlatishda).
-- **Method override**: parameter contravariant — torroq parametr (subtype) ruxsat etilmaydi `strictFunctionTypes` bilan.
-- **Optional override**: parent'da majburiy property'ni child'da optional qilish — error.
+- **Method override**: method shorthand (`m(x: T): R`) parametri `strictFunctionTypes` ostida ham bivariant qoladi — torroq parametr bilan override ruxsat etiladi (Savol 7). Property function (`m: (x: T) => R`) esa contravariant: torroq parametr redd etiladi.
+- **Optional override**: parent'da majburiy property'ni child'da optional qilish — `interface extends`'da ruxsat etilmaydi (override majburiylikni saqlashi shart).
 
 ### Follow-up savollar
 
 1. **"Nima uchun intersection xato bermaydi?"** — Intersection lazy hisoblanadi, conflict faqat consumer kodda ishlatishda yuzaga chiqadi.
-2. **"`Omit` bilan parent property o'chirib bo'ladimi?"** — `interface Dog extends Omit<Animal, "sound">` — TS 4.x+ ishlaydi, lekin type alias intersection variant aniqroq.
+2. **"`Omit` bilan parent property o'chirib bo'ladimi?"** — `interface Dog extends Omit<Animal, "sound">` ishlaydi (`Omit` object type qaytaradi, interface uni extend qila oladi), so'ng `sound`'ni yangi tip bilan qayta e'lon qilish mumkin.
 
 </details>
 
@@ -1155,9 +1155,10 @@ type IntersectedB = Base & { name: number };
 // Faqat ishlatishda ko'rinadi:
 const b: IntersectedB = {
   id: 1,
-  name: ???, // Hech qanday qiymat — never
+  name: "Aziz", // ❌ Type 'string' is not assignable to type 'never'
   meta: { version: 1 },
 };
+// Hech qanday qiymat 'never' ga assign bo'lmaydi — bu property amalda yaroqsiz
 
 // 3. Nested conflict — extends
 interface ExtendedC extends Base {
@@ -1172,8 +1173,9 @@ type IntersectedD = Base & { meta: { version: string } };
 const d: IntersectedD = {
   id: 1,
   name: "x",
-  meta: { version: ??? }, // Hech qanday qiymat — never
+  meta: { version: 1 }, // ❌ Type 'number' is not assignable to type 'never'
 };
+// meta.version 'never' — number ham, string ham assign bo'lmaydi
 
 // Tuzatish — explicit narrowing yoki overlap
 type ProperD = Omit<Base, "meta"> & { meta: { version: string } };

@@ -1,6 +1,6 @@
 # Interview: TypeScript 5.x Yangiliklari
 
-> TC39 decorators (TS 5.0), `const` type parameters (TS 5.0), `satisfies` operator (TS 4.9), `using`/`await using` declarations (TS 5.2), `NoInfer<T>` (TS 5.4), inferred type predicates (TS 5.5), `isolatedDeclarations` (TS 5.5), `erasableSyntaxOnly` (TS 5.8) va boshqa TS 5.x feature lari bo'yicha interview savollari.
+> TC39 decorators (TS 5.0), `const` type parameters (TS 5.0), `satisfies` operator (TS 4.9), `using`/`await using` declarations (TS 5.2), `NoInfer<T>` (TS 5.4), inferred type predicates (TS 5.5), `isolatedDeclarations` (TS 5.5), `erasableSyntaxOnly` (TS 5.8) va boshqa TS 5.x feature'lari bo'yicha interview savollari.
 
 ---
 
@@ -15,7 +15,7 @@
 
 ## Nazariy savollar
 
-### Savol 1: `satisfies` operator (TS 4.9) nima va `as` dan farqi? [Junior+]
+### Savol 1: `satisfies` operator (TS 4.9) nima va `as`'dan farqi? [Junior+]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -26,9 +26,9 @@
 
 ### To'liq tushuntirish
 
-`as T` — programmer "bu T tipida" deydi. Compiler bidirectional assignability tekshiradi (qiymat T ga yoki T qiymatga assignable bo'lishi shart), lekin natija type — `T` (qiymatning inferred shape'i yo'qoladi). Mos kelmagan cast'ga `unknown` orqali ikkala assertion (`as unknown as T`) bypass'i mavjud — runtime crash xavfi.
+`as T` — programmer "bu T tipida" deydi. Compiler bidirectional assignability tekshiradi (qiymat T'ga yoki T qiymatga assignable bo'lishi shart), lekin natija type — `T` (qiymatning inferred shape'i yo'qoladi). Mos kelmagan cast'ga `unknown` orqali ikkala assertion (`as unknown as T`) bypass'i mavjud — runtime crash xavfi.
 
-`satisfies T` — compiler "expression T ga mos keladimi?" deb tekshiradi. Mos kelmasa — error. Lekin expression'ning **inferred type**'ini saqlaydi (literal, narrow, specific). Bu `as const` bilan birgalikda yaxshi ishlaydi.
+`satisfies T` — compiler "expression T'ga mos keladimi?" deb tekshiradi. Mos kelmasa — error. Lekin expression'ning **inferred type**'ini saqlaydi (literal, narrow, specific). Bu `as const` bilan birgalikda yaxshi ishlaydi.
 
 Asosiy use case: object literal aniq shape'ini saqlash, lekin contract'ni tekshirish. Routes, config, theme'lar uchun keng tarqalgan pattern.
 
@@ -58,15 +58,15 @@ type RoutePath = keyof typeof routes;  // "/users" | "/posts"
 
 ### Edge Cases
 
-- **`as const` bilan birga** — `{ x: 1 } as const satisfies { x: number }` — `readonly { x: 1 }`
+- **`as const` bilan birga** — `{ x: 1 } as const satisfies { x: number }` — natija `{ readonly x: 1 }`
 - **Function return** — `function f() { return { x: 1 } satisfies T; }` ruxsat
-- **Generic constraint check** — `satisfies` da type parameter infer bo'lmaydi, lekin constraint tekshiriladi
+- **Generic constraint check** — `satisfies`'da type parameter infer bo'lmaydi, lekin constraint tekshiriladi
 - **Excess property** rejected — `{ a: 1, extra: 2 } satisfies { a: number }` error
 - **Runtime kod yo'q** — emit'da to'liq olib tashlanadi (type erasure)
 
 ### Follow-up savollar
 
-1. **"`satisfies` ni har joyda ishlatish kerakmi?"** — Yo'q. Faqat narrow type kerak + contract check ikkalasi kerak bo'lganda. Function parameter type allaqachon contract beradi.
+1. **"`satisfies`'ni har joyda ishlatish kerakmi?"** — Yo'q. Faqat narrow type kerak + contract check ikkalasi kerak bo'lganda. Function parameter type allaqachon contract beradi.
 2. **"`satisfies` Pick/Partial bilan qanday ishlaydi?"** — Pick/Partial result satisfies'da contract sifatida ishlatiladi, lekin output type literal saqlanadi.
 
 </details>
@@ -86,7 +86,7 @@ type RoutePath = keyof typeof routes;  // "/users" | "/posts"
 
 Default generic inference array'ni widen qiladi: `f([1, 2, 3])` natijasi `T = number[]`. Literal va tuple saqlanmaydi.
 
-`<const T>` modifier compiler'ga "argument'ni xuddi `as const` qilingandek tekshir" deyish. Natijada:
+`<const T>` modifier compiler'ga "argument'ni `as const` qilingandek tekshir" degan ko'rsatma. Natijada:
 - Array → readonly tuple (`readonly [1, 2, 3]`)
 - Object literal → readonly properties with literal values
 - String literal → narrow literal type
@@ -144,15 +144,15 @@ type State = (typeof m.states)[number];  // "idle" | "loading" | "success" | "er
 
 ### To'liq tushuntirish
 
-`using` deklaratsiya — block scope (function body, if/for block) tugaganda LIFO tartibda dispose chaqiriladi. Hatto exception throw bo'lsa ham. Manual `try/finally` boilerplate'siz.
+`using` declaration — block scope (function body, if/for block) tugaganda LIFO tartibda dispose chaqiriladi. Hatto exception throw bo'lsa ham. Manual `try/finally` boilerplate'siz.
 
 Implementation:
-- **Sync resource** — `Symbol.dispose()` method qaytaruvchi obyekt (`Disposable` interface)
+- **Sync resource** — `Symbol.dispose()` method qaytaruvchi ob'ekt (`Disposable` interface)
 - **Async resource** — `Symbol.asyncDispose()` Promise qaytaruvchi (`AsyncDisposable` interface). Faqat `await using` bilan ishlatiladi
 
-Compile target'ga qarab TS down-level emit qiladi (`try/finally`'ga aylanadi). Runtime'da `Symbol.dispose` va `Symbol.asyncDispose` global'lari kerak (ES2023+ runtime yoki polyfill).
+Compile target'ga qarab TS down-level emit qiladi (`try/finally`'ga aylanadi). Runtime'da `Symbol.dispose` va `Symbol.asyncDispose` well-known symbol'lari kerak — Explicit Resource Management proposal'i bilan keladi (TS'da `esnext.disposable` lib), eski runtime'da polyfill.
 
-Resource lifetime aniq scope bilan bog'lanadi — file handle, DB connection, lock, transaction kabi cleanup kerak resurslar uchun. C# `using`, Python `with`, Java `try-with-resources` ekvivalenti.
+Resource lifetime aniq scope bilan bog'lanadi — cleanup talab qiladigan resurslar uchun: file handle, DB connection, lock, transaction. C# `using`, Python `with`, Java `try-with-resources` ekvivalenti.
 
 ### Kod misol
 
@@ -203,7 +203,7 @@ async function fetchUsers() {
 
 ### Follow-up savollar
 
-1. **"`using` va `try/finally` farqi nima?"** — `using` deklarativ, LIFO multi-resource, exception chain. `try/finally` imperative, manual order, nested boilerplate.
+1. **"`using` va `try/finally` farqi nima?"** — `using` declarative, LIFO multi-resource, exception chain. `try/finally` imperative, manual order, nested boilerplate.
 2. **"Symbol.dispose qaysi runtime'da mavjud?"** — Node.js 20+, Bun, Deno. Browser polyfill kerak (esnext.disposable lib).
 
 </details>
@@ -217,13 +217,13 @@ async function fetchUsers() {
 
 ### Qisqa javob
 
-`NoInfer<T>` — generic inference'da type parameter ni o'zining position'idan **infer qilinmasligi**ni belgilaydi. Bir nechta parameter dan T infer qilinishi kerak bo'lganda, ba'zilarini "passive" qilib boshqalardan inference'ga ishonadi.
+`NoInfer<T>` — generic inference'da type parameter'ni o'zining position'idan **infer qilinmasligi**ni belgilaydi. Bir nechta parameter'dan T infer qilinishi kerak bo'lganda, ba'zilarini "passive" qilib boshqalardan inference'ga ishonadi.
 
 ### To'liq tushuntirish
 
 Default generic inference — har parameter T'ni infer qilishga urinadi. Bu ba'zan istalmagan: birinchi argument'dan T'ni aniqlash, qolganlari faqat T'ga mos kelishini tekshirish kerak.
 
-`NoInfer<T>` parameter ni "passive" qiladi — T faqat boshqa parameter'lardan infer qilinadi. Type check baribir ishlaydi (mos kelmasa error), lekin inference faqat boshqa parameter'lardan.
+`NoInfer<T>` parameter'ni "passive" qiladi — T faqat boshqa parameter'lardan infer qilinadi. Type check baribir ishlaydi (mos kelmasa error), lekin inference faqat boshqa parameter'lardan.
 
 Use case'lar: default value, fallback, override parameter (ko'pincha "tweak" parameter T'ni aniqlamasligi kerak).
 
@@ -249,13 +249,17 @@ function defineComponent<P>(props: P, defaultProps: NoInfer<P>) {
 }
 defineComponent({ name: "Ali", age: 25 }, { name: "", age: 0 });
 
-// Configurable factory
-function createValidator<T>(
-  schema: T,
-  errors: { [K in keyof T as NoInfer<K>]?: string }
-) {
-  return { schema, errors };
+// Bir nechta "passive" parameter — T faqat current'dan infer bo'ladi
+function pickValue<T>(
+  current: T,
+  primary: NoInfer<T>,
+  secondary: NoInfer<T>
+): T {
+  return current;
 }
+pickValue("active", "idle", "pending");
+// T = string (current'dan) — primary/secondary inference candidate emas
+// pickValue("active", "idle", 42);  // ❌ number string'ga mos emas
 ```
 
 ### Edge Cases
@@ -288,8 +292,8 @@ TS 5.5'dan `Array.filter` (va shunga o'xshash method'lar) callback `boolean` qay
 
 TS 5.4'gacha `[1, null].filter(x => x !== null)` natijasi `(number | null)[]` qoladi. Manual predicate kerak edi: `.filter((x): x is number => x !== null)`.
 
-TS 5.5'da compiler callback ichidagi logic'ni tahlil qilib type narrowing predicate ni avtomatik chiqaradi. Quyidagi shartlar bajarilsa:
-- Callback type predicate'ga "rasshifrovka" qilinadi (`typeof x === "string"`, `x !== null`, `x instanceof Cls`, va h.k.)
+TS 5.5'da compiler callback ichidagi logic'ni tahlil qilib type narrowing predicate'ni avtomatik chiqaradi. Quyidagi shartlar bajarilsa:
+- Callback narrowing operatsiyasidan type predicate'ga aylantiriladi (`typeof x === "string"`, `x !== null`, `x instanceof Cls`, va h.k.)
 - Callback boshqa kompleks logic ishlatmaydi
 - Narrowing aniq
 
@@ -320,7 +324,7 @@ const animals: (Cat | Dog)[] = [new Cat(), new Dog()];
 const cats = animals.filter(a => a instanceof Cat);
 // cats: Cat[]
 
-// `.find` da ham
+// `.find`'da ham
 const firstString = mixed.find(v => typeof v === "string");
 // firstString: string | undefined
 ```
@@ -355,12 +359,13 @@ TC39 Stage 3 decorators — yangi ECMAScript standart (TS 5.0). `experimentalDec
 
 **Legacy decorator** (TS <5.0):
 - `experimentalDecorators: true` kerak
-- Signature: `(target, propertyKey, descriptor)` — `Reflect.metadata` ishlatiladi
+- Method signature: `(target, propertyKey, descriptor)`; class/property/parameter uchun alohida shakl
 - Parameter decorator mavjud (Stage 3'da yo'q)
+- Runtime metadata uchun `reflect-metadata` polyfill + `emitDecoratorMetadata` kerak — TS o'zi metadata emit qilmaydi
 - ECMA spec'ga rasman kirmagan — TypeScript-only
 
 **Stage 3 decorator** (TS 5.0+):
-- Flag kerak emas (default qoidlangan)
+- Flag kerak emas (TS 5.0'da default holat)
 - Signature: `(value, context)` — `context` aniq turi (`ClassMethodDecoratorContext`, `ClassFieldDecoratorContext`)
 - `Symbol.metadata` orqali metadata (TS 5.2+)
 - ECMAScript standart bo'lib bormoqda — kelajakda runtime native
@@ -500,7 +505,7 @@ export type User = { id: number; name: string };
 
 ### Qisqa javob
 
-`erasableSyntaxOnly` — faqat **type erasure** bilan o'chiriladigan syntax ruxsat. `enum`, `namespace`, parameter property (constructor `public/private x`), legacy decorators — TAQIQ. Node.js'ning `--experimental-strip-types` flag'iga mo'ljallangan.
+`erasableSyntaxOnly` — faqat **type erasure** bilan o'chiriladigan syntax ruxsat. `enum`, `namespace`, parameter property (constructor `public/private x`), decorator (legacy va Stage 3) — TAQIQ. Node.js'ning `--experimental-strip-types` flag'iga mo'ljallangan.
 
 ### To'liq tushuntirish
 
@@ -510,21 +515,22 @@ Taqiqlanadigan syntax (runtime kod hosil qiladi):
 - **`enum`** — JS'da yo'q, TS object hosil qiladi
 - **`namespace`** (non-type) — IIFE hosil qiladi
 - **Parameter property** — `constructor(public name: string)` — body'ga `this.name = name` qo'shadi
-- **Legacy decorator emit'i** — runtime decorator behavior
+- **Decorator** (legacy va Stage 3) — runtime decorator-application kodi emit qiladi
 
 Ruxsat (type erasure):
 - Type annotation, interface, type alias
 - Generic parameter
 - `satisfies`, `as`, type assertion
 - `import type`, `export type`
-- TC39 Stage 3 decorators (JS standart)
+
+Decorator (legacy ham, Stage 3 ham) — TAQIQ. Stage 3 decorator hali TC39 proposal, JS engine'larda native emas; TS uni runtime decorator-application kodiga emit qiladi — type erasure emas. Node'ning `--experimental-strip-types` rejimida decorator parser error beradi.
 
 Migration: enum → `as const` object, namespace → object yoki ES module, parameter property → manual assign.
 
 ### Kod misol
 
 ```typescript
-// ❌ erasableSyntaxOnly da TAQIQ
+// ❌ erasableSyntaxOnly'da TAQIQ
 // enum Status { Active, Inactive }
 
 // ✅ muqobil
@@ -566,12 +572,12 @@ interface User { id: number; name: string; }
 - **`const enum`** — taqiq, lekin inlined bo'lgani uchun ko'pincha re-implement oson
 - **Declaration merging namespace** — type-only namespace ruxsat (faqat type member'lar)
 - **Re-export'da default qiymat** — class re-export OK (type info erased)
-- **TC39 decorators** — Stage 3 decoratorlar runtime'da JS standart bo'lgani uchun ruxsat (kelajakda)
+- **TC39 Stage 3 decorator** — `erasableSyntaxOnly`'da TAQIQ. Hali JS engine native emas, TS runtime decorator-application kodi emit qiladi
 - **Node 22 strip-types** — `erasableSyntaxOnly` bilan birga ishlatish tavsiya
 
 ### Follow-up savollar
 
-1. **"`enum` ni butunlay tashlash kerakmi?"** — `erasableSyntaxOnly` ishlatadigan loyihada — ha. Aks holda — opsiyaviy.
+1. **"`enum`'ni butunlay tashlash kerakmi?"** — `erasableSyntaxOnly` ishlatadigan loyihada — ha. Aks holda — opsiyaviy.
 2. **"`reflect-metadata` `erasableSyntaxOnly`'ga ta'sir qiladimi?"** — Ha. Legacy decorator + emitDecoratorMetadata'ga tayanadi — taqiqlanadi.
 
 </details>
@@ -609,7 +615,7 @@ type PaletteItem2 = (typeof palette2)[number];
 
 `<const T>` modifier argument'ni `as const` qilingandek infer qiladi — array tuple readonly bo'lib, har element literal saqlanadi. `(typeof palette)[number]` index access bilan union narrow olinadi.
 
-`defineColorsNoConst` da `T extends readonly string[]` constraint bor, lekin `const` modifier yo'q — array `string[]` ga widen bo'ladi (literal yo'qoladi). `PaletteItem2` `string` umumiy type bo'ladi.
+`defineColorsNoConst`'da `T extends readonly string[]` constraint bor, lekin `const` modifier yo'q — array `string[]`'ga widen bo'ladi (literal yo'qoladi). `PaletteItem2` `string` umumiy type bo'ladi.
 
 ### Edge Cases
 
@@ -692,7 +698,7 @@ close A
 
 ### To'liq tushuntirish
 
-Resource'lar deklaratsiya tartibida open bo'ladi. Scope tugaganda **LIFO** (Last-In-First-Out) tartibda dispose — `C → B → A`. Bu nested resource'lar uchun to'g'ri: oxirgi olingan resurs avval ozod bo'ladi. C# `using` va Java `try-with-resources` ham xuddi shu tartibni qo'llaydi.
+Resource'lar declaration tartibida open bo'ladi. Scope tugaganda **LIFO** (Last-In-First-Out) tartibda dispose — `C → B → A`. Bu nested resource'lar uchun to'g'ri: oxirgi olingan resurs avval ozod bo'ladi. C# `using` va Java `try-with-resources` ham shu tartibni qo'llaydi.
 
 ### Edge Cases
 
@@ -833,7 +839,7 @@ await main();
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Down-level emit semantics.** TS `using` deklaratsiyani target'ga qarab transform qiladi. ES2022 va undan past target'larda compiler `try/finally` bilan implementation kod hosil qiladi — har `using` declaration yashirin `try` block ochadi, scope tugaganda `finally`'da `[Symbol.dispose]()` chaqiriladi. Ko'p `using` deklaratsiyalar nested `try/finally` ga aylanadi (LIFO kafolatlash uchun).
+**Down-level emit semantics.** TS `using` declaration'ni target'ga qarab transform qiladi. ES2022 va undan past target'larda compiler `try/finally` bilan implementation kod hosil qiladi — har `using` declaration yashirin `try` block ochadi, scope tugaganda `finally`'da `[Symbol.dispose]()` chaqiriladi. Ko'p `using` declaration nested `try/finally`'ga aylanadi (LIFO kafolatlash uchun).
 
 **`SuppressedError` semantikasi.** ECMAScript spec qoidasi: agar function body throw qilsa va dispose chaqirig'i ham throw qilsa, dispose error original error'ni "suppress" qiladi. `SuppressedError` class'i ikki error'ni saqlaydi: `error` (suppressing) va `suppressed` (original). Stack trace ikkalasini ham ko'rsatadi.
 
@@ -843,7 +849,7 @@ await main();
 
 **Pool exhaustion strategy.** Production pool'larda `acquire()` Promise qaytaradi — bo'sh slot bo'lmasa wait queue'ga qo'shiladi (event loop). `Symbol.asyncDispose` bilan birga `await using conn = await pool.acquire()` pattern — connection kelguncha kutish va auto-release.
 
-**Spec stage va runtime support.** TC39 Explicit Resource Management — Stage 3 (TS 5.2 release vaqtida). Node.js 22+, Bun 1.0+, Deno 1.40+ native qo'llaydi. Browser support hozircha cheklangan — polyfill (`esnext.disposable` lib option, `core-js`) kerak.
+**Spec stage va runtime support.** TC39 Explicit Resource Management — Stage 3 (TS 5.2 release vaqtida). `Symbol.dispose`/`Symbol.asyncDispose` well-known symbol'lari Node.js 20.4+'dan mavjud; `using` syntax'ini V8 native Node.js 24+'da qo'llaydi (Bun va Deno ham qo'llaydi). Eski runtime'da TS down-level emit + `Symbol.dispose` polyfill (`esnext.disposable` lib option yoki `core-js`) kerak.
 
 </details>
 
@@ -925,13 +931,13 @@ router.navigate("/posts/:postId/comments/:commentId", {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Template literal type recursion mexanizmi.** `RouteParam<P>` conditional type recursive — `Path extends ${string}:${infer Param}/${infer Rest}` pattern segment'ni ajratib oladi (`:userId/comments/:commentId` → `Param = "userId"`, `Rest = "comments/:commentId"`). Recursion `RouteParam<\`/${Rest}\`>` bilan davom etadi. Base case — `:${infer Param}` (oxirgi parameter). Tail recursion paterni — TS optimizer recursion'ni unroll qiladi (TS 4.5+ tail call optimization for conditional types).
+**Template literal type recursion mexanizmi.** `RouteParam<P>` conditional type recursive — `Path extends ${string}:${infer Param}/${infer Rest}` pattern segment'ni ajratib oladi (`:userId/comments/:commentId` → `Param = "userId"`, `Rest = "comments/:commentId"`). Recursion `RouteParam<\`/${Rest}\`>` bilan davom etadi. Base case — `:${infer Param}` (oxirgi parameter). Bu recursion **tail-recursive emas**: rekursiv chaqiruv `Param | RouteParam<...>` union ichida, ya'ni natija tail position'da emas. Shuning uchun TS 4.5'dagi tail-recursion elimination (faqat rekursiv chaqiruv butun natija bo'lganda) bu yerga tegishli emas — har segment alohida instantiate qilinadi.
 
 **`<const T>` inference deep effect.** Routes array `[{path: "/users/:userId"}, ...]` — default inference `{path: string}[]` widening qiladi. `<const T>` har element'ni `as const` qilingandek: `readonly [{readonly path: "/users/:userId"}, ...]`. `T[number]["path"]` indexed access narrow union beradi: `"/users/:userId" | "/posts/:postId/comments/:commentId"`.
 
 **`Record<RouteParam<P>, string>` exhaustiveness.** Recursive `RouteParam<P>` union qaytaradi (`"postId" | "commentId"`). `Record<Union, string>` har key majburi (TS missing key error). Bu compile-time exhaustiveness — runtime'da `replace` qilingan key parametrlar to'liq berilgan.
 
-**Recursion depth limit.** TS conditional type recursion default 50 level (`tsc --noErrorTruncation` da error: "Type instantiation is excessively deep"). Long path (`/a/:b/c/:d/...`) recursion limit'ga yaqinlashishi mumkin. Workaround: accumulator pattern (`RouteParam<Path, Acc = never>`) tail-recursive form.
+**Recursion depth limit.** Chuqur instantiate bo'lgan type'da TS `error TS2589: Type instantiation is excessively deep and possibly infinite` chiqaradi. Tail-recursive conditional type'lar uchun hard limit 1000 chuqurlik (o'zgartirib bo'lmaydi). Juda uzun path (`/a/:b/c/:d/...`) bu chegaraga yaqinlashishi mumkin. Workaround: accumulator pattern (`RouteParam<Path, Acc = never>`) — rekursiv chaqiruvni tail position'ga keltirib, TS 4.5+ tail-recursion elimination'dan foydalanish.
 
 **Wildcards va optional params.** `:param?` (optional) — conditional branch'da `Path extends ${string}:${infer Param}?` qo'shish (`?` literal). Wildcard (`/*`) — `${string}*` pattern. Production router'lar (`react-router`, `expo-router`) bu pattern'larni keng ishlatadi — schema'dan generated tipga tayanadi.
 
@@ -1008,7 +1014,7 @@ function processData() {
 
 ### To'liq tushuntirish
 
-`using` deklaratsiya runtime'da resource scope tugaganda `[Symbol.dispose]()` chaqiradi. Compiler bu method mavjudligini tekshiradi. `close()` — odatiy method nomi, lekin `using` uchun maxsus emas.
+`using` declaration runtime'da resource scope tugaganda `[Symbol.dispose]()` chaqiradi. Compiler bu method mavjudligini tekshiradi. `close()` — odatiy method nomi, lekin `using` uchun maxsus emas.
 
 ### Kod misol (tuzatilgan)
 
@@ -1038,7 +1044,7 @@ class Connection2 implements Disposable {
 
 - `AsyncDisposable` interface — `[Symbol.asyncDispose]()` Promise qaytaradi, `await using` bilan
 - `Symbol.dispose` global'i mavjud bo'lishi kerak (Node 20+, lib `esnext.disposable`)
-- Class library — Stage 3 standart, fallback polyfill kerak
+- `Disposable`/`AsyncDisposable` interface'lar `esnext.disposable` lib'da; eski runtime'da `Symbol.dispose` polyfill kerak
 
 </details>
 
@@ -1100,25 +1106,25 @@ const v = setStateAlt(0, 42);  // T = number (defaultValue'dan)
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**`NoInfer<T>` implementation.** TS standard library'da:
+**`NoInfer<T>` implementation.** TS 5.4'dan oldin manual hack ishlatilgan:
 
 ```typescript
 type NoInfer<T> = [T][T extends any ? 0 : never];
 ```
 
-Bu hack (TS 5.4'dan oldin manual ishlatilgan) — indexed access tuple'dan T'ni "extract" qiladi, lekin TS inference engine bu position'da T'ni candidate sifatida qabul qilmaydi. TS 5.4'da `NoInfer` rasman lib type — internal flag `INTRINSIC` orqali inference'dan chetlatadi (`intrinsicTypeKinds.NoInfer`).
+Indexed access tuple'dan T'ni "extract" qiladi, lekin TS inference engine bu position'da T'ni candidate sifatida qabul qilmaydi. TS 5.4'da `NoInfer` rasman lib type sifatida qo'shildi — `lib.es5.d.ts`'da `type NoInfer<T> = intrinsic;` deb e'lon qilingan. Compiler buni maxsus substitution type sifatida ifodalaydi (constraint type `unknown`), inference candidate to'plamidan chetlatadi. Inference'ni bloklashdan tashqari `NoInfer<T>` `T`'ga hech ta'sir qilmaydi — boshqa barcha kontekstda `T` bilan bir xil type.
 
-**Inference algorithm interaction.** TS generic inference candidate collection bosqichida har parameter'dan T uchun nomzod chiqaradi (`InferTypeArguments`). `NoInfer<T>` position'i bu collection'dan istisno. Lekin keyingi assignability check'da `NoInfer<T>` parameter T'ga mos kelishi tekshiriladi — type check ishlaydi, inference o'tkazib yuboriladi.
+**Inference algorithm interaction.** TS generic inference candidate collection bosqichida har parameter'dan T uchun nomzod chiqaradi. `NoInfer<T>` bilan o'ralgan position bu collection'dan istisno qilinadi. Lekin keyingi assignability check'da `NoInfer<T>` parameter T'ga mos kelishi tekshiriladi — type check ishlaydi, faqat inference o'tkazib yuboriladi.
 
 **Callback parameter reverse inference chegarasi.** `update: (prev: T) => T`'da `prev` annotation'siz callback yozilsa (`(prev) => prev + 1`), TS contextual typing orqali `prev`'ni `T` deb qabul qiladi — lekin T birinchi navbatda boshqa parameter'lardan aniqlanishi kerak. Agar boshqa parameter `NoInfer<T>` bo'lsa, T uchun candidate yo'q → T `unknown` yoki constraint default'ga tushadi.
 
-**`prev + 1` semantikasi.** `T = unknown` bo'lsa `prev + 1` — `unknown + number` error. TS arithmetic operator'lar `number | bigint`'ga toraytirilgan operand kutadi. Bu xato chain'da paydo bo'ladi.
+**`prev + 1` semantikasi.** `T = unknown` bo'lsa `prev + 1` `'+' operator 'unknown' va 'number' tiplariga qo'llanmaydi` xatosini beradi (TS2365). `+` operand sifatida `number`/`bigint`/`string`'ni qabul qiladi, `unknown`'ni emas. Bu xato inference chain'i T'ni aniqlay olmaganidan kelib chiqadi.
 
 **Reverse inference: declaration position vs use position.** `<T>` parameter generic function call'da har use site uchun mustaqil aniqlanadi. `setState(0, (p) => p + 1)`'da TS birinchi parameter'dan `T = number` nomzod chiqarmoqchi bo'ladi, ammo `NoInfer<T>` bu nomzodni rad etadi. Ikkinchi parameter `(p: T) => T` — `p` annotation'siz, T uchun candidate berolmaydi.
 
 **Tuzatish yondashuvi.** Variant 1: `NoInfer`'ni ko'chirish (yuqorida). Variant 2: callback parameter'iga explicit annotation (`(prev: number) => prev + 1`). Variant 3: `NoInfer` umuman olib tashlash — agar T'ni har ikki parameter'dan infer qilish maqbul (union widening bo'lmasa).
 
-**Spec status.** `NoInfer<T>` TS 5.4 release (2024-03-06)'da kiritildi. ECMAScript standartiga mansub emas — TS-specific utility (Java/C#/Rust ekvivalenti yo'q, ammo Scala `=:=` constraint'lar shu maqsadda).
+**Spec status.** `NoInfer<T>` TS 5.4 release (2024-03-06)'da kiritildi. ECMAScript standartiga mansub emas — type-level inference'ni boshqarish uchun TS-specific utility.
 
 </details>
 
@@ -1135,6 +1141,6 @@ Bu hack (TS 5.4'dan oldin manual ishlatilgan) — indexed access tuple'dan T'ni 
 - **`NoInfer<T>` (TS 5.4)** — generic parameter'ni inference'dan chetlatadi, type check saqlanadi. Default/fallback parameter pattern
 - **Inferred type predicates (TS 5.5)** — `Array.filter` callback'dan predicate avtomatik. Manual `(v): v is T` kerak emas (sodda case'larda)
 - **`isolatedDeclarations` (TS 5.5)** — har file mustaqil `.d.ts` emit, public export'da explicit return type majburiy. Build tool parallelizmi
-- **`erasableSyntaxOnly` (TS 5.8)** — type erasure bilan o'chiriladigan syntax cheklash. `enum`, `namespace`, parameter property TAQIQ. Node.js `--experimental-strip-types` integrasi
+- **`erasableSyntaxOnly` (TS 5.8)** — type erasure bilan o'chiriladigan syntax cheklash. `enum`, `namespace`, parameter property TAQIQ. Node.js `--experimental-strip-types` bilan integration uchun
 - **Migration roadmap** — legacy decorator → Stage 3 (framework bog'liq), `enum` → `as const` object, `namespace` → ES module, parameter property → explicit assign
 

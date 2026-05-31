@@ -556,7 +556,7 @@ class Counter {
 // Real TypeScript emit biroz murakkab
 ```
 
-**Runtime mexanizmi:** `#` private bilan property access — runtime'da private name lookup (V8 hidden class slot orqali). TypeScript `private` — oddiy property access (direct slot lookup). Engine optimization farqlarni minimallashtiradi — amaliyotda performance tanlovga ta'sir qilmaydi, encapsulation talabiga qarab tanlanadi.
+**Runtime mexanizmi:** `#` private field oddiy named property emas — ECMAScript spec'da u alohida private name namespace orqali bog'lanadi. Shuning uchun `Object.keys`, `for...in`, `JSON.stringify` va `Reflect.ownKeys` uni ko'rmaydi, va class tashqarisida unga murojaat qilish parse bosqichidayoq xato. TypeScript `private` esa — oddiy enumerable property, runtime'da hech qanday himoya yo'q. Encapsulation talabiga qarab tanlanadi: runtime kafolat kerak bo'lsa `#`, faqat API niyati bo'lsa `private`.
 
 **Encapsulation niyati:** TypeScript `private` — "public API'da bu property'ni ko'rsatma" degan signal. `#` — "runtime'da ham bu property'ga kirib bo'lmaydi" degan kafolat. Agar siz library yozayotgan bo'lsangiz va foydalanuvchilar JavaScript'dan sizning class'lardan foydalansa — `#` kerak.
 
@@ -1215,7 +1215,7 @@ Instance (new Counter())
 
 **Static member'lar prototype chain'da yo'q** — shuning uchun instance orqali kirib bo'lmaydi. Ular class constructor function'ga to'g'ridan-to'g'ri biriktirilgan.
 
-**Static va inheritance:** Subclass parent'ning static member'larini meros oladi. Bu **constructor object'ining `[[Prototype]]` zanjiri** orqali ishlaydi — `extends` orqasida `Object.setPrototypeOf(Child, Parent)` chaqiruv yotadi. Instance prototype chain `Child.prototype → Parent.prototype` o'zaro alohida (instance method'lar uchun); static lookup esa `Child → Parent` zanjiridan o'tadi:
+**Static va inheritance:** Subclass parent'ning static member'larini meros oladi. Bu **constructor object'ining `[[Prototype]]` zanjiri** orqali ishlaydi — `extends` semantikasi `Child`'ning `[[Prototype]]`'ini `Parent`'ga o'rnatadi (`Object.getPrototypeOf(Child) === Parent`). Instance prototype chain `Child.prototype → Parent.prototype` o'zaro alohida (instance method'lar uchun); static lookup esa `Child → Parent` zanjiridan o'tadi:
 
 ```typescript
 class Base {
@@ -1338,15 +1338,13 @@ const e3 = new Entity("C"); // id = 3
 class Shape {
   constructor(public readonly type: string) {}
 
-  static create(type: string): Shape {
-    return new this(type); // this = qaysi class chaqirilsa
+  static create<This extends typeof Shape>(this: This, type: string): InstanceType<This> {
+    return new this(type) as InstanceType<This>; // this = qaysi class chaqirilsa
   }
 }
 
 class Circle extends Shape {
-  constructor() {
-    super("circle");
-  }
+  radius = 0;
 }
 
 const s = Shape.create("square");   // Shape instance
@@ -1402,7 +1400,7 @@ class Database {
 
   static {
     try {
-      Database.connection = createConnection(process.env.DB_URL!);
+      Database.connection = createConnection(process.env.DB_URL ?? "");
       Database.isReady = true;
     } catch {
       Database.connection = createFallbackConnection();
@@ -1447,7 +1445,7 @@ class Config {
 }
 ```
 
-**Bir nechta static block tartibi:** Class'da bir nechta static block bo'lsa, ular **deklaratsiya tartibida** bajariladi. Har block'ning ichidagi logic previous block'lar state'iga bog'liq bo'lishi mumkin:
+**Bir nechta static block tartibi:** Class'da bir nechta static block bo'lsa, ular **declaration tartibida** bajariladi, va boshqa static field initializer'lar bilan bir xil oqimda — yuqoridan pastga. Har block'ning ichidagi logic o'zidan oldin kelgan block va field state'iga bog'liq bo'lishi mumkin:
 
 ```typescript
 class Registry {
@@ -1466,7 +1464,7 @@ class Registry {
 }
 ```
 
-**Qachon ishlaydi:** Static block class deklaratsiya bajarilganda — class file birinchi marta load qilinganda. `new Class()` chaqirmay ham static block bajariladi. Agar class hech qachon ishlatilmasa (tree-shaking), static block ham bajarilmaydi.
+**Qachon ishlaydi:** Static block class declaration evaluate qilinganda bajariladi — class'ni saqlovchi module load bo'lib, class declaration'ga yetganda. `new Class()` chaqirmay ham static block bajariladi. Agar bundler class'ni hech qaerda reference qilinmaganligi sababli tree-shake qilsa, declaration butunlay olib tashlanadi va u bilan birga static block ham ishlamaydi.
 
 **`this` static block'da:** Static block ichida `this` — class'ning o'ziga ishora qiladi (`typeof ClassName`). Lekin static block'da `this` o'rniga class nomi ishlatish aniqlik uchun yaxshiroq.
 
@@ -1707,17 +1705,17 @@ abstract class DataProcessor<T, R> {
 
 Subclass'lar faqat abstract method'larni implement qiladi, umumiy algoritm parent'dan keladi. Bu kod takrorlanishini kamaytiradi va consistency ta'minlaydi.
 
-**Abstract constructor pattern:** Abstract class'ni factory'da ishlatish uchun `new (...args: any[]) => T` pattern'i:
+**Abstract constructor pattern:** Abstract class'ni factory'da ishlatish uchun generic constructor signature `new (...args: Args) => T` pattern'i — `Args` tuple constructor parametrlarini saqlaydi, shuning uchun chaqiruv to'liq type-safe:
 
 ```typescript
-function createShape<T extends Shape>(
-  Ctor: new (...args: any[]) => T,
-  ...args: any[]
+function createShape<Args extends unknown[], T extends Shape>(
+  Ctor: new (...args: Args) => T,
+  ...args: Args
 ): T {
   return new Ctor(...args);
 }
 
-// createShape(Shape); // ❌ Shape abstract
+// createShape(Shape); // ❌ Shape abstract — abstract constructor mos kelmaydi
 createShape(Circle, 5); // ✅ Circle concrete
 ```
 
@@ -1834,9 +1832,9 @@ class UserRepo extends Repository<User> {
 }
 
 // 5. Factory with abstract constructor
-function createShape<T extends Shape>(
-  Ctor: new (...args: any[]) => T,
-  ...args: any[]
+function createShape<Args extends unknown[], T extends Shape>(
+  Ctor: new (...args: Args) => T,
+  ...args: Args
 ): T {
   return new Ctor(...args);
 }
@@ -1979,7 +1977,7 @@ Interface faqat compile-time structural check.
 
 Dizayn qarori: explicit annotation har doim ishonchli. Developer interface'ga tayanmasdan, method'ga aniq type yozadi.
 
-**Structural vs nominal typing:** TypeScript dizayni JavaScript'ning duck typing xususiyatiga asoslangan — "agar u ducklike ko'rinsa va ducklike tovushlasa, u duck". Interface'lar faqat shape'ni belgilaydi, nom emas. `implements` yozmasdan ham moslik ishlaydi.
+**Structural vs nominal typing:** TypeScript type compatibility'ni nom bo'yicha emas, shape bo'yicha aniqlaydi. Ikki type bir-biriga mos keladi, agar manba type'da maqsad type talab qilgan barcha member'lar mavjud bo'lsa (member'lar bir-biriga assignable). Interface'lar faqat shape'ni belgilaydi, declaration nomini emas — shuning uchun `implements` yozmagan class ham, kerakli member'larga ega bo'lsa, interface o'rniga ishlatiladi.
 
 Nominal typing kerak bo'lgan holatlarda branded type'lar ishlatiladi:
 
@@ -2095,16 +2093,18 @@ function cacheItem(item: Cacheable): void {
 cacheItem(new UserDto(1, "Ali", "ali@test.com"));
 
 // 6. Class va interface merge (declaration merging)
-interface User {
-  // Qo'shimcha property'lar interface'dan
+// Bir xil nomdagi interface class'ning instance type'iga member qo'shadi
+interface Account {
   extraField?: string;
 }
 
-class User {
-  constructor(public name: string) {}
+class Account {
+  constructor(public balance: number) {}
 }
 
-// User endi: { name: string; extraField?: string }
+const acc = new Account(100);
+acc.extraField = "vip"; // ✅ interface'dan kelgan optional member
+// acc instance type endi: { balance: number; extraField?: string }
 ```
 
 </details>
@@ -2380,15 +2380,15 @@ class SuperAdmin extends Admin {
 // SuperAdmin constructor: isRoot=true
 
 // 6. instanceof chain
-class A {}
-class B extends A {}
-class C extends B {}
+class Account {}
+class Customer extends Account {}
+class PremiumCustomer extends Customer {}
 
-const c = new C();
-c instanceof A; // true
-c instanceof B; // true
-c instanceof C; // true
-// prototype chain: c -> C.prototype -> B.prototype -> A.prototype
+const premium = new PremiumCustomer();
+premium instanceof Account;         // true
+premium instanceof Customer;        // true
+premium instanceof PremiumCustomer; // true
+// prototype chain: premium -> PremiumCustomer.prototype -> Customer.prototype -> Account.prototype
 ```
 
 </details>
@@ -2541,23 +2541,23 @@ class Derived extends Base {
 }
 
 // 4. override chain — uch daraja
-class A {
-  greet(): string { return "A"; }
+class BaseNotifier {
+  format(): string { return "base"; }
 }
 
-class B extends A {
-  override greet(): string {
-    return `B > ${super.greet()}`;
+class EmailNotifier extends BaseNotifier {
+  override format(): string {
+    return `email > ${super.format()}`;
   }
 }
 
-class C extends B {
-  override greet(): string {
-    return `C > ${super.greet()}`;
+class HtmlEmailNotifier extends EmailNotifier {
+  override format(): string {
+    return `html > ${super.format()}`;
   }
 }
 
-new C().greet(); // "C > B > A"
+new HtmlEmailNotifier().format(); // "html > email > base"
 
 // 5. override bilan generic
 abstract class Collection<T> {
@@ -2941,7 +2941,8 @@ Yechim: method-level generic.
 ```typescript
 const box1 = new Box(42);        // T = number (inferred)
 const box2 = new Box<string>("hello"); // explicit
-const empty = new Stack();        // T = unknown — explicit yoki push orqali infer
+const empty = new Stack<string>(); // explicit kerak — argument yo'q
+const loose = new Stack();         // T = unknown (strict mode'da), keyin o'zgarmaydi
 ```
 
 **Instantiation expression** (TS 4.7+) — generic class'ni pre-bind qilish:
@@ -3175,9 +3176,9 @@ Decorator'ga `ClassAccessorDecoratorTarget` beriladi — original `get` va `set`
 |-----------|----------------|-------------|
 | Storage | Instance property | Private field (`#`) |
 | Runtime privacy | ❌ | ✅ |
-| Decorator intercept | Faqat eski experimental API | Native TC39 Stage 3 |
+| Decorator get/set'ni almashtirishi | Mumkin emas (field decorator faqat initializer transform qiladi) | Mumkin (decorator yangi `{ get, set }` qaytaradi) |
 | Property access | Direct property lookup | Getter/setter function call |
-| Bekor qilish | Oddiy property — hech narsa | Hech narsa (built-in) |
+| Boilerplate | Manual `get`/`set` + backing field yozish kerak | Avtomatik generate qilinadi |
 
 **Qachon ishlatish:** `accessor` — agar siz decorator ishlatishingiz kerak bo'lsa (validation, reactivity, logging). Oddiy property — boshqa hamma holatlarda.
 

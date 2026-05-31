@@ -110,7 +110,7 @@ function makeStrongEmail(v: string): StrongEmail {
 }
 
 // __brand: "Email" va __brand: "Phone" — agar developer xato qilib bir xil string yozsa,
-// type collision. unique symbol har deklaratsiya uchun unique — collision yo'q.
+// type collision. unique symbol har declaration uchun unique — collision yo'q.
 ```
 
 ### Edge Cases
@@ -311,7 +311,7 @@ const ROUTES = {
 // Constraint: barcha qiymat "/" bilan boshlanadi
 // ROUTES.userDetail: "/users/:id" literal
 
-// === const type parameter (TS 5.0+) bilan kombinatsiya ===
+// === const type parameter (TS 5.0+) bilan combination ===
 function createConfig<const T extends Record<string, unknown>>(config: T): T {
   return config;
 }
@@ -326,7 +326,7 @@ const cfg = createConfig({ host: "localhost", port: 3000 });
 - **Mutable `as const satisfies`**: `as const` deep readonly qiladi. Agar mutation kerak bo'lsa, faqat `satisfies` (without `as const`) ishlatish: `const t = { ... } satisfies Theme`.
 - **`satisfies` generic constraint bilan**: `function fn<T>(x: T satisfies Constraint)` — invalid syntax. `satisfies` faqat expression position'da, type parameter constraint o'rniga `extends` ishlatiladi.
 - **Discriminated union narrowing**: `satisfies` bilan literal saqlanadi, discriminator narrowing aniqroq ishlaydi (`if (cfg.kind === "circle") cfg.radius // number literal`).
-- **`as` (assertion) bilan farq**: `satisfies` tekshiradi, `as` "majburlaydi" (xavfli). `satisfies` xato bo'lganda kompilyator xato beradi, `as` esa unsafe cast.
+- **`as` (assertion) bilan farq**: `satisfies` tekshiradi, `as` "majburlaydi" (xavfli). `satisfies` xato bo'lganda compiler xato beradi, `as` esa unsafe cast.
 
 ### Follow-up savollar
 
@@ -381,7 +381,7 @@ import { z } from "zod";
 const UserSchema = z.object({
   id: z.number().int().positive(),
   name: z.string().min(2).max(100),
-  email: z.string().email(),
+  email: z.email(),
   age: z.number().min(18).max(120),
   role: z.enum(["admin", "user", "moderator"]),
   createdAt: z.date(),
@@ -425,9 +425,9 @@ async function fetchUser(id: number): Promise<User> {
 }
 
 // === Branded type with Zod ===
-const EmailSchema = z.string().email().brand<"Email">();
+const EmailSchema = z.email().brand<"Email">();
 type Email = z.infer<typeof EmailSchema>;
-// string & z.BRAND<"Email">
+// string & z.$brand<"Email">
 
 function sendEmail(to: Email): void {
   console.log(`Sending to ${to}`);
@@ -452,7 +452,7 @@ type Output = z.infer<typeof NumberFromString>;  // number (transform'dan keyin)
 
 ### Follow-up savollar
 
-1. "Zod bundle size katta — qaysi alternativa?" — Valibot (~1-2kb modular, tree-shakeable). Pipe API, har validator alohida import.
+1. "Zod bundle size katta — qaysi alternativa?" — Valibot: modular va tree-shakeable, faqat ishlatilgan validator'lar bundle'ga kiradi. Pipe API, har validator alohida import. Aniq raqam release'da o'zgaradi — Bundlephobia bilan tekshirish.
 2. "tRPC bilan Zod qanday ishlaydi?" — tRPC procedure'da `.input(Schema)` bilan input validation. Schema'dan type chiqariladi — client'da to'liq type-safe.
 
 </details>
@@ -474,7 +474,7 @@ Har library trade-off'lari:
 
 **Zod**:
 
-- API: method chaining (`.string().min(2).email()`).
+- API: method chaining (`z.string().min(2)`) + top-level format'lar (`z.email()`, `z.url()` — v4'da string format'lar `z.string().email()` o'rniga top-level, eski chained forma deprecated).
 - Bundle: bitta paket, har feature import qilingan vaqtda ham chained method'lar tree-shake qilinmaydi.
 - Ecosystem: eng katta (tRPC, RHF, Next.js, OpenAPI generation).
 - Brand: `.brand()` native support.
@@ -512,11 +512,13 @@ Tanlash matrix:
 ### Kod misol
 
 ```typescript
+declare const data: unknown; // external input (fetch/JSON)
+
 // === Zod ===
 import { z } from "zod";
 const ZodUser = z.object({
   name: z.string().min(2),
-  email: z.string().email(),
+  email: z.email(),
 });
 type ZodUserType = z.infer<typeof ZodUser>;
 
@@ -770,9 +772,11 @@ function usd(amount: number): USD {
 const price = usd(29.99);
 
 // === Runtime ===
-console.log(price);           // 29.99
-console.log(typeof price);    // "number"
-console.log("__brand" in (price as any)); // false — property yo'q
+console.log(price);                    // 29.99
+console.log(typeof price);             // "number"
+console.log(Object.hasOwn(Object(price), "__brand")); // false — __brand property yo'q
+// E'tibor: "__brand" in price to'g'ridan-to'g'ri ishlamaydi — `in` operatori
+// primitive (number)'da TypeError beradi, shuning uchun Object(price) wrapper kerak
 
 // === Compile-time ===
 // price: USD (intersection number & { __brand: "USD" })
@@ -834,7 +838,7 @@ function reducer(state: number, action: Action): number {
 
 ### Qisqa javob
 
-Xato: `"RESET"` case handled emas, function `undefined` qaytarishi mumkin (return type `number` deklaratsiya qilingan). `assertNever` bilan default branch qo'shib, future-proof exhaustive check.
+Xato: `"RESET"` case handled emas, function `undefined` qaytarishi mumkin (return type `number` deb e'lon qilingan). `assertNever` bilan default branch qo'shib, future-proof exhaustive check.
 
 ### To'liq tushuntirish
 
@@ -1036,8 +1040,16 @@ type Router = {
 
 ### Follow-up savollar
 
-1. "TypeScript'da recursive type limit bormi?" — Ha, default 50 level. `--noStrictGenericChecks` yoki refactoring. Modern TS (5.x) `instantiationExpressions` bilan deep yaxshilangan.
-2. "DeepKeys (path string) qanday qilinadi?" — Template literal types: `type Paths<T> = T extends object ? { [K in keyof T]: ${K & string}.${Paths<T[K]>} | ${K & string} }[keyof T] : never`.
+1. "TypeScript'da recursive type limit bormi?" — Ha. Juda chuqur yoki cheksiz recursion `TS2589: Type instantiation is excessively deep and possibly infinite` error beradi. Instantiation depth limiti modern TS'da 100 (compiler ichida `instantiationDepth === 100` tekshiruvi; tarix: 50 → 500 PR #45025'da → 100 PR #45711'da tail-recursion bilan). Yechim: recursive type'ni kichik qismlarga bo'lish, conditional type'ni tail-recursive yozish, yoki counter type bilan depth cheklash (`type Paths<T, Depth extends number[] = []>`).
+2. "DeepKeys (path string) qanday qilinadi?" — Template literal types bilan:
+```typescript
+type Paths<T> = T extends object
+  ? { [K in keyof T]-?: K extends string
+      ? T[K] extends object ? `${K}` | `${K}.${Paths<T[K]>}` : `${K}`
+      : never
+    }[keyof T]
+  : never;
+```
 
 </details>
 
@@ -1244,8 +1256,8 @@ const cfg2 = new TypeSafeBuilder<DbConfig>()
 //   .build();
 // Error: 'this' context of type 'TypeSafeBuilder<DbConfig, "host">'
 //        is not assignable to method's 'this' of type 'never'
-// Sabab: RequiredKeys<DbConfig> = "host" | "port" | "database"
-//        "host" "port" | "database" ni qoplamaydi → never
+// Sabab: RequiredKeys<DbConfig> = "host" | "port" | "database", Provided = "host"
+//        "host" | "port" | "database" extends "host" → false → this type 'never'
 
 // ❌ Type mismatch
 // new TypeSafeBuilder<DbConfig>()
@@ -1309,7 +1321,7 @@ interface DbConfigStepBuilderComplete {
 
 ### Qisqa javob
 
-`Brand<string, "Email">` orqali `Email` type. `createEmail(value: string): Email` constructor validation bilan. Zod variant: `z.string().email().brand<"Email">()` — runtime + compile-time brand birga.
+`Brand<string, "Email">` orqali `Email` type. `createEmail(value: string): Email` constructor validation bilan. Zod variant: `z.email().brand<"Email">()` — runtime + compile-time brand birga.
 
 ### To'liq tushuntirish
 
@@ -1323,7 +1335,7 @@ Ikki strategiya:
 
 **2. Zod brand**: schema'ga brand qo'shish.
 
-- `z.string().email().brand<"Email">()` — runtime regex + compile-time brand.
+- `z.email().brand<"Email">()` — runtime regex + compile-time brand.
 - `.parse(v)` → `Email` (validated).
 
 **3. `unique symbol` brand**: collision-free nominal typing.
@@ -1371,9 +1383,9 @@ function createEmailStrong(value: string): EmailStrong {
 // unique symbol har declare uchun unique — collision yo'q
 
 // === Strategiya 3: Zod integration (recommended) ===
-const EmailSchema = z.string().email().brand<"Email">();
+const EmailSchema = z.email().brand<"Email">();
 type ZodEmail = z.infer<typeof EmailSchema>;
-// string & z.BRAND<"Email">
+// string & z.$brand<"Email">
 
 function createZodEmail(value: string): ZodEmail {
   return EmailSchema.parse(value); // throw qiladi invalid'da
@@ -1385,7 +1397,7 @@ function safeCreateZodEmail(value: string): ZodEmail | null {
 }
 
 const zodEmail = createZodEmail("ali@test.com");
-// zodEmail: string & z.BRAND<"Email">
+// zodEmail: string & z.$brand<"Email">
 
 // === Combine: User schema with branded fields ===
 const UserIdSchema = z.number().int().positive().brand<"UserId">();
@@ -1398,8 +1410,8 @@ const UserSchema = z.object({
 });
 type User = z.infer<typeof UserSchema>;
 // {
-//   id: number & z.BRAND<"UserId">;
-//   email: string & z.BRAND<"Email">;
+//   id: number & z.$brand<"UserId">;
+//   email: string & z.$brand<"Email">;
 //   name: string;
 // }
 
@@ -1413,7 +1425,7 @@ async function fetchUser(id: UserId): Promise<User> {
 ### Edge Cases
 
 - **Brand'ni JSON serialize**: `JSON.stringify(email)` → raw string. Parse'da qayta brand qilish kerak (`EmailSchema.parse(JSON.parse(...))`).
-- **`z.brand()` chaining**: `.brand<"X">().brand<"Y">()` — second brand intersection'ga qo'shiladi (`string & BRAND<"X"> & BRAND<"Y">`). Mantiqsiz, faqat birini ishlatish.
+- **`z.brand()` chaining**: `.brand<"X">().brand<"Y">()` — second brand intersection'ga qo'shiladi (`string & z.$brand<"X"> & z.$brand<"Y">`). Mantiqsiz, faqat birini ishlatish.
 - **Generic over branded**: `function isEmail<T extends Email>(v: T): boolean` — `T extends Email` faqat `Email` accept qiladi (raw string yo'q).
 - **Database storage**: Branded type DB'da raw string sifatida saqlanadi. ORM (Prisma, Drizzle) brand'ni saqlamaydi — query result'ni manual brand qilish kerak.
 
@@ -1425,14 +1437,15 @@ async function fetchUser(id: UserId): Promise<User> {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Zod brand implementation.** `z.string().email().brand<"Email">()` — schema'ga phantom `_output` field'iga `BRAND<"Email">` intersection qo'shadi:
+**Zod brand implementation.** `z.email().brand<"Email">()` — schema'ning output type'iga `z.$brand<"Email">` intersection qo'shadi. Zod v4'da brand marker'i `$brand` unique symbol orqali ifodalanadi:
 
 ```typescript
-type BRAND<T extends string | number | symbol> = { readonly [BRAND]: { [k in T]: true } };
-type ZodBrandedDef<...> = ZodTypeDef & { brand: string };
+// Zod v4 brand marker (soddalashtirilgan ko'rinish)
+declare const $brand: unique symbol;
+type Branded<B extends string | number | symbol> = { [$brand]: { [k in B]: true } };
 ```
 
-Runtime'da `_def.brand` faqat metadata — `parse` qaytaradigan qiymat oddiy string. Compile-time'da `z.infer` `string & BRAND<"Email">` chiqaradi — bu intersection assignment'ni cheklaydi.
+Runtime'da brand faqat type-level marker — `parse` qaytaradigan qiymat oddiy string, hech qanday qo'shimcha property yo'q. Compile-time'da `z.infer` `string & z.$brand<"Email">` chiqaradi — bu intersection raw string'ni branded type'ga assign qilishni cheklaydi.
 
 **`unique symbol` vs string brand collision.** `Brand<string, "Email">` ikki module'da bir xil literal `"Email"` ishlatilsa — TS strukturally bir xil deb hisoblaydi (intersection brand key bir xil). `declare const EmailTag: unique symbol` — har declaration unique tag yaratadi (TS spec: `unique symbol` har declaration uchun nominal identity). Kross-module brand uchun `unique symbol` xavfsizroq.
 

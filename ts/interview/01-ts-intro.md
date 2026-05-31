@@ -155,9 +155,9 @@ while (token !== ts.SyntaxKind.EndOfFileToken) {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-`tsc` ning Checker qismi **lazy evaluation** ishlatadi — barcha type larni oldindan hisoblamasdan, kerak bo'lganda hisoblaydi. Bu katta loyihalarda zarur: agar har bir generic instantiation darhol resolve qilinsa, kompilyatsiya vaqti eksponensial o'sardi.
+`tsc` ning Checker qismi **lazy evaluation** ishlatadi — barcha type larni oldindan hisoblamasdan, kerak bo'lganda hisoblaydi. Bu katta loyihalarda zarur: agar har bir generic instantiation darhol resolve qilinsa, compilation vaqti eksponensial o'sardi.
 
-Checker da type assignability `isTypeAssignableTo(source, target)` funksiyasi orqali tekshiriladi — `Subtype`, `Strict subtype`, `Assignability` aloqalari structural rules bo'yicha. Generic constraint checking `inferTypes` orqali variance qoidalarini hisobga oladi (covariance, contravariance, bivariance).
+Checker da type assignability `isTypeAssignableTo(source, target)` funksiyasi orqali tekshiriladi — `Subtype`, `Assignability`, `Identity` aloqalari structural rules bo'yicha. Generic type'lar solishtirilganda type argument lar variance qoidalari (covariance, contravariance, bivariance, invariance) asosida tekshiriladi — bu structural comparison ning bir qismi.
 
 Source map generation `Emitter` da source position information ni TypeScript AST node lariga bog'laydi — debugging vaqtida compiled JS dagi qatordan original TS qatoriga o'tish uchun.
 
@@ -411,7 +411,7 @@ Har flag ning ta'siri:
 | `strictBindCallApply` | `.bind()`, `.call()`, `.apply()` parametrlarini to'g'ri tekshiradi |
 | `strictPropertyInitialization` | Class property lar constructor da initialize qilinishi shart |
 | `noImplicitThis` | `this` type noma'lum bo'lsa xato |
-| `alwaysStrict` | Har faylga `"use strict"` qo'shish (ESM modullarda tushiriladi — ES modules avtomatik strict) |
+| `alwaysStrict` | Faylni strict mode da parse qiladi va output ga `"use strict"` qo'shadi. ES module output uchun pragma semantik jihatdan ortiqcha — ESM spec bo'yicha har doim strict mode |
 | `useUnknownInCatchVariables` | `catch(e)` da `e` ning type `unknown` (TS 4.4 da `strict` ostiga qo'shildi) |
 
 `strict: true` yozib, alohida flag ni `false` qilish mumkin — migration paytida foydali:
@@ -476,7 +476,7 @@ try {
 - `strict: false` bilan boshlangan eski loyihada `strict: true` yoqilsa — yuzlab xato bir zumda. Migration bosqichma-bosqich: `strictNullChecks: true` avval, keyin `noImplicitAny`, va hokazo
 - `strictPropertyInitialization` — abstract class va `declare` keyword bilan property uchun init talab qilinmaydi
 - `useUnknownInCatchVariables: false` — TS 4.4 dan oldingi xulq (`catch(e)` da `e: any`)
-- ECMAScript module fayllar (`.mjs`/`.mts` yoki `"type": "module"` paketda) avtomatik strict mode — `alwaysStrict` ulanmaydi
+- ECMAScript module fayllar (`.mjs`/`.mts` yoki `"type": "module"` paketda) spec bo'yicha har doim strict mode — `alwaysStrict` bu yerda semantik o'zgarish bermaydi (emit qilingan `"use strict"` ortiqcha)
 
 ### Follow-up savollar
 
@@ -492,9 +492,8 @@ try {
 - **TS 2.3** — `strict` meta-flag kiritildi
 - **TS 2.6** — `strictFunctionTypes`
 - **TS 2.7** — `strictPropertyInitialization`, `strictBindCallApply`
-- **TS 4.0** — `noPropertyAccessFromIndexSignature` (alohida, `strict` ostida emas)
-- **TS 4.4** — `useUnknownInCatchVariables` `strict` ostiga qo'shildi
-- **TS 4.7** — `exactOptionalPropertyTypes` (alohida, `strict` ostida emas)
+- **TS 4.2** — `noPropertyAccessFromIndexSignature` (alohida, `strict` ostida emas)
+- **TS 4.4** — `useUnknownInCatchVariables` `strict` ostiga qo'shildi, `exactOptionalPropertyTypes` kiritildi (alohida, `strict` ostida emas)
 
 `strictFunctionTypes` ning contravariance check'i `checker.ts` da `compareSignaturesRelated()` funksiyasida amalga oshiriladi. Method syntax (`{ handle(x: Dog): void }`) bivariant bo'lib qoldirilgan chunki TypeScript 1.x da DOM library va array method signature lar shu shaklda yozilgan — strictness qo'shilsa, mavjud kodning yarmi buzilgan bo'lardi.
 
@@ -583,7 +582,7 @@ try {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-`unknown` ni implementatsiya qilish — TypeScript 3.0 ning eng murakkab type system yangiligi edi. `unknown` "top type" deb ataladi — barcha tiplar `unknown` ga assignable, lekin `unknown` faqat `any` va `unknown` ga assignable. Type theory tilida: `T <: unknown` har T uchun.
+`unknown` ni implementation qilish — TypeScript 3.0 ning eng murakkab type system yangiligi edi. `unknown` "top type" deb ataladi — barcha tiplar `unknown` ga assignable, lekin `unknown` faqat `any` va `unknown` ga assignable. Type theory tilida: `T <: unknown` har T uchun.
 
 `any` ham top type, ham bottom type kabi xulq qiladi — `any` `never` dan tashqari har tipga assignable, va har tip `any` ga assignable. Bu "noisy" property type system'ning soundness'ini buzadi. `unknown` aynan shu muammoni hal qilish uchun kiritildi.
 
@@ -917,7 +916,7 @@ const Direction = {
 
 ### Edge Cases
 
-- Playground browser memory da `tsc` ni ishga tushiradi — bundle hajmi ~10 MB
+- Playground browser memory da `tsc` ni to'liq ishga tushiradi — compiler bundle brauzerga yuklanadi
 - Web Worker ichida ishlaydi — main thread bloklanmaydi
 - In-memory virtual file system — multi-file project simulate qilish mumkin (`.d.ts` fayl qo'shish)
 - Versiya tanlash — `nightly` build ham mavjud (preview features)
@@ -946,7 +945,7 @@ Eng muhim milestone lar: TS 2.0 (`strictNullChecks`), 2.8 (conditional types + `
 | Versiya | Yil | Muhim xususiyat |
 |---------|-----|-----------------|
 | **1.0** | 2014 | Birinchi stable — generics, classes, modules |
-| **1.6** | 2016 | `.tsx`, intersection types (`&`), user-defined type guards |
+| **1.6** | 2015 | `.tsx`, intersection types (`&`), user-defined type guards |
 | **2.0** | 2016 | `strictNullChecks`, `never` type, discriminated unions, `readonly` |
 | **2.1** | 2016 | `keyof`, mapped types, `Partial`, `Readonly` |
 | **2.3** | 2017 | `strict: true` meta-flag |
@@ -1131,8 +1130,8 @@ console.log(dog instanceof Dog); // ✅ true
 
 - `class A implements I` — `implements` compile-time check, lekin `A` runtime da mavjud, shuning uchun `instanceof A` ishlaydi
 - Abstract class — `instanceof` ishlaydi (abstract class runtime da JS class)
-- `class A { #x = 1 }` — `#x in obj` syntax brand check sifatida ishlaydi (TS 4.9+, runtime da `obj` aslida `A` instance ekanini tekshiradi)
-- `typeof Animal` value sifatida ishlatilsa ham xato: `'Animal' only refers to a type` — chunki interface'ning value space da reprezentatsiyasi yo'q
+- `class A { #x = 1 }` — `#x in obj` syntax brand check sifatida ishlaydi (TS 4.5+, ergonomic brand checks). Runtime da `#x` private field mavjudligini tekshiradi — odatda `obj` `A` orqali yaratilganini bildiradi
+- `typeof Animal` value sifatida ishlatilsa ham xato: `'Animal' only refers to a type` — chunki interface'ning value space da hech qanday ko'rinishi yo'q
 
 ### Follow-up savollar
 
@@ -1414,7 +1413,7 @@ console.log(isUser("string")); // false
 
 - TS 5.5+ — funksiya tanasida narrowing pattern bo'lsa, TypeScript avtomatik type predicate hosil qiladi (inferred type predicates). Lekin aniq yozish IDE uchun aniqroq
 - Type guard `false` qaytarsa, TypeScript `value` ni `User` dan **chiqarib tashlaydi** — `unknown` qoladi
-- Type guard narrowing faqat keyingi statement larga ta'sir qiladi — closure ichida saqlanmaydi (TS 5.4 da yaxshilangan)
+- Type guard narrowing faqat keyingi statement larga ta'sir qiladi. TS 5.4 dan boshlab closure ichida ham saqlanadi, agar variable (parameter yoki `let`) closure yaratilishidan oldin oxirgi marta assign qilingan va hech qaysi nested function ichida qayta o'zgartirilmagan bo'lsa
 - `value is User` semantic — agar funksiya noto'g'ri implement qilingan bo'lsa, runtime crash bo'lishi mumkin (TS ishonadi)
 
 ### Follow-up savollar
@@ -1887,7 +1886,7 @@ function newFunction(data: { value: string }): string {
 
 ### Follow-up savollar
 
-1. **"Qaysi flag eng ko'p xato beradi?"** — `strictNullChecks` — odatda 60-70% xato shu yerdan. Sababi: API javob, DOM query, object property access — har joyda `null` mumkin.
+1. **"Qaysi flag eng ko'p xato beradi?"** — Odatda `strictNullChecks` — xatolarning katta qismi shu yerdan. Sababi: API javob, DOM query, object property access — har joyda `null`/`undefined` mumkin.
 2. **"Migration vaqtida new fayllar uchun nima qilish kerak?"** — Yangi fayllar uchun `strict: true` ni alohida loyiha sifatida (project references) yoki har faylda `// @ts-check` bilan strict mode majburlash mumkin.
 
 </details>
@@ -2119,7 +2118,7 @@ function exhaustive(shape: Shape): number {
 }
 ```
 
-Narrowing closure'da yo'qoladi (TS 5.4'gacha):
+Narrowing closure'da yo'qolardi (TS 5.4'gacha):
 
 ```typescript
 function process(value: string | null) {
@@ -2128,7 +2127,10 @@ function process(value: string | null) {
 
   setTimeout(() => {
     // TS 5.4'gacha: value: string | null (narrowing yo'qolardi)
-    // TS 5.4+: value: string (`const` saqlanganligi sababli preserved)
+    // TS 5.4+: value: string. `value` parameter closure
+    // yaratilishidan oldin oxirgi marta belgilangan va hech
+    // qaysi nested function ichida qayta assign qilinmaydi —
+    // shuning uchun narrowing saqlanadi
     console.log(value.toUpperCase());
   }, 100);
 }
@@ -2137,14 +2139,14 @@ function process(value: string | null) {
 ### Edge Cases
 
 - **Mutation invalidates narrowing** — agar variable narrowing'dan keyin yangi qiymat olsa, narrowing yo'qoladi
-- **Function parameter narrowing** — closure orqali yuborilganda yo'qolardi, TS 5.4 da `const` reference'larda saqlanadi
-- **`let` vs `const`** — `const` bilan narrowing aniqroq (variable mutate bo'lmaydi)
+- **Function parameter narrowing** — closure orqali yuborilganda TS 5.4'gacha yo'qolardi. TS 5.4 da parameter va `let` variable narrowing'i, agar oxirgi assignment closure'dan oldin bo'lsa va nested function ichida qayta assign qilinmasa, saqlanadi
+- **`let` vs `const`** — `const` hech qachon qayta assign qilinmaydi, shuning uchun closure ichidagi narrowing analizi har doim ishonchli. `let` uchun TS 5.4 oxirgi assignment nuqtasini topadi
 - **`switch` fallthrough** — `case` ichida `break` yoki `return` bo'lmasa, narrowing keyingi case'ga "joriy" bo'ladi (TS bilmaydi)
 - **`while`/`for` loop** — har iteration boshida narrowing reset bo'ladi (mutation imkoniyati tufayli)
 
 ### Follow-up savollar
 
-1. **"Why does narrowing get lost in callbacks?"** — JavaScript closure orqali callback har vaqt ishga tushishi mumkin — kompilyator callback ichidagi `value` ekspressiyasini original declaration type bo'yicha tekshiradi. TS 5.4 narrowing'ni `const` reference'lar uchun preserve qiladi.
+1. **"Nima uchun narrowing callback'da yo'qoladi?"** — JavaScript closure orqali callback istalgan vaqtda ishga tushishi mumkin — compiler callback ichidagi `value` reference'ini original declaration type bo'yicha tekshiradi. TS 5.4 narrowing'ni saqlaydi, agar variable closure yaratilishidan oldin oxirgi marta belgilangan va nested function ichida qayta assign qilinmagan bo'lsa.
 2. **"Exhaustive check `default` clause'sida `never` qanday ishlatish kerak?"** — `const _: never = shape;` — agar barcha `case` qoplagan bo'lsa, `shape` `never` ga narrowing qilinadi va assignment compile'da o'tadi. Yangi union member qo'shilganda compile error — yangi case yozish majburlanadi.
 
 <details>
@@ -2252,7 +2254,7 @@ Agar `Dog extends Animal`:
 
 **Covariance intuition:** `Animal[]` kerak bo'lsa, `Dog[]` yetadi — har element `Animal` (subtype relation saqlanadi). Lekin faqat o'qish uchun (`ReadonlyArray`).
 
-**Contravariance intuition:** `(x: Dog) => void` callback kerak bo'lganda `(x: Animal) => void` ham yaramaydi — `Animal` `Dog`'ga assignable emas, lekin callback'ga `Dog` yuboriladi. Aksincha — `(x: Animal) => void` callback `(x: Dog) => void` o'rniga yaroqli (callback `Animal` qabul qiladi → har `Dog` ham `Animal`).
+**Contravariance intuition:** `(x: Dog) => void` slot kerak bo'lganda `(x: Animal) => void` callback yaroqli — slot har doim `Dog` uzatadi, callback esa `Animal` (shu jumladan `Dog`) qabul qiladi. Teskari yo'nalish xato: `(x: Animal) => void` slot ga `(x: Dog) => void` callback berib bo'lmaydi — slot ixtiyoriy `Animal` (masalan `Cat`) uzatishi mumkin, callback esa faqat `Dog` qabul qiladi. Parameter type subtype relation'ni teskari yo'nalishda saqlaydi — shuning uchun contravariant.
 
 **Mutable container — invariance:** `Array<Dog>`'ga `Animal` push qilish mumkin emas (`Dog` array). `Array<Animal>` argument sifatida `Array<Dog>` yuborib `array.push(new Cat())` qilish runtime'da type system'ni buzar edi. Shuning uchun mutable `Array<T>` invariant.
 
@@ -2297,10 +2299,21 @@ interface CoContainer<T> {
   handle: (x: T) => void;  // ← function property, contravariant (strict)
 }
 
-let bi: BiContainer<Dog> = { handle: (a: Animal) => a.eat() }; // ✅ bivariant
-let co: CoContainer<Dog> = { handle: (a: Animal) => a.eat() };
-//                              ❌ contravariant — Animal Dog ga assignable
-//                              (lekin reverse OK)
+// Farqni ko'rsatadigan yo'nalish: narrow param handler'ni
+// wide param slot'ga berish. Bivariance ruxsat beradi, strict
+// contravariance esa xato deb topadi.
+
+// Method syntax — bivariant: ikki yo'nalishda ham qabul qiladi
+let bi: BiContainer<Animal> = { handle: (d: Dog) => d.bark() }; // ✅ bivariant
+
+// Function property — strictFunctionTypes contravariant
+let co: CoContainer<Animal> = { handle: (d: Dog) => d.bark() };
+//                              ❌ Type '(d: Dog) => void' is not assignable
+//                              to '(x: Animal) => void'. (x: Dog) Animal'ni
+//                              qabul qila olmaydi — narrow param wide slot'da
+
+// Teskari yo'nalish ikkalasida ham OK (wide param wide/narrow slot'da):
+let co2: CoContainer<Dog> = { handle: (a: Animal) => a.eat() }; // ✅
 ```
 
 Invariance — mutable `Array`:
@@ -2379,11 +2392,13 @@ interface Container<T> {
 // Result: Container<T> invariant (ikki ko'rinish)
 ```
 
-`getVarianceModifiers()` har generic parameter'ning variance markerlarini hisoblaydi:
-- Faqat output: `out`
-- Faqat input: `in`
-- Ikkalasi: `in out` (invariant)
-- Hech biri: `never used` (unsafe, har xulq mumkin)
+Compiler har generic parameter uchun ishlatilish pozitsiyasidan variance ni aniqlaydi:
+- Faqat output position: covariant (`out`)
+- Faqat input position: contravariant (`in`)
+- Ikkalasi: invariant (`in out`)
+- Hech biri (ishlatilmagan): unmeasurable — `unknown`/`never` substitution bilan probe qilinadi
+
+`in`/`out` annotation explicit yozilsa, compiler infer qilingan variance annotation bilan mos kelishini ham tekshiradi.
 
 **Soundness sabab:**
 
@@ -2407,7 +2422,7 @@ type ComponentProps<T> = {
   data: T;
   render: (item: T) => React.ReactNode;
 };
-// data covariant, render contravariant — kompilyator har biri uchun alohida hisoblaydi
+// data covariant, render contravariant — compiler har biri uchun alohida hisoblaydi
 
 // Promise — covariant
 const dogPromise: Promise<Dog> = Promise.resolve(new Dog());

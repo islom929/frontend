@@ -106,7 +106,7 @@ Behavior:
 - **Uppercase / Lowercase** — barcha harflar
 - **Capitalize / Uncapitalize** — faqat birinchi harf
 
-Widened `string` argument berilsa o'zgarishsiz qaytadi (`Uppercase<string>` → `string`).
+Widened `string` argument berilsa intrinsic deferred holatda qoladi — `Uppercase<string>` (concrete literal'ga aylanmaydi). Bu type `string`'ga assignable, lekin teskari emas: plain `string` `Uppercase<string>`'ga assignable emas.
 
 ### Kod misol
 
@@ -122,7 +122,7 @@ type Handlers = `on${Capitalize<Events>}`;
 // "onClick" | "onScroll" | "onHover"
 
 // Widened
-type W = Uppercase<string>;      // string (o'zgarishsiz)
+type W = Uppercase<string>;      // Uppercase<string> (deferred, concrete literal'ga aylanmaydi)
 
 // Real use case — getter generator
 interface User { name: string; age: number }
@@ -136,7 +136,7 @@ type Getters = {
 
 - `Capitalize<"">` → `""` (bo'sh string o'zgarishsiz)
 - `Capitalize<"123abc">` → `"123abc"` (sonlar harf emas, o'zgarish yo'q)
-- Non-ASCII Unicode (`Capitalize<"şehir">`) — barcha Unicode rules qo'llab-quvvatlanadi
+- Non-ASCII Unicode — intrinsic'lar JavaScript `toUpperCase()`/`toLowerCase()` (locale-independent Unicode default case mapping) ishlatadi, `toLocaleUpperCase` emas. Shuning uchun Turkcha `i` → `I` (`İ` emas) — locale-specific qoidalar qo'llanmaydi
 - Concatenation: `Capitalize<Uncapitalize<S>>` ≠ `S` agar S birinchi harfi ASCII'dan boshqa special bo'lsa
 
 ### Follow-up savollar
@@ -279,7 +279,7 @@ type Result = Parse<"user_profile_update">;
 
 </details>
 
-### Savol 5: Template literal type lar compile bo'lganda qanday holatda qoladi? [Junior+]
+### Savol 5: Template literal type'lar compile bo'lganda qanday holatda qoladi? [Junior+]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -407,7 +407,7 @@ type UserCrud = ResourceCrud<"user">;
 - `string & K` — Capitalize faqat string qabul qiladi, intersection number/symbol key'larni `never` orqali skip qiladi
 - Bir mapped type'da bir nechta template literal — bir necha key per property yaratish uchun union (`as `get${K}` | `set${K}` `)
 - Capitalize empty string — `Capitalize<"">` → `""`, lekin `get${Capitalize<"">}` → `"get"` (valid key)
-- Key collision: agar `as` clause ikkita property uchun bir xil key generate qilsa, oxirgi g'olib chiqadi (override). Intersection union mapped type orasida yuzaga keladi, bitta mapped type ichida emas
+- Key collision: agar `as` clause ikkita source key uchun bir xil target key generate qilsa (masalan `string` cast tufayli ustma-ust tushsa), TS value type'larni union qiladi. Bu bitta mapped type ichida ham yuzaga keladi — ogohlantirish berilmaydi
 
 ### Follow-up savollar
 
@@ -435,7 +435,7 @@ Template literal interpolation har type uchun maxsus rules ishlatadi:
 | `string` (widened) | Pattern saqlanadi, distribution yo'q |
 | `number` literal | String representation (`42` → `"42"`) |
 | `number` (widened) | `` `${number}` `` qoladi |
-| `boolean` | `"true" | "false"` (distributive) |
+| `boolean` | `"true" \| "false"` (distributive) |
 | `bigint` | String representation (`42n` → `"42"`) |
 | `symbol` | Compile error |
 | `null` | `"null"` (literal) |
@@ -496,14 +496,14 @@ type Combo = `${boolean}-${0 | 1}`;
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Compiler internal'da template literal type `TemplateLiteralType` AST node sifatida saqlanadi: text qismlari va type interpolation'lar. Instantiation paytida:
+Compiler internal'da template literal type ikki qismdan iborat: literal `texts` (string fragmentlari) va `types` (interpolation pozitsiyalaridagi type'lar). Instantiation paytida:
 
 1. Har interpolation slot uchun type resolve qilinadi
 2. Union pozitsiyada distribution qo'llaniladi (kartezian)
 3. Widened type'lar (`string`, `number`) distribution to'xtatadi
-4. Natija — `Set<StringLiteralType>` yoki widened `TemplateLiteralType`
+4. Natija — string literal type'lar union'i (barcha kombinatsiyalar resolve bo'lganda) yoki widened template literal type (kamida bitta widened slot qolsa)
 
-Performance: kartezian explosion oldini olish uchun TS internal limit (`Expression produces a union type that is too complex to represent` — 100,000 member dan oshganda). Real-world katta API type'larda (REST endpoint'lar 500+) bu limit'ga yaqin kelishadi — refactor (depth limit, lazy evaluation) zarur.
+Performance: kartezian explosion oldini olish uchun TS union member sonini cheklaydi — 100,000 dan oshsa `Expression produces a union type that is too complex to represent` error chiqadi. Bu limit'ga ko'p pozitsiyali kichik union'lar tez yetadi: `316 × 316 ≈ 100,000`, ya'ni ikki pozitsiyada har biri ~316 member'li union limit'ni urib o'tadi. Refactor yo'li — widened `string` ishlatish (distribution to'xtaydi) yoki literal union'ni kichikroq qismlarga bo'lish.
 
 Number/boolean interpolation:
 - `boolean` aslida `true | false` union, distribution natijasi `"true" | "false"` (2 ta literal)
@@ -553,10 +553,11 @@ type C = "HELLO_true" | "HELLO_false";
 // boolean = true | false → "true" | "false"
 // 1 × 2 = 2 ta member
 
-type D = "horizontal" | "vertical";
-// Conditional distribution: Direction har member alohida tekshiriladi
-// "left" → "horizontal", "right" → "horizontal"
-// "top" → "vertical", "bottom" → "vertical"
+type D = "horizontal";
+// `${Direction}` template literal type — naked type parameter EMAS,
+// shuning uchun conditional DISTRIBUTE BO'LMAYDI.
+// `${Direction}` → "left" | "right" | "top" | "bottom" (butun union)
+// Butun union `top` | `bottom` ga assignable emas → false branch → "horizontal"
 ```
 
 ### To'liq tushuntirish
@@ -564,7 +565,7 @@ type D = "horizontal" | "vertical";
 - A — Capitalize union'ga distributive, har element capitalize bo'ladi
 - B — har pozitsiya 4 element, 4 × 4 = 16 kombinatsiya
 - C — boolean 2 literal'ga aylanadi (`"true"` va `"false"`)
-- D — conditional type union'ga distributive — har member alohida tekshiriladi
+- D — `` `${Direction}` `` naked type parameter emas (template literal type), shuning uchun conditional **distribute bo'lmaydi**. Butun union `` `top` | `bottom` `` ga assignable emas → `"horizontal"`. Distribution faqat naked `T extends ... ? ... : ...` da bo'ladi
 
 ### Edge Cases
 
@@ -602,16 +603,17 @@ type F = ExtractAll<"x.y.z.w">;
 
 ```typescript
 type A = "api.example.com";
-// "https://" prefix mos, Domain greedy emas (chunki "/" separator bilan cheklangan)
+// "https://" prefix mos, Domain `/` gacha, trailing ${string} = "users"
+// (string'da bitta "/" — natija aniq)
 
 type B = never;
 // "http://" "https://" emas — pattern mos kelmaydi
 
 type C = "GET";
-// Birinchi space gacha
+// `${infer M} ${string}` — M space gacha (bitta space)
 
 type D = "POST";
-// Birinchi space gacha (minimal match)
+// `${infer M} ${string}` — M space gacha. String'da bitta space, M = "POST"
 
 type E = ["a", "b", "c"];
 // 3 ta segment, har biri "." separator bilan ajratilgan
@@ -622,10 +624,10 @@ type F = ["x", "y", "z.w"];
 
 ### To'liq tushuntirish
 
-- A — "https://" prefix match, Domain `/` separator bilan cheklangan (greedy emas)
+- A — "https://" prefix match, Domain `/` gacha, trailing `${string}` qolganini oladi
 - B — prefix mos kelmaydi, `never`
-- C, D — birinchi infer minimal, space gacha
-- F — oxirgi infer greedy, qolgan "z.w" bir bo'lakda
+- C, D — `${infer M} ${string}` da M space gacha; har ikkala string'da bitta space bo'lgani uchun natija aniq
+- E, F — bir nechta `infer` ketma-ket bo'lganda oxirgisi greedy (qolgan hammasini oladi), oldingilari shu sababli eng kichik bo'lakni oladi. F'da oxirgi slot "z.w" ni butun oladi
 
 ### Edge Cases
 
@@ -720,12 +722,15 @@ type B = never;
 // Bitta never butun natijani never qiladi
 
 type C = never;
-// `never extends X` — naked type parameter pozitsiyasida `never` distributive
-// `never` — bo'sh union (0 member) — 0 marta distribute — natija `never`
-// T branch hech qachon evaluate qilinmaydi
+// `never` to'g'ridan-to'g'ri yozilgan (naked type parameter EMAS) → distribution YO'Q
+// `never` har narsaga assignable → true branch ishlaydi
+// `infer T` ni `never` source'ga match qilganda T = never → natija `never`
+// (distribution faqat `type X<T> = T extends ... ` — naked T orqali `never` berilganda bo'ladi)
 
-type D = string;
-// `${string}` `${infer T}` ga match — T = string
+type D = "no";
+// `${string}` source `${infer T}` pattern'iga inference uchun mos kelmaydi —
+// false branch ishlaydi. (`${string}` extends `${string}` esa true,
+// lekin `infer` qo'shilganda placeholder bind bo'lmaydi → "no")
 
 type F = "no";
 // "hello" da "-" yo'q → false branch
@@ -734,34 +739,32 @@ type G = "no";
 // "" da "-" yo'q
 
 type H = "";
-// "-" da "-" bor → F="", B="" → A = ""
+// "-" da "-" bor → A="", B="" → natija A = ""
 ```
 
 ### Edge Cases
 
 - `never` har pozitsiyada — butun template `never`
-- C variant — `never` distributive pozitsiyada `never` qaytaradi (0 member distribute). `"no"` fallback emas, chunki conditional branch hech qachon evaluate qilinmaydi
-- Non-distributive variant: `[never] extends [`${infer T}`] ? T : "no"` — wrapper bilan natija `string` (chunki `never` har narsaga assignable)
+- C variant — `never` to'g'ridan-to'g'ri yozilgan (naked type parameter emas) → distribution yo'q. `never` har narsaga assignable → true branch ishlaydi, lekin `infer T` ni `never` source'ga match qilganda T = never → natija `never`. `"no"` fallback ishlamaydi
+- Non-distributive wrapper ham `never`'ni o'zgartirmaydi: `[never] extends [`${infer T}`] ? T : "no"` — wrapper distribution'ni to'xtatadi, `[never]` `[X]` ga assignable, lekin `never` source'dan inference yana `T = never` beradi (TS template literal `infer`'ni mos kelmaydigan source'da `never` qiladi). Natija `never`, `string` emas
 - H — "-" string'da chap va o'ng tomon bo'sh, infer ham bo'sh string
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-`never` template literal interaction'i juda subtle:
+`never` ning template literal bilan interaksiyasida ikki alohida mexanizmni farqlash kerak: (a) `never` interpolation pozitsiyasida, (b) `never` distribution naked type parameter orqali berilganda. Bu ikkovi har xil natija beradi.
 
-**1. Interpolation pozitsiyasi:** `` `prefix-${never}` `` — `never` har qanday type'ga assignable, lekin template literal context'da bo'sh union sifatida natija `never`. Bu non-distributive — har template literal type "anchor type" sifatida ko'riladi, bitta interpolation `never` butun shape'ni zaharlaydi.
+**1. Interpolation pozitsiyasi:** `` `prefix-${never}` `` — interpolation slot'da `never` butun template literal type'ni `never` qiladi. Bitta slot `never` bo'lsa, hech qanday string kombinatsiya yasab bo'lmaydi → natija `never`.
 
-**2. Distributive pozitsiya:** `never extends X ? Y : Z` — naked `T` (yoki `never` to'g'ridan-to'g'ri), 0 distribute, natija `never`. Conditional branch hech qachon evaluate qilinmaydi.
+**2. Naked type parameter orqali `never`:** `type Check<T> = T extends X ? Y : Z` — bu yerda `T` naked type parameter, shuning uchun distributive. `Check<never>` da `never` bo'sh union (0 member) sifatida 0 marta distribute bo'ladi → natija `never`, branch'lar evaluate qilinmaydi. **Lekin** `never extends X ? Y : Z` ni TO'G'RIDAN-TO'G'RI yozsangiz (type parameter emas), distribution YO'Q — `never` har narsaga assignable, true branch ishlaydi.
 
-**3. Infer pattern matching:** `S extends \`${infer T}\` ? T : "no"` — agar S = `never`, distributive evaluation 0 marta, natija `never`. T branch ishlamaydi.
+**3. Infer pattern matching (case C):** `never extends \`${infer T}\` ? T : "no"` — `never` to'g'ridan-to'g'ri, distribution yo'q. `never extends \`${infer T}\`` true (never assignable), `infer T` ni `never` source'ga match qilganda T = never. Natija `never`. `"no"` ishlamaydi, lekin sababi distribution emas — true branch'ning natijasi `never`.
 
-**4. Non-distributive wrapper:** `[never] extends [\`${infer T}\`] ? T : "no"` — wrapper distribution to'xtatadi. `[never]` `[X]` ga assignable (chunki `never` har narsaga assignable), T branch ishlaydi, T = `string` (template literal `${infer T}` widened pattern).
+**4. Wrapper ham `never`'ni o'zgartirmaydi:** `[never] extends [\`${infer T}\`] ? T : "no"` — wrapper distribution'ni to'xtatadi (faqat naked type parameter uchun ahamiyatli). `[never]` `[X]` ga assignable, true branch ishlaydi, lekin `never` source'dan template literal `infer` yana `T = never` beradi (TS mos kelmaydigan source'da placeholder'ni `never` qiladi, PR #40518). Natija `never` — `string` EMAS.
 
-**5. Empty string distinction:** `""` va `never` — `""` valid empty string literal type, `${infer F}${infer R}` ga match qilmaydi (ikkala bo'sh bo'lolmaydi). `never` — pattern matching evaluate qilinmaydi.
+**5. Empty string distinction:** `""` va `never` — `""` valid empty string literal type, `${infer F}${infer R}` ga match qilmaydi (ikkala bo'sh bo'lolmaydi). `never` — yuqoridagi qoidalar bo'yicha ishlaydi.
 
-Real-world impact: form validation library'larda `never` propagation — agar bitta field type aniqlanmasa, butun schema `never` bo'lib qoladi. Defensive pattern: `[T] extends [never] ? Fallback : T` qatorlari bilan never propagation'ni to'xtatish.
-
-Spec reference: TC39 conditional type spec (TS extends) `never` bo'sh union sifatida qaraladi — `S<U> = U extends C ? T1 : T2` `never` argument'da `S<never> = never` (har qanday `T1`/`T2` uchun).
+Real-world impact: validation library type'larida `never` propagation — agar bitta field type `never` bo'lib qolsa, interpolation orqali butun template literal `never` bo'ladi. `[T] extends [never] ? Fallback : T` pattern bilan naked type parameter distribution'ni to'xtatib `never`'ni aniq tutib olish mumkin.
 
 </details>
 
@@ -849,7 +852,7 @@ type PathSegmentsTail<S extends string, Acc extends string[] = []> =
 
 **Real-world use case:** Express router (`/api/users/:id`), React Router (`/dashboard/*`), Vue Router (`/posts/:slug`). Type generation tools (tRPC, ts-rest) shu pattern'dan endpoint inference uchun foydalanadi.
 
-**Performance limit:** har segment uchun new instantiation. 100+ segment path — compile time sezilarli. Real-world API'larda 5-10 segment optimal.
+**Performance limit:** har segment uchun yangi instantiation. Non-tail variant 50 daraja limit'ga ega — 50+ segment'li path `Type instantiation is excessively deep` error beradi. Tail-recursive variant (accumulator) bu chegarani 1000 ga ko'taradi. Real-world API path'lari odatda bir necha segment, shuning uchun amalda muammo kam uchraydi.
 
 **Edge case'lar production'da:**
 - Query string parse: `?key=value&...` — alohida pattern, `?` separator
@@ -920,7 +923,7 @@ get("/users/:id/posts/:postId", (params) => {
 
 ### Edge Cases
 
-- Multiple `:` bir segmentda — `:a:b` — birinchi `infer` `a:b` ni greedy oladi (chunki keyin `/` yo'q)
+- Multiple `:` bir segmentda — masalan `/:a:b` — pattern2 `${string}:${infer Param}` da leading `${string}` birinchi `:` gacha minimal match qiladi (chap qism non-greedy), oxirgi `infer Param` esa qolgan hammasini greedily oladi → `Param = "a:b"`. `ExtractRouteParams<"/:a:b">` natijasi `"a:b"`. Bir segmentda bir nechta param real route'da bo'lmaydi
 - Query string — pattern `:` ga qaramaydi, lekin `?` separator bilan extending kerak
 - Optional params (`:id?`) — qo'shimcha conditional check kerak
 - Mixed types — har param `string` deb belgilanadi, real type bo'yicha conversion kerak
@@ -985,7 +988,7 @@ type RA3 = ReplaceAll<"snake_case_string", "_", "-">;
 
 - `From` bo'sh string — guard branch, S o'zgarishsiz qaytadi
 - `From` topilmasa — base case, S o'zgarishsiz
-- Recursive limit — TS 50 darajaga ruxsat, juda uzun string'lar uchun limit'ga yetishi mumkin
+- Recursive limit — bu `ReplaceAll` tail-recursive (recursive call conditional branch'ning to'g'ridan-to'g'ri natijasi), shuning uchun 1000 daraja limit qo'llaniladi. Agar recursion tuple/template ichiga o'ralsa edi (non-tail), limit 50 bo'lardi
 - Overlapping matches — `ReplaceAll<"aaa", "aa", "b">` → `"ba"` (chap'dan o'ngga, non-overlapping)
 
 ### Follow-up savollar
@@ -1063,11 +1066,11 @@ person.on("activeChanged", (val) => {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-TypeScript inference engine'ning ish tartibi: contextual typing birinchi argument'dan boshlanadi. Compiler `"nameChanged"` literal type'ni `${K}Changed` pattern'i bilan match qiladi va K = `"name"` ni infer qiladi. So'ngra ikkinchi argument (callback)'ning signature'i K orqali instantiate qilinadi.
+Inference tartibi: compiler birinchi argument `"nameChanged"` literal type'ni `${K}Changed` pattern bilan match qilib K = `"name"` ni infer qiladi. So'ngra ikkinchi argument (callback)'ning signature'i shu K orqali instantiate qilinadi — `newValue` type'i `T["name"]` ga aniqlanadi. Bu ketma-ketlik muhim: agar callback type birinchi argument'dan oldin tekshirilsa, K hali ma'lum bo'lmasdi.
 
-Performance: har generic call uchun inference algorithm O(n*m) (n — pattern length, m — input length). Katta event map'larda (1000+ event) inference vaqti sezilarli bo'lishi mumkin.
+Eslatma: K constraint `string & keyof T` — bu `keyof T` ichidagi `number` va `symbol` key'larni `string` bilan kesib tashlaydi, chunki template literal interpolation faqat string-like type bilan ishlaydi.
 
-Real-world implementation: React `useReducer`, Redux Toolkit `createSlice` shu pattern ishlatadi — action type pattern'dan payload type'ni infer qiladi. RxJS event stream'larda ham keng ishlatiladi.
+Real-world: action type pattern'dan payload type infer qilish (typed event emitter, reducer dispatch) shu mexanizmga tayanadi.
 
 </details>
 
@@ -1161,16 +1164,11 @@ const host = get(config, "db.host");
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Compiler instantiation strategy: TS recursive type'ni lazy evaluate qiladi — chaqirilgan darajagacha resolve qiladi. Lekin `keyof T & string` traversal har property uchun yangi instantiation generate qiladi.
+Compiler instantiation strategy: TS recursive type'ni lazy evaluate qiladi — faqat so'ralgan darajagacha resolve qiladi. `keyof T & string` traversal har property uchun yangi instantiation generate qiladi.
 
-Compile-time complexity:
-- N key per object, D darajalik depth
-- Total path count: `O(N^D)` worst case (har key recursive)
-- TS internal cache hit'lar takrorlangan instantiation'larni tezlashtiradi
+Compile-time o'sish: har nesting darajasi `keyof` member'larini ko'paytiradi, shuning uchun chuqur va keng object'larda path soni tez o'sadi. `Depth["length"] extends 4 ? never` guard aynan shu o'sishni cheklash va `Type instantiation is excessively deep` error'idan saqlanish uchun kerak. Depth guard'siz chuqur yoki circular type'lar bu chegaraga uriladi.
 
-V8 (`tsc` ham V8'da yoki Node.js'da ishlaydi): type checker O(N^D) memory ishlatadi (cache uchun). Katta config (Webpack config, 100+ key, 5 daraja) — memory exhaustion mumkin.
-
-react-hook-form implementation: `Path<TFieldValues>` shu pattern bilan, lekin `PathString` constraint orqali tighter — `${string}.${string}` shape'i bilan cheklab, kombinatsiya soni'ni kamaytiradi.
+react-hook-form'ning form path type'lari ham shu recursive dotted-path pattern asosida — har field uchun type-safe path generate qiladi. Amalda guard yoki cheklangan depth bilan kombinatsiya sonini boshqarish standart yondashuv.
 
 </details>
 
@@ -1263,16 +1261,16 @@ const q = select<Tables, "users", readonly ["id", "name"]>("users", ["id", "name
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Template literal type bilan SQL query builder real production ORM'larda asos: Prisma type-safe client'i Prisma schema'dan TypeScript type'larini code generation orqali yaratadi, Drizzle ORM esa runtime'da to'g'ridan-to'g'ri TypeScript schema definitions'dan template literal type'larini hisoblaydi.
+Type-safe query builder'lar ikki yondashuvga bo'linadi: Prisma `.prisma` schema'dan TypeScript type'larini code generation (build step) orqali yaratadi, Drizzle ORM esa TypeScript'da yozilgan schema definition'lardan type'larni compile-time generic inference bilan oladi (kod generatsiyasiz). Ikkalasida ham type'lar compile-time'da mavjud — runtime'da type hisoblanmaydi (type erasure).
 
 Compile-time vs runtime trade-off:
 - Template literal type compile vaqtida statement shape'ini garantiyalaydi
 - Runtime'da escape qilish, parameterized query (SQL injection oldini olish) majburiy
-- Type-level SELECT statement string sifatida natija, lekin runtime database driver execution uchun parametrized query interface kerak
+- Type-level SELECT statement string sifatida natija beradi, lekin runtime'da database driver execution uchun parametrized query interface kerak
 
-Performance: katta schema (50+ table, har biri 20+ column) — `keyof Schema[Table]` resolution har query call uchun. Drizzle ORM solution: query builder API (`.select().from().where()`) — har step kichik type inference, lazy evaluation.
+Performance: keng schema'da har query call'da `keyof Schema[Table]` resolution qayta hisoblanadi. Chaining API (`.select().from().where()`) har step'ni kichik, alohida type inference bosqichiga bo'lib, bitta katta template literal type'ni instantiate qilishdan saqlanadi.
 
-Limitation: template literal type natija — pure string type, runtime'da SQL parser kerak (PostgreSQL/MySQL syntax). Type-level SQL parser ham mavjud (open-source eksperimentlar), lekin compile time prohibitive.
+Limitation: template literal type natija — pure string type, runtime'da SQL execution uchun parser/driver kerak (PostgreSQL/MySQL syntax dialect'ga bog'liq). To'liq type-level SQL parser nazariy mumkin, lekin instantiation depth va union limit'lari tufayli amalda cheklangan.
 
 </details>
 
@@ -1457,4 +1455,4 @@ type SplitTail<S, D, Acc extends string[] = []> =
 - **`symbol` key'lar** — `string & K` filter zarur
 - **Recursive patterns** — `Split`, `Replace`, `CamelCase`, route extraction, dotted path
 - **Depth limit** — non-tail recursion 50, tail-recursive (TS 4.5+) 1000 daraja
-- **Real-world:** Express route typing, REST API SDK, react-hook-form path, RxJS event stream
+- **Real-world:** Express/React Router route param typing, react-hook-form dotted path, typed event emitter (`${K}Changed`), type-safe query builder (Prisma/Drizzle)

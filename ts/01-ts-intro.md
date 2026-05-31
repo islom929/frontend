@@ -75,7 +75,7 @@ TypeScript JavaScript ustiga qo'shadigan narsalarni ikki asosiy kategoriyaga bo'
 └─────────────────────────────────────────────────────────┘
 ```
 
-Birinchi kategoriya — type system — `tsc` emitter tomonidan to'liq o'chiriladi. Ikkinchi kategoriya — TS-specific runtime construct'lar — JavaScript kodga aylantiriladi. TS 5.8 (mart 2025) `erasableSyntaxOnly` flag ikkinchi kategoriyani taqiqlaydi — Node.js 22.6+ `--experimental-strip-types` va Node.js 23.6+ default type stripping bilan integratsiya uchun.
+Birinchi kategoriya — type system — `tsc` emitter tomonidan to'liq o'chiriladi. Ikkinchi kategoriya — TS-specific runtime construct'lar — JavaScript kodga aylantiriladi. TS 5.8 (fevral 2025) `erasableSyntaxOnly` flag ikkinchi kategoriyani taqiqlaydi — Node.js 22.6+ `--experimental-strip-types` va Node.js 23.6+ default type stripping bilan integratsiya uchun.
 
 </details>
 
@@ -191,7 +191,7 @@ TypeScript va JavaScript ning execution pipeline lari fundamental farq qiladi:
 ```
 JavaScript Execution Pipeline:
 ┌──────────────┐    ┌────────────────┐    ┌──────────────┐
-│  .js source  │ →  │  V8/SpiderMnky │ →  │   Runtime    │
+│  .js source  │ →  │  JS engine     │ →  │   Runtime    │
 │  (dynamic)   │    │  parse         │    │   execution  │
 │              │    │  + JIT compile │    │   (xatolar   │
 │              │    │                │    │    bu yerda) │
@@ -199,7 +199,7 @@ JavaScript Execution Pipeline:
 
 TypeScript Compilation + Execution Pipeline:
 ┌──────────────┐    ┌────────────────┐    ┌──────────────┐    ┌────────────────┐    ┌──────────────┐
-│  .ts source  │ →  │  tsc: type     │ →  │  tsc: emit   │ →  │  V8/SpiderMnky │ →  │   Runtime    │
+│  .ts source  │ →  │  tsc: type     │ →  │  tsc: emit   │ →  │  JS engine     │ →  │   Runtime    │
 │  (static     │    │  checking      │    │  (type       │    │  parse         │    │   execution  │
 │   types)     │    │  (xatolar      │    │   erasure)   │    │  + JIT compile │    │              │
 │              │    │   bu yerda)    │    │  → .js       │    │                │    │              │
@@ -371,7 +371,7 @@ Binder AST bo'ylab yurib, **Symbol** larni yaratadi va scope larni aniqlaydi. Ha
 
 **Bosqich 4: Checker (Type Checker)**
 
-Checker `tsc` ning eng katta va murakkab qismi — `checker.ts` fayli juda katta hajmli (kompiler logikasining yarmidan ko'pi shu yerda). Checker barcha type tekshiruvlarni amalga oshiradi:
+Checker `tsc` ning eng katta va murakkab qismi — `checker.ts` fayli juda katta hajmli (compiler logikasining yarmidan ko'pi shu yerda). Checker barcha type tekshiruvlarni amalga oshiradi:
 
 - Har bir ifoda type ini aniqlaydi (type inference)
 - Annotation type'lar bilan haqiqiy type larni solishtiradi (assignability check)
@@ -586,7 +586,7 @@ interface Dog {
 function makeSound(animal: Cat | Dog) {
   // ❌ ISHLAMAYDI — interface runtime da yo'q
   // if (animal instanceof Cat) { ... }
-  // SyntaxError/ReferenceError: 'Cat' only refers to a type
+  // Compile-time xato: 'Cat' only refers to a type, but is being used as a value here
 
   // ✅ Runtime da mavjud bo'lgan property ni tekshirish kerak
   if ("meow" in animal) {
@@ -649,7 +649,7 @@ UserId userId = new ProductId(1); // ❌ Compile error!
 **Structural Typing** (TypeScript, Go interfaces, OCaml object types):
 Ikki tip mos keladi agar ularning **tuzilmasi (shape)** mos bo'lsa. Nomlar ahamiyatsiz — agar type A ning barcha kerakli property va method lari type B da mavjud bo'lsa, A ni B o'rnida ishlatish mumkin.
 
-TypeScript aynan structural typing ishlatadi. Bu JavaScript ning tabiatiga mos keladi — JavaScript da object ning qaysi property va method lari borligiga qarab "type" aniqlanadi (bu duck typing deb ataladi: *"agar qush kabi yursa va qush kabi qichqirsa, demak qush"*). TypeScript shu yondashuvni compile-time da rasmiylashtiradi — class yoki interface nomi emas, **shape (tuzilma)** bo'yicha tip tekshiradi.
+TypeScript aynan structural typing ishlatadi. Bu JavaScript ning tabiatiga mos keladi — JavaScript da object ning qaysi property va method lari borligiga qarab undan qanday operatsiyalar talab qilish mumkinligi aniqlanadi (bu yondashuv duck typing deb ataladi). TypeScript shu prinsipni compile-time da rasmiylashtiradi — class yoki interface nomi emas, **shape (tuzilma)** bo'yicha tip mosligini tekshiradi.
 
 Structural typing'ning afzalligi — soddalik va JavaScript pattern'lari bilan tabiiy mos kelish. Kamchiligi — ba'zan **mantiqan farqli** lekin **tuzilmasi bir xil** tiplarni aralashtirish mumkin (masalan, `UserId` va `ProductId` ikkalasi ham `number` bo'lsa).
 
@@ -745,7 +745,7 @@ Node.js da CJS (CommonJS) formatidagi TypeScript fayl. Compile bo'lganda `.cjs` 
 
 ### Nazariya
 
-`tsconfig.json` — TypeScript loyihasining konfiguratsiya fayli. `tsc` shu faylni o'qib, qanday compile qilishni aniqlaydi. Odatda loyihaning root papkasida joylashadi. `tsc` ni hech qanday argumentsiz ishga tushirganingizda — u joriy papkada va ota papkalarda `tsconfig.json` ni qidiradi.
+`tsconfig.json` — TypeScript loyihasining configuration fayli. `tsc` shu faylni o'qib, qanday compile qilishni aniqlaydi. Odatda loyihaning root papkasida joylashadi. `tsc` ni hech qanday argumentsiz ishga tushirganingizda — u joriy papkada va ota papkalarda `tsconfig.json` ni qidiradi.
 
 `tsconfig.json` ning asosiy bo'limlari:
 
@@ -815,7 +815,7 @@ Turli loyiha turlari uchun qo'shimcha sozlamalar:
 }
 ```
 
-> **Batafsil:** `tsconfig.json` ning barcha opsiyalari, `extends` merge qoidalari, `references` monorepo setup va tez-tez uchraydigan konfiguratsiya pattern'lari [22-tsconfig.md](22-tsconfig.md) da yoritiladi.
+> **Batafsil:** `tsconfig.json` ning barcha opsiyalari, `extends` merge qoidalari, `references` monorepo setup va tez-tez uchraydigan configuration pattern'lari [22-tsconfig.md](22-tsconfig.md) da yoritiladi.
 
 </details>
 
@@ -861,28 +861,28 @@ Eng ko'p ishlatiladigan uchta strict flag amalda:
 
 ```typescript
 // strict: false — null/undefined hech qayerda tekshirilmaydi
-function getLength(str: string): number {
+function getLengthUnsafe(str: string): number {
   return str.length; // str null bo'lsa → runtime crash
 }
-getLength(null); // Hech qanday xato — runtime'da crash
+getLengthUnsafe(null); // Hech qanday compile xato — runtime'da crash
 
 // strict: true — null alohida handle qilinishi SHART
-function getLength(str: string | null): number {
+function getLengthSafe(str: string | null): number {
   if (str === null) return 0; // ✅ null tekshirish majburiy
   return str.length;
 }
-getLength(null); // ✅ Xavfsiz — 0 qaytaradi
+getLengthSafe(null); // ✅ Xavfsiz — 0 qaytaradi
 ```
 
 **`noImplicitAny`:**
 
 ```typescript
 // strict: true — parameter type majburiy
-function process(data) { // ❌ Parameter 'data' implicitly has an 'any' type
+function processImplicit(data) { // ❌ Parameter 'data' implicitly has an 'any' type
   return data.name;
 }
 
-function process(data: { name: string }) { // ✅ Aniq type
+function processTyped(data: { name: string }) { // ✅ Aniq type
   return data.name;
 }
 ```
@@ -1038,7 +1038,7 @@ TypeScript 2012-yildan beri faol rivojlanib kelmoqda. Quyida major versiyalar va
 | **5.2** | 2023 | `using` declarations (Explicit Resource Management) |
 | **5.4** | 2024 | `NoInfer<T>` utility type, preserved narrowing in closures |
 | **5.5** | 2024 | `isolatedDeclarations`, inferred type predicates |
-| **5.6** | 2024 | `--noCheck` flag (emit without type check), iterator helpers, strict builtin iterator checks |
+| **5.6** | 2024 | `--noCheck` flag (emit without type check), `strictBuiltinIteratorReturn`, Iterator Helper lib type'lari |
 | **5.7** | 2024 | `--rewriteRelativeImportExtensions`, never-initialized variable checks |
 | **5.8** | 2025 | `erasableSyntaxOnly` — Node.js native TS support bilan integratsiya, `--module node18`/`node20` |
 
@@ -1064,7 +1064,7 @@ TypeScript 2012-yildan beri faol rivojlanib kelmoqda. Quyida major versiyalar va
 
 TypeScript ning asoslarini o'rganishda odatda ko'rinmas bo'lgan nozik holatlar. Bular ko'pincha production loyihalarda kutilmagan xatolar sifatida namoyon bo'ladi.
 
-### 🕳 Gotcha 1: `instanceof` interface bilan ishlamaydi — type erasure oqibati
+### Gotcha 1: `instanceof` interface bilan ishlamaydi — type erasure oqibati
 
 ```typescript
 interface Animal {
@@ -1087,7 +1087,7 @@ function check(value: unknown) {
 
 ---
 
-### 🕳 Gotcha 2: `strict: false → strict: true` — mavjud loyihada yuzlab xatolar
+### Gotcha 2: `strict: false → strict: true` — mavjud loyihada yuzlab xatolar
 
 ```json
 // Eski loyiha
@@ -1104,7 +1104,7 @@ function check(value: unknown) {
 
 ---
 
-### 🕳 Gotcha 3: `tsc` versiyasi va VS Code versiyasi mos kelmasligi
+### Gotcha 3: `tsc` versiyasi va VS Code versiyasi mos kelmasligi
 
 ```bash
 # Loyihada
@@ -1120,7 +1120,7 @@ npm install --save-dev typescript@5.4
 
 ---
 
-### 🕳 Gotcha 4: `skipLibCheck: false` bilan `node_modules` type xatolari
+### Gotcha 4: `skipLibCheck: false` bilan `node_modules` type xatolari
 
 ```json
 {
@@ -1138,18 +1138,18 @@ npm install --save-dev typescript@5.4
 
 ---
 
-### 🕳 Gotcha 5: JS loyihani TS'ga migratsiya — `allowJs` va `checkJs` chalkashligi
+### Gotcha 5: JS loyihani TS'ga migration — `allowJs` va `checkJs` chalkashligi
 
 ```json
 {
   "compilerOptions": {
-    "allowJs": true,    // JS fayllarni kompilyatsiyaga qo'shish
+    "allowJs": true,    // JS fayllarni compilation'ga qo'shish
     "checkJs": false    // Lekin ularni type check qilmaslik
   }
 }
 ```
 
-`allowJs: true` bilan `.js` fayllar ham loyihaga kiradi, lekin `checkJs: false` bo'lsa ular tekshirilmaydi. `checkJs: true` yoqilsa — JS fayllarda ham type xatolar chiqa boshlaydi. Migration paytida bu ikki flagni noto'g'ri konfiguratsiya qilsangiz, loyiha ham ishlamaydi, ham to'liq tekshirilmagan bo'ladi.
+`allowJs: true` bilan `.js` fayllar ham loyihaga kiradi, lekin `checkJs: false` bo'lsa ular tekshirilmaydi. `checkJs: true` yoqilsa — JS fayllarda ham type xatolar chiqa boshlaydi. Migration paytida bu ikki flagni noto'g'ri configuration qilsangiz, loyiha ham ishlamaydi, ham to'liq tekshirilmagan bo'ladi.
 
 **Yechim:** Migration bosqichlari:
 1. `"allowJs": true, "checkJs": false` — JS fayllar compile bo'ladi
@@ -1163,28 +1163,28 @@ npm install --save-dev typescript@5.4
 ### ❌ Xato 1: TypeScript runtime da type tekshiradi deb o'ylash
 
 ```typescript
+import { z } from "zod";
+
 interface User {
   name: string;
   age: number;
 }
 
 // API dan kelgan data ni TypeScript avtomatik tekshirmaydi
-const data: User = await fetch("/api/user").then(r => r.json());
+const unsafeUser: User = await fetch("/api/user").then(r => r.json());
 // ❌ XAVFLI — API boshqa format qaytarsa, runtime xato
 // .json() any qaytaradi, TS hech narsa tekshirmaydi
 
 // ✅ To'g'ri — runtime validation (Zod, io-ts yoki manual)
-import { z } from "zod";
-
 const UserSchema = z.object({
   name: z.string(),
   age: z.number(),
 });
 
-const data = UserSchema.parse(
+const safeUser = UserSchema.parse(
   await fetch("/api/user").then(r => r.json())
 );
-// Endi runtime'da ham type xavfsiz
+// Endi runtime'da ham type xavfsiz — safeUser: { name: string; age: number }
 ```
 
 **Nima uchun:** TypeScript faqat compile-time da type tekshiradi. Runtime'da API javob, user input, JSON parse, `localStorage` — bularning barchasi TypeScript nazoratidan tashqarida. Tashqi ma'lumotlar uchun runtime validation majburiy.
@@ -1195,13 +1195,13 @@ const data = UserSchema.parse(
 
 ```typescript
 // ❌ any — TypeScript'ni butunlay o'chiradi
-function processData(data: any) {
+function processWithAny(data: any) {
   return data.users.map((u: any) => u.name.toUpperCase());
   // Hech qanday type check — runtime crash xavfi
 }
 
 // ✅ unknown — xavfsiz alternativa
-function processData(data: unknown) {
+function processWithUnknown(data: unknown) {
   if (
     typeof data === "object" && data !== null &&
     "users" in data && Array.isArray((data as { users: unknown[] }).users)
@@ -1215,7 +1215,7 @@ interface ApiResponse {
   users: { name: string }[];
 }
 
-function processData(data: ApiResponse) {
+function processWithType(data: ApiResponse) {
   return data.users.map(u => u.name.toUpperCase());
   // ✅ To'liq type safety + autocomplete
 }
@@ -1232,7 +1232,7 @@ interface Serializable {
   serialize(): string;
 }
 
-// ❌ Kompilyatsiya xatosi
+// ❌ Compilation xatosi
 function save(obj: unknown) {
   // if (obj instanceof Serializable) { ... }
   // 'Serializable' only refers to a type, but is being used as a value here
@@ -1467,10 +1467,10 @@ Bu bo'limda TypeScript ning asosiy tushunchalari bilan tanishdik:
 - **TypeScript** — JavaScript ustiga qurilgan statik tiplangan til. Compile-time'da type xavfsizligini ta'minlaydi, runtime'da iz qoldirmaydi.
 - **TypeScript vs JavaScript** — fundamental farqi static vs dynamic typing. TypeScript'ning asosiy foydasi — tooling (IDE autocomplete, refactoring, inline errors).
 - **tsc Pipeline** — Scanner → Parser → AST → Binder → Checker → Emitter. Har bosqich o'z vazifasi: lexical analysis, syntax analysis, symbol binding, type checking, JavaScript emission.
-- **Type Erasure** — TypeScript ning fundamental xususiyati. Kompile vaqtida barcha type ma'lumotlari o'chiriladi, runtime'da sof JavaScript qoladi.
+- **Type Erasure** — TypeScript ning fundamental xususiyati. Compile vaqtida barcha type ma'lumotlari o'chiriladi, runtime'da sof JavaScript qoladi.
 - **Structural Typing** — TypeScript tip mosligini nom bo'yicha emas, **shape (tuzilma)** bo'yicha aniqlaydi. JavaScript'ning duck typing'ini compile-time'da rasmiylashtiradi.
 - **Fayl kengaytmalari** — `.ts`, `.tsx`, `.d.ts`, `.mts`, `.cts` — har birining aniq maqsadi bor.
-- **`tsconfig.json`** — TypeScript loyihasining konfiguratsiyasi. `strict: true` bilan boshlash majburiy.
+- **`tsconfig.json`** — TypeScript loyihasining configuration'i. `strict: true` bilan boshlash majburiy.
 - **`strict: true`** — bir nechta strict sub-flag'larni birdan yoqadigan meta-flag: `strictNullChecks`, `noImplicitAny`, `strictFunctionTypes` va boshqalar.
 - **TypeScript Playground** — brauzerda TS kodni sinab ko'rish va compile natijasini real-time ko'rish uchun rasmiy tool.
 - **Versiyalar tarixi** — TS 2.0 `strictNullChecks`, 2.8 conditional types, 4.1 template literals, 4.9 `satisfies`, 5.0 TC39 decorators — eng muhim milestone'lar.

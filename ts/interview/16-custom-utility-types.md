@@ -22,7 +22,7 @@
 
 ### Qisqa javob
 
-`Partial<T>` faqat top-level property larni optional qiladi. `DeepPartial<T>` esa barcha darajadagi nested property larni recursive ravishda optional qiladi.
+`Partial<T>` faqat top-level property'larni optional qiladi. `DeepPartial<T>` esa barcha darajadagi nested property'larni recursive ravishda optional qiladi.
 
 ### To'liq tushuntirish
 
@@ -32,9 +32,9 @@
 type Partial<T> = { [K in keyof T]?: T[K] };
 ```
 
-Bu **shallow** transformatsiya — `T[K]` ning ichiga kirmaydi. Agar `T[K]` object bo'lsa, uning property lari hali required qoladi.
+Bu **shallow** transformation — `T[K]` ning ichiga kirmaydi. Agar `T[K]` object bo'lsa, uning property'lari hali required qoladi.
 
-**`DeepPartial<T>`** — recursive conditional type, har bir level da `Partial` semantikasini qo'llaydi:
+**`DeepPartial<T>`** — recursive conditional type, har bir level'da `Partial` semantikasini qo'llaydi:
 
 ```typescript
 type DeepPartial<T> = T extends object
@@ -42,7 +42,7 @@ type DeepPartial<T> = T extends object
   : T;
 ```
 
-Asosiy farq — recursive chaqiruv (`DeepPartial<T[K]>`). Bu nested object lar ichiga ham kirib, har bir property ni optional qiladi.
+Asosiy farq — recursive chaqiruv (`DeepPartial<T[K]>`). Bu nested object'lar ichiga ham kirib, har bir property'ni optional qiladi.
 
 **Real-world ishlatilish:**
 - **Config merging** — default config + user override (override har xil darajada bo'lishi mumkin)
@@ -79,39 +79,39 @@ const deepUpdate: Deep = {
 
 ### Edge Cases
 
-- **`Date`, `Map`, `Set`** — `object` ga extends qiladi. Naive `DeepPartial` ularning method larini ham optional qiladi (bug). To'g'ri implementatsiyada `BuiltIn` check kerak.
-- **Function** — `Function` ham `object`. Recursive bo'lib kirilsa, function parameter type lari noto'g'ri transform bo'ladi.
+- **`Date`, `Map`, `Set`** — `object` ga extends qiladi. Naive `DeepPartial` ularning method'larini ham optional qiladi (bug). To'g'ri implementation'da `BuiltIn` check kerak.
+- **Function** — function type ham `object`. Recursive bo'lib kirilsa, `keyof (function type) = never` → mapped type `{}` ga collapse bo'ladi va call signature yo'qoladi.
 - **Union type** — `DeepPartial<A | B>` distributive: `DeepPartial<A> | DeepPartial<B>`.
 
 ### Follow-up savollar
 
-1. **"Date method lari nima uchun optional bo'lib qoladi?"** — `Date` ham `object` ga extends qiladi. Mapped type `[K in keyof Date]?` Date ning `getTime`, `toISOString` kabi method larini ham optional qiladi.
-2. **"DeepPartial<ReadonlyArray<T>> nima qiladi?"** — Array element type ni `DeepPartial` qiladi, lekin readonly modifier ham qoladi. Special case kerak: `T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : ...`
+1. **"Date method'lari nima uchun optional bo'lib qoladi?"** — `Date` ham `object` ga extends qiladi. Mapped type `[K in keyof Date]?` Date'ning `getTime`, `toISOString` kabi method'larini ham optional qiladi.
+2. **"DeepPartial<ReadonlyArray<T>> nima qiladi?"** — Array element type'ni `DeepPartial` qiladi, lekin readonly modifier ham qoladi. Special case kerak: `T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : ...`
 
 </details>
 
 ---
 
-### Savol 2: Recursive type da `Function`, `Date`, `Array` nima uchun alohida handle qilinadi? [Middle]
+### Savol 2: Recursive type'da `Function`, `Date`, `Array` nima uchun alohida handle qilinadi? [Middle]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-`Function`, `Date`, `Array`, `Map`, `Set` — barchasi `object` ga extends qiladi. Special case qilmasak, ularning ichki method va property lari ham transform bo'ladi va broken type yaratiladi.
+`Function`, `Date`, `Array`, `Map`, `Set` — barchasi `object` ga extends qiladi. Special case qilmasak, ularning ichki method va property'lari ham transform bo'ladi va broken type yaratiladi.
 
 ### To'liq tushuntirish
 
-TypeScript da `T extends object` check juda keng — barcha non-primitive type lar bunga mos keladi. Lekin recursive transformation logikasi har xil holatda har xil bo'lishi kerak:
+TypeScript'da `T extends object` check juda keng — barcha non-primitive type'lar bunga mos keladi. Lekin recursive transformation logikasi har xil holatda har xil bo'lishi kerak:
 
-- **Plain object** — property larni transform qilish kerak (recursion ichiga kirish)
-- **Date, Error, RegExp** — built-in class. Ichki method larni transform qilish noto'g'ri — type yaroqsiz bo'ladi
-- **Array** — element type ni transform qilish kerak, lekin array structure saqlanishi shart
-- **Map / Set** — generic parameter type larni transform qilish kerak
-- **Function** — signature ni transform qilish notog'ri — funksiya ishlamay qoladi
+- **Plain object** — property'larni transform qilish kerak (recursion ichiga kirish)
+- **Date, Error, RegExp** — built-in class. Ichki method'larni transform qilish noto'g'ri — type yaroqsiz bo'ladi
+- **Array** — element type'ni transform qilish kerak, lekin array structure saqlanishi shart
+- **Map / Set** — generic parameter type'larni transform qilish kerak
+- **Function** — signature'ni transform qilish noto'g'ri — funksiya ishlamay qoladi
 
-**Tartib muhim:** Conditional type lar ketma-ket evaluate qilinadi. Plain object check **oxirgi** bo'lishi kerak — aks holda special case larga yetib bormaydi.
+**Tartib muhim:** Conditional type'lar ketma-ket evaluate qilinadi. Plain object check **oxirgi** bo'lishi kerak — aks holda special case'larga yetib bormaydi.
 
 ### Kod misol
 
@@ -131,15 +131,15 @@ type Bad = BadDeepPartial<OrderEvent>;
 // {
 //   id?: string;
 //   createdAt?: {
-//     getTime?(): number;          // ❌ Date method optional!
-//     toISOString?(): string;       // ❌
-//     ...
+//     getTime?: {};        // ❌ Date method recursion'ga kirdi: BadDeepPartial<()=>number> = {}
+//     toISOString?: {};     // ❌ keyof (function) = never → {} ga collapse
+//     ...                   //    Date endi chaqirib bo'lmaydigan {} lar to'plami
 //   };
-//   handlers?: BadDeepPartial<((order: Order) => void)[]>;
-//   // Array ning push, pop kabi method lari ham optional ❌
+//   handlers?: ({} | undefined)[];
+//   // element ((order: Order) => void) ham {} ga collapse — callback type yo'qoldi ❌
 // }
 
-// ✅ To'g'ri — special case lar tartibda
+// ✅ To'g'ri — special case'lar tartibda
 type Primitive = string | number | boolean | bigint | symbol | undefined | null;
 type BuiltIn = Primitive | Date | Error | RegExp;
 
@@ -163,14 +163,14 @@ type Good = DeepPartial<OrderEvent>;
 
 ### Edge Cases
 
-- **`Date` `object` ga extends qiladimi?** — Ha. `Date.prototype` `Object.prototype` ga chain qilingan. `typeof new Date()` runtime da `"object"`.
-- **Custom class** — agar `class User` definition `BuiltIn` ga kirmasa, naive check uning property larini transform qiladi. Real-world custom class lar kamdan-kam recursive type input bo'ladi (DTO uchun plain object afzal).
-- **Generic constraint** — `T extends Function` faqat `Function` interface ga match qiladi. Arrow function/method uchun `T extends (...args: any[]) => any` ishonchli.
+- **`Date` `object` ga extends qiladimi?** — Ha. `Date.prototype` `Object.prototype` ga chain qilingan. `typeof new Date()` runtime'da `"object"`.
+- **Custom class** — agar `class User` definition `BuiltIn` ga kirmasa, naive check uning property'larini transform qiladi. Real-world custom class'lar kamdan-kam recursive type input bo'ladi (DTO uchun plain object afzal).
+- **Generic constraint** — `T extends Function` faqat `Function` interface'ga match qiladi. Arrow function/method uchun `T extends (...args: any[]) => any` ishonchli.
 
 ### Follow-up savollar
 
 1. **"`BuiltIn` ga yana nima qo'shish kerak?"** — Domain'ga qarab: `Promise<any>`, `WeakMap`, `WeakSet`, `Buffer` (Node.js), DOM types (`File`, `Blob`, `FormData`).
-2. **"Recursive type da tartib o'zgartirilsa nima bo'ladi?"** — Plain object check birinchi bo'lsa, `Date` ga ham kiradi va broken type yaratiladi. Specific check'lar avval bo'lishi shart.
+2. **"Recursive type'da tartib o'zgartirilsa nima bo'ladi?"** — Plain object check birinchi bo'lsa, `Date` ga ham kiradi va broken type yaratiladi. Specific check'lar avval bo'lishi shart.
 
 </details>
 
@@ -183,11 +183,11 @@ type Good = DeepPartial<OrderEvent>;
 
 ### Qisqa javob
 
-`Prettify<T>` — intersection type ni flat object ga aylantiradi. IDE hover da type ni o'qish qulayligi uchun ishlatiladi. Runtime ta'siri yo'q — faqat type display.
+`Prettify<T>` — intersection type'ni flat object'ga aylantiradi. IDE hover'da type'ni o'qish qulayligi uchun ishlatiladi. Runtime ta'siri yo'q — faqat type display.
 
 ### To'liq tushuntirish
 
-TypeScript intersection type (`A & B & C`) ni IDE hover qilganda **alohida-alohida** ko'rsatadi. Bu murakkab type kompozitsiyalarida o'qishni qiyinlashtiradi.
+TypeScript intersection type (`A & B & C`) ni IDE hover qilganda **alohida-alohida** ko'rsatadi. Bu murakkab type composition'larida o'qishni qiyinlashtiradi.
 
 `Prettify` — identity mapped type:
 
@@ -196,10 +196,10 @@ type Prettify<T> = { [K in keyof T]: T[K] } & {};
 ```
 
 Ikki qism:
-1. **`{ [K in keyof T]: T[K] }`** — identity mapped type. Strukturani saqlaydi, lekin TypeScript ga "type ni qaytadan compute qil" degan signal beradi.
-2. **`& {}`** — bo'sh intersection. Mapped type result ni intersection sifatida force qiladi — TypeScript bu paytda intersection ni resolve qilib flat object yaratadi.
+1. **`{ [K in keyof T]: T[K] }`** — identity mapped type. Strukturani saqlaydi, lekin TypeScript'ga "type'ni qaytadan compute qil" degan signal beradi.
+2. **`& {}`** — bo'sh intersection. Mapped type result'ni intersection sifatida force qiladi — TypeScript bu paytda intersection'ni resolve qilib flat object yaratadi.
 
-**Nima uchun ishlaydi:** TypeScript intersection type ni lazy resolve qiladi (display uchun original shape ni saqlaydi). Mapped type esa **eager evaluation** ni majburlaydi — barcha key/value larni compute qiladi.
+**Nima uchun ishlaydi:** TypeScript intersection type'ni lazy resolve qiladi (display uchun original shape'ni saqlaydi). Mapped type esa **eager evaluation** ni majburlaydi — barcha key/value'larni compute qiladi.
 
 **Qachon kerak:**
 - **Generic helper output** — `Pick<T, K> & Omit<U, M>` natijasi
@@ -213,7 +213,7 @@ type UserBase = { id: number; name: string };
 type UserAuth = { email: string; password: string };
 type UserMeta = { createdAt: Date; updatedAt: Date };
 
-// Intersection — IDE hover da yomon ko'rinadi
+// Intersection — IDE hover'da yomon ko'rinadi
 type User = UserBase & UserAuth & UserMeta;
 // IDE: UserBase & UserAuth & UserMeta
 
@@ -237,9 +237,9 @@ type UserUpdateInput = Prettify<
 
 ### Edge Cases
 
-- **Faqat top-level ishlaydi** — nested intersection lar flat bo'lmaydi. `DeepPrettify` kerak.
-- **`& {}` runtime ta'siri yo'q** — bu pure type-level operation. JS output ga ta'sir qilmaydi.
-- **Performance** — har Prettify mapped type instantiation yaratadi. Hot path da overuse qilmaslik kerak.
+- **Faqat top-level ishlaydi** — nested intersection'lar flat bo'lmaydi. `DeepPrettify` kerak.
+- **`& {}` runtime ta'siri yo'q** — bu pure type-level operation. JS output'ga ta'sir qilmaydi.
+- **Performance** — har Prettify mapped type instantiation yaratadi. Hot path'da overuse qilmaslik kerak.
 
 ### Follow-up savollar
 
@@ -261,24 +261,24 @@ type UserUpdateInput = Prettify<
 
 ### To'liq tushuntirish
 
-**`keyof T`** — built-in operator. Object type ning key larini string/number/symbol literal union sifatida qaytaradi:
+**`keyof T`** — built-in operator. Object type'ning key'larini string/number/symbol literal union sifatida qaytaradi:
 
 ```typescript
 type Keys = keyof { a: 1; b: 2 }; // "a" | "b"
 ```
 
-**`ValueOf<T>`** — index access type orqali qurilgan custom utility. `T[keyof T]` ifoda barcha key larga indeks orqali kirib, value type larini union sifatida qaytaradi:
+**`ValueOf<T>`** — index access type orqali qurilgan custom utility. `T[keyof T]` ifoda barcha key'larga indeks orqali kirib, value type'larini union sifatida qaytaradi:
 
 ```typescript
 type ValueOf<T> = T[keyof T];
 type Values = ValueOf<{ a: 1; b: 2 }>; // 1 | 2
 ```
 
-**Qanday ishlaydi:** `T[keyof T]` — distributive index access. `T["a" | "b"]` = `T["a"] | T["b"]` = `1 | 2`. TypeScript index type bilan union access da distribution avtomatik qo'llaniladi.
+**Qanday ishlaydi:** `T[keyof T]` — distributive index access. `T["a" | "b"]` = `T["a"] | T["b"]` = `1 | 2`. TypeScript index type bilan union access'da distribution avtomatik qo'llaniladi.
 
 **Real-world ishlatish:**
 
-1. **Enum alternative** — `const`-assertion object dan literal union qurish
+1. **Enum alternative** — `const`-assertion object'dan literal union qurish
 2. **Lookup table value type** — status codes, error codes
 3. **Discriminated union dispatch** — tag-based action type
 
@@ -305,7 +305,7 @@ function handleStatus(code: StatusCode): void {
   switch (code) {
     case 200: return; // ✅
     case 201: return; // ✅
-    case 999: return; // ❌ — union da yo'q
+    case 999: return; // ❌ — union'da yo'q
   }
 }
 
@@ -322,14 +322,14 @@ type ActionType = ValueOf<typeof Actions>;
 
 ### Edge Cases
 
-- **`ValueOf<string>` natija kutilmagan** — `string` primitive ning method/property type lari union (charAt, includes, length, ...). `ValueOf` ni object type bilan ishlatish kerak: `type SafeValueOf<T extends Record<string, unknown>> = T[keyof T]`.
-- **Array — `ValueOf<T[]>`** — array element type'ni qaytaradi, lekin number indexer ham kiradi: `T[number] | T["length"] | T["map"] | ...`. Specific element type kerak bo'lsa `T[number]` ishlatish kerak.
-- **Tuple — `ValueOf<[1, 2, 3]>`** — `1 | 2 | 3 | number` (number indexer tufayli). `T[number]` aniqroq.
+- **`ValueOf<string>` natija kutilmagan** — `string` primitive'ning method/property type'lari union (charAt, includes, length, ...). `ValueOf` ni object type bilan ishlatish kerak: `type SafeValueOf<T extends Record<string, unknown>> = T[keyof T]`.
+- **Array — `ValueOf<T[]>`** — element type bilan birga `keyof T[]` ning barcha member'lari kiradi: element type `T`, `length` ning `number`, va `push`/`map` kabi method signature type'lari. Specific element type kerak bo'lsa `T[number]` ishlatish kerak.
+- **Tuple — `ValueOf<[1, 2, 3]>`** — element type'lar `1 | 2 | 3`, `length` ning literal `3`, va array method signature type'lari (tuple `length` widening bo'lmaydi, `3` literal qoladi). Aniq element union uchun `T[number]` ishlatish kerak.
 
 ### Follow-up savollar
 
-1. **"`keyof T` da symbol key qanday chiqadi?"** — `keyof` symbol key larni ham qaytaradi: `string | number | symbol`. Filter qilish uchun `keyof T & string`.
-2. **"`as const` bo'lmagan object da `ValueOf` nima qaytaradi?"** — Literal type lar widening sodir bo'ladi: `{ a: 1; b: 2 }` → `{ a: number; b: number }`. Natijada `ValueOf` = `number`.
+1. **"`keyof T` da symbol key qanday chiqadi?"** — `keyof` symbol key'larni ham qaytaradi: `string | number | symbol`. Filter qilish uchun `keyof T & string`.
+2. **"`as const` bo'lmagan object'da `ValueOf` nima qaytaradi?"** — Literal type'lar widening sodir bo'ladi: `{ a: 1; b: 2 }` → `{ a: number; b: number }`. Natijada `ValueOf` = `number`.
 
 </details>
 
@@ -342,13 +342,13 @@ type ActionType = ValueOf<typeof Actions>;
 
 ### Qisqa javob
 
-TypeScript 4.5+ da recursive conditional type lar uchun tail-call optimization qo'shilgan. Agar recursive chaqiruv to'g'ridan-to'g'ri qaytarilsa (boshqa type operatsiya ichida o'ralmagan bo'lsa) — compiler stack depth ni oshirmasdan evaluate qiladi. Accumulator pattern bilan 1000+ depth gacha ishlaydi.
+TypeScript 4.5+ da recursive conditional type'lar uchun tail-call optimization qo'shilgan. Agar recursive chaqiruv to'g'ridan-to'g'ri qaytarilsa (boshqa type operatsiya ichida o'ralmagan bo'lsa) — compiler stack depth'ni oshirmasdan evaluate qiladi. Accumulator pattern bilan 1000+ depth'gacha ishlaydi.
 
 ### To'liq tushuntirish
 
 **Muammo:** Recursive conditional type har chaqiruvda compiler internal stack frame yaratadi. Standart limit ~50 daraja — bundan oshsa `Type instantiation is excessively deep and possibly infinite` error.
 
-**Tail-call optimization printsipi:** Agar recursive chaqiruv result type ni boshqa hech qanday operatsiyasiz qaytarsa, compiler stack frame ni qayta ishlatishi mumkin. Bu functional language compiler optimization ga o'xshash.
+**Tail-call optimization printsipi:** Agar recursive chaqiruv result type'ni boshqa hech qanday operatsiyasiz qaytarsa, compiler stack frame'ni qayta ishlatishi mumkin. Bu functional language compiler optimization'ga o'xshash.
 
 **Quyidagi recursive chaqiruv tail-call EMAS:**
 ```typescript
@@ -364,17 +364,17 @@ T extends [infer H, ...infer R]
   : Acc
 ```
 
-Farq: birinchi variantda recursive natija `[...X, H]` operatsiya ichida — compiler avval recursion ni resolve qilib, keyin spread qilishi kerak. Ikkinchi variantda esa recursion ning natijasi = function natijasi — wrap qilinmagan.
+Farq: birinchi variantda recursive natija `[...X, H]` operatsiya ichida — compiler avval recursion'ni resolve qilib, keyin spread qilishi kerak. Ikkinchi variantda esa recursion'ning natijasi = function natijasi — wrap qilinmagan.
 
 **Accumulator pattern qoidasi:**
-1. Recursive type ga additional parameter qo'shish (`Acc extends any[] = []`)
-2. Natijani har step da accumulator ga yig'ish
-3. Base case da accumulator ni qaytarish
+1. Recursive type'ga additional parameter qo'shish (`Acc extends any[] = []`)
+2. Natijani har step'da accumulator'ga yig'ish
+3. Base case'da accumulator'ni qaytarish
 
 ### Kod misol
 
 ```typescript
-// ❌ Non-tail-call — ~50 element da fail
+// ❌ Non-tail-call — ~50 element'da fail
 type BadReverse<T extends any[]> = T extends [infer H, ...infer R]
   ? [...BadReverse<R>, H]
   : [];
@@ -412,31 +412,31 @@ type S = SplitTail<"a.b.c.d", ".">; // ["a", "b", "c", "d"]
 ### Edge Cases
 
 - **Tail-call faqat conditional type uchun** — mapped type larda alohida optimization. Mapped type recursion (`{ [K in keyof T]: Recursive<T[K]> }`) doim "expensive".
-- **`infer` placement** — tail-call holatida ham `infer` evaluate qilinadi. Recursive call dan oldin barcha infer lar resolve bo'lishi kerak.
-- **`Type instantiation depth` vs `union member limit`** — tail-call faqat depth limit ni cheklab beradi. Katta union larda member count limit alohida (1000+ atrofi).
+- **`infer` placement** — tail-call holatida ham `infer` evaluate qilinadi. Recursive call'dan oldin barcha infer'lar resolve bo'lishi kerak.
+- **`Type instantiation depth` vs `union member limit`** — tail-call faqat tail-recursion depth'ni 1000 gacha cho'zadi. Katta union larda member count limit alohida (100_000 atrofi).
 
 ### Follow-up savollar
 
-1. **"Tail-call optimization compile-time da real-time tezlik beradi mi?"** — Asosan stack depth limit ni oshirish uchun. Tezlik o'sishi minimal — har step deyarli bir xil cost.
-2. **"`as` keyword bilan accumulator ga assertion qilish kerak mi?"** — Yo'q. Accumulator type i `extends any[]` constraint bilan generic — compiler o'zi infer qiladi.
+1. **"Tail-call optimization compile-time'da real-time tezlik beradi mi?"** — Asosan stack depth limit'ni oshirish uchun. Tezlik o'sishi minimal — har step deyarli bir xil cost.
+2. **"`as` keyword bilan accumulator'ga assertion qilish kerak mi?"** — Yo'q. Accumulator type'i `extends any[]` constraint bilan generic — compiler o'zi infer qiladi.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
 **TypeScript compiler internal mechanism:**
 
-Compiler conditional type ni evaluate qilganda **instantiation depth counter** yuritadi. Har conditional/recursive chaqiruvda counter oshadi. Limit (default 50) ga yetganda `Type instantiation is excessively deep` error.
+Compiler conditional type'ni evaluate qilganda **instantiation depth counter** yuritadi. Har conditional/recursive chaqiruvda counter oshadi. Limit (default 50) ga yetganda `Type instantiation is excessively deep` error.
 
 Tail-call holatida compiler shu logikani aniqlaydi:
-- Recursive type expression i = function output to'g'ridan-to'g'ri
+- Recursive type expression'i = function output to'g'ridan-to'g'ri
 - Yangi instantiation natijasi har holda **avvalgi** instantiation natijasiga teng
-- Stack frame ni qayta ishlatish mumkin
+- Stack frame'ni qayta ishlatish mumkin
 
 Bu PR'da implement qilingan: [microsoft/TypeScript#45711](https://github.com/microsoft/TypeScript/pull/45711) (TS 4.5).
 
-**Limit oshirilishi:** `--noStrictGenericChecks` yoki internal compiler flag lar bilan limit ni o'zgartirib bo'lmaydi. Yagona yo'l — accumulator pattern.
+**Limit oshirilishi:** `--noStrictGenericChecks` yoki internal compiler flag'lar bilan limit'ni o'zgartirib bo'lmaydi. Yagona yo'l — accumulator pattern.
 
-**Real performance impact:** Tail-call optimization bilan ham 5000+ element tuple lar real-world TypeScript loyihada amalga oshmaydi — type system general-purpose computation uchun emas. Pragmatik chegara: 100-500 element atrofida.
+**Real performance impact:** Tail-call optimization bilan ham 5000+ element tuple'lar real-world TypeScript loyihada amalga oshmaydi — type system general-purpose computation uchun emas. Pragmatik chegara: 100-500 element atrofida.
 
 </details>
 
@@ -451,11 +451,11 @@ Bu PR'da implement qilingan: [microsoft/TypeScript#45711](https://github.com/mic
 
 ### Qisqa javob
 
-Branded types — TypeScript structural typing sistemasiga "nominal-like" semantika qo'shadigan pattern. Base type ga compile-time only phantom property qo'shish orqali type larga unique identity beradi.
+Branded types — TypeScript structural typing sistemasiga "nominal-like" semantika qo'shadigan pattern. Base type'ga compile-time only phantom property qo'shish orqali type'larga unique identity beradi.
 
 ### To'liq tushuntirish
 
-**Structural typing** — TypeScript ning default tizimi. Type lar shape (struktura) bo'yicha solishtiriladi:
+**Structural typing** — TypeScript'ning default tizimi. Type'lar shape (struktura) bo'yicha solishtiriladi:
 
 ```typescript
 type UserId = number;
@@ -465,20 +465,20 @@ const userId: UserId = 1;
 const postId: PostId = userId; // ✅ — TS struktura bo'yicha tekshiradi
 ```
 
-**Nominal typing** — type lar nom bo'yicha solishtiriladi. TypeScript da yo'q.
+**Nominal typing** — type'lar nom bo'yicha solishtiriladi. TypeScript'da yo'q.
 
-**Branded types pattern** — base type ga phantom property qo'shib unique identity yaratish:
+**Branded types pattern** — base type'ga phantom property qo'shib unique identity yaratish:
 
 ```typescript
 type Brand<T, B extends string> = T & { readonly __brand: B };
 ```
 
-Phantom property runtime da mavjud emas — faqat type system ko'radi. Ikki branded type bir-biriga assignable bo'lmaydi chunki ularning `__brand` qiymati har xil.
+Phantom property runtime'da mavjud emas — faqat type system ko'radi. Ikki branded type bir-biriga assignable bo'lmaydi chunki ularning `__brand` qiymati har xil.
 
 **Real-world ishlatish:**
-- **ID type larini ajratish** — `UserId`, `PostId`, `OrderId`
+- **ID type'larini ajratish** — `UserId`, `PostId`, `OrderId`
 - **Validated string** — `Email`, `URL`, `UUID` (validation o'tgan deb belgilash)
-- **Currency** — `USD`, `EUR` (arithmetic confusion ni oldini olish)
+- **Currency** — `USD`, `EUR` (arithmetic confusion'ni oldini olish)
 - **Unit-of-measure** — `Meters`, `Feet`
 
 ### Kod misol
@@ -516,15 +516,15 @@ getUser(42);      // ❌ — plain number assign bo'lmaydi
 
 ### Edge Cases
 
-- **Arithmetic da brand yo'qoladi** — `userId + 1` natijasi `number` (brand yo'q). `+` operator branded type ni saqlamaydi.
-- **JSON serialize/deserialize** — `JSON.parse` natijasi plain type. Deserialize da qayta validation kerak.
-- **`unique symbol` variant** — `declare const __brand: unique symbol` bilan brand collision oldini olish mumkin. Lekin code da kamroq ko'rinmas (developer experience).
-- **`as` assertion zarur** — branded type yaratish uchun `value as Brand<...>` shart, chunki runtime da phantom property yo'q. Shu yerda **constructor function** pattern ishlatiladi — validation + assertion bir joyda.
+- **Arithmetic'da brand yo'qoladi** — `userId + 1` natijasi `number` (brand yo'q). `+` operator branded type'ni saqlamaydi.
+- **JSON serialize/deserialize** — `JSON.parse` natijasi plain type. Deserialize'da qayta validation kerak.
+- **`unique symbol` variant** — `declare const __brand: unique symbol` bilan brand collision oldini olish mumkin. Lekin code'da kamroq ko'rinmas (developer experience).
+- **`as` assertion zarur** — branded type yaratish uchun `value as Brand<...>` shart, chunki runtime'da phantom property yo'q. Shu yerda **constructor function** pattern ishlatiladi — validation + assertion bir joyda.
 
 ### Follow-up savollar
 
 1. **"Branded type bilan inheritance ishlaydimi?"** — Strukturali. `Brand<number, "A"> extends Brand<number, "B">` — false, chunki `__brand` qiymati har xil. Lekin `Brand<number, "A">` `number` ga extends qiladi.
-2. **"Zod va branded types qanday integrate qilinadi?"** — Zod da built-in `.brand<T>()` method: `z.number().positive().brand<"UserId">()`. Runtime validation + compile-time branding birgalikda.
+2. **"Zod va branded types qanday integrate qilinadi?"** — Zod'da built-in `.brand<T>()` method: `z.number().positive().brand<"UserId">()`. Runtime validation + compile-time branding birgalikda.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
@@ -553,7 +553,7 @@ type ValidatedEmail = Email & { readonly __validated: true };
 type AdminEmail = Email & { readonly __admin: true };
 ```
 
-**Performance:** Branded types pure compile-time. Runtime da ortiqcha cost yo'q. Bundle size ga ta'sir yo'q (TypeScript JS ga compile bo'lganda brand property o'chadi).
+**Performance:** Branded types pure compile-time. Runtime'da ortiqcha cost yo'q. Bundle size'ga ta'sir yo'q (TypeScript JS'ga compile bo'lganda brand property o'chadi).
 
 </details>
 
@@ -568,7 +568,7 @@ type AdminEmail = Email & { readonly __admin: true };
 
 ### Qisqa javob
 
-`PathKeys<T>` — nested object ning barcha mumkin bo'lgan dotted path key larini union type sifatida qaytaradi. `PathValue<T, P>` — berilgan path bo'yicha aniq value type ni qaytaradi. Ikkalasi birgalikda type-safe `get`/`set` funksiya yaratish imkonini beradi.
+`PathKeys<T>` — nested object'ning barcha mumkin bo'lgan dotted path key'larini union type sifatida qaytaradi. `PathValue<T, P>` — berilgan path bo'yicha aniq value type'ni qaytaradi. Ikkalasi birgalikda type-safe `get`/`set` funksiya yaratish imkonini beradi.
 
 ### To'liq tushuntirish
 
@@ -588,9 +588,9 @@ type PathKeys<T> = T extends object
 1. Mapped type `{ [K in keyof T & string]: ... }` — har key uchun string path generate qiladi
 2. Agar `T[K]` object bo'lsa — `K` (faqat key) **yoki** `${K}.${PathKeys<T[K]>}` (key + recursive path)
 3. Agar `T[K]` primitive bo'lsa — faqat `K`
-4. `[keyof T & string]` — index access bilan mapped type ni union ga aylantiradi
+4. `[keyof T & string]` — index access bilan mapped type'ni union'ga aylantiradi
 
-**`PathValue<T, P>`** — template literal pattern matching bilan path ni split qilib walk down:
+**`PathValue<T, P>`** — template literal pattern matching bilan path'ni split qilib walk down:
 
 ```typescript
 type PathValue<T, P extends string> = P extends `${infer First}.${infer Rest}`
@@ -605,7 +605,7 @@ type PathValue<T, P extends string> = P extends `${infer First}.${infer Rest}`
 **Real-world ishlatish:**
 - **React Hook Form** — `register("user.address.city")` type-safe
 - **Lodash `_.get`** — type-safe natija
-- **Form library lar** — nested field validation
+- **Form library'lar** — nested field validation
 - **i18n** — translation key paths
 
 ### Kod misol
@@ -671,12 +671,12 @@ const currency = get(config, "payment.currency");   // "USD" | "EUR" | "UZS" ✅
 
 - **Circular reference** — `interface Tree { children: Tree[] }` da depth limit yo'q bo'lsa cheksiz recursion. **Depth limit majburiy** (tuple counter pattern).
 - **Array element access** — `PathKeys` da array indeks (`users.0.name`) handle qilinmaydi. Specific implementation kerak.
-- **Symbol/number key lar** — `keyof T & string` bilan filter qilinadi, aks holda template literal type da xato.
-- **Optional property** — `address?: { city: string }` — `PathKeys` da `address.city` bor, lekin runtime da `undefined` bo'lishi mumkin. Type system buni signalizatsiya qilmaydi.
+- **Symbol/number key'lar** — `keyof T & string` bilan filter qilinadi, aks holda template literal type'da xato.
+- **Optional property** — `address?: { city: string }` — `PathKeys` da `address.city` bor, lekin runtime'da `undefined` bo'lishi mumkin. Type system buni signal qilmaydi.
 
 ### Follow-up savollar
 
-1. **"`PathValue` chuqur path da `never` qaytarsa nima?"** — Path noto'g'ri. `get` funksiya signature `P extends PathKeys<T>` constraint bilan invalid path ni compile-time da to'sadi.
+1. **"`PathValue` chuqur path'da `never` qaytarsa nima?"** — Path noto'g'ri. `get` funksiya signature `P extends PathKeys<T>` constraint bilan invalid path'ni compile-time'da to'sadi.
 2. **"Array indeks bilan path qanday qilinadi?"** — `users.${number}.name` template literal. Implementation murakkab: `T extends Array<infer U> ? \`${number}.${PathKeys<U>}\` : ...`.
 
 <details>
@@ -684,14 +684,14 @@ const currency = get(config, "payment.currency");   // "USD" | "EUR" | "UZS" ✅
 
 **Performance ogohlantirish:**
 
-`PathKeys` har recursion level da ko'p type instantiation yaratadi:
+`PathKeys` har recursion level'da ko'p type instantiation yaratadi:
 - 1 level: O(keys)
 - 2 level: O(keys × nested_keys)
 - 3 level: O(keys × nested × nested²)
 
 5-6 level chuqur nested type uchun compiler sezilarli sekinlashadi. Depth limit (4-5) majburiy.
 
-**Compiler tracing:** `tsc --generateTrace traceDir` bilan profile qilish mumkin. Type instantiation count ni ko'rsatadi.
+**Compiler tracing:** `tsc --generateTrace traceDir` bilan profile qilish mumkin. Type instantiation count'ni ko'rsatadi.
 
 **Cache-friendly variant:**
 
@@ -728,11 +728,11 @@ Path + value type kombinatsiyasi bilan immutable update funksiya yaratish mumkin
 
 ### Qisqa javob
 
-`Mutable<T>` — `Readonly<T>` ning teskari operatsiyasi. `-readonly` modifier mapped type da readonly modifier ni olib tashlaydi. TypeScript da built-in `Mutable` yo'q — custom yozish kerak.
+`Mutable<T>` — `Readonly<T>` ning teskari operatsiyasi. `-readonly` modifier mapped type'da readonly modifier'ni olib tashlaydi. TypeScript'da built-in `Mutable` yo'q — custom yozish kerak.
 
 ### To'liq tushuntirish
 
-**Mapped type modifier lar:**
+**Mapped type modifier'lar:**
 
 | Modifier | Ma'no |
 |----------|-------|
@@ -741,7 +741,7 @@ Path + value type kombinatsiyasi bilan immutable update funksiya yaratish mumkin
 | `?` | Optional qo'shish |
 | `-?` | Optional olib tashlash |
 
-**`Mutable<T>` implementatsiyasi:**
+**`Mutable<T>` implementation'i:**
 
 ```typescript
 type Mutable<T> = {
@@ -749,7 +749,7 @@ type Mutable<T> = {
 };
 ```
 
-`-readonly` — explicit removal. Hech qanday modifier yozmaslik (`[K in keyof T]: T[K]`) — original modifier larni saqlaydi (readonly bo'lsa, readonly qoladi).
+`-readonly` — explicit removal. Hech qanday modifier yozmaslik (`[K in keyof T]: T[K]`) — original modifier'larni saqlaydi (readonly bo'lsa, readonly qoladi).
 
 **Deep variant:**
 
@@ -812,7 +812,7 @@ type FullMutable = DeepMutable<ReadonlyConfig>;
 //   };
 // }
 
-// `as const` object dan mutable yaratish
+// `as const` object'dan mutable yaratish
 const frozenConfig = {
   host: "localhost",
   features: ["auth", "cache"],
@@ -833,15 +833,15 @@ type WritableConfig = DeepMutable<FrozenType>;
 
 ### Edge Cases
 
-- **Literal type saqlanadi** — `Mutable` faqat modifier ni olib tashlaydi, literal type ni widen qilmaydi: `readonly host: "localhost"` → `host: "localhost"` (`string` emas).
+- **Literal type saqlanadi** — `Mutable` faqat modifier'ni olib tashlaydi, literal type'ni widen qilmaydi: `readonly host: "localhost"` → `host: "localhost"` (`string` emas).
 - **`ReadonlyMap`/`ReadonlySet`** — alohida special case kerak: `T extends ReadonlyMap<infer K, infer V> ? Map<K, V> : ...`
 - **Index signature** — `readonly [key: string]: T` da `-readonly` ishlaydi: `[key: string]: T`.
-- **Inherited readonly** — `readonly` `class` member dan kelgan bo'lsa, mapped type chiroyli olib tashlaydi.
+- **Inherited readonly** — `readonly` `class` member'dan kelgan bo'lsa, mapped type chiroyli olib tashlaydi.
 
 ### Follow-up savollar
 
 1. **"`Mutable` va `Required` ni birga ishlatish mumkin?"** — Ha: `type MutableRequired<T> = { -readonly [K in keyof T]-?: T[K] }`.
-2. **"`-readonly` o'rniga shunchaki `[K in keyof T]: T[K]` yozsam-chi?"** — Original modifier saqlanadi. Modifier hech qaysisi yozilmasa (homomorphic mapped type) — input dan inherit qiladi. Explicit `-readonly` yozish kerak.
+2. **"`-readonly` o'rniga shunchaki `[K in keyof T]: T[K]` yozsam-chi?"** — Original modifier saqlanadi. Modifier hech qaysisi yozilmasa (homomorphic mapped type) — input'dan inherit qiladi. Explicit `-readonly` yozish kerak.
 
 </details>
 
@@ -854,11 +854,11 @@ type WritableConfig = DeepMutable<FrozenType>;
 
 ### Qisqa javob
 
-`Required<T>` `-?` modifier bilan optional marker (`?`) ni olib tashlaydi, lekin union dagi `| undefined` ni olib tashlamaydi. To'liq strict required uchun `NonNullable<T[K]>` bilan birga ishlatish kerak.
+`Required<T>` `-?` modifier bilan optional marker (`?`) ni olib tashlaydi, lekin union'dagi `| undefined` ni olib tashlamaydi. To'liq strict required uchun `NonNullable<T[K]>` bilan birga ishlatish kerak.
 
 ### To'liq tushuntirish
 
-TypeScript da property ikki yo'l bilan "undefined" bo'lishi mumkin:
+TypeScript'da property ikki yo'l bilan "undefined" bo'lishi mumkin:
 
 1. **Optional marker** — `name?: string` — property ixtiyoriy
 2. **Union with undefined** — `name: string | undefined` — property doim mavjud, lekin qiymati `undefined` bo'lishi mumkin
@@ -877,14 +877,14 @@ const u3: User = { name: "a", email: "b" }; // ✅
 const u4: User = { name: "a" };             // ❌ — email kerak (mavjud bo'lishi shart)
 ```
 
-**`Required<T>` faqat optional marker ni olib tashlaydi:**
+**`Required<T>` faqat optional marker'ni olib tashlaydi:**
 
 ```typescript
 type Required<T> = { [K in keyof T]-?: T[K] };
 //                                 ^^ — optional marker remove
 ```
 
-`-?` faqat `?` ni o'chiradi. Agar value type da `| undefined` bo'lsa — qoladi:
+`-?` faqat `?` ni o'chiradi. Agar value type'da `| undefined` bo'lsa — qoladi:
 
 ```typescript
 type R = Required<User>;
@@ -902,7 +902,7 @@ type StrictRequired<T> = {
 };
 ```
 
-`NonNullable<T[K]>` union dan `null` va `undefined` ni olib tashlaydi.
+`NonNullable<T[K]>` union'dan `null` va `undefined` ni olib tashlaydi.
 
 ### Kod misol
 
@@ -964,7 +964,7 @@ type FullConfig = DeepStrictRequired<Config>;
 ### Follow-up savollar
 
 1. **"`exactOptionalPropertyTypes` bilan ish o'zgaradimi?"** — Ha, juda muhim. Bu flag bilan `name?: string` ga `undefined` assign qilish ham error — property mavjud bo'lmasligi yoki string bo'lishi kerak.
-2. **"`{ [K in keyof T]: NonNullable<T[K]> }` `-?` siz ishlaydi mi?"** — Faqat value type ni clean qiladi. Optional marker qoladi: `name?: NonNullable<string>` = `name?: string`. To'liq strict uchun ikkalasi kerak.
+2. **"`{ [K in keyof T]: NonNullable<T[K]> }` `-?` siz ishlaydi mi?"** — Faqat value type'ni clean qiladi. Optional marker qoladi: `name?: NonNullable<string>` = `name?: string`. To'liq strict uchun ikkalasi kerak.
 
 </details>
 
@@ -977,7 +977,7 @@ type FullConfig = DeepStrictRequired<Config>;
 
 ### Qisqa javob
 
-Type-level programming — TypeScript type system ichida hisob-kitob bajarish. Recursive conditional types va template literal types bilan tuple manipulation, string parsing, type-level arithmetic, hatto state machine qurish mumkin. TypeScript type system Turing-complete deb e'tirof etilgan (community researcher lar).
+Type-level programming — TypeScript type system ichida hisob-kitob bajarish. Recursive conditional types va template literal types bilan tuple manipulation, string parsing, type-level arithmetic, hatto state machine qurish mumkin. TypeScript type system Turing-complete deb e'tirof etilgan (community researcher'lar).
 
 ### To'liq tushuntirish
 
@@ -995,7 +995,7 @@ Type-level programming — TypeScript type system ichida hisob-kitob bajarish. R
 - **`infer` keyword** — sub-type ajratib olish
 - **Mapped types** — type transformation
 
-**Turing-completeness:** TypeScript type system Turing-complete ekanligi proof beriladi — Rule 110 cellular automaton type-level da implement qilingan ([github.com/microsoft/TypeScript/issues/14833](https://github.com/microsoft/TypeScript/issues/14833)). Lekin amaliy ahamiyat cheklangan — compiler instantiation limit lari general computation ga to'sqinlik qiladi.
+**Turing-completeness:** TypeScript type system Turing-complete ekanligi proof beriladi — Rule 110 cellular automaton type-level'da implement qilingan ([github.com/microsoft/TypeScript/issues/14833](https://github.com/microsoft/TypeScript/issues/14833)). Lekin amaliy ahamiyat cheklangan — compiler instantiation limit'lari general computation'ga to'sqinlik qiladi.
 
 **Amaliy ishlatish:**
 - **Library API ergonomic** — fluent builder, type-safe query builder
@@ -1090,15 +1090,15 @@ transition("idle", "success");    // ❌ — never (idle → success ruxsat etil
 
 ### Edge Cases
 
-- **Instantiation limit** — TypeScript ichki limit ~5000 type instantiation per evaluation. Katta tuple yoki chuqur recursion bunga yetishi mumkin.
-- **Union member limit** — ~10000 atrof. Distributive conditional bilan katta union lar tezda yetiladi.
-- **Compile time impact** — chuqur type-level computation IDE response ni sekinlashtiradi.
+- **Instantiation count limit** — bitta type evaluation jarayonida instantiation soni `instantiationCount` 5_000_000 ga yetganda compiler to'xtaydi. Katta tuple yoki chuqur recursion bunga yetishi mumkin.
+- **Union member limit** — bir union 100_000 member'dan oshsa `Expression produces a union type that is too complex to represent` error. Distributive conditional bilan katta union'lar tezda yetiladi.
+- **Compile time impact** — chuqur type-level computation IDE response'ni sekinlashtiradi.
 - **Generic recursion** — `T extends Foo<T>` typically infinite. Depth limit bilan oldini olish kerak.
 
 ### Follow-up savollar
 
-1. **"Type-level fizz-buzz ishlaydi mi?"** — Ha — `Mod`, `IsZero`, `IfElse` type lar bilan implement qilish mumkin. Lekin praktik emas.
-2. **"Type-level computation runtime ga ta'sir qiladimi?"** — Yo'q. Pure compile-time. Runtime cost — 0. Lekin compile time va developer experience ga ta'sir qiladi.
+1. **"Type-level fizz-buzz ishlaydi mi?"** — Ha — `Mod`, `IsZero`, `IfElse` type'lar bilan implement qilish mumkin. Lekin praktik emas.
+2. **"Type-level computation runtime'ga ta'sir qiladimi?"** — Yo'q. Pure compile-time. Runtime cost — 0. Lekin compile time va developer experience'ga ta'sir qiladi.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
@@ -1115,12 +1115,12 @@ TypeScript type system **structural type checker** + **declarative type calculat
 - **O(n^d)** — recursive conditional with depth d
 - **Exponential** — nested distributive conditional (avoid)
 
-**Limit bypass technique lar:**
+**Limit bypass technique'lar:**
 
 1. **Accumulator pattern** — tail-call optimization aktivlashtirish
 2. **Helper type alias** — instantiation cache
 3. **`extends infer R extends X`** — TS 4.7+ constraint with infer
-4. **`@ts-ignore-error`** — error ni o'chirish (bypass emas)
+4. **`@ts-expect-error`** — error'ni suppress qilish (limit bypass emas, faqat diagnostic'ni yashirish)
 
 **Production library examples:**
 - **Drizzle ORM** — SQL builder fully type-safe
@@ -1129,7 +1129,7 @@ TypeScript type system **structural type checker** + **declarative type calculat
 - **Zod** — schema parser with type inference
 
 **O'qish manbai:**
-- [type-challenges](https://github.com/type-challenges/type-challenges) — type-level puzzle lar
+- [type-challenges](https://github.com/type-challenges/type-challenges) — type-level puzzle'lar
 - [TypeScript-deep-dive](https://basarat.gitbook.io/typescript/)
 
 </details>
@@ -1183,9 +1183,9 @@ A — ❌ Error. user.name readonly — assignment mumkin emas
 B — ❌ Error. scores ReadonlyArray<number> — push method yo'q
     "Property 'push' does not exist on type 'readonly number[]'"
 
-C — ✅ OK. ReadonlyArray dan index access (read) ruxsat etilgan
+C — ✅ OK. ReadonlyArray'dan index access (read) ruxsat etilgan
 
-D — ✅ OK. readonly faqat write ni taqiqlaydi, read har doim ruxsat
+D — ✅ OK. readonly faqat write'ni taqiqlaydi, read har doim ruxsat
 
 E — ❌ Error. state.user ham readonly (top-level)
     "Cannot assign to 'user' because it is a read-only property"
@@ -1193,19 +1193,19 @@ E — ❌ Error. state.user ham readonly (top-level)
 
 **Mexanizm:**
 
-`DeepReadonly` har object level ga `readonly` modifier qo'shadi. `Array<infer U>` ni `ReadonlyArray<DeepReadonly<U>>` ga aylantiradi.
+`DeepReadonly` har object level'ga `readonly` modifier qo'shadi. `Array<infer U>` ni `ReadonlyArray<DeepReadonly<U>>` ga aylantiradi.
 
 `ReadonlyArray<T>` farqi:
-- **Mutating method lar yo'q** — `push`, `pop`, `shift`, `unshift`, `splice`, `sort`, `reverse`
-- **Non-mutating method lar mavjud** — `map`, `filter`, `reduce`, `find`, `forEach`, `slice`
+- **Mutating method'lar yo'q** — `push`, `pop`, `shift`, `unshift`, `splice`, `sort`, `reverse`
+- **Non-mutating method'lar mavjud** — `map`, `filter`, `reduce`, `find`, `forEach`, `slice`
 - **Index access — read only** — `arr[0]` ✅, `arr[0] = x` ❌
 
-Runtime da `ReadonlyArray` va `Array` bir xil — farq faqat compile-time.
+Runtime'da `ReadonlyArray` va `Array` bir xil — farq faqat compile-time.
 
 ### Edge Cases
 
-- **Object spread** — `{ ...state.user }` natijasi mutable shallow copy. DeepReadonly ni bypass qilish usul.
-- **Type assertion** — `(state as AppState).user.name = "x"` — TS error ni o'chiradi, lekin runtime da hali ham native object (mutable).
+- **Object spread** — `{ ...state.user }` natijasi mutable shallow copy. DeepReadonly'ni bypass qilish usul.
+- **Type assertion** — `(state as AppState).user.name = "x"` — TS error'ni o'chiradi, lekin runtime'da hali ham native object (mutable).
 - **`Object.freeze` runtime equivalent** — Compile-time `DeepReadonly` runtime'da `Object.freeze` bilan birga ishlatish to'liq immutability beradi.
 
 </details>
@@ -1238,29 +1238,33 @@ const e: PartialEvent = {
 
 ### Qisqa javob
 
-`occurredAt` field type i `NaiveDeepPartial<Date>` bo'ladi — Date ning hamma method lari optional. `e.occurredAt` aniq `Date` object emas — ixtiyoriy method lar bilan object.
+`occurredAt` field type'i `NaiveDeepPartial<Date>` bo'ladi. `Date` ning har method'i — function, function `object` ga extends qiladi, shuning uchun har biri `NaiveDeepPartial<() => X>` = `{}` ga collapse bo'ladi. Natija — barcha key'lari optional `{}` bo'lgan broken object, `Date` emas.
 
 ### To'liq tushuntirish
 
-`Date` ham `object` ga extends qiladi. Naive `DeepPartial` Date method larini ham mapped type orqali optional qiladi:
+`Date` ham `object` ga extends qiladi. Naive `DeepPartial` `keyof Date` (method nomlari) bo'yicha map qiladi. Har method type `() => X` — `T[K] extends object` true → recursion:
 
 ```typescript
 type PartialDate = NaiveDeepPartial<Date>;
+// keyof Date = "getTime" | "toISOString" | "getFullYear" | ...
+// Har key uchun: T[K] = (...) => X, function `object` ga extends qiladi → recursion:
+//   NaiveDeepPartial<() => number> = { [K in keyof (()=>number)]?: ... }
+//   keyof (function type) = never → {} (bo'sh object)
+// Natija:
 // {
-//   getTime?(): number;
-//   toISOString?(): string;
-//   toJSON?(): string;
-//   getFullYear?(): number;
-//   // ... barcha Date method lari optional!
+//   getTime?: {};
+//   toISOString?: {};
+//   getFullYear?: {};
+//   // ... barcha Date method'lari {} ga aylandi — chaqirib bo'lmaydi
 //   // Bu broken — Date type kabi ishlamaydi
 // }
 ```
 
 **Natija:**
 - `occurredAt: Date` bo'lishi kerak edi
-- Naive `DeepPartial` esa `occurredAt?: { getTime?(): number; ... }` qildi
-- `{ getTime: () => 0 }` literal object ham assign bo'ladi (TS error chiqarmaydi!)
-- Runtime da `e.occurredAt.toISOString()` — `undefined is not a function`
+- Naive `DeepPartial` esa `occurredAt?: { getTime?: {}; toISOString?: {}; ... }` qildi
+- `{ getTime: () => 0 }` literal object ham assign bo'ladi: `getTime` `{}` kutadi, `() => 0` esa `{}` ga assignable (TS error chiqarmaydi!)
+- Runtime'da `e.occurredAt.toISOString()` — `toISOString` mavjud emas → `undefined is not a function`
 
 **To'g'ri implementation `BuiltIn` check bilan:**
 
@@ -1282,7 +1286,7 @@ type SafeEvent = DeepPartial<Event>;
 
 ### Edge Cases
 
-- **`Record<string, unknown>`** — bu plain object. `DeepPartial` recursion ga kiradi — `Record<string, unknown>` ga `Record<string, NaiveDeepPartial<unknown>>` bo'ladi.
+- **`Record<string, unknown>`** — bu plain object. `DeepPartial` recursion'ga kiradi — `Record<string, unknown>` ga `Record<string, NaiveDeepPartial<unknown>>` bo'ladi.
 - **Generic class** — agar `class Wrapper<T> { value: T }` bo'lsa, `DeepPartial<Wrapper<X>>` ichki implementation logikasini transform qiladi — odatda kutilmagan natija.
 - **`object` constraint** — `T extends object` `function` ham match qiladi. Function ham alohida case kerak.
 
@@ -1301,7 +1305,7 @@ interface User {
 }
 
 type R = Required<User>;
-// R type i nima?
+// R type'i nima?
 
 const u: R = { name: "Ali", email: undefined };
 // Compile bo'ladimi?
@@ -1323,7 +1327,7 @@ Kod **compile bo'ladi**. `email: undefined` ruxsat etiladi.
 
 ### To'liq tushuntirish
 
-`Required<T>` `-?` modifier ni qo'llaydi:
+`Required<T>` `-?` modifier'ni qo'llaydi:
 
 ```typescript
 type Required<T> = { [K in keyof T]-?: T[K] };
@@ -1333,7 +1337,7 @@ type Required<T> = { [K in keyof T]-?: T[K] };
 - `name?: string` → `name: string` (marker o'chdi)
 - `email: string | undefined` → `email: string | undefined` (marker yo'q edi)
 
-**`Required` `| undefined` ni union dan olib tashlamaydi.** Bu ko'p hollarda kutilmagan xatti-harakat.
+**`Required` `| undefined` ni union'dan olib tashlamaydi.** Bu ko'p hollarda kutilmagan xatti-harakat.
 
 ```typescript
 const u: R = { name: "Ali", email: undefined }; // ✅ — email | undefined qabul qiladi
@@ -1363,7 +1367,7 @@ const u2: SR = { name: "Ali", email: undefined }; // ❌ Error
 
 ### Savol 14: Tail-call vs Non-tail-call [Senior]
 
-**Savol:** Ikki `Reverse` implementatsiyasini taqqoslang:
+**Savol:** Ikki `Reverse` implementation ini taqqoslang:
 
 ```typescript
 type ReverseA<T extends any[]> = T extends [infer H, ...infer R]
@@ -1382,7 +1386,7 @@ type ReverseB<T extends any[], Acc extends any[] = []> = T extends [infer H, ...
 
 ### Qisqa javob
 
-`ReverseA` — non-tail-call. ~50 element gacha. `ReverseB` — tail-call. ~1000 element gacha.
+`ReverseA` — non-tail-call. ~50 element'gacha. `ReverseB` — tail-call. ~1000 element'gacha.
 
 ### To'liq tushuntirish
 
@@ -1404,7 +1408,7 @@ T extends [infer H, ...infer R]
   : Acc
 ```
 
-`ReverseB<R, ...>` natija — function natijasi. Hech qanday wrapping yo'q. Compiler stack frame ni qayta ishlatadi. Limit ~1000 atrofi.
+`ReverseB<R, ...>` natija — function natijasi. Hech qanday wrapping yo'q. Compiler stack frame'ni qayta ishlatadi. Limit ~1000 atrofi.
 
 **100 element uchun natija:**
 - `ReverseA<[1, 2, ..., 100]>` — ❌ `Type instantiation is excessively deep and possibly infinite`
@@ -1420,12 +1424,12 @@ ReverseB<[1,2,3], []>
         → [3,2,1]
 ```
 
-Har step da yangi tuple yaratiladi, ammo stack depth oshmaydi — har recursive call avvalgi call ning natijasi.
+Har step'da yangi tuple yaratiladi, ammo stack depth oshmaydi — har recursive call avvalgi call'ning natijasi.
 
 ### Edge Cases
 
 - **Tail-call optimization faqat conditional type uchun** — mapped type recursion (`{ [K in keyof T]: Rec<T[K]> }`) har doim "expensive".
-- **`as`-cast** — `as Recursive<X>` tail-call ni buzadi. Yagona toza recursion kerak.
+- **`as`-cast** — `as Recursive<X>` tail-call'ni buzadi. Yagona toza recursion kerak.
 - **Multi-recursion** — `T extends [...]<Y, Recursive<X>>` natijasi har holda non-tail-call.
 
 <details>
@@ -1433,7 +1437,7 @@ Har step da yangi tuple yaratiladi, ammo stack depth oshmaydi — har recursive 
 
 **Compiler internal mexanizm:**
 
-TypeScript 4.5 da [PR #45711](https://github.com/microsoft/TypeScript/pull/45711) tail-call optimization'ni kiritdi. Kompilyator har conditional type'ni evaluate qilishda **instantiation depth counter** yuritadi. Limit (`typescript.compiler.maxInstantiationDepth`, default ~50) yetilganda `Type instantiation is excessively deep and possibly infinite` xato beriladi.
+TypeScript 4.5 da [PR #45711](https://github.com/microsoft/TypeScript/pull/45711) tail-call optimization'ni kiritdi. Compiler har conditional type'ni evaluate qilishda instantiation depth'ni hisoblaydi. Bu limit compiler ichida hardcoded constant — sozlanmaydi (`tsconfig` flag yo'q). Non-tail recursion depth 50 ga yetganda `Type instantiation is excessively deep and possibly infinite` xato beriladi.
 
 Compiler tail-call'ni quyidagi pattern bilan aniqlaydi:
 - Recursive call **eng tashqi qaytarish ifodasi** (return position)
@@ -1481,13 +1485,13 @@ Iterativ — har step bir xil frame.
 
 **Limit qiymatlari:**
 
-- Conditional instantiation: ~50 (non-tail-call), ~1000 (tail-call)
-- Union member: ~100 000 (TypeScript 5.x default)
-- Mapped type: alohida limit, ~5000 atrofi
+- Conditional recursion depth: 50 (non-tail-call), 1000 (tail-call recursion count)
+- Union member: 100_000 (bundan oshsa `union type that is too complex to represent`)
+- Instantiation count: bitta evaluation jarayonida 5_000_000 (`instantiationCount`)
 
 **Performance characteristic:**
 
-- Tail-call recursion: linear time, constant memory (compiler perspektivasidan)
+- Tail-call recursion: linear time, compiler tomonidan constant stack frame
 - Non-tail-call: linear time, linear memory + early bailout `excessively deep`
 
 </details>
@@ -1529,7 +1533,7 @@ type Paths = PathKeys<Order>;
 type Paths = "id" | "items" | "createdAt";
 ```
 
-`items` ichidagi path lar (`items.name`, `items.price`) **yo'q**, chunki array element access alohida implementation kerak.
+`items` ichidagi path'lar (`items.name`, `items.price`) **yo'q**, chunki array element access alohida implementation kerak.
 
 ### To'liq tushuntirish
 
@@ -1562,7 +1566,7 @@ type FullPaths = PathKeysWithArray<Order>;
 // | `items.${number}.price` | "createdAt"
 ```
 
-Lekin bu `${number}` ko'plab path generatsiya qiladi — practical emas. Real-world da array path lar uchun "wildcard" yoki "all elements" semantikasi ko'p ishlatiladi.
+Lekin bu `${number}` ko'plab path generate qiladi — practical emas. Real-world da array path'lar uchun "wildcard" yoki "all elements" semantikasi ko'p ishlatiladi.
 
 ### Edge Cases
 
@@ -1607,7 +1611,7 @@ type ArrayWildcard<T> = T extends Array<infer U>
 T extends [infer H extends string, ...infer R extends string[]]
 ```
 
-`infer H extends string` — `H` ni `string` ga constrain qiladi. Bu pattern tail-call optimization da accumulator type'ni narrow saqlash uchun ishlatiladi.
+`infer H extends string` — `H` ni `string` ga constrain qiladi. Bu pattern tail-call optimization'da accumulator type'ni narrow saqlash uchun ishlatiladi.
 
 </details>
 
@@ -1643,11 +1647,11 @@ u.name = "Vali";
 ### Qisqa javob
 
 ```
-u.id = 2;       ❌ Error — id type i 1 (literal)
-u.name = "Vali"; ❌ Error — name type i "Ali" (literal)
+u.id = 2;       ❌ Error — id type'i 1 (literal)
+u.name = "Vali"; ❌ Error — name type'i "Ali" (literal)
 ```
 
-`Mutable` faqat `readonly` modifier ni olib tashlaydi. Literal type larni widen qilmaydi.
+`Mutable` faqat `readonly` modifier'ni olib tashlaydi. Literal type'larni widen qilmaydi.
 
 ### To'liq tushuntirish
 
@@ -1672,9 +1676,9 @@ type MutUser = {
 }
 ```
 
-Mapped type identity `T[K]` qiymat type ni saqlaydi. Literal type widening avtomatik sodir bo'lmaydi.
+Mapped type identity `T[K]` qiymat type'ni saqlaydi. Literal type widening avtomatik sodir bo'lmaydi.
 
-**`u.id = 2`** — `id` type i `1` (literal). `2` literal `1` ga assignable emas — error.
+**`u.id = 2`** — `id` type'i `1` (literal). `2` literal `1` ga assignable emas — error.
 
 **Widening kerak bo'lsa — explicit:**
 
@@ -1697,7 +1701,7 @@ u2.name = "Vali"; // ✅
 ### Edge Cases
 
 - **`as const` recursive** — `readonly { x: readonly [1,2] }`. Shallow `Mutable` faqat top-level. `DeepMutable` kerak nested o'zgartirish uchun.
-- **Spread immutability** — `{ ...frozenUser }` shallow copy. Nested object lar reference orqali shared.
+- **Spread immutability** — `{ ...frozenUser }` shallow copy. Nested object'lar reference orqali shared.
 - **Discriminated union saqlansin** — agar `role: "admin"` widen bo'lib `string` ga aylansa, discriminated union sifatida ishlatib bo'lmaydi.
 
 </details>
@@ -1739,7 +1743,7 @@ type ConstValues = 200 | 201 | 404;     // literal union
 
 ### To'liq tushuntirish
 
-**`enum`** TypeScript da maxsus construct — runtime object + type. `typeof HttpStatusEnum` enum object'ning type i:
+**`enum`** TypeScript'da maxsus construct — runtime object + type. `typeof HttpStatusEnum` enum object'ning type'i:
 
 ```typescript
 typeof HttpStatusEnum
@@ -1752,7 +1756,7 @@ typeof HttpStatusEnum
 
 `ValueOf<typeof HttpStatusEnum>` = `HttpStatusEnum.OK | HttpStatusEnum.Created | HttpStatusEnum.NotFound` = `HttpStatusEnum`.
 
-Numeric enum member lar **bidirectional** — ham value (200), ham type (`HttpStatusEnum.OK`). Lekin enum branded — `200 as HttpStatusEnum` to'g'ridan-to'g'ri assignable.
+Numeric enum member har biri alohida literal type (`HttpStatusEnum.OK`), ularning union'i esa nominal `HttpStatusEnum` type. TypeScript numeric enum uchun maxsus qoida — har qanday numeric literal (`200`) cast'siz numeric enum type'ga assignable. String enum'da bu qoida yo'q.
 
 **`as const` object** — plain object literal type bilan:
 
@@ -1782,12 +1786,12 @@ function handleEnum(status: EnumValues): void {
 }
 
 handleEnum(HttpStatusEnum.OK); // ✅
-handleEnum(200);               // ✅ — numeric enum implicit conversion
+handleEnum(200);               // ✅ — numeric literal numeric enum'ga assignable (TS special-case)
 ```
 
 ### Edge Cases
 
-- **`const enum`** — compile-time inline. `typeof` ishlamaydi (compile-time da o'chadi).
+- **`const enum`** — compile-time inline, runtime object yo'q. Runtime'da enum object'ga murojaat qilib bo'lmaydi (`Object.values(ConstEnum)` xato), shuning uchun `ValueOf` pattern uchun yaroqsiz.
 - **String enum** — bidirectionality yo'q. `ValueOf<typeof StringEnum>` = string literal union.
 - **Mixed enum** — `enum X { A, B = "B" }` — har xil value type. `ValueOf` aralash union.
 
@@ -1799,7 +1803,7 @@ handleEnum(200);               // ✅ — numeric enum implicit conversion
 
 ### Savol 18: `Mutable<T>` va `DeepMutable<T>` yozing [Middle]
 
-**Savol:** Shallow va deep `Mutable` ni implement qiling. ReadonlyArray ni Array ga aylantiring.
+**Savol:** Shallow va deep `Mutable` ni implement qiling. ReadonlyArray'ni Array'ga aylantiring.
 
 ```typescript
 interface FrozenUser {
@@ -1879,14 +1883,14 @@ mutable.profile.bio = "Senior";   // ✅
 
 ### Edge Cases
 
-- **`ReadonlyArray` → `Array` shartmi?** — Optional. Agar developer faqat readonly modifier olib tashlamoqchi bo'lsa, array transformation ham qo'shilmaydi. Pragmatik amalda esa ko'pchilik DeepMutable da arrayni ham mutable qiladi.
+- **`ReadonlyArray` → `Array` shartmi?** — Optional. Agar developer faqat readonly modifier olib tashlamoqchi bo'lsa, array transformation ham qo'shilmaydi. Pragmatik amalda esa ko'pchilik DeepMutable'da arrayni ham mutable qiladi.
 - **`as const` literal saqlanadi** — `DeepMutable<{ readonly x: 1 }>` = `{ x: 1 }` (`x: number` emas). Widening alohida.
-- **Functions** — `T extends BuiltIn` ga `Function` qo'shilmagan — function type-level da har qanday object kabi. Special case kerak bo'lsa qo'shing.
+- **Functions** — `T extends BuiltIn` ga `Function` qo'shilmagan — function type-level'da har qanday object kabi. Special case kerak bo'lsa qo'shing.
 
 ### Follow-up savollar
 
-1. **"Tuple va array farqi `DeepMutable` da?"** — `readonly [1, 2, 3]` — tuple. `ReadonlyArray<infer U>` bilan tuple ham match qiladi. Element type lar widen bo'lmaydi.
-2. **"`Object.freeze` runtime ekvivalentini qanday yozish mumkin?"** — `DeepMutable` ning teskari `DeepReadonly`. Runtime da `Object.freeze` recursive — har property uchun.
+1. **"Tuple va array farqi `DeepMutable` da?"** — `readonly [1, 2, 3]` — tuple. `ReadonlyArray<infer U>` bilan tuple ham match qiladi. Element type'lar widen bo'lmaydi.
+2. **"`Object.freeze` runtime ekvivalentini qanday yozish mumkin?"** — `DeepMutable` ning teskari `DeepReadonly`. Runtime'da `Object.freeze` recursive — har property uchun.
 
 </details>
 
@@ -1933,7 +1937,7 @@ type DeepRequired<T> = T extends BuiltIn
 
 type Required1 = DeepRequired<Config>;
 // {
-//   db: { host: string; port: number | undefined };    ← port da undefined qoldi
+//   db: { host: string; port: number | undefined };    ← port'da undefined qoldi
 //   logging: { level: "info" | "error" | null };       ← null qoldi
 // }
 
@@ -1974,9 +1978,9 @@ u.profile.age.toFixed(0); // ✅ — type system kafolat beradi age mavjud va nu
 
 ### Edge Cases
 
-- **`exactOptionalPropertyTypes: true` bilan** — strict mode optional va undefined ni alohida ushlab turadi. `Required` bilan farq aniqroq.
+- **`exactOptionalPropertyTypes: true` bilan** — strict mode optional va undefined'ni alohida ushlab turadi. `Required` bilan farq aniqroq.
 - **Array element optional** — `(number | undefined)[]` da `DeepStrictRequired` `number[]` qiladi. Ehtimol kerak bo'lmagan transformation.
-- **Generic constraint** — agar `T extends string | undefined` bo'lsa, `NonNullable<T>` = `T extends string ? T : never`. Generic da har xil ishlaydi.
+- **Generic constraint** — agar `T extends string | undefined` bo'lsa, `NonNullable<T>` = `T extends string ? T : never`. Generic'da har xil ishlaydi.
 
 ### Follow-up savollar
 
@@ -2136,10 +2140,10 @@ const parsedId = UserIdSchema.parse(42); // ✅ — runtime validated + branded
 
 ### Edge Cases
 
-- **Arithmetic da brand yo'qoladi** — `UserId(1) + UserId(2)` natijasi `number` (brand yo'q). Bu mantiqiy — arithmetic identity beradi.
+- **Arithmetic'da brand yo'qoladi** — `UserId(1) + UserId(2)` natijasi `number` (brand yo'q). Bu mantiqiy — arithmetic identity beradi.
 - **JSON serialization** — `JSON.stringify(userId)` = `"42"`. `JSON.parse` natijasi plain — qayta validation kerak.
 - **`as`-cast bypass** — `42 as UserId` runtime validation siz. Yagona ishonchli yo'l — constructor function.
-- **Multi-brand** — `Brand<Brand<number, "A">, "B">` — chained brand. Compiler intersect qiladi, har ikki brand saqlanadi.
+- **Multi-brand** — `Brand<Brand<number, "A">, "B">` = `number & { __brand: "A" } & { __brand: "B" }` = `number & { __brand: "A" & "B" }` = `number & { __brand: never }`. Bir xil `__brand` key'da ikki brand saqlanmaydi — ular `never` ga collapse bo'ladi. Bir nechta brand kerak bo'lsa, har brand uchun alohida key kerak (`__brand` + `__validated`).
 
 ### Follow-up savollar
 
@@ -2168,7 +2172,7 @@ const a: A = ...;
 const b: B = a;  // ❌ — __brand: "X" "Y" ga assignable emas
 ```
 
-`isRelatedTo()` checker funktsiyasi structural diff topadi — `__brand` field type'lari farq qiladi, intersection mismatch.
+Compiler structural assignability check'da `__brand` field type'lari farq qilishini topadi (`"X"` `"Y"` ga assignable emas) — shu sabab `B` `A` ga assignable bo'lmaydi.
 
 **`unique symbol` afzalligi:**
 
@@ -2205,7 +2209,8 @@ Brand pure compile-time. Bundle size impact: 0 bytes. Runtime overhead: 0 ns.
 ```typescript
 type ValidatedEmail = Brand<string, "Email"> & Brand<string, "Validated">;
 // = string & { __brand: "Email" } & { __brand: "Validated" }
-// ❌ Collision: __brand "Email" ≠ "Validated"
+// = string & { __brand: "Email" & "Validated" } = string & { __brand: never }
+// ❌ Bir xil __brand key: "Email" & "Validated" = never — bu type'ga value yaratib bo'lmaydi
 ```
 
 Bir xil field nomi bilan multi-brand muammoli. Yechim — har brand uchun farqli field:
@@ -2284,11 +2289,11 @@ function set<T, P extends PathKeys<T> & string>(
   value: PathValue<T, P>,
 ): T {
   const keys = path.split(".");
-  const last = keys.pop()!;
+  const last = keys[keys.length - 1];
   const result = structuredClone(obj) as any;
   let target = result;
-  for (const key of keys) {
-    target = target[key];
+  for (let i = 0; i < keys.length - 1; i++) {
+    target = target[keys[i]];
   }
   target[last] = value;
   return result;
@@ -2335,7 +2340,7 @@ const updated = set(config, "database.port", 6432);
 
 ### Edge Cases
 
-- **Array element access** — `users.0.name` — bu implementatsiyada handle qilinmaydi. Specific path syntax kerak.
+- **Array element access** — `users.0.name` — bu implementation'da handle qilinmaydi. Specific path syntax kerak.
 - **Optional nested property** — `database?.host` da `database` undefined bo'lsa runtime error. `?.` operator yordamida safe access.
 - **Null prototype object** — `Object.create(null)` da hasOwnProperty yo'q. `acc?.[key]` ishlaydi (`?.` null check).
 - **Circular reference** — `TreeNode` kabi. Depth limit majburiy aks holda `Type instantiation is excessively deep`.
@@ -2343,7 +2348,7 @@ const updated = set(config, "database.port", 6432);
 ### Follow-up savollar
 
 1. **"`structuredClone` qo'llab-quvvatlamaslik holatda?"** — `structuredClone` Node 17+ va modern browser. Eski muhitda lodash `cloneDeep` yoki manual recursive clone.
-2. **"Optional path qanday support qilinadi?"** — `PathValue` ni recursive level da `| undefined` qo'shish kerak. Lekin compile-time da to'liq aniqlash qiyin.
+2. **"Optional path qanday support qilinadi?"** — `PathValue` ni recursive level'da `| undefined` qo'shish kerak. Lekin compile-time'da to'liq aniqlash qiyin.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
@@ -2379,7 +2384,7 @@ PathValue<CredentialsType, "username">
   ≡ string
 ```
 
-Har step template literal pattern matching + index access. Compiler ichida `tryInferTemplateLiteralType()` funksiyasi pattern'ni resolve qiladi.
+Har step template literal pattern matching + index access. Compiler `${infer First}.${infer Rest}` pattern'ni `infer` inference orqali resolve qiladi — string'ni birinchi `.` bo'yicha bo'ladi.
 
 **Immutable update — `structuredClone` cost:**
 
@@ -2407,7 +2412,7 @@ function set<T, P extends PathKeys<T> & string>(
 }
 ```
 
-Immer.js, Mutative shu yondashuv asosida — har level yangi reference, modifikatsiyalanmagan branch'lar shared.
+Immer.js, Mutative shu yondashuv asosida — har level yangi reference, o'zgartirilmagan branch'lar shared.
 
 **Type inference limit:**
 
@@ -2503,22 +2508,22 @@ type Rev = ReversePath<"a.b.c.d">; // "d.c.b.a"
 
 ### Edge Cases
 
-- **`Split<"", D>`** — bo'sh string. Base case: `S extends "" ? [] : [S]`. Bu implementatsiyada `S extends ""` check yo'q — natija `[""]` (bo'sh string single element).
+- **`Split<"", D>`** — bo'sh string. Base case: `S extends "" ? [] : [S]`. Bu implementation'da `S extends ""` check yo'q — natija `[""]` (bo'sh string single element).
 - **Multi-character delimiter** — `Split<"a..b", ".">` — natija `["a", "", "b"]` (bo'sh string element).
 - **`Join` empty array** — natija bo'sh string `""`.
 - **Generic constraint** — `T extends readonly [...]` `readonly` qo'shilishi tuple va `as const` array ikkalasini support qiladi.
 
 ### Follow-up savollar
 
-1. **"`Replace` qanday tail-call qilinadi?"** — Recursive: pattern topib replace qilish, qolgan string da takrorlash. Accumulator pattern bilan.
-2. **"Type-level `parseInt` qila olamiz?"** — Cheklangan. Recursive digit parsing template literal bilan, lekin large number lar uchun tuple length cheklov.
+1. **"`Replace` qanday tail-call qilinadi?"** — Recursive: pattern topib replace qilish, qolgan string'da takrorlash. Accumulator pattern bilan.
+2. **"Type-level `parseInt` qila olamiz?"** — Cheklangan. Recursive digit parsing template literal bilan, lekin large number'lar uchun tuple length cheklov.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
 **Template literal pattern matching internals:**
 
-TypeScript 4.1'da template literal types kiritildi. Compiler ichida `tryInferTemplateLiteralType()` funksiyasi pattern'larni resolve qiladi. Algoritm:
+TypeScript 4.1'da template literal types kiritildi. Compiler `${infer A}.${infer B}` kabi pattern'larni `infer` inference orqali resolve qiladi. Algoritm:
 
 1. Pattern segmentlarini ajratish (`${infer A}.${infer B}` → 3 segment)
 2. Input string'ni segment delimiter'lar bilan parse qilish
@@ -2555,7 +2560,7 @@ type Add<A extends number, B extends number> = [
 ]["length"];
 ```
 
-Limit: tuple length ~5000 (V8 array limit type-level'da). Bu cheklov compiler instantiation limit'i emas — runtime'da `T extends any[]` constraint'ga bog'liq.
+Limit: TypeScript spread normalization orqali yaratiladigan tuple uzunligi 10_000 element bilan cheklangan (bundan oshsa `Tuple type ... has a length that is too large to represent`). Amalda esa `BuildTuple<N>` tail-call recursion limit (1000) ga undan oldin yetadi.
 
 `Subtract`, `Multiply`, `Divide` — har biri tuple manipulation'ga aylanadi:
 
@@ -2587,7 +2592,7 @@ type CamelToKebab<S extends string> = S extends `${infer H}${infer T}`
   : S;
 ```
 
-Char-by-char iteration — `O(n)` template instantiation. `Uppercase<H>` va `Lowercase<H>` intrinsic types — kompilyator ichida implement qilingan (`mappedTypeIntrinsicNames` map).
+Char-by-char iteration — `O(n)` template instantiation. `Uppercase<H>`, `Lowercase<H>`, `Capitalize`, `Uncapitalize` — intrinsic string-manipulation types: ularning `lib.es5.d.ts` da definition'i `intrinsic` keyword bilan (`type Uppercase<S extends string> = intrinsic`), o'zgartirish compiler ichida bajariladi.
 
 **Type challenges va real-world:**
 
@@ -2636,19 +2641,26 @@ state.handler();                 // ❓
 
 ### Qisqa javob
 
-**3 ta bug:** Date, Function, Array special case yo'q. Date method lari readonly bo'lib qoladi, Function ham transform bo'ladi, Array `ReadonlyArray` ga aylanadi lekin element ham readonly bo'lmaydi.
+**2 ta bug:** `Date` va `Function` uchun special case yo'q. `Date` ning method property'lari (`getTime`, `toISOString`, ...) — har biri function, function `object` ga extends qiladi, shuning uchun `DeepReadonly<() => number>` = `{}` ga collapse bo'ladi — Date method'lari chaqirilmaydigan `{}` bo'lib qoladi. `handler: () => void` ham `{}` ga aylanadi. `tags: string[]` esa to'g'ri ishlaydi — homomorphic mapped type array structure'ni saqlaydi.
 
 ### To'liq tushuntirish
 
-**Bug 1 — Date:**
+Buggy `DeepReadonly<T>` — pure homomorphic mapped type (`{ readonly [K in keyof T]: ... }`, `as` clause yo'q). Element type `object` bo'lsa recursion'ga kiradi.
+
+**Bug 1 — Date (method'lari `{}` ga collapse):**
 
 ```typescript
 state.user.createdAt
 // type: DeepReadonly<Date>
-// = { readonly getTime: () => number; readonly toISOString: () => string; ... }
-// Method type lar readonly bo'ldi — semantik xato, lekin runtime ishlaydi
+// keyof Date = "getTime" | "toISOString" | "getFullYear" | ... (method nomlari)
+// Har method T[K] = (...) => X — function `object` ga extends qiladi → recursion:
+//   DeepReadonly<() => number> → { readonly [K in keyof (()=>number)]: ... }
+//   keyof (function type) = never → never key li mapped type = {} (bo'sh object)
+// Natija: { readonly getTime: {}; readonly toISOString: {}; ... }
 
-state.user.createdAt.getTime(); // ✅ ishlaydi, lekin type sifat past
+state.user.createdAt.getTime();
+// ❌ Error — getTime endi {}, chaqirib bo'lmaydi
+// "This expression is not callable. Type '{}' has no call signatures."
 ```
 
 **Bug 2 — Function:**
@@ -2656,22 +2668,26 @@ state.user.createdAt.getTime(); // ✅ ishlaydi, lekin type sifat past
 ```typescript
 state.handler
 // type: DeepReadonly<() => void>
-// = { readonly arguments: ...; readonly caller: ...; readonly bind: ...; ... }
-// Function shape o'rniga function-as-object transform qilingan!
+// keyof (function type) = never → never key li mapped type = {} (bo'sh object)
+// Call signature yo'qoldi — function emas, {} bo'lib qoldi!
 
-state.handler(); // ❌ Error — bu function emas, object
-// "This expression is not callable. Type 'DeepReadonly<() => void>' has no call signatures."
+state.handler(); // ❌ Error — bu function emas, {}
+// "This expression is not callable. Type '{}' has no call signatures."
 ```
 
-**Bug 3 — Array:**
+**`tags: string[]` — bug EMAS:**
 
 ```typescript
 state.tags
 // type: DeepReadonly<string[]>
-// = { readonly 0: string; readonly 1: string; ...; readonly length: number; readonly push: ... }
-// Array transform bo'lib object kabi — array method lari ham transform
-// push readonly bo'lib qoladi (type-level "blocked")
+// Homomorphic mapped type array/tuple'ga maxsus ishlanadi (TS 3.1+, PR #26063):
+// plain object emas, array structure saqlanadi → readonly string[]
+// element `string` primitive — recursion'ga kirmaydi, o'zgarmaydi
+
+state.tags.push("admin"); // ❌ readonly string[] — push yo'q (kutilgan natija)
 ```
+
+Array case to'g'ri ishlashi homomorphic mapped type'ning array special-case'i tufayli. Ammo `Date` va `Function` baribir alohida case talab qiladi.
 
 **Tuzatish:**
 
@@ -2754,24 +2770,28 @@ type P = DeepPartial<EventHandler>;
 ```typescript
 type P = DeepPartial<EventHandler>;
 // {
-//   onClick?: DeepPartial<(e: MouseEvent) => void>;  ← Function type DeepPartial ga kirdi
+//   onClick?: DeepPartial<(e: MouseEvent) => void>;  ← Function type DeepPartial'ga kirdi
 //   onHover?: DeepPartial<...>;
 // }
 
-// DeepPartial<(e: MouseEvent) => void> — function shape ni transform qiladi
-// Natija: { (e: MouseEvent): void; readonly name?: string; readonly length?: number; ... }
-// Yoki: { } (chunki function callable signature ni mapped type ushlay olmaydi)
+// DeepPartial<(e: MouseEvent) => void> = { [K in keyof (e: MouseEvent) => void]?: ... }
+// keyof (function type) = never (bare call signature'da keyof never qaytaradi)
+// never key li mapped type = {} (bo'sh object type)
+// Natija: DeepPartial<(e: MouseEvent) => void> = {}
 
-// onClick endi function emas — broken object!
+// onClick?: {} — call signature yo'qoldi. {} deyarli har qanday qiymatni qabul qiladi:
 const handler: P = {
-  onClick: () => {}, // ❌ Type mismatch
+  onClick: () => {},        // {} ga assignable (function ham object) — error chiqmaydi
+  onHover: { random: 1 },   // ❌ semantik bug: callback o'rniga ixtiyoriy object o'tadi
 };
+// Bug: type safety yo'qoldi — onClick endi `(e: MouseEvent) => void` deb tekshirilmaydi,
+// `{}` sifatida har narsa o'tadi.
 ```
 
 **Tuzatish — `BuiltIn` ga function qo'shish yoki alohida case:**
 
 ```typescript
-// Variant 1 — BuiltIn ga function qo'shish
+// Variant 1 — BuiltIn'ga function qo'shish
 type BuiltIn = Primitive | Date | Error | RegExp | ((...args: any[]) => any);
 
 // Variant 2 — alohida conditional (afzal — clean)
@@ -2795,7 +2815,7 @@ type Fixed = DeepPartial<EventHandler>;
 ### Edge Cases
 
 - **Generic function** — `<T>(x: T) => T` — `T extends (...args: any[]) => any` match qiladi. Generic saqlanadi.
-- **Overloaded function** — bir nechta call signature li function. `infer` faqat oxirgi overload ga match qiladi (TypeScript limitation).
+- **Overloaded function** — bir nechta call signature li function. `infer` faqat oxirgi overload'ga match qiladi (TypeScript limitation).
 - **Method ichidagi function property** — `{ method(): void }` — method short syntax `function` type sifatida tan olinadi.
 
 </details>
@@ -2804,12 +2824,12 @@ type Fixed = DeepPartial<EventHandler>;
 
 ## Xulosa
 
-- **`DeepPartial`/`DeepReadonly`/`DeepRequired`** — recursive transformation, special case lar majburiy (Function, Date, Array, Map, Set)
-- **`Mutable<T>` `-readonly`** — `Readonly` ning teskari modifier. Deep variant da `ReadonlyArray → Array`
+- **`DeepPartial`/`DeepReadonly`/`DeepRequired`** — recursive transformation, special case'lar majburiy (Function, Date, Array, Map, Set)
+- **`Mutable<T>` `-readonly`** — `Readonly` ning teskari modifier. Deep variant'da `ReadonlyArray → Array`
 - **`Required<T>` `-?`** — faqat optional marker olib tashlaydi. `| undefined` qoladi. Strict version `NonNullable<T[K]>` bilan
-- **`Prettify<T>`** — `{ [K]: T[K] } & {}` — intersection ni flat object ga aylantiradi (IDE display)
-- **`ValueOf<T>` = `T[keyof T]`** — barcha value type larning union. Enum alternative pattern
+- **`Prettify<T>`** — `{ [K]: T[K] } & {}` — intersection'ni flat object'ga aylantiradi (IDE display)
+- **`ValueOf<T>` = `T[keyof T]`** — barcha value type'larning union. Enum alternative pattern
 - **`Brand<T, B>`** — phantom property bilan nominal typing. Constructor function + runtime validation
 - **`PathKeys<T>`/`PathValue<T, P>`** — dotted path type-safe access. Depth limit majburiy
-- **Tail-call optimization (TS 4.5+)** — accumulator pattern, 1000+ depth gacha
+- **Tail-call optimization (TS 4.5+)** — accumulator pattern, 1000+ depth'gacha
 - **Type-level programming** — tuple manipulation, string parsing, arithmetic, state machine. Pragmatik chegara 100-500 element

@@ -8,9 +8,9 @@
 
 ### Nazariy savollar
 1. [Decorator nima va qanday ishlaydi?](#savol-1-decorator-nima-va-qanday-ishlaydi-junior) [Junior+]
-2. [Legacy va TC39 decorator lar farqi?](#savol-2-legacy-va-tc39-decorator-lar-farqi-middle) [Middle]
-3. [Decorator factory nima? Oddiy decorator dan farqi?](#savol-3-decorator-factory-nima-oddiy-decorator-dan-farqi-junior) [Junior+]
-4. [Decorator turlari va signature lari?](#savol-4-decorator-turlari-va-signature-lari-middle) [Middle]
+2. [Legacy va TC39 decorator'lar farqi?](#savol-2-legacy-va-tc39-decoratorlar-farqi-middle) [Middle]
+3. [Decorator factory nima? Oddiy decorator'dan farqi?](#savol-3-decorator-factory-nima-oddiy-decoratordan-farqi-junior) [Junior+]
+4. [Decorator turlari va signature'lari?](#savol-4-decorator-turlari-va-signaturelari-middle) [Middle]
 5. [TC39 da `accessor` keyword nima?](#savol-5-tc39-da-accessor-keyword-nima-middle) [Middle+]
 6. [`Symbol.metadata` va `reflect-metadata` farqi?](#savol-6-symbolmetadata-va-reflect-metadata-farqi-middle) [Middle+]
 7. [TC39 da parameter decorator yo'q — qanday yechim?](#savol-7-tc39-da-parameter-decorator-yoq--qanday-yechim-senior) [Senior]
@@ -44,11 +44,11 @@
 
 ### Qisqa javob
 
-Decorator — class yoki class a'zolariga qo'shimcha behavior qo'shadigan funksiya, `@expression` syntax bilan qo'llanadi. Type annotation lardan farqli o'laroq runtime da ishlaydi — JS ga compile qilingandan keyin ham qoladi.
+Decorator — class yoki class a'zolariga qo'shimcha behavior qo'shadigan funksiya, `@expression` syntax bilan qo'llanadi. Type annotation'lardan farqli o'laroq runtime da ishlaydi — JS ga compile qilingandan keyin ham qoladi.
 
 ### To'liq tushuntirish
 
-Decorator — meta-programming mexanizmi. Class declaration, method, property, accessor yoki parameter dan oldin `@decoratorName` deb yoziladi va shu element ga avtomatik ravishda qo'llaniladi.
+Decorator — meta-programming mexanizmi. Class declaration, method, property, accessor yoki parameter dan oldin `@decoratorName` deb yoziladi va shu element'ga avtomatik ravishda qo'llaniladi.
 
 **Nima uchun kerak:**
 1. **Cross-cutting concerns** — logging, validation, caching, authorization. Business logic dan ajratib infrastructure logic ni decorator orqali qo'shish
@@ -56,9 +56,9 @@ Decorator — meta-programming mexanizmi. Class declaration, method, property, a
 3. **Declarative programming** — imperative kod o'rniga "nima kerak" deb belgilash
 4. **Code reuse** — bir behavior ni ko'p joyda qayta ishlatish
 
-**Mexanizm:** Decorator — oddiy funksiya. Compiler decorate qilingan element ni o'rab, decorator funksiyasiga argument sifatida uzatadi. Decorator yangi versiyani qaytarishi yoki original ni o'zgartirishi mumkin.
+**Mexanizm:** Decorator — oddiy funksiya. Compiler decorate qilingan element'ni o'rab, decorator funksiyasiga argument sifatida uzatadi. Decorator yangi versiyani qaytarishi yoki original ni o'zgartirishi mumkin.
 
-**Type annotation dan farqi:** Interface va type alias compile-time da o'chiriladi (type erasure). Decorator — runtime artifact. Compiled JS da `@log method() {}` o'rniga `__decorate([log], ...)` chaqiruvi qoladi.
+**Type annotation'dan farqi:** Interface va type alias compile-time da o'chiriladi (type erasure). Decorator — runtime artifact. Compiled JS da `@log method() {}` o'rniga `__decorate([log], ...)` chaqiruvi qoladi.
 
 ### Kod misol
 
@@ -91,21 +91,21 @@ new Calculator().add(2, 3);
 
 ### Edge Cases
 
-- Decorator faqat **class va class a'zolariga** qo'llanadi — standalone funksiyaga, arrow function ga, plain object ga emas
-- Decorator order muhim — composition kompozitsiyasi (`@a @b method` → `a(b(method))`)
+- Decorator faqat **class va class a'zolariga** qo'llanadi — standalone funksiyaga, arrow function'ga, plain object'ga emas
+- Decorator order muhim — composition tartibida (`@a @b method` → `a(b(method))`)
 - Method decorator yangi funksiya qaytarsa — original almashtiriladi; `void` qaytarsa — original qoladi
-- Decorator runtime ish bajarganda type information yo'qoladi — TS interface va generic decorator ga ko'rinmaydi
+- Decorator runtime ish bajarganda type information yo'qoladi — TS interface va generic decorator'ga ko'rinmaydi
 
 ### Follow-up savollar
 
-1. **"Decorator type annotation dan qanday farqi bor compiled output da?"** — Type annotation o'chiriladi, decorator esa `__decorate`/`__esDecorate` chaqiruvi sifatida qoladi
-2. **"Standalone funksiyaga decorator qo'yish mumkinmi?"** — Yo'q, faqat class context da. Funksiya uchun higher-order function pattern ishlatiladi: `const fn = log(myFunction)`
+1. **"Decorator type annotation'dan qanday farqi bor compiled output da?"** — Type annotation o'chiriladi, decorator esa `__decorate`/`__esDecorate` chaqiruvi sifatida qoladi
+2. **"Standalone funksiyaga decorator qo'yish mumkinmi?"** — Yo'q, faqat class context'da. Funksiya uchun higher-order function pattern ishlatiladi: `const fn = log(myFunction)`
 
 </details>
 
 ---
 
-### Savol 2: Legacy va TC39 decorator lar farqi? [Middle]
+### Savol 2: Legacy va TC39 decorator'lar farqi? [Middle]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -132,17 +132,17 @@ Legacy — `experimentalDecorators: true` bilan ishlovchi eski TypeScript implem
 
 **Asosiy farqlar tahlili:**
 
-1. **Context API** — TC39 da har decorator yagona `context` object oladi (`kind`, `name`, `static`, `private`, `access`, `addInitializer`, `metadata`). Legacy da har turi uchun alohida argument lar.
+1. **Context API** — TC39 da har decorator yagona `context` object oladi (`kind`, `name`, `static`, `private`, `access`, `addInitializer`, `metadata`). Legacy da har turi uchun alohida argument'lar.
 
 2. **Parameter decorator yo'qligi** — TC39 da bu chiqarib tashlangan. Bu NestJS va Angular ning legacy da qolishining asosiy sababi — DI ularga `@inject()` parameter decorator zarur.
 
-3. **`accessor` keyword** — TC39 da auto getter/setter avtomatik yaratiladi, decorator getter va setter ni bir vaqtda intercept qila oladi.
+3. **`accessor` keyword** — TC39 da auto getter/setter avtomatik yaratiladi, decorator getter va setter'ni bir vaqtda intercept qila oladi.
 
 4. **Native metadata** — `Symbol.metadata` orqali. Class-scoped, prototype chain orqali inherited. `reflect-metadata` global WeakMap edi.
 
 **Qachon qaysi biri:**
 - **Legacy** — Angular, NestJS, TypeORM, MikroORM, mavjud production loyihalar
-- **TC39** — yangi loyihalar, library author lar, standartga moslik kerak bo'lganda
+- **TC39** — yangi loyihalar, library author'lar, standartga moslik kerak bo'lganda
 
 ### Kod misol
 
@@ -184,7 +184,7 @@ class UserService {
 
 ### Edge Cases
 
-- **Aralash ishlatib bo'lmaydi:** `experimentalDecorators: true` yoqilganda barcha decorator lar legacy mode da interpret qilinadi
+- **Aralash ishlatib bo'lmaydi:** `experimentalDecorators: true` yoqilganda barcha decorator'lar legacy mode da interpret qilinadi
 - **`emitDecoratorMetadata` TC39 da ta'siri yo'q** — DI container yozish uchun TC39 da boshqa yo'l (token + `Symbol.metadata`)
 - **Class decorator return type** — Legacy: `void | typeof constructor`. TC39: `void | new (...args: any[]) => any`
 - **Static method:** Legacy da `target` constructor, TC39 da `context.static === true`
@@ -192,13 +192,13 @@ class UserService {
 ### Follow-up savollar
 
 1. **"NestJS nima uchun hali legacy da?"** — Parameter decorator yo'qligi sababli. `@Param`, `@Body`, `@Query` qayta yozish katta breaking change
-2. **"TC39 ga migratsiya qanday?"** — Tsconfig dan `experimentalDecorators` olib tashlash, decorator signature larni yangilash, `reflect-metadata` o'rniga `Symbol.metadata`
+2. **"TC39 ga migration qanday?"** — Tsconfig'dan `experimentalDecorators` olib tashlash, decorator signature'larni yangilash, `reflect-metadata` o'rniga `Symbol.metadata`
 
 </details>
 
 ---
 
-### Savol 3: Decorator factory nima? Oddiy decorator dan farqi? [Junior+]
+### Savol 3: Decorator factory nima? Oddiy decorator'dan farqi? [Junior+]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -209,14 +209,14 @@ Decorator factory — parametr qabul qilib, decorator qaytaradigan funksiya. Odd
 
 ### To'liq tushuntirish
 
-Oddiy decorator — to'g'ridan-to'g'ri qo'llaniladigan funksiya. Factory — yana bir qatlam — uni avval chaqirib, qaytgan funksiya decorator sifatida ishlatiladi. Closure orqali ichki decorator outer parametr larni capture qiladi.
+Oddiy decorator — to'g'ridan-to'g'ri qo'llaniladigan funksiya. Factory — yana bir qatlam — uni avval chaqirib, qaytgan funksiya decorator sifatida ishlatiladi. Closure orqali ichki decorator outer parametr'larni capture qiladi.
 
-**Nima uchun kerak:** decorator ni konfiguratsiya qilish. Masalan, `@retry(3)` — 3 marta urinish, `@cache(60000)` — 60 sekund cache. Bir kodda turli xulq.
+**Nima uchun kerak:** decorator'ni configuration qilish. Masalan, `@retry(3)` — 3 marta urinish, `@cache(60000)` — 60 sekund cache. Bir kodda turli xulq.
 
 **Mexanizm:**
 1. Compiler `@log("debug")` ko'radi → `log("debug")` ni evaluate qiladi (factory chaqiriladi)
-2. Qaytgan funksiya decorator sifatida target ga qo'llaniladi
-3. Inner decorator closure orqali factory parametr larini eslab qoladi
+2. Qaytgan funksiya decorator sifatida target'ga qo'llaniladi
+3. Inner decorator closure orqali factory parametr'larini eslab qoladi
 
 **Composition timing:**
 - **Evaluate** (factory chaqiruvi) — yuqoridan pastga
@@ -267,20 +267,20 @@ new PaymentService().refundPayment();
 ### Edge Cases
 
 - Factory **har class definition da** chaqiriladi — agar factory `console.log` qilsa, har class uchun ko'rinadi
-- Factory parametri **closure orqali** ichki decorator da yashaydi — har decorate qilingan element o'z parametri bilan
+- Factory parametri **closure orqali** ichki decorator'da yashaydi — har decorate qilingan element o'z parametri bilan
 - **Composition order:** factory yuqoridan pastga evaluate, decorator pastdan yuqoriga apply. `@a() @b() method` → `a()` evaluate → `b()` evaluate → `b` apply → `a` apply
 - Factory **side effect** beruvchi kod yozmang — class definition vaqtida ishlaydi, kod startup performance ga ta'sir qiladi
 
 ### Follow-up savollar
 
-1. **"Oddiy decorator ni factory ga aylantirish kerakmi?"** — Faqat parametr kerak bo'lsa. Sabab: factory qo'shimcha bir level closure, syntax `@log()` (parantezli) — code reader uchun signal: "konfiguratsiya bor"
-2. **"Factory ichida yana factory bo'lishi mumkinmi?"** — Mumkin, lekin kamdan-kam. Curried decorators — `@auth("admin")("write")` kabi konstruksiyalar over-engineering
+1. **"Oddiy decorator'ni factory'ga aylantirish kerakmi?"** — Faqat parametr kerak bo'lsa. Sabab: factory qo'shimcha bir level closure, syntax `@log()` (qavsli) — code reader uchun signal: "configuration bor"
+2. **"Factory ichida yana factory bo'lishi mumkinmi?"** — Mumkin, lekin kamdan-kam. Curried decorators — `@auth("admin")("write")` ko'rinishidagi konstruksiyalar over-engineering
 
 </details>
 
 ---
 
-### Savol 4: Decorator turlari va signature lari? [Middle]
+### Savol 4: Decorator turlari va signature'lari? [Middle]
 
 <details>
 <summary><strong>Javob</strong></summary>
@@ -291,7 +291,7 @@ TC39 da 5 ta decorator turi: class, method, getter, setter, field, accessor (aut
 
 ### To'liq tushuntirish
 
-**TC39 decorator signature lari (TS 5.0+):**
+**TC39 decorator signature'lari (TS 5.0+):**
 
 ```typescript
 // 1. Class decorator
@@ -426,15 +426,15 @@ class UserProfile {
 
 ### Edge Cases
 
-- **`kind` discriminant** — context type ni narrow qilish uchun: `if (context.kind === "method") { ... }`
-- **Private member** — `context.private === true`. Decorator orqali private field ga access — `context.access.get(obj)`
-- **Static member** — `context.static === true`. Class definition vaqtida ishlaydi, instance da emas
+- **`kind` discriminant** — context type'ni narrow qilish uchun: `if (context.kind === "method") { ... }`
+- **Private member** — `context.private === true`. Decorator orqali private field'ga access — `context.access.get(obj)`
+- **Static member** — `context.static === true`. Class definition vaqtida ishlaydi, instance'da emas
 - **Field decorator field value ololmaydi** — `value: undefined`. Faqat initializer transform mumkin. Getter/setter kerak bo'lsa `accessor` keyword ishlatiladi
 
 ### Follow-up savollar
 
 1. **"Field va accessor decorator orasidagi farq?"** — Field: faqat initial value transform, get/set yo'q. Accessor: get/set funksiyalari beriladi, read/write intercept qilish mumkin
-2. **"`context.access` qanday holda kerak?"** — Decorator orqali boshqa decorator ga access berish: registry pattern (`addInitializer` ichida `context.access.get(this)` orqali instance value olish)
+2. **"`context.access` qanday holda kerak?"** — Decorator orqali boshqa decorator'ga access berish: registry pattern (`addInitializer` ichida `context.access.get(this)` orqali instance value olish)
 
 </details>
 
@@ -447,7 +447,7 @@ class UserProfile {
 
 ### Qisqa javob
 
-`accessor` — class field oldidan yoziladigan keyword. Compiler avtomatik private storage + getter + setter pair yaratadi. Decorator bilan ishlatilganda getter va setter ni bir vaqtda intercept qilish imkonini beradi.
+`accessor` — class field oldidan yoziladigan keyword. Compiler avtomatik private storage + getter + setter pair yaratadi. Decorator bilan ishlatilganda getter va setter'ni bir vaqtda intercept qilish imkonini beradi.
 
 ### To'liq tushuntirish
 
@@ -461,14 +461,14 @@ set name(v) { this.#name = v; }
 
 **Nima uchun kerak:**
 
-Field decorator (oddiy `@logged name = ""`) faqat `initialValue` transform qila oladi — getter/setter yo'q. Lekin runtime da read/write track qilish kerak bo'lsa (reactivity, validation, logging) — getter/setter zarur. `accessor` keyword bu pair ni avtomatik yaratadi va decorator ga `{ get, set }` object beradi.
+Field decorator (oddiy `@logged name = ""`) faqat `initialValue` transform qila oladi — getter/setter yo'q. Lekin runtime da read/write track qilish kerak bo'lsa (reactivity, validation, logging) — getter/setter zarur. `accessor` keyword bu pair ni avtomatik yaratadi va decorator'ga `{ get, set }` object beradi.
 
 **Decorator API:** Accessor decorator `{ get, set, init }` object qaytaradi:
-- `get` — getter ni almashtiradi
-- `set` — setter ni almashtiradi
-- `init` — initial value ni transform qiladi
+- `get` — getter'ni almashtiradi
+- `set` — setter'ni almashtiradi
+- `init` — initial value'ni transform qiladi
 
-**Reactivity uchun ideal:** MobX, SolidJS, Lit kabi reactive framework lar accessor decorator orqali avtomatik signal yoki observable wrap qiladi.
+**Reactivity uchun ideal:** MobX, SolidJS, Lit reactive framework'lari accessor decorator orqali avtomatik signal yoki observable wrap qiladi.
 
 ### Kod misol
 
@@ -515,11 +515,11 @@ console.log(cart.itemCount);
 ### Edge Cases
 
 - **`accessor` siz field decorator getter/setter olmaydi** — faqat initializer transform. Read/write intercept kerak bo'lsa accessor majburiy
-- **Private accessor:** `accessor #count = 0` — private storage ham private (`##count`)
+- **Private accessor:** `accessor #count = 0` — public accessor o'rniga private getter/setter pair, backing storage ham private field (TS uni `#count_accessor_storage` ko'rinishida nomlaydi)
 - **`init` field initializer transform qiladi** — accessor decorator ham field decorator vazifasini bajaradi
-- **`return undefined` ruxsat** — har property optional (`{ get: ..., set: undefined, init: ... }` — faqat getter ni intercept)
+- **`return undefined` ruxsat** — har property optional (`{ get: ..., set: undefined, init: ... }` — faqat getter'ni intercept)
 - **TS 4.9+ kerak** — `accessor` syntax o'zi (decorator-free) shu versiyadan
-- **Performance:** auto-accessor — private field ga access. Manual getter/setter dan farqsiz, lekin code less verbose
+- **Performance:** auto-accessor — private field'ga access. Manual getter/setter'dan farqsiz, lekin code less verbose
 
 ### Follow-up savollar
 
@@ -537,7 +537,7 @@ console.log(cart.itemCount);
 
 ### Qisqa javob
 
-`reflect-metadata` — legacy decorators bilan ishlovchi polyfill (Stage 2 proposal, to'xtab qolgan). `Symbol.metadata` — TC39 decorators ning native mexanizmi, ECMAScript standart, class-scoped, prototype chain orqali inherited.
+`reflect-metadata` — legacy decorators bilan ishlovchi prototype polyfill (rasmiy TC39 proposal bo'lib ulgurmagan, hech qanday Stage'dan o'tmagan). `Symbol.metadata` — TC39 decorators'ning native mexanizmi, Stage 3 ECMAScript, class-scoped, prototype chain orqali inherited.
 
 ### To'liq tushuntirish
 
@@ -545,14 +545,14 @@ console.log(cart.itemCount);
 |-----------|-------------------|-------------------|
 | Import kerak | `import "reflect-metadata"` | Yo'q — native |
 | API | `Reflect.defineMetadata`, `Reflect.getMetadata` | `context.metadata`, `Class[Symbol.metadata]` |
-| Storage | Global WeakMap | Class object da `[Symbol.metadata]` property |
+| Storage | Global WeakMap | Class object'da `[Symbol.metadata]` property |
 | Scope | Global key-value | Class-scoped |
 | Inheritance | Manual (`getOwnMetadata` vs `getMetadata`) | Prototype chain orqali avtomatik |
 | Decorator bilan | Legacy faqat | TC39 faqat |
 | `emitDecoratorMetadata` | Ishlaydi | Ishlamaydi |
-| Standart holati | Stage 2 (to'xtagan) | Stage 3 (ECMAScript) |
-| Bundle size | `+10 KB` (minified) polyfill | 0 (native) |
-| Polyfill | Browser/Node uchun kerak | TS 5.2+, Node 22+ |
+| Standart holati | Rasmiy proposal emas (prototype) | Stage 3 (ECMAScript) |
+| Bundle | Polyfill kerak (runtime ga qo'shiladi) | Native bo'lsa 0 |
+| Polyfill | Browser/Node uchun kerak | Aksariyat runtime hali polyfill talab qiladi |
 
 **`reflect-metadata` (legacy) misol:**
 
@@ -655,13 +655,13 @@ console.log(routes);
 
 - **`context.metadata` qaytadan o'qish:** decorator ichida yozilgan metadata `Class[Symbol.metadata]` orqali tashqaridan o'qiladi
 - **Prototype chain:** child class metadata parent dan inherit qilinadi — lekin child override qilsa, parent ko'rilmaydi
-- **Browser support:** Symbol.metadata Node 22+, V8 12+, Firefox 134+. Eski environment uchun polyfill: `(Symbol as any).metadata ??= Symbol("Symbol.metadata")`
-- **Legacy aralash:** bir loyihada `reflect-metadata` va `Symbol.metadata` ikkalasi mavjud bo'lsa — ikki turli metadata storage. Decorator standart i bilan bog'liq
+- **Runtime support:** `context.metadata` API TypeScript 5.2+ da emit qilinadi, lekin native `Symbol.metadata` aksariyat runtime'da hali yo'q — polyfill kerak: `(Symbol as { metadata?: symbol }).metadata ??= Symbol("Symbol.metadata")`
+- **Legacy aralash:** bir loyihada `reflect-metadata` va `Symbol.metadata` ikkalasi mavjud bo'lsa — ikki turli metadata storage. Decorator standarti bilan bog'liq
 
 ### Follow-up savollar
 
-1. **"NestJS Symbol.metadata ga ko'chadimi?"** — Hozircha yo'q — parameter decorator yo'qligi blocking issue. Hammasi qayta yozilishi kerak
-2. **"Performance farq bormi?"** — `Symbol.metadata` — class object da to'g'ridan-to'g'ri property access. `reflect-metadata` — global WeakMap lookup. Native tezroq, lekin farq ko'pchilik holatda sezilmaydi
+1. **"NestJS Symbol.metadata'ga ko'chadimi?"** — Hozircha yo'q — parameter decorator yo'qligi blocking issue. Hammasi qayta yozilishi kerak
+2. **"Performance farq bormi?"** — `Symbol.metadata` — class object'da to'g'ridan-to'g'ri property access. `reflect-metadata` — global WeakMap lookup. Native tezroq, lekin farq ko'pchilik holatda sezilmaydi
 
 </details>
 
@@ -689,7 +689,7 @@ class UserService {
 
 TC39 da bunday syntax mavjud emas — compiler ham qabul qilmaydi.
 
-**Yechim 1: Method decorator + metadata (parametr ma'lumotini method ga yozish)**
+**Yechim 1: Method decorator + metadata (parametr ma'lumotini method'ga yozish)**
 
 ```typescript
 const PARAMS_KEY = Symbol("params");
@@ -724,7 +724,7 @@ class UserController {
 }
 ```
 
-**Yechim 2: Object parameter pattern (single object da barcha parametr)**
+**Yechim 2: Object parameter pattern (single object'da barcha parametr)**
 
 ```typescript
 class UserController {
@@ -739,7 +739,7 @@ class UserController {
 }
 ```
 
-Framework adapter request dan to'g'ri object yaratadi. Type safety to'liq, parameter decorator kerak emas.
+Framework adapter request'dan to'g'ri object yaratadi. Type safety to'liq, parameter decorator kerak emas.
 
 **Yechim 3: Symbol-based DI token + constructor**
 
@@ -765,7 +765,7 @@ class UserService {
   constructor(private logger: any, private db: any) {}
 }
 
-// Container constructor tokenlarini class metadata dan o'qiydi
+// Container constructor tokenlarini class metadata'dan o'qiydi
 ```
 
 **Yechim 4: `addInitializer` orqali class init time da parametr metadata**
@@ -777,7 +777,7 @@ function paramMeta(index: number, source: string) {
     context: ClassMethodDecoratorContext
   ) {
     context.addInitializer(function (this: any) {
-      // Class init time — instance ga metadata biriktirish
+      // Class init time — instance'ga metadata biriktirish
     });
   };
 }
@@ -836,21 +836,21 @@ class ArticleController {
   }
 }
 
-// Router framework metadata ni o'qib request larni map qiladi
+// Router framework metadata'ni o'qib request'larni map qiladi
 const routes = ArticleController[Symbol.metadata]?.[ROUTES_KEY] as RouteConfig[];
 console.log(routes);
 ```
 
 ### Edge Cases
 
-- **Type safety yo'qoladi qisman** — method decorator parametr metadata da string-based, compiler tekshirmaydi `key === parametr nomi` ekanini
+- **Type safety yo'qoladi qisman** — method decorator parametr metadata'da string-based, compiler tekshirmaydi `key === parametr nomi` ekanini
 - **Refactoring xavfi** — parametr nomini o'zgartirsangiz, metadata ham o'zgarishi kerak (avtomatik emas)
-- **IDE autocomplete cheklangan** — string literal lar bilan ishlaydi, parametr nomi bilan emas
+- **IDE autocomplete cheklangan** — string literal'lar bilan ishlaydi, parametr nomi bilan emas
 - **Compile-time error yo'q** — agar metadata `params: ["id", "name"]` deylsa va method `getUser(id, role)` bo'lsa — runtime da topiladi
 
 ### Follow-up savollar
 
-1. **"Nima uchun TC39 parameter decorator olib tashlandi?"** — Standartlashtirish murakkabligi: positional argument lar shape ni o'zgartiradi, lexical scope ga kira oladi, type system bilan mosligi muammoli
+1. **"Nima uchun TC39 parameter decorator olib tashlandi?"** — Standartlashtirish murakkabligi: positional argument'lar shape ni o'zgartiradi, lexical scope ga kira oladi, type system bilan mosligi muammoli
 2. **"NestJS qachon TC39 ga ko'chadi?"** — Parameter decorator proposal qayta tiklanmaguncha emas. Hozir community alohida proposal ustida ishlamoqda (`@decorator on parameter`)
 3. **"DI uchun eng yaxshi pattern qaysi?"** — Constructor injection + class-level token list. Function-based DI (factory function) — TC39 bilan eng mos
 
@@ -953,9 +953,9 @@ class Container {
 |----------------|------------------------|
 | Class decorator | Class definition tugagach (bir marta) |
 | Static method/field | Class definition vaqtida (bir marta) |
-| Instance method | Har instance constructor da |
-| Instance field | Har instance constructor da, field set bo'lgandan keyin |
-| Accessor | Har instance constructor da |
+| Instance method | Har instance constructor'da |
+| Instance field | Har instance constructor'da, field set bo'lgandan keyin |
+| Accessor | Har instance constructor'da |
 
 **`this` context:**
 - Class decorator: `this` = class constructor
@@ -965,7 +965,7 @@ class Container {
 **Use cases:**
 1. **Method binding** — `this.method = this.method.bind(this)`
 2. **Event listener** — instance yaratilganda avtomatik subscribe
-3. **Validation** — barcha decorator lar qo'llanganidan keyin invariant check
+3. **Validation** — barcha decorator'lar qo'llanganidan keyin invariant check
 4. **Registry pattern** — class definition tugagach global ga ro'yxat qo'shish
 5. **`Object.defineProperty`** — descriptor manipulation kerak bo'lganda
 
@@ -976,7 +976,7 @@ class Container {
 ### Kod misol
 
 ```typescript
-// === @bound — method ni instance ga bind qilish ===
+// === @bound — method'ni instance'ga bind qilish ===
 function bound(
   originalMethod: (...args: any[]) => any,
   context: ClassMethodDecoratorContext
@@ -1000,7 +1000,7 @@ const fn = handler.onClick;
 fn(); // "Click by Ali" — this saqlanadi
 
 
-// === @autoRegister — class ni global registry ga qo'shish ===
+// === @autoRegister — class'ni global registry'ga qo'shish ===
 const componentRegistry = new Map<string, new (...args: any[]) => any>();
 
 function autoRegister(
@@ -1022,7 +1022,7 @@ console.log(componentRegistry.size);  // 2
 console.log(componentRegistry.get("HeaderComponent")); // [class HeaderComponent]
 
 
-// === @readonly — method ni writable: false qilish ===
+// === @readonly — method'ni writable: false qilish ===
 function readonly(
   originalMethod: (...args: any[]) => any,
   context: ClassMethodDecoratorContext
@@ -1048,15 +1048,15 @@ const cfg = new Config();
 ### Edge Cases
 
 - **Order:** decorator return birinchi qo'llaniladi, keyin `addInitializer` chaqiriladi. Initializer ichida `this[context.name]` allaqachon decorated version
-- **`this` static method da** — class constructor, instance emas. Static initializer da `this[fieldName]` static field ga murojaat
+- **`this` static method'da** — class constructor, instance emas. Static initializer'da `this[fieldName]` static field'ga murojaat
 - **Initializer return value** ignored — `void`. Side effect uchun ishlatish kerak
 - **Initializer order** — bir element uchun bir nechta initializer registered bo'lsa, evaluation order da bajariladi (top-to-bottom decorator factory order)
 - **Private member uchun** — `this[context.name]` ishlamaydi (private member dinamik access yo'q). `context.access.get(this)` ishlatish kerak
 
 ### Follow-up savollar
 
-1. **"`addInitializer` `constructor` ichidagi `bind` dan qanday farqi?"** — Decorator deklarativ, har class da `constructor` da `this.method = this.method.bind(this)` yozish boilerplate
-2. **"`return` va `addInitializer` ikkalasini birga ishlatish mumkinmi?"** — Mumkin va keng tarqalgan. `return` method ni replace qiladi, `addInitializer` instance ga side effect
+1. **"`addInitializer` `constructor` ichidagi `bind` dan qanday farqi?"** — Decorator deklarativ, har class'da `constructor` da `this.method = this.method.bind(this)` yozish boilerplate
+2. **"`return` va `addInitializer` ikkalasini birga ishlatish mumkinmi?"** — Mumkin va keng tarqalgan. `return` method'ni replace qiladi, `addInitializer` instance'ga side effect
 
 </details>
 
@@ -1069,7 +1069,7 @@ const cfg = new Config();
 
 ### Qisqa javob
 
-Legacy method decorator 3 ta argument oladi: `target` (prototype yoki constructor), `propertyKey` (method nomi), `descriptor` (`PropertyDescriptor` — value, writable, enumerable, configurable). Decorator descriptor ni o'zgartirib yoki yangi descriptor qaytarib method ni boshqaradi.
+Legacy method decorator 3 ta argument oladi: `target` (prototype yoki constructor), `propertyKey` (method nomi), `descriptor` (`PropertyDescriptor` — value, writable, enumerable, configurable). Decorator descriptor'ni o'zgartirib yoki yangi descriptor qaytarib method'ni boshqaradi.
 
 ### To'liq tushuntirish
 
@@ -1096,9 +1096,9 @@ function decorator(
 ): PropertyDescriptor | void;
 ```
 
-**Asosiy pattern lar:**
+**Asosiy pattern'lar:**
 
-1. **Original method ni saqlab, wrap qilish** (`descriptor.value` ni almashtirish)
+1. **Original method'ni saqlab, wrap qilish** (`descriptor.value` ni almashtirish)
 2. **Yangi descriptor qaytarish** (Object.defineProperty natijasiga ta'sir)
 3. **Faqat metadata yozish** (descriptor o'zgarmaydi)
 
@@ -1137,7 +1137,7 @@ new OrderService().calculateTotal(100, 3);
 // <- calculateTotal = 300
 
 
-// === @readonly — method ni o'zgartirib bo'lmaydi ===
+// === @readonly — method'ni o'zgartirib bo'lmaydi ===
 function readonly(
   target: any,
   propertyKey: string,
@@ -1197,8 +1197,8 @@ class HttpClient {
 
 ### Edge Cases
 
-- **Static method decorator:** `target` = constructor, instance method da `target` = prototype. Bu instance va class metadata farqi
-- **Descriptor return value:** `void` qaytarsa — original descriptor saqlanadi. Yangi descriptor qaytarsa — alm ashtiriladi. Reference da o'zgartirish (`descriptor.value = ...`) ham ishlaydi
+- **Static method decorator:** `target` = constructor, instance method'da `target` = prototype. Bu instance va class metadata farqi
+- **Descriptor return value:** `void` qaytarsa — original descriptor saqlanadi. Yangi descriptor qaytarsa — almashtiriladi. Reference'da o'zgartirish (`descriptor.value = ...`) ham ishlaydi
 - **Arrow function `this` muammosi:** `descriptor.value = (...args) => original.apply(this, args)` — `this` decorator scope. To'g'risi: `function (this: any, ...args)`
 - **`writable: false` + qayta `defineProperty`:** Configurable bo'lsa, `defineProperty` bilan qayta yozish mumkin. `configurable: false` esa to'liq lock
 - **Async method:** decorator wrap funksiyasi `async` deb declare qilinmasligi mumkin — promise return value automatic await beradi
@@ -1219,7 +1219,7 @@ class HttpClient {
 
 ### Qisqa javob
 
-`__decorate` — legacy decorator helper, har decorator ni target ga ketma-ket qo'llaydi. `__esDecorate` — TC39 helper, context object yaratadi va decorator return value lar bilan class structure ni qayta quradi. `__runInitializers` — `addInitializer` callback larni triggerlash uchun.
+`__decorate` — legacy decorator helper, har decorator'ni target'ga ketma-ket qo'llaydi. `__esDecorate` — TC39 helper, context object yaratadi va decorator return value'lar bilan class structure ni qayta quradi. `__runInitializers` — `addInitializer` callback'larni triggerlash uchun.
 
 ### To'liq tushuntirish
 
@@ -1322,7 +1322,7 @@ let UserService = (() => {
 | Context | Yo'q | Object: `kind`, `name`, `static`, `private`, `access`, `addInitializer`, `metadata` |
 | Decorator return | Method/class replacement | Method/class replacement + initializer callbacks |
 | Class wrap | IIFE da bir oddiy class | IIFE + static block + `_classThis` reference |
-| Initializer | Yo'q | `__runInitializers` chaqiriladi `addInitializer` callback lar uchun |
+| Initializer | Yo'q | `__runInitializers` chaqiriladi `addInitializer` callback'lar uchun |
 
 **`__runInitializers`:**
 
@@ -1367,7 +1367,7 @@ new Service().fetch();
 
 ### Edge Cases
 
-- **Bundle size:** TC39 helper lar (`__esDecorate`, `__runInitializers`) — legacy `__decorate` dan kattaroq. Production bundle uchun TS `importHelpers: true` + `tslib` orqali helper lar share qilinadi
+- **Bundle size:** TC39 helper'lar (`__esDecorate`, `__runInitializers`) — legacy `__decorate` dan kattaroq. Production bundle uchun TS `importHelpers: true` + `tslib` orqali helper'lar share qilinadi
 - **`static { }` block:** TC39 da decorator setup static block ichida — class definition vaqtida bir marta ishlaydi
 - **Recursive `_classThis`:** `static` decorator chaqiruvi paytida class hali fully constructed emas. `_classThis` reference orqali muhokama qilinadi
 - **`Reflect.decorate` polyfill:** Legacy `__decorate` `Reflect.decorate` mavjud bo'lsa, undan foydalanadi (`reflect-metadata` polyfill bilan keladi)
@@ -1553,16 +1553,16 @@ Decorator composition ikki bosqichli jarayon:
 
 1. **Evaluate phase (yuqoridan pastga)** — factory funksiyalar chaqiriladi. Bu inner decorator funksiyani qaytaradi. `a()` → `b()` ketma-ketligida.
 
-2. **Apply phase (pastdan yuqoriga)** — qaytgan inner decorator lar target ga qo'llaniladi. Matematik kompozitsiya kabi: `a(b(method))` — eng yaqin decorator (`@b`) birinchi qo'llaniladi, natijani `@a` o'rab oladi.
+2. **Apply phase (pastdan yuqoriga)** — qaytgan inner decorator'lar target'ga qo'llaniladi. Function composition tartibida: `a(b(method))` — eng yaqin decorator (`@b`) birinchi qo'llaniladi, natijani `@a` o'rab oladi.
 
-3. **Class decorator eng oxirida** — barcha member (method, field, accessor) decorator lar tugagandan keyin. Sabab: class decorator class ni butunligicha (member lar bilan birga) oladi va replace qila oladi.
+3. **Class decorator eng oxirida** — barcha member (method, field, accessor) decorator'lar tugagandan keyin. Sabab: class decorator class'ni butunligicha (member'lar bilan birga) oladi va replace qila oladi.
 
-**Member tartibi:** Class ichida member decorator lar **deklaratsiya tartibida** ishlaydi (top-to-bottom class body bo'yicha).
+**Member tartibi:** Class ichida member decorator'lar **declaration tartibida** ishlaydi (top-to-bottom class body bo'yicha).
 
 ### Kod misol
 
 ```typescript
-// Mantiqiy kompozitsiya:
+// Mantiqiy composition:
 // @a() @b() method  ==  method = a(b(method))
 
 // Misol — b method natijasini *2, a esa +10 qiladi
@@ -1598,8 +1598,8 @@ new Calc().value(); // (5 * 2) + 10 = 20
 
 ### Follow-up savollar
 
-1. **"Class decorator nima uchun oxirida?"** — Class decorator class ni butunlay almashtirishi mumkin (constructor extend). Avval member structure tayyor bo'lishi kerak
-2. **"Parameter decorator (legacy) tartibi qaerda?"** — Method decorator dan oldin, har parametr uchun
+1. **"Class decorator nima uchun oxirida?"** — Class decorator class'ni butunlay almashtirishi mumkin (constructor extend). Avval member structure tayyor bo'lishi kerak
+2. **"Parameter decorator (legacy) tartibi qaerda?"** — Method decorator'dan oldin, har parametr uchun
 
 </details>
 
@@ -1660,17 +1660,17 @@ x = 20 y = 40
 
 **Class definition phase (instance yaratishdan oldin):**
 
-1. Member decorator lar **deklaratsiya tartibida** chaqiriladi — body order: `x` → `greet` → `y`
-2. Class decorator **eng oxirida** — barcha member decorator lar tugagach
+1. Member decorator'lar **declaration tartibida** chaqiriladi — body order: `x` → `greet` → `y`
+2. Class decorator **eng oxirida** — barcha member decorator'lar tugagach
 3. Field decorator faqat metadata yozadi yoki initializer qaytaradi — qiymat **hali transform qilinmaydi**
 
 **Instance creation phase (`new Example()`):**
 
-1. Field initializer lar har instance da chaqiriladi
+1. Field initializer'lar har instance'da chaqiriladi
 2. Field decorator qaytargan funksiya (`initializer`) `initialValue` ni argument qilib oladi
-3. Return qilingan qiymat instance field ga yoziladi
+3. Return qilingan qiymat instance field'ga yoziladi
 
-**Field decorator timing:** decorator value sifatida `undefined` oladi (field hali set bo'lmagan). Lekin instance constructor da har field uchun initializer (decorator return) chaqiriladi va `initialValue * 2` natijasi field ga yoziladi.
+**Field decorator timing:** decorator value sifatida `undefined` oladi (field hali set bo'lmagan). Lekin instance constructor'da har field uchun initializer (decorator return) chaqiriladi va `initialValue * 2` natijasi field'ga yoziladi.
 
 ### Kod misol
 
@@ -1705,8 +1705,8 @@ console.log(p.health, p.mana); // 100 0
 
 ### Follow-up savollar
 
-1. **"`@field x` va `@field y` initializer alohida-alohida ishlaydimi?"** — Ha, har field uchun har instance da
-2. **"Order ni o'zgartirish mumkinmi?"** — Yo'q. Spec da deklaratsiya order qat'iy
+1. **"`@field x` va `@field y` initializer alohida-alohida ishlaydimi?"** — Ha, har field uchun har instance'da
+2. **"Order'ni o'zgartirish mumkinmi?"** — Yo'q. Spec'da declaration order qat'iy
 
 </details>
 
@@ -1758,11 +1758,11 @@ method called
 
 1. **Factory phase yuqoridan pastga** — `dec("A")` evaluate, keyin `dec("B")` evaluate. Har factory `console.log("factory: ...")` qiladi.
 
-2. **Apply phase pastdan yuqoriga** — qaytgan inner decorator lar applied. `B` apply (yaqinroq), keyin `A` apply (tashqaridan o'rab).
+2. **Apply phase pastdan yuqoriga** — qaytgan inner decorator'lar applied. `B` apply (yaqinroq), keyin `A` apply (tashqaridan o'rab).
 
 **Method body class definition vaqtida ishlamaydi** — faqat `new Service().method()` chaqirilganda. Bu sabab `--- runtime ---` dan keyin `method called`.
 
-**Key insight:** Decorator faqat **class definition time** da ishlaydi. Har `new` da decorator qayta chaqirilmaydi (lekin `addInitializer` callback har instance da chaqiriladi).
+**Key insight:** Decorator faqat **class definition time** da ishlaydi. Har `new` da decorator qayta chaqirilmaydi (lekin `addInitializer` callback har instance'da chaqiriladi).
 
 ### Kod misol
 
@@ -1812,12 +1812,12 @@ new App();
 
 - **Factory faqat bir marta** — class definition vaqtida. Ko'p instance bo'lsa ham factory takrorlanmaydi
 - **`addInitializer` har instance** — har `new` da chaqiriladi
-- **Module load order:** import qilish ham class definition triggerlaydi (top-level class lar)
+- **Module load order:** import qilish ham class definition triggerlaydi (top-level class'lar)
 - **Class expression:** `const C = class { @log method() {} }` — definition vaqti har `new C()` da emas, **`class` expression evaluate bo'lganda**
 
 ### Follow-up savollar
 
-1. **"Lazy initialization mumkinmi?"** — Decorator apply lazy emas, lekin `addInitializer` har instance da. Side effect lazy bo'lishi mumkin
+1. **"Lazy initialization mumkinmi?"** — Decorator apply lazy emas, lekin `addInitializer` har instance'da. Side effect lazy bo'lishi mumkin
 2. **"Tree-shaking ga ta'siri?"** — Decorator side effect beradi → tree-shaking qiyinroq. Bundler decorator chaqiruvini side-effect-free deb assume qila olmaydi
 
 </details>
@@ -1828,7 +1828,7 @@ new App();
 
 ### Savol 14: `@memoize` decorator yozing [Middle+]
 
-**Savol:** TC39 standartida method natijasini argument lariga ko'ra cache qiladigan `@memoize` decorator yozing:
+**Savol:** TC39 standartida method natijasini argument'lariga ko'ra cache qiladigan `@memoize` decorator yozing:
 
 ```typescript
 class MathService {
@@ -1847,20 +1847,20 @@ class MathService {
 
 ### Qisqa javob
 
-`@memoize` — method around `Map` cache wrap. Argument lardan `JSON.stringify` orqali key yaratiladi. Birinchi chaqiruvda hisoblab cache qiladi, keyingilarida cache dan oladi.
+`@memoize` — method around `Map` cache wrap. Argument'lardan `JSON.stringify` orqali key yaratiladi. Birinchi chaqiruvda hisoblab cache qiladi, keyingilarida cache dan oladi.
 
 ### To'liq tushuntirish
 
-**Asosiy g'oya:** method natijasini argument lar bo'yicha cache qilish. Sof funksiya (pure function) uchun ishlaydi — bir xil argument lar bir xil natija beradi.
+**Asosiy g'oya:** method natijasini argument'lar bo'yicha cache qilish. Sof funksiya (pure function) uchun ishlaydi — bir xil argument'lar bir xil natija beradi.
 
 **Cache scope tanlash:**
-- **Class-level cache** (decorator scope) — barcha instance lar bir cache ni share qiladi. Eng oddiy, lekin instance state bog'liq method uchun noto'g'ri natija
-- **Instance-level cache** (`WeakMap<instance, Map>`) — har instance o'z cache i. To'g'ri, lekin biroz murakkab
+- **Class-level cache** (decorator scope) — barcha instance'lar bir cache ni share qiladi. Eng oddiy, lekin instance state bog'liq method uchun noto'g'ri natija
+- **Instance-level cache** (`WeakMap<instance, Map>`) — har instance o'z cache'i. To'g'ri, lekin biroz murakkab
 
 **Key strategy:**
-- `JSON.stringify(args)` — sodda, primitive argument lar uchun ishlaydi
-- Object argument lar uchun unstable (key tartibi farq qilishi mumkin) — alternativa: `WeakMap` argument identity asosida
-- Symbol, function argument lar — JSON da ko'rinmaydi
+- `JSON.stringify(args)` — sodda, primitive argument'lar uchun ishlaydi
+- Object argument'lar uchun unstable (key tartibi farq qilishi mumkin) — alternativa: `WeakMap` argument identity asosida
+- Symbol, function argument'lar — JSON da ko'rinmaydi
 
 ### Kod misol
 
@@ -1981,7 +1981,7 @@ class ApiClient {
 }
 ```
 
-**Spec-level note:** `Map` insertion order ni saqlaydi — LRU implementation uchun ideal. `Map.prototype.delete` + `set` — element ni oxiriga ko'chiradi.
+**Spec-level note:** `Map` insertion order ni saqlaydi — LRU implementation uchun ideal. `Map.prototype.delete` + `set` — element'ni oxiriga ko'chiradi.
 
 </details>
 
@@ -2008,20 +2008,20 @@ class DatabaseConnection {
 
 ### Qisqa javob
 
-Class ni `extends` qiladigan yangi class qaytarish. Birinchi `new` da super constructor ishlaydi va instance saqlanadi. Keyingi `new` larda saqlangan instance qaytariladi — JS spec da constructor `return object` qilsa, `new` shu object ni qaytaradi.
+Class ni `extends` qiladigan yangi class qaytarish. Birinchi `new` da super constructor ishlaydi va instance saqlanadi. Keyingi `new` larda saqlangan instance qaytariladi — JS spec'da constructor `return object` qilsa, `new` shu object'ni qaytaradi.
 
 ### To'liq tushuntirish
 
-**Mexanizm:** JavaScript spec da `new SomeClass()` — agar constructor object qaytarsa, yangi yaratilgan `this` o'rniga shu object qaytariladi. Bu xususiyatdan foydalanib singleton implement qilinadi.
+**Mexanizm:** JavaScript spec'da `new SomeClass()` — agar constructor object qaytarsa, yangi yaratilgan `this` o'rniga shu object qaytariladi. Bu xususiyatdan foydalanib singleton implement qilinadi.
 
 **Step by step:**
-1. Decorator class ni argument sifatida oladi
-2. Yangi class qaytaradi — original class ni extends qiladi
+1. Decorator class'ni argument sifatida oladi
+2. Yangi class qaytaradi — original class'ni extends qiladi
 3. Yangi class constructor:
    - Agar instance saqlangan bo'lsa — `return instance` (yangi `this` ignored)
    - Aks holda — `super(...args)` orqali parent constructor ishlaydi, natija saqlanadi
 
-**TypeScript generic constraint:** `<T extends new (...args: any[]) => any>` — har qanday constructor ni qabul qilish uchun.
+**TypeScript generic constraint:** `<T extends new (...args: any[]) => any>` — har qanday constructor'ni qabul qilish uchun.
 
 ### Kod misol
 
@@ -2051,22 +2051,22 @@ class ConfigService {
 const c1 = new ConfigService("production"); // "Config initialized: production"
 const c2 = new ConfigService("development"); // console.log YO'Q
 console.log(c1 === c2);   // true
-console.log(c2.env);       // "production" (birinchi instance ning env i)
+console.log(c2.env);       // "production" (birinchi instance'ning env'i)
 ```
 
 ### Edge Cases
 
-- **Argument farqi:** ikkinchi `new` ning argument lari **ignored**. `c2.env === "production"` — birinchi argument
+- **Argument farqi:** ikkinchi `new` ning argument'lari **ignored**. `c2.env === "production"` — birinchi argument
 - **Inheritance:** `class Sub extends ConfigService {}` — Sub o'zining singleton emas. Lekin Sub instance yaratish murakkabroq (parent singleton constructor return qiladi)
-- **Static method bilan singleton (alternativa):** `Class.getInstance()` pattern — decorator ga muhtoj emas. Lekin `new` syntax beradi singleton decorator
-- **Type info:** Return `T` cast — TS uchun yangi class haqida soxta yoddoshlik. Compile-time da original class kabi
+- **Static method bilan singleton (alternativa):** `Class.getInstance()` pattern — decorator'ga muhtoj emas. Lekin `new` syntax beradi singleton decorator
+- **Type info:** `as T` cast — qaytarilgan subclass'ni TypeScript original class type'i sifatida ko'radi. Compile-time'da type bir xil qoladi, faqat runtime'da subclass
 - **Module-level singleton (afzal):** `export const config = new Config(...)` — har import bir xil. Decorator singleton dan oddiy
 - **Reset uchun nima qilish?:** decorator inner `instance` ga tashqaridan access yo'q. Test da reset kerak bo'lsa — DI yaxshiroq
 
 ### Follow-up savollar
 
-1. **"Singleton anti-pattern deyilishining sababi?"** — Global state, test izolyatsiya muammosi, dependency injection bilan ziddiyat. Module-level instance + DI yaxshiroq
-2. **"`InstanceType<T>` nima?"** — Utility type: constructor type dan instance type ni oladi. `class Foo {}` → `InstanceType<typeof Foo> === Foo`
+1. **"Singleton anti-pattern deyilishining sababi?"** — Global state, test isolation muammosi, dependency injection bilan ziddiyat. Module-level instance + DI yaxshiroq
+2. **"`InstanceType<T>` nima?"** — Utility type: constructor type'dan instance type'ni oladi. `class Foo {}` → `InstanceType<typeof Foo> === Foo`
 
 </details>
 
@@ -2074,7 +2074,7 @@ console.log(c2.env);       // "production" (birinchi instance ning env i)
 
 ### Savol 16: `@retry` decorator factory yozing [Middle+]
 
-**Savol:** TC39 standartida async method ni xato bo'lganda qayta urinadigan `@retry(n)` decorator factory:
+**Savol:** TC39 standartida async method'ni xato bo'lganda qayta urinadigan `@retry(n)` decorator factory:
 
 ```typescript
 class ApiClient {
@@ -2092,17 +2092,17 @@ class ApiClient {
 
 ### Qisqa javob
 
-Factory `attempts` parametr oladi, inner decorator async method ni wrap qiladi. `try/catch` orqali xatoni tutib, `attempts - 1` martagacha qayta urinadi. Oxirgi urinishda ham xato bo'lsa — throw qiladi.
+Factory `attempts` parametr oladi, inner decorator async method'ni wrap qiladi. `try/catch` orqali xatoni tutib, `attempts - 1` martagacha qayta urinadi. Oxirgi urinishda ham xato bo'lsa — throw qiladi.
 
 ### To'liq tushuntirish
 
 **Asosiy elementlar:**
 1. **Factory funksiya** — `attempts: number` qabul qiladi
-2. **Inner decorator** — method ni wrap qiladi
+2. **Inner decorator** — method'ni wrap qiladi
 3. **Loop** — `attempts` marta urinish
 4. **Catch + last error** — har retry da xato saqlanadi, oxirgi urinishda throw
 
-**Production konsidersiyalar:**
+**Production'da hisobga olinadigan jihatlar:**
 - **Backoff strategy:** har retry orasida `delay` (linear, exponential). Sabab — server'ga bir vaqtning o'zida ko'p so'rov yubormaslik
 - **Retryable errors:** har xato emas retry qilinadi (404 retry ma'nosiz, 500 retry mantiqli). `shouldRetry: (e) => boolean` callback
 - **Jitter:** delay ga random offset — thundering herd oldini olish
@@ -2198,16 +2198,16 @@ class ResilientApi {
 
 ### Edge Cases
 
-- **Sync method da:** `for` loop sync ishlaydi, `await` no-op. Lekin natija qaytarilmaydi to'g'ri, retry semantikasi sync uchun foydasiz
+- **Sync method'da:** `for` loop sync ishlaydi, `await` no-op. Lekin natija qaytarilmaydi to'g'ri, retry semantikasi sync uchun foydasiz
 - **`this` arrow function bilan:** arrow function decorator scope `this` ni oladi — class instance emas. `function (this: any, ...)` ishlatish
 - **Cancellation:** uzoq retry chain ni to'xtatish kerak bo'lsa — `AbortSignal` parametr sifatida
 - **Side effect retry:** `POST /charge` 5 marta retry — to'lov 5 marta o'tishi mumkin. Idempotency key kerak
-- **Error swallow:** intermediate xato lar log qilinmasa, debugging qiyin
+- **Error swallow:** intermediate xatolar log qilinmasa, debugging qiyin
 
 ### Follow-up savollar
 
 1. **"Exponential backoff sababi nima?"** — Linear delay server ga uzluksiz yuk beradi. Exponential — har retry da 2x kutish, server ga vaqt beradi recover qilish
-2. **"`retry` va `circuit breaker` farqi?"** — Retry — individual chaqiruv darajasida. Circuit breaker — service darajasida, ko'p xatoga uchragan service ga chaqiruvni vaqtincha to'xtatadi
+2. **"`retry` va `circuit breaker` farqi?"** — Retry — individual chaqiruv darajasida. Circuit breaker — service darajasida, ko'p xatoga uchragan service'ga chaqiruvni vaqtincha to'xtatadi
 
 </details>
 
@@ -2234,20 +2234,20 @@ class AdminPanel {
 
 ### Qisqa javob
 
-Factory `role` qabul qiladi. Inner decorator method ni wrap qiladi — chaqiruvdan oldin `this.currentUserRole` ni tekshiradi. Role mos kelmasa — `throw new Error("Unauthorized")`.
+Factory `role` qabul qiladi. Inner decorator method'ni wrap qiladi — chaqiruvdan oldin `this.currentUserRole` ni tekshiradi. Role mos kelmasa — `throw new Error("Unauthorized")`.
 
 ### To'liq tushuntirish
 
 **Asosiy pattern:**
-1. Factory roles ni capture qiladi (closure)
-2. Inner decorator method ni replace qiladi
-3. Wrapped funksiya `this` orqali current user state ga access
+1. Factory roles'ni capture qiladi (closure)
+2. Inner decorator method'ni replace qiladi
+3. Wrapped funksiya `this` orqali current user state'ga access
 4. Authorization check, fail bo'lsa throw
 
 **Real-world enhancement:**
 - **Multiple roles:** `@authorize("admin", "owner")` — har qaysi role yetarli
 - **Permission hierarchy:** admin > moderator > user — yuqori role pastni ham qoplaydi
-- **Async authorization:** role ni tashqi service dan olish kerak bo'lsa, decorator async
+- **Async authorization:** role ni tashqi service'dan olish kerak bo'lsa, decorator async
 - **Audit logging:** har unauthorized urinish log qilinadi
 
 ### Kod misol
@@ -2349,15 +2349,15 @@ class UserManagement {
 ### Edge Cases
 
 - **`this.currentUserRole` undefined:** decorator chaqirilganda `this` instance — agar property yo'q bo'lsa `undefined`, mos role bilan tekshirish noto'g'ri. Initial value berilishi kerak
-- **Static method bilan:** `this` constructor. Decorator instance state ga emas, class-level config ga ishonadi
+- **Static method bilan:** `this` constructor. Decorator instance state'ga emas, class-level config'ga ishonadi
 - **Async method:** wrapped funksiya `async` bo'lishi kerak — `return await originalMethod.call(this, ...args)`. Yoki promise tabiiy chain
 - **Throw vs return error:** throw — exception flow. Alternative: `Result<T, AuthError>` qaytarish (functional style)
 - **JWT-based:** `this.currentUserRole` o'rniga JWT token decode — async, side effect heavy
 
 ### Follow-up savollar
 
-1. **"Role decorator-da hardcode bo'lsa, runtime config qanday?"** — Decorator factory parametri runtime da o'zgartirib bo'lmaydi (class definition vaqtida fix). Yechim: roles ni context yoki external config dan o'qish
-2. **"Frontend va backend authorization farqi?"** — Frontend — UX (button hide), backend — security (har request da check). Decorator faqat client tomon mexanizm, asosiy authorization backend da
+1. **"Role decorator-da hardcode bo'lsa, runtime config qanday?"** — Decorator factory parametri runtime da o'zgartirib bo'lmaydi (class definition vaqtida fix). Yechim: roles'ni context yoki external config'dan o'qish
+2. **"Frontend va backend authorization farqi?"** — Frontend — UX (button hide), backend — security (har request'da check). Decorator faqat client tomon mexanizm, asosiy authorization backend da
 
 </details>
 
@@ -2367,7 +2367,7 @@ class UserManagement {
 
 ### Savol 18: Arrow function `this` xato — toping va tuzating [Middle+]
 
-**Savol:** Bu decorator da xato bor. Toping va tuzating:
+**Savol:** Bu decorator'da xato bor. Toping va tuzating:
 
 ```typescript
 function log(
@@ -2445,16 +2445,16 @@ console.log(new UserService().getUsers());
 
 ### Edge Cases
 
-- **TypeScript `this: any` parametri:** function signature ga `this` parametr type qo'shish kerak — TS unga aniq type beradi. Aks holda noaniq `any`
+- **TypeScript `this: any` parametri:** function signature'ga `this` parametr type qo'shish kerak — TS unga aniq type beradi. Aks holda noaniq `any`
 - **Arrow ichida arrow:** nested arrow ham lexical chain. Outer regular function `this` bind bo'lsa, ichidagi arrow uni ko'ra oladi
 - **`call`/`apply`/`bind` arrow uchun:** ishlamaydi. Arrow function `this` o'zgarmas
-- **Class arrow method:** `name = () => this.something` — yaratilganda lexical scope. Bu instance constructor da bind bo'ladi. Class body da method da — boshqacha story
+- **Class arrow method:** `name = () => this.something` — yaratilganda lexical scope. Bu instance constructor'da bind bo'ladi. Class body da method'da — boshqacha story
 - **Test:** `new Class().method.call(otherInstance, ...)` arrow bo'lsa — yangi `this` ishlamaydi
 
 ### Follow-up savollar
 
-1. **"Arrow va regular function da `arguments` ham farq qiladimi?"** — Ha, arrow `arguments` ham yo'q. Regular `arguments` array-like
-2. **"Class method arrow sifatida yozish (auto-bind) — yaxshimi?"** — Trade-off: bind muammo yo'q, lekin har instance da yangi function (memory cost), super orqali chaqirib bo'lmaydi
+1. **"Arrow va regular function'da `arguments` ham farq qiladimi?"** — Ha, arrow `arguments` ham yo'q. Regular `arguments` array-like
+2. **"Class method arrow sifatida yozish (auto-bind) — yaxshimi?"** — Trade-off: bind muammo yo'q, lekin har instance'da yangi function (memory cost), super orqali chaqirib bo'lmaydi
 
 </details>
 
@@ -2491,15 +2491,15 @@ console.log(cart.itemCount);
 
 ### Qisqa javob
 
-Field decorator faqat initial value ni transform qila oladi — getter/setter intercept qila olmaydi. Wrapping `Proxy` initial value ni almashtirsa ham, keyingi `cart.itemCount = 5` — bevosita field ga assign — proxy bypass qiladi. Yechim: `accessor` keyword ishlatish va accessor decorator yozish.
+Field decorator faqat initial value'ni transform qila oladi — getter/setter intercept qila olmaydi. Wrapping `Proxy` initial value'ni almashtirsa ham, keyingi `cart.itemCount = 5` — bevosita field'ga assign — proxy bypass qiladi. Yechim: `accessor` keyword ishlatish va accessor decorator yozish.
 
 ### To'liq tushuntirish
 
 **Muammo tahlili:**
 
 1. **Field decorator API:** `value: undefined` (field hali yaratilmagan), return funksiya `(initialValue) => transformedValue`
-2. **Proxy initial value sifatida** — `new Proxy(...)` field ga assign bo'ladi
-3. **`cart.itemCount = 5`** — field ni butunlay almashtiradi, proxy yo'qoladi
+2. **Proxy initial value sifatida** — `new Proxy(...)` field'ga assign bo'ladi
+3. **`cart.itemCount = 5`** — field'ni butunlay almashtiradi, proxy yo'qoladi
 4. **Read** — endi field oddiy number (5), proxy emas
 
 **Field decorator nima qila oladi:**
@@ -2559,7 +2559,7 @@ console.log(cart.itemCount);
 ### Edge Cases
 
 - **`accessor` keyword TS 4.9+ kerak** — eski versiyada syntax error
-- **Private accessor:** `@logged accessor #count = 0` — private storage ham private
+- **Private accessor:** `@logged accessor #count = 0` — getter/setter pair ham private, backing storage TS tomonidan `#count_accessor_storage` ko'rinishida nomlanadi
 - **`init` optional** — qaytarmasa initial value saqlanadi
 - **Eski yondashuv (manual getter/setter):** `accessor` siz manual `#name + get/set` yozish mumkin, lekin decorator API harakat qilmaydi (oddiy method/accessor decorator alohida-alohida bo'ladi)
 - **Reactivity framework:** MobX `@observable`, SolidJS — accessor decorator orqali implement qilingan
@@ -2587,5 +2587,5 @@ console.log(cart.itemCount);
 - **Parameter decorator TC39 da yo'q** — NestJS/Angular legacy da qolish sababi
 - **Composition** — factory yuqoridan pastga evaluate, decorator pastdan yuqoriga apply
 - **Compiled output** — legacy `__decorate`, TC39 `__esDecorate` + `__runInitializers`
-- **Arrow function decorator da TAQIQ** — `this` yo'qoladi, regular function ishlatish
+- **Arrow function decorator'da TAQIQ** — `this` yo'qoladi, regular function ishlatish
 - **Field decorator faqat initializer transform** — getter/setter kerak bo'lsa `accessor` keyword

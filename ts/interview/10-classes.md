@@ -13,24 +13,24 @@
 
 ## Nazariy savollar
 
-### Savol 1: TypeScript class da `public`, `private`, `protected` farqi nima? Runtime da nima bo'ladi? [Junior+]
+### Savol 1: TypeScript class'da `public`, `private`, `protected` farqi nima? Runtime'da nima bo'ladi? [Junior+]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-Uchta access modifier compile-time da member visibility ni cheklaydi. JS ga compile bo'lganda **butunlay o'chiriladi** — runtime da hech qanday tekshiruv qolmaydi.
+Uchta access modifier compile-time'da member visibility'ni cheklaydi. JS'ga compile bo'lganda **butunlay o'chiriladi** — runtime'da hech qanday tekshiruv qolmaydi.
 
 ### To'liq tushuntirish
 
-| Modifier | Class ichida | Subclass da | Tashqarida |
+| Modifier | Class ichida | Subclass'da | Tashqarida |
 |----------|:----------:|:-----------:|:----------:|
 | `public` (default) | Ruxsat | Ruxsat | Ruxsat |
 | `protected` | Ruxsat | Ruxsat | Taqiq |
 | `private` | Ruxsat | Taqiq | Taqiq |
 
-Access modifier lar TypeScript ning **type system** xususiyati. Compiler tekshiradi, lekin `tsc` `.js` faylga yozganda barcha modifier'lar o'chiriladi. Bu sabab — JavaScript spec'ida bunday modifier'lar yo'q, kompilyator emit qila olmaydi.
+Access modifier'lar TypeScript'ning **type system** xususiyati. Compiler tekshiradi, lekin `tsc` `.js` faylga yozganda barcha modifier'lar o'chiriladi. Bu sabab — JavaScript spec'ida bunday modifier'lar yo'q, compiler emit qila olmaydi.
 
 Haqiqiy runtime privacy uchun ECMAScript `#` private fields (Stage 4, ES2022) ishlatiladi. `#field` lexical scoping orqali implement qilingan — class declaration tashqarisidan parse-time'da reject bo'ladi.
 
@@ -65,8 +65,8 @@ const secure = new SecurePaymentProcessor();
 ### Edge Cases
 
 - **Soft private bypass:** `(obj as any).private` har doim ishlaydi — TS modifier compile-time emit'dan keyin yo'q
-- **Subclass override:** subclass parent ning `private` member'ini override qila olmaydi — compile error, lekin JS'da hech qanday cheklov yo'q
-- **Cross-instance access:** TS `private` bir xil class'ning ikkinchi instance'iga kirishga ruxsat beradi (`this.other.privateField`), `#private` bera olmaydi (faqat declaring class lexical scope)
+- **Subclass override:** subclass parent'ning `private` member'ini override qila olmaydi — compile error, lekin JS'da hech qanday cheklov yo'q
+- **Cross-instance access:** TS `private` ham, `#private` ham bir xil class'ning boshqa instance'iga kirishga ruxsat beradi (`this.other.#privateField`). Cheklov — declaring class lexical scope: **boshqa** class'dan kirish ikkalasida ham taqiq. `#privateField` ni declaring class'dan tashqarida yozishning iloji yo'q — `#name` syntax faqat shu nomni e'lon qilgan class body ichida lexical scope'da ko'rinadi, tashqarida parse-time SyntaxError. TS `private` esa compile error
 - **JSON.stringify:** TS `private` enumerable — JSON'da chiqadi. `#private` har doim chiqmaydi
 - **DevTools:** TS `private` browser DevTools'da oddiy property sifatida ko'rinadi
 
@@ -139,10 +139,10 @@ console.log(inv.total); // → 60
 
 ### Edge Cases
 
-- **`useDefineForClassFields: true`** (TS 4.0+, default ES2022) — parameter property `[[Define]]` semantics bilan emit bo'ladi, oldindan declare qilingan field'ni shadow qilmaydi
-- **Inherit holatda:** parent ning parameter property'sini subclass `super()` orqali init qiladi — subclass'da qayta yozish kerak emas
+- **`useDefineForClassFields: true`** (TS 3.7+, target ES2022+ da default `true`) — field'lar `Object.defineProperty` (`[[Define]]`) semantics bilan emit bo'ladi. Parameter property esa constructor body'da `this.x = x` orqali assign bo'ladi, shu sabab oddiy own property bo'lib qoladi
+- **Inherit holatda:** parent'ning parameter property'sini subclass `super()` orqali init qiladi — subclass'da qayta yozish kerak emas
 - **Mix qilish:** parameter property va oddiy parameter aralash bo'lishi mumkin: `constructor(public id: number, options: Options)` — `id` property, `options` lokal
-- **Decorator bilan:** parameter decorator parameter property'ga ham qo'llanadi (TS 5.0+ ECMAScript decorators bilan)
+- **Decorator bilan:** Stage 3 ECMAScript decorators (TS 5.0+) parameter decorator'ni umuman qo'llab-quvvatlamaydi. Parameter decorator faqat legacy `experimentalDecorators: true` rejimida mavjud — u yerda parameter property'ga ham qo'llanadi
 
 ### Follow-up savollar
 
@@ -217,7 +217,7 @@ function registerGateway(Ctor: GatewayCtor): void { /* ... */ }
 
 - **Abstract construct signature** (TS 4.2+): `abstract new (...) => T` — abstract class'ni constructor parameter sifatida qabul qilish
 - **Abstract member visibility:** abstract member `public`/`protected` bo'lishi mumkin, `private` taqiq (subclass implement qila olmaydi)
-- **Abstract static:** TS 4.2+ ruxsat beradi, lekin foydali emas — instantiate qilinmasdan ishlatilishi mumkin
+- **Abstract static taqiq:** `abstract static` member TypeScript'da ruxsat etilmaydi — `'static' modifier cannot be used with 'abstract' modifier` (TS1243). Bu hali ham ochiq feature request
 - **Empty abstract class:** abstract member yo'q bo'lsa ham `new` taqiq — declaration intent muhim
 
 ### Follow-up savollar
@@ -230,7 +230,7 @@ function registerGateway(Ctor: GatewayCtor): void { /* ... */ }
 
 Abstract class emit'da har qanday boshqa class kabi yoziladi — `abstract` keyword tashlanadi. Yagona farq — TypeScript constructor call'ni compile-time'da bloklaydi. Runtime'da `Reflect.construct(AbstractClass, [])` muvaffaqiyatli ishlaydi (TS himoyasidan tashqarida).
 
-Spec referensi: TC39 class fields ECMA-262 §15.7 — abstract emit'da hech qanday native semantics yo'q. TypeScript implementation faylda `TSAbstractClass*` AST node bilan tracking qiladi.
+`abstract` ECMAScript spec'ida mavjud emas — bu sof TypeScript type-system construct'i. Emit qilingan JS'da abstract class oddiy class, abstract method esa umuman yozilmaydi (faqat signature). Shu sabab `new`-ni bloklash kafolati faqat `tsc` compile bosqichida — JS-darajadagi hech qanday native cheklov yo'q.
 
 </details>
 
@@ -245,7 +245,7 @@ Spec referensi: TC39 class fields ECMA-262 §15.7 — abstract emit'da hech qand
 
 ### Qisqa javob
 
-`implements` — class ning interface contract'iga mosligini compile-time'da tekshiradi. Faqat tekshiruv — type bermaydi. Method signature'lari `any` bo'lib qoladi agar explicit annotate qilinmasa.
+`implements` — class'ning interface contract'iga mosligini compile-time'da tekshiradi. Faqat tekshiruv — type bermaydi. Method signature'lari `any` bo'lib qoladi agar explicit annotate qilinmasa.
 
 ### To'liq tushuntirish
 
@@ -293,7 +293,7 @@ class RedisCache implements CacheStore {
 
 - **Multiple implements:** `class X implements A, B, C` — har bir interface contract'iga rioya qilish kerak
 - **`implements` va inheritance:** `class X extends Y implements Z` — Y'dan member meros oladi, Z contract'iga rioya qilishi shart
-- **Method signature mismatch:** parameter contravariant, return covariant — bivariant yondashuv `strictFunctionTypes` bilan strictroq
+- **Method signature variance:** method shaklida (`get(key: string): T`) yozilgan signature parameter'lari `strictFunctionTypes` yoqilgan bo'lsa ham **bivariant** tekshiriladi — `strictFunctionTypes` faqat function-type property'lar (`get: (key: string) => T`) ga ta'sir qiladi, ularni contravariant qiladi. Return type har doim covariant
 - **Optional member:** interface'da `prop?: T` — class'da yozilmasa ham OK
 - **Index signature:** interface'da `[key: string]: T` — class'da har bir property `T` ga mos bo'lishi shart
 
@@ -401,7 +401,7 @@ TS `private` — compile-time soft privacy, JS emit'da o'chiriladi. ES `#` priva
 | Cross-instance access | Ruxsat | Ruxsat (same class) |
 | `in` operator | Default ko'rinadi | `#x in obj` syntax bilan |
 
-`target: ES2015` da `#` har bir field uchun WeakMap shim'ga compile bo'ladi — har access lookup qo'shimcha. `ES2022+` native `#` — V8 hidden class optimization saqlanadi.
+`target: ES2015` da `#` har bir field uchun WeakMap shim'ga compile bo'ladi — har access qo'shimcha WeakMap lookup. `ES2022+` native `#` esa engine'ning o'z private field mexanizmiga emit bo'ladi, WeakMap shim qatlamisiz.
 
 ### Kod misol
 
@@ -440,7 +440,7 @@ console.log(EsPaymentProcessor.brandCheck({}));          // → false
 - **Mix qilish:** bitta class'da `private` va `#private` ikkalasi ishlatilishi mumkin, lekin chalkash
 - **WeakMap shim performance:** `target: ES2015` da `#` access har biri WeakMap lookup — hot loop'da sezilarli overhead
 - **Subclass `#name` conflict:** subclass parent'ning `#name` ga kira olmaydi (lexical scope cheklovi)
-- **Reflection cheklovi:** `Reflect.getOwnPropertyNames` `#` field'ni qaytarmaydi
+- **Reflection cheklovi:** `Object.getOwnPropertyNames`, `Reflect.ownKeys` va `Object.getOwnPropertySymbols` `#` field'ni qaytarmaydi
 - **DevTools:** `#field` Chrome DevTools'da ko'rsatiladi (debugger uchun), lekin user code'dan kira olmaydi
 
 ### Follow-up savollar
@@ -451,12 +451,12 @@ console.log(EsPaymentProcessor.brandCheck({}));          // → false
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-V8 implementation: `#field` har class declaration uchun unique `PrivateName` symbol yaratadi. Bu symbol class lexical scope'da yashirin saqlanadi. Access tekshiruvi V8'da `LoadProperty` bytecode'ning maxsus path'i — `[[PrivateBrand]]` slot check.
+ECMAScript spec'da `#field` Private Name sifatida modellanadi — bu nom faqat class lexical scope ichida ko'rinadi va object'ning oddiy property key'lari (string/symbol) ro'yxatiga kirmaydi. Shu sabab `Object.keys`, `JSON.stringify`, `Reflect.ownKeys` uni qaytarmaydi. Class instance yaratilganda unga private brand biriktiriladi; private name'ga har access shu brand mavjudligini tekshiradi va yo'q bo'lsa runtime'da `TypeError` beradi.
 
-TS `private` esa AST'da `TSPrivateKeyword` modifier — emit phase'da olib tashlanadi. `tsc --target es2022` `#` ni native sifatida emit qiladi, `--target es2015` Babel'ga o'xshash WeakMap shim:
+TS `private` esa type-system modifier — emit phase'da butunlay olib tashlanadi va JS'da hech qanday iz qoldirmaydi. `tsc --target es2022` `#` ni native sifatida emit qiladi, `--target es2015` esa downlevel WeakMap shim ishlatadi:
 
 ```javascript
-// target: es2015 da `#field` emit:
+// target: es2015 uchun `#field` emit (soddalashtirilgan):
 var _ApiKey = new WeakMap();
 class EsPaymentProcessor {
   constructor() { _ApiKey.set(this, "sk_live_test"); }
@@ -464,7 +464,7 @@ class EsPaymentProcessor {
 }
 ```
 
-Brand check (`#x in obj`) `[[HasPrivateName]]` internal slot orqali — `instanceof` o'rniga ishlatilishi mumkin (lekin secondary use case).
+Brand check (`#x in obj`) shu private brand mavjudligini xavfsiz, exception'siz tekshiradi — `instanceof` o'rniga ishlatilishi mumkin (lekin asosiy maqsadi bu emas).
 
 </details>
 
@@ -479,7 +479,7 @@ Brand check (`#x in obj`) `[[HasPrivateName]]` internal slot orqali — `instanc
 
 ### Qisqa javob
 
-Class declaration ikkita type hosil qiladi: **instance type** (`OrderEntity` — `new OrderEntity()` natijasi) va **constructor type** (`typeof OrderEntity` — class ning o'zi). Function parametrida class'ni qabul qilganda farq muhim.
+Class declaration ikkita type hosil qiladi: **instance type** (`OrderEntity` — `new OrderEntity()` natijasi) va **constructor type** (`typeof OrderEntity` — class'ning o'zi). Function parametrida class'ni qabul qilganda farq muhim.
 
 ### To'liq tushuntirish
 
@@ -506,7 +506,7 @@ class OrderEntity {
 const order: OrderEntity = new OrderEntity(1, 100);
 order.toJSON(); // ✅
 
-// Constructor type — typeof User
+// Constructor type — typeof OrderEntity
 const EntityClass: typeof OrderEntity = OrderEntity;
 console.log(EntityClass.tableName);   // → "orders" (static access)
 const order2 = new EntityClass(2, 200); // ✅
@@ -684,7 +684,7 @@ HttpClient.request("/users");
 
 ### Edge Cases
 
-- **`this` static method ichida:** static method ichida `this` — class ning o'zi (`typeof Class`), instance emas
+- **`this` static method ichida:** static method ichida `this` — class'ning o'zi (`typeof Class`), instance emas
 - **Static + inheritance:** subclass parent static member'ni meros oladi (`Child.parentStatic` ishlaydi)
 - **`static override`** (TS 4.3+): static method override qilinganda `override` keyword ishlatish mumkin
 - **Multiple static blocks:** bir class'da bir nechta static block — declaration tartibida ishlaydi
@@ -710,7 +710,7 @@ HttpClient.request("/users");
 
 ### To'liq tushuntirish
 
-Stage 3 ECMAScript decorators field'ga apply qilinganda decorator getter/setter pair olib, getter/setter pair qaytaradi. Oddiy field'ni decorate qilish mumkin emas — `accessor` keyword field'ni avtomatik getter/setter ga aylantiradi.
+Stage 3 ECMAScript decorators field'ga apply qilinganda decorator getter/setter pair olib, getter/setter pair qaytaradi. Oddiy field'ni decorate qilish mumkin emas — `accessor` keyword field'ni avtomatik getter/setter'ga aylantiradi.
 
 Compile'da `accessor x` → private storage + getter + setter:
 
@@ -769,21 +769,11 @@ console.log(acc.balance);
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Stage 3 decorators (TC39 proposal) spec'i: `ClassAccessorDecoratorContext` da `access.get`, `access.set` reference bor — decorator field'ni getter/setter pair sifatida ko'radi. Emit:
+Stage 3 decorators (TC39 proposal) accessor uchun maxsus shape belgilaydi. Decorator'ning **birinchi argumenti** — `ClassAccessorDecoratorTarget` — backing storage'ning `get`/`set` funksiyalarini beradi. **Ikkinchi argument** — `ClassAccessorDecoratorContext` — `name`, `kind: "accessor"`, `static`, `private` va `access` (`{ get, set, has }`) maydonlarini, hamda `addInitializer` ni ushlaydi. Decorator yangi `{ get?, set?, init? }` qaytarib backing accessor'ni o'rab oladi yoki initial value'ni transform qiladi.
 
-```javascript
-class UserAccount {
-  #balance_initializers = [];
-  #balance = (() => {
-    const result = logged({ get: this.#balance_get, set: this.#balance_set }, {...});
-    return result.init ? result.init.call(this, 0) : 0;
-  })();
-  get balance() { return this.#balance; }
-  set balance(v) { this.#balance = v; }
-}
-```
+Emit'da `accessor x = 1` private backing field + getter + setter'ga aylanadi, decorator esa shu pair ustida bir marta (class definition vaqtida) chaqiriladi. Aniq emit `tsc` versiyasi va helper'larga (`__esDecorate`, `__runInitializers`) bog'liq — versiyalar orasida o'zgaradi.
 
-`accessor` field decorator metadata uchun unified API — old-style getter/setter manual yozishni almashtiradi.
+`accessor` field decorator uchun unified API beradi — old-style getter/setter manual yozishni almashtiradi va decorator'ga read/write ikkalasini ham intercept qilish imkonini beradi.
 
 </details>
 
@@ -922,11 +912,11 @@ Execution order:
 
 ### Kod misol
 
-ES2022 (TS 4.6 `useDefineForClassFields: true` default) field initializer'lar `super()` qaytgandan **keyin** ishlaydi. Bu sabab subclass field'lari Base constructor ichida `undefined` ko'rinadi.
+Target ES2022+ da (`useDefineForClassFields` default `true`) subclass field initializer'lar `super()` qaytgandan **keyin** ishlaydi. Bu sabab subclass field'lari Base constructor ichida `undefined` ko'rinadi.
 
 ### Edge Cases
 
-- **`useDefineForClassFields: false`** (TS 4.0 dan oldin default) — `[[Set]]` semantics, accessor'larni trigger qiladi
+- **`useDefineForClassFields: false`** (target ES2021 va past da default) — field assignment `[[Set]]` semantics bilan, parent'dagi accessor'larni trigger qiladi (`[[Define]]` esa qilmaydi)
 - **Parameter property:** `constructor(public x: number)` — body'da explicit init kabi ishlaydi
 - **Abstract method call:** abstract class constructor'da abstract method chaqirish ham xavfli
 
@@ -977,9 +967,16 @@ Nominal typing (Java, C#) — `Dog extends Animal` yozilishi shart edi. TS — `
 ### Kod misol
 
 ```typescript
-printAnimal(dog);                  // ✅ Dog shape mos
-printAnimal({ name: "Cat" });      // ✅ Oddiy object ham mos
-printAnimal({ name: "X", age: 3 });// ✅ Extra property ham OK
+printAnimal(dog);                   // ✅ Dog shape mos
+printAnimal({ name: "Cat" });       // ✅ Oddiy object ham mos
+
+// Fresh object literal'da excess property check (EPC) ishlaydi:
+// printAnimal({ name: "X", age: 3 }); // ❌ TS2353 — 'age' Animal'da yo'q
+
+// Lekin oldin variable'ga assign qilinsa — EPC faqat fresh literal'ga
+// qo'llanadi, shu sabab keng shape o'tib ketadi:
+const extra = { name: "X", age: 3 };
+printAnimal(extra);                 // ✅ structural mos (EPC fresh literal emas)
 
 // Private/protected member'lar nominal qiladi
 class SecureAnimal {
@@ -1054,7 +1051,10 @@ abstract class Cache<T> {
   abstract has(key: string): boolean;
 
   getOrSet(key: string, factory: () => T): T {
-    if (this.has(key)) return this.get(key)!;
+    if (this.has(key)) {
+      const existing = this.get(key);
+      if (existing !== undefined) return existing;
+    }
     const value = factory();
     this.set(key, value);
     return value;
@@ -1073,9 +1073,11 @@ cache.set("count", 0);
 console.log(cache.getOrSet("count", () => 99)); // → 0 (xato yo'q!)
 ```
 
+`has(key)` gate `0`/`""`/`false` kabi falsy qiymatlarni "miss" deb hisoblamaydi. `get` ning `T | undefined` natijasini `existing !== undefined` bilan narrow qilish `!` non-null assertion'siz `T` ga olib keladi.
+
 ### Edge Cases
 
-- **`!` non-null assertion:** `this.get(key)!` — `has` true bo'lsa, lekin keyin race condition'da o'chgan bo'lsa runtime undefined
+- **`T` ichida `undefined`:** agar `T` o'zi `undefined` ni qamrasa, `existing !== undefined` narrowing aralashadi — bunday holatda `has` natijasini sentinel sifatida ishlatish kerak
 - **Async cache:** `async get(key): Promise<T | undefined>` — `getOrSet` ham async, race protection kerak
 - **Eviction policy:** LRU, TTL — `has` true qaytarishidan oldin TTL tekshirilishi kerak
 
@@ -1171,7 +1173,7 @@ const sql = new UserQueryBuilder()
 
 - **`this` type narrowing:** `this is SubType` type predicate orqali narrow qilish mumkin
 - **Method nashr qilish:** `this` polymorphic — subclass har doim o'z type'iga ega bo'lib qoladi
-- **`return this`** SHART — `this` type return qaytarmasa, runtime undefined, compile error
+- **`return this`** SHART — method `this` qaytarishga e'lon qilinib `this` ni qaytarmasa, return type mos kelmaydi va compile error beradi (chain'ning keyingi bo'g'ini `undefined` ustida ishlar edi)
 
 ### Follow-up savollar
 
@@ -1352,9 +1354,9 @@ class UserRecord2 implements JsonSerializable2 {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Index signature TC39 spec emas — TypeScript type system feature. Implementation: `IndexInfo` AST'da har structural check'da `getApparentType().indexInfos` solishtiriladi. Index signature `string` va `number` (separately) yoki `symbol` bo'lishi mumkin (TS 4.4+).
+Index signature ECMAScript spec'da mavjud emas — bu sof TypeScript type-system xususiyati. `class X implements I` tekshirilganda, agar `I` da `[key: string]: V` index signature bo'lsa, compiler `X` ning har bir e'lon qilingan property type'ini `V` ga assignable ekanligini tekshiradi (method type'lar ham, ular `V` ga mos kelmasa xato). Index signature key'i `string`, `number` yoki (TS 4.4+) `symbol`/template literal bo'lishi mumkin.
 
-V8'da hidden class invariant: property'lar bir xil shape'da saqlanadi. Index signature TypeScript abstraction — runtime'da har property oddiy own property.
+Runtime'da index signature hech qanday iz qoldirmaydi — emit qilingan JS'da har property oddiy own property bo'lib qoladi.
 
 </details>
 

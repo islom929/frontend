@@ -13,14 +13,14 @@
 
 ## Nazariy savollar
 
-### Savol 1: Mixin nima? TypeScript da mixin pattern qanday ishlaydi? [Middle]
+### Savol 1: Mixin nima? TypeScript'da mixin pattern qanday ishlaydi? [Middle]
 
 <details>
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
 
-Mixin — class'ga **mustaqil behavior** qo'shadigan funksiya. JavaScript single inheritance — class faqat bitta class'dan `extends` qila oladi. Mixin shu cheklovni constructor signature generic'i orqali chetlab o'tadi.
+Mixin — base class qabul qilib, uni extend qilgan yangi class qaytaradigan funksiya. JavaScript single inheritance — class faqat bitta class'dan `extends` qila oladi. Mixin shu cheklovni dinamik base'ni extend qilish (`class extends Base`) orqali chetlab o'tadi; TypeScript'da base'ni `GConstructor` generic constructor type bilan typing qiladi.
 
 ### To'liq tushuntirish
 
@@ -105,7 +105,7 @@ class Anonymous {
 
 Mixin pattern V8 hidden class optimization'iga zid kelishi mumkin — har mixin level yangi prototype hosil qiladi. Inline cache har mixin level uchun alohida tracking qiladi. Cold path'da bu ahamiyatsiz, hot loop'da `Mixin1(Mixin2(Mixin3(Base)))` chain monomorphic property access'ni murakkablashtiradi.
 
-TC39 mixin'ni native qilish proposal'i (Class Friend, Class Brand) bor edi — Stage 1'da to'xtagan. Decorators (Stage 3) — alternative mexanizm: behavior'ni decorator orqali qo'shish.
+TC39 `proposal-mixins` mixin'ni "subclass factory" sifatida ta'riflaydi (declaration vaqtida superclass noma'lum) — Stage 1'da qolgan, native syntax bermagan. Hozirgi pattern (mixin function) shu modelga asoslangan. Decorators (Stage 3, TS 5.0'da flagsiz) — behavior'ni decorator orqali qo'shadigan alternative mexanizm.
 
 </details>
 
@@ -136,7 +136,7 @@ TC39 mixin'ni native qilish proposal'i (Class Friend, Class Brand) bor edi — S
 
 Inheritance hech bo'lmasa quyidagi shartlar hammasi bajarilganda:
 1. Haqiqiy "is a" munosabati
-2. Subclass parent ning butun API'sini meros olishi mantiqli
+2. Subclass parent'ning butun API'sini meros olishi mantiqli
 3. Liskov Substitution Principle buzilmaydi
 
 Aksariyat real-world OOP'da composition + interface afzal — DI test'da mock'ni osongina inject qilish imkonini beradi.
@@ -282,12 +282,12 @@ const Singleton = (class {
 - **Named expression scope:** internal nom faqat class body'da accessible — recursive reference yoki `Class.name` uchun
 - **Hoisting:** class declaration hoist bo'lmaydi (TDZ), class expression assignment qilingan vaqtdan keyin
 - **Class as type vs value:** declaration ikkalasini ham qo'shadi, anonymous expression faqat value (alias kerak type uchun)
-- **Decorator class expression'ga:** Stage 3 decorators class expression'ni ham decorate qiladi (TS 5.0+)
+- **Decorator faqat declaration'ga:** Stage 3 decorators (TS 5.0+) class **declaration**, method, accessor, property, parameter'larga qo'llanadi — `const X = @dec class {}` ko'rinishidagi class expression'ga emas
 
 ### Follow-up savollar
 
 1. "Class declaration'ni mixin function ichida ishlatib bo'ladimi?" — Ha, lekin idiomatic anonymous expression — natija bir xil
-2. "`class.toString()` namesi nima?" — Anonymous class — engine'ga bog'liq (V8: variable nomi inferred)
+2. "Anonymous class expression'ning `.name`'i nima?" — `const UserAccount2 = class {}` da `UserAccount2.name === "UserAccount2"` — spec NamedEvaluation variable nomini infer qiladi. To'g'ridan-to'g'ri argument sifatida berilsa (nomsiz, assign'siz) `.name` bo'sh string
 
 </details>
 
@@ -483,60 +483,57 @@ Faydasi: required field'lar to'ldirilmasdan `build()` chaqirilsa compile error. 
 ```typescript
 type RequestState = "unset" | "set";
 
-interface RequestBuilder<
-  Url extends RequestState,
-  Method extends RequestState,
-> {
-  setUrl(url: string): RequestBuilder<"set", Method>;
-  setMethod(method: "GET" | "POST" | "PUT"): RequestBuilder<Url, "set">;
-  setHeader(key: string, value: string): RequestBuilder<Url, Method>;
-}
+// Fluent method'lar class type'ni qaytaradi — build() class'da, lekin `this`
+// parameter orqali faqat ikki state ham "set" bo'lganda chaqiriladi
+class HttpRequestBuilder<Url extends RequestState, Method extends RequestState> {
+  // Phantom marker'lar — Url/Method generic'larini member type'da "anchor" qiladi.
+  // Busiz generic'lar hech qaysi member'da ko'rinmaydi → structural typing ularni
+  // bir xil hisoblaydi → `this` guard ishlamaydi. Runtime'da hech qachon assign qilinmaydi
+  declare private __url: Url;
+  declare private __method: Method;
 
-interface CompleteRequestBuilder extends RequestBuilder<"set", "set"> {
-  build(): { url: string; method: string; headers: Record<string, string> };
-}
-
-class HttpRequestBuilder<Url extends RequestState, Method extends RequestState>
-  implements RequestBuilder<Url, Method>
-{
   private url?: string;
   private method?: string;
   private headers: Record<string, string> = {};
 
-  setUrl(url: string): RequestBuilder<"set", Method> {
+  setUrl(url: string): HttpRequestBuilder<"set", Method> {
     this.url = url;
-    return this as unknown as RequestBuilder<"set", Method>;
+    return this as unknown as HttpRequestBuilder<"set", Method>;
   }
 
-  setMethod(method: "GET" | "POST" | "PUT"): RequestBuilder<Url, "set"> {
+  setMethod(method: "GET" | "POST" | "PUT"): HttpRequestBuilder<Url, "set"> {
     this.method = method;
-    return this as unknown as RequestBuilder<Url, "set">;
+    return this as unknown as HttpRequestBuilder<Url, "set">;
   }
 
-  setHeader(key: string, value: string): RequestBuilder<Url, Method> {
+  setHeader(key: string, value: string): HttpRequestBuilder<Url, Method> {
     this.headers[key] = value;
     return this;
   }
 
-  build(this: CompleteRequestBuilder): {
+  // `this` parameter: build() faqat HttpRequestBuilder<"set", "set">'da chaqiriladi.
+  // Field'lar `string | undefined` (state phantom type — field type'ni narrow qilmaydi),
+  // shuning uchun `as string` — bu pattern'ning ma'lum cast cost'i
+  build(this: HttpRequestBuilder<"set", "set">): {
     url: string;
     method: string;
     headers: Record<string, string>;
   } {
     return {
-      url: (this as any).url,
-      method: (this as any).method,
-      headers: (this as any).headers,
+      url: this.url as string,
+      method: this.method as string,
+      headers: this.headers,
     };
   }
 }
 
 const start = new HttpRequestBuilder<"unset", "unset">();
 
-// ❌ build() — Url va Method "unset"
-// start.build(); // Error: 'this' context not compatible
+// ❌ start.build();
+// Error: The 'this' context of type 'HttpRequestBuilder<"unset", "unset">'
+//   is not assignable to method's 'this' of type 'HttpRequestBuilder<"set", "set">'
 
-// ✅ to'liq chain
+// ✅ to'liq chain — har step state'ni "set" qiladi, oxirida build() ochiladi
 const request = start
   .setUrl("https://api.example.com/users")
   .setMethod("POST")
@@ -549,9 +546,9 @@ console.log(request);
 
 ### Edge Cases
 
-- **Cast cost:** type assertion (`as unknown as ...`) — type system bilan kurashish. Library author yaqasiga olishi mumkin
-- **`this` parameter pattern:** alternativa — `build` method'ni faqat to'liq state'da accessible qilish
-- **Phantom type:** generic parameter haqiqiy runtime value bermaydi — pure compile-time mexanizm
+- **Cast cost:** har step `as unknown as ...` ishlatadi — runtime instance bitta, faqat type "ko'chadi". Type safety pattern guideline darajasida
+- **Phantom anchor majburiy:** agar generic parameter hech qaysi member type'da ko'rinmasa, structural typing barcha instantiation'larni bir xil hisoblaydi va `this` guard ishlamaydi — shuning uchun `declare private __url: Url` marker kerak
+- **`this` parameter pattern:** `build(this: HttpRequestBuilder<"set", "set">)` — method'ni faqat to'liq state'da chaqirish mumkin qiladi
 - **Builder reuse:** har method yangi type qaytaradi, lekin runtime'da bir xil instance — clone strategy kerak bo'lishi mumkin
 
 ### Follow-up savollar
@@ -566,7 +563,7 @@ Type-state pattern — type system'da progress tracking. Rust state pattern'inin
 
 Alternative API: discriminated union'lar va exhaustive check. Builder API ergonomic, lekin type system murakkab bo'lib ketadi. Industry'da: Effect.ts, fp-ts builder'lari, Zod schema builder.
 
-TC39'da type-state'ni native qilish proposal yo'q — bu TypeScript-specific pattern. Run-time'da hech qanday Foydasi yo'q.
+TC39'da type-state'ni native qilish proposal yo'q — bu TypeScript-specific pattern. Runtime'da pattern hech qanday kod hosil qilmaydi — phantom type'lar emit'da yo'qoladi.
 
 </details>
 
@@ -653,9 +650,9 @@ type EnhancedShape = InstanceType<typeof Enhanced>;
 
 ### Edge Cases
 
-- **Method signature intersection:** `(x: string) => void` & `(x: number) => void` — bivariant funksiya `(x: string & number) => void` = `never`
+- **Function type intersection:** `((x: string) => void) & ((x: number) => void)` — parameter `string & number` ga aylanmaydi; TS buni **overloaded** call signature qiladi (`f("a")` ham, `f(1)` ham chaqiriladi)
 - **`unknown` intersection:** `T & unknown = T` (unknown identity)
-- **Conflicting return:** `() => string & () => number` — `() => string & number = () => never`
+- **Conflicting return:** `(() => string) & (() => number)` — chaqirilganda return type `string & number = never`; qaytariladigan qiymat yo'q
 - **Index signature merge:** intersection — har bir index signature merge bo'ladi
 
 ### Follow-up savollar
@@ -674,44 +671,45 @@ type EnhancedShape = InstanceType<typeof Enhanced>;
 
 ### Qisqa javob
 
-`satisfies` (TS 4.9+) — qiymatning ma'lum type'ga rioya qilishini tekshiradi, lekin literal type'ni saqlaydi. Class property'da `as Type` o'rniga `satisfies Type` — type widening'ga yo'l qo'ymaydi.
+`satisfies` (TS 4.9+) — qiymatning ma'lum type'ga rioya qilishini tekshiradi, lekin qiymatdan infer qilingan aniqroq type'ni saqlaydi. Class property'da `as Type` o'rniga `satisfies Type` — qiymatni target type'ga widening qilmasdan, inferred type'ni qoldiradi.
 
 ### To'liq tushuntirish
 
-`as Type` — explicit assertion, qiymat type'ga assignable deb assumption qiladi (xato bo'lsa ham TS oxirgi gapni assertion'ga qoldiradi). `satisfies Type` — bidirectional check: qiymat type'ga mos kelishi shart, lekin TS literal type'ni saqlaydi.
+`as Type` — explicit assertion, qiymatni aytilgan type'ga "majburlaydi" va inferred type yo'qoladi (`config.pending.color` → `Color`). `satisfies Type` — bidirectional check: qiymat type'ga assignable bo'lishi shart, lekin TS inferred type'ni qoldiradi (`config.pending.color` → `"yellow"`).
 
-Class context'da `satisfies` foydali — `Record<K, V>` shape'iga rioya qilish, lekin har specific key uchun aniq literal type saqlash.
+Muhim nuance: `satisfies` target type'ni **contextual type** sifatida ishlatadi. Agar target property literal yoki literal union bo'lsa (`"text" | "number"`, `Color`), aniq literal saqlanadi. Agar target property `string` kabi keng bo'lsa, literal **`string` ga widening bo'ladi** — chunki mutable object literal property `string` kontekstida widening qiladi. Literal preservation faqat target literal-darajada bo'lganda kafolatlanadi.
 
 ### Kod misol
 
 ```typescript
+type Color = "yellow" | "green" | "red";
 type StatusConfig = {
   [K in "pending" | "approved" | "rejected"]: {
     label: string;
-    color: string;
+    color: Color;
   };
 };
 
 class OrderStatus {
-  // ❌ `as` — type widening, literal yo'qoladi
+  // ❌ `as` — type StatusConfig'ga widening, har key uchun color: Color
   static configAs = {
     pending: { label: "Kutilmoqda", color: "yellow" },
     approved: { label: "Tasdiqlangan", color: "green" },
     rejected: { label: "Rad etilgan", color: "red" },
   } as StatusConfig;
-  // configAs.pending.color: string (literal yo'qoldi)
+  // configAs.pending.color: Color ("yellow" | "green" | "red")
 
-  // ✅ `satisfies` — literal type saqlanadi
+  // ✅ `satisfies` — contextual type literal union bo'lgani uchun aniq literal saqlanadi
   static config = {
     pending: { label: "Kutilmoqda", color: "yellow" },
     approved: { label: "Tasdiqlangan", color: "green" },
     rejected: { label: "Rad etilgan", color: "red" },
   } satisfies StatusConfig;
-  // config.pending.color: "yellow" (literal!)
+  // config.pending.color: "yellow" (aniq literal, butun Color union emas)
 }
 
-const pendingColor = OrderStatus.config.pending.color; // → "yellow" literal
-const approvedColor = OrderStatus.config.approved.color; // → "green" literal
+const pendingColor = OrderStatus.config.pending.color; // → "yellow"
+const approvedColor = OrderStatus.config.approved.color; // → "green"
 
 // Xato ushlash
 class ProductCategory {
@@ -722,7 +720,8 @@ class ProductCategory {
   } satisfies Record<string, number>;
 }
 
-// Class field bilan
+// Diqqat: agar contextual type'da property `string` bo'lsa, literal SAQLANMAYDI —
+// `string` ga widening bo'ladi. Literal preservation faqat target literal/literal-union bo'lganda
 class FormConfig {
   fields = {
     name: { type: "text", required: true },
@@ -731,13 +730,13 @@ class FormConfig {
 }
 
 const form = new FormConfig();
-form.fields.name.type; // → "text" literal, not "text" | "number"
+form.fields.name.type; // → "text" (target "text" | "number" literal union — saqlanadi)
 ```
 
 ### Edge Cases
 
-- **`as const` bilan:** `satisfies T as const` — har ikkala feature kombinatsiyasi. `const T = {...} as const satisfies SomeType`
-- **Generic constraint:** `function f<T>(x: T satisfies BaseType)` — generic'da `extends` afzal
+- **`as const` bilan:** to'g'ri tartib — `{...} as const satisfies SomeType`. `as const` deep readonly literal beradi, `satisfies` shape'ni tekshiradi. Teskari tartib (`satisfies T as const`) ishlamaydi
+- **Generic constraint emas:** `satisfies` faqat expression operator — type annotation pozitsiyasida ishlamaydi. Generic constraint uchun `<T extends BaseType>` ishlatiladi, `satisfies` emas
 - **Class property modifier:** `static readonly config = {...} satisfies T` — readonly + literal preservation
 - **`satisfies` after expression:** `obj.method() satisfies ReturnType` — runtime overhead yo'q, faqat compile check
 
@@ -830,13 +829,13 @@ console.log(otherRealm instanceof Object); // → false (boshqa realm Object)
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-V8 implementation: `[[PrivateBrand]]` — har class declaration uchun yashirin internal slot. `#field in obj` bytecode'da `LdaPrivateName` + brand check sifatida emit qilinadi. `instanceof` esa `OrdinaryHasInstance` abstract operation orqali prototype chain'ni traverse qiladi — `[[GetPrototypeOf]]` har step uchun.
+Mexanizm: har private field declaration object'ning private element ro'yxatiga yoziladi. `#field in obj` instance'da shu private element borligini tekshiradi — spec abstract operation `PrivateElementFind` orqali, throw qilmasdan boolean qaytaradi (private field'ga to'g'ridan-to'g'ri `obj.#field` murojaat — mavjud bo'lmasa `TypeError`). `instanceof` esa `OrdinaryHasInstance` orqali prototype chain'ni `[[GetPrototypeOf]]` bilan traverse qiladi.
 
-Realm cheklovi: har `vm.runInNewContext`, iframe, Worker — alohida V8 isolate yoki realm. Har realm o'zining `Object`, `Array`, `Map` global'lariga ega. `instanceof` faqat bir xil realm ichida ishonchli — cross-realm tekshiruv (`x instanceof Object`) `false` qaytarishi mumkin agar `x` boshqa realm'da yaratilgan bo'lsa.
+Realm cheklovi: har `vm.runInNewContext`, iframe, Worker — alohida realm. Har realm o'zining `Object`, `Array`, `Map` global'lariga ega. `instanceof` faqat bir xil realm ichida ishonchli — cross-realm tekshiruv (`x instanceof Object`) `false` qaytarishi mumkin agar `x` boshqa realm'da yaratilgan bo'lsa, chunki `Object` boshqa identity'ga ega.
 
-Brand check esa class lexical scope'iga bog'liq, realm emas. `#field in obj` faqat shu class declaration'dan kelgan instance uchun `true` qaytaradi — realm'dan qat'iy nazar.
+Brand check class lexical scope'iga bog'liq, realm emas. `#field in obj` faqat shu class declaration'dan kelgan instance uchun `true` qaytaradi — realm'dan qat'iy nazar, chunki private name lexical identity orqali aniqlanadi.
 
-Spec referensi: ECMA-262 §7.3.30 `PrivateElementFind`, §13.10.1 `RelationalExpression` `in` operator semantics.
+`#field in obj` ergonomic brand check ES2022'da standartlashtirilgan. `in` operator'ning private name'lar uchun semantikasi `PrivateElementFind` abstract operation'iga tayanadi.
 
 </details>
 
@@ -848,7 +847,7 @@ Spec referensi: ECMA-262 §7.3.30 `PrivateElementFind`, §13.10.1 `RelationalExp
 
 ### Savol 10: Mixin output — prototype chain [Middle+]
 
-**Savol:** Output ni ayting:
+**Savol:** Output'ni ayting:
 
 ```typescript
 function Loggable<T extends new (...args: any[]) => any>(Base: T) {
@@ -908,7 +907,7 @@ true
 
 ### Savol 11: Mixin field initialization order — tricky [Senior]
 
-**Savol:** Output ni ayting:
+**Savol:** Output'ni ayting:
 
 ```typescript
 class BaseEntity {
@@ -994,16 +993,16 @@ e.init(); // ✅ field'lar tayyor
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-ES2022 class field semantics (`useDefineForClassFields: true`, TS 4.6+ default):
+ES2022 class field semantics (`useDefineForClassFields: true` — `target` `ES2022` yoki yuqori bo'lganda default):
 1. `super()` chaqiriladi — parent constructor butun body bajariladi
 2. Parent constructor tugagandan keyin, joriy class field initializer'lari **`[[Define]]` semantics** bilan ishlaydi (har biri `Object.defineProperty` ekvivalenti — accessor'larni trigger qilmaydi)
 3. Constructor body qolgan qismi bajariladi
 
 Eski semantics (`useDefineForClassFields: false`) — field initializer'lar `[[Set]]` semantics bilan ishlaydi (parent setter'larini trigger qilishi mumkin) — bu legacy behavior `Object.defineProperty` o'rniga oddiy assignment.
 
-V8'da har field initializer alohida bytecode block sifatida emit qilinadi. Mixin chain'da har class o'z field initializer'iga ega — chain ichidagi har class qadam-baqadam initialize qilinadi.
+Mixin chain'da har class o'z field initializer'lariga ega. Har bir derived class instance'i quriladi: avval `super()` (butun parent zanjiri tugaydi), keyin o'sha class'ning field initializer'lari tartibli ishlaydi — eng pastdan (BaseEntity) eng yuqorigacha (Loggable).
 
-Spec referensi: ECMA-262 §15.7.14 `InitializeInstanceElements` — class field'larni `[[Construct]]` paytida tartibli init qilish algoritmi. TC39 proposal "Class Fields" (Stage 4, ES2022) bu order'ni mustahkamladi.
+Spec referensi: ECMA-262 `InitializeInstanceElements` abstract operation — class element'larni instance qurishda tartibli init qiladi. Class Fields proposal (Stage 4, ES2022) bu order'ni standartlashtirdi.
 
 </details>
 
@@ -1013,7 +1012,7 @@ Spec referensi: ECMA-262 §15.7.14 `InitializeInstanceElements` — class field'
 
 ### Savol 12: Mixin deserialize — xatoni toping [Middle+]
 
-**Savol:** Bu kodda runtime xato bor. Toping va tuzating:
+**Savol:** Bu `deserialize` fragile — constructor'ni keraksiz chaqiradi. Muammoni toping va tuzating:
 
 ```typescript
 function Serializable<T extends new (...args: any[]) => any>(Base: T) {
@@ -1042,11 +1041,11 @@ console.log(restored.greet());
 
 ### Qisqa javob
 
-`new Base()` — `UserAccount` constructor `name` va `age` argument'larni talab qiladi. Argument'siz chaqirilganda `undefined`. `Object.assign` data qo'shadi, lekin constructor side effect'lar ishlamaydi.
+`new Base()` deserialize'da `UserAccount` constructor'ini argument'siz chaqiradi — `name`/`age` `undefined` bilan boshlanadi, keyin `Object.assign` ustiga yozadi. Bu misolda `greet()` ishlaydi, lekin constructor validation yoki side effect (masalan, ID generatsiya, log) qilsa — deserialize'da keraksiz/noto'g'ri bajariladi. Argument talab qiladigan constructor `throw` qilsa, deserialize butunlay buziladi.
 
 ### To'liq tushuntirish
 
-`new Base()` bilan constructor invariant'lar buziladi. Yechim: `Object.create(Base.prototype)` — constructor chaqirmasdan to'g'ri prototype chain'ga ega object yaratish.
+Deserialize'da constructor logic'ini qayta ishga tushirish noto'g'ri — saqlangan data allaqachon to'liq state. Yechim: `Object.create(Base.prototype)` — constructor chaqirmasdan to'g'ri prototype chain'ga ega object yaratadi, keyin `Object.assign` bilan data ko'chiriladi. Shu bilan `greet()` (prototype method) ishlaydi va constructor side effect'lari takrorlanmaydi.
 
 ### Kod misol
 
@@ -1080,7 +1079,7 @@ console.log(restored.greet()); // → "Hi, Ali"
 - **Non-enumerable property'lar:** `JSON.stringify` enumerable'larni oladi, non-enumerable'lar yo'qoladi
 - **Methods on instance:** arrow function field'lar (`onClick = () => {}`) — own property, JSON'da ko'rinadi, deserialize'da ham
 - **Date va custom class:** `JSON.stringify(new Date())` → string. `JSON.parse` string'ni Date'ga qaytarmaydi
-- **Production library:** `class-transformer`, `zod` schema validation — tip-top serializatsiya
+- **Production library:** `class-transformer` (decorator-based instance qurish), `zod` (parse + runtime validation) — manual `Object.assign`'dan ishonchliroq
 
 ### Follow-up savollar
 
@@ -1171,7 +1170,7 @@ console.log(invalid.isValid); // → false
 ### Follow-up savollar
 
 1. "Decorator bilan o'rniga?" — Stage 3 decorators bilan ham mumkin, lekin runtime metadata kerak
-2. "Validation rule'lar kompozitsiyasi?" — Strategy pattern: validate'ga array of rules berish
+2. "Validation rule'lar composition'i?" — Strategy pattern: validate'ga array of rules berish
 
 </details>
 
@@ -1268,7 +1267,7 @@ const testService = new NotificationService(consoleLogger, emailValidator, mockS
 
 Dependency Injection mexanizm: constructor signature DI container uchun "resolution recipe". TypeScript `reflect-metadata` polyfill (`emitDecoratorMetadata: true`) bilan constructor parameter type'lar runtime'da mavjud — NestJS, Inversify, TypeDI shu metadata'dan foydalanadi.
 
-Composition Root pattern: app entry point'da barcha dependency'lar bir joyda yig'iladi (`main.ts`). Service constructor'lar faqat o'z dependency'larini deklaratsiya qiladi, instantiation strategiyasini bilmaydi. Bu Inversion of Control (IoC) printsipining amaliy ifodasi.
+Composition Root pattern: app entry point'da barcha dependency'lar bir joyda yig'iladi (`main.ts`). Service constructor'lar faqat o'z dependency'larini declaration qiladi, instantiation strategiyasini bilmaydi. Bu Inversion of Control (IoC) printsipining amaliy ifodasi.
 
 SOLID printsiplari bilan bog'liq:
 - **D — Dependency Inversion:** yuqori darajadagi modul (NotificationService) past darajadagi modulga (concrete Sender) emas, abstractsiyaga (Sender interface) bog'lanadi
@@ -1285,7 +1284,7 @@ TypeScript'da DI container'lar runtime metadata'siz ham ishlaydi (TypeDI manual 
 
 ### Savol 15: `this` type — fluent chain'da subclass-aware return [Middle+]
 
-**Savol:** Output ni ayting va sababini tushuntiring:
+**Savol:** Output'ni ayting va sababini tushuntiring:
 
 ```typescript
 class StringBuilder {
@@ -1431,7 +1430,7 @@ repo.add(new UserEntity());
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-`InstanceType<T>` utility'ning ichki implementatsiyasi:
+`InstanceType<T>` utility'ning ichki implementation'i:
 
 ```typescript
 type InstanceType<T extends abstract new (...args: any) => any> =
@@ -1454,7 +1453,7 @@ Generic factory'da `InstanceType<T>` ishlatish — Higher-Kinded Type (HKT) simu
 
 ## Xulosa
 
-- Mixin — single inheritance cheklovini chetlab o'tish, constructor signature generic orqali
+- Mixin — single inheritance cheklovini chetlab o'tish, dinamik base'ni extend qilish + `GConstructor` typing orqali
 - Constrained mixin — `GConstructor<{...}>` bilan base'dan shape talab qilish
 - Composition > Inheritance — DI, testing, loose coupling. Inheritance — haqiqiy "is a" + shared implementation
 - Class expression — runtime'da class yaratish, mixin va factory uchun zaruriy

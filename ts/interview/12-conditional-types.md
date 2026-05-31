@@ -83,7 +83,7 @@ handleEvent("click", { x: 10, y: 20 });    // ✅
 
 ### Edge Cases
 
-- **`any` extends har narsa:** `any extends T` har doim ham true ham false branch'ni qaytaradi (union)
+- **`any` check type:** `any extends U ? X : Y` har doim `X | Y` (ikkala branch union) qaytaradi
 - **`never` extends:** distributive pozitsiyada `never` — bo'sh union (0 member), 0 marta distribute — natija `never`
 - **Conditional in mapped type:** mapped type ichida conditional — `{ [K in keyof T]: T[K] extends Function ? ... : ... }`
 - **Recursive conditional:** conditional o'z ichida o'zini referencing qila oladi (TS 4.1+)
@@ -231,11 +231,11 @@ type DogPet = Extract<Pet, { kind: "dog" }>;
 
 ### Edge Cases
 
-- **Inline conditional check:** `T extends any ? ... : ...` — distribute trigger (any har qanday union'ga mos)
+- **`extends any` idiom:** `T extends any ? ... : ...` — distribution check type `T` naked bo'lgani uchun sodir bo'ladi (`any` esa har doim true branch tanlash uchun ishlatiladi)
 - **Generic constraint distribution:** `function f<T extends string | number>(x: T)` — generic instance da distribute bo'lmaydi (T ma'lum)
-- **`boolean` distribution:** `boolean = true | false` — distributive'da har biri uchun alohida
+- **`boolean` distribution:** `boolean = true | false` — distributive'da har biri uchun alohida, natija qayta `boolean`'ga yig'iladi
 - **Tuple T:** tuple element distribute bo'lmaydi — tuple type non-distributive bo'lib qoladi
-- **`unknown` vs `any`:** `unknown extends T` — har doim false branch (faqat unknown'ga assignable). `any` — ikkala branch
+- **`any` check type:** `T extends string ? X : Y` da `T = any` bo'lsa — TS ikkala branch'ni ham qaytaradi (`X | Y`); `T = unknown` esa faqat false branch (`unknown` `string`'ga assignable emas)
 
 ### Follow-up savollar
 
@@ -383,7 +383,7 @@ function tagOverload(value: string | number): string {
 ### Edge Cases
 
 - **Type narrowing limit:** TS variable type'ni narrow qiladi, generic type parameter'ni narrow qilmaydi
-- **Generic constraint narrowing (TS 5.4+):** generic constraint'da control flow analysis qisman ishlaydi (kontrolflow ichida `T` constraint bo'yicha narrow bo'ladi), lekin conditional return type'ga ta'sir qilmaydi
+- **Value narrowing vs type parameter:** `typeof value === "string"` value'ni narrow qiladi (`value: T & string`), lekin `T` type parameter o'zi narrow bo'lmaydi — shu sabab conditional return type deferred qoladi
 - **Conditional return assignability:** body type'ni return type'ga assign — TS conservative, assertion zarur
 - **Overload signature order:** specific signature avval, general — keyin
 
@@ -477,10 +477,10 @@ type MyReturnType<T> = T extends (...args: any) => infer R ? R : never;
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-TC39 type theory: function type `(A) → B` ning subtype relationship:
+Type theory: function type `(A) → B` ning subtype relationship:
 - `(A) → B <: (A') → B'` agar `A' <: A` (contravariant param) va `B <: B'` (covariant return)
 
-TypeScript spec'da type checker bu qoidalarni `isTypeAssignableTo` checker'da implement qiladi. `inferTypes` algorithm har xil pozitsiyalarda candidates'ni yig'adi: union (covariant) yoki intersection (contravariant).
+TypeScript checker bu qoidalarni `isTypeAssignableTo` orqali implement qiladi. `inferTypes` algoritmi har xil pozitsiyalarda candidate'larni yig'adi: union (covariant) yoki intersection (contravariant).
 
 Real industry use case: function composition, lens'lar, optic'lar — variance to'g'ri ishlatilmasa type system noto'g'ri natija beradi.
 
@@ -497,15 +497,15 @@ Real industry use case: function composition, lens'lar, optic'lar — variance t
 
 ### Qisqa javob
 
-Recursive conditional type — type o'z ichida o'zini referencing qiladi. TS recursion depth'ni 50 darajaga cheklaydi (instantiation excess). TS 4.5+ tail-recursive optimization — accumulator pattern bilan 1000+ darajagacha mumkin.
+Recursive conditional type — type o'z ichida o'zini referencing qiladi. Non-tail recursion amaliy ~50 daraja chuqurlikda `excessively deep` xato beradi. TS 4.5+ tail-recursive optimization — accumulator pattern bilan 1000 darajagacha mumkin.
 
 ### To'liq tushuntirish
 
-Recursion limit: 50 darajadan keyin `Type instantiation is excessively deep` xato. Sabab: infinite loop'ni oldini olish, compile time'ni cheklash.
+Recursion limit: tuple build kabi non-tail recursion ~50 darajadan keyin `Type instantiation is excessively deep` xato. Sabab: infinite loop'ni oldini olish, compile time'ni cheklash.
 
-Tail recursion: agar recursive call **eng oxirgi pozitsiya**da bo'lsa (accumulator pattern), TS optimization qiladi — har step uchun stack frame yaratmaydi, iterativ ishlaydi. Bu o'z chegarasini ko'taradi (1000+).
+Tail recursion: agar recursive call **eng oxirgi pozitsiya**da bo'lsa (accumulator pattern), TS optimization qiladi — har step uchun instantiation depth'ni oshirmaydi, iterativ ishlaydi. Bu chegarani 1000 darajaga ko'taradi.
 
-Non-tail recursion'da `[...PrevResult, T]` — eng oxirgi bo'lib qaytarilsa tail recursive. Lekin `T extends [...A, infer B] ? B[] : never` non-tail (B[] keyin processing).
+Tail position — recursive call'ning natijasi to'g'ridan-to'g'ri qaytarilsa: `? ReverseTail<Rest, [First, ...Acc]> : Acc`. Non-tail — recursive call wrapper ichida bo'lsa: `[...Reverse<Rest>, First]` (spread ichida) yoki `Reverse<Rest> extends ... ? ...` (conditional check'da).
 
 ### Kod misol
 
@@ -526,7 +526,8 @@ type ReverseTail<T extends any[], Acc extends any[] = []> =
     : Acc;
 
 type A = ReverseTail<[1, 2, 3]>; // [3, 2, 1]
-type B = ReverseTail<[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]>; // ✅ 1000+ ishlaydi
+type B = ReverseTail<[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]>; // [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+// Tail-recursive bo'lgani uchun 1000 darajagacha element'da ham ishlaydi (non-tail ~50 da uziladi)
 
 // DeepAwaited — tail recursive (TS optimize qiladi)
 type DeepAwaited<T> =
@@ -560,7 +561,7 @@ type E = SplitString<"a,b,c,d", ",">; // ["a", "b", "c", "d"]
 - **Distributive recursion:** union member'lar ham distribute bo'ladi — har biri 50 limit
 - **Cache:** TS type checker recursive type natijalarini cache qiladi — qayta call tezroq
 - **Mutual recursion:** `A<T> = ... B<T> ...; B<T> = ... A<T> ...` — limit aralash
-- **Instantiation depth:** non-tail recursion 50, tail-recursive (TS 4.5+) 1000 (`maxInstantiationCount`). Limit `tsc` source'da hardcoded — config orqali o'zgartirib bo'lmaydi
+- **Instantiation depth:** non-tail recursion'da tuple build amaliy ~50 darajada `excessively deep` beradi (recursion-identity heuristic), tail-recursive (TS 4.5+) 1000 darajagacha (`tailCount` limiti). Limit'lar `tsc` checker source'ida hardcoded — config orqali o'zgartirib bo'lmaydi
 
 ### Follow-up savollar
 
@@ -570,9 +571,9 @@ type E = SplitString<"a,b,c,d", ",">; // ["a", "b", "c", "d"]
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-TypeScript 4.5 release: tail-call optimization. AST'da recursive instantiation eng oxirgi node bo'lsa, TS instantiation stack o'rniga iteration ishlatadi. Bu `Tuple<...>` manipulation'lar uchun kritik — fp-ts, ts-toolbelt, type-fest library'lar bu pattern'ga tayanadi.
+TypeScript 4.5 release: tail-call optimization. Conditional type'ning natijasi to'g'ridan-to'g'ri yana bir conditional bo'lsa (tail position), TS instantiation stack o'rniga iteration ishlatadi. Bu `Tuple<...>` manipulation'lar uchun kritik — fp-ts, ts-toolbelt, type-fest library'lar bu pattern'ga tayanadi.
 
-Compiler implementation: `getConditionalType` har recursive call'ga `instantiationDepth` counter ko'taradi. Tail position aniqlanganda, counter inkrement qilinmaydi va iterativ resolve davom etadi.
+Compiler implementation: `getConditionalType` checker'da tail position'ni aniqlaganda, alohida `tailCount` hisoblagich orqali loop'da resolve qiladi va umumiy `instantiationDepth`'ni har step uchun oshirmaydi. `tailCount` 1000 darajaga yetganda to'xtaydi. Non-tail recursion esa har instantiation'da `instantiationDepth`'ni oshiradi, va recursion-identity heuristic uni amaliy ~50 daraja chuqurlikda `excessively deep` deb belgilaydi.
 
 Production tip: agar 50 limit'ga yaqinlashadigan recursive type bo'lsa — refactor majbur. Aks holda IDE intellisense break bo'ladi.
 
@@ -953,8 +954,8 @@ type L = DeepFlatten<any[]>;
 
 ### Edge Cases
 
-- **TS 4.5+ tail optimization:** 1000+ nested Promise — ishlaydi
-- **Eski TS:** 50 darajadan ko'p — `excessively deep` xato
+- **TS 4.5+ tail optimization:** `DeepAwaited` tail position'da — 1000 darajagacha nested Promise ishlaydi
+- **Eski TS (4.5'gacha):** tail optimization yo'q edi — ~50 darajadan keyin `excessively deep` xato
 - **Mix array + Promise:** `Promise<string[]>` — `DeepAwaited<Promise<string[]>>` = `string[]` (Promise unwrap, lekin array qoladi)
 - **`PromiseLike` standard:** TS built-in `Awaited` `PromiseLike` ham qamraydi
 
@@ -974,7 +975,7 @@ type L = DeepFlatten<any[]>;
 ```typescript
 // IsNever<never> → true, IsNever<string> → false
 // IsUnion<string | number> → true, IsUnion<string> → false
-// NDExclude — butun union ni tekshirish
+// NDExclude — butun union'ni tekshirish
 ```
 
 <details>
@@ -1055,10 +1056,10 @@ type RequireKey<T, K extends keyof T> = T & { [P in K]-?: NonNullable<T[P]> };
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Spec algoritmi (TC39 type theory adapted to TS):
-- `T extends U ? X : Y` distributiv bo'lishi uchun `T` **naked type parameter** bo'lishi shart
-- Compiler `isDistributionDependent` flag bilan ajratadi — naked yoki wrapped
-- Wrapper tuple (`[T]`) — `instantiateType` da `TupleType` sifatida saqlanadi, distributiv bo'lmaydi
+TypeScript distribution algoritmi:
+- `T extends U ? X : Y` distributiv bo'lishi uchun `T` (check type) **naked type parameter** bo'lishi shart
+- Compiler conditional type root'iga `isDistributive` flag o'rnatadi — check type naked bo'lsa true
+- Wrapper tuple (`[T]`) check type'ni naked emas qiladi → `isDistributive` false → distribution o'chadi
 
 `IsUnion` trick'ning ichki mexanizmi: distributive conditional ichidan boshlangan har "iteration"da `Copy` saqlanadi (parameter default — bir marta resolve qilingan). Distribute har `T` member uchun `[Copy] extends [T]` non-distributive tekshiruv — `Copy` butun union, `T` individual member. Agar union > 1 member bo'lsa, hech qaysi `T` `Copy` ni qamrab olmaydi.
 
@@ -1127,15 +1128,19 @@ type D = MergeObjects<[
 // = { name: string } & { age: number } & { email: string }
 // = { name: string; age: number; email: string }
 
-// Discriminated union'dan barcha key'lar
-type AllKeys<T> = UnionToIntersection<keyof T extends infer K ? { [P in keyof K]: K } : never>;
+// Union member'larining BARCHA key'lari (faqat shared emas)
+type AllKeys<T> = keyof UnionToIntersection<T>;
+
+type M1 = AllKeys<{ name: string } | { age: number }>;
+// = "name" | "age" — har ikki member key'i
+// Taqqoslang: keyof ({ name: string } | { age: number }) = never (shared yo'q)
 ```
 
 ### Edge Cases
 
 - **Primitive intersection:** `string & number = never` — primitive union'da foydasiz
 - **Object property conflict:** `{ x: string } | { x: number }` → `{ x: string } & { x: number }` = `{ x: never }`
-- **Function union:** `((x: A) => B) | ((x: C) => D)` → `(x: A & C) => B | D` (param intersect, return union)
+- **Function union:** `((x: A) => B) | ((x: C) => D)` → `((x: A) => B) & ((x: C) => D)` — natija ikkita function type'ning intersection'i (overloaded callable signature), bitta `(x: A & C) => B | D` emas
 - **`unknown` member:** `string | unknown` = `unknown` — union ko'pincha collapse
 
 ### Follow-up savollar
@@ -1277,7 +1282,7 @@ type DeepMutable<T> = {
 
 ### Follow-up savollar
 
-1. "Recursion limit yo'qmi?" — 50 daraja — chuqur nested config refactor talab qiladi
+1. "Recursion limit yo'qmi?" — ~50 daraja nesting — chuqur nested config refactor talab qiladi
 2. "Performance ta'siri qancha?" — Murakkab DeepPartial application — sezilarli compile time
 
 <details>
@@ -1285,7 +1290,7 @@ type DeepMutable<T> = {
 
 `DeepPartial` recursion mexanizmi: compiler har `T[K]` uchun `extends object` check qiladi va recursive instantiation generate qiladi. `instantiationDepth` har step'da inkrement bo'ladi.
 
-Function preservation muammosi: JS'da function ham `typeof === "function"`, lekin TS type checker `Function extends object` true qaytaradi (chunki function prototype `Object.prototype`'dan inherit qiladi). `[K in keyof T]` mapped — function'ning property'lari (`length`, `name`, `prototype`, `apply`, ...) ham iterate qilinadi, callable signature buziladi.
+Function preservation muammosi: `object` type "non-primitive" degani — primitive (`string`, `number`, `boolean`, `symbol`, `bigint`, `null`, `undefined`) bo'lmagan har qanday type unga assignable. Function type non-primitive, shu sabab `Function extends object` (va `((x: number) => void) extends object`) — true. `[K in keyof T]` mapped function'ga qo'llansa, callable signature emas, faqat named property'lar (`length`, `name`, `prototype`, `apply`, `call`, `bind`) iterate qilinadi — natija call qilib bo'lmaydigan object type, signature yo'qoladi.
 
 Built-in object'lar (`Date`, `RegExp`, `Map`, `Set`) — `extends object` true, lekin internal slot'lar (`[[DateValue]]`, `[[MapData]]`) type'ga ko'rinmaydi. `DeepPartial<Date>` natijasi — barcha `Date.prototype` method'lari optional, lekin runtime'da `new Date()` instance'i internal slot'larga ega bo'ladi.
 
@@ -1374,12 +1379,12 @@ type R = Reverse<[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
 
 ### Xato tushuntirish
 
-`Reverse<Rest>` recursive call **non-tail pozitsiyada** — natija `[...Reverse<Rest>, First]` ichida wrapper bor (tuple spread). TS 4.5+ tail-recursion optimization faqat recursive call eng oxirgi pozitsiyada bo'lganda ishlaydi. Non-tail uchun limit 50 daraja.
+`Reverse<Rest>` recursive call **non-tail pozitsiyada** — natija `[...Reverse<Rest>, First]` ichida wrapper bor (tuple spread). TS 4.5+ tail-recursion optimization faqat recursive call eng oxirgi pozitsiyada bo'lganda ishlaydi. Non-tail uchun amaliy limit ~50 daraja.
 
 ### Kod misol
 
 ```typescript
-// ❌ Non-tail recursion — 50 daraja limit
+// ❌ Non-tail recursion — ~50 daraja limit
 type BadReverse<T extends any[]> =
   T extends [infer First, ...infer Rest]
     ? [...BadReverse<Rest>, First]  // ❌ recursive call spread ichida
@@ -1421,18 +1426,18 @@ Non-tail (optimize qilinmaydi):
 ### Follow-up savollar
 
 1. **"Tail recursion qachon ishlamaydi?"** — `[...Recursive<Rest>, X]` non-tail, `Union | Recursive<X>` non-tail, har qanday wrapper ichidagi recursive call non-tail.
-2. **"50 va 1000 limit qaerda hardcoded?"** — `tsc` source code'da (`src/compiler/checker.ts` ichida `maxInstantiationDepth` va `maxInstantiationCount`). Config orqali o'zgartirib bo'lmaydi.
+2. **"50 va 1000 limit qaerda hardcoded?"** — `tsc` checker source'ida. Non-tail uchun `instantiationDepth` hisoblagichi (qattiq cap 100) va recursion-identity heuristic tuple build'ni amaliy ~50 darajada to'xtatadi; tail-recursive uchun `tailCount` 1000 darajada to'xtaydi. Config orqali o'zgartirib bo'lmaydi.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-TS 4.5 release tail-call optimization implementation: AST'da recursive conditional type aniqlanadi, agar `instantiation` eng oxirgi pozitsiyada bo'lsa, compiler iterative resolution path'ga o'tadi. Stack frame yaratmasdan, har step uchun bir xil instance qayta ishlatadi.
+TS 4.5 release tail-call optimization implementation: conditional type'ning natijasi yana bir conditional bo'lsa (tail position), compiler iterative resolution path'ga o'tadi. Stack frame chuqurlashtirmasdan, loop bilan resolve qiladi.
 
 Algorithm detail (simplified):
-1. Compiler `getConditionalType` chaqirig'ida `isTailRecursive(node)` tekshiradi
-2. Tail recursive bo'lsa — `instantiationDepth` inkrement qilinmaydi
-3. Iterative loop bilan resolve davom etadi
-4. Non-tail — har step depth + 1, 50 darajada throw
+1. `getConditionalType` checker'da true/false branch'ning natijasi yana conditional ekanini tekshiradi (tail position)
+2. Tail recursive bo'lsa — `tailCount` hisoblagichi orqali loop'da davom etadi, `instantiationDepth` har step uchun oshmaydi
+3. `tailCount` 1000 ga yetganda `excessively deep` throw
+4. Non-tail — har instantiation `instantiationDepth`'ni oshiradi; recursion-identity heuristic tuple build'ni amaliy ~50 darajada throw qiladi
 
 Real-world impact:
 - **ts-toolbelt, type-fest:** tuple manipulation library'lar accumulator pattern'ga to'liq tayanadi
@@ -1456,7 +1461,7 @@ Performance tip: agar tail-recursive refactor mumkin bo'lmasa, recursive type'ni
 - `infer extends` (TS 4.7+) — string'dan number/boolean parse, inferred type cheklash
 - Deferred conditional — generic body'da resolve bo'lmaydi, function overload yechim
 - `infer` covariant (return) → union, contravariant (parameter) → intersection
-- Recursive conditional 50 daraja limit. Tail recursion (TS 4.5+) 1000+ darajagacha
+- Recursive conditional non-tail amaliy ~50 daraja limit. Tail recursion (TS 4.5+) 1000 darajagacha (`tailCount`)
 - `IsNever` → `[T] extends [never]`, `IsAny` → `0 extends 1 & T`
 - `UnionToIntersection` — contravariant infer bilan
 - DeepPartial/DeepReadonly — mapped type + recursive conditional + Function branch

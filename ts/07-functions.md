@@ -59,7 +59,7 @@ Parametr type annotation'i noto'g'ri argument berilishini oldini oladi va parame
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-TypeScript kompilatori funksiya chaqiruvini ko'rganda, har bir argument'ning type'ini funksiya signaturasidagi parametr type bilan solishtiradi. Bu **subtype** tekshiruvi — argument type parametr type'ning subtype'i bo'lsa mos keladi.
+TypeScript compiler funksiya chaqiruvini ko'rganda, har bir argument'ning type'ini funksiya signaturasidagi parametr type bilan solishtiradi. Bu **subtype** tekshiruvi — argument type parametr type'ning subtype'i bo'lsa mos keladi.
 
 ```
 greet("Ali") tekshiruvi:
@@ -73,9 +73,9 @@ greet(42) tekshiruvi:
   42 extends string? → ❌ xato
 ```
 
-Kompilator har bir funksiya deklaratsiyasi uchun **`Signature`** object yaratadi — unda parametr type'lari, return type, `this` type, minimum required parametr soni, va maksimal parametr soni saqlanadi. Funksiya chaqiruvini tekshirishda kompilator mos keluvchi signature'ni call expression bo'yicha hal qiladi va argument'larni unga moslashtiradi.
+Compiler har bir funksiya declaration'i uchun **`Signature`** object yaratadi — unda parametr type'lari ro'yxati, return type, `this` type va minimum required argument soni saqlanadi. Maksimal argument soni esa parametr ro'yxati uzunligidan kelib chiqadi (rest parameter bo'lsa cheksiz). Funksiya chaqiruvini tekshirishda compiler call expression uchun mos signature'ni hal qiladi va argument'larni unga moslashtiradi.
 
-**Parametr type annotation qo'yilmagan holat:** Agar parametr type'siz yozilsa, TypeScript odatda `any` beradi. Lekin `noImplicitAny` flag'i yoqilgan bo'lsa (yoki `strict: true`), kompilator xato beradi — har parametr uchun aniq type yoki contextual type (masalan, callback'da) kerak. Contextual type — funksiya tashqi contextdan type'ni "oladi", masalan `array.map((x) => x * 2)`'da `x` array element type'iga inferrans bo'ladi.
+**Parametr type annotation qo'yilmagan holat:** Agar parametr type'siz yozilsa, TypeScript odatda `any` beradi. Lekin `noImplicitAny` flag'i yoqilgan bo'lsa (yoki `strict: true`), compiler xato beradi — har parametr uchun aniq type yoki contextual type (masalan, callback'da) kerak. Contextual type — funksiya tashqi contextdan type'ni "oladi", masalan `array.map((x) => x * 2)`'da `x` array element type'iga infer bo'ladi.
 
 **Annotation vs inference:** Parametr type'lari uchun annotation kerak bo'lsa-da, return type uchun TypeScript ko'p hollarda inference qiladi. Shuning uchun `function add(a: number, b: number)` yozish ham mumkin — TypeScript return type `number` deb biladi. Lekin public API'larda explicit return type tavsiya etiladi (pastda batafsil).
 
@@ -168,7 +168,7 @@ function add(a, b) {
 const multiply = (a, b) => a * b;
 ```
 
-Type annotation'lar — **sof compile-time** konstruksiya. Runtime'da hech qanday iz qolmaydi. Funksiya JavaScript'dagi oddiy funksiya — `typeof add === "function"`.
+Type annotation'lar — **sof compile-time** construction. Runtime'da hech qanday iz qolmaydi. Funksiya JavaScript'dagi oddiy funksiya — `typeof add === "function"`.
 
 </details>
 
@@ -188,7 +188,7 @@ TypeScript inference mexanizmi kuchli — ko'p hollarda return type yozish shart
 | Holat | Yozish kerakmi? | Sabab |
 |-------|-----------------|-------|
 | Public API / library | ✅ Tavsiya | Consumer'lar uchun aniq contract, refactor xavfsizligi |
-| Recursive funksiya | ✅ Majburiy (ba'zan) | TS o'zi aniqlay olmaydi, infinite loop xavfi |
+| Recursive funksiya | ✅ Majburiy (ba'zan) | Return type o'zini chaqiradi — circular inference, TS7023 |
 | Murakkab return | ✅ Tavsiya | Kutilmagan type inference'ning oldini olish |
 | Private / internal | ❌ Shart emas | Inference yetarli, kod toza qoladi |
 | Oddiy arrow funksiya | ❌ Shart emas | `const sum = (a: number, b: number) => a + b` — aniq |
@@ -211,7 +211,7 @@ function parseJSON(text: string): unknown {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-TypeScript kompilatori funksiya body'dagi **barcha `return` statement'larini** yig'adi va ularning type'larini **union** qiladi. Agar hech qanday `return` yo'q bo'lsa — return type `void`.
+TypeScript compiler funksiya body'dagi **barcha `return` statement'larini** yig'adi va ularning type'larini **union** qiladi. Agar hech qanday `return` yo'q bo'lsa — return type `void`.
 
 ```
 function getValue(condition: boolean) {
@@ -222,9 +222,9 @@ function getValue(condition: boolean) {
 Inference: string | number
 ```
 
-Literal type'lar odatda `return` context'ida kengaytiriladi (widen) — `"hello"` → `string`, `42` → `number`. Bu `let` assignment'dagi widening bilan bir xil qoida — kompilator kengroq type tanlaydi, chunki boshqa holat'larda ham shu funksiya ishlatilishi mumkin.
+Literal type'lar odatda `return` context'ida kengaytiriladi (widen) — `"hello"` → `string`, `42` → `number`. Bu `let` assignment'dagi widening bilan bir xil qoida — compiler kengroq type tanlaydi, chunki boshqa holat'larda ham shu funksiya ishlatilishi mumkin.
 
-**Recursive funksiyalar:** TypeScript rekursiv funksiyalarda return type'ni aniqlash uchun "type seed" (tiyin) kerak — funksiya o'zini chaqirsa, kompilator hali o'zini bilmaydi. Bu holatda explicit return type yozish kerak:
+**Recursive funksiyalar:** Funksiya o'z return type'ini aniqlash uchun body'ni tahlil qiladi, lekin body o'zini chaqirsa — compiler'ga hali aniqlanmagan return type kerak bo'ladi. Bu circular bog'liqlikda compiler inference'ni `any` bilan to'xtatadi va `noImplicitAny` ostida xato beradi. Bu holatda explicit return type yozish kerak:
 
 ```typescript
 // ❌ TS inference'ni aniqlay olmaydi
@@ -378,7 +378,7 @@ Bu farq `exactOptionalPropertyTypes` flag'i (TS 4.4+) bilan yanada kuchayadi. Bu
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-TypeScript kompilatori optional parameter'ni ko'rganda, funksiya chaqiruvida argument sonini quyidagicha tekshiradi:
+TypeScript compiler optional parameter'ni ko'rganda, funksiya chaqiruvida argument sonini quyidagicha tekshiradi:
 
 ```
 function createOrder(product: string, quantity?: number, urgent?: boolean)
@@ -393,7 +393,7 @@ createOrder()                      → 0 arguments, 0 < 1 ❌
 createOrder("a", "b", "c", "d")    → 4 arguments, 4 > 3 ❌
 ```
 
-**`Signature` object'da hisoblash:** Kompilator har funksiya uchun `Signature` object'da `minArgumentCount` va `parameters.length` (maksimal) saqlaydi. Optional parametr'lar `minArgumentCount`'ga qo'shilmaydi. Rest parameter bo'lsa, `maxArgumentCount` — cheksiz.
+**`Signature` object'da hisoblash:** Compiler har funksiya uchun `Signature` object'da `minArgumentCount` (required parametr soni) va `parameters` ro'yxatini saqlaydi. Optional parametr'lar `minArgumentCount`'ga qo'shilmaydi. Maksimal argument soni `parameters` uzunligidan hisoblanadi — rest parameter bo'lsa esa yuqori chegara yo'q.
 
 **`exactOptionalPropertyTypes` (TS 4.4+).** Bu flag optional property/parameter semantikasini o'zgartiradi. Oddiy holat'da `x?: string` = `string | undefined`. `exactOptionalPropertyTypes: true` bo'lsa, "optional" va "undefined" alohida tushunchalar:
 
@@ -484,12 +484,12 @@ function request(url: string, options?: Options): void {
 request("/api/data");
 request("/api/data", { retries: 5 });
 
-// 6. ⚠️ Optional parameter division'da
+// 6. Optional parameter division'da
 function unsafeDivide(a: number, b?: number): number {
-  return a / b!; // ❌ b undefined bo'lsa — NaN
+  return a / b!; // ❌ ! type xatosini bostiradi, lekin b undefined bo'lsa runtime NaN qaytaradi
 }
 
-// ✅ Default parameter bilan xavfsiz
+// ✅ Default parameter bilan xavfsiz — b har doim number
 function safeDivide(a: number, b: number = 1): number {
   return a / b;
 }
@@ -557,9 +557,9 @@ Default parameter o'rtada ham bo'lishi mumkin, lekin chaqirayotgan joyda uni "sk
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-TypeScript kompilatori default parameter'ni ko'rganda ikki narsa sodir bo'ladi: **type inference** va **compiled output**'da default qiymatni saqlash.
+TypeScript compiler default parameter'ni ko'rganda ikki narsa sodir bo'ladi: **type inference** va **compiled output**'da default qiymatni saqlash.
 
-**Type inference:** `page = 1` ko'rilganda, kompilator `1` ning type'ini aniqlab, `page` ga `number` type beradi. Bu **widening** — literal type `1` emas, balki `number` type assign bo'ladi. `let` va `var` deklaratsiyasi bilan bir xil widening qoidasi:
+**Type inference:** `page = 1` ko'rilganda, compiler `1` ning type'ini aniqlab, `page` ga `number` type beradi. Bu **widening** — literal type `1` emas, balki `number` type assign bo'ladi. `let` va `var` declaration'i bilan bir xil widening qoidasi:
 
 ```
 function createPagination(page = 1, limit = 20)
@@ -577,11 +577,11 @@ Agar aniq literal type kerak bo'lsa, explicit annotation yoki `as const` ishlati
 function withLiteral(mode: "dev" | "prod" = "dev"): void { }
 // mode: "dev" | "prod" — literal saqlanadi, chunki explicit type bor
 
-function withAsConst(modes = ["a", "b", "c"] as const): void { }
-// modes: readonly ["a", "b", "c"] — as const tufayli literal tuple
+function withAsConst(roles = ["admin", "editor", "viewer"] as const): void { }
+// roles: readonly ["admin", "editor", "viewer"] — as const tufayli literal tuple
 ```
 
-**Compiled output'da default value:** Bu — type annotation emas, runtime feature. Shuning uchun kompilator target ga qarab turlicha emit qiladi:
+**Compiled output'da default value:** Bu — type annotation emas, runtime feature. Shuning uchun compiler target ga qarab turlicha emit qiladi:
 
 - **ES2015+ (ES6+):** `function f(x = 10)` — JS syntax'i to'g'ridan-to'g'ri qoldiriladi (native JS default parameter).
 - **ES5:** `function f(x)` + body boshida `if (x === void 0) { x = 10; }` pattern.
@@ -775,23 +775,23 @@ withFirstString("label", 1, 2, 3); // ✅
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Rest parameter — **runtime feature**, compile-time annotation emas. TypeScript kompilatori rest parameter'ni tuple yoki array type bilan bog'laydi va chaqiruv argument'larini tekshiradi.
+Rest parameter — **runtime feature**, compile-time annotation emas. TypeScript compiler rest parameter'ni tuple yoki array type bilan bog'laydi va chaqiruv argument'larini tekshiradi.
 
 ```
 function log(level: string, ...messages: string[])
 
-Compiler internal:
+Compiler tahlili:
   parameters: [level: string]
   rest parameter: messages: string[]
   minArgumentCount: 1
-  maxArgumentCount: Infinity
+  max chegara: yo'q (rest parameter)
 
 log("info")                → 1 argument, ≥ 1 ✅
 log("info", "a", "b")      → 3 arguments, ≥ 1 ✅
 log()                      → 0 arguments, < 1 ❌
 ```
 
-**Spread argument bilan tekshirish:** Spread argument (`func(...arr)`) ishlatilganda, kompilator array'ning **uzunligini bilishi kerak** — aks holda aniq argument count tekshiruvini qila olmaydi:
+**Spread argument bilan tekshirish:** Spread argument (`func(...arr)`) ishlatilganda, compiler array'ning **uzunligini bilishi kerak** — aks holda aniq argument count tekshiruvini qila olmaydi:
 
 ```
 function add(a: number, b: number): number
@@ -975,7 +975,7 @@ Overload'ni faqat return type parametrga qarab **o'zgarganda** ishlatish kerak �
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Overload resolution kompilator ichida quyidagi algoritm bo'yicha amalga oshiriladi:
+Overload resolution compiler ichida quyidagi algoritm bo'yicha amalga oshiriladi:
 
 ```
 Overload Resolution Algorithm:
@@ -1017,11 +1017,11 @@ const result = processRight("hello");
 // result type: string[] ✅
 ```
 
-**Implementation signature tashqi dunyodan yashirin:** TypeScript implementation signature'ni `getSignaturesOfType()`'dan chiqarib tashlaydi. Bu yashirinlik sabab — implementation signature ko'pincha ancha keng (`string | number`) bo'ladi, lekin caller'lar har doim bitta aniq variant bilan chaqiradi. Agar implementation ham "visible" bo'lsa, overload'lar keraksiz bo'lib qolardi.
+**Implementation signature tashqi dunyodan yashirin:** Bir nechta overload signature mavjud bo'lganda, compiler call'larni tekshirishda implementation signature'ni candidate ro'yxatidan chiqarib tashlaydi — faqat overload signature'lar ko'rinadi. Sabab: implementation signature ko'pincha ancha keng (`string | number`) bo'ladi, lekin caller'lar har doim bitta aniq variant bilan chaqiradi. Agar implementation ham "visible" bo'lsa, overload'lar keraksiz bo'lib qolardi.
 
 **Overload vs generic function:** Ba'zi holatlarda overload o'rniga generic funksiya yaxshiroq. Masalan, `identity<T>(x: T): T` — har qanday type uchun ishlaydi. Overload faqat **dispatch** kerak bo'lganda (turli parameter turlari turli return type beradi) qo'llaniladi.
 
-**Implementation signature caller'lar uchun ko'rinmasligi:** Agar 2 ta overload + implementation yozsangiz, caller'ga faqat 2 ta variant ko'rinadi. Implementation signature'dagi keng type (`string | number | boolean`) caller uchun emas — faqat body'ni yozish uchun kompilatorga yordam uchun.
+**Implementation signature caller'lar uchun ko'rinmasligi:** Agar 2 ta overload + implementation yozsangiz, caller'ga faqat 2 ta variant ko'rinadi. Implementation signature'dagi keng type (`string | number | boolean`) caller uchun emas — faqat body'ni yozish uchun compiler'ga yordam uchun.
 
 </details>
 
@@ -1087,8 +1087,8 @@ function parseConfig(source: string, raw?: boolean): Record<string, string> | st
   return result;
 }
 
-const parsed = parseConfig("key=value\nfoo=bar");   // Record<string, string>
-const raw = parseConfig("key=value\nfoo=bar", true); // string
+const parsed = parseConfig("host=localhost\nport=5432");   // Record<string, string>
+const raw = parseConfig("host=localhost\nport=5432", true); // string
 
 // 6. ❌ Keraksiz overload — union yetarli
 function toStringBad(value: string): string;
@@ -1136,9 +1136,9 @@ Call signature ikkita syntax'da yoziladi — `type` alias yoki `interface`. Ikka
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Call signature — **faqat type system**'da mavjud bo'lgan konstruksiya. Compiled JavaScript'da call signature'ning hech qanday izi qolmaydi — butunlay type erasure qurboni.
+Call signature — **faqat type system**'da mavjud bo'lgan construction. Compiled JavaScript'da call signature'ning hech qanday izi qolmaydi — butunlay type erasure qurboni.
 
-TypeScript kompilatori ichida call signature `CallSignatureDeclaration` AST node sifatida saqlanadi. Bu node funksiya type'ini object type ichida ifodalaydi. Kompilator object type'ni tekshirganda, call signature bor-yo'qligini ko'radi — agar bor bo'lsa, shu object'ni funksiya sifatida chaqirish mumkinligini belgilaydi.
+TypeScript compiler ichida call signature `CallSignatureDeclaration` AST node sifatida saqlanadi. Bu node funksiya type'ini object type ichida ifodalaydi. Compiler object type'ni tekshirganda, call signature bor-yo'qligini ko'radi — agar bor bo'lsa, shu object'ni funksiya sifatida chaqirish mumkinligini belgilaydi.
 
 ```
 type Logger = {
@@ -1154,7 +1154,7 @@ Compiler tekshiruvi:
 
 **Hybrid type** — bu TypeScript community'da qabul qilingan nom. Call signature + property'lar birgalikda type'ni "ham funksiya, ham object" qiladi. JavaScript runtime'da bunday object oddiy JS function — `typeof hybridObj === "function"` qaytaradi, chunki JS funksiyalari ham object'dir (ularga property assign qilish mumkin).
 
-**Arrow function type vs call signature:** Ikkalasi ham kompilator ichida bir xil `Signature` object'ga resolve bo'ladi. Farq faqat syntax'da:
+**Arrow function type vs call signature:** Ikkalasi ham compiler ichida bir xil `Signature` object'ga resolve bo'ladi. Farq faqat syntax'da:
 
 ```typescript
 // Arrow syntax — faqat funksiya
@@ -1188,7 +1188,7 @@ function createCounter(): Counter {
 }
 ```
 
-`Object.assign` funksiya object'ga property'larni qo'shadi va natija'ni qaytaradi. TypeScript 3.0'dan boshlab `Object.assign` return type'i barcha qo'shilgan property'lar bilan hisoblanadi — shuning uchun hybrid type'ga ishonchli cast qilish mumkin.
+`Object.assign` funksiya object'ga property'larni qo'shadi va natija'ni qaytaradi. `lib.es2015.core.d.ts`'dagi `Object.assign` overload'lari return type'ni target va source'larning **intersection**'i sifatida hisoblaydi — shuning uchun natija barcha qo'shilgan property'lar bilan birga hybrid type'ga mos keladi (explicit cast shart emas).
 
 </details>
 
@@ -1321,7 +1321,7 @@ const logger = Object.assign(
 );
 ```
 
-Call signature — sof type system konstruksiyasi. Compiled JavaScript'da faqat `Object.assign` chaqiriq qoladi — bu JS runtime feature. TypeScript hech qanday kod qo'shmaydi.
+Call signature — sof type system construction'i. Compiled JavaScript'da faqat `Object.assign` chaqiriq qoladi — bu JS runtime feature. TypeScript hech qanday kod qo'shmaydi.
 
 </details>
 
@@ -1373,7 +1373,7 @@ Bu pattern JavaScript'ning legacy API'larida uchraydi. Zamonaviy kod'da kam ishl
 
 Construct signature — type system'da `new` bilan chaqiriladigan funksiyani ifodalash usuli. Compiled JavaScript'da construct signature **butunlay o'chiriladi** — faqat compile-time tekshiruv uchun mavjud.
 
-TypeScript kompilatori ichida construct signature `ConstructSignatureDeclaration` node sifatida AST'da saqlanadi. `new ctor(args)` expression ko'rilganda, kompilator `ctor`'ning type'ida construct signature borligini tekshiradi. Agar yo'q bo'lsa — `This expression is not constructable` xatosi beradi.
+TypeScript compiler ichida construct signature `ConstructSignatureDeclaration` node sifatida AST'da saqlanadi. `new ctor(args)` expression ko'rilganda, compiler `ctor`'ning type'ida construct signature borligini tekshiradi. Agar yo'q bo'lsa — `This expression is not constructable` xatosi beradi.
 
 ```
 type UserConstructor = {
@@ -1389,7 +1389,7 @@ Compiler tekshiruvi:
 
 JavaScript runtime'da `new` keyword — JS'ning oddiy constructor chaqiruv mexanizmi: prototype chain, `this` binding, va object creation. TypeScript'ning construct signature bu mexanizmga **hech narsa qo'shmaydi** — faqat compile-time'da argument type'lari va return type to'g'ri ekanligini kafolatlaydi.
 
-**Class'lar avtomatik construct signature'ga ega:** Kompilator class'ning `constructor` method'idan construct signature'ni hosil qiladi. Shuning uchun `new ClassName()` chaqiruvi type-safe bo'ladi. Class nomi ham type sifatida, ham value (constructor funksiya) sifatida ishlatiladi:
+**Class'lar avtomatik construct signature'ga ega:** Compiler class'ning `constructor` method'idan construct signature'ni hosil qiladi. Shuning uchun `new ClassName()` chaqiruvi type-safe bo'ladi. Class nomi ham type sifatida, ham value (constructor funksiya) sifatida ishlatiladi:
 
 ```typescript
 class Point {
@@ -1404,7 +1404,7 @@ const PointCtor: typeof Point = Point;
 const p2 = new PointCtor(3, 4);
 ```
 
-**Abstract class va construct signature:** Abstract class'ni `new` bilan chaqirish taqiqlanadi — kompilator construct signature'ni "abstract" deb belgilaydi va `new AbstractClass()` xato beradi. Lekin abstract class concrete subclass'lar uchun constructor signature'ga ega — factory pattern'da ishlatish mumkin.
+**Abstract class va construct signature:** Abstract class'ni to'g'ridan-to'g'ri `new` bilan chaqirish taqiqlanadi — compiler unga abstract construct signature beradi va `new AbstractClass()` xato qiladi. Bunday abstract constructor `new (...args: any[]) => T` kabi non-abstract construct signature'ga assign bo'lmaydi (TS2345). Abstract class'ni factory parameter sifatida qabul qilish uchun signature ham `abstract` bo'lishi kerak: `Ctor: abstract new (...args: any[]) => T` (TS 4.2+). Concrete subclass'lar (masalan, `Circle`) har ikkala signature'ga ham mos keladi.
 
 </details>
 
@@ -1506,7 +1506,7 @@ function createShape(Ctor: new (...args: any[]) => Shape, ...args: any[]): Shape
 }
 
 const circle = createShape(Circle, 5);
-// const shape = createShape(Shape); // ❌ Error: Cannot create instance of abstract class
+// const shape = createShape(Shape); // ❌ Error: abstract constructor type non-abstract'ga assign bo'lmaydi
 ```
 
 </details>
@@ -1576,7 +1576,7 @@ button.onClick(new MouseEvent("click"));
 
 `this` parameter — TypeScript'ning **eng aniq type erasure** misollaridan biri. Compile bo'lganda birinchi `this` parameter **butunlay o'chiriladi** — JavaScript output'da u mavjud emas. Runtime'da `this` parameter hech qanday himoya bermaydi — faqat compile-time xavfsizlik.
 
-TypeScript kompilatori `this` parameter'ni boshqa parametrlardan farqlaydi — birinchi parameter nomi `this` bo'lsa, uni **pseudo-parameter** sifatida belgilaydi. Parameter list'dan chiqarib tashlanadi va funksiya chaqiruvlarida argument count'ga qo'shilmaydi.
+TypeScript compiler `this` parameter'ni boshqa parametrlardan farqlaydi — birinchi parameter nomi `this` bo'lsa, uni **pseudo-parameter** sifatida belgilaydi. Parameter list'dan chiqarib tashlanadi va funksiya chaqiruvlarida argument count'ga qo'shilmaydi.
 
 ```
 TS source:
@@ -1592,7 +1592,7 @@ Compiled JS:
 function handleClick(event) { ... }
 ```
 
-Kompilator `this` parameter turgan funksiya chaqiruvlarini tekshiradi — chaqiruv konteksti (method call, `.call()`, `.bind()`) orqali `this`'ning type'ini aniqlaydi va belgilangan type'ga mos kelishini verify qiladi. Agar funksiya detach qilinsa (variable'ga assign bo'lsa), `this` kontekst yo'qolishi haqida xato beradi.
+Compiler `this` parameter turgan funksiya chaqiruvlarini tekshiradi — chaqiruv konteksti (method call, `.call()`, `.bind()`) orqali `this`'ning type'ini aniqlaydi va belgilangan type'ga mos kelishini verify qiladi. Agar funksiya detach qilinsa (variable'ga assign bo'lsa), `this` kontekst yo'qolishi haqida xato beradi.
 
 **Arrow funksiya va `this`:** Arrow funksiyalarda `this` **lexical** — o'rab turgan scope'dan olinadi. Shuning uchun arrow funksiyada `this` parameter ishlatib bo'lmaydi — TypeScript buni taqiqlaydi:
 
@@ -1737,7 +1737,7 @@ function handleClick(event) {
 // (method call, .call, .bind, new, arrow function lexical)
 ```
 
-`this` parameter — **type erasure** qurboni. JavaScript'ga compile bo'lganda u butunlay yo'qoladi. Lekin compile-time'da kompilator chaqiruv kontekstini tekshiradi va noto'g'ri usage'ni topadi.
+`this` parameter — **type erasure** qurboni. JavaScript'ga compile bo'lganda u butunlay yo'qoladi. Lekin compile-time'da compiler chaqiruv kontekstini tekshiradi va noto'g'ri usage'ni topadi.
 
 </details>
 
@@ -1766,7 +1766,7 @@ function findItem(arr: number[], target: number): number | undefined {
 }
 ```
 
-**`void`'ning maxsus xatti-harakati callback context'da.** Kompilator `() => void` type'li callback uchun return type'ni **ignore** qiladi — callback istalgan qiymat qaytarishi mumkin, lekin u qiymat **o'qilmaydi**. Bu JavaScript'ning real pattern'ini support qilish uchun kiritilgan ongli dizayn qarori.
+**`void`'ning maxsus xatti-harakati callback context'da.** Compiler `() => void` type'li callback uchun return type'ni **ignore** qiladi — callback istalgan qiymat qaytarishi mumkin, lekin u qiymat **o'qilmaydi**. Bu JavaScript'ning real pattern'ini support qilish uchun kiritilgan ongli dizayn qarori.
 
 ```typescript
 // forEach callback type: (value: T) => void
@@ -1797,7 +1797,7 @@ const cb: Callback = () => 42; // ✅ — void callback'da ruxsat
 
 `void` va `undefined` — JavaScript runtime'da **ikkalasi ham** `undefined` qiymatga resolve bo'ladi. Farq faqat TypeScript type system ichida mavjud — compiled JS'da ular orasida hech qanday farq yo'q.
 
-TypeScript kompilatori ichida `void` va `undefined` **alohida type node**'lar sifatida saqlanadi. `void` — `VoidKeyword`, `undefined` — `UndefinedKeyword`. Checker ular orasida assignability qoidalarini quyidagicha belgilaydi:
+TypeScript compiler ichida `void` va `undefined` **alohida type node**'lar sifatida saqlanadi. `void` — `VoidKeyword`, `undefined` — `UndefinedKeyword`. Checker ular orasida assignability qoidalarini quyidagicha belgilaydi:
 
 ```
 Type assignability:
@@ -1806,7 +1806,7 @@ Type assignability:
   number → void:     ❌ (hech qanday type void'ga assign bo'lmaydi, callback'dan tashqari)
 ```
 
-**`void`'ning maxsus callback xatti-harakati:** kompilator assignability tekshiruvida buni maxsus case sifatida handle qiladi. Agar target type `void` va expression "contextual type" (callback, method arg) da ishlatilsa, return type tekshirilmaydi. Agar funksiya deklaratsiyasi bo'lsa (standalone function yoki method body'si), return type tekshiriladi va `void` uchun return qiymat taqiqlanadi.
+**`void`'ning maxsus callback xatti-harakati:** compiler assignability tekshiruvida buni maxsus case sifatida handle qiladi. Agar target type `void` va expression "contextual type" (callback, method arg) da ishlatilsa, return type tekshirilmaydi. Agar funksiya declaration'i bo'lsa (standalone function yoki method body'si), return type tekshiriladi va `void` uchun return qiymat taqiqlanadi.
 
 **Nima uchun bu asimmetriya?** JavaScript'da `Array.prototype.forEach`, `Array.prototype.map`, event handler'lar kabi ko'p API'lar callback'dan void kutadi. Lekin developer'lar ko'pincha return qiymatli expression yozadilar:
 
@@ -1884,8 +1884,9 @@ interface Publisher {
 
 const pub: Publisher = {
   notify(event) {
-    // Implementation return number ham qilsa, void consumer ishlatmaydi
-    return event.length as unknown as void;
+    // void return type'li funksiya istalgan qiymat qaytarishi mumkin —
+    // consumer uni void deb ko'radi va ishlatmaydi (cast kerak emas)
+    return event.length;
   },
 };
 
@@ -1904,13 +1905,19 @@ function neverFn(): never {
   // Yoki: while (true) { } — infinite loop
 }
 
-// 8. void callback'da error handling
+// 8. Promise<void> — void leniency Promise ichida ISHLAMAYDI
 type AsyncVoid = () => Promise<void>;
 
-const task: AsyncVoid = async () => {
-  const data = await fetch("/api/data");
-  return data.status as unknown as void; // ignored by caller
+// ✅ qiymat qaytarmaydi — Promise<void>
+const taskOk: AsyncVoid = async () => {
+  await fetch("/api/data");
 };
+
+// ❌ Promise<number> — Promise<void>'ga assign bo'lmaydi
+// const taskBad: AsyncVoid = async () => {
+//   const data = await fetch("/api/data");
+//   return data.status; // Error: number not assignable to void
+// };
 
 // 9. Explicit undefined vs void parameter
 function optional(x?: number): void {}  // x?: number → number | undefined
@@ -1981,9 +1988,9 @@ Function type expression'lar **reusable** type yaratish uchun ishlatiladi — bi
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Function type expression — **butunlay type-level** konstruksiya. Compiled JS'da `type Predicate<T> = (value: T) => boolean` kabi deklaratsiyalar **to'liq o'chiriladi** — hech qanday JS kodi hosil bo'lmaydi.
+Function type expression — **butunlay type-level** construction. Compiled JS'da `type Predicate<T> = (value: T) => boolean` kabi declaration'lar **to'liq o'chiriladi** — hech qanday JS kodi hosil bo'lmaydi.
 
-TypeScript kompilatori ichida function type expression `FunctionTypeNode` AST node sifatida parse qilinadi. Bu node `TypeAliasDeclaration` ichida turadi (`type X = ...`). Kompilator type alias'ni **resolve** qilganda, function type'ning parametr type'lari va return type'ini `Signature` object'ga aylantiradi — bu real funksiya deklaratsiyasining signature'i bilan bir xil internal representation.
+TypeScript compiler ichida function type expression `FunctionTypeNode` AST node sifatida parse qilinadi. Bu node `TypeAliasDeclaration` ichida turadi (`type X = ...`). Compiler type alias'ni **resolve** qilganda, function type'ning parametr type'lari va return type'ini `Signature` object'ga aylantiradi — bu real funksiya declaration'ining signature'i bilan bir xil internal representation.
 
 ```
 type Predicate<T> = (value: T) => boolean;
@@ -2000,7 +2007,7 @@ Ishlatilganda:
   → predicate parameter'ning type'i sifatida tekshiriladi
 ```
 
-Generic function type (`Predicate<T>`) instantiate bo'lganda, kompilator `T`'ni aniq type bilan almashtiradi va yangi `Signature` hosil qiladi. Bu jarayon ham faqat compile-time'da sodir bo'ladi — runtime'da hech qanday iz yo'q.
+Generic function type (`Predicate<T>`) instantiate bo'lganda, compiler `T`'ni aniq type bilan almashtiradi va yangi `Signature` hosil qiladi. Bu jarayon ham faqat compile-time'da sodir bo'ladi — runtime'da hech qanday iz yo'q.
 
 **Function type vs call signature farqi:**
 
@@ -2015,7 +2022,7 @@ type Fn2 = {
 };
 ```
 
-Farq: `Fn1`'da property qo'shib bo'lmaydi, `Fn2`'da property qo'shish mumkin. Ikkalasi ham kompilator ichida `Signature` object sifatida saqlanadi, lekin `Fn2`'da qo'shimcha property signature'lar ham bor. Agar faqat funksiya kerak bo'lsa, arrow syntax afzal — qisqa va o'qishga oson.
+Farq: `Fn1`'da property qo'shib bo'lmaydi, `Fn2`'da property qo'shish mumkin. Ikkalasi ham compiler ichida `Signature` object sifatida saqlanadi, lekin `Fn2`'da qo'shimcha property signature'lar ham bor. Agar faqat funksiya kerak bo'lsa, arrow syntax afzal — qisqa va o'qishga oson.
 
 **Type alias vs interface uchun funksiya type:**
 
@@ -2191,7 +2198,7 @@ function firstElement(arr) { return arr[0]; }
 // <T> va T[] type annotation'lar to'liq o'chirildi
 ```
 
-TypeScript kompilatori generic funksiya chaqiruvini ko'rganda **type inference** jarayonini ishga tushiradi. Kompilator argument'ning actual type'ini parametr type'idagi type variable bilan **unification** qiladi:
+TypeScript compiler generic funksiya chaqiruvini ko'rganda **type inference** jarayonini ishga tushiradi. Compiler argument'ning actual type'ini parametr type'idagi type variable bilan **unification** qiladi:
 
 ```
 firstElement(["a", "b"]) chaqiruvida:
@@ -2201,9 +2208,9 @@ firstElement(["a", "b"]) chaqiruvida:
   4. Return type: T | undefined → string | undefined
 ```
 
-Agar kompilator type'ni infer qila olmasa, constraint type yoki `unknown`'ga fallback qiladi. Explicit type argument — `firstElement<number>([1, 2])` — inference'ni override qiladi.
+Agar compiler type'ni infer qila olmasa, constraint type yoki `unknown`'ga fallback qiladi. Explicit type argument — `firstElement<number>([1, 2])` — inference'ni override qiladi.
 
-**Generic constraint** (`extends`) — compile-time'da type parameter'ning upper bound'ini belgilaydi. `T extends { length: number }` deganda, kompilator `T` sifatida faqat `length: number` property'ga ega type'larni qabul qiladi. Bu constraint ham runtime'da yo'q — faqat checker tomonidan tekshiriladi.
+**Generic constraint** (`extends`) — compile-time'da type parameter'ning upper bound'ini belgilaydi. `T extends { length: number }` deganda, compiler `T` sifatida faqat `length: number` property'ga ega type'larni qabul qiladi. Bu constraint ham runtime'da yo'q — faqat checker tomonidan tekshiriladi.
 
 **`keyof` bilan generic constraint** — juda foydali pattern:
 
@@ -2219,7 +2226,7 @@ getProperty(user, "age");   // number
 // getProperty(user, "phone"); // ❌ Error: "phone" keyof user'da yo'q
 ```
 
-Bu pattern `08-generics.md` va `13-mapped-types.md`'da batafsil ko'rib chiqiladi. Hozircha `K extends keyof T` konstruksiyasi — "K, T'ning key'laridan biri" deganlikdir.
+Bu pattern `08-generics.md` va `13-mapped-types.md`'da batafsil ko'rib chiqiladi. Hozircha `K extends keyof T` construction'i — "K, T'ning key'laridan biri" deganlikdir.
 
 **`const` type parameter** (TS 5.0+) — type parameter'ga `const` qo'shib, inference'da literal type'larni saqlash:
 
@@ -2338,7 +2345,7 @@ Callback pattern'lar JavaScript/TypeScript'da hammajoyda ishlatiladi:
 - **Node.js callback'lar** — `fs.readFile(path, (err, data) => {})`
 - **Higher-order function'lar** — `retry`, `debounce`, `throttle`
 
-**Contextual typing** — TypeScript'ning eng foydali callback feature'laridan biri. Callback inline yozilganda (arrow function sifatida), kompilator tashqi funksiya signaturasidan callback'ning parameter type'larini **infer** qiladi. Shuning uchun inline callback'larda parametr type yozish ko'pincha kerak emas.
+**Contextual typing** — TypeScript'ning eng foydali callback feature'laridan biri. Callback inline yozilganda (arrow function sifatida), compiler tashqi funksiya signaturasidan callback'ning parameter type'larini **infer** qiladi. Shuning uchun inline callback'larda parametr type yozish ko'pincha kerak emas.
 
 ```typescript
 // addEventListener type: (handler: (event: MouseEvent) => void) => void
@@ -2355,7 +2362,7 @@ document.body.addEventListener("click", (event) => {
 
 Callback type annotation'lari — boshqa type annotation'lar kabi **compile-time'da to'liq o'chiriladi**. Runtime'da callback funksiyalar oddiy JS function object sifatida beriladi — hech qanday type metadata saqlanmaydi.
 
-TypeScript kompilatori callback type'larni tekshirishda **contextual typing** mexanizmidan foydalanadi. Callback inline yozilganda, kompilator tashqi funksiya signaturasidagi parametr type'idan callback'ning parametr type'larini infer qiladi:
+TypeScript compiler callback type'larni tekshirishda **contextual typing** mexanizmidan foydalanadi. Callback inline yozilganda, compiler tashqi funksiya signaturasidagi parametr type'idan callback'ning parametr type'larini infer qiladi:
 
 ```
 addClickListener(document.body, (event) => { ... });
@@ -2368,7 +2375,7 @@ Contextual typing jarayoni:
   5. Callback ichida event.clientX → MouseEvent'da bor → ✅
 ```
 
-Bu **bidirectional type flow** — type ma'lumoti tashqi funksiyadan ichki callback'ga oqadi. Shuning uchun inline callback'larda parametr type yozish ko'pincha kerak emas — kompilator o'zi aniqlaydi.
+Bu **bidirectional type flow** — type ma'lumoti tashqi funksiyadan ichki callback'ga oqadi. Shuning uchun inline callback'larda parametr type yozish ko'pincha kerak emas — compiler o'zi aniqlaydi.
 
 **Callback type'lar uchun farqli contextual typing source'lari:**
 
@@ -2437,7 +2444,7 @@ type AsyncCallback<T> = (error: Error | null, result: T | null) => void;
 
 function fetchData(url: string, callback: AsyncCallback<string>): void {
   try {
-    const content = "file content"; // simulyatsiya
+    const content = "file content"; // simulation
     callback(null, content);
   } catch (error) {
     callback(error as Error, null);
@@ -2471,7 +2478,7 @@ function retry<T>(
         }
       }
     }
-    throw lastError; // TS biladi: loop oxirida error bo'lishi kerak
+    throw lastError; // lastError: Error | undefined — throw har qanday qiymatni qabul qiladi
   })();
 }
 
@@ -2571,7 +2578,7 @@ Intuitiv tushunish: funksiya return qilganda nima **chiqadi** (output), parametr
 class Animal { name = "animal"; }
 class Dog extends Animal { breed = "labrador"; }
 
-// Return type — COVARIANT (tabiy yo'nalish)
+// Return type — COVARIANT (tabiiy yo'nalish)
 type ReturnsAnimal = () => Animal;
 type ReturnsDog = () => Dog;
 
@@ -2624,7 +2631,7 @@ Source signature:  (sA: SA, sB: SB) => SR
 Target signature:  (tA: TA, tB: TB) => TR
 
 1. Argument count check:
-   source.minArgumentCount ≤ target.maxArgumentCount
+   source.minArgumentCount ≤ target parametr soni
    Source kamroq parameter olishi mumkin (extra ignored)
 
 2. Parameter types (CONTRAVARIANT):
@@ -2662,7 +2669,7 @@ type Inner = (callback: (arg: Dog) => void) => void;
 
 Murakkab misollar uchun intuitiv qoida: **har "kirish-chiqish" (`→`) yo'nalishini o'zgartiradi**. Bir `→` — contravariant (input), ikki `→` — covariant qayta. Bu munosabat **assignability** qoidasi, "tenglik" emas. Inner (torroq callback param) — Outer (kengroq callback param) subtype'i.
 
-**Parameter count soni tekshiruvi:** Kompilator target funksiyaning `minArgumentCount`'ini source funksiyaning parameter count bilan solishtiradi. Source'da kamroq parameter bo'lishi mumkin — ortiqcha parametr'lar ignore bo'ladi (JS xatti-harakatiga mos).
+**Parameter count soni tekshiruvi:** Compiler target funksiyaning `minArgumentCount`'ini source funksiyaning parameter count bilan solishtiradi. Source'da kamroq parameter bo'lishi mumkin — ortiqcha parametr'lar ignore bo'ladi (JS xatti-harakatiga mos).
 
 ```typescript
 type TwoArgs = (a: number, b: string) => void;
@@ -2681,22 +2688,22 @@ strictFunctionTypes: true:
   Method shorthand:  method(x: T): U → BIVARIANT x (backward compat)
 ```
 
-Kompilator AST node type'iga qarab qaysi variance qoidasini ishlatishni aniqlaydi. `PropertySignature` + `FunctionType` → contravariant, `MethodSignature` → bivariant.
+Compiler AST node type'iga qarab qaysi variance qoidasini ishlatishni aniqlaydi. `PropertySignature` + `FunctionType` → contravariant, `MethodSignature` → bivariant.
 
-**Nima uchun bu farq muhim?** Real DOM API'da:
+**Nima uchun bu farq muhim?** `lib.es5.d.ts`'da `Array<T>.push` method shorthand sifatida yozilgan — shuning uchun parametr'i bivariant. Bu array covariance bilan birgalikda quyidagi xavfsiz ko'rinadigan, lekin runtime'da xavfli kodga yo'l ochadi:
 
 ```typescript
-interface Array<T> {
-  push(...items: T[]): number;  // method shorthand — bivariant
-}
+class Animal { name = "animal"; }
+class Dog extends Animal { breed = "labrador"; }
+class Cat extends Animal { lives = 9; }
 
-// Bu ishlashini ta'minlash uchun:
 const dogs: Dog[] = [];
-const animals: Animal[] = dogs;  // ✅ array covariant (strictly unsafe but allowed)
-animals.push(new Cat()); // runtime'da dogs'ga Cat qo'shildi!
+const animals: Animal[] = dogs;  // ✅ array covariant — Dog[] Animal[]'ga assign bo'ladi
+animals.push(new Cat());          // ✅ push bivariant — xato bermaydi
+// Runtime'da dogs array'iga Cat qo'shildi — endi dogs[0] Dog emas
 ```
 
-Bu — **type system unsoundness** (TypeScript spec'da "hole" deb yuritiladi): runtime'da xavfli, lekin TypeScript backward compatibility uchun qo'llab-quvvatlaydi. Agar bu xavf bo'lsa, `readonly Dog[]` ishlatish kerak — covariant lekin xavfsiz (mutation taqiqlanadi).
+Bu — **type system unsoundness**: compile-time'da xato yo'q, lekin runtime'da `dogs` array'ida `Dog` bo'lmagan element paydo bo'ldi. TypeScript buni backward compatibility uchun qabul qiladi. Mutation'ni taqiqlash kerak bo'lsa `readonly Dog[]` ishlatiladi — covariant, lekin `push` mavjud emasligi sabab xavfsiz.
 
 </details>
 
@@ -2746,22 +2753,31 @@ const animals = [new Shape(), new Circle()];
 applyToAll(animals, (item) => console.log(item.color));
 // ✅ Ishlaydi, chunki Circle ham Shape
 
-// 5. Method shorthand bivariance
-interface Container<T> {
-  add(item: T): void;      // method shorthand
-  remove: (item: T) => void; // function property
+// 5. Method shorthand bivariance vs function property contravariance
+interface MethodBox<T> {
+  add(item: T): void;        // method shorthand — BIVARIANT
 }
 
-const circleContainer: Container<Circle> = {
+interface PropertyBox<T> {
+  add: (item: T) => void;    // function property — CONTRAVARIANT
+}
+
+const circleMethodBox: MethodBox<Circle> = {
   add(item) { console.log(item.radius); },
-  remove: (item) => console.log(item.radius),
 };
 
-// Bu ishlaydi method shorthand bivariance tufayli:
-const shapeContainer: Container<Shape> = circleContainer;
-// ❌ Aslida xavfli — shapeContainer.add(new Shape())
-//    circleContainer.add'ga ulanadi, Circle kutilgan lekin Shape keladi
-// Lekin method shorthand backward compat uchun ruxsat beradi
+// ✅ Method shorthand bivariance tufayli ruxsat etiladi:
+const shapeMethodBox: MethodBox<Shape> = circleMethodBox;
+// Aslida xavfli — shapeMethodBox.add(new Shape()) Circle kutilgan add'ga boradi.
+// Lekin method shorthand backward compat uchun ruxsat beradi (unsound).
+
+const circlePropBox: PropertyBox<Circle> = {
+  add: (item) => console.log(item.radius),
+};
+
+// ❌ Function property contravariant — strictFunctionTypes bu xavfli assignmentni bloklaydi:
+// const shapePropBox: PropertyBox<Shape> = circlePropBox;
+// Error: '(item: Circle) => void' '(item: Shape) => void'ga assign bo'lmaydi
 
 // 6. Array covariance (unsafe)
 const circles: Circle[] = [new Circle()];
@@ -2824,16 +2840,18 @@ JavaScript'da class constructor'lar ham funksiya — `typeof MyClass === "functi
 ```typescript
 class User { constructor(public name: string) {} }
 
-function handleCallable(value: ((x: number) => string) | User | string): void {
+// E'tibor: union'da User instance EMAS, balki typeof User (constructor) bor
+function handleCallable(value: ((x: number) => string) | (typeof User) | string): void {
   if (typeof value === "function") {
     // value: ((x: number) => string) | typeof User
-    // Lekin User class — callable, narrowing oddiy funksiya'ga toraytirmaydi
-    // Ba'zida kompilator union'ni "callable" ga qisqartiradi, ba'zida — yo'q
+    // string olib tashlandi, lekin typeof User qoldi —
+    // chunki class constructor ham typeof "function" qaytaradi
+    value;
   }
 }
 ```
 
-Bu gotcha [06-type-narrowing.md](06-type-narrowing.md)'da batafsil. Yechim — class'larni `instanceof` bilan narrow qilish, funksiyalarni alohida.
+`typeof value === "function"` guard'i `string`'ni olib tashlaydi, lekin oddiy funksiya bilan class constructor'ni bir-biridan **ajratmaydi** — ikkalasi ham `"function"`. Yechim: funksiya bilan constructor'ni ajratish uchun `value.prototype` mavjudligini yoki `Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false` ni tekshirish. Narrowing tafsiloti [06-type-narrowing.md](06-type-narrowing.md)'da.
 
 ### 2. Arrow Function vs Function Declaration — `this` Binding
 
@@ -2894,7 +2912,7 @@ Bu xavfli emas, lekin TypeScript/JavaScript'dan boshqa tilga kelgan developer'la
 
 ### 4. Callback `void` Return Type Funksiya Declaration'da Xato
 
-Kompilator void return type'ni callback context'da "ignore" qiladi, lekin function declaration'da esa **taqiqlaydi** — asimmetrik xatti-harakat.
+Compiler void return type'ni callback context'da "ignore" qiladi, lekin function declaration'da esa **taqiqlaydi** — asimmetrik xatti-harakat.
 
 ```typescript
 // ❌ Function declaration da return taqiqlanadi
@@ -2907,7 +2925,8 @@ type Cb = () => void;
 const cb: Cb = () => 42; // ✅ return ignored
 
 // Shu tufayli bu JS pattern ishlaydi:
-[1, 2, 3].forEach((n) => arr.push(n));
+const collected: number[] = [];
+[1, 2, 3].forEach((n) => collected.push(n));
 // push returns number, forEach callback void kutadi
 // Agar return taqiqlansa — pattern buziladi
 ```
@@ -3205,7 +3224,7 @@ function formatOverloaded(value: string | number | Date): string {
 }
 ```
 
-**Farq:** Overload variant'i xuddi shu ishni qiladi, lekin kod ko'proq. Union type qisqa va bir xil type safety beradi. Qachon overload kerak: `parseInput(s: string): string[]; parseInput(n: number): number[];` — bu yerda return type parametrga bog'liq, overload kerak.
+**Farq:** Overload variant'i aynan shu ishni qiladi, lekin kod ko'proq. Union type qisqa va bir xil type safety beradi. Qachon overload kerak: `parseInput(s: string): string[]; parseInput(n: number): number[];` — bu yerda return type parametrga bog'liq, overload kerak.
 
 **Decision tree:**
 
@@ -3490,7 +3509,7 @@ function pipeVariadic<Fns extends readonly PipeFunction<any, any>[]>(
 }
 ```
 
-Bu pattern — conditional types va inference bilan chuqur advanced. [12-conditional-types.md](12-conditional-types.md) va [13-mapped-types.md]'da batafsil.
+Bu pattern — conditional types va inference bilan chuqur advanced. [12-conditional-types.md](12-conditional-types.md) va [13-mapped-types.md](13-mapped-types.md)'da batafsil.
 
 </details>
 
@@ -3502,7 +3521,7 @@ Bu bo'limda TypeScript'da funksiyalar bilan ishlashning barcha jihatlarini o'rga
 
 **Asosiy tushunchalar:**
 
-- **Type annotation'lar** — parametr va return type'larni belgilash, kompilator inference mexanizmi, qachon explicit yozish kerak
+- **Type annotation'lar** — parametr va return type'larni belgilash, compiler inference mexanizmi, qachon explicit yozish kerak
 - **Optional va default parameter'lar** — `?` va `= value` farqi, widening, har chaqiriqda qayta evaluate
 - **Rest parameter'lar** — `...args: T[]`, tuple rest, named tuple elements, variadic tuple types (TS 4.0+)
 - **Function overload'lar** — resolution order, implementation signature tashqi ko'rinmasligi, overload vs union qarori
@@ -3516,13 +3535,13 @@ Bu bo'limda TypeScript'da funksiyalar bilan ishlashning barcha jihatlarini o'rga
 
 **Variance intuitiv tushunish:**
 
-- **Output (return type)** — tabi yo'nalish (covariance): `Dog → Animal` tabiy, Dog return Animal expected joyga mos
+- **Output (return type)** — tabiiy yo'nalish (covariance): `Dog → Animal` tabiiy, Dog return Animal expected joyga mos
 - **Input (parameter)** — teskari yo'nalish (contravariance): `Animal → Dog` teskari, keng input tor joyga mos
 - **Method shorthand** — bivariance (ikkala yo'nalish) backward compatibility uchun
 
 **Umumiy takeaway'lar:**
 
-1. **Kompilator inference'ga ishonish** — oddiy funksiyalarda return type yozmaslik. Faqat public API, recursive funksiya, va murakkab return uchun explicit yozish.
+1. **Compiler inference'ga ishonish** — oddiy funksiyalarda return type yozmaslik. Faqat public API, recursive funksiya, va murakkab return uchun explicit yozish.
 2. **Union vs overload qarori** — qachon union yetarli, qachon overload kerak: return type parametrga bog'liqmi?
 3. **Arrow vs method** — class'da `this` muammosini oldini olish uchun arrow property yoki `bind` ishlatish.
 4. **Callback type safety** — contextual typing'dan foydalanish, inline callback'larda parametr type yozmaslik.

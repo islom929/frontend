@@ -48,14 +48,16 @@ Decorator'lar **runtime'da ishlaydigan oddiy funksiyalar**. Ular type erasure'ga
 Decorator'lar **runtime construct** — TypeScript'ning type erasure qoidasidan istisno. `tsc` emitter decorator'larni JavaScript'ga compile qiladi va target'ga `__decorate` (legacy) yoki `__esDecorate` (TC39) helper'lar orqali qo'llaydi.
 
 ECMAScript decorator proposal taraqqiyot bosqichlari:
-- **Stage 1** (2014) — Yuri Estrin tomonidan dastlabki proposal
-- **Stage 2** (2018) — "Static decorators" — keyinroq tashlab yuborilgan
-- **Stage 3** (2022, mart) — Kristen Hewell Garrett tomonidan qayta dizayn, hozirgi `context` API
-- **Browser native** — V8 (Chrome 121, yanvar 2024), JSC, SpiderMonkey hozir ham flag ostida
+- **Stage 0** (2014, aprel) — Yehuda Katz va Ron Buckton tomonidan dastlabki proposal
+- **Stage 1** (2015, mart) — proposal Stage 1 ga ko'tarildi
+- **"Static decorators"** (2018) — alohida dizayn varianti, keyinroq tashlab yuborilgan
+- **Stage 3** (2022, mart) — Daniel Ehrenberg va Kristen Hewell Garrett championligida qayta dizayn, hozirgi `context` API
 
 TS evolution:
-- **TS 1.5** (2015) — eksperimental decorator support (`experimentalDecorators`), Stage 2 draft asosida
-- **TS 5.0** (mart 2023) — TC39 Stage 3 decorator'lar nativ qo'llab-quvvatlanadi, `experimentalDecorators` flag'siz
+- **TS 1.5** (2015) — eksperimental decorator support (`experimentalDecorators`), eski proposal draft asosida
+- **TS 5.0** (2023, mart) — TC39 Stage 3 decorator'lar nativ qo'llab-quvvatlanadi, `experimentalDecorators` flag'siz
+
+Runtime qo'llab-quvvatlash: Stage 3 ga yetganidan keyin ham decorator'lar V8'da nativ implement qilinmagan (V8 issue 12763 hali ochiq) — Chrome, Node.js'da kod transpilation orqali ishlaydi. Deno 1.40 (2024, yanvar) `.ts`/`.tsx` fayllarda decorator'larni transpilation orqali qo'llaydi, nativ JS engine darajasida emas.
 
 Decorator funksiya call signature decorator turiga qarab farqlanadi (class, method, field, accessor) va ikki standart (legacy vs TC39) bir-biridan parameter ro'yxati bilan ajraladi — bu farqlar keyingi section'larda batafsil ochiladi.
 
@@ -256,7 +258,7 @@ Method decorator chaqirig'i `__decorate([log], User.prototype, "greet", null)` f
 
 3. **Re-define** — `c > 3 && r` shart bajarilgani uchun `Object.defineProperty(target, key, r)` — yangi descriptor prototype'ga yoziladi. Bu eski method'ni almashtiradi.
 
-**Muhim:** Decorator'lar **teskari tartibda** (`for i = decorators.length - 1; i >= 0; i--`) qo'llanadi — pastdan yuqoriga. `@a @b method` bo'lsa: avval `b`, keyin `a` qo'llanadi — funksiya kompozitsiyasi `a(b(method))` natijasini beradi.
+**Muhim:** Decorator'lar **teskari tartibda** (`for i = decorators.length - 1; i >= 0; i--`) qo'llanadi — pastdan yuqoriga. `@a @b method` bo'lsa: avval `b`, keyin `a` qo'llanadi — function composition `a(b(method))` natijasini beradi.
 
 Static method uchun `target` constructor function'ning o'zi (prototype emas). Instance method uchun — `Constructor.prototype`.
 
@@ -394,7 +396,7 @@ __decorate([
 
 `__param(index, decorator)` curry pattern — `(target, key) => decorator(target, key, index)` qaytaradi. Parameter decorator return qiymati `__decorate`'da inkor qilinadi — faqat side effect (metadata yozish) muhim.
 
-TC39 standartida parameter decorator olib tashlandi — sababi: tip system bilan parameter'larga decorator qo'shish ECMAScript semantikasiga zid (parameter'lar function-level, decorator'lar declaration-level). NestJS va Angular DI uchun constructor injection + reflect-metadata + boshqa pattern'lar ishlatadi.
+TC39 Stage 3 proposal'iga parameter decorator kiritilmadi — proposal'ni minimal va consensus'ga olib chiqish uchun parameter decorator alohida follow-on proposal'ga qoldirildi. NestJS va Angular DI hozircha legacy decorator + `reflect-metadata` ishlatadi.
 
 </details>
 
@@ -469,9 +471,9 @@ Accessor descriptor method descriptor'dan farqli — `value`/`writable` o'rniga 
 
 `__decorate` helper accessor uchun ham method bilan bir xil yo'l bo'yicha ishlaydi — `Object.getOwnPropertyDescriptor(target, key)` getter/setter pair'ni qaytaradi. Decorator ikkalasini o'zgartirishi mumkin (faqat birini yoki ikkalasini).
 
-**Spec cheklov:** ECMAScript class body ichida bitta property uchun `get` va `set` alohida deklarasiyalar — lekin runtime'da ular bitta property'ning ikki side'i (bitta descriptor). Shuning uchun `@deco get x() {}` va keyin `@deco2 set x(v) {}` yozish noto'g'ri natija beradi — TS `experimentalDecorators: true` da birinchi decorator ikkinchisini override qiladi (yoki silently ignored — TS versiyasiga qarab).
+**Cheklov:** class body ichida bitta property uchun `get` va `set` alohida declaration bo'lsa-da, runtime'da ular bitta property'ning ikki tomoni (bitta descriptor). Shu sababdan decorator ikkala accessor'ga emas, faqat **document order bo'yicha birinchi** kelganiga qo'yiladi va u butun descriptor'ga (get + set) ta'sir qiladi. `get` va `set` ikkalasiga decorator yozsangiz TypeScript `TS1207: Decorators cannot be applied to multiple get/set accessors of the same name` compile xatosini beradi.
 
-TC39 standartida bu cheklovni `accessor` keyword hal qiladi — auto-accessor bitta deklarasiya, bitta decorator chaqirig'i `{ get, set }` pair'ni atomic uzatadi.
+TC39 standartida bu cheklovni `accessor` keyword hal qiladi — auto-accessor bitta declaration, bitta decorator chaqirig'i `{ get, set }` pair'ni atomic uzatadi.
 
 </details>
 
@@ -547,20 +549,20 @@ TC39 decorator proposal Stage 3'ga 2022-mart oyida o'tdi. Avvalgi Stage 2 "stati
 3. **No `target` argument** — `target` (prototype yoki constructor) o'rniga `context.access` orqali field/method'ga reference olinadi
 4. **Initialization separation** — `addInitializer` orqali class/instance lifecycle'ga ulanish
 
-**TS implementation (`checker.ts` + `transformer/decorators.ts`):**
+**TS implementation:**
 
-- `checker.ts` decorator signature'ni tip bo'yicha tekshiradi — `kind: "method"` bilan tagged context'ni method decorator'ga uzatadi
-- `transformer/legacyDecorators.ts` — eski `__decorate` emitter (legacy mode)
-- `transformer/esDecorators.ts` — TC39 `__esDecorate` + `__runInitializers` emitter (default mode 5.0+)
+- type checker decorator signature'ni tip bo'yicha tekshiradi — `kind: "method"` bilan tagged context'ni method decorator'ga uzatadi
+- legacy mode'da emitter `__decorate` helper'ini chiqaradi
+- TC39 mode'da (default, 5.0+) emitter `__esDecorate` + `__runInitializers` helper'larini chiqaradi
 
-**`accessor` keyword (TS 4.9+):**
+**`accessor` keyword (TS 5.0):**
 
-`accessor name = "Ali"` syntax avtomatik quyidagiga compile bo'ladi:
+Auto-accessor `accessor` keyword Stage 3 decorators bilan birga TS 5.0'da yetkazildi. `accessor userName = "Ali"` syntax avtomatik quyidagiga compile bo'ladi:
 
 ```javascript
-#name = "Ali";  // private storage
-get name() { return this.#name; }
-set name(v) { this.#name = v; }
+#userName = "Ali";  // private storage
+get userName() { return this.#userName; }
+set userName(value) { this.#userName = value; }
 ```
 
 Bu pattern Object getter/setter'larni explicit yozishdan saqlaydi va decorator'lar uchun atomik `{ get, set }` pair'ni ta'minlaydi.
@@ -580,7 +582,7 @@ TC39 class decorator — class constructor'ni va context'ni oladi. Yangi class q
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-TC39 decorator'lar `__esDecorate` helper'iga compile qilinadi. Bu helper TC39 Stage 3 proposal'idagi abstract operation'larni implementatsiya qiladi.
+TC39 decorator'lar `__esDecorate` helper'iga compile qilinadi. Bu helper TC39 Stage 3 proposal'idagi abstract operation'larni implement qiladi.
 
 `__esDecorate` signature:
 
@@ -613,9 +615,9 @@ Decorator return qiymati:
 - **`undefined` / `void`** — original class qoladi
 
 `__esDecorate` chaqiruv tartibi:
-1. Field/accessor/method decorator'lar avval qo'llanadi (instance va static alohida)
+1. A'zo (field/accessor/method) decorator'lar avval chaqiriladi — **document order** bo'yicha, static va instance ajratilmasdan (kod tartibi belgilaydi)
 2. Class decorator eng oxirida — to'liq qurilgan class'ga
-3. Har bosqichda decorator'lar **teskari tartibda** apply qilinadi (pastdan yuqoriga)
+3. Bitta a'zoga bir nechta decorator bo'lsa, ular shu a'zoda **teskari tartibda** apply qilinadi (pastdan yuqoriga)
 
 </details>
 
@@ -767,8 +769,8 @@ function authorize(role: string) {
     originalMethod: (...args: any[]) => any,
     context: ClassMethodDecoratorContext
   ) {
-    return function (this: any, ...args: any[]) {
-      if ((this as any).currentUserRole !== role) {
+    return function (this: { currentUserRole: string }, ...args: any[]) {
+      if (this.currentUserRole !== role) {
         throw new Error(`Unauthorized: requires ${role}`);
       }
       return originalMethod.call(this, ...args);
@@ -794,7 +796,7 @@ class AdminPanel {
 
 **Field decorator** — class property'ni decorate qiladi. Property **value'sini** oladi (yoki `undefined` agar initializer yo'q bo'lsa). Return value — initializer funksiya bo'lib, property'ning boshlang'ich qiymatini o'zgartiradi.
 
-**Accessor decorator** — `accessor` keyword bilan declare qilingan auto-accessor'lar uchun. `accessor` keyword TS 4.9+'da qo'shilgan — avtomatik getter/setter pair yaratadi. Decorator `get` va `set` funksiyalarni o'z ichiga olgan object oladi.
+**Accessor decorator** — `accessor` keyword bilan declare qilingan auto-accessor'lar uchun. `accessor` keyword TS 5.0'da Stage 3 decorators bilan birga qo'shilgan — avtomatik getter/setter pair yaratadi. Decorator `get` va `set` funksiyalarni o'z ichiga olgan object oladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -811,13 +813,13 @@ this[fieldName] = initialValue;
 
 `__runInitializers` constructor body'da `__runInitializers(this, _fieldName_initializers, initialValue)` chaqiruvi bilan invoke qilinadi. Initializer'lar zanjir tarzda chaqiriladi — har biri oldingisining natijasini oladi.
 
-**Accessor decorator** auto-accessor'lar uchun. `accessor` keyword TS 4.9'da kiritildi va TC39 Stage 3 proposal'ning bir qismi. Compile natijasi:
+**Accessor decorator** auto-accessor'lar uchun. `accessor` keyword TS 5.0'da Stage 3 decorators bilan birga kiritildi. Compile natijasi:
 
 ```javascript
-// accessor name = "Ali"  →
-#name = "Ali";              // private field
-get name() { return this.#name; }
-set name(v) { this.#name = v; }
+// accessor userName = "Ali"  →
+#userName = "Ali";              // private field
+get userName() { return this.#userName; }
+set userName(value) { this.#userName = value; }
 ```
 
 Accessor decorator `context` quyidagi shape'da:
@@ -929,15 +931,15 @@ s.theme = "dark";  // "Set theme = dark"
 
 ### Nazariya
 
-Decorator factory — **parametr qabul qilib decorator qaytaradigan funksiya**. Bu `@decorator` o'rniga `@decorator(args)` syntax bilan ishlatiladi. Factory pattern decorator'ni konfiguratsiya qilish imkonini beradi.
+Decorator factory — **parametr qabul qilib decorator qaytaradigan funksiya**. Bu `@decorator` o'rniga `@decorator(args)` syntax bilan ishlatiladi. Factory pattern decorator'ni configuration qilish imkonini beradi.
 
 ```typescript
 // Oddiy decorator — parametrsiz
-function log(target: any, ctx: ClassMethodDecoratorContext) { /* ... */ }
+function log(originalMethod: (...args: any[]) => any, context: ClassMethodDecoratorContext) { /* ... */ }
 
 // Decorator factory — parametrli
-function log(level: string) {
-  return function (target: any, ctx: ClassMethodDecoratorContext) { /* ... */ };
+function logLevel(level: string) {
+  return function (originalMethod: (...args: any[]) => any, context: ClassMethodDecoratorContext) { /* ... */ };
 }
 ```
 
@@ -964,12 +966,19 @@ __decorate([retry(3)], ApiClient.prototype, "fetchData", null);
 
 Diqqat: `retry(3)` array yaratishdan oldin chaqiriladi — factory'lar har class evaluation paytida bir marta evaluate qilinadi. Bu performance jihatdan muhim: `@retry(3)` har instance yaratilganda emas, class definition vaqtida bir marta `retry(3)` chaqiriladi.
 
-**Type inference:** Factory return type decorator signature'ga mos kelishi kerak. TS overload pattern bilan factory'larni multi-target qilish mumkin (class + method ikkalasi):
+**Type inference:** Factory return type decorator slot signature'iga mos kelishi kerak. Argument'i ixtiyoriy bo'lgan factory'ni overload bilan ifodalash mumkin — qaytarilgan funksiya method decorator signature'iga to'g'ri keladi:
 
 ```typescript
-function memoize(): ClassMethodDecoratorFunction;
-function memoize(maxSize: number): ClassMethodDecoratorFunction;
-function memoize(maxSize?: number) { /* ... */ }
+type MethodDecorator = (
+  originalMethod: (...args: any[]) => any,
+  context: ClassMethodDecoratorContext,
+) => ((...args: any[]) => any) | void;
+
+function memoize(): MethodDecorator;
+function memoize(maxSize: number): MethodDecorator;
+function memoize(maxSize?: number): MethodDecorator {
+  return (originalMethod, context) => originalMethod;
+}
 ```
 
 Bu pattern Angular `@Injectable()` va NestJS `@Module()` kabi factory'larda keng ishlatiladi — argument'lar ixtiyoriy bo'lib, default behavior'ga ega.
@@ -1037,18 +1046,19 @@ Bir nechta decorator bitta target'ga qo'yilganda — ikki bosqichli jarayon:
 1. **Evaluate** (yuqoridan pastga) — decorator factory'lar chaqiriladi
 2. **Apply** (pastdan yuqoriga) — decorator'lar target'ga qo'llanadi
 
-Bu matematikdagi **funksiya kompozitsiyasi** — `@a @b @c method` → `a(b(c(method)))`.
+Bu matematik **function composition** — `@a @b @c method` → `a(b(c(method)))`.
 
-**Class ichidagi umumiy tartib:**
-1. Instance method/property/accessor decorator'lar (tartibda)
-2. Static method/property/accessor decorator'lar (tartibda)
-3. Constructor parameter decorator'lar (legacy faqat)
-4. Class decorator'lar
+**Class a'zolari decorator'lari tartibi standartga bog'liq:**
+
+- **Legacy (TypeScript):** avval barcha instance a'zo decorator'lari (member tartibida), keyin barcha static a'zo decorator'lari, keyin constructor parameter decorator'lari, eng oxirida class decorator'lar.
+- **TC39:** a'zo decorator'lari **document order**'da (static/instance aralash, kod tartibi bo'yicha) chaqiriladi; static va instance ajratilmaydi. Class decorator a'zolardan keyin chaqiriladi.
+
+Ikkala standartda ham class decorator class a'zolari decorator'laridan **keyin** ishlanadi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Decorator composition tartibining sababi — JavaScript expression evaluation va kompozitsiya semantikasidan kelib chiqadi.
+Decorator composition tartibining sababi — JavaScript expression evaluation va composition semantikasidan kelib chiqadi.
 
 **Factory evaluation (yuqoridan pastga):**
 
@@ -1064,16 +1074,13 @@ method() {}
 
 `__decorate` helper'da `for (var i = decorators.length - 1; i >= 0; i--)` loop'i — array oxiridan boshiga. Decorator'lar source code'da `[a, b]` tartibda joylashgan (TS emitter top-to-bottom yozadi), shuning uchun loop avval `b`, keyin `a` chaqiradi.
 
-Bu funksiya kompozitsiyasi semantikasiga mos: `f ∘ g (x) = f(g(x))` — `g` avval `x`'ga qo'llanadi, keyin `f`. Decorator'larda `@a @b method` → `a(b(method))` — `b` avval method'ga qo'llanadi (eng yaqindagi decorator birinchi).
+Bu function composition semantikasiga mos: `f ∘ g (x) = f(g(x))` — `g` avval `x`'ga qo'llanadi, keyin `f`. Decorator'larda `@a @b method` → `a(b(method))` — `b` avval method'ga qo'llanadi (eng yaqindagi decorator birinchi).
 
 **Class member tartibi spec'da:**
 
-TC39 spec'iga ko'ra class body ichida decorator'lar quyidagi tartibda ishlanadi:
-1. Static field/method/accessor decorator'lar — class evaluation paytida, member tartibida
-2. Instance field/method/accessor decorator'lar — class evaluation paytida, member tartibida
-3. Class decorator'lar — class body to'liq qurilgandan keyin
+TC39 spec'iga ko'ra a'zo decorator'lari **document order**'da chaqiriladi — static va instance a'zolar ajratilmaydi, kod tartibi (computed property nomlari bilan birga, chapdan o'ngga, yuqoridan pastga) belgilaydi. TypeScript legacy esa boshqacha: avval barcha instance a'zolar, keyin barcha static a'zolar. A'zo decorator'lar chaqirilgach, class decorator'lar ishlanadi; decorator'larning haqiqiy ta'siri (prototype va constructor'ni mutate qilish) barcha decorator chaqirilgandan keyin bir vaqtda qo'llanadi.
 
-Har bosqichda `addInitializer` callback'lar ham collected bo'ladi va boshqa fazada chaqiriladi:
+`addInitializer` callback'lar collected bo'ladi va alohida fazada chaqiriladi:
 - Class addInitializer'lar — class decoration tugagandan keyin
 - Instance addInitializer'lar — har `new` chaqirig'ida constructor body boshida (`__runInitializers`)
 - Static addInitializer'lar — class definition'dan keyin darhol
@@ -1130,7 +1137,7 @@ TC39 decorators `Symbol.metadata` orqali **native metadata** mexanizm beradi. Bu
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`Symbol.metadata` ECMAScript Decorator Metadata proposal (Stage 3) tarkibida. TS 5.2+ qo'llab-quvvatlaydi (`lib: ["ESNext.Decorators"]` yoki `target: ESNext` kerak bo'lishi mumkin). Browser native support hozircha cheklangan — V8 flag ostida.
+`Symbol.metadata` ECMAScript Decorator Metadata proposal (Stage 3) tarkibida. TS 5.2'dan qo'llab-quvvatlanadi — `lib`'ga `ESNext.Decorators` qo'shilishi kerak (`Function[Symbol.metadata]` declaration shu lib faylida). Hozircha JS engine'lar (V8 ham) decorator'ni nativ implement qilmagan, shu sababli `Symbol.metadata` ham transpilation orqali polyfill qilinadi.
 
 **Metadata lifecycle:**
 
@@ -1155,7 +1162,7 @@ Prototype chain orqali subclass parent metadata'ni avtomatik ko'radi, lekin o'z 
 | Storage | Global WeakMap | Class property |
 | Inheritance | Manual `Reflect.getMetadata` | Native prototype chain |
 | Type information | `emitDecoratorMetadata: true` bilan auto | Faqat decorator o'zi yozsa |
-| Bundle size | +5KB polyfill | 0 (native) |
+| Bundle size | polyfill kerak | qo'shimcha polyfill yo'q |
 
 `emitDecoratorMetadata: true` — faqat legacy decorators bilan ishlaydi. TC39'da bunday flag yo'q — type information'ni decorator'da qo'lda yozish kerak (yoki Zod/io-ts kabi runtime schema library ishlatish).
 
@@ -1215,7 +1222,7 @@ Decorator'lar real-world'da quyidagi pattern'larda keng ishlatiladi. Barchasi **
 - **MobX** — `@observable`, `@action`, `@computed` — reactive state management
 - **class-validator** — `@IsString`, `@Min`, `@IsEmail` — runtime validation
 
-Bularning aksariyati hozircha **legacy decorators** ishlatadi (`experimentalDecorators: true`) — TC39'ga migration secaman tugadi. Bu sabab: legacy parameter decorator + `reflect-metadata` + `emitDecoratorMetadata` kombinatsiyasi DI uchun zarur, TC39 esa parameter decorator'siz alternative DI pattern'lar talab qiladi.
+Bularning aksariyati hozircha **legacy decorators** ishlatadi (`experimentalDecorators: true`) — TC39'ga migration sekin kechmoqda. Sababi: legacy parameter decorator + `reflect-metadata` + `emitDecoratorMetadata` kombinatsiyasi DI uchun zarur, TC39 esa parameter decorator'siz alternative DI pattern'lar talab qiladi.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -1305,9 +1312,9 @@ class Service {
   method(@inject param: string) {} // ✅ experimentalDecorators bilan
 }
 
-// TC39 — ❌ syntax error
+// TC39 — ❌ compile error
 class Service {
-  method(@inject param: string) {} // ❌ — TC39 da parameter decorator yo'q
+  method(@inject param: string) {} // ❌ TS1206: Decorators are not valid here.
 }
 
 // Yechim: NestJS va Angular bular uchun boshqa pattern ishlatmoqda (inject token, constructor injection)
@@ -1318,10 +1325,10 @@ class Service {
 ```typescript
 // ❌ — oddiy funksiya ga decorator qo'yib bo'lmaydi
 @log
-function standalone() {} // ❌ Syntax error
+function standalone() {} // ❌ TS1206: Decorators are not valid here.
 
 // ❌ — arrow function ga qo'yib bo'lmaydi
-const fn = @log () => {}; // ❌
+const fn = @log () => {}; // ❌ TS1109: Expression expected (parse error)
 
 // ✅ — faqat class va class a'zolari
 class Service {
@@ -1584,7 +1591,7 @@ function trace(originalMethod: (...args: any[]) => any, context: ClassMethodDeco
       console.log(`[${id}] ← ${name} =`, result);
       return result;
     } catch (e) {
-      console.log(`[${id}] ❌ ${name}:`, e);
+      console.log(`[${id}] threw ${name}:`, e);
       throw e;
     }
   };

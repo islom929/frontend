@@ -50,7 +50,7 @@ Template literal type lar **faqat** `string`, `number`, `bigint`, `boolean`, `nu
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-TypeScript kompilatori template literal type ni quyidagicha qayta ishlaydi:
+TypeScript compiler'i template literal type ni quyidagicha qayta ishlaydi:
 
 ```
 Input: type T = `Hello ${string}`
@@ -70,7 +70,7 @@ Input: type T = `Hello ${string}`
    - "Hi World"    → ❌ ("Hello " bilan boshlanmaydi)
 ```
 
-Kompilator literal type larni interpolation qilganda — **string concatenation** ni type darajasida bajaradi:
+Compiler literal type larni interpolation qilganda — **string concatenation** ni type darajasida bajaradi:
 
 ```
 `${"Hello"} ${"World"}` → "Hello World"  (literal + literal = literal)
@@ -169,7 +169,7 @@ function greet(name) {  // type annotation o'chirildi
 
 ### Nazariya
 
-TypeScript 4 ta **built-in string manipulation type** beradi. Bular **intrinsic** type lar — ya'ni user-level TypeScript da emas, kompilator ning o'z ichki kodida implementatsiya qilingan. Ularni TypeScript da qayta yozib bo'lmaydi.
+TypeScript 4 ta **built-in string manipulation type** beradi. Bular **intrinsic** type lar — ya'ni user-level TypeScript da emas, compiler'ning o'z ichki kodida implementation qilingan. Ularni TypeScript da qayta yozib bo'lmaydi.
 
 | Type | Nima qiladi | Misol |
 |------|-------------|-------|
@@ -189,12 +189,12 @@ type Capitalize<S extends string> = intrinsic;
 type Uncapitalize<S extends string> = intrinsic;
 ```
 
-`intrinsic` — maxsus keyword, faqat TypeScript ning o'z declaration fayllarida ishlatiladi. User code da `intrinsic` yozib bo'lmaydi. Kompilator bu type larni uchratganda — string literal ni JavaScript ning `toUpperCase()`, `toLowerCase()` metodlari kabi qayta ishlaydi, lekin type darajasida.
+`intrinsic` — maxsus keyword, faqat TypeScript ning o'z declaration fayllarida ishlatiladi. User code da `intrinsic` yozib bo'lmaydi. Compiler bu type larni uchratganda string literal ga Unicode case mapping ni type darajasida qo'llaydi — runtime da `toUpperCase()`/`toLowerCase()` qaytaradigan natijaning aynan o'zini compile-time da hosil qiladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Bu 4 ta type ni kompilator **maxsus holat** sifatida taniydi — ular oddiy type alias emas. Kompilator `Uppercase<"hello">` ni uchratganda:
+Bu 4 ta type ni compiler **maxsus holat** sifatida taniydi — ular oddiy type alias emas. Compiler `Uppercase<"hello">` ni uchratganda:
 
 1. Type argument ni resolve qiladi → `"hello"` (string literal)
 2. Intrinsic type ekanini aniqlaydi
@@ -220,7 +220,7 @@ EventHandler<"click" | "scroll">
 → "onClick" | "onScroll"
 ```
 
-Muhim: `Capitalize` faqat **birinchi** harfni katta qiladi. `Capitalize<"helloWorld">` → `"HelloWorld"` (faqat `h` → `H`, qolgan harflar o'zgarmaydi). Bu `toUpperCase()` emas — `charAt(0).toUpperCase() + slice(1)` ga yaqin.
+`Capitalize` faqat **birinchi** harfni katta qiladi. `Capitalize<"helloWorld">` → `"HelloWorld"` (faqat `h` → `H`, qolgan harflar o'zgarmaydi). Butun string ni emas, balki birinchi belgini uppercase ga o'tkazib, qolgan qismni o'zgarishsiz qoldiradi.
 
 </details>
 
@@ -293,7 +293,7 @@ type Demo2 = CamelToScreamingSnake<"helloWorld">;  // "HELLO_WORLD" ✅
 
 ### Nazariya
 
-Template literal type ning eng qudratli xususiyati — union type lar bilan **distributive** (taqsimlovchi) ishlashi. Agar template literal ichida union type bo'lsa — TypeScript union ning **har bir member** ini alohida-alohida interpolation qiladi va natijalarni yangi union ga birlashtiradi.
+Template literal type ning eng qudratli xususiyati — union type lar bilan **distributive** ishlashi. Agar template literal ichida union type bo'lsa — TypeScript union ning **har bir member** ini alohida-alohida interpolation qiladi va natijalarni yangi union ga birlashtiradi.
 
 Agar bir nechta pozitsiyada union bo'lsa — **kartezian ko'paytma** (Cartesian product) hosil bo'ladi. Ya'ni har bir kombinatsiya alohida member bo'ladi.
 
@@ -310,7 +310,7 @@ Template literal da:
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator distributive template literal ni quyidagicha qayta ishlaydi:
+Compiler distributive template literal ni quyidagicha qayta ishlaydi:
 
 ```
 Input: type T = `${"mouse" | "key"}${"up" | "down"}`
@@ -330,12 +330,12 @@ Input: type T = `${"mouse" | "key"}${"up" | "down"}`
 
 Bu distributive behavior [Bo'lim 12](12-conditional-types.md) dagi conditional type distributivity bilan o'xshash prinsipga asoslangan — union ning har bir member i alohida qayta ishlanadi. Farq shundaki, conditional type da `T extends U` sharti kerak, template literal da esa union **avtomatik** distribute bo'ladi.
 
-Kompilator distribution jarayonida:
+Compiler distribution jarayonida:
 - Har bir union member uchun alohida string literal type yaratadi
 - Barcha natijalarni bitta union ga birlashtiradi
 - Duplicate member larni avtomatik olib tashlaydi
 
-Caching: kompilator yaratilgan type larni cache qiladi. Bir xil template literal type ikki joyda ishlatilsa — ikkinchisida qayta compute qilinmaydi.
+Caching: compiler yaratilgan type larni cache qiladi. Bir xil template literal type ikki joyda ishlatilsa — ikkinchisida qayta compute qilinmaydi.
 
 </details>
 
@@ -434,7 +434,7 @@ Matching jarayoni:
 3. Natija: ["Hello", "World.TS"]
 ```
 
-Agar `infer A` birinchi kelsa va undan keyin static separator bo'lsa — kompilator A ni **minimal** (birinchi separator gacha), oxirgi `infer` ni **greedy** (qolgan hammasi) qiladi.
+Agar `infer A` birinchi kelsa va undan keyin static separator bo'lsa — compiler A ni **minimal** (birinchi separator gacha), oxirgi `infer` ni **greedy** (qolgan hammasi) qiladi.
 
 Nima uchun greedy? Agar ikkala `infer` ham minimal bo'lganida — `"Hello.World.TS"` uchun `B = "World"` bo'lardi va `.TS` qismi hech qayerga tushmaydi. Greedy matching butun string ni qamrab olishni kafolatlaydi.
 
@@ -576,7 +576,7 @@ Bu mapped type ning key remapping xususiyati va template literal type larni birl
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator mapped type ni template literal bilan birlashtirganida quyidagi jarayon bo'ladi:
+Compiler mapped type ni template literal bilan birlashtirganida quyidagi jarayon bo'ladi:
 
 ```
 Input: type Getters<T> = { [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K] }
@@ -596,7 +596,7 @@ Input: type Getters<T> = { [K in keyof T as `get${Capitalize<string & K>}`]: () 
    { getName: () => string; getAge: () => number; getEmail: () => string }
 ```
 
-Har bir `K` uchun kompilator yangi template literal type yaratadi. Agar `T` da N ta key bo'lsa — N ta template literal instantiation bajariladi. Bu oddiy holatlarda tez, lekin ko'p key li type lar (yuzdan ortiq property) bilan sezilarli bo'lishi mumkin.
+Har bir `K` uchun compiler yangi template literal type yaratadi. Agar `T` da N ta key bo'lsa — N ta template literal instantiation bajariladi. Bu oddiy holatlarda tez, lekin ko'p key li type lar (yuzdan ortiq property) bilan sezilarli bo'lishi mumkin.
 
 Type erasure: bu construct butunlay compile-time da ishlaydi. JS output da faqat oddiy object literal yoki class qoladi — `as`, `Capitalize`, mapped type iz ham qolmaydi.
 
@@ -765,7 +765,7 @@ on<K extends string & keyof T>(
 ): void;
 ```
 
-`person.on("nameChanged", ...)` chaqirganda — kompilator template literal pattern ni actual argument bilan moslashtiradi:
+`person.on("nameChanged", ...)` chaqirganda — compiler template literal pattern ni actual argument bilan moslashtiradi:
 1. `"nameChanged"` dan `K = "name"` deb aniqlaydi (`"Changed"` suffix ni olib tashlaydi)
 2. `K = "name"` → `T["name"]` → `string` → callback parametri `string` bo'ladi
 3. Developer annotate qilmaydi — contextual typing avtomatik ishlaydi
@@ -792,7 +792,7 @@ Call: person.on("nameChanged", (val) => { ... })
    (val) => { ... } da val type i string deb infer bo'ladi
 ```
 
-Bitta `on()` call uchun kompilator:
+Bitta `on()` call uchun compiler:
 - Template literal pattern match bajaradi
 - Constraint satisfaction tekshiradi
 - Indexed access type `T[K]` ni resolve qiladi
@@ -929,7 +929,7 @@ RouteParams<"/users/:userId/posts/:postId">
 → { userId: string; postId: string }
 ```
 
-Runtime da bu type lar to'liq yo'qoladi. Route matching, parameter extraction — hammasi runtime da oddiy string operations bilan amalga oshadi (regex yoki `split`). Kompilator faqat developer ga `params.userId` yozganda type safety beradi, router ning actual logikasiga ta'sir qilmaydi.
+Runtime da bu type lar to'liq yo'qoladi. Route matching, parameter extraction — hammasi runtime da oddiy string operations bilan amalga oshadi (regex yoki `split`). Compiler faqat developer ga `params.userId` yozganda type safety beradi, router ning actual logikasiga ta'sir qilmaydi.
 
 </details>
 
@@ -1030,7 +1030,7 @@ type RouteObj = ParseRoute<"/users/:userId/posts/:postId/comments/:commentId">;
 
 ### Nazariya
 
-Chuqur nested object larda `"user.profile.name"` kabi **dotted path** (nuqta bilan ajratilgan yo'l) bilan property ga murojaat qilish ko'p uchraydi — masalan Lodash ning `_.get()`, MongoDB query lari, yoki form library larda. Template literal type lar yordamida bunday path larni type-safe qilish mumkin.
+Chuqur nested object larda `"user.profile.name"` kabi **dotted path** bilan property ga murojaat qilish ko'p uchraydi — masalan Lodash ning `_.get()`, MongoDB query lari, yoki form library larda. Template literal type lar yordamida bunday path larni type-safe qilish mumkin.
 
 Bu ikki qismdan iborat:
 
@@ -1043,7 +1043,7 @@ Bu ikki qismdan iborat:
 Dotted path type lari — recursive template literal + conditional type larning eng resurs talab qiladigan ishlatilishi:
 
 ```
-DottedPaths<Config> ni kompilator qanday process qiladi:
+DottedPaths<Config> ni compiler qanday process qiladi:
 
 Config = { db: { host: string; port: number }; cache: { enabled: boolean } }
 
@@ -1058,9 +1058,9 @@ Depth 1: keyof Config["db"] → "host" | "port"
 Depth 2: string extends object → false → never (recursion to'xtaydi)
 ```
 
-Har bir depth da kompilator union ni kengaytiradi. Object chuqurroq va ko'p key li bo'lsa — type instantiation soni eksponensial o'sadi va kompilator sekinlashadi.
+Har bir depth da compiler union ni kengaytiradi. Object chuqurroq va ko'p key li bo'lsa — type instantiation soni eksponensial o'sadi va compiler sekinlashadi.
 
-TypeScript recursive type lar uchun **depth limit** qo'llaydi — standart recursion da taxminan 50, tail-call optimized da taxminan 1000. `DottedPaths` tail-call emas (union accumulate qiladi), shuning uchun real project larda 3-4 darajadan chuqur nested object lar uchun depth parameter qo'shish tavsiya etiladi:
+TypeScript recursive type lar uchun **depth limit** qo'llaydi — non-tail-recursive instantiation uchun bu limit TS 4.5 da 50 dan 100 ga oshirildi, tail-recursive conditional type lar esa loop sifatida evaluate bo'lib taxminan 1000 instantiation gacha cho'zila oladi. `DottedPaths` tail-recursive emas (union accumulate qiladi), shuning uchun real project larda chuqur nested object lar uchun depth parameter qo'shish tavsiya etiladi:
 
 ```typescript
 type BoundedPaths<T, D extends number = 4> = ...  // D = 0 bo'lganda to'xtaydi
@@ -1322,16 +1322,26 @@ Template literal type lar recursive ishlatilganda — string ni parse qilish, tr
 
 TypeScript 4.5 dan boshlab recursive type lar uchun **tail-call optimization** qo'llandi — bu chuqur recursion da performance ni yaxshilaydi va depth limitni sezilarli oshiradi.
 
-**Tail-call eligible:**
+**Tail-call eligible** — recursive instantiation conditional branch ning **bevosita natijasi** (accumulator parametr orqali):
 ```typescript
-type Split<S> = S extends `${infer H}${infer T}` ? [H, ...Split<T>] : []
-// ✅ Tuple spread tail position da — optimized
+type CharList<S extends string, Acc extends string[] = []> =
+  S extends `${infer Head}${infer Rest}`
+    ? CharList<Rest, [...Acc, Head]>   // ← branch'ning bevosita natijasi
+    : Acc;
+// ✅ CharList<Rest, ...> conditional branch ning o'zi — qo'shimcha operation yo'q.
+//    Compiler buni stack o'rniga loop da evaluate qiladi.
 ```
 
-**Tail-call NOT eligible:**
+**Tail-call NOT eligible** — recursive natija boshqa construct ichida ishlatiladi:
 ```typescript
-type Reverse<S> = S extends `${infer F}${infer R}` ? `${Reverse<R>}${F}` : ""
-// ❌ Reverse<R> natijasi ustida template concat bor — NOT tail position
+type Chars<S extends string> =
+  S extends `${infer Head}${infer Rest}`
+    ? [Head, ...Chars<Rest>]   // ← Chars<Rest> tuple ichida — natija ustida operation
+    : [];
+// ❌ Chars<Rest> natijasi tuple spread ichiga joylashtiriladi (tail position emas).
+//    Aynan shu holat union (`Head | Chars<Rest>`) yoki template concat
+//    (`${Chars<Rest>}${Head}`) bilan ham — recursive call natija ustida
+//    qo'shimcha operation bo'lsa, optimization qo'llanmaydi.
 ```
 
 <details>
@@ -1340,7 +1350,7 @@ type Reverse<S> = S extends `${infer F}${infer R}` ? `${Reverse<R>}${F}` : ""
 Recursive template literal type — har bir qadamda conditional type ni qayta evaluate qilish. Masalan:
 
 ```
-CamelCase<"user_first_name"> ni kompilator qanday evaluate qiladi:
+CamelCase<"user_first_name"> ni compiler qanday evaluate qiladi:
 
 Step 1: "user_first_name" extends `${infer First}_${infer Rest}` → YES
   First = "user", Rest = "first_name"
@@ -1358,9 +1368,9 @@ Step 3: "Name" extends `${infer First}_${infer Rest}` → NO
 Final: `user${"First" + "Name"}` → "userFirstName"
 ```
 
-**Tail-call optimization (TS 4.5+):** Agar recursive type ning natijasi to'g'ridan-to'g'ri recursive call bo'lsa (qo'shimcha operation yo'q), kompilator stack frame ni qayta ishlatadi. Bu depth limitni taxminan 50 dan **taxminan 1000** ga oshiradi.
+**Tail-call optimization (TS 4.5+):** Agar conditional type ning natijasi to'g'ridan-to'g'ri o'zining yana bir instantiation iga tugasa (qo'shimcha operation yo'q), compiler type resolution ni qo'shimcha call stack sarflamaydigan loop da bajaradi. Non-tail-recursive instantiation depth limit TS 4.5 da 50 dan **100** ga oshirildi; tail-recursive conditional type lar esa shu loop tufayli **taxminan 1000** instantiation gacha yeta oladi.
 
-Kompilator recursive type uchun instantiation counter yuritadi. Agar bitta type evaluation haddan tashqari ko'p instantiation bajarsa — `"Type instantiation is excessively deep and possibly infinite"` error beradi. Bu hard limit bo'lib, chuqur recursive type lar uchun ehtiyot bo'lish kerak.
+Compiler recursive type uchun instantiation counter yuritadi. Agar bitta type evaluation haddan tashqari ko'p instantiation bajarsa — `"Type instantiation is excessively deep and possibly infinite"` error beradi. Bu hard limit bo'lib, chuqur recursive type lar uchun ehtiyot bo'lish kerak.
 
 </details>
 
@@ -1487,11 +1497,11 @@ type CamelUser = CamelCaseKeys<SnakeUser>;
 
 ### Nazariya
 
-Template literal type lar kuchli vosita, lekin kompilator performance ga sezilarli ta'sir qilishi mumkin. Quyidagi cheklovlar va optimizatsiya qoidalarini bilish kerak.
+Template literal type lar kuchli vosita, lekin compiler performance ga sezilarli ta'sir qilishi mumkin. Quyidagi cheklovlar va optimization qoidalarini bilish kerak.
 
 **1. Kartezian ko'paytma limiti:**
 
-TypeScript 4.2 dan boshlab — template literal type dagi union distribution cheklangan. Haddan tashqari katta union hosil bo'lganda compile-time error beradi:
+TypeScript union type ni 100,000 member dan oshganda represent qila olmaydi — bu cheklov template literal type lar joriy etilganidan (4.1) beri amal qiladi. Distribution natijasida shu limit dan oshib ketilsa, compile-time error beradi:
 
 ```typescript
 type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
@@ -1502,17 +1512,17 @@ type TwoDigit = `${Digit}${Digit}`;
 // 10 × 10 × 10 = 1,000 — OK, lekin sekin
 type ThreeDigit = `${Digit}${Digit}${Digit}`;
 
-// 10 × 10 × 10 × 10 = 10,000 — kompilatsiya sezilarli sekinlashadi
+// 10 × 10 × 10 × 10 = 10,000 — compilation sezilarli sekinlashadi
 type FourDigit = `${Digit}${Digit}${Digit}${Digit}`;
 
-// 10^5 = 100,000 — limitga yaqin
+// 10^5 = 100,000 — represent limiti dan oshadi
 type FiveDigit = `${Digit}${Digit}${Digit}${Digit}${Digit}`;
-// ❌ Error: "Expression produces a union type that is too complex to represent"
+// ❌ Error TS2590: "Expression produces a union type that is too complex to represent"
 ```
 
 **2. Recursive depth limiti:**
 
-Oddiy recursion da taxminan **50** depth ga ega. TS 4.5+ da tail-call optimization bilan bu **taxminan 1000** ga oshadi. Uzun string larni parse qilish kerak bo'lsa — depth limit ga duch kelish mumkin.
+Non-tail-recursive instantiation depth limit — TS 4.5 da 50 dan **100** ga oshirildi. Tail-recursive conditional type lar esa loop sifatida evaluate bo'lib **taxminan 1000** instantiation gacha yeta oladi. Uzun string larni parse qilish kerak bo'lsa — depth limit ga duch kelish mumkin.
 
 **3. `string` va `number` bilan pattern type:**
 
@@ -1565,7 +1575,7 @@ type BadCombined = `${BrandColor}_${Shade}_${SizeUnit}_${Variant}`;
 // 3 × 2 × 3 × 3 = 54 ta member — bitta type alias da hisoblash sekin
 
 // ✅ Yaxshi — intermediate type alias lar bilan bosqichma-bosqich
-type ColorShade = `${BrandColor}_${Shade}`;          // 6 ta — kompilator cache qiladi
+type ColorShade = `${BrandColor}_${Shade}`;          // 6 ta — compiler cache qiladi
 type ColorShadeSize = `${ColorShade}_${SizeUnit}`;   // 18 ta
 type FinalCombined = `${ColorShadeSize}_${Variant}`; // 54 ta, lekin har bosqich alohida
 
@@ -1688,13 +1698,13 @@ type Letter = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j"
             | "u" | "v" | "w" | "x" | "y" | "z";
 
 type ThreeLetterWord = `${Letter}${Letter}${Letter}`;
-// 26 × 26 × 26 = 17,576 ta member — kompilator sezilarli sekinlashadi
+// 26 × 26 × 26 = 17,576 ta member — compiler sezilarli sekinlashadi
 
 // ✅ Yaxshi — cheklangan ro'yxat yoki `string` ishlatish
 type Word = string;
 ```
 
-**Nima uchun:** Kompilator har bir kombinatsiyani alohida hisoblaydi. Katta union lar — memory va CPU iste'molini oshiradi. Loyihaning butun type checking tezligiga ta'sir qiladi.
+**Nima uchun:** Compiler har bir kombinatsiyani alohida hisoblaydi. Katta union lar — memory va CPU iste'molini oshiradi. Loyihaning butun type checking tezligiga ta'sir qiladi.
 
 ### ❌ Xato 3: Recursive type da base case ni unutish
 
@@ -1968,8 +1978,8 @@ type CamelCaseKeys<T> = T extends readonly unknown[]
 Bu bo'limda template literal types ning chuqur mexanizmlari o'rganildi:
 
 - **Syntax va semantics** — backtick ichida type interpolation, `string`, `number`, `boolean`, `bigint` qo'llab-quvvatlash. Literal + literal = literal, literal + widened = pattern type.
-- **String manipulation types** — `Uppercase`, `Lowercase`, `Capitalize`, `Uncapitalize` — kompilator ichida intrinsic implementatsiya, union bilan distributive ishlash.
-- **Union distribution** — kartezian ko'paytma. `N₁ × N₂ × ... × Nₖ` ta member. Katta union lar kompilatorni sekinlashtiradi.
+- **String manipulation types** — `Uppercase`, `Lowercase`, `Capitalize`, `Uncapitalize` — compiler ichida intrinsic implementation, union bilan distributive ishlash.
+- **Union distribution** — kartezian ko'paytma. `N₁ × N₂ × ... × Nₖ` ta member. Katta union lar compiler'ni sekinlashtiradi.
 - **Pattern matching (`infer`)** — string type larni parse qilish: `Split`, `Replace`, `Trim`, `StartsWith`, `Includes`. Greedy/minimal matching qoidalari.
 - **Mapped types bilan** — key remapping (`as`) + template literal = `Getters<T>`, `Setters<T>`, `OnEvents<T>`, `Prefixed<T>`. `string & K` nima uchun kerak.
 - **Type-safe event systems** — `"propChanged"` pattern, typed `EventEmitter`. Event name dan handler type ni avtomatik aniqlash.
@@ -1977,7 +1987,7 @@ Bu bo'limda template literal types ning chuqur mexanizmlari o'rganildi:
 - **Dotted path types** — `DottedPaths<T>` va `PathValue<T, P>` — chuqur nested object larda type-safe access.
 - **Real-world patterns** — BEM CSS, REST API endpoint, i18n key validation, SQL query builder.
 - **Recursive types** — `CamelCase`, `SnakeCase`, `KebabCase`, `Join`, `Reverse`, `CamelCaseKeys` — string va object transformation lar.
-- **Performance** — kartezian ko'paytma cheklangan, recursion depth limit, intermediate type alias lar bilan optimizatsiya.
+- **Performance** — kartezian ko'paytma cheklangan, recursion depth limit, intermediate type alias lar bilan optimization.
 
 **Bog'liq bo'limlar:**
 - [Bo'lim 9: Advanced Generics](09-advanced-generics.md) — template literal asoslari
@@ -1990,4 +2000,4 @@ Asosiy insight: template literal types — **type-level string processing**. Com
 
 ---
 
-**Keyingi bo'lim:** [15-utility-types.md](15-utility-types.md) — TypeScript ning barcha built-in utility type lari chuqur: `Partial`, `Required`, `Readonly`, `Record`, `Pick`, `Omit`, `Exclude`, `Extract`, `ReturnType`, `Parameters`, `Awaited`, `NoInfer` — har birining implementatsiyasi, real-world use case lari, va gotchas.
+**Keyingi bo'lim:** [15-utility-types.md](15-utility-types.md) — TypeScript ning barcha built-in utility type lari chuqur: `Partial`, `Required`, `Readonly`, `Record`, `Pick`, `Omit`, `Exclude`, `Extract`, `ReturnType`, `Parameters`, `Awaited`, `NoInfer` — har birining implementation'i, real-world use case lari, va gotchas.

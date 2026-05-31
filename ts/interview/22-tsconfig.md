@@ -75,8 +75,8 @@ async function fetchUser(id: number) {
 ### Edge Cases
 
 - `lib` o'zgartirilganda target default lib'i olib tashlanadi — qo'lda `lib: ["ES2020", "DOM"]` yozganda har ikkalasini ham yozish kerak (DOM'ni unutish — `window`/`document` type'lari yo'qoladi).
-- `target: "ESNext"` — har TS release bilan o'zgaradi (TS 5.4 da ES2023, TS 5.7 da ES2024). Production'da aniq versiya tavsiya (`"ES2022"`).
-- `lib: ["ES2022"]` server'da — `DOM.Iterable` yo'q. Iterator Helpers (`.map`, `.filter`, `.toArray` iterator'larda) Stage 4 proposal, ES2025'ga kiritilgan — `lib: ["ESNext"]` yoki TS 5.6+ da `lib: ["ESNext.Iterator"]` kerak. Eski runtime'da `core-js` polyfill.
+- `target: "ESNext"` — har TS release bilan o'zgaruvchan (eng yangi qabul qilingan + staged feature'larni qamrab oladi). Production'da reproducible build uchun aniq versiya tavsiya (`"ES2022"`).
+- `lib: ["ES2022"]` server'da — `DOM.Iterable` yo'q. Iterator Helpers (`.map`, `.filter`, `.toArray` iterator'larda) Stage 4 proposal, ES2025'ga kiritilgan — TS 5.6+ da `lib.es2025.iterator.d.ts` qo'shildi, `lib: ["ES2025.Iterator"]` (yoki to'liq ES2025/ESNext) bilan yoqiladi. Eski runtime'da `core-js` polyfill.
 - `target` `importHelpers` bilan birga — `tslib` package'dan helper import (`__awaiter` har faylda inline emas), bundle hajmi kichrayadi.
 
 ### Follow-up savollar
@@ -105,7 +105,7 @@ Sub-flag'lar tafsiloti:
 
 - **`noImplicitAny`** — type annotation yo'q va inference imkonsiz bo'lsa, `any` taxmin qilmaydi, error beradi.
 - **`strictNullChecks`** — `null`/`undefined` alohida type, har joyda assignable emas (`string` ga `null` o'tmaydi).
-- **`strictFunctionTypes`** — function parameter'larda contravariance enforce qilinadi. `method` syntax (`foo(x: T): void`) bundan istisno — bivariant qoladi (DOM API compatibility uchun).
+- **`strictFunctionTypes`** — function parameter'larda contravariance enforce qilinadi. `method` syntax (`handleEvent(e: T): void`) bundan istisno — bivariant qoladi (DOM API compatibility uchun).
 - **`strictBindCallApply`** — `Function.prototype.bind/call/apply` argumentlari type-check qilinadi.
 - **`strictPropertyInitialization`** — class field constructor'da yoki declaration'da initialize qilinmasa, error (`strictNullChecks` ham yoqilgan bo'lishi kerak).
 - **`noImplicitThis`** — `this` type aniqlanmasa, error.
@@ -158,7 +158,7 @@ try {
 ### Edge Cases
 
 - `strict: true` + `strictPropertyInitialization` lekin field DI framework (NestJS) tomonidan inject qilinadi — `!` definite assignment assertion (`name!: string`) yoki `@Injectable()` decorator pattern.
-- `strictFunctionTypes` faqat **function syntax**'ga qo'llanadi (`(x: T) => void`), method syntax'da (`foo(x: T): void`) bivariant qoladi. Bu legacy DOM API'lar (`addEventListener`) uchun maxsus qoldirilgan.
+- `strictFunctionTypes` faqat **function syntax**'ga qo'llanadi (`(x: T) => void`), method syntax'da (`handleEvent(e: T): void`) bivariant qoladi. Bu legacy DOM API'lar (`addEventListener`) uchun maxsus qoldirilgan.
 - `useUnknownInCatchVariables: false` qilib, `catch (e: Error)` yozish — TS bunga ruxsat bermaydi (`catch` parameter faqat `any` yoki `unknown` bo'lishi mumkin, spec talabi).
 - `strict: true` lekin `noImplicitAny: false` — sub-flag override ishlaydi, `strict` general default beradi.
 
@@ -226,7 +226,7 @@ const item = items[0];
 
 ### Edge Cases
 
-- `for...of` loop ichida — `item` aniq `T` (undefined emas), TS narrowing qiladi. `forEach` callback ham xuddi shunday.
+- `for...of` loop ichida — `item` aniq `T` (undefined emas), TS narrowing qiladi. `forEach` callback ham shu tarzda.
 - Destructuring: `const [first, second] = arr;` da `first: T | undefined` (out-of-bounds ehtimoli). Default value bilan tuzatish: `const [first = "x"] = arr;`.
 - `Map.prototype.get` bu flag'dan **mustaqil** — har doim `V | undefined` (lib.d.ts'da shunday declare qilingan).
 - `Array.prototype.at(0)` ham har doim `T | undefined` (lib.d.ts default, flag'siz ham).
@@ -305,7 +305,7 @@ JSON.stringify({ a: null });      // '{"a":null}' — saqlanadi
 
 - `Partial<T>` bilan birga: `Partial<User>` har property'ni `?` qiladi. `exactOptionalPropertyTypes` yoqilgan bo'lsa, `{ name: undefined }` Partial'ga assign qilinmaydi — bu kutilmagan bo'lishi mumkin.
 - React `useState<string | undefined>` vs `useState<string>()` — birinchisi `T | undefined`, ikkinchisi initial undefined ammo state type `string`. Library typing bu flag bilan o'zaro ta'sirda noaniq bo'lishi mumkin.
-- DOM API'larda ko'p property `T | undefined` deklaratsiya qilingan, lekin runtime'da har doim mavjud. Bu flag bilan kelishilmagan typing'lar yuzaga chiqishi mumkin.
+- DOM API'larda ko'p property `T | undefined` declare qilingan, lekin runtime'da har doim mavjud. Bu flag bilan kelishilmagan typing'lar yuzaga chiqishi mumkin.
 - `delete obj.x` operatsiyasi `x?: T` uchun ruxsat etiladi, `x: T | undefined` uchun ham (lekin semantically noto'g'ri — property o'chiriladi, lekin type'ga ko'ra mavjud bo'lishi kerak).
 
 ### Follow-up savollar
@@ -388,7 +388,7 @@ Juftlik qoidasi: `module: "Node16"` bilan `moduleResolution: "node"` (legacy) �
 
 ### Edge Cases
 
-- `moduleResolution: "Node16"` + `package.json` `"type": "module"` — `.ts` faylda relative import majburiy `.js` extension bilan (`import { x } from "./foo.js"`). `.ts` import xato beradi (NodeNext qoidalari).
+- `moduleResolution: "Node16"` + `package.json` `"type": "module"` — `.ts` faylda relative import majburiy `.js` extension bilan (`import { createUser } from "./user.js"`). `.ts` import xato beradi (NodeNext qoidalari).
 - `moduleResolution: "Bundler"` — `exports` field qo'llab-quvvatlanadi, lekin Node.js'da to'g'ridan-to'g'ri run qilib bo'lmaydi (faqat bundler context).
 - `module: "Preserve"` (TS 5.4+) — bundler context uchun yangi qiymat, ES syntax o'zgartirmaydi, ammo `verbatimModuleSyntax`'ga rioya qiladi.
 - `module: "NodeNext"` har TS minor release'da behavior o'zgarishi mumkin (Node.js'ning eng yangi algoritmiga moslashadi). Stable production'da `"Node16"` afzal.
@@ -483,7 +483,7 @@ module.exports = {
 ```
 
 ```bash
-# Node.js da tsconfig-paths bilan run
+# Node.js'da tsconfig-paths bilan run
 node -r tsconfig-paths/register dist/app.js
 
 # tsx esbuild-based — paths avtomatik
@@ -499,7 +499,7 @@ npx tsx src/app.ts
 
 ### Follow-up savollar
 
-1. "Nima uchun `tsc` import'larni transform qilmaydi?" — Spec qoida: `tsc` syntax transformation qilmaydi (faqat type-erasure). Bu bundler responsibility. TS 5.0+ da `paths` `bundler` resolution mode bilan strict.
+1. "Nima uchun `tsc` import path'larini transform qilmaydi?" — `tsc` ko'p syntax transformation qiladi (downleveling, module format, JSX), ammo import specifier string'ini ataylab o'zgartirmaydi — module specifier'ni rewrite qilish bundler/runtime responsibility'sida qoldirilgan. `paths` faqat checker resolution uchun, emit'ga ta'sir qilmaydi.
 2. "Library uchun `paths`'siz qanday qulay tartib?" — Workspace + relative import, yoki source'ni publish qilish (`exports.types` raw `.ts`'ga ko'rsatib). Build'da `tsc-alias` ham mumkin.
 
 </details>
@@ -596,7 +596,7 @@ node --experimental-strip-types src/app.ts
 - `declare enum` — type-only declaration, erasable (`erasableSyntaxOnly` ruxsat etadi).
 - `const enum` — `erasableSyntaxOnly` bilan taqiqlanadi, chunki TS uni runtime'da inline qiladi (transpilation qo'shadi).
 - `enum`'dan oddiy `object as const` ga migration — runtime semantic farq: enum reverse mapping (`Direction[0]` → `"Up"`) yo'qoladi.
-- Decorator (`@Injectable`) — `erasableSyntaxOnly` ruxsat berishi/bermasligi TS versiyasiga bog'liq (TC39 decorator proposal stage 3, native JS — erasable).
+- Legacy decorator (`experimentalDecorators: true`, NestJS `@Injectable`) — `erasableSyntaxOnly` bilan **taqiqlanadi**: `__decorate`/`__metadata` runtime helper'lar emit qilinadi, bu pure type-erasure emas. Standart Stage-3 decorator'lar (TS 5.0+, flag'siz) ham runtime code emit qiladi — decorator umuman erasable construct emas, native strip-types decorator'larni qo'llab-quvvatlamaydi.
 
 ### Follow-up savollar
 
@@ -614,7 +614,7 @@ node --experimental-strip-types src/app.ts
 
 ### Qisqa javob
 
-`isolatedModules: true` — har TS fayl mustaqil transpile qilinishi mumkin bo'lishini kafolatlaydi (SWC, esbuild, Babel — fayl-by-fayl ishlaydi). `const enum`, ambiguous re-export, `export =` kabi cross-file context talab qiladigan syntax'larni taqiqlaydi.
+`isolatedModules: true` — har TS fayl mustaqil transpile qilinishi mumkin bo'lishini kafolatlaydi (SWC, esbuild, Babel — fayl-by-fayl ishlaydi). Ambient (import qilingan/`declare`) `const enum` access'i, ambiguous re-export, `export =` kabi cross-file context talab qiladigan construct'larni taqiqlaydi.
 
 ### To'liq tushuntirish
 
@@ -622,7 +622,7 @@ node --experimental-strip-types src/app.ts
 
 Cheklovlar:
 
-- **`const enum`** — `tsc` enum qiymatlarini inline qiladi (`Direction.Up` → `0`). Bundler bitta faylni ko'rganda enum boshqa fayldagi qiymatlarni bila olmaydi.
+- **Ambient `const enum` access** — `tsc` enum access'ini inline qiladi (`Direction.Up` → `0`). Single-file transpiler bitta faylni ko'rganda boshqa fayldagi const enum qiymatlarini bila olmaydi → import qilib access qilinganda TS2748. Shu faylda lokal declare qilingan const enum esa cheklanmaydi (declaration ko'rinadi).
 - **`export =`** / **`import = require()`** — TypeScript-specific CJS interop, modern bundler'lar bu syntax'ni qo'llab-quvvatlamaydi.
 - **Ambiguous re-export** — `export { User } from "./types"` — `User` type yoki value ekanligi faylda ko'rinmasa, `export type { User }` (type-only) majburiy.
 - **Non-module fayl** — `isolatedModules` `moduleDetection: "force"` bilan birga ishlatiladi, har fayl modul bo'lishi kerak (`import`/`export` bo'lishi shart).
@@ -633,15 +633,16 @@ Modern Vite/Next.js loyihalarda `isolatedModules: true` default — bundler `esb
 ### Kod misol
 
 ```typescript
-// === ❌ const enum cross-file ===
+// === ❌ ambient const enum access cross-file ===
 // types.ts
 export const enum Status { Active = "A", Inactive = "I" }
 
 // app.ts
 import { Status } from "./types";
 console.log(Status.Active);
-// tsc: emit'da "A" inline qilinadi
-// SWC/esbuild: Status type'i Status object'i sifatida qaraydi → ReferenceError
+// ❌ tsc: TS2748 — Cannot access ambient const enums when 'isolatedModules' is enabled
+// Sabab: tsc emit'da "A" inline qiladi, single-file transpiler (SWC/esbuild) esa
+// boshqa fayldagi qiymatni ko'rmaydi → Status object runtime'da yo'q → ReferenceError
 
 // ✅ Yechim — oddiy enum yoki const object
 export const Status = { Active: "A", Inactive: "I" } as const;
@@ -661,13 +662,13 @@ export type { User } from "./types";
 
 // === ❌ export = ===
 // legacy.ts
-class Foo { /* ... */ }
-export = Foo; // ❌ isolatedModules error
+class PaymentGateway { /* ... */ }
+export = PaymentGateway; // ❌ isolatedModules error
 
 // ✅ Yechim
-export default class Foo { /* ... */ }
+export default class PaymentGateway { /* ... */ }
 // yoki
-export class Foo { /* ... */ }
+export class PaymentGateway { /* ... */ }
 
 // === ❌ Non-module fayl ===
 // global-script.ts
@@ -815,7 +816,7 @@ tsc -b packages/api
 # Watch mode — har o'zgarishda incremental rebuild
 tsc -b --watch
 
-# Cache ni tozalab to'liq rebuild
+# Cache'ni tozalab to'liq rebuild
 tsc -b --clean
 tsc -b --force
 ```
@@ -931,7 +932,7 @@ Qo'shimcha library-specific options:
 
 **`declarationMap` ichida nima saqlanadi:** `.d.ts.map` source-map format (V3) bilan — `.d.ts`'ning har position'i source `.ts`'ga mapping. Consumer IDE "Go to Definition" `.d.ts` o'rniga source `.ts`'ga olib boradi. Bu yondashuv `sources` field'da relative path orqali ishlaydi — package publish'da `.ts` source ham include qilinishi kerak (`files` field).
 
-**`isolatedDeclarations` performance trade-off:** Cross-file inference yo'qotiladi, ammo har `.d.ts` mustaqil generate qilinadi. SWC/oxc kabi parallel tool'lar TS'siz `.d.ts` emit qila oladi (TS 5.5'dan keyin `--build` da `--isolated-declarations`). Bu library author'lar uchun kompromiss: verbose return type'lar, lekin 5-10x tezroq build.
+**`isolatedDeclarations` performance trade-off:** Cross-file inference yo'qotiladi, ammo har `.d.ts` mustaqil, faqat o'sha faylga qarab generate qilinadi. TS 5.5'dan beri `isolatedDeclarations: true` constraint'i bilan SWC/oxc kabi parser-only tool'lar `.d.ts` emit'ini type checker'siz, parallel bajara oladi (`tsc`'ning o'zi baribir constraint'ni tekshiradi va `.d.ts` emit qila oladi). Bu library author'lar uchun kompromiss: verbose explicit return type'lar evaziga parallel, tezroq build.
 
 **`stripInternal` implementation:** TS checker JSDoc `@internal` tag'ini topadi va declaration emit'da uni skip qiladi. Mexanizm fragile: parser nuance'lariga sezgir. ESM context'da `__INTERNAL__` prefix ham ishlatiladi (Vue.js style) — har ikkala usul bir-birini almashtirmaydi.
 
@@ -1058,7 +1059,7 @@ Har project turi turli build pipeline va consumer'larga ega — config farqlanad
 ### Edge Cases
 
 - React App + Next.js — Next.js o'z `tsconfig` plugin'ini (`"plugins": [{ "name": "next" }]`) talab qiladi (auto-incremental). `next dev` `tsc --noEmit`'dan ko'ra ko'proq qiladi (incremental file detection).
-- Node.js API + Native ESM (`"type": "module"`) — relative import majburiy `.js` extension bilan (`./foo.js`), `.ts` import error.
+- Node.js API + Native ESM (`"type": "module"`) — relative import majburiy `.js` extension bilan (`./user.js`), `.ts` import error.
 - Library uchun `paths` ishlatish xavfli — `tsc-alias` bilan post-process kerak, yoki umuman ishlatmaslik.
 - Monorepo'da har package alohida tsconfig — `extends` orqali base config'ni share qilish, har biri o'z `module`/`outDir`'ini override qiladi.
 
@@ -1086,58 +1087,62 @@ export { User } from "./types";
 
 ### Qisqa javob
 
-Ikki xato: `const enum` cross-file inline'ni talab qiladi (transpiler bitta faylda buni qila olmaydi), `export { User }` — `User` type yoki value ekanligi bandler uchun noaniq (explicit `export type` kerak).
+`isolatedModules` o'zi yoqilgan holda bu faylda **bitta** xato: `export { User } from "./types"` — `User` `./types`'da type bo'lib chiqsa, TS re-export'ni `export type` bilan majburlaydi (TS1205). `const enum Direction` shu faylda **lokal** declare qilingan, undan keyin `export { Direction }` — bu faylda xato bermaydi: TS local const enum qiymatlarini ko'rib turibdi. Const enum muammosi boshqa modul uni **import qilib access** qilganda (TS2748) yoki shu faylga `verbatimModuleSyntax: true` ham qo'shilganda chiqadi.
 
 ### To'liq tushuntirish
 
-**Xato 1: `const enum` `isolatedModules`'da taqiqlanadi**
-
-`tsc` `const enum`'ni inline qiladi: `Direction.Up` → `"UP"`. Bunga butun loyihani ko'rish kerak. SWC/esbuild har faylni alohida transpile qiladi — `Direction` import qilingan faylda enum qiymatlarini bila olmaydi.
+**Xato: ambiguous type re-export (TS1205)**
 
 ```typescript
-// ❌ Error: 'const' enums are not supported with 'isolatedModules'
-const enum Direction { Up = "UP", Down = "DOWN" }
+export { User } from "./types";
 ```
 
-Yechim 1 — oddiy enum (runtime'da object emit qilinadi, transpilation kerak emas):
+`isolatedModules` har faylni single-file transpiler (SWC/esbuild/Babel) mustaqil transpile qila olishini kafolatlaydi. Bu transpiler `./types`'ni o'qimaydi — faqat joriy faylni. `User` type bo'lsa, emit'da re-export butunlay yo'qotilishi kerak (type-erasure); value bo'lsa — saqlanishi kerak. `tsc` o'zi `./types`'ni resolve qilib `User` type ekanini aniqlaganda — single-file transpiler buni qila olmasligini bilib xato beradi:
+
+```
+TS1205: Re-exporting a type when 'isolatedModules' is enabled requires using 'export type'.
+```
 
 ```typescript
-enum Direction { Up = "UP", Down = "DOWN" }
+// ✅ Yechim — explicit export type
+export type { User } from "./types";
+```
+
+**Nega `const enum Direction` + `export { Direction }` bu faylda xato emas**
+
+`tsc` `const enum` access'ini inline qiladi: `Direction.Up` → `"UP"`. Bu inlining uchun declaration ko'rinishi kerak. Declaration **shu faylda** bo'lganda — transpiler ham uni ko'radi, shu sababli local const enum `isolatedModules`'da xato bermaydi. Muammo declaration boshqa modulda bo'lib (ambient/imported), uni access qilganda chiqadi:
+
+```typescript
+// other.ts — Direction'ni import qilib access qilsa:
+import { Direction } from "./this-file";
+console.log(Direction.Up);
+// ❌ TS2748: Cannot access ambient const enums when 'isolatedModules' is enabled.
+```
+
+Shu sababli `const enum`'ni **export qilish** xavfli: consumer faylda access TS2748 beradi va single-file transpiler inline qila olmaydi. Bu faylga `verbatimModuleSyntax: true` qo'shilsa — const enum export'i ham xato bo'ladi (const enum runtime value emas, shaffof emit imkonsiz).
+
+**Const enum'dan qochish — barqaror muqobil**
+
+Yechim 1 — oddiy enum (runtime'da object emit qilinadi, cross-file inline kerak emas):
+
+```typescript
+export enum Direction { Up = "UP", Down = "DOWN" }
 ```
 
 Yechim 2 — `as const` object (modern, type-safe):
 
 ```typescript
-const Direction = { Up: "UP", Down: "DOWN" } as const;
-type Direction = typeof Direction[keyof typeof Direction];
+export const Direction = { Up: "UP", Down: "DOWN" } as const;
+export type Direction = typeof Direction[keyof typeof Direction];
 ```
-
-**Xato 2: Ambiguous re-export**
-
-```typescript
-export { User } from "./types";
-// User type'mi yoki value'mi — bundler bilmaydi
-```
-
-Bundler `./types`'ni o'qimaydi (faqat joriy faylni). `User` type bo'lsa — emit'da bu re-export butunlay yo'qotilishi kerak (type-erasure). Value bo'lsa — saqlanadi. Aniq bo'lishi kerak.
-
-```typescript
-// ✅ Yechim — explicit type
-export type { User } from "./types";
-
-// Yoki value bo'lsa:
-export { User } from "./types"; // verbatimModuleSyntax: false bo'lsa OK
-```
-
-`verbatimModuleSyntax: true` bilan `import type`/`export type` strict bo'ladi — har import/export aniqligi majburiy.
 
 ### Kod misol
 
 ```typescript
-// === ❌ Original ===
+// === Original ===
 const enum Direction { Up = "UP", Down = "DOWN" }
-export { Direction };
-export { User } from "./types";
+export { Direction };                  // bu faylda xato emas (local const enum)
+export { User } from "./types";        // ❌ TS1205 — User type bo'lsa, export type kerak
 
 // === ✅ Yechim 1 — oddiy enum + type re-export ===
 export enum Direction { Up = "UP", Down = "DOWN" }
@@ -1151,15 +1156,15 @@ export type { User } from "./types";
 
 ### Edge Cases
 
-- `enum` (const emas) ham SWC/esbuild'da IIFE'ga emit qilinadi — ishlaydi. Faqat `const enum` cross-file inline talab qiladi.
-- `preserveConstEnums: true` flag — `const enum`'ni runtime object'ga aylantiradi, lekin `isolatedModules` baribir cheklaydi.
-- Babel `@babel/plugin-transform-typescript` `const enum`'ni umuman qo'llab-quvvatlamaydi (TS 5.0+).
-- Library publish'da `const enum` export qilish xavfli — consumer cross-package inline qila olmaydi, runtime error.
+- `enum` (const emas) ham SWC/esbuild'da IIFE'ga emit qilinadi — ishlaydi. Const enum esa access'da inline'ga tayanadi, shuning uchun import qilib access qilinganda single-file transpiler buziladi.
+- TS2748 (ambient const enum access) faqat **import qilingan/`declare` qilingan** const enum'da chiqadi — shu faylda lokal declare qilingan const enum'da emas.
+- `preserveConstEnums: true` flag — `const enum`'ni runtime object'ga ham emit qiladi, lekin `isolatedModules` baribir cross-file access'ni cheklaydi (single-file transpiler boshqa fayldagi object'ni ko'rmaydi).
+- Library publish'da `const enum` export qilish xavfli — consumer cross-package access TS2748 beradi yoki single-file transpiler inline qila olmaydi.
 
 ### Follow-up savollar
 
 1. "`enum`'ni umuman ishlatmaslik kerakmi?" — Modern stil — `as const` object afzal (`erasableSyntaxOnly` mos, runtime overhead yo'q, tree-shakeable).
-2. "`export type` `export { type }`'dan farqi nima?" — Sintaksis farqi: `export type { User }` butun statement type-only, `export { type User, value }` (TS 5.0+) inline marker — har export uchun alohida.
+2. "`export type` `export { type }`'dan farqi nima?" — Syntax farqi: `export type { User }` butun statement type-only, `export { type User, createUser }` (TS 5.0+) inline marker — har export uchun alohida (`User` type-only, `createUser` value).
 
 </details>
 
@@ -1186,7 +1191,7 @@ function getConfig(key: string): string {
 
 ### Qisqa javob
 
-Compile bo'lmaydi. `config[key]` `string | undefined` type'ga ega, ammo return type `string` deklaratsiya qilingan. TS error: `Type 'string | undefined' is not assignable to type 'string'`.
+Compile bo'lmaydi. `config[key]` `string | undefined` type'ga ega, ammo return type `string` deb e'lon qilingan. TS error: `Type 'string | undefined' is not assignable to type 'string'`.
 
 ### To'liq tushuntirish
 
@@ -1245,7 +1250,7 @@ const xyz = getConfigOptional("xyz"); // undefined
 ### Edge Cases
 
 - `as` assertion bilan flag'ni "bypass" qilish — `return config[key] as string;` — xavfli, runtime'da undefined.toUpperCase() crash bo'ladi. TS xatoni yashiradi, lekin bug saqlanadi.
-- `!` non-null assertion — `return config[key]!;` — xuddi shu xavfli pattern. Faqat siz haqiqatan key mavjudligiga ishonsangiz.
+- `!` non-null assertion — `return config[key]!;` — aynan shu xavfli pattern. Faqat siz haqiqatan key mavjudligiga ishonsangiz.
 - `in` operator narrowing: `if (key in config)` — TS bu yerda hali `noUncheckedIndexedAccess` natijasini narrow qilmaydi (TypeScript 5.x).
 - `Object.hasOwn(config, key)` ham type narrowing qilmaydi — explicit `value !== undefined` check kerak.
 
@@ -1364,7 +1369,7 @@ export default [
 
 ### Edge Cases
 
-- `exclude` test fayllar uchun ishlatilsa — `**/*.test.ts` excluded, ammo `src/foo.ts` `./foo.test` import qilsa baribir compile bo'ladi. Test fayllar alohida `tsconfig.test.json`'da bo'lishi afzal.
+- `exclude` test fayllar uchun ishlatilsa — `**/*.test.ts` excluded, ammo `src/user.ts` `./user.test` import qilsa baribir compile bo'ladi. Test fayllar alohida `tsconfig.test.json`'da bo'lishi afzal.
 - `module: "ESNext"` + `moduleResolution: "node"` — eski Webpack 4 loyihalarda ko'rinadi, ammo modern packages buziladi. Migration: `moduleResolution: "Bundler"`.
 - `moduleResolution: "node"` `node10`'ga rename qilingan (TS 5.0+), ammo backward compat uchun ikkala nom ishlaydi.
 - `module: "NodeNext"` har TS minor release'da xulqi o'zgarishi mumkin — production'da `"Node16"` stable.
@@ -1372,7 +1377,7 @@ export default [
 ### Follow-up savollar
 
 1. "`moduleResolution: "node"` ni qachon ishlatish mumkin?" — Faqat legacy CJS loyihalarda (`module: "CommonJS"`), `exports` field ishlatmaydigan eski package'lar bilan. Yangi kodda — yo'q.
-2. "Real internal modul'ni qanday yashirish?" — Monorepo: `packages/internal` private (`"private": true`), `exports` field'da fa qat public surface'ni eksport qilish.
+2. "Real internal modul'ni qanday yashirish?" — Monorepo: `packages/internal` private (`"private": true`), `exports` field'da faqat public surface'ni export qilish.
 
 </details>
 
@@ -1397,9 +1402,9 @@ Default'da TS "tushunadi" qaysi import type-only — emit fazasida olib tashlayd
 
 `verbatimModuleSyntax: true` qoidalari:
 
-- **Value import**: `import { Foo } from "./mod"` — `Foo` value bo'lishi shart, emit'da saqlanadi.
-- **Type import**: `import type { Foo } from "./mod"` — type-only, emit'da olib tashlanadi.
-- **Mixed**: `import { Foo, type Bar } from "./mod"` — inline type marker (TS 5.0+).
+- **Value import**: `import { createUser } from "./user"` — `createUser` value bo'lishi shart, emit'da saqlanadi.
+- **Type import**: `import type { User } from "./user"` — type-only, emit'da olib tashlanadi.
+- **Mixed**: `import { createUser, type User } from "./user"` — inline type marker (TS 5.0+).
 - **Side-effect**: `import "./styles.css"` — har doim saqlanadi (no specifier).
 
 Emit qoidasi:
@@ -1447,13 +1452,13 @@ import { readFile } from "fs";
 
 - `verbatimModuleSyntax: true` `module: "CommonJS"` bilan birga — ESM syntax taqiqlanadi, faqat `import = require()` ishlaydi. Modern loyihada `module: "Node16"` ga o'tish afzal.
 - Decorators (`@Injectable`) — class metadata uchun runtime reflection talab qilinadi. `verbatimModuleSyntax` bilan `import` decorator-emitted metadata uchun saqlanishi shart. Tip-aware decorator (NestJS) bilan ehtiyot.
-- Re-export pattern (`export { Foo } from "./mod"`) — `Foo` type yoki value bo'lishi `verbatimModuleSyntax` bilan strict aniqlanishi kerak (`export type { Foo }` agar type).
+- Re-export pattern (`export { User } from "./user"`) — `User` type yoki value bo'lishi `verbatimModuleSyntax` bilan strict aniqlanishi kerak (`export type { User }` agar type).
 - `importsNotUsedAsValues` va `preserveValueImports` (eski flag'lar) `verbatimModuleSyntax` bilan birlashtirilgan — yangi kodda `verbatim` ishlatish.
 
 ### Follow-up savollar
 
 1. "`verbatimModuleSyntax` yoqilganda code o'zgarishi qancha bo'ladi?" — Mavjud value-only import'lar `import type` ga aylantirilishi kerak. TS auto-fix (VSCode quick action) yordam beradi, ESLint rule (`@typescript-eslint/consistent-type-imports`) ham.
-2. "Bu flag tree-shaking ga ta'sir qiladimi?" — Bilvosita ha — emit predictable bo'lsa, bundler dead code elimination aniqroq.
+2. "Bu flag tree-shaking'ga ta'sir qiladimi?" — Bilvosita ha — emit predictable bo'lsa, bundler dead code elimination aniqroq.
 
 </details>
 
@@ -1513,14 +1518,14 @@ $ tsc --build packages/api
 $ tsc --build packages/api
 # Output: All projects up-to-date (skip)
 
-# === auth/src/index.ts ni o'zgartirib ===
+# === auth/src/index.ts'ni o'zgartirib ===
 $ tsc --build packages/api
 # Order:
 # 1. shared up-to-date (skip)
 # 2. auth rebuild (file changed)
 # 3. api rebuild (depends on auth)
 
-# === shared/src/index.ts ni o'zgartirib ===
+# === shared/src/index.ts'ni o'zgartirib ===
 $ tsc --build packages/api
 # Order:
 # 1. shared rebuild
@@ -1615,7 +1620,7 @@ const c = new Child();
 // c.x → getter → 200
 
 // === useDefineForClassFields: true ===
-// Child constructor: Object.defineProperty(this, "x", { value: 100, writable: true, configurable: true })
+// Child constructor: Object.defineProperty(this, "x", { value: 100, writable: true, enumerable: true, configurable: true })
 // → Yangi own data property
 // c.x → own property → 100
 // Setter "shadowed" (yo'qotilmagan, lekin override qilingan)
@@ -1630,10 +1635,11 @@ class ChildSafe extends Base {
 }
 
 // === Decorator pattern (NestJS, Angular) ===
-class Service {
-  @Inject() private repo!: Repository;
-  // Decorator runtime'da this.repo'ga property descriptor o'rnatadi
-  // useDefineForClassFields: true bo'lsa — class field override qiladi (bug)
+class OrderService {
+  @Inject() private orderRepository!: OrderRepository;
+  // Decorator runtime'da this.orderRepository'ga property descriptor o'rnatadi
+  // useDefineForClassFields: true bo'lsa — class field bu property'ni
+  // undefined bilan qayta define qilib injection'ni o'chiradi (bug)
   // Yechim: declare ishlatish yoki useDefineForClassFields: false
 }
 ```
@@ -1648,7 +1654,7 @@ class Service {
 ### Follow-up savollar
 
 1. "Mavjud loyiha `target: "ES2020"` da, agar `"ES2022"` ga ko'tarsam nima buziladi?" — `useDefineForClassFields` default `true`'ga aylanadi. Decorator yoki inheritance pattern'da behavior o'zgarishi mumkin — har class'ni audit qilish.
-2. "`declare` keyword qachon kerak?" — Field deklaratsiya kerak (TS type), ammo runtime emit kerak emas. Decorator-injected, parent-set, framework-managed field'larda.
+2. "`declare` keyword qachon kerak?" — Field declaration kerak (TS type), ammo runtime emit kerak emas. Decorator-injected, parent-set, framework-managed field'larda.
 
 <details>
 <summary><strong>Deep Dive</strong></summary>
@@ -1679,7 +1685,7 @@ class Child extends Base {
 
 **`declare` modifier internal:** `declare x: number` TS AST'da `ClassDeclaration.modifiers`'ga `DeclareKeyword` qo'shadi. Emit fazasi bu node'ni butunlay skip qiladi — runtime'da hech qanday property o'rnatish bo'lmaydi. Type-only contract. Decorator-aware framework'da parent yoki decorator metadata property'ni o'rnatadi, TS faqat type kontekstni biladi.
 
-**`accessor` keyword (TS 4.9+, ES2024 proposal):** `accessor x = 5` — auto-generated getter/setter pair bilan private backing field. TC39 "auto-accessor" proposal Stage 3. Decorator integration: `@reactive accessor count = 0` — decorator getter/setter'ga ulanishi mumkin. Modern alternative `useDefineForClassFields` semantics'ga.
+**`accessor` keyword (TS 4.9+):** `accessor x = 5` — auto-generated getter/setter pair bilan private backing field. TC39 decorators proposal'ning bir qismi (auto-accessor, Stage 3 — hali biror ES editiona kiritilmagan). Decorator integration: `@reactive accessor count = 0` — decorator getter/setter'ga ulanishi mumkin. Modern alternative `useDefineForClassFields` define semantics'ga.
 
 **Migration strategy `target: "ES2020"` → `"ES2022"`:** Inheritance audit (parent accessor + child field), decorator framework versiya (NestJS 10+ class fields'ga moslashgan), `declare` qo'shish (DI injection points). `tsc --strict` audit'da uncovered behaviors topiladi.
 
@@ -1803,9 +1809,9 @@ export const configAlt = {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-**Motivation va architectural design:** Default TS declaration emit cross-file inference talab qiladi — `function foo() { return helper(); }`'da `helper`'ning return type'i boshqa fayldan keladi. `tsc` butun project graph'ni quradi — bu sekin, parallel emit imkonsiz. `isolatedDeclarations` constraint: har export'ning type'i fayl ichida explicit ko'rinishi shart. Bu — DTS Emit Spec'da rasmiy hujjatlangan.
+**Motivation va architectural design:** Default TS declaration emit cross-file inference talab qiladi — `function loadUser() { return fetchUser(); }`'da `fetchUser`'ning return type'i boshqa fayldan keladi. `tsc` butun project graph'ni quradi — bu sekin, parallel emit imkonsiz. `isolatedDeclarations` constraint: har export'ning type'i fayl ichida explicit ko'rinishi shart.
 
-**Non-TS tool'lar uchun spec:** Bu flag yoqilganda `.d.ts` syntactic transformation orqali generate qilinishi mumkin — type checker kerak emas. Bablon, SWC, oxc kabi parser-only tool'lar `.d.ts` emit qila oladi. TS 5.5'dan beri rasmiy spec mavjud (`isolatedDeclarations` constraints).
+**Non-TS tool'lar uchun spec:** Bu flag yoqilganda `.d.ts` syntactic transformation orqali generate qilinishi mumkin — type checker kerak emas. SWC va oxc (`oxc-transform`'ning `isolatedDeclaration()`) kabi parser-only tool'lar `.d.ts` emit qila oladi. Babel `.d.ts` emit'ini qo'llab-quvvatlamaydi (AST codegen yetishmaydi). TS 5.5'dan beri `isolatedDeclarations` constraint'i rasmiy.
 
 **Constraint rules formal:**
 
@@ -1813,7 +1819,7 @@ export const configAlt = {
 2. Har exported variable: explicit type annotation, yoki literal expression (TS literal'dan type infer qila oladi sintaktik).
 3. Har exported class: har public method explicit return type, har property explicit type.
 4. Generic parameter: explicit inference signature (`<T>(x: T): T`).
-5. Re-export: type-only marker (`export type { Foo }`).
+5. Re-export: type-only marker (`export type { User }`).
 
 **`satisfies` operator with isolated declarations:**
 
@@ -1830,11 +1836,11 @@ export const config: Config = { port: 3000 };
 
 `satisfies` syntactic — TS faqat fayl ichidagi expression'ni ko'radi.
 
-**Performance benchmarks (typical library):** `tsc --build` (cross-file) 12s → `tsc --build --isolatedDeclarations` 4s → parallel SWC emit 1.2s. Loyiha hajmiga bog'liq (linear scaling cross-file, sub-linear parallel).
+**Performance trade-off:** `tsc`'ning cross-file declaration emit'i butun project graph'ni quradi (sekin, parallel emas). `isolatedDeclarations` constraint'i ostida har `.d.ts` faqat o'z faylidan generate qilinadi — oxc/SWC kabi native tool'lar uni TS'dan ancha tezroq va parallel emit qila oladi. Aniq tezlik loyiha hajmi va fayl soniga bog'liq; native parallel emit `tsc`'dan sezilarli ustun.
 
 **Library author perspective:** Explicit type — API surface dokumentatsiya sifatida. Implicit return type'lar API consumer uchun "noaniq" — `tsc` har versiya bilan inference o'zgarishi mumkin (breaking change semver bo'yicha). Explicit type — stable API contract.
 
-**Limitation:** Generic constraint inference cheklangan — `function id<T extends string>(x: T): T` da ish, ammo `function magic<T>(x: T)` da explicit return type T kerak. Function overload — har signature alohida explicit.
+**Limitation:** Generic'da return type baribir explicit yozilishi shart — `function identity<T>(x: T): T` ishlaydi, ammo `function identity<T>(x: T)` (return type'siz) `isolatedDeclarations` ostida xato beradi. Function overload — har signature alohida explicit.
 
 </details>
 
@@ -1856,5 +1862,3 @@ export const config: Config = { port: 3000 };
 - Project references — `composite: true` majburiy, DAG (no circular), `tsc --build` topological order
 - `useDefineForClassFields` — class field `[[Define]]` vs `[[Set]]` semantics (inheritance/decorator pattern)
 - Library tsconfig: `target: "ES2020"`, `declarationMap`, `stripInternal`, `isolatedDeclarations`, `paths`'siz
-
-[Asosiy bo'limga qaytish →](../22-tsconfig.md)

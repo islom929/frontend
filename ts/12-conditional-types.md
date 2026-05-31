@@ -78,7 +78,7 @@ Har `extends` tekshiruvi ketma-ket — birinchi rost bo'lgan branch qaytariladi.
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-TypeScript kompilatori conditional type'ni quyidagi tartibda qayta ishlaydi:
+TypeScript compiler'i conditional type'ni quyidagi tartibda qayta ishlaydi:
 
 ```
 1. T concrete type mi yoki generic mi?
@@ -87,7 +87,7 @@ TypeScript kompilatori conditional type'ni quyidagi tartibda qayta ishlaydi:
    │   IsString<string> → string extends string ? true : false → true
    │
    └── Generic → DEFERRED (keyinga qoldiriladi)
-       function foo<T>(x: T): IsString<T> { ... }
+       function classify<T>(value: T): IsString<T> { ... }
        → IsString<T> saqlanadi, T aniq bo'lganda evaluate bo'ladi
 
 2. T union type mi?
@@ -118,11 +118,11 @@ function processValue<T>(value: T): T extends string ? string[] : T {
 }
 
 // Chaqiruvda T aniq bo'lganda — evaluate bo'ladi:
-const a = processValue("hello"); // string[] — T = string
-const b = processValue(42);      // number — T = number
+const chars = processValue("hello"); // string[] — T = string
+const count = processValue(42);       // number — T = number
 ```
 
-**Runtime narrowing vs compile-time conditional:** Runtime'da `typeof value === "string"` ishlaydi va to'g'ri natija beradi. Lekin TypeScript kompilator generic `T`'ni runtime check orqali aniqlay olmaydi — conditional type compile-time'da, runtime'da esa type'lar yo'q. Bu farq ko'p developer'ni chalkashtiradi.
+**Runtime narrowing vs compile-time conditional:** Runtime'da `typeof value === "string"` ishlaydi va to'g'ri natija beradi. Lekin compiler generic `T`'ni runtime check orqali aniqlay olmaydi — conditional type compile-time'da resolve bo'ladi, runtime'da esa type'lar erase qilingan. Shuning uchun funksiya ichida `return` qiymatini conditional return type'ga assertion bilan ulash kerak bo'ladi.
 
 **Yechim'lar:** Function overloads (pastda batafsil) yoki type assertion.
 
@@ -153,9 +153,9 @@ type TypeName<T> =
   T extends unknown[] ? "array" :
   "object";
 
-type T1 = TypeName<string>;         // "string"
-type T2 = TypeName<number[]>;       // "array"
-type T3 = TypeName<() => void>;     // "function"
+type StringName = TypeName<string>;         // "string"
+type ArrayName = TypeName<number[]>;        // "array"
+type FunctionName = TypeName<() => void>;   // "function"
 
 // 3. API response type — endpoint'ga qarab turli shape
 interface User { id: string; name: string; }
@@ -189,8 +189,8 @@ function process<T extends string | number>(
   return ((value as number) * 2) as T extends string ? string[] : number;
 }
 
-const a = process("hello"); // string[]
-const b = process(42);      // number
+const chars = process("hello"); // string[]
+const doubled = process(42);    // number
 
 // 6. Nullable check
 type IsNullable<T> = T extends null | undefined ? true : false;
@@ -297,7 +297,7 @@ type Z = ParseBool<"true">; // true
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-TypeScript kompilatori `infer`'ni pattern matching algoritmi bilan qayta ishlaydi:
+TypeScript compiler'i `infer`'ni pattern matching algoritmi bilan qayta ishlaydi:
 
 ```
 Input: T extends Pattern<infer U> ? TrueType : FalseType
@@ -360,7 +360,7 @@ T extends Pattern<infer U extends Constraint>
 Bu `infer U` + `U extends Constraint ? ...`'ga qaraganda yaxshiroq:
 
 - Nested conditional kam
-- Kompilator optimizatsiya qila oladi
+- Compiler optimization qila oladi
 - Type aniqroq
 
 **Overloaded function `infer`:** TypeScript overloaded funksiya'ning **oxirgi overload signature**'ini oladi, barcha overload'lar union'ini emas:
@@ -372,7 +372,7 @@ declare function overloaded(x: number): number;
 type R = ReturnType<typeof overloaded>; // number (oxirgi overload)
 ```
 
-**Sabab:** TypeScript type system overload list'idagi **eng oxirgi** signature'ni implementation signature sifatida ishlatadi. Bu deterministik tanlov, lekin ko'p developer buni bilmaydi. Bu TypeScript'ning hujjatlangan cheklovi (microsoft/TypeScript#26113).
+**Sabab:** `infer` overload list'dan bitta signature tanlashi kerak, va TypeScript eng oxirgi (eng pastdagi) overload signature'ni oladi. Bu deterministik, lekin overload tartibiga bog'liq — signature'larni qayta tartiblash `ReturnType` natijasini o'zgartiradi (microsoft/TypeScript#26591).
 
 **Runtime'da iz yo'q:** `infer` sof compile-time feature. Compiled JavaScript'da hech qanday iz qolmaydi.
 
@@ -519,7 +519,7 @@ type Dist<T> = T extends U ? X : Y;
 
 Dist<A | B | C>
 
-Kompilator jarayoni:
+Compiler jarayoni:
 1. T = A | B | C — union detected
 2. T naked type parameter — distribution triggered
 3. Split: Dist<A> | Dist<B> | Dist<C>
@@ -559,7 +559,7 @@ type B = Check<boolean>;
 // boolean distributive qilinadi:
 // = Check<true> | Check<false>
 // = "yes" | "no"
-// Diqqat: "yes" emas — chunki false ham tekshiriladi
+// Diqqat: natija faqat "yes" emas — false ham alohida tekshiriladi
 ```
 
 **Naked type parameter visual contrast:**
@@ -703,7 +703,7 @@ type NonDist4<T> = { value: T } extends { value: string } ? "yes" : "no";
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Non-distributive conditional type'da kompilator union'ni split qilmaydi — butun union type'ni `extends` tekshiruviga beradi:
+Non-distributive conditional type'da compiler union'ni split qilmaydi — butun union type'ni `extends` tekshiruviga beradi:
 
 ```
 type NonDist<T> = [T] extends [string] ? true : false;
@@ -825,7 +825,7 @@ type IsUnion<T, C = T> =
 
 type U1 = IsUnion<string>;          // false
 type U2 = IsUnion<string | number>;  // true
-type U3 = IsUnion<never>;            // false
+type U3 = IsUnion<never>;            // never — never empty union, distribution branch'larga kirmaydi
 
 // 6. Wrapped vs naked comparison
 type NakedCheck<T> = T extends string ? "yes" : "no";
@@ -867,9 +867,9 @@ type Recursive<T> =
   Default;
 ```
 
-Har recursive type'da **base case** (to'xtash sharti) **shart** — aks holda kompilator cheksiz loop'ga tushadi.
+Har recursive type'da **base case** (to'xtash sharti) **shart** — aks holda compiler cheksiz loop'ga tushadi.
 
-**Tail-call optimization (TS 4.5+):** Agar recursive call true branch'ida **return pozitsiyasida** tursa (boshqa type bilan wrap qilinmasdan), kompilator uni tail call sifatida aniqlaydi va stack frame'ni qayta ishlatadi. Bu depth limit'ni taxminan **1000**'ga oshiradi (odatdagi **~50**'dan).
+**Tail-call optimization (TS 4.5+):** Agar recursive call true branch'ida **return pozitsiyasida** tursa (boshqa type bilan wrap qilinmasdan), compiler uni tail call sifatida aniqlaydi va stack frame'ni qayta ishlatadi. Bu depth limit'ni taxminan **1000**'ga oshiradi (odatdagi **~50**'dan).
 
 **Accumulator pattern — tail-recursive bo'lishning qoidasi:**
 
@@ -892,12 +892,12 @@ Accumulator pattern'da natija har iteration'da `Acc` parameter'ga to'planadi va 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Depth limit mexanizmi:** TypeScript kompilatori recursive conditional type'lar uchun cheklangan depth limit qo'ygan. Limit'ga yetganda `Type instantiation is excessively deep and possibly infinite` xatosi chiqadi — bu compile-time stack overflow'ni oldini olish uchun.
+**Depth limit mexanizmi:** TypeScript compiler'i recursive conditional type'lar uchun cheklangan depth limit qo'ygan. Limit'ga yetganda `Type instantiation is excessively deep and possibly infinite` xatosi chiqadi — bu compile-time stack overflow'ni oldini olish uchun.
 
 - **Non-tail-recursive** — taxminan **50 daraja** limit
 - **Tail-recursive** (TS 4.5+) — taxminan **1000 daraja** limit (optimize qilingan)
 
-**Tail-call optimization nima uchun ishlaydi:** Tail position'dagi recursive call kompilatorning "joriy stack frame'ni qayta ishlating" signalini beradi. Stack frame har yangi call'da yaratilmaydi — bitta frame qayta ishlatiladi. Bu functional programming til'larida (Haskell, Scala, Scheme) keng qo'llaniladi, TypeScript'da esa type-level recursion uchun kiritilgan.
+**Tail-call optimization nima uchun ishlaydi:** Tail position'dagi recursive call compiler'ning "joriy stack frame'ni qayta ishlating" signalini beradi. Stack frame har yangi call'da yaratilmaydi — bitta frame qayta ishlatiladi. Bu functional programming til'larida (Haskell, Scala, Scheme) keng qo'llaniladi, TypeScript'da esa type-level recursion uchun kiritilgan.
 
 ```
 Non-tail recursion (50 limit):
@@ -921,7 +921,7 @@ Tail<3, []>
 
 **Accumulator pattern — functional programming texnikasi:** Accumulator "yig'uvchi" parameter — har iteration'da natija unga qo'shiladi. Oxirgi iteration'da (base case) accumulator qaytariladi. Bu pattern O(1) stack space ishlatadi, O(n) o'rniga.
 
-**TypeScript'da tail-recursion tekshiruvi:** Kompilator AST'da recursive call'ning pozitsiyasini tekshiradi. Agar call true branch'ning return pozitsiyasida bo'lsa (boshqa type construct bilan wrap qilinmasa), tail call deb belgilanadi.
+**TypeScript'da tail-recursion tekshiruvi:** Compiler AST'da recursive call'ning pozitsiyasini tekshiradi. Agar call true branch'ning return pozitsiyasida bo'lsa (boshqa type construct bilan wrap qilinmasa), tail call deb belgilanadi.
 
 Tail qoida'lari:
 - `T extends X ? Recursive<...> : Y` — ✅ tail
@@ -1079,8 +1079,8 @@ function process(value: string | number): string[] | number {
   return value * 2;
 }
 
-const a = process("hello"); // string[]
-const b = process(42);      // number
+const chars = process("hello"); // string[]
+const doubled = process(42);    // number
 ```
 
 **Conditional type:**
@@ -1115,9 +1115,9 @@ function process<T extends string | number>(value: T): ProcessResult<T> {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator overload resolution va conditional type evaluation'ni **butunlay farqli mexanizm**'larda bajaradi.
+Compiler overload resolution va conditional type evaluation'ni **butunlay farqli mexanizm**'larda bajaradi.
 
-**Overload resolution:** Kompilator barcha overload signature'larni yuqoridan pastga tekshiradi. Birinchi mos keladigan overload tanlanadi. Union argument berilganda kompilator **bitta** overload tanlashga harakat qiladi — lekin union hech bir aniq overload'ga to'liq mos kelmaydi, shuning uchun xato bo'lishi mumkin.
+**Overload resolution:** Compiler barcha overload signature'larni yuqoridan pastga tekshiradi. Birinchi mos keladigan overload tanlanadi. Union argument berilganda compiler **bitta** overload tanlashga harakat qiladi — lekin union hech bir aniq overload'ga to'liq mos kelmaydi, shuning uchun xato bo'lishi mumkin.
 
 **Conditional type evaluation:** Conditional type `T extends U ? X : Y`'ni evaluate qiladi. Agar `T` naked parameter + union bo'lsa — distributive behavior yoqiladi va har member alohida evaluate bo'ladi:
 
@@ -1134,24 +1134,35 @@ process(string | number)      ProcessResult<string | number>
                                  string[] | number  ✅
 ```
 
-**Overloaded function + `ReturnType` — nozik holat:** TypeScript overloaded funksiya uchun `ReturnType<typeof fn>` chaqirilganda **oxirgi** overload signature'ning return type'ini oladi. Bu deterministik tanlov, lekin ko'p developer'larni chalkashtiradi:
+**Overloaded function + `ReturnType` — nozik holat:** TypeScript overloaded funksiya uchun `ReturnType<typeof fn>` chaqirilganda **oxirgi** overload signature'ning return type'ini oladi, barcha overload'lar union'ini emas:
 
 ```typescript
 declare function overloaded(x: string): string;
 declare function overloaded(x: number): number;
 
-type R = ReturnType<typeof overloaded>; // number (oxirgi)
-// Kutilgan: string | number — lekin noto'g'ri
+type R = ReturnType<typeof overloaded>; // number (oxirgi overload)
+// "string | number" emas — faqat oxirgi signature
 ```
 
-**Sabab:** TypeScript type system'da funksiya `typeof` orqali type olinganda, signature'larning oxirgisi (implementation signature'ga eng yaqini) tanlanadi. Bu eski design tanlov — backward compatibility tufayli o'zgarmaydi.
+**Sabab:** `ReturnType<T> = T extends (...args: any[]) => infer R ? R : any`. Funksiya bir nechta call signature'ga ega bo'lganda, `infer` faqat **oxirgi** signature'dan inference qiladi — TypeScript uni eng keng "catch-all" deb hisoblaydi (microsoft/TypeScript#26591). Bu type system'ning hujjatlangan cheklovi.
 
-**Yechim** — `infer` bilan barcha overload'larni olish (chekli):
+**Yechim** — conditional type'ning o'ng tomonida bir xil sondagi overload'li function type pattern yozish va har pozitsiyaga `infer` qo'yish. Quyida ikki overload uchun barcha return type'larni olish:
 
 ```typescript
-// TypeScript'ning standart yo'li yo'q — faqat oxirgi overload olinadi
-// Custom trick mavjud, lekin 4 ta overload'gacha cheklangan
+type OverloadReturn<T> =
+  T extends {
+    (...args: any[]): infer R1;
+    (...args: any[]): infer R2;
+  }
+    ? R1 | R2
+    : T extends (...args: any[]) => infer R
+      ? R
+      : never;
+
+type AllReturns = OverloadReturn<typeof overloaded>; // string | number
 ```
+
+Pattern overload soniga bog'liq — har qo'shimcha overload uchun yana bitta call signature qo'shish kerak.
 
 **Emit farqi yo'q:** Emitter ikkala yondashuvni (overloads va conditional) bir xil JavaScript'ga aylantiradi — runtime'da farq yo'q. Barcha tanlov — compile-time type safety va developer experience uchun.
 
@@ -1214,8 +1225,8 @@ function expand<T extends "small" | "medium" | "large" | "xlarge" | "xxlarge">(
   return { size: map[size] } as ExpandType<T>;
 }
 
-const s1 = expand("small");  // { size: 10 }
-const s2 = expand("large");  // { size: 100 }
+const smallSize = expand("small");  // { size: 10 }
+const largeSize = expand("large");  // { size: 100 }
 
 // 5. Generic context — conditional natural
 type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
@@ -1264,9 +1275,9 @@ Conditional types'ning amaliy qo'llanilishi — library/framework type safety, A
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator conditional type'ni evaluate qilganda **type instantiation** jarayoni ishlaydi. Har conditional chaqiriqda yangi type object yaratiladi. Real-world pattern'larda chuqur recursion va nested conditional'lar bu jarayonni sezilarli sekinlashtirishi mumkin.
+Compiler conditional type'ni evaluate qilganda **type instantiation** jarayoni ishlaydi. Har conditional chaqiriqda yangi type object yaratiladi. Real-world pattern'larda chuqur recursion va nested conditional'lar bu jarayonni sezilarli sekinlashtirishi mumkin.
 
-**Type caching:** Kompilator bir xil argument'lar bilan ikkinchi marta bir xil conditional type'ni hisoblamaydi — cache'dan oladi. Bu katta loyihalarda muhim optimization. Lekin har chaqiriqda yangi argument kombinatsiyasi bo'lsa, cache miss va qayta evaluation.
+**Type caching:** Compiler bir xil argument'lar bilan ikkinchi marta bir xil conditional type'ni hisoblamaydi — cache'dan oladi. Bu katta loyihalarda muhim optimization. Lekin har chaqiriqda yangi argument kombinatsiyasi bo'lsa, cache miss va qayta evaluation.
 
 **Lazy evaluation:** Generic kontekstda conditional type **deferred** holatda qoladi — faqat concrete type bilan instantiate bo'lganda resolve bo'ladi. Bu pattern library kodda ko'p uchraydi:
 
@@ -1434,7 +1445,7 @@ const async = processConfig({ async: true });   // Promise<string>
 
 ### Nazariya
 
-Conditional types juda qudratli, lekin cheklovlari ham bor. Bu cheklovlarni bilish — noto'g'ri ishlatishdan va kompilator muammolaridan qochish uchun muhim.
+Conditional types juda qudratli, lekin cheklovlari ham bor. Bu cheklovlarni bilish — noto'g'ri ishlatishdan va compiler muammolaridan qochish uchun muhim.
 
 **Asosiy cheklovlar:**
 
@@ -1449,16 +1460,16 @@ Conditional types juda qudratli, lekin cheklovlari ham bor. Bu cheklovlarni bili
 
 **TypeScript cheklovlari:**
 
-Kompilator recursive conditional type'larda cheklangan depth limit'ga ega — bu compile-time stack overflow'ni oldini olish uchun. Limit'ga yetganda `Type instantiation is excessively deep and possibly infinite` xatosi chiqadi. Taxminiy qiymat'lar:
+Compiler recursive conditional type'larda cheklangan depth limit'ga ega — bu compile-time stack overflow'ni oldini olish uchun. Limit'ga yetganda `Type instantiation is excessively deep and possibly infinite` xatosi chiqadi. Taxminiy qiymat'lar:
 
 - **Non-tail-recursive:** cheklangan depth (~50 darajagacha)
 - **Tail-recursive (TS 4.5+):** kengaytirilgan depth (~1000 darajagacha)
 
-Aniq raqamlar compiler versiyasi va optimizatsiya'lariga bog'liq — o'zgarishi mumkin.
+Aniq raqamlar compiler versiyasi va optimization'lariga bog'liq — o'zgarishi mumkin.
 
-**Total type instantiation budget:** Kompilator butun compilation uchun cheklangan total instantiation count'ga ega. Bu limit aniq documented emas — lekin katta loyihalarda (distributive conditional + katta union) yetib bo'lishi mumkin. Belgi — compilation sekinlashishi yoki `--generateTrace` bilan ko'plab instantiation'lar.
+**Total type instantiation budget:** Compiler butun compilation uchun cheklangan total instantiation count'ga ega. Bu limit aniq documented emas — lekin katta loyihalarda (distributive conditional + katta union) yetib bo'lishi mumkin. Belgi — compilation sekinlashishi yoki `--generateTrace` bilan ko'plab instantiation'lar.
 
-**Union member limit:** Kompilator distributive conditional'da eksponensial instantiation'dan qochish uchun union member count'ga cheklov qo'ygan. Juda katta union'lar (masalan, 10,000+ member) kompilator'ni sekinlashtiradi yoki error beradi.
+**Union member limit:** Compiler union type uchun taxminan 100,000 ta constituent cheklovi qo'ygan. Undan oshganda `TS2590: Expression produces a union type that is too complex to represent` xatosi chiqadi. Distributive conditional katta union'larni yana kengaytirishi mumkin (har member alohida branch), shuning uchun bu chegaraga aslida juda katta input'dan oldinroq yetib boriladi.
 
 **Profiling:** `tsc --generateTrace <dir>` flag'i compilation trace'ni yozadi:
 
@@ -1471,7 +1482,7 @@ tsc --generateTrace ./trace-output
 
 Trace'da `checkSourceFile`, `resolveName`, `getContextualType` kabi event'larni kuzating. Agar bitta type minglab marta instantiate bo'lsa — bu bottleneck va refactoring kerak.
 
-**Deferred narrowing muammo:** Generic funksiya ichida conditional return type'ni runtime check bilan resolve qilib bo'lmaydi. Kompilator `T`'ni bilmaydi, va conditional type faqat `T` aniq bo'lganda evaluate bo'ladi. Runtime'da `typeof value === "string"` ishlaydi, lekin TypeScript type system'ga ta'sir qilmaydi — bu sof runtime narrowing.
+**Deferred narrowing muammo:** Generic funksiya ichida conditional return type'ni runtime check bilan resolve qilib bo'lmaydi. Compiler `T`'ni bilmaydi, va conditional type faqat `T` aniq bo'lganda evaluate bo'ladi. Runtime'da `typeof value === "string"` ishlaydi, lekin TypeScript type system'ga ta'sir qilmaydi — bu sof runtime narrowing.
 
 **Workaround'lar:**
 
@@ -1513,7 +1524,7 @@ type DeepNested = {
 
 type ReadonlyDeep = DeepReadonly<DeepNested>; // OK, chuqur emas
 
-// Juda chuqur bo'lsa — kompilator xato:
+// Juda chuqur bo'lsa — compiler xato:
 // type TooDeep = DeepReadonly<VeryVeryDeeplyNested>; // ❌ excessively deep
 
 // 4. Depth-limited workaround
@@ -1548,8 +1559,8 @@ type Test = USD extends EUR ? true : false;
 type Animal = { name: string };
 type Dog = { name: string; breed: string };
 
-type T1 = Dog extends Animal ? true : false;  // true — Dog has all Animal props
-type T2 = Animal extends Dog ? true : false;  // false — Animal missing breed
+type DogIsAnimal = Dog extends Animal ? true : false;  // true — Dog has all Animal props
+type AnimalIsDog = Animal extends Dog ? true : false;  // false — Animal missing breed
 
 // 8. Deferred type + function
 function identity<T>(value: T): T {
@@ -1583,7 +1594,7 @@ type A = Check<never>;
 // Haqiqiy: never (empty union distribute)
 ```
 
-**Nima uchun:** Kompilator `never`'ni union sifatida split qiladi — lekin empty union'da hech qanday element yo'q. Distribution natijasi ham empty union = `never`.
+**Nima uchun:** Compiler `never`'ni union sifatida split qiladi — lekin empty union'da hech qanday element yo'q. Distribution natijasi ham empty union = `never`.
 
 **`IsNever` check:**
 
@@ -1610,7 +1621,7 @@ type Check<T> = T extends string ? "yes" : "no";
 type A = Check<any>; // "yes" | "no" (ikkala branch!)
 ```
 
-**Sabab:** `any` — "istalgan type" ma'nosini beradi. Kompilator `any extends string` shartini aniq tekshira olmaydi — chunki `any` bir vaqtda ham string bo'lishi mumkin, ham emas. Shuning uchun kompilator pessimistik yondashadi va ikkala branch'ni qo'shadi.
+**Sabab:** `any` har qanday type'ga ham, har qanday type'dan ham assignable. Shuning uchun `any extends string` shartini biror tomonga aniqlab bo'lmaydi — compiler ikkala branch natijasini ham union qilib qaytaradi. Bu faqat naked `any` checked type bo'lganda yuz beradi; `any` extends'ning o'ng tomonida bo'lsa, oddiy true beradi.
 
 **`IsAny` detection — famous trick:**
 
@@ -1630,7 +1641,7 @@ type Y4 = IsAny<never>;    // false
 
 ### 3. Deferred Conditional + Runtime Narrowing
 
-Generic funksiya ichida conditional return type'ni runtime `typeof` check bilan resolve qilib bo'lmaydi. Kompilator generic `T`'ni bilmaydi, conditional type deferred holatda qoladi:
+Generic funksiya ichida conditional return type'ni runtime `typeof` check bilan resolve qilib bo'lmaydi. Compiler generic `T`'ni bilmaydi, conditional type deferred holatda qoladi:
 
 ```typescript
 function process<T extends string | number>(
@@ -1639,7 +1650,7 @@ function process<T extends string | number>(
   if (typeof value === "string") {
     return value.split(""); // ❌ Error
     // TS: T extends string ? string[] : number
-    // Kompilator T'ni bilmaydi, string[]'ni T extends ...'ga assign qila olmaydi
+    // Compiler T'ni bilmaydi, string[]'ni T extends ...'ga assign qila olmaydi
   }
   return value * 2; // ❌ Error (same reason)
 }
@@ -1651,7 +1662,7 @@ function process<T extends string | number>(
 2. **Type assertion** — `as T extends string ? X : Y` (kamroq xavfsiz)
 3. **Return union'ni oddiyroq qilish** — `string[] | number` (aniq type'dan voz kechish)
 
-**Nima uchun TS shunday:** Compile-time type system runtime check'larni tushunmaydi. `typeof value === "string"` runtime statement, type system'ga ta'sir qilmaydi. Generic kontekstda `T` hali aniq emas — kompilator conditional'ni resolve qila olmaydi.
+**Nima uchun TS shunday:** Compile-time type system runtime check'larni tushunmaydi. `typeof value === "string"` runtime statement, type system'ga ta'sir qilmaydi. Generic kontekstda `T` hali aniq emas — compiler conditional'ni resolve qila olmaydi.
 
 ### 4. `boolean` Distributive — `true | false`
 
@@ -1664,10 +1675,10 @@ type B = Check<boolean>;
 // boolean distributive qilinadi:
 // = Check<true> | Check<false>
 // = "yes" | "no"
-// Diqqat: "yes" emas
+// Diqqat: natija faqat "yes" emas — false ham alohida tekshiriladi
 ```
 
-**Sabab:** `boolean` — aslida union `true | false`. Distributive conditional'da har member alohida evaluate bo'ladi. Bu ko'p developer'ni chalkashtiradi — `boolean` monolithic type emas.
+**Sabab:** `boolean` — aslida union `true | false`. Distributive conditional'da har member alohida evaluate bo'ladi, shuning uchun `boolean` monolithic type sifatida tekshirilmaydi.
 
 **Yechim — non-distributive wrap:**
 
@@ -1748,7 +1759,7 @@ function exampleAssert<T extends string | number>(
 }
 ```
 
-**Nima uchun:** Generic funksiya ichida kompilator `T`'ni bilmaydi. Conditional type deferred, runtime narrowing type system'ga ta'sir qilmaydi.
+**Nima uchun:** Generic funksiya ichida compiler `T`'ni bilmaydi. Conditional type deferred, runtime narrowing type system'ga ta'sir qilmaydi.
 
 ---
 
@@ -1778,7 +1789,7 @@ type B = Flatten<string[][][]>;     // string
 type C = Flatten<boolean>;          // boolean
 ```
 
-**Nima uchun:** Recursive type'da base case bo'lmasa, kompilator infinite loop'ga tushadi va "excessively deep" xatosi chiqadi. Har recursive type'da `T extends ... ? recurse : basecase` pattern'i shart.
+**Nima uchun:** Recursive type'da base case bo'lmasa, compiler infinite loop'ga tushadi va "excessively deep" xatosi chiqadi. Har recursive type'da `T extends ... ? recurse : basecase` pattern'i shart.
 
 ---
 
@@ -1816,7 +1827,7 @@ type SimpleResult<T> = T extends string ? { value: T } : never;
 // Kamroq field, tezroq
 ```
 
-**Nima uchun:** Katta union + distributive conditional = eksponensial instantiation. Kompilator har member uchun alohida hisoblaydi. Real-world library kodda bu oddiy muammo — profiling va optimization kerak.
+**Nima uchun:** Katta union + distributive conditional = eksponensial instantiation. Compiler har member uchun alohida hisoblaydi. Real-world library kodda bu oddiy muammo — profiling va optimization kerak.
 
 ---
 
@@ -2176,7 +2187,7 @@ type J = NonDist<"a" | 1>;
 
 ### Mashq 5: Template Literal Parser (Qiyin)
 
-`infer extends` (TS 4.8+) bilan URL path'dan parameter'larni extract qiluvchi type yozing.
+Template literal type, `infer`, va recursion bilan URL path'dan parameter'larni extract qiluvchi type yozing.
 
 ```typescript
 // type P1 = ExtractParams<"/users/:id">;                    // { id: string }

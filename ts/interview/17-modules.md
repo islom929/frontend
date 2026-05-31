@@ -61,7 +61,7 @@ TypeScript 3.8 da qo'shilgan `import type` syntax — type-only import explicit 
 |-----------|----------|---------------|
 | JS output da qoladi | ✅ | ❌ |
 | `new Class()` qilish mumkin | ✅ | ❌ |
-| Type annotation da | ✅ | ✅ |
+| Type annotation'da | ✅ | ✅ |
 | Bundle size ta'siri | Ha | Yo'q |
 | Side effects ishlaydi | ✅ | ❌ |
 | Circular dependency | Muammo | Hal qiladi |
@@ -70,9 +70,9 @@ TypeScript 3.8 da qo'shilgan `import type` syntax — type-only import explicit 
 
 1. **Bundle size** — type-only import bundler tomonidan aniq olib tashlanadi
 2. **Circular dependencies** — type-only import runtime'da yo'q → circular uziladi
-3. **Side effects** — `import "./polyfill"` kabi side effect import larni type-only qilib bo'lmaydi (runtime'da kerak)
-4. **Aniqlik** — code review da type va value import lar darhol ko'rinadi
-5. **Bundler compatibility** — esbuild/SWC type-only import larni aniq biladi
+3. **Side effects** — `import "./polyfill"` kabi side effect import'larni type-only qilib bo'lmaydi (runtime'da kerak)
+4. **Aniqlik** — code review'da type va value import'lar darhol ko'rinadi
+5. **Bundler compatibility** — esbuild/SWC type-only import'larni aniq biladi
 
 ### Kod misol
 
@@ -91,16 +91,16 @@ import type { User, Role } from "./types";   // ← type-only
 import { UserService } from "./types";        // ← runtime kerak
 
 const service = new UserService();             // ✅ — UserService runtime'da bor
-const users: User[] = service.getAll();        // ✅ — User type annotation da
+const users: User[] = service.getAll();        // ✅ — User type annotation'da
 
-// ❌ Error — import type bilan runtime ishlatish mumkin emas
-// const svc = new UserType();
+// ❌ Error — import type bilan kelgan User'ni value sifatida ishlatib bo'lmaydi
+// const role: Role = Role; // 'Role' cannot be used as a value (import type)
 ```
 
 **Inline syntax (TS 4.5+):**
 
 ```typescript
-// Bitta statement da aralash
+// Bitta statement'da aralash
 import { type User, type Role, UserService } from "./types";
 //        ^^^^      ^^^^      type-only       value
 ```
@@ -121,11 +121,11 @@ const users = service.getAll();
 - **Side-effect import** — `import "./polyfill"` — value import. `import type "./polyfill"` syntax xato (type-only side effect mumkin emas).
 - **Re-export** — `export type { User } from "./types"` — type-only re-export. JS da o'chadi.
 - **Default + named aralash** — `import type Default, { Named } from "./mod"` — ikkala ham type-only.
-- **`typeof` value position da** — `import type { Foo } from "./mod"; type T = typeof Foo` — error! `typeof` value position da `Foo` ni runtime'da talab qiladi.
+- **`typeof` value position'da** — `import type { OrderService } from "./services"; type T = typeof OrderService` — error! `typeof` value position'da `OrderService`'ni runtime'da talab qiladi.
 
 ### Follow-up savollar
 
-1. **"`import { type X }` va `import type { X }` farqi?"** — Funksional bir xil. Inline form (TS 4.5+) bitta statement da type va value aralashtirish imkonini beradi.
+1. **"`import { type X }` va `import type { X }` farqi?"** — Funksional bir xil. Inline form (TS 4.5+) bitta statement'da type va value aralashtirish imkonini beradi.
 2. **"`export type` ham bor mi?"** — Ha. `export type { User }` yoki `export { type User }` — type-only re-export.
 
 </details>
@@ -139,7 +139,7 @@ const users = service.getAll();
 
 ### Qisqa javob
 
-`verbatimModuleSyntax` — TS 5.0 da qo'shilgan tsconfig option. Import/export larni **aynan yozilgan holatda** emit qiladi (heuristic yo'q). `import type` ni majburiy qiladi.
+`verbatimModuleSyntax` — TS 5.0 da qo'shilgan tsconfig option. Import/export'larni **aynan yozilgan holatda** emit qiladi (heuristic yo'q). `import type` ni majburiy qiladi.
 
 ### To'liq tushuntirish
 
@@ -234,7 +234,7 @@ import "reflect-metadata";
 ### Follow-up savollar
 
 1. **"`importsNotUsedAsValues: 'error'` bilan farq?"** — `importsNotUsedAsValues` faqat **diagnostic** beradi (warning). `verbatimModuleSyntax` esa **emit** semantikasini ham o'zgartiradi. Yangi standart va to'liqroq.
-2. **"`verbatimModuleSyntax` `esModuleInterop` bilan ishlaydi?"** — Ha, lekin CommonJS interop default import larida (`import X from "cjs-module"`) developer e'tibor talab qiladi. `verbatim` heuristic yo'q.
+2. **"`verbatimModuleSyntax` `esModuleInterop` bilan ishlaydi?"** — Ha, lekin CommonJS interop default import'larida (`import X from "cjs-module"`) developer e'tibor talab qiladi. `verbatim` heuristic yo'q.
 
 </details>
 
@@ -407,9 +407,9 @@ export type { User } from "./types";
 
 **2. `const enum` cross-file inline mumkin emas:**
 
-`const enum` value lar compile-time'da inline replace bo'ladi. Bu boshqa fayldan type information talab qiladi. Transpiler bilmaydi.
+`const enum` value'lar compile-time'da inline replace bo'ladi. Bu boshqa fayldan type information talab qiladi. Transpiler bilmaydi.
 
-TS 5.5'dan beri `preserveConstEnums: true` bilan **local** const enum ruxsat, lekin **boshqa fayldan import qilingan** const enum hali ham muammoli.
+`preserveConstEnums: true` (TS 1.4'dan beri mavjud) const enum'ni inline qilish o'rniga oddiy enum kabi runtime object emit qiladi → transpiler bilan ishlaydi. Lekin bu inline optimization'dan voz kechadi.
 
 ```typescript
 // ❌ — cross-file inline mumkin emas
@@ -438,7 +438,7 @@ export {};
 
 **4. `namespace` cross-file merging muammoli:**
 
-Namespace `namespace Foo { ... }` ikki turli faylda — transpiler bir-biriga merge qilolmaydi.
+Namespace `namespace Validation { ... }` ikki turli faylda declare qilingan bo'lsa — transpiler bir-biriga merge qilolmaydi (har faylni alohida ko'radi).
 
 **Qachon yoqish:** Deyarli doim. Vite, Next.js, Remix, esbuild ishlatayotgan bo'lsangiz — yoqing.
 
@@ -489,7 +489,7 @@ export { User };
 ### Follow-up savollar
 
 1. **"`isolatedModules` va `verbatimModuleSyntax` ikkalasini ham yoqish kerakmi?"** — Ha, ikkalasi to'ldiruvchi. `isolatedModules` strict transpilation, `verbatim` strict import/export emit.
-2. **"`preserveConstEnums: true` (TS 5.5+) nima qiladi?"** — Local `const enum` ni saqlaydi (oddiy enum kabi). Lekin cross-file inline hali ham muammoli `isolatedModules` da.
+2. **"`preserveConstEnums: true` nima qiladi?"** — `const enum`'ni inline qilish o'rniga oddiy enum kabi runtime object emit qiladi. Const enum project bo'ylab shu option bilan compile qilinsa, transpiler `Color.Red` ni runtime object'da topadi → `isolatedModules` muammosi yo'qoladi (inline optimization'dan voz kechiladi).
 
 </details>
 
@@ -502,13 +502,13 @@ export { User };
 
 ### Qisqa javob
 
-Module augmentation — mavjud module ning type larini kengaytirish. `declare module "name"` bilan amalga oshadi. **`import` shart** — aks holda fayl script bo'ladi va `declare module` ambient declaration sifatida mavjud module ni almashtiradi.
+Module augmentation — mavjud module'ning type'larini kengaytirish. `declare module "name"` bilan amalga oshadi. Module faylda (`import`/`export` bor) `declare module` aniq **augmentation** sifatida tan olinadi; script faylda esa **ambient module declaration** bo'ladi — u ham mavjud module bilan merge qiladi, lekin niyat noaniq va target xato bo'lsa jim ishlamaydi.
 
 ### To'liq tushuntirish
 
 TypeScript da fayl ikki turdan biri:
 - **Module** — fayl ichida kamida bitta `import` yoki `export` bor
-- **Script** — global scope da ishlaydi, import/export yo'q
+- **Script** — global scope'da ishlaydi, import/export yo'q
 
 `declare module "name"` script va module faylda **har xil ishlaydi**:
 
@@ -521,7 +521,7 @@ declare module "express" {
 }
 ```
 
-Bu **ambient module declaration** — kompilator bu shu nomdagi yangi/mustaqil module deb biladi. `node_modules/express` da mavjud type'lar bilan **merge bo'lmaydi** — module resolution paytida kompilator boshqa declaration topishi mumkin va kutilgan augmentation amalga oshmaydi.
+Bu **ambient module declaration**. Bir xil nomli ambient `declare module "express"` declaration'lar (`@types/express`'dagi bilan ham) **merge bo'ladi** — almashtirmaydi. Lekin niyat noaniq: bu yerda `Request` `express` module scope'ida ochiladi. Agar haqiqiy `Request` boshqa module'da (modern `@types/express`'da — `express-serve-static-core`) bo'lsa, augmentation noto'g'ri target'ga tushadi va jim ishlamaydi (16 va 23-savollarga qarang).
 
 **Module faylda:**
 
@@ -529,17 +529,17 @@ Bu **ambient module declaration** — kompilator bu shu nomdagi yangi/mustaqil m
 // types.d.ts
 import "express"; // ← faylni MODULE qiladi
 
-declare module "express" {
+declare module "express-serve-static-core" {
   interface Request { userId: string; }
 }
 ```
 
-Endi `declare module "express"` — **module augmentation**. Mavjud Express modulidagi `Request` interface'iga merge bo'ladi (interface declaration merging mexanizmi orqali).
+Endi `declare module "express-serve-static-core"` — **module augmentation**. Modern `@types/express`'da `Request` aynan shu module'da yashaydi, shuning uchun augmentation haqiqiy `Request` interface'iga merge bo'ladi (interface declaration merging mexanizmi orqali).
 
 **Mexanizm:**
 1. `import "express"` faylni module qiladi va Express'ni resolve qiladi
-2. Compiler `declare module "express"` ni augmentation deb tan oladi
-3. `Request` interface ikki marta declare qilingan (express dan + augmentation dan) → merge
+2. Compiler `declare module "express-serve-static-core"` ni augmentation deb tan oladi
+3. `Request` interface ikki marta declare qilingan (`@types`'dagi + augmentation'dagi) → merge
 
 **Real-world misollar:**
 - Express `Request` ga `userId`, `user`, `role` qo'shish
@@ -609,14 +609,14 @@ declare module "dayjs" {
 
 ### Edge Cases
 
-- **Express ichida `express-serve-static-core`** — Real-world Express `Request` interface aslida `express-serve-static-core` package'da. Augmentation o'sha module ga yo'naltirilishi kerak (yuqoridagi misol).
+- **Express ichida `express-serve-static-core`** — Real-world Express `Request` interface aslida `express-serve-static-core` package'da. Augmentation o'sha module'ga yo'naltirilishi kerak (yuqoridagi misol).
 - **Sub-module augmentation** — `declare module "lodash/fp"` — lodash'ning sub-path. Sub-path resolution kerak.
 - **`import "express"` o'rniga `export {}`** — ikkalasi ham faylni module qiladi. Lekin `import` Express ni resolve qiladi va aniq augmentation niyati ko'rinadi.
 - **`tsconfig.json` `include`** — augmentation fayli `include` da bo'lishi kerak, aks holda compiler ko'rmaydi.
 
 ### Follow-up savollar
 
-1. **"Augmentation ichida `class` declare qilish mumkin?"** — Yo'q. Faqat interface (declaration merging) va type aliases (limited). Class augmentation deklaratsion merging cheklovi tufayli to'liq ishlamaydi.
+1. **"Augmentation ichida `class` declare qilish mumkin?"** — Yo'q. Faqat interface (declaration merging) va type aliases (limited). Class augmentation declaration merging cheklovi tufayli to'liq ishlamaydi.
 2. **"Library'ga yangi default export qo'shish mumkinmi?"** — Yo'q. Default export augmentation cheklangan — interface yangi method qo'shish mumkin, lekin yangi default value qo'shish mumkin emas.
 
 </details>
@@ -630,13 +630,13 @@ declare module "dayjs" {
 
 ### Qisqa javob
 
-`declare global` — module fayl ichida global scope ga yangi type, variable, function declare qilish. `export {}` bilan faylni module qilish kerak.
+`declare global` — module fayl ichida global scope'ga yangi type, variable, function declare qilish. `export {}` bilan faylni module qilish kerak.
 
 ### To'liq tushuntirish
 
-Standart TypeScript da `declare const`, `declare function` global scope ga directly qo'shiladi — agar fayl **script** bo'lsa. Lekin modern project'larda barcha fayllar module — global declaration ishlamaydi.
+Standart TypeScript da `declare const`, `declare function` global scope'ga directly qo'shiladi — agar fayl **script** bo'lsa. Lekin modern project'larda barcha fayllar module — global declaration ishlamaydi.
 
-`declare global { ... }` blok — module fayl ichidan global scope ni "augment" qilish:
+`declare global { ... }` blok — module fayl ichidan global scope'ni augment qilish:
 
 ```typescript
 // faylni module qilish uchun
@@ -723,7 +723,7 @@ if (__DEV__) {
 ### Follow-up savollar
 
 1. **"`declare global` faqat .d.ts'da ishlaydimi?"** — Yo'q. .ts faylda ham ishlaydi, agar fayl module bo'lsa (`export {}` yoki boshqa import/export).
-2. **"`window.foo = "bar"` runtime'da kerak emasmi?"** — Type-level declare runtime qiymat yaratmaydi. Developer o'zi assign qilishi kerak (HTML script tag, DefinePlugin, polyfill).
+2. **"`window.__APP_VERSION__ = "1.0.0"` runtime'da kerak emasmi?"** — Type-level declare runtime qiymat yaratmaydi. Developer o'zi assign qilishi kerak (HTML script tag, DefinePlugin, polyfill).
 
 </details>
 
@@ -736,7 +736,7 @@ if (__DEV__) {
 
 ### Qisqa javob
 
-Inline type imports (TS 4.5+) — bitta `import` statement ichida ba'zi nomlarni `type` deb belgilash. `import type { X }` bilan funksional bir xil, lekin bitta statement da type va value aralashtirish imkonini beradi.
+Inline type imports (TS 4.5+) — bitta `import` statement ichida ba'zi nomlarni `type` deb belgilash. `import type { X }` bilan funksional bir xil, lekin bitta statement'da type va value aralashtirish imkonini beradi.
 
 ### To'liq tushuntirish
 
@@ -748,7 +748,7 @@ import type { User, Role } from "./types";
 import { UserService } from "./types";
 ```
 
-TS 4.5+ da bir statement da aralashtirish mumkin:
+TS 4.5+ da bir statement'da aralashtirish mumkin:
 
 ```typescript
 import { type User, type Role, UserService } from "./types";
@@ -809,11 +809,12 @@ import { ProductService, TAX_RATE } from "./product";
 // AuthService default, User type
 import Auth, { type User } from "./auth";
 
-// Default type, named value
+// Default type, named value — bitta statement'da bo'lmaydi
 import type Config, { logger } from "./app";
-// Wait — bu syntax xato! Logger type yoki value?
+// ❌ Bu syntax to'g'ri, lekin `import type` prefix HAMMASINI type-only qiladi:
+//    Config ham, logger ham type-only bo'ladi. logger value bo'lsa — runtime'da yo'qoladi.
 
-// To'g'ri:
+// To'g'ri — type va value alohida statement:
 import type Config from "./app";
 import { logger } from "./app";
 ```
@@ -976,7 +977,7 @@ Bundler/Tool: → src/components/Button.js ← resolve qiladi
 
 ### Qisqa javob
 
-Barrel — `index.ts` orqali papka export'larini birlashtirish. Toza import lar, lekin tree shaking buzilishi va circular dependency xavfi bor. Type-only barrel xavfsiz.
+Barrel — `index.ts` orqali papka export'larini birlashtirish. Toza import'lar, lekin tree shaking buzilishi va circular dependency xavfi bor. Type-only barrel xavfsiz.
 
 ### To'liq tushuntirish
 
@@ -1001,7 +1002,7 @@ import { User, Product } from "./models";
 ```
 
 **Afzalliklari:**
-1. **Toza import lar** — fayl path emas, modul path
+1. **Toza import'lar** — fayl path emas, modul path
 2. **Refactoring oson** — fayllar reorganizatsiya qilinsa, barrel saqlaydi
 3. **Public API aniq** — qaysi narsalar export qilingan ko'rinadi
 4. **Cleaner consumer code** — bitta `from "./models"`
@@ -1122,7 +1123,7 @@ export { UserService } from "./user-service";
 
 ### Qisqa javob
 
-`import()` expression — runtime'da module ni lazy load. TypeScript qaytaradigan promise type ini avtomatik `Promise<typeof import("./module")>` deb infer qiladi. To'liq type-safe.
+`import()` expression — runtime'da module'ni lazy load. TypeScript qaytaradigan promise type'ini avtomatik `Promise<typeof import("./module")>` deb infer qiladi. To'liq type-safe.
 
 ### To'liq tushuntirish
 
@@ -1432,7 +1433,7 @@ Endi `user.ts` `Post` ni runtime'da import qiladi, lekin `post.ts` faqat `IUser`
 ### Follow-up savollar
 
 1. **"Circular dependency'ni qanday topish mumkin?"** — `madge --circular`, `dpdm`, ESLint `import/no-cycle` rule. CI'da check qilish tavsiya.
-2. **"CommonJS va ESM circular farqi?"** — CJS modullari sinxron synchronously evaluate qilinadi — partial exports. ESM static graph — circular'ni live binding bilan hal qiladi.
+2. **"CommonJS va ESM circular farqi?"** — CJS modullari synchronous evaluate qilinadi — circular'da partial (incomplete) exports qaytadi. ESM static graph — circular'ni live binding bilan hal qiladi.
 
 </details>
 
@@ -1550,7 +1551,7 @@ src/
 
 - **`.mts` faylda `__filename`/`__dirname`** — ESM'da yo'q. `import.meta.url` ishlatish kerak.
 - **`.cts` faylda `import.meta`** — CJS'da yo'q. `__filename`/`__dirname` ishlatish.
-- **Type declaration** — `.d.mts` va `.d.cts` ham mavjud. Library type lar uchun.
+- **Type declaration** — `.d.mts` va `.d.cts` ham mavjud. Library type'lar uchun.
 - **Top-level await** — faqat `.mts` (ESM) da ishlaydi. `.cts` da yo'q.
 
 ### Follow-up savollar
@@ -1623,20 +1624,22 @@ async function main() {
 }
 ```
 
-Node.js 22.12+ da `--experimental-require-module` flag bilan synchronous `require()` ESM uchun ham ishlay boshladi — lekin faqat **top-level await yo'q** modullarda.
+Node.js 22.12+ (LTS) da `require()` ESM uchun **default yoqilgan** holatda ishlay boshladi (avval `--experimental-require-module` flag talab qilardi) — lekin faqat **top-level await yo'q** modullarda. Hali experimental, `--no-experimental-require-module` bilan o'chirsa bo'ladi.
 
 **`esModuleInterop` — TypeScript level interop:**
 
-`esModuleInterop: true` (default tsconfig'da) — TypeScript CJS namespace import'ni standart ESM default import sifatida ko'rsatadi:
+`esModuleInterop: true` (`tsc --init` generatsiya qilgan config'da yoqilgan, lekin compiler default'i `false`) — TypeScript CJS namespace import'ni standart ESM default import sifatida ko'rsatadi:
 
 ```typescript
 // `esModuleInterop: false`
-import * as express from "express";
-const app = express();  // ❌ TypeError: express is not a function
+import express from "express";
+// ❌ Compile error — express '@types' `export =` ishlatadi,
+//    default import allowSyntheticDefaultImports'siz ruxsat etilmaydi.
+//    Namespace import (`import * as express`) kerak bo'lardi.
 
 // `esModuleInterop: true`
 import express from "express";
-const app = express();  // ✅
+const app = express();  // ✅ — default import ishlaydi
 ```
 
 Compiler `__importDefault` helper qo'shadi — `{ default: requireResult }` wrap qiladi. Side effect: namespace import semantikasi o'zgaradi.
@@ -1708,12 +1711,12 @@ console.log(log instanceof CjsLogger);  // ❌ false — different classes
 - **Top-level await CJS'da:** `.mts` ESM'da ruxsat, `.cts` CJS'da yo'q. `require()` sync — async wait qila olmaydi.
 - **`__filename` / `import.meta.url` ekvivalenti** — ESM'da: `const __filename = fileURLToPath(import.meta.url)`. CJS'da `__filename` global.
 - **JSON import attributes** — ESM'da `import data from "./data.json" with { type: "json" }` (TS 5.3+, Node 22+). Stage 3 spec.
-- **`require()` ESM'ni sync — Node 22.12+** — `--experimental-require-module` flag bilan, faqat top-level await yo'q modullarda.
+- **`require()` ESM'ni sync — Node 22.12+** — default yoqilgan (avval flag kerak edi), faqat top-level await yo'q modullarda. Hali experimental.
 - **Webpack/Vite namespace** — Bundler ESM/CJS interop'ni o'zicha implement qiladi. Node.js'dan farq qilishi mumkin (default property unwrapping).
 
 ### Follow-up savollar
 
-1. **"`__esModule` marker nima?"** — TypeScript/Babel emit'i. `module.exports.__esModule = true` — ESM namespace ekanligini bildiradi. Node.js'ning native interop'i ushbu marker'ni o'qiydi.
+1. **"`__esModule` marker nima?"** — TypeScript/Babel transpiled CJS emit'i. `module.exports.__esModule = true` — bu fayl asli ESM bo'lganini bildiradi va transpiled consumer'ning `__importDefault` helper'i default export'ni to'g'ri unwrap qilishi uchun. Node.js'ning **native** interop'i bu marker'ni o'qimaydi — u named export'larni `cjs-module-lexer` orqali, default'ni esa butun `module.exports` sifatida aniqlaydi.
 2. **"Library yozar ekan ESM-only chiqarish mumkinmi?"** — Ha, lekin ehtiyot. CJS consumer'lar `await import()` qilishi shart. Modern library lar (chalk v5, node-fetch v3) shu yo'lni tanlagan.
 
 <details>
@@ -1758,27 +1761,33 @@ ESM modullari uch fazada evaluate bo'ladi:
 2. **Instantiation** — exports/imports linkage (live binding)
 3. **Evaluation** — top-level code ishlaydi (top-to-bottom, dependency-first)
 
-Live binding tufayli circular dependency ESM'da ko'pincha ishlaydi:
+Live binding shuni anglatadiki, import qilingan nom value snapshot emas, export'ning joriy holatiga reference. Lekin `const`/`let` binding'lar TDZ'ga bo'ysunadi — circular'da ular initialize bo'lishidan oldin **o'qib bo'lmaydi**.
+
+Entry `a.mts` bo'lsa, ESM dependency-first evaluate qiladi: avval `b.mts` ishga tushadi. Top-level'da darhol `a`'ni o'qish TDZ xatosini beradi:
 
 ```typescript
-// a.mts
-import { b } from "./b.mjs";
+// a.mts (entry)
+import { getB } from "./b.mjs";
 export const a = 1;
-console.log("a evaluated, b =", b);  // b yet undefined (b hali evaluate bo'lmagan)
+export function getA() { return a; }
+console.log("a body, getB() =", getB());  // getB() — b hozir 2 (b.mts allaqachon evaluate bo'lgan)
 
 // b.mts
-import { a } from "./a.mjs";
+import { getA } from "./a.mjs";
 export const b = 2;
-console.log("b evaluated, a =", a);  // a = 1 (live binding orqali)
+export function getB() { return b; }
+// console.log(getA()); // ❌ — bu yerda chaqirilsa a hali TDZ'da → ReferenceError
 ```
+
+Function orqali kechiktirilgan access (`getA`/`getB`) ishlaydi, chunki funksiya chaqirilganda ikkala module ham evaluate bo'lgan. Top-level'da to'g'ridan-to'g'ri `const` o'qish esa TDZ tufayli xato beradi.
 
 **`cjs-module-lexer` analiz:**
 
 Node.js CJS'dan named exports'ni quyidagicha topadi:
-- `module.exports.foo = ...`
-- `exports.foo = ...`
-- `module.exports = { foo, bar }` (object literal)
-- `Object.defineProperty(exports, "foo", ...)` — partial support
+- `module.exports.greet = ...`
+- `exports.greet = ...`
+- `module.exports = { greet, VERSION }` (object literal)
+- `Object.defineProperty(exports, "greet", ...)` — partial support
 
 Dynamic assignment (`module.exports[key] = ...`) yoki conditional export — named import'da ko'rinmaydi.
 
@@ -1896,10 +1905,11 @@ type Svc = InstanceType<typeof UserService>;  // ❌ Error (typeof value positio
 - ✅ Parameter type (`function f(x: UserService)`)
 - ✅ Return type (`function f(): UserService`)
 - ✅ Generic argument (`Array<UserService>`)
-- ✅ `extends` clause (`class X extends UserService` — value emas, type extension)
+- ✅ `implements` clause (`class AdminService implements UserService` — `implements` type position)
 
 Lekin **value position**'da ishlatib bo'lmaydi:
 - ❌ `new UserService()` — instantiation (runtime call)
+- ❌ `class X extends UserService` — `extends` clause expression runtime'da value sifatida evaluate bo'ladi (`implements`'dan farqli)
 - ❌ `typeof UserService` — value reference (`typeof` ning argumenti — value)
 - ❌ `UserService.staticMethod()` — static method call
 - ❌ Variable assignment (`const x = UserService`)
@@ -1924,7 +1934,7 @@ Lekin **value position**'da ishlatib bo'lmaydi:
 
 ### Savol 16: Module augmentation tartibi [Middle+]
 
-**Savol:** Quyidagi kodda nima xato? Qaysi satr error beradi?
+**Savol:** Quyidagi `.d.ts` augmentation `req.userId` ni modern `@types/express` request'iga qo'sha olmaydi. Nima uchun? `auth` ichidagi satrlar error beradimi?
 
 ```typescript
 // types/express.d.ts (faqat shu fayl)
@@ -1949,30 +1959,27 @@ function auth(req: Request) {
 
 ### Qisqa javob
 
-**Bug:** `types/express.d.ts` script (import yo'q). `declare module "express"` ambient module declaration sifatida ishlaydi → mavjud Express'ni almashtiradi.
+Hech bir satr error bermaydi (A, B, C — hammasi compile bo'ladi). Bug **jim**: augmentation noto'g'ri module'ga yo'naltirilgan. Modern `@types/express`'da `Request` interface `express-serve-static-core`'da, `express` emas. `declare module "express" { interface Request }` — boshqa, bog'liqsiz `Request` yaratadi → haqiqiy request type'iga ta'sir qilmaydi.
 
 ```
-A — ✅ userId mavjud (declared)
-B — ❌ body property does not exist (Express'ning original Request'i yo'q!)
-C — ❌ params property does not exist
+A — ✅ (lekin userId real Request'ga emas, soxta Request'ga tegishli)
+B — ✅ body mavjud (express-serve-static-core'dagi original Request'dan)
+C — ✅ params mavjud (original Request'dan)
 ```
 
 ### To'liq tushuntirish
 
-**Muammo:** Fayl `types/express.d.ts` script kontekstida:
-- `import` yo'q
-- `export` yo'q
-- → fayl script
+**Avval bir noto'g'ri taxminni yo'qotamiz:** ".d.ts script'da `declare module "express"` Express'ni butunlay almashtiradi" — bu noto'g'ri. Bir xil nomli ambient `declare module` declaration'lar **merge bo'ladi** (`@types/express`'dagi `express` module bilan ham). Shuning uchun `body`, `params` yo'qolmaydi — error bermaydi.
 
-Script faylda `declare module "express"` — **ambient module declaration**. Yangi/mustaqil Express module type ini declare qiladi. Mavjud `node_modules/@types/express` bilan **merge bo'lmaydi**.
+**Asl bug — noto'g'ri augmentation target:**
 
-Natija: `Request` interface'da faqat `userId` mavjud — `body`, `params`, `query`, `cookies` va boshqalar yo'qoladi.
+Modern `@types/express`'da `Request` interface `express-serve-static-core` package'da declare qilingan; `express` uni faqat re-export qiladi. `declare module "express" { interface Request {...} }` esa `express` module scope'ida **yangi, alohida** `Request` interface ochadi — u `express-serve-static-core`'dagi haqiqiy `Request` bilan merge bo'lmaydi. Natija: `userId` typing haqiqiy request object'iga yetib bormaydi.
 
 **Fix:**
 
 ```typescript
 // types/express.d.ts
-import "express"; // ← faylni MODULE qiladi
+import "express"; // ← faylni MODULE qiladi (.ts module faylda augmentation uchun shart)
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -1982,17 +1989,16 @@ declare module "express-serve-static-core" {
 ```
 
 Endi:
-- `import "express"` faylni module qiladi
-- `declare module` — augmentation (merging)
-- `Request` interface mavjud properties + `userId`
+- `declare module "express-serve-static-core"` — haqiqiy `Request` interface'iga merge
+- `Request` interface: original properties (`body`, `params`, ...) + `userId`
 
-**Express ichida `express-serve-static-core`:** Real-world Express `Request` interface aslida `express-serve-static-core` package'da. Augmentation o'sha module'ga yo'naltirilishi kerak.
+**Script vs module nuance:** `.d.ts` faylda `declare module` default ambient declaration sifatida ishlaydi (va merge qiladi). Lekin `.ts` (yoki module bo'lishi kutilgan) faylda `declare module` faqat fayl module bo'lganda (`import`/`export` bor) augmentation bo'ladi — aks holda ambient declaration. `import "express"` ikkala holatda ham xavfsiz: faylni module qiladi va niyatni aniq ko'rsatadi.
 
 ### Edge Cases
 
-- **`export {}` bilan ham ishlaydi** — Faqat faylni module qilish uchun. `import` aniq Express'ni resolve qiladi.
-- **TypeScript versiya** — Eski Express type'lar `declare module "express"` bilan augment qilingan. Yangi versiyalarda `express-serve-static-core`.
-- **`tsconfig.json` `include`** — augmentation fayli compile'ga kirishi kerak.
+- **Eski `@types/express`** — Eski versiyalarda `Request` to'g'ridan-to'g'ri `express` module'da bo'lgan; o'shanda `declare module "express"` to'g'ri ishlardi. Versiyaga bog'liq.
+- **`export {}` bilan ham module bo'ladi** — `.ts` faylni module qilishning eng yengil usuli. `import "express"` esa qo'shimcha ravishda Express'ni resolve qiladi.
+- **`tsconfig.json` `include`** — augmentation fayli compile'ga kirishi kerak, aks holda hech qanday ta'sir bermaydi.
 
 </details>
 
@@ -2175,7 +2181,7 @@ const c = Color.Red;
 
 ### Qisqa javob
 
-`tsc` bilan compile bo'ladi, lekin esbuild/SWC/Babel bilan ishlamaydi. TS 5.5+ da `preserveConstEnums: true` bilan tuzatish mumkin.
+`tsc` bilan compile bo'ladi (value inline qilinadi), lekin esbuild/SWC/Babel bilan transpile qilinsa runtime'da `Color` topilmaydi. `preserveConstEnums: true` bilan tuzatish mumkin.
 
 ### To'liq tushuntirish
 
@@ -2199,14 +2205,15 @@ const c = Color.Red;  // ← `Color` runtime'da yo'q — runtime error!
 
 Transpiler'lar `constants.ts`'dagi `const enum` ni o'qimaydi → `Color` runtime'da mavjud emas → error.
 
-**`isolatedModules: true` warning:**
+**`isolatedModules: true` va `const enum`:**
 
-TypeScript bunday holatda warning beradi:
+Project ichidagi (non-ambient) const enum'ni `import` qilganda `tsc` xato bermaydi — value'ni inline qiladi. Lekin **ambient** const enum'ga (`.d.ts` yoki `declare const enum`) murojaat qilinsa, `isolatedModules` bilan TS2748 xatosi chiqadi:
 
 ```
-Cannot re-export a type when 'isolatedModules' is enabled.
-Re-exporting 'const enum's is not supported.
+error TS2748: Cannot access ambient const enums when '--isolatedModules' flag is provided.
 ```
+
+Asosiy xavf shu: kod `tsc` bilan compile bo'lsa-da, esbuild/SWC bilan transpile qilinganda jim runtime error beradi.
 
 **Yechimlar:**
 
@@ -2222,14 +2229,15 @@ export type Color = "red" | "green" | "blue";
 export const Color = { Red: "red", Green: "green", Blue: "blue" } as const;
 ```
 
-3. **TS 5.5+ `preserveConstEnums`** (lokal const enum uchun):
+3. **`preserveConstEnums: true`** (const enum'ni runtime object sifatida emit qiladi):
 ```json
 { "compilerOptions": { "preserveConstEnums": true, "isolatedModules": true } }
 ```
+Const enum project bo'ylab shu option bilan compile qilingan bo'lsa, `Color` runtime object sifatida saqlanadi → transpiler `Color.Red` ni topadi.
 
 ### Edge Cases
 
-- **Local const enum** — TS 5.5+ `preserveConstEnums: true` bilan local (export qilinmagan) const enum ishlaydi.
+- **`preserveConstEnums`** — const enum'ni inline qilish o'rniga runtime object emit qiladi (TS 1.4'dan beri mavjud). Inline optimization yo'qoladi, lekin transpiler bilan moslashadi.
 - **`esModuleInterop`** ta'siri yo'q — bu boshqa muammo.
 - **Numeric vs string const enum** — Ikkalasi ham bir xil cheklov. Lekin numeric'da inline'lash optimization'i ko'proq foyda berardi (string'da kam).
 
@@ -2319,7 +2327,7 @@ import { z } from "zod";
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]),
-  DATABASE_URL: z.string().url(),
+  DATABASE_URL: z.url(),
   API_KEY: z.string().min(1),
   PORT: z.string().regex(/^\d+$/),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]),
@@ -2537,7 +2545,7 @@ export default defineConfig({
 
 ### Savol 23: Module augmentation override [Middle+]
 
-**Savol:** Quyidagi kodda Express'ning original Request properties (`body`, `params`) yo'qoladi. Toping va tuzating:
+**Savol:** Quyidagi augmentation modern `@types/express`'da `req.userId` ni haqiqiy request type'iga qo'sha olmaydi (jim ishlamaydi). Toping va tuzating:
 
 ```typescript
 // types/custom.d.ts
@@ -2551,9 +2559,9 @@ declare module "express" {
 import { Request } from "express";
 
 function auth(req: Request) {
-  req.userId = "user-1";
-  console.log(req.body);   // ❌ — body does not exist
-  console.log(req.params); // ❌ — params does not exist
+  req.userId = "user-1";   // augmentation niyati — lekin real Request'ga yetmaydi
+  console.log(req.body);   // body bor (original Request'dan)
+  console.log(req.params); // params bor (original Request'dan)
 }
 ```
 
@@ -2562,24 +2570,15 @@ function auth(req: Request) {
 
 ### Qisqa javob
 
-`types/custom.d.ts` script (import yo'q). `declare module` ambient declaration sifatida Express'ni butunlay almashtiradi. `import "express"` qo'shish kerak. Va aslida `express-serve-static-core` ni augment qilish kerak.
+Bug — noto'g'ri augmentation target. Modern `@types/express`'da `Request` interface `express-serve-static-core`'da, `express`'da emas. `declare module "express" { interface Request }` — alohida, bog'liqsiz `Request` yaratadi → haqiqiy request type'iga merge bo'lmaydi. To'g'ri module — `express-serve-static-core`.
 
 ### To'liq tushuntirish
 
-**Bug 1 — Script vs Module:**
+**Noto'g'ri taxmin — `body`/`params` yo'qolmaydi:** Bir xil nomli ambient `declare module` declaration'lar merge bo'ladi, almashtirmaydi. Shuning uchun `req.body`, `req.params` saqlanadi va error bermaydi. Bug butunlay boshqa joyda.
 
-```typescript
-// ❌ Script — declare module ambient declaration
-declare module "express" {
-  interface Request { userId: string }
-}
-```
+**Asl bug — wrong augmentation target:**
 
-Fayl script bo'lgani uchun `declare module "express"` — yangi/mustaqil Express type'i. Mavjud `@types/express` bilan merge bo'lmaydi.
-
-**Bug 2 — Wrong augmentation target:**
-
-Modern Express `@types`'da `Request` interface aslida `express-serve-static-core` package'da. `express` module'ni augment qilish ishlamaydi.
+Modern Express `@types`'da `Request` interface aslida `express-serve-static-core` package'da declare qilingan; `express` uni re-export qiladi. `declare module "express"` ichidagi `Request` esa `express` scope'ida yangi, alohida interface ochadi — `express-serve-static-core`'dagi haqiqiy `Request` bilan merge bo'lmaydi. Natija: `userId` typing haqiqiy request'ga yetib bormaydi.
 
 **Fix:**
 
@@ -2627,7 +2626,7 @@ function auth(req: Request, res: Response, next: NextFunction) {
 
 ### Savol 24: Circular dependency bug [Middle+]
 
-**Savol:** Quyidagi kodda circular dependency. Runtime'da `User` `undefined` bo'lib chiqyapti. Toping va tuzating:
+**Savol:** Quyidagi kodda circular dependency bor va `post.ts` `User`'ni runtime'da (`extends`) ishlatadi. Modullar yuklanish tartibida `User` hali aniqlanmagan paytda `post.ts` evaluate bo'ladi. Toping va tuzating:
 
 ```typescript
 // user.ts
@@ -2643,14 +2642,19 @@ export class User {
 // post.ts
 import { User } from "./user";
 
-export class Post {
-  constructor(public content: string, public author: User) {}
+// User runtime'da kerak — extends value reference
+export class Post extends User {
+  constructor(public content: string, public author: User) {
+    super();
+  }
 }
 
 // main.ts
 import { User } from "./user";
 const u = new User();
-u.addPost("Hello"); // ❌ Runtime: TypeError: Post is not a constructor
+u.addPost("Hello");
+// ❌ Runtime: ReferenceError: Cannot access 'User' before initialization
+//   (post.ts evaluate bo'lganda user.ts hali to'liq yuklanmagan)
 ```
 
 <details>
@@ -2658,17 +2662,19 @@ u.addPost("Hello"); // ❌ Runtime: TypeError: Post is not a constructor
 
 ### Qisqa javob
 
-`user.ts` `Post`'ni runtime'da ishlatadi (`new Post`), shuning uchun `import type` mos kelmaydi. Yechim — type'larni alohida fayl ga ajratish va dependency yo'nalishini bir tomonga qilish.
+`user.ts` `Post`'ni runtime'da (`new Post`), `post.ts` esa `User`'ni runtime'da (`extends User`) ishlatadi — ikki tomonlama runtime cycle. `extends` value reference bo'lgani uchun `import type` uni hal qila olmaydi. Yechim — `extends` ni olib tashlash (composition) yoki umumiy base'ni uchinchi modulga ajratish.
 
 ### To'liq tushuntirish
 
 **Muammo:**
 - `user.ts` `Post`'ni instantiate qiladi → runtime'da kerak
-- `post.ts` `User`'ni faqat type sifatida ishlatadi → type-only yetadi
+- `post.ts` `Post extends User` qiladi → `User` class-evaluation paytida runtime'da kerak
 
-**Yechim 1 — One-way `import type`:**
+`main.ts` `user.ts` ni yuklaydi → `user.ts` `post.ts` ni so'raydi → `post.ts` `extends User` uchun `User`'ni o'qiydi, lekin `user.ts` hali to'liq evaluate bo'lmagan → `User` binding TDZ'da → `ReferenceError`.
 
-`post.ts`'da `User` faqat type sifatida ishlatiladi → `import type`:
+**Yechim 1 — `extends` ni olib tashlash (composition):**
+
+`Post`'ga `User`'ni runtime'da kerak qiladigan `extends` yo'q. `User` faqat type sifatida → `import type`:
 
 ```typescript
 // user.ts
@@ -2689,7 +2695,7 @@ export class Post {
 }
 ```
 
-Endi runtime dependency `post → user` yo'nalishida emas. `user → post` faqat bir tomonga.
+Endi runtime dependency faqat `user → post` bir tomonga. `post.ts` `User`'ni runtime'da o'qimaydi → cycle uziladi.
 
 **Yechim 2 — Types ajratish:**
 

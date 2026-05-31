@@ -57,10 +57,10 @@ Conditional type'lar nima uchun kerak:
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator conditional type'ni ikki xil usulda evaluate qiladi:
+Compiler conditional type'ni ikki xil usulda evaluate qiladi:
 
-- **Resolved (darhol hisoblangan)** — `T` concrete type bo'lganda. Kompilator `T extends U` shartini darhol tekshiradi va true yoki false branch'ni tanlaydi. Natija — bitta aniq type.
-- **Deferred (keyinga qoldirilgan)** — `T` hali noma'lum type parameter bo'lganda (generic funksiya ichida). Kompilator bu conditional type'ni resolve qilmaydi, keyinroq — `T` concrete type bilan instantiate bo'lganda hisoblaydi.
+- **Resolved (darhol hisoblangan)** — `T` concrete type bo'lganda. Compiler `T extends U` shartini darhol tekshiradi va true yoki false branch'ni tanlaydi. Natija — bitta aniq type.
+- **Deferred (keyinga qoldirilgan)** — `T` hali noma'lum type parameter bo'lganda (generic funksiya ichida). Compiler bu conditional type'ni resolve qilmaydi, keyinroq — `T` concrete type bilan instantiate bo'lganda hisoblaydi.
 
 ```text
 Conditional type evaluation:
@@ -202,7 +202,7 @@ type C = ElementOf<boolean>;   // never — boolean array emas
 
 `infer` ishlash jarayoni — **pattern matching**:
 
-1. Kompilator `T extends SomePattern<infer U>` ko'radi
+1. Compiler `T extends SomePattern<infer U>` ko'radi
 2. T'ni SomePattern'ga moslashtiradi (structural check)
 3. Agar T mos kelsa — `infer U` joylashgan pozitsiyada qanday type bo'lsa, U'ga assign qiladi
 4. True branch'da U ishlatilsa — shu infer qilingan type bilan almashtiriladi
@@ -227,7 +227,7 @@ Moslashtirish:
   ❌ Mos kelmadi — false branch
 ```
 
-**`infer` multi-position — variance farqi:** `infer U` bir nechta pozitsiyada ishlatilsa, kompilator natijani quyidagi qoidalar bo'yicha birlashtiradi:
+**`infer` multi-position — variance farqi:** `infer U` bir nechta pozitsiyada ishlatilsa, compiler natijani quyidagi qoidalar bo'yicha birlashtiradi:
 
 - **Covariant position** (return type, read-only property) — natija **union** bo'ladi
 - **Contravariant position** (parameter type) — natija **intersection** bo'ladi
@@ -369,7 +369,7 @@ type ToArray<T> = T extends any ? T[] : never;
 type A = ToArray<string | number>;
 // = ToArray<string> | ToArray<number>
 // = string[] | number[]
-// ❗ (string | number)[] EMAS!
+// Diqqat: (string | number)[] EMAS!
 ```
 
 Distributive behavior — TypeScript'ning eng muhim built-in utility type'larining asosi:
@@ -381,7 +381,7 @@ Distributive behavior — TypeScript'ning eng muhim built-in utility type'larini
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator conditional type'ni evaluate qilganda, avval check type'ning **naked type parameter** ekanligini tekshiradi. Agar `T` to'g'ridan-to'g'ri tursa — distribution mexanizmi ishga tushadi va union'ning har bir member'i uchun alohida evaluation qiladi.
+Compiler conditional type'ni evaluate qilganda, avval check type'ning **naked type parameter** ekanligini tekshiradi. Agar `T` to'g'ridan-to'g'ri tursa — distribution mexanizmi ishga tushadi va union'ning har bir member'i uchun alohida evaluation qiladi.
 
 ```text
 Distributive jarayon:
@@ -411,7 +411,7 @@ type X = MyExclude<"a" | "b" | "c", "a">;
 // Natija: never | "b" | "c" = "b" | "c"
 ```
 
-**`never` bilan nozik holat:** `never` — empty union deb qaraladi. `T extends any ? T[] : never` ichida `T = never` bo'lsa, kompilator distribution'ga hech narsa bermaydi va natija `never` bo'ladi:
+**`never` bilan nozik holat:** `never` — empty union deb qaraladi. `T extends any ? T[] : never` ichida `T = never` bo'lsa, compiler distribution'ga hech narsa bermaydi va natija `never` bo'ladi:
 
 ```typescript
 type ToArray<T> = T extends any ? T[] : never;
@@ -513,7 +513,7 @@ type B = IsStringNonDist<string | number>;
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator conditional type'ni evaluate qilganda avval check type'ning **naked type parameter** ekanligini tekshiradi. `[T] extends [string]` yozganda, kompilator `T`'ni endi naked emas deb biladi — u tuple ichida wrapped. Natijada distribution mexanizmi ishlamaydi.
+Compiler conditional type'ni evaluate qilganda avval check type'ning **naked type parameter** ekanligini tekshiradi. `[T] extends [string]` yozganda, compiler `T`'ni endi naked emas deb biladi — u tuple ichida wrapped. Natijada distribution mexanizmi ishlamaydi.
 
 ```text
 Non-distributive evaluation:
@@ -528,7 +528,7 @@ Check<string | number>
 5. Natija: false (bitta natija, union emas)
 ```
 
-**Muhim nuance:** `[T]` wrapping faqat compile-time'da type checker behavior'ini o'zgartiradi. Runtime'da hech narsa o'zgarmaydi — bu purely type-level trick. Kompilator `[T] extends [U]`'ni internally tuple type'lar orasidagi subtyping sifatida tekshiradi.
+**Muhim nuance:** `[T]` wrapping faqat compile-time'da type checker behavior'ini o'zgartiradi. Runtime'da hech narsa o'zgarmaydi — bu purely type-level trick. Compiler `[T] extends [U]`'ni internally tuple type'lar orasidagi subtyping sifatida tekshiradi.
 
 **Boshqa wrapper'lar:** `[T]` eng keng tarqalgan, lekin istalgan wrapper ishlaydi:
 
@@ -668,7 +668,7 @@ type Mapped<T> = {
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator mapped type'ni qayta ishlaganda, avval `keyof T` yoki `in` dan keyin kelgan type'ni resolve qilib, **string literal union** hosil qiladi. Keyin bu union'ning har bir member'i uchun yangi property yaratiladi.
+Compiler mapped type'ni qayta ishlaganda, avval `keyof T` yoki `in` dan keyin kelgan type'ni resolve qilib, **string literal union** hosil qiladi. Keyin bu union'ning har bir member'i uchun yangi property yaratiladi.
 
 ```text
 Mapped type evaluation:
@@ -721,7 +721,7 @@ type OnlyStrings<T> = {
 
 Bu pattern filter'lash uchun juda kuchli — utility type'larda (masalan, `PickByValue`) ishlatiladi.
 
-**Compile-time operation:** Barcha mapped type transformatsiyalari compile-time'da sodir bo'ladi. Runtime'da oddiy JS object qoladi — hech qanday iz yo'q.
+**Compile-time operation:** Barcha mapped type transformation'lari compile-time'da sodir bo'ladi. Runtime'da oddiy JS object qoladi — hech qanday iz yo'q.
 
 </details>
 
@@ -860,7 +860,7 @@ type ClassName = `${Color}-${Size}`;
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator template literal type'ni compile-time'da to'liq construct qiladi. Har `${X}` placeholder uchun kompilator X'ning type'ini resolve qiladi — agar X string literal union bo'lsa, barcha kombinatsiyalar hosil qilinadi (Cartesian product).
+Compiler template literal type'ni compile-time'da to'liq construct qiladi. Har `${X}` placeholder uchun compiler X'ning type'ini resolve qiladi — agar X string literal union bo'lsa, barcha kombinatsiyalar hosil qilinadi (Cartesian product).
 
 ```text
 Template literal evaluation:
@@ -868,7 +868,7 @@ Template literal evaluation:
 type T = `${Color}-${Size}`;
 Color = "red" | "green", Size = "sm" | "lg"
 
-1. Kompilator Cartesian product hisoblaydi:
+1. Compiler Cartesian product hisoblaydi:
    "red" × "sm" → "red-sm"
    "red" × "lg" → "red-lg"
    "green" × "sm" → "green-sm"
@@ -876,11 +876,11 @@ Color = "red" | "green", Size = "sm" | "lg"
 2. Natija: "red-sm" | "red-lg" | "green-sm" | "green-lg"
 ```
 
-**`${string}` pattern** — agar placeholder'da literal emas `string` bo'lsa, kompilator concrete literal hosil qila olmaydi. Natija `` `prefix${string}` `` pattern type bo'lib qoladi. Bu pattern type structural matching'da ishlatiladi — har qanday string `prefix` bilan boshlansa mos keladi.
+**`${string}` pattern** — agar placeholder'da literal emas `string` bo'lsa, compiler concrete literal hosil qila olmaydi. Natija `` `prefix${string}` `` pattern type bo'lib qoladi. Bu pattern type structural matching'da ishlatiladi — har qanday string `prefix` bilan boshlansa mos keladi.
 
-**Intrinsic types implementation:** `Uppercase`, `Lowercase`, `Capitalize`, `Uncapitalize` — TS compiler'ning ichida maxsus kod sifatida implement qilingan. `lib.es5.d.ts`'da bu type'lar `type Uppercase<S extends string> = intrinsic;` deb declare qilingan — `intrinsic` keyword kompilatorga "bu type'ni mening ichki implementatsiyam orqali hisobla" deb buyuradi. Kompilator JavaScript'ning native `String.prototype.toUpperCase()` / `toLowerCase()`'ga o'xshash logika orqali string literal'larni transform qiladi.
+**Intrinsic types implementation:** `Uppercase`, `Lowercase`, `Capitalize`, `Uncapitalize` — TS compiler'ning ichida maxsus kod sifatida implement qilingan. `lib.es5.d.ts`'da bu type'lar `type Uppercase<S extends string> = intrinsic;` deb declare qilingan — `intrinsic` keyword compiler'ga "bu type'ni mening ichki implementation'im orqali hisobla" deb buyuradi. Compiler JavaScript'ning native `String.prototype.toUpperCase()` / `toLowerCase()`'ga o'xshash logic orqali string literal'larni transform qiladi.
 
-Bu type'lar runtime'da mavjud emas — faqat compile-time'da string literal transformatsiya uchun ishlaydi. (Eslatma: TypeScript compiler'ning o'zi to'liq TypeScript'da yozilgan.)
+Bu type'lar runtime'da mavjud emas — faqat compile-time'da string literal transformation uchun ishlaydi. (Eslatma: TypeScript compiler'ning o'zi to'liq TypeScript'da yozilgan.)
 
 **Template literal bilan `infer`:** TS 4.1+ da template literal type'lar ichida `infer` ishlatib string parsing qilish mumkin:
 
@@ -1017,15 +1017,15 @@ type DeepReadonly<T> = {
 
 **TypeScript recursive type'larda cheklov bor:**
 
-- **Non-tail-recursive** — taxminan 50 daraja limit
-- **Tail-recursive** (TS 4.5+ optimizatsiyasi) — taxminan 1000 daraja limit
+- **Non-tail-recursive** — umumiy type instantiation depth limit bilan chegaralangan. Bu limit TS 4.5'gacha 50 edi, TS 4.5'da 100'ga oshirildi (PR #45025).
+- **Tail-recursive** (TS 4.5+ optimization'i) — taxminan 1000 iteration. Bu chegaradan oshsa, compiler type'ni nonterminating deb biladi va xato beradi.
 
-**Tail-call optimization (TS 4.5+):** Agar conditional type'ning true branch'ida recursive call faqat "return position"'da tursa (boshqa type bilan wrap qilinmagan), kompilator uni tail position sifatida aniqlaydi va stack frame'ni qayta ishlatadi.
+**Tail-call optimization (TS 4.5+):** Agar conditional type'ning bitta branch'i to'g'ridan-to'g'ri yana bir conditional type'ni (yoki recursion orqali o'zining yangi instantiation'ini) qaytarsa, compiler type resolution'ni call stack'ni o'stirmaydigan loop ichida bajaradi. Natijada instantiation depth counter o'rniga iteration limit (~1000) qo'llaniladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator recursive type'ni evaluate qilganda har recursion step'da yangi type instantiation yaratadi. Instantiation depth counter bor — har recursive call'da oshadi. Agar bu counter limitga yetsa, kompilator "Type instantiation is excessively deep and possibly infinite" xato beradi.
+Compiler recursive type'ni evaluate qilganda har recursion step'da yangi type instantiation yaratadi. Instantiation depth counter bor — har recursive call'da oshadi. Agar bu counter limitga yetsa, compiler "Type instantiation is excessively deep and possibly infinite" xato beradi.
 
 **Tail-recursive vs non-tail-recursive:**
 
@@ -1056,9 +1056,9 @@ Call 3: BuildTuple<3, [0, 0]>     → Acc.length (2) !== 3 → BuildTuple<3, [0,
 Call 4: BuildTuple<3, [0, 0, 0]>  → Acc.length (3) === 3 → return [0, 0, 0]
 ```
 
-Har qadamda natija accumulator ichida saqlanadi. Kompilator tail call'ni optimize qilib, stack frame'ni qayta ishlatadi — depth limit 1000'ga oshadi.
+Har qadamda natija accumulator ichida saqlanadi. Compiler tail call'ni optimize qilib, stack frame'ni qayta ishlatadi — depth limit 1000'ga oshadi.
 
-**Lazy evaluation:** Kompilator recursive type'ni **lazy** evaluate qiladi — ya'ni type faqat ishlatilganda (kerak bo'lganda) fully resolve qilinadi. Bu `JSONValue` kabi o'zini reference qiluvchi type alias'lar uchun muhim — agar eager evaluate qilsa, cheksiz loop bo'lardi.
+**Lazy evaluation:** Compiler recursive type'ni **lazy** evaluate qiladi — ya'ni type faqat ishlatilganda (kerak bo'lganda) fully resolve qilinadi. Bu `JSONValue` kabi o'zini reference qiluvchi type alias'lar uchun muhim — agar eager evaluate qilsa, cheksiz loop bo'lardi.
 
 **Depth limit bilan workaround:** Recursive type'ni counter tuple bilan chegaralash standart pattern:
 
@@ -1233,7 +1233,7 @@ type B = Concat<[string], [number, boolean]>;  // [string, number, boolean]
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator variadic tuple type'ni compile-time'da resolve qiladi. `[...T, ...U]` ko'rganda, kompilator T va U tuple type'larining element type'larini chiqarib, yangi birlashtirilgan tuple type yaratadi.
+Compiler variadic tuple type'ni compile-time'da resolve qiladi. `[...T, ...U]` ko'rganda, compiler T va U tuple type'larining element type'larini chiqarib, yangi birlashtirilgan tuple type yaratadi.
 
 ```text
 Variadic tuple evaluation:
@@ -1256,7 +1256,7 @@ type FirstAndRest<T> = T extends [infer F, ...infer R] ? [F, R] : never;
 type F = FirstAndRest<[1, 2, 3]>;  // [1, [2, 3]]
 ```
 
-**Mixed position — `[string, ...T, number]`:** Variadic element o'rtada ham turishi mumkin. Kompilator bu holatda T'ni "middle element"'lar sifatida infer qiladi — birinchi va oxirgi element'lar fixed, o'rtadagilar T'ga to'planadi.
+**Mixed position — `[string, ...T, number]`:** Variadic element o'rtada ham turishi mumkin. Compiler bu holatda T'ni "middle element"'lar sifatida infer qiladi — birinchi va oxirgi element'lar fixed, o'rtadagilar T'ga to'planadi.
 
 ```typescript
 type SurroundWith<T extends unknown[]> = [string, ...T, number];
@@ -1400,7 +1400,7 @@ Generic constraint yozishda ikkita xato tomon bor: **over-constraining** (haddan
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Kompilator generic constraint'ni har `T` instantiation'da tekshiradi. Constraint qanchalik keng bo'lsa — shuncha ko'p type'lar qabul qilinadi.
+Compiler generic constraint'ni har `T` instantiation'da tekshiradi. Constraint qanchalik keng bo'lsa — shuncha ko'p type'lar qabul qilinadi.
 
 **Over-constraining va inference:** Agar constraint juda qat'iy bo'lsa, TypeScript inference ham buziladi:
 
@@ -1412,7 +1412,7 @@ function f<T extends User>(x: T): T {
 
 f({ name: "Ali" });
 // ❌ Error: id, email, role yo'q
-// Kompilator: Argument is not assignable to User
+// Compiler: Argument is not assignable to User
 
 // Minimal constraint: faqat name kerak
 function g<T extends { name: string }>(x: T): T {
@@ -1438,7 +1438,7 @@ function mergeFixed<T extends object, U extends object>(a: T, b: U): T & U {
 }
 ```
 
-**Dependent constraint — `<U extends keyof T>`:** Constraint boshqa type parameter'ga reference qilishi mumkin. Bu holatda kompilator avval `T`'ni resolve qiladi, keyin `T`'dan olingan key union'ni `U`'ning constraint sifatida ishlatadi:
+**Dependent constraint — `<U extends keyof T>`:** Constraint boshqa type parameter'ga reference qilishi mumkin. Bu holatda compiler avval `T`'ni resolve qiladi, keyin `T`'dan olingan key union'ni `U`'ning constraint sifatida ishlatadi:
 
 ```typescript
 function getProp<T, K extends keyof T>(obj: T, key: K): T[K] {
@@ -1568,7 +1568,7 @@ Bu pattern'lar ko'pincha **type-level** va **runtime-level** ni birlashtiradi �
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Complex generic chain'larning cost'i:** Murakkab generic pattern'lar kompilator uchun **type instantiation cost** yaratadi. Har generic funksiya call'da kompilator yangi type instantiation yaratadi. Chuqur generic chain'larda (masalan, `api<Path, Method>` ichida nested conditional type'lar bilan) bu instantiation'lar ko'payib ketadi.
+**Complex generic chain'larning cost'i:** Murakkab generic pattern'lar compiler uchun **type instantiation cost** yaratadi. Har generic funksiya call'da compiler yangi type instantiation yaratadi. Chuqur generic chain'larda (masalan, `api<Path, Method>` ichida nested conditional type'lar bilan) bu instantiation'lar ko'payib ketadi.
 
 ```text
 Type instantiation chain (API example):
@@ -1590,7 +1590,7 @@ Har qadam — yangi instantiation
 3. **Type aliases cache** — `type Cached<T> = ...` bilan takror hisoblashni kamaytirish
 4. **Avoid deep recursion** — tail-recursive pattern'lar ishlatish
 
-**Cache mechanism:** Kompilator bir xil type argument'lar bilan ikkinchi marta instantiation kerak bo'lganda, cache'dan oladi. Lekin agar har chaqiriqda yangi type argument kombinatsiyasi bo'lsa, cache miss bo'ladi — har biri qaytadan evaluate qilinadi.
+**Cache mechanism:** Compiler bir xil type argument'lar bilan ikkinchi marta instantiation kerak bo'lganda, cache'dan oladi. Lekin agar har chaqiriqda yangi type argument kombinatsiyasi bo'lsa, cache miss bo'ladi — har biri qaytadan evaluate qilinadi.
 
 **Builder pattern va type evolution:** Fluent builder pattern'da har method call yangi generic instantiation yaratadi (`QueryBuilder<T, K>` → `QueryBuilder<T, K2>`). Katta chain'larda bu compile vaqtini sezilarli oshirishi mumkin.
 
@@ -1819,7 +1819,7 @@ TypeScript'da HKT'ni **simulate qilish** uchun workaround'lar bor — lekin ular
 
 **Nima uchun TypeScript'da HKT yo'q?** TypeScript'ning type system'ida type parameter faqat **concrete type** (kind `*`) bo'lishi mumkin — ya'ni `T` o'zi `string`, `number`, `User` kabi to'liq type. HKT uchun type parameter'ning "kind" (type'ning type'i) `* -> *` bo'lishi kerak — ya'ni `F` o'zi generic, unga type berganingda concrete type hosil bo'ladi (`Array`, `Promise` kabi).
 
-TypeScript'ning type system'i bunday "type constructor"'larni qo'llab-quvvatlamaydi. Bu dizayn qaroridan kelib chiqadi — TypeScript ko'proq structural va pragmatic bo'lish uchun yaratilgan, akademik type system emas. HKT qo'shilish kompilator arxitekturasini tubdan o'zgartirishni talab qiladi.
+TypeScript'ning type system'i bunday "type constructor"'larni qo'llab-quvvatlamaydi. Bu dizayn qaroridan kelib chiqadi — TypeScript ko'proq structural va pragmatic bo'lish uchun yaratilgan, akademik type system emas. HKT qo'shilish compiler architecture'sini tubdan o'zgartirishni talab qiladi.
 
 **Workaround yondashuvlari:**
 
@@ -1920,7 +1920,7 @@ type Kind<URI extends URIS, A> = URItoKind<A>[URI];
 
 ### 1. `never` va Distributive — Hech Narsa Qaytaradi
 
-`never` — "bo'sh union" deb qaraladi. Distributive conditional type'da `never` berilsa, kompilator distribution'ga hech narsa bermaydi — natija `never`:
+`never` — "bo'sh union" deb qaraladi. Distributive conditional type'da `never` berilsa, compiler distribution'ga hech narsa bermaydi — natija `never`:
 
 ```typescript
 type ToArray<T> = T extends any ? T[] : never;
@@ -1950,7 +1950,7 @@ type Check<T> = T extends string ? "yes" : "no";
 type A = Check<any>; // "yes" | "no" (ikkala branch!)
 ```
 
-**Sabab:** `any` — "istalgan type" ma'nosini beradi. Kompilator `any extends string` shartini tekshira olmaydi — chunki `any` bir vaqtda ham string bo'lishi mumkin, ham emas. Shuning uchun kompilator pessimistik yondashadi va ikkala branch'ni qo'shadi.
+**Sabab:** `any` — "istalgan type" ma'nosini beradi. Compiler `any extends string` shartini tekshira olmaydi — chunki `any` bir vaqtda ham string bo'lishi mumkin, ham emas. Shuning uchun compiler pessimistik yondashadi va ikkala branch'ni qo'shadi.
 
 **Nima uchun muhim:** `any` parameter bilan conditional type kutilmagan natijalar beradi. Agar aniq natija kerak bo'lsa, `unknown` yoki specific type ishlatish kerak:
 
@@ -1962,7 +1962,7 @@ type S = Check2<string>;  // "yes" — aniq string
 
 ### 3. `infer` Multi-Position — Same Variable Different Positions
 
-`infer U` bir nechta pozitsiyada ishlatilganda, kompilator variance qoidalariga asoslanib natijani union yoki intersection qiladi:
+`infer U` bir nechta pozitsiyada ishlatilganda, compiler variance qoidalariga asoslanib natijani union yoki intersection qiladi:
 
 ```typescript
 // Return position — covariant → union
@@ -2041,9 +2041,9 @@ type UserData = RemoveFunctions<User>;
 // greet va logout olib tashlandi
 ```
 
-**Nima uchun `as never` property'ni o'chiradi:** Mapped type'da key `never` bo'lsa, property "mavjud emas" sifatida qaraladi. Kompilator bu property'ni butunlay chiqarib tashlaydi. Bu filter uchun juda kuchli pattern.
+**Nima uchun `as never` property'ni o'chiradi:** Mapped type'da key `never` bo'lsa, property "mavjud emas" sifatida qaraladi. Compiler bu property'ni butunlay chiqarib tashlaydi. Bu filter uchun juda kuchli pattern.
 
-**Gotcha:** Bu mexanizm faqat `keyof T` ishlatilgan mapped type'da ishlaydi. Oddiy union key source'da (`"a" | "b"`) `never` boshqacha ishlashi mumkin.
+**Gotcha:** Key'ni `never`'ga remap qilish istalgan mapped type'da — `keyof T` bo'ladimi yoki oddiy union key source (`"a" | "b"`) bo'ladimi — property'ni bir xil olib tashlaydi. Homomorphic (`keyof T`) vs non-homomorphic farqi modifier (`readonly`, `?`) saqlanishiga ta'sir qiladi, key remapping'ga emas — `as never` filter ikkalasida ham ishlaydi.
 
 ---
 
@@ -2119,7 +2119,7 @@ type DeepFlatten<T, Depth extends unknown[] = []> =
 type Flat = DeepFlatten<[[[[string]]]]>; // string ✅
 ```
 
-**Nima uchun:** Kompilator recursive type'larni chekli darajagacha qo'llab-quvvatlaydi. Counter tuple bilan chegaralash — standart workaround.
+**Nima uchun:** Compiler recursive type'larni chekli darajagacha qo'llab-quvvatlaydi. Counter tuple bilan chegaralash — standart workaround.
 
 ---
 
