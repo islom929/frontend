@@ -350,7 +350,7 @@ E'tibor: ikkala funksiya ham **resolve** chaqiradi (reject hech qachon emas). Bu
 
 **Boshlang'ich `remainingElements = 1`:**
 
-Spec'da counter `0` dan emas, `1` dan boshlanadi va har element uchun increment qilinadi. Iteration tugagandan keyin manual decrement (`remainingElements -= 1`). Sabab: agar iterable juda tez (sync), `0` ga tezroq yetib aborted bo'lib qolardi — pre-increment pattern bunga yo'l qo'ymaydi.
+Spec'da counter `0` dan emas, `1` dan boshlanadi va har element uchun increment qilinadi. Iteration tugagandan keyin manual decrement (`remainingElements -= 1`). Sabab: agar barcha element sync settle bo'lsa, iteration tugamasdan turib counter `0` ga yetib, natija to'liq to'lmasdan oldin resolve bo'lib qolardi — boshlang'ich `1` esa loop tugaguncha settle'ni ushlab turadi.
 
 **Memory consideration:**
 
@@ -489,17 +489,18 @@ Step 3: Outer Promise (then_A natija) resolve qilinishi kerak — lekin
 Step 4: PromiseResolveThenableJob queue qilinadi — tick #1
 Step 5: ThenableJob ishlaydi: Promise.resolve("B").then(resolveOuter, rejectOuter)
         → resolveOuter callback yana microtask queue'ga qo'shiladi — tick #2
-Step 6: resolveOuter("B") chaqiriladi → keyingi then_B handler queue'ga
+Step 6: resolveOuter("B") chaqiriladi → outer Promise resolve bo'ladi
+        → keyingi then_B handler queue'ga — tick #3
 Step 7: then_B ishlaydi → "B" chiqadi
 ```
 
-Jami **2 ta qo'shimcha tick** "A" va "B" orasida. Shu sabab "C", "D", "E" oraliqda joylashib oladi.
+"A" va "B" orasida jami **3 ta microtask tick** (PromiseResolveThenableJob → resolveOuter reaction → then_B reaction) — oddiy qiymat (`return undefined`, 1 tick)'dan 2 tick ko'p. Shu sabab "C", "D", "E" oraliqda joylashib oladi.
 
 **V8 optimization tarixi:**
 
-- **V8 7.2 dan oldin (Node 10):** `await` operatori ham 2 tick ishlatardi — `await` desugar'i `.then(...)` ga ekvivalent edi
-- **V8 7.2+ (Node 11+, ES2020 spec rasmiy):** `await native_promise` → 1 tick (PerformPromiseThen direct). Spec'da `PerformPromiseThen` optimizatsiyasi qo'shildi — native Promise uchun `PromiseResolveThenableJob` skip qilinadi
-- **`.then()` return Promise:** Hozirgi spec'da hali 2 tick — spec'da bu pattern uchun optimization yo'q
+- **V8 7.2 dan oldin (Node 10):** `await native_promise` ham 3 tick ishlatardi — `await` desugar'i thenable adoption path'iga (`PromiseResolveThenableJob`) ekvivalent edi
+- **V8 7.2+ (Node 11+, ES2020 spec rasmiy):** `await native_promise` → 1 tick. Optimization argument allaqachon native Promise bo'lsa wrapper Promise va `PromiseResolveThenableJob` ni skip qiladi (2 tick tejaladi)
+- **`.then()` return Promise:** hali 3 tick — optimization faqat `await` operatoriga tegishli, `.then()` callback'dan Promise qaytarish bu pattern'ni qamramaydi
 
 **Test variant:**
 
@@ -510,13 +511,13 @@ async function test1() {
   console.log("after"); // Faqat 1 tick keyin
 }
 
-// .then() return — 2 tick
+// .then() return — 3 tick
 Promise.resolve()
   .then(() => Promise.resolve("B"))
-  .then(val => console.log(val)); // 2 tick keyin
+  .then(val => console.log(val)); // 3 tick keyin
 ```
 
-> **Runtime eslatma:** Yuqoridagi tartib ECMA-262 spec'ga mos (2 extra tick). Ba'zi muhitlarda (eski V8) farq bo'lishi mumkin. Interview'da: "spec bo'yicha 2 tick" — to'g'ri javob.
+> **Runtime eslatma:** Yuqoridagi tartib ECMA-262 spec'ga mos (adoption point'dan 3 tick, oddiy qiymatdan 2 tick ko'p). Interview'da: ".then() return Promise → 3 tick, await native Promise → 1 tick (V8 7.2+)" — to'g'ri javob.
 
 **Spec referensiyasi:** ECMA-262 `27.2.1.4 PromiseResolveThenableJob`, `27.2.1.7 RejectPromise`, `27.2.2.1 PerformPromiseThen`.
 

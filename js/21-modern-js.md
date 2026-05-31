@@ -153,7 +153,7 @@ getFirstLast([10, 20, 30]); // { first: 10, last: 30 }
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Array spread — engine `Symbol.iterator` protocol'ini ishlatadi. Har qanday iterable spread qilish mumkin: Array, String, Map, Set, generator, NodeList. Object spread — `Object.keys()` + property copy. Engine ichida `CopyDataProperties()` abstract operation chaqiriladi — bu faqat **own enumerable** property'larni copy qiladi (prototype'dagi property'lar copy bo'lmaydi).
+Array spread — engine `Symbol.iterator` protocol'ini ishlatadi. Har qanday iterable spread qilish mumkin: Array, String, Map, Set, generator, NodeList. Object spread — engine `CopyDataProperties` abstract operation'ini chaqiradi: u source'ning `[[OwnPropertyKeys]]` ro'yxati bo'yicha yuradi va faqat **own enumerable** property'larni copy qiladi (prototype'dagi property'lar copy bo'lmaydi). `[[OwnPropertyKeys]]` string VA symbol key'larni ikkalasini qaytaradi — shuning uchun spread symbol key'larni ham copy qiladi (`Object.keys()` esa faqat string key'larni ko'radi).
 
 </details>
 
@@ -547,7 +547,7 @@ const result = a ?? expensiveCall(); // expensiveCall CHAQIRILMAYDI
 | `val = null` | `def` | `def` |
 | `val = undefined` | `def` | `def` |
 
-`??` faqat `null`/`undefined` uchun fallback beradi — `0`, `""`, `false` valid qiymatlarni saqlaydi. Bu konfiguratsiya va default qiymatlarda xato manbai bo'ladi.
+`??` faqat `null`/`undefined` uchun fallback beradi — `0`, `""`, `false` valid qiymatlarni saqlaydi. Bu configuration va default qiymatlarda xato manbai bo'ladi.
 
 **Eng kuchli pattern** — optional chaining bilan:
 ```javascript
@@ -590,7 +590,7 @@ console.log(theme); // "light" — theme null bo'lgani uchun
 // const x = a || b ?? c; // SyntaxError!
 const a = null, b = 0, c = "default";
 const x = (a || b) ?? c; // ✅ qavs bilan — to'g'ri
-console.log(x); // "default" — a va b falsy, natija c
+console.log(x); // 0 — (a || b) bu 0, 0 esa null/undefined emas, shuning uchun ?? to'xtaydi
 ```
 
 | Expression | `0` | `""` | `false` | `NaN` | `null` | `undefined` |
@@ -630,7 +630,7 @@ for (const key in arr) {
 
 Lodash, MooTools kabi eski library'lar `Array.prototype` ga method qo'shgan paytlarda ko'p bug manbai bo'lgan. Shuning uchun array uchun doim `for`/`for...of`/`forEach` ishlating.
 
-**Performance**: oddiy `for` loop odatda eng tez (minimal overhead, JIT uchun maksimal optimizatsiya imkoniyati), keyin `for...of` (iterator protocol chaqiruvi), `forEach` (callback function chaqiruvi), va `for...in` (prototype chain traversal tufayli eng sekin). Aniq farq V8 versiyasi, loop body, va loop o'lchamiga bog'liq. Hot loop va katta data uchun `for` yoki `for...of` afzal, DX uchun `forEach`/`map`/`filter` — ko'pincha farq ahamiyatsiz.
+**Performance**: oddiy `for` loop odatda eng tez (minimal overhead, JIT uchun maksimal optimization imkoniyati), keyin `for...of` (iterator protocol chaqiruvi), `forEach` (callback function chaqiruvi), va `for...in` (prototype chain traversal tufayli eng sekin). Aniq farq V8 versiyasi, loop body, va loop o'lchamiga bog'liq. Hot loop va katta data uchun `for` yoki `for...of` afzal, DX uchun `forEach`/`map`/`filter` — ko'pincha farq ahamiyatsiz.
 
 </details>
 
@@ -756,7 +756,7 @@ user.sessionId &&= encrypt(user.sessionId);
 // sessionId bor edi (truthy) — encrypt qilinadi
 // Agar undefined bo'lsa — hech narsa qilinmaydi
 
-// Real-world: default konfiguratsiya
+// Real-world: default configuration
 function setup(options = {}) {
   options.host ??= "localhost";
   options.port ??= 3000;
@@ -825,7 +825,7 @@ console.log(1_000_000 === 1000000); // true — runtime da farq yo'q
 
 ### Nazariya
 
-Regular Expression (RegExp) — matn ichida pattern bo'yicha qidirish, almashtirish va validatsiya uchun. JavaScript'da RegExp — birinchi darajali obyekt, maxsus literal sintaksisi bor: `/pattern/flags`. Ikki xil yaratish: literal (`/abc/g`) va constructor (`new RegExp("abc", "g")`). Constructor dinamik pattern uchun ishlatiladi.
+Regular Expression (RegExp) — matn ichida pattern bo'yicha qidirish, almashtirish va validation uchun. JavaScript'da RegExp — birinchi darajali obyekt, maxsus literal sintaksisi bor: `/pattern/flags`. Ikki xil yaratish: literal (`/abc/g`) va constructor (`new RegExp("abc", "g")`). Constructor dinamik pattern uchun ishlatiladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -949,9 +949,8 @@ console.log(matchD.indices[0]);         // [0, 5] — to'liq match pozitsiyasi
 console.log(matchD.indices.groups.word); // [0, 5] — named group pozitsiyasi
 
 // v flag (ES2024) — Unicode Sets: difference, intersection
-// Harf bo'lgan, lekin emoji bo'lmagan belgilar (misol):
-// /[\p{Letter}--\p{Script=Latin}]/v — Unicode Set difference
-// /[[a-z]&&[^aeiou]]/v              — consonant'lar (intersection)
+// /[\p{Letter}--\p{Script=Latin}]/v — Letter, lekin Latin script EMAS (difference)
+// /[[a-z]&&[^aeiou]]/v              — consonant'lar: a-z VA unli emas (intersection)
 ```
 
 ---
@@ -967,7 +966,7 @@ console.log(matchD.indices.groups.word); // [0, 5] — named group pozitsiyasi
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**JSON spec** (ECMA-404, RFC 8259): strict format — double-quoted strings, no comments, no trailing commas, no functions. JavaScript implementatsiyasi to'liq shunga mos.
+**JSON spec** (ECMA-404, RFC 8259): strict format — double-quoted strings, no comments, no trailing commas, no functions. JavaScript implementation'i to'liq shunga mos.
 
 **`stringify` skip qiladi**: `undefined`, function, Symbol — object'da skip, array'da `null` ga aylanadi. `Infinity`, `NaN` → `null`. `BigInt` → `TypeError`. `Date` → `toJSON()` natijasi (ISO string).
 
@@ -1310,7 +1309,7 @@ Shu sababli `a?.b?.c ?? default` toza ishlaydi — `?.` chain avval evaluate bo'
 - `a?.b.c` — `a` null/undefined bo'lsa, `b.c` evaluate qilinmaydi (short-circuit butun zanjirga tarqaladi)
 - `a ||= b` — `a` truthy bo'lsa, `b` evaluate qilinmaydi VA **assign ham qilinmaydi**
 
-**V8 optimizatsiyasi:** zamonaviy V8 bu syntax'ni inline caches bilan ishlaydi — ya'ni `obj?.prop` monomorphic hidden class bilan to'g'ridan-to'g'ri `obj.prop` kabi tez ishlaydi (null branch CPU branch predictor tomonidan deyarli hech qanday overhead'siz handle qilinadi).
+**V8 optimization:** zamonaviy V8 bu syntax'ni inline caches bilan ishlaydi — ya'ni `obj?.prop` monomorphic hidden class bilan to'g'ridan-to'g'ri `obj.prop` kabi tez ishlaydi (null branch CPU branch predictor tomonidan deyarli hech qanday overhead'siz handle qilinadi).
 
 </details>
 
@@ -1324,7 +1323,7 @@ function setupConfig(options) {
   return {
     host: options.host || "localhost",    // ❌ options.host === "" bo'lsa "localhost"
     port: options.port || 3000,            // ❌ options.port === 0 bo'lsa 3000
-    debug: options.debug || false,         // ❌ options.debug === false → false (OK chance!)
+    debug: options.debug || false,         // ❌ options.debug === false → false (bu yerda tasodifan to'g'ri, lekin || mantig'i noto'g'ri)
     timeout: options.timeout || 5000,      // ❌ options.timeout === 0 bo'lsa 5000
   };
 }
@@ -1494,7 +1493,7 @@ function updateUserV2(user, updates) {
 
 ```javascript
 // ❌ Eski — length tekshirish uzoq
-const count = (arr && arr.length) || 0;          // ❌ length === 0 bo'lsa 0 (chance OK)
+const count = (arr && arr.length) || 0;          // ❌ length === 0 bo'lsa 0 (tasodifan to'g'ri, lekin || mantig'i noto'g'ri)
 const firstItem = (arr && arr[0]) || "default"; // ❌ arr[0] === 0 bo'lsa "default"
 
 // ✅ Zamonaviy
@@ -1630,7 +1629,7 @@ function processUser({ name, age } = {}) {
 processUser();            // "Noma'lum, 0"
 processUser({});          // "Noma'lum, 0"
 // processUser(null);      // Hali ham TypeError — default faqat undefined uchun
-processUser(null ?? {});  // "Noma'lum, 0" — ??qisqartma
+processUser(null ?? {});  // "Noma'lum, 0" — ?? bilan {} ga almashtirildi
 
 // ✅ Eng xavfsiz pattern
 function processUserSafe(input) {
@@ -1820,7 +1819,8 @@ const result = stringifyCircular(parent);
 console.log(result);
 // {"name":"Parent","child":{"name":"Child","parent":"[Circular]"}}
 
-// ✅ Yechim 2: structuredClone (ES2022) — circular qabul qiladi
+// ✅ Yechim 2: structuredClone — circular qabul qiladi
+// (WHATWG HTML spec global API, ECMAScript emas; brauzerlarda 2022 dan keng qo'llab-quvvatlanadi, Node.js 17+)
 const cloned = structuredClone(parent);
 // structuredClone circular'ni to'g'ri handle qiladi
 // Lekin clone, serialization emas — JSON string kerak bo'lsa yaramaydi
@@ -1975,7 +1975,7 @@ const copy = { ...original };
 copy.address.city = "Samarqand";
 console.log(original.address.city); // "Samarqand" — ❌ original ham o'zgardi!
 
-// ✅ Deep copy — structuredClone (ES2022)
+// ✅ Deep copy — structuredClone (WHATWG HTML global API, ECMAScript emas; brauzerlarda 2022 dan, Node.js 17+)
 const deepCopy = structuredClone(original);
 deepCopy.address.city = "Buxoro";
 console.log(original.address.city); // "Samarqand" — ✅ original o'zgarmadi

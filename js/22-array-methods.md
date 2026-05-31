@@ -1,6 +1,6 @@
 # Bo'lim 22: Array Methods Mastery
 
-> Array methods — JavaScript da ma'lumotlarni iteratsiya, qidirish, transformatsiya va aggregatsiya qilish uchun ishlatiladigan built-in methodlar to'plami.
+> Array methods — JavaScript da ma'lumotlarni iteration, qidirish, transformation va aggregation qilish uchun ishlatiladigan built-in methodlar to'plami.
 
 ---
 
@@ -15,7 +15,7 @@
 - [reduce Deep Dive](#reduce-deep-dive)
 - [sort Deep Dive](#sort-deep-dive)
 - [at() Method (ES2022)](#at-method-es2022)
-- [Array.fromAsync (ES2024)](#arrayfromasync-es2024)
+- [Array.fromAsync (ES2025)](#arrayfromasync-es2025)
 - [Method Chaining](#method-chaining)
 - [Performance](#performance)
 - [Typed Arrays](#typed-arrays)
@@ -57,7 +57,7 @@ Iteration methodlarining uchta muhim xususiyati:
 
 **3. Erta to'xtatish yo'q** — `forEach`/`map`/`filter`/`reduce` `break` qabul qilmaydi. Callback ichidagi `return` faqat shu iteratsiyani tugatadi. Erta to'xtatish uchun `some`/`every`/`find` yoki klassik loop ishlating.
 
-**V8 optimizatsiyasi**: Monomorphic callback (bir xil tipdagi argumentlar) inline qilinadi. Polymorphic callback (turli hidden class'li object'lar) — deoptimizatsiya va performance pasaydi.
+**V8 optimization**: Monomorphic callback (bir xil tipdagi argumentlar) inline qilinadi. Polymorphic callback (turli hidden class'li object'lar) — deoptimization va performance pasaydi.
 
 </details>
 
@@ -240,7 +240,7 @@ bigArray.some(n => n === 5); // birinchi 6 elementni tekshirib to'xtaydi
 [].some(() => true);   // false — hech narsa tekshirilmadi
 [].every(() => false);  // true — "barcha elementlar shartga mos" (vacuous truth)
 
-// Real-world: validatsiya
+// Real-world: validation
 const formFields = [
   { name: "email", value: "ali@test.com", valid: true },
   { name: "password", value: "", valid: false },
@@ -276,7 +276,7 @@ Transform methodlari array'ni qayta shakllantirish uchun. Muhim: bu guruhda **mu
 
 **`flat` vs `flatMap` farqi**: `flatMap` — `map(...).flat(1)` ekvivalenti emas. Spec'da alohida algoritm sifatida yozilgan — map va flatten **bitta iteratsiyada** bajariladi, intermediate array yaratilmaydi. Katta array'larda xotira tejaydi.
 
-**`sort` algoritmi**: ECMAScript spec faqat **stable** (ES2019+) bo'lishini talab qiladi. Engine implementatsiyalari:
+**`sort` algoritmi**: ECMAScript spec faqat **stable** (ES2019+) bo'lishini talab qiladi. Engine implementation'lari:
 - **V8** (Chrome/Node.js): TimSort — hybrid merge sort + insertion sort, adaptive
 - **JavaScriptCore** (Safari): stable sort
 - **SpiderMonkey** (Firefox): merge sort
@@ -423,7 +423,7 @@ Array yaratish uchun static va instance methodlar. Static methodlar (`Array.from
 1. Iterable bo'lsa (`Set`, `Map`, `NodeList`, string, generator) — `Symbol.iterator` orqali
 2. Array-like bo'lsa (`{length: 3, 0: 'a'}`) — `length` va index orqali
 
-**`Array.of` nima uchun kerak** — `new Array(n)` inkonsistent API:
+**`Array.of` nima uchun kerak** — `new Array(n)` inconsistent API:
 ```javascript
 new Array(3);     // [<3 empty items>] — length sifatida!
 new Array(1, 2);  // [1, 2] — elementlar sifatida
@@ -578,7 +578,7 @@ ES2019 dan boshlab `sort()` **stable** — bir xil qiymatli elementlar original 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**V8 implementatsiyasi — TimSort** (2018-yildan): hybrid algorithm — kichik array'larda insertion sort, kattalarida adaptive merge sort. Stable (ES2019+ spec talab), real-world data'da O(n log n) dan tez (qisman sorted data'da).
+**V8 implementation — TimSort** (2018-yildan): hybrid algorithm — kichik array'larda insertion sort, kattalarida adaptive merge sort. Stable (ES2019+ spec talab), real-world data'da O(n log n) dan tez (qisman sorted data'da).
 
 **Comparator xatosi** — eng ko'p uchraydigani:
 ```javascript
@@ -588,7 +588,7 @@ arr.sort((a, b) => a - b);  // ✅ -1, 0, 1 oralig'idagi son
 
 Spec comparator uchun 3 shart talab qiladi: pure (bir xil input → bir xil output), transitive (`a<b`, `b<c` → `a<c`), antisymmetric (`compare(a,b) === -compare(b,a)`). Buzilsa — undefined behavior.
 
-**Decorate-sort-undecorate optimizatsiyasi** — murakkab comparator uchun:
+**Decorate-sort-undecorate optimization** — murakkab comparator uchun:
 ```javascript
 // ❌ Sekin: localeCompare har taqqoslashda chaqiriladi
 arr.sort((a, b) => a.name.localeCompare(b.name));
@@ -631,7 +631,8 @@ const users = [
 
 // age bo'yicha, keyin name bo'yicha
 users.sort((a, b) => a.age - b.age || a.name.localeCompare(b.name));
-// Soli(25), Vali(25), Ali(30) — stable sort: 25 lar original tartibda emas, name bo'yicha
+// Soli(25), Vali(25), Ali(30) — teng age'da secondary comparator name bo'yicha tartiblaydi
+// (S < V), shuning uchun Soli oldin Vali keladi
 
 // ⚠️ sort MUTATE qiladi!
 const original = [3, 1, 2];
@@ -695,11 +696,11 @@ arr[-1]; // undefined — array'da "-1" property yo'q
 
 ---
 
-## Array.fromAsync (ES2024)
+## Array.fromAsync (ES2025)
 
 ### Nazariya
 
-`Array.fromAsync()` — async iterable yoki Promise array'dan array yaratish. `Array.from()` ning async versiyasi. `for await...of` bilan array yig'ish o'rniga bir qadamda. ES2024 da qo'shildi.
+`Array.fromAsync()` — async iterable yoki Promise array'dan array yaratish. `Array.from()` ning async versiyasi. `for await...of` bilan array yig'ish o'rniga bir qadamda. ES2025 (16-edition) da qo'shildi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -725,7 +726,7 @@ await Array.fromAsync(generateUsers()); // bu yerda sequential muhim
 
 **Qachon ishlatish**:
 - ✅ **Async generator** output yig'ish: `Array.fromAsync(generateUsers())` — haqiqiy sequential, `Promise.all` bilan bu ishlamaydi
-- ✅ **Async iterable API** (paginatsiya, stream) — `Promise.all` async iterable qabul qilmaydi
+- ✅ **Async iterable API** (pagination, stream) — `Promise.all` async iterable qabul qilmaydi
 - ✅ **Promise array** — `Promise.all` bilan farqsiz (ikkalasi ham parallel wall-clock), tanlov style masalasi
 - ❌ Sync iterable'dan darhol array — oddiy `Array.from` yetarli
 
@@ -764,7 +765,7 @@ const data = await Array.fromAsync([
 
 ### Nazariya
 
-Array method'larining ko'pchiligi yangi array qaytargani uchun ularni **zanjirlab** ishlatish mumkin. Bu data transformation pipeline yaratadi — deklarativ uslub. Har bir qadam bitta operatsiya bajaradi va yangi array qaytaradi, navbatdagi method shu yangi array ustida ishlaydi.
+Array method'larining ko'pchiligi yangi array qaytargani uchun ularni **zanjirlab** ishlatish mumkin. Bu data transformation pipeline yaratadi — declarative uslub. Har bir qadam bitta operatsiya bajaradi va yangi array qaytaradi, navbatdagi method shu yangi array ustida ishlaydi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -833,14 +834,14 @@ const cleanNames = rawInput
 | `for` loop | Eng tez | Juda katta array, performance critical |
 | `for...of` | Tez | Iterable, break kerak |
 | `forEach` | Biroz sekin | Side effects, break kerak emas |
-| `map/filter/reduce` | Biroz sekin | Deklarativ, chain kerak |
+| `map/filter/reduce` | Biroz sekin | Declarative, chain kerak |
 
 **Early termination**: `find`, `some`, `every`, `findIndex` — shartga mos kelganda **to'xtaydi**. `forEach`, `map`, `filter`, `reduce` — doim **butun array'ni** aylantiradi. 1M elementli array'da bitta element topish: `find` darhol to'xtaydi, `filter` 1M elementni tekshiradi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**`for` loop nima uchun tez?** V8 da klassik `for` loop maksimal optimizatsiya imkonini beradi — callback yo'q, bounds check eliminated, monomorphic inline caching. `map`/`filter`/`forEach` har element uchun callback chaqiradi, function call overhead qo'shadi — lekin TurboFan bu callback'larni inline qila olganda farq kichik bo'ladi.
+**`for` loop nima uchun tez?** V8 da klassik `for` loop maksimal optimization imkonini beradi — callback yo'q, bounds check eliminated, monomorphic inline caching. `map`/`filter`/`forEach` har element uchun callback chaqiradi, function call overhead qo'shadi — lekin TurboFan bu callback'larni inline qila olganda farq kichik bo'ladi.
 
 **Umumiy tendentsiya**: oddiy `for` loop odatda eng tez, `for...of` yaqin (iterator protocol), `forEach`/`map`/`filter`/`reduce` — callback chaqiruv overhead'i bilan biroz sekinroq. Lekin **farq ko'p hollarda mikrosekund darajasida** va 99% production code'da sezilmaydi. Hot path (game loop, animation, million'lab element bilan tight loop) uchun `for` yoki `for...of` afzal; oddiy business logic uchun `map/filter/reduce` — o'qilishi va maintainability ahamiyatliroq. Aniq tezlik V8 versiyasi, element turi (monomorphic vs polymorphic), va callback complexity'ga bog'liq.
 
@@ -859,7 +860,7 @@ const result = hugeArray
   .filter(x => x > 100) // Yana 1M iteratsiya
   .slice(0, 10);         // Faqat 10 ta kerak edi!
 
-// ✅ for loop bilan optimizatsiya (yoki reduce bilan)
+// ✅ for loop bilan optimization (yoki reduce bilan)
 const result = [];
 for (const x of hugeArray) {
   const doubled = x * 2;
@@ -893,7 +894,7 @@ Typed Array'lar — fixed-size, single-type binary data bilan ishlash uchun. Reg
 
 **Memory model**: TypedArray — `ArrayBuffer` ustidagi **view**. ArrayBuffer — raw binary data (xom xotira), view esa shu raw data'ni qanday o'qish kerakligini belgilaydi. Bir ArrayBuffer ustida bir necha view bo'lishi mumkin (memory aliasing).
 
-**Nima uchun tez?** TypedArray'larda: (1) fixed type, (2) no boxing (raw memory, oddiy `Array` `PACKED_DOUBLE_ELEMENTS` kind'idan ham zichroq layout), (3) contiguous layout (cache-friendly), (4) `ArrayBuffer` orqali Workers'ga zero-copy transfer, WebGL/WebAudio interop, (5) ba'zi operatsiyalar SIMD bilan. Numerical computing uchun oddiy `Array` dan sezilarli darajada samaraliroq bo'lishi mumkin — aniq farq operation turiga, V8 ning element kind optimizatsiyasiga, va workload'ga bog'liq. Asosiy afzallik "raw speed" emas — **predictable memory layout** va **binary API interop**.
+**Nima uchun tez?** TypedArray'larda: (1) fixed type, (2) no boxing (raw memory, oddiy `Array` `PACKED_DOUBLE_ELEMENTS` kind'idan ham zichroq layout), (3) contiguous layout (cache-friendly), (4) `ArrayBuffer` orqali Workers'ga zero-copy transfer, WebGL/WebAudio interop, (5) ba'zi operatsiyalar SIMD bilan. Numerical computing uchun oddiy `Array` dan sezilarli darajada samaraliroq bo'lishi mumkin — aniq farq operation turiga, V8 ning element kind optimization'iga, va workload'ga bog'liq. Asosiy afzallik "raw speed" emas — **predictable memory layout** va **binary API interop**.
 
 **`Uint8ClampedArray` — Canvas uchun**: 255 dan katta → 255, manfiy → 0 (clamp, modulo emas). Pixel data uchun ideal:
 ```javascript
@@ -973,7 +974,7 @@ const keyValue = users.map(user => ({ // ← ( majburiy, {} — object literal
 
 **Nima uchun:** Arrow function'ning ikki shakli ECMAScript 2015 spec'da aniq belgilangan: `x => expr` — expression body, natijasi `expr` — returned. `x => { stmt }` — block body, oddiy function kabi ishlaydi — `return` yo'q bo'lsa `undefined` qaytaradi. `{}` ning object literal va block statement ikkalasi ham bo'lishi mumkinligi tufayli — `x => { a: 1 }` aslida **label statement** sifatida parse qilinadi, object emas. Shuning uchun object return uchun `x => ({ a: 1 })` pattern'i kerak.
 
-**Yechim:** Har doim `map` callback'ni expression body bilan yozishga harakat qiling — qisqaroq va `return` unutish imkoniyati yo'q. Multi-line transformatsiya kerak bo'lsa — block body ichida explicit `return`. Object return uchun `({...})` parentheses pattern. Linter (`arrow-body-style`) bu xatolarni ushlay oladi.
+**Yechim:** Har doim `map` callback'ni expression body bilan yozishga harakat qiling — qisqaroq va `return` unutish imkoniyati yo'q. Multi-line transformation kerak bo'lsa — block body ichida explicit `return`. Object return uchun `({...})` parentheses pattern. Linter (`arrow-body-style`) bu xatolarni ushlay oladi.
 
 ### Gotcha 2: `new Array(n).fill().map()` ishlamaydi — sparse array + map skip
 

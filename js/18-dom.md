@@ -1,6 +1,6 @@
 # Bo'lim 18: DOM Manipulation
 
-> DOM (Document Object Model) — brauzer HTML hujjatni parse qilib, JavaScript orqali boshqarish imkonini beradigan daraxt (tree) strukturasi. Har bir element, matn, komment — barchasi node. Bu bo'limda DOM traversal, element yaratish/o'zgartirish/o'chirish, attribute va style boshqaruv, va performance optimizatsiyasi (reflow/repaint, DocumentFragment, requestAnimationFrame) to'liq yoritiladi.
+> DOM (Document Object Model) — brauzer HTML hujjatni parse qilib, JavaScript orqali boshqarish imkonini beradigan daraxt (tree) strukturasi. Har bir element, matn, komment — barchasi node. Bu bo'limda DOM traversal, element yaratish/o'zgartirish/o'chirish, attribute va style boshqaruv, va performance optimization (reflow/repaint, DocumentFragment, requestAnimationFrame) to'liq yoritiladi.
 
 ---
 
@@ -36,7 +36,7 @@
 
 DOM (Document Object Model) — brauzer HTML hujjatni parse qilib xotirada yaratadigan **daraxt (tree) strukturasi**. DOM **HTML ning o'zi emas** — HTML matn fayl, DOM esa brauzer xotirasidagi tirik (live) obyektlar daraxti. Brauzer HTML ni parse qilib DOM yaratadi, keyin JavaScript va CSS shu DOM bilan ishlaydi.
 
-DOM — W3C standarti bo'lib, u **platform va til agnostic** interfeys beradi. JavaScript DOM bilan ishlash uchun eng ko'p ishlatiladigan til, lekin DOM API texnik jihatdan boshqa tillar bilan ham ishlatilishi mumkin. Brauzer kontekstida `document` global obyekt orqali DOM daraxtiga kirish mumkin.
+DOM — W3C standarti bo'lib, u **platform va til agnostic** interface beradi. JavaScript DOM bilan ishlash uchun eng ko'p ishlatiladigan til, lekin DOM API texnik jihatdan boshqa tillar bilan ham ishlatilishi mumkin. Brauzer kontekstida `document` global obyekt orqali DOM daraxtiga kirish mumkin.
 
 Rendering pipeline: `HTML → Parser → DOM Tree + CSSOM → Render Tree → Layout → Paint → Composite → Screen`. Parse jarayoni **incremental** — brauzer hujjatni to'liq kutmaydi, kelgan qismlari bilan DOM qurishni boshlaydi. `<script>` tag'ga duch kelganda parser to'xtaydi (parser-blocking), shuning uchun script'larni `defer` yoki `async` bilan yoki `</body>` oldiga qo'yish tavsiya etiladi.
 
@@ -68,7 +68,7 @@ Rendering Pipeline:
 └──────┘    └───────┘    └───────────┘    └────────┘    └──────┘    └───────────┘
 ```
 
-V8 (Chrome) da DOM node'lari C++ obyektlari sifatida yaratiladi va JavaScript wrapper orqali expose qilinadi (Blink binding qatlami). Tarixan DOM operatsiyalari "sekinroq" deb hisoblangan — chunki har chaqiriq C++ tomoniga o'tish va uning effektlarini (layout, style recalculation) trigger qilish mumkin edi. Zamonaviy Blink va V8 inline caches, fast path'lar, va direct property access optimizatsiyalarini qo'llaydi — shuning uchun ko'p DOM getter/setter chaqiriqlari **deyarli native** tezlikda ishlaydi. Lekin **layout'ni trigger qiluvchi operatsiyalar** (`offsetWidth`, `getBoundingClientRect`, `getComputedStyle`) hanuzgacha qimmat qoladi — bu narsa "DOM sekinligi" ning haqiqiy sababi, JavaScript↔C++ bridge emas.
+V8 (Chrome) da DOM node'lari C++ obyektlari sifatida yaratiladi va JavaScript wrapper orqali expose qilinadi (Blink binding qatlami). Tarixan DOM operatsiyalari "sekinroq" deb hisoblangan — chunki har chaqiriq C++ tomoniga o'tish va uning effektlarini (layout, style recalculation) trigger qilish mumkin edi. Zamonaviy Blink va V8 inline caches, fast path'lar, va direct property access optimization'larini qo'llaydi — shuning uchun ko'p DOM getter/setter chaqiriqlari **deyarli native** tezlikda ishlaydi. Lekin **layout'ni trigger qiluvchi operatsiyalar** (`offsetWidth`, `getBoundingClientRect`, `getComputedStyle`) hanuzgacha qimmat qoladi — bu narsa "DOM sekinligi" ning haqiqiy sababi, JavaScript↔C++ bridge emas.
 
 </details>
 
@@ -98,7 +98,7 @@ document.title = "Yangi Sarlavha"; // brauzer tab sarlavhasi o'zgaradi
 
 DOM daraxtidagi har bir element **node**. Node'larning bir nechta turi bor, har biri `nodeType` raqami bilan farqlanadi. Amalda eng ko'p ishlatiladigan 5 ta tur: **Element** (1) — HTML tag'lar (`<div>`, `<p>`, `<a>`); **Text** (3) — element ichidagi matn; **Comment** (8) — HTML kommentlari (`<!-- ... -->`); **Document** (9) — daraxtning ildizi; **DocumentFragment** (11) — virtual container, DOM da ko'rinmaydi, lekin ichiga node'lar qo'shiladi.
 
-Barcha node'lar `Node` interfeysidan meros oladi — `nodeType`, `nodeName`, `nodeValue`, `parentNode`, `childNodes`, `firstChild`, `lastChild`, `nextSibling`, `previousSibling` property'lari bor. Element node'lari qo'shimcha `Element` interfeysidan ham meros oladi — `children`, `className`, `id`, `getAttribute()`, `querySelector()` kabi.
+Barcha node'lar `Node` interface'idan meros oladi — `nodeType`, `nodeName`, `nodeValue`, `parentNode`, `childNodes`, `firstChild`, `lastChild`, `nextSibling`, `previousSibling` property'lari bor. Element node'lari qo'shimcha `Element` interface'idan ham meros oladi — `children`, `className`, `id`, `getAttribute()`, `querySelector()` kabi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -122,7 +122,7 @@ EventTarget
               └── SVGElement
 ```
 
-`childNodes` property `NodeList` qaytaradi — bu **live** collection. DOM ga child qo'shilsa yoki o'chirilsa, `childNodes` avtomatik yangilanadi. `children` esa `HTMLCollection` qaytaradi — faqat Element node'lar (Text, Comment filtrlangan). Brauzer ichida `childNodes` node'larni linked list yoki array sifatida saqlaydi — engine implementatsiyasiga bog'liq.
+`childNodes` property `NodeList` qaytaradi — bu **live** collection. DOM ga child qo'shilsa yoki o'chirilsa, `childNodes` avtomatik yangilanadi. `children` esa `HTMLCollection` qaytaradi — faqat Element node'lar (Text, Comment filtrlangan). Brauzer ichida `childNodes` node'larni linked list yoki array sifatida saqlaydi — engine implementation'iga bog'liq.
 
 </details>
 
@@ -280,7 +280,7 @@ console.log(staticList.length); // 3 ← o'zgarmadi (static snapshot)
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`getElementById` eng tez — brauzer DOM tree'dan alohida **ID hash map** yuritadi. Yangi ID li element qo'shilsa yoki o'chirilsa, map yangilanadi. `querySelector` esa CSS selector'ni avval parse qiladi, keyin DOM daraxtini depth-first preorder traversal bilan qidiradi — O(n). Lekin zamonaviy brauzerlar murakkab optimizatsiyalar qo'llaydi: Bloom filter, selector caching, indexed collections.
+`getElementById` eng tez — brauzer DOM tree'dan alohida **ID hash map** yuritadi. Yangi ID li element qo'shilsa yoki o'chirilsa, map yangilanadi. `querySelector` esa CSS selector'ni avval parse qiladi, keyin DOM daraxtini depth-first preorder traversal bilan qidiradi — O(n). Lekin zamonaviy brauzerlar murakkab optimization'lar qo'llaydi: Bloom filter, selector caching, indexed collections.
 
 </details>
 
@@ -903,7 +903,7 @@ cancelAnimationFrame(animId); // animatsiyani to'xtatish
 
 ### Nazariya
 
-**Virtual DOM** — real DOM ning JavaScript object representatsiyasi. React, Vue kabi framework'lar real DOM bilan to'g'ridan-to'g'ri ishlamaydi — avval Virtual DOM da o'zgarishlarni qiladi, keyin eski va yangi Virtual DOM ni **diff** qiladi (farqlarni topadi), va faqat **o'zgargan qismlarni** real DOM da yangilaydi (patch). Bu minimal DOM manipulation kafolatlaydi.
+**Virtual DOM** — real DOM ning JavaScript object representation'i. React, Vue kabi framework'lar real DOM bilan to'g'ridan-to'g'ri ishlamaydi — avval Virtual DOM da o'zgarishlarni qiladi, keyin eski va yangi Virtual DOM ni **diff** qiladi (farqlarni topadi), va faqat **o'zgargan qismlarni** real DOM da yangilaydi (patch). Bu minimal DOM manipulation kafolatlaydi.
 
 Virtual DOM nima uchun kerak: real DOM operatsiyalari qimmat (C++ bridge, reflow/repaint). JavaScript object'lar bilan ishlash esa juda tez. 1000 ta element ichidan 3 tasi o'zgarganda — butun ro'yxatni qayta render qilish o'rniga faqat 3 ta DOM node yangilanadi.
 
@@ -912,7 +912,7 @@ Bu framework-specific texnologiya — native JavaScript da Virtual DOM ishlatilm
 <details>
 <summary><strong>Kod Misollari</strong></summary>
 
-Virtual DOM konsepti — soddalashtirilgan implementatsiya:
+Virtual DOM konsepti — soddalashtirilgan implementation:
 
 ```javascript
 // Virtual DOM node — oddiy JavaScript object:
@@ -965,7 +965,7 @@ document.body.appendChild(render(app));
 Web Components 3 ta asosiy texnologiyadan iborat:
 
 ```
-Web Components Arxitekturasi:
+Web Components architecture:
 ┌─────────────────────────────────────────────────────────┐
 │                   Web Components                         │
 │                                                          │
@@ -1054,7 +1054,7 @@ Custom Element Lifecycle:
 
 **Events va Shadow DOM:** Shadow DOM ichidan dispatch qilingan eventlar `composed: true` bo'lsa shadow boundary'ni kesib chiqadi. `event.composedPath()` event'ning to'liq yo'lini ko'rsatadi (shadow DOM ichini ham). Native eventlar (click, input, focus) default `composed: true`. Custom eventlar uchun `composed: true` ni qo'lda belgilash kerak.
 
-**Form-associated custom elements** — `ElementInternals` API orqali custom element'lar `<form>` bilan integratsiya qila oladi: validation, form data, submit — native `<input>` kabi ishlaydi.
+**Form-associated custom elements** — `ElementInternals` API orqali custom element'lar `<form>` bilan integration qila oladi: validation, form data, submit — native `<input>` kabi ishlaydi.
 
 **Framework vs Web Components:**
 - Web Components — **UI primitives** uchun ideal (design system, shareable widgets)
@@ -1086,9 +1086,9 @@ customElements.define() jarayoni:
                           new MyCard() → upgrade
 ```
 
-Element **upgrade** mexanizmi: Agar HTML da `<my-card>` yozilgan bo'lsa, lekin JavaScript hali `customElements.define()` chaqirmagan bo'lsa — brauzer uni `HTMLUnknownElement` sifatida yaratadi. `define()` chaqirilganda barcha mavjud `<my-card>` elementlari **upgrade** qilinadi — class almashtiriladi va `constructor` + `connectedCallback` chaqiriladi. `customElements.whenDefined('my-card')` — element define bo'lguncha kutadigan Promise qaytaradi.
+Element **upgrade** mexanizmi: Agar HTML da `<my-card>` yozilgan bo'lsa, lekin JavaScript hali `customElements.define()` chaqirmagan bo'lsa — nomi valid custom element name (tire bilan) bo'lgani uchun brauzer uni `HTMLElement` sifatida yaratadi va custom element state'ini `"undefined"` qilib belgilaydi. (`HTMLUnknownElement` esa faqat spec aniqlamagan nomlar uchun — `<blink>` kabi eskirgan teglar; valid custom element name hech qachon `HTMLUnknownElement` bo'lmaydi.) `define()` chaqirilganda barcha mavjud `<my-card>` elementlari **upgrade** qilinadi — prototype shu yangi class'ga o'zgartiriladi (yangi obyekt yaratilmaydi) va `constructor` + `connectedCallback` chaqiriladi. `customElements.whenDefined('my-card')` — element define bo'lguncha kutadigan Promise qaytaradi.
 
-Shadow DOM attachment — `attachShadow({ mode: 'open' })` chaqirilganda brauzer element ichida alohida DOM tree yaratadi. `mode: 'open'` — `element.shadowRoot` public property orqali tashqaridan kirish mumkin. `mode: 'closed'` — `element.shadowRoot` `null` qaytaradi va standart DOM API orqali ichkariga kirish mumkin emas. Lekin bu **soft encapsulation**: determined kod `attachShadow` method'ini `Element.prototype` darajasida patch qilib, har bir closed root reference'ni sirtqi `WeakMap`'ga saqlashi mumkin — ya'ni "xavfsizlik" chegarasi emas, faqat accidental access'ga qarshi. Ko'p hollarda `open` afzal — debugging va DevTools integratsiyasi oddiyroq, va closed mode'ning haqiqiy encapsulation kafolati yo'q.
+Shadow DOM attachment — `attachShadow({ mode: 'open' })` chaqirilganda brauzer element ichida alohida DOM tree yaratadi. `mode: 'open'` — `element.shadowRoot` public property orqali tashqaridan kirish mumkin. `mode: 'closed'` — `element.shadowRoot` `null` qaytaradi va standart DOM API orqali ichkariga kirish mumkin emas. Lekin bu **soft encapsulation**: determined kod `attachShadow` method'ini `Element.prototype` darajasida patch qilib, har bir closed root reference'ni sirtqi `WeakMap`'ga saqlashi mumkin — ya'ni "xavfsizlik" chegarasi emas, faqat accidental access'ga qarshi. Ko'p hollarda `open` afzal — debugging va DevTools integration'i oddiyroq, va closed mode'ning haqiqiy encapsulation kafolati yo'q.
 
 </details>
 
@@ -1735,7 +1735,7 @@ Barchasi umumiy pattern: `new Observer(callback)` → `.observe(target, options)
 
 **MutationObserver** — DOM spec tomonidan aniqlangan. Brauzer har DOM mutation'da (child qo'shish/o'chirish, attribute o'zgartirish, Text node qiymati) o'zgarishni **mutation record**'ga yozadi. Rendering pipeline'ning oxirida (microtask phase'da) barcha to'plangan record'lar callback'ga **batch** qilib yuboriladi — bu narsa DOM o'zgarishlar seriyasi paytida callback ko'p marta chaqirilishining oldini oladi. `MutationRecord` ichida `type`, `target`, `addedNodes`, `removedNodes`, `attributeName`, `oldValue` bor.
 
-**IntersectionObserver** — W3C spec. Brauzer compositor thread'da element pozitsiyalarini kuzatadi — **layout thread'ni band qilmaydi**. Har target uchun intersection ratio hisoblanadi va `threshold` ga yetganda callback chaqiriladi. Threshold — 0 (element ko'rina boshlaganda), 0.5 (yarmi ko'rinsa), 1 (to'liq ko'rinsa), yoki bir nechta qiymat bilan array. `root` parameter — default viewport, lekin ixtiyoriy scroll container bo'lishi mumkin. `rootMargin` — root'ning margin'i (CSS syntax bilan), masalan `"100px 0px"` — 100px oldin trigger qilish (preloading uchun).
+**IntersectionObserver** — W3C spec. Intersection hisoblash rendering update step'larining bir qismi sifatida asinxron bajariladi — `getBoundingClientRect` kabi **forced synchronous layout trigger qilmaydi**, shuning uchun scroll event + manual `getBoundingClientRect` loop'ga nisbatan layout thrashing keltirib chiqarmaydi. Hisoblash qachon bajarilishini brauzer optimallashtirimga qarab o'zi belgilaydi (har scroll frame'da emas). Callback'ning o'zi esa main thread'da chaqiriladi — og'ir ish kerak bo'lsa `requestIdleCallback` ichiga ko'chirish kerak. Har target uchun intersection ratio hisoblanadi va `threshold` ga yetganda callback chaqiriladi. Threshold — 0 (element ko'rina boshlaganda), 0.5 (yarmi ko'rinsa), 1 (to'liq ko'rinsa), yoki bir nechta qiymat bilan array. `root` parameter — default viewport, lekin ixtiyoriy scroll container bo'lishi mumkin. `rootMargin` — root'ning margin'i (CSS syntax bilan), masalan `"100px 0px"` — 100px oldin trigger qilish (preloading uchun).
 
 **ResizeObserver** — CSS WG spec. Element hajmi o'zgarganda (CSS, content, window resize, parent layout change — barchasi) trigger bo'ladi. `scroll`/`resize` event'lardan farqli ravishda — faqat kuzatilayotgan element'ga tegishli o'zgarishlarda chaqiriladi, butun window resize'ga emas. Callback rendering cycle'ning **layout phase'idan keyin** ishga tushadi — bu `ResizeObserver` ichida DOM o'qish xavfsiz ekanligini anglatadi. **ResizeObserver loop** — agar callback ichida kuzatilayotgan element hajmini o'zgartirsangiz va bu zanjirli effekt bersa — brauzer "ResizeObserver loop limit exceeded" warning chiqaradi va o'zini to'xtatadi.
 
@@ -1916,7 +1916,7 @@ window.addEventListener("scroll", () => {
 // 60 Hz scroll → har frame'da 100 ta img uchun getBoundingClientRect →
 // massive layout thrashing, janky scroll, battery drain
 
-// ✅ IntersectionObserver — compositor thread da:
+// ✅ IntersectionObserver — forced synchronous layout yo'q:
 const obs = new IntersectionObserver((entries) => {
   entries.filter(e => e.isIntersecting).forEach(e => {
     e.target.src = e.target.dataset.src;
@@ -1933,7 +1933,7 @@ document.querySelectorAll("img[data-src]").forEach(img => obs.observe(img));
 
 ## Edge Cases va Gotchas
 
-DOM manipulatsiyasi bo'yicha 5 ta nozik, production'da tez-tez uchrab, debug qilish qiyin bo'lgan gotcha. Har biri spec/browser behavior darajasida sabab bilan.
+DOM manipulation bo'yicha 5 ta nozik, production'da tez-tez uchrab, debug qilish qiyin bo'lgan gotcha. Har biri spec/browser behavior darajasida sabab bilan.
 
 ### Gotcha 1: HTML property `+=` barcha child event listener'larni yo'q qiladi
 
@@ -2063,7 +2063,7 @@ function parseDataset(element) {
 }
 ```
 
-**Nima uchun:** HTML attribute qiymatlari har doim string — bu HTML spec'ning fundamental qoidasi. `dataset` faqat `data-*` attribute'lar uchun "qulay accessor" — u `getAttribute("data-foo")` bilan ekvivalent, faqat kebab-case → camelCase mapping qiladi. Type konversiya qilmaydi. `"false"`, `"0"`, `"null"` — barchasi truthy string'lar.
+**Nima uchun:** HTML attribute qiymatlari har doim string — bu HTML spec'ning fundamental qoidasi. `dataset` faqat `data-*` attribute'lar uchun "qulay accessor" — u `getAttribute("data-foo")` bilan ekvivalent, faqat kebab-case → camelCase mapping qiladi. Type conversion qilmaydi. `"false"`, `"0"`, `"null"` — barchasi truthy string'lar.
 
 **Yechim:** `dataset` qiymatlarini doim explicit parse qiling — `Number()`, `=== "true"`, `JSON.parse()`. Boolean-like attribute'lar uchun `hasAttribute()` ishlatish ma'no jihatdan toza (HTML boolean attribute semantikasi bilan mos).
 
@@ -2106,7 +2106,7 @@ items.forEach(item => {
 // - focus() (some cases)
 ```
 
-**Nima uchun:** Brauzer rendering optimizatsiyasi uchun DOM mutations'ni batch qilib, bitta reflow bilan apply qiladi (style/layout invalidation tracking). Lekin `getBoundingClientRect` **aniq hozirgi** pozitsiyani so'raydi — pending mutations bilan hisoblash notekis bo'lardi, shuning uchun brauzer hamma narsani flush qilib layout'ni sync hisoblaydi. Shu mexanizm barcha "layout-reading" DOM API'larga taalluqli.
+**Nima uchun:** Brauzer rendering optimization uchun DOM mutations'ni batch qilib, bitta reflow bilan apply qiladi (style/layout invalidation tracking). Lekin `getBoundingClientRect` **aniq hozirgi** pozitsiyani so'raydi — pending mutations bilan hisoblash notekis bo'lardi, shuning uchun brauzer hamma narsani flush qilib layout'ni sync hisoblaydi. Shu mexanizm barcha "layout-reading" DOM API'larga taalluqli.
 
 **Yechim:** **Read/write separation pattern** — avval barcha o'qishlarni bajarish, keyin barcha yozishlarni. Sync layout API'larni loop ichida ishlatmang — loop oldidan kerakli ma'lumotlarni olib qo'ying. Agar real-time observer kerak bo'lsa — `IntersectionObserver` yoki `ResizeObserver` ishlating (ular layout-aware lekin forced sync emas).
 

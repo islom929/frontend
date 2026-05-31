@@ -74,8 +74,8 @@ Engine xato throw qilganda ichki jarayon: (1) mos Error subclass'ining yangi ins
 ```javascript
 // === SyntaxError — parse vaqtida ===
 // eval("if(");           // SyntaxError: Unexpected end of input
-// JSON.parse("{invalid}"); // SyntaxError: Unexpected token i
-JSON.parse("{'key': 'val'}"); // SyntaxError: Expected property name or '}'
+// JSON.parse("{invalid}"); // SyntaxError: Expected property name or '}' in JSON at position 1
+JSON.parse("{'key': 'val'}"); // SyntaxError: Expected property name or '}' in JSON at position 1
 // JSON faqat double quotes qabul qiladi
 
 // === ReferenceError — o'zgaruvchi topilmadi ===
@@ -236,7 +236,7 @@ function parseConfig(rawData) {
   try {
     return JSON.parse(rawData);
   } catch (parseError) {
-    throw new Error("Konfiguratsiya fayli noto'g'ri formatda", {
+    throw new Error("Configuration fayli noto'g'ri formatda", {
       cause: parseError
     });
   }
@@ -257,8 +257,8 @@ try {
 } catch (error) {
   // To'liq zanjir:
   console.log(error.message);             // "Dastur ishga tushmadi"
-  console.log(error.cause.message);        // "Konfiguratsiya fayli noto'g'ri formatda"
-  console.log(error.cause.cause.message);  // "Unexpected token i in JSON..."
+  console.log(error.cause.message);        // "Configuration fayli noto'g'ri formatda"
+  console.log(error.cause.cause.message);  // "Unexpected token 'i', "invalid json" is not valid JSON"
 }
 ```
 
@@ -322,7 +322,7 @@ try {
   const data = JSON.parse("noto'g'ri json");
 } catch (error) {
   console.log(error.name);    // "SyntaxError"
-  console.log(error.message); // "Unexpected token n in JSON at position 0"
+  console.log(error.message); // "Unexpected token 'o', \"noto'g'ri json\" is not valid JSON"
 }
 console.log("Dastur davom etadi"); // ✅ try/catch tufayli dastur to'xtamadi
 
@@ -448,7 +448,7 @@ try {
 ```
 
 ```javascript
-// throw ni validatsiyada ishlatish
+// throw ni validation'da ishlatish
 function createUser(name, age) {
   if (typeof name !== "string" || name.trim().length === 0) {
     throw new TypeError("name string bo'lishi va bo'sh bo'lmasligi kerak");
@@ -463,7 +463,7 @@ try {
   const user = createUser("", 25);
 } catch (error) {
   if (error instanceof TypeError) {
-    console.log("Validatsiya:", error.message);
+    console.log("Validation:", error.message);
     // "name string bo'lishi va bo'sh bo'lmasligi kerak"
   }
 }
@@ -480,7 +480,7 @@ try {
 Katta dasturlarda built-in error turlaridan tashqari o'z xato class'larimiz kerak bo'ladi — bu xatolarni kategoriyalash, `instanceof` bilan aniq tekshirish, qo'shimcha ma'lumot (field, statusCode, resource) biriktirish imkonini beradi. Custom error class yaratish: `extends Error` bilan meros olish, `super(message)` chaqirish, `this.name` ni o'rnatish (debugging da stack trace'da ko'rinadi). `this.name = this.constructor.name` pattern barcha subclass'lar uchun avtomatik to'g'ri nom beradi.
 
 Custom error'lar ikki muhim kategoriyaga bo'linadi:
-- **Operational errors** — kutilgan, boshqarish mumkin: validatsiya xatosi, 404 not found, network timeout. Dastur davom etishi mumkin.
+- **Operational errors** — kutilgan, boshqarish mumkin: validation xatosi, 404 not found, network timeout. Dastur davom etishi mumkin.
 - **Programmer errors** — koddagi bug: undefined property o'qish, noto'g'ri argument. Dasturni to'xtatish va tuzatish kerak.
 
 <details>
@@ -496,9 +496,9 @@ CustomError instance
         → null
 ```
 
-`super(message)` chaqirilganda `Error` constructor ichida `this.message` o'rnatiladi va V8 engine **avtomatik ravishda** joriy call stack snapshot'ini saqlaydi (`.stack` property shu snapshot'dan lazy formatlanadi). Agar custom error class uchun stack trace'dan konstruktor frame'ini olib tashlashni xohlasangiz — alohida `Error.captureStackTrace(this, CustomError)` static helper'ini constructor ichida **qo'lda** chaqirasiz. Ya'ni: stack trace capture avtomatik, lekin "custom class konstruktorini stack'dan hide qilish" uchun `Error.captureStackTrace()` manual chaqirish kerak.
+`super(message)` chaqirilganda `Error` constructor ichida `this.message` o'rnatiladi va V8 engine **avtomatik ravishda** joriy call stack snapshot'ini saqlaydi (`.stack` property shu snapshot'dan lazy formatlanadi). Agar custom error class uchun stack trace'dan constructor frame'ini olib tashlashni xohlasangiz — alohida `Error.captureStackTrace(this, CustomError)` static helper'ini constructor ichida **qo'lda** chaqirasiz. Ya'ni: stack trace capture avtomatik, lekin "custom class constructor'ini stack'dan hide qilish" uchun `Error.captureStackTrace()` manual chaqirish kerak.
 
-**Prototype chain muammosi tarixi:** ES5 (transpile) davrida `extends Error` to'g'ri ishlamasdi — `Error` konstruktori `new.target` ga qarab yangi obyekt qaytarardi, bu esa `this` ni bypass qilib meros chainni buzardi. **ES6 class syntax (2015)** bu muammoni hal qildi — ES6 `class` va `super()` spec'da aniq belgilangan tarzda `this` ni to'g'ri o'rnatadi va prototype chain avtomatik quriladi. Babel va boshqa ES5 transpiler'larda `Error` subclass'lari uchun maxsus workaround (`Object.setPrototypeOf(this, new.target.prototype)`) ishlatilardi — native ES6 syntax'da bu kerak emas. ES2022 `Error.cause` option qo'shdi (error chaining uchun), lekin subclass hierarchy bilan bog'liq emas.
+**Prototype chain muammosi tarixi:** ES5 (transpile) davrida `extends Error` to'g'ri ishlamasdi — `Error` constructor'i `new.target` ga qarab yangi obyekt qaytarardi, bu esa `this` ni bypass qilib meros chainni buzardi. **ES6 class syntax (2015)** bu muammoni hal qildi — ES6 `class` va `super()` spec'da aniq belgilangan tarzda `this` ni to'g'ri o'rnatadi va prototype chain avtomatik quriladi. Babel va boshqa ES5 transpiler'larda `Error` subclass'lari uchun maxsus workaround (`Object.setPrototypeOf(this, new.target.prototype)`) ishlatilardi — native ES6 syntax'da bu kerak emas. ES2022 `Error.cause` option qo'shdi (error chaining uchun), lekin subclass hierarchy bilan bog'liq emas.
 
 </details>
 
@@ -931,7 +931,7 @@ Global error handler'lar — ushlanmagan xatolar uchun **oxirgi himoya qatlami**
 
 **Browser'da:**
 - `window.onerror` — ushlanmagan JavaScript runtime xatolar (TypeError, ReferenceError va b.); resurs yuklash xatolarini ushlamaydi
-- `window.addEventListener("error", ...)` — runtime xatolar + resurs yuklash xatolari (img, script, link)
+- `window.addEventListener("error", ...)` — runtime xatolar; resurs yuklash xatolari (img, script, link) bubble qilmaydi, ularni faqat capture phase (3-argument `true`) bilan ushlash mumkin
 - `window.addEventListener("unhandledrejection", ...)` — ushlanmagan Promise rejection'lar
 
 **Node.js'da:**
@@ -960,7 +960,9 @@ window.onerror = function(message, source, lineno, colno, error) {
   // false/undefined — default xulq (console da ko'rsatadi)
 };
 
-// addEventListener versiya — ko'proq imkoniyat beradi
+// addEventListener versiya — ko'proq imkoniyat beradi.
+// Resurs yuklash xatolari (img, script, link) bubble qilmaydi —
+// ularni ushlash uchun capture phase (3-argument true) MAJBURIY.
 window.addEventListener("error", (event) => {
   // event.error — Error obyekti
   // event.message, event.filename, event.lineno, event.colno
@@ -970,7 +972,7 @@ window.addEventListener("error", (event) => {
   if (event.target !== window) {
     console.log("Resurs yuklanmadi:", event.target.src || event.target.href);
   }
-});
+}, true); // ← capture phase — resurs xatolari uchun shart
 
 // === Browser — ushlanmagan Promise rejection ===
 window.addEventListener("unhandledrejection", (event) => {
@@ -1024,12 +1026,12 @@ process.on("unhandledRejection", (reason, promise) => {
 
 ### Nazariya
 
-Error throw qilish o'rniga natija obyekti qaytarish — `{ ok: true, data }` yoki `{ ok: false, error }`. Bu pattern `try/catch` kerak qilmaydi va xato boshqarishni explicit qiladi. Go tilida standart pattern, JavaScript da kutilgan xatolar uchun foydali — ayniqsa xato "exception" emas, "normal control flow" bo'lganda (validatsiya, tekshiruv).
+Error throw qilish o'rniga natija obyekti qaytarish — `{ ok: true, data }` yoki `{ ok: false, error }`. Bu pattern `try/catch` kerak qilmaydi va xato boshqarishni explicit qiladi. Go tilida standart pattern, JavaScript da kutilgan xatolar uchun foydali — ayniqsa xato "exception" emas, "normal control flow" bo'lganda (validation, tekshiruv).
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Result Type pattern'da `try/catch` ga nisbatan boshqa control flow mexanizmi ishlaydi. `throw` statement engine'da stack unwinding boshlaydi — call stack bo'ylab yuqoriga qarab `catch` blok qidiriladi, har bir frame'dan environment record tozalanadi. Result Type'da esa bunday unwinding yo'q — funksiya oddiy `return` statement orqali natija qaytaradi, call stack normal tarzda pop bo'ladi. Bu ikki farq performance'ga ta'sir qiladi: V8 da `try/catch` blok ichidagi kod avval optimizatsiya qilinmas edi (TurboFan dan oldingi JIT compilerlarda), hozir bu muammo hal qilingan, lekin `throw` ning o'zi hali ham qimmat operatsiya — Error obyekt yaratiladi, stack trace capture qilinadi. Result Type'da Error obyekti faqat kerak bo'lganda yaratiladi. Discriminated union pattern `{ ok, data, error }` — engine bu obyektlarni inline allocation bilan yaratadi, hidden class bir xil bo'lgani uchun monomorphic property access ishlaydi.
+Result Type pattern'da `try/catch` ga nisbatan boshqa control flow mexanizmi ishlaydi. `throw` statement engine'da stack unwinding boshlaydi — call stack bo'ylab yuqoriga qarab `catch` blok qidiriladi, har bir frame'dan environment record tozalanadi. Result Type'da esa bunday unwinding yo'q — funksiya oddiy `return` statement orqali natija qaytaradi, call stack normal tarzda pop bo'ladi. Bu ikki farq performance'ga ta'sir qiladi: V8 da `try/catch` blok ichidagi kod avval optimization qilinmas edi (TurboFan dan oldingi JIT compilerlarda), hozir bu muammo hal qilingan, lekin `throw` ning o'zi hali ham qimmat operatsiya — Error obyekt yaratiladi, stack trace capture qilinadi. Result Type'da Error obyekti faqat kerak bo'lganda yaratiladi. Discriminated union pattern `{ ok, data, error }` — engine bu obyektlarni inline allocation bilan yaratadi, hidden class bir xil bo'lgani uchun monomorphic property access ishlaydi.
 
 </details>
 
@@ -1080,7 +1082,7 @@ Vaqtinchalik xatolar (network timeout, rate limiting, server overload) uchun qay
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-`setTimeout(resolve, waitTime)` chaqirilganda browser/Node.js timer'ni Web API (yoki libuv) ga topshiradi. Timer tugagach callback task queue (macrotask queue) ga qo'shiladi — lekin bu aniq `waitTime` ms dan keyin emas, balki **kamida** `waitTime` ms dan keyin. Agar call stack band bo'lsa yoki queue'da oldingi task'lar bo'lsa, haqiqiy delay ko'proq bo'ladi. `Math.pow(backoff, attempt)` bilan hisoblangan delay — bu minimum delay. HTML spec bo'yicha nested `setTimeout` (4+ darajadan keyin) kamida 4ms clamp qilinadi, lekin retry pattern'da bu ahamiyatsiz chunki delay'lar katta. `await new Promise(resolve => setTimeout(resolve, waitTime))` — bu Promise microtask va setTimeout macrotask'ni birlashtiradi: `setTimeout` callback macrotask sifatida ishlaydi, `resolve()` chaqiradi, keyin `await` davomidagi kod microtask sifatida ishga tushadi. Jitter qo'shish (`delay * (1 + Math.random() * 0.1)`) server thundering herd muammosini kamaytiradi — barcha client'lar bir vaqtda retry qilmasligini ta'minlaydi.
+`setTimeout(resolve, waitTime)` chaqirilganda browser/Node.js timer'ni Web API (yoki libuv) ga topshiradi. Timer tugagach callback task queue (macrotask queue) ga qo'shiladi — lekin bu aniq `waitTime` ms dan keyin emas, balki **kamida** `waitTime` ms dan keyin. Agar call stack band bo'lsa yoki queue'da oldingi task'lar bo'lsa, haqiqiy delay ko'proq bo'ladi. `Math.pow(backoff, attempt)` bilan hisoblangan delay — bu minimum delay. HTML spec bo'yicha nesting level 5 dan oshganda `setTimeout` timeout'i 4ms dan kichik bo'lsa 4ms ga clamp qilinadi, lekin retry pattern'da bu ahamiyatsiz chunki delay'lar katta. `await new Promise(resolve => setTimeout(resolve, waitTime))` — bu Promise microtask va setTimeout macrotask'ni birlashtiradi: `setTimeout` callback macrotask sifatida ishlaydi, `resolve()` chaqiradi, keyin `await` davomidagi kod microtask sifatida ishga tushadi. Jitter qo'shish (`delay * (1 + Math.random() * 0.1)`) server thundering herd muammosini kamaytiradi — barcha client'lar bir vaqtda retry qilmasligini ta'minlaydi.
 
 </details>
 
@@ -1273,7 +1275,7 @@ function processOrder(order) {
     throw new RangeError("Buyurtma summasi musbat son bo'lishi kerak");
   }
 
-  // Asosiy logika — faqat validatsiya o'tgandan keyin
+  // Asosiy logika — faqat validation o'tgandan keyin
   return submitOrder(order);
 }
 ```
@@ -1294,7 +1296,7 @@ function processOrder(order) {
 
 **Error serialization muammosi** — `JSON.stringify(error)` natijasi `"{}"` — bo'sh obyekt. Sababi: `message`, `stack`, `name` property'lari **non-enumerable**. Yechim: custom replacer yoki qo'lda serialize qilish kerak.
 
-**Async stack traces** — `await` bilan chaqirilgan asinxron funksiya xato berganda, oddiy stack trace faqat `async` funksiya ichidagi frame'larni ko'rsatadi — chaqirgan joyni ko'rsatmaydi. Chrome DevTools "Async" stack trace'ni yoqsa (default yoqilgan), `await` qilgan joy ham ko'rinadi. Node.js da `--async-stack-traces` flag (v12+).
+**Async stack traces** — `await` bilan chaqirilgan asinxron funksiya xato berganda, oddiy stack trace faqat `async` funksiya ichidagi frame'larni ko'rsatadi — chaqirgan joyni ko'rsatmaydi. Chrome DevTools "Async" stack trace'ni yoqsa (default yoqilgan), `await` qilgan joy ham ko'rinadi. Node.js 12+ da zero-cost async stack traces default yoqilgan — `--no-async-stack-traces` bilan o'chiriladi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -1306,7 +1308,7 @@ function processOrder(order) {
 
 Bu farqlar Sentry/LogRocket kabi tool'lar har engine uchun alohida parser yozishiga sabab.
 
-**V8 lazy stack trace**: `new Error()` paytida stack darhol hisoblanmaydi — faqat internal pointer saqlanadi. `error.stack` birinchi marta o'qilganda format qilinadi va cache'lanadi. Bu performance optimizatsiyasi: agar stack o'qilmasa, formatting overhead yo'q.
+**V8 lazy stack trace**: `new Error()` paytida stack darhol hisoblanmaydi — faqat internal pointer saqlanadi. `error.stack` birinchi marta o'qilganda format qilinadi va cache'lanadi. Bu performance optimization: agar stack o'qilmasa, formatting overhead yo'q.
 
 **`Error.captureStackTrace(target, constructorOpt)`** — V8-only API. `constructorOpt` funksiya va undan keyingi frame'larni stack'dan chiqarib tashlaydi. Custom error class'lar yoki assert utility'lar uchun foydali — foydalanuvchi stack'da utility frame'larini ko'rmaydi:
 ```
@@ -1451,7 +1453,7 @@ try {
 
 ### Nazariya
 
-Console API — debugging va development uchun browser va Node.js da mavjud bo'lgan xabar chiqarish interfeysi. `console` global obyekt bo'lib, turli xil log levels, formatting, performance o'lchash va guruhlash imkoniyatlarini taqdim etadi.
+Console API — debugging va development uchun browser va Node.js da mavjud bo'lgan xabar chiqarish interface'i. `console` global obyekt bo'lib, turli xil log levels, formatting, performance o'lchash va guruhlash imkoniyatlarini taqdim etadi.
 
 **Log levels:**
 - `console.log()` — umumiy xabar, info darajasida

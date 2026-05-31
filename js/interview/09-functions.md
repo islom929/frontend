@@ -95,7 +95,7 @@ console.log(validate.length); // 1 (parametr soni)
 <details>
 <summary><strong>Javob</strong></summary>
 
-**IIFE** (Immediately Invoked Function Expression) — funksiya yaratilishi bilan darhol chaqiriladi. Scope izolyatsiyasi uchun ishlatiladi.
+**IIFE** (Immediately Invoked Function Expression) — funksiya yaratilishi bilan darhol chaqiriladi. Scope isolation'i uchun ishlatiladi.
 
 ```javascript
 // Klassik IIFE
@@ -415,7 +415,8 @@ function partial(fn, ...presetArgs) {
   };
 }
 
-const double = partial(multiply, 2);
+const multiply = (a, b) => a * b;
+const double = partial(multiply, 2); // a = 2 qotirildi
 double(5); // 10
 ```
 
@@ -1046,9 +1047,9 @@ new greet();              // ?
 <summary><strong>Javob</strong></summary>
 
 - `obj.greet()` → `obj` ({greet: f, announce: f}) — implicit binding
-- `obj.announce()` → `window`/`global` (yoki `{}` module da) — arrow function `this` ni **tashqi scope dan oladi**, implicit binding ishlamaydi
+- `obj.announce()` → `announce` definition vaqtidagi tashqi `this` (script'da `globalThis`, ES module'da `undefined`) — arrow function `this` ni **tashqi scope dan oladi**, implicit binding ishlamaydi
 - `greet.call({ a: 1 })` → `{ a: 1 }` — explicit binding
-- `announce.call({ a: 1 })` → `window`/`global` — arrow function da `call` **this ni o'zgartirmaydi**
+- `announce.call({ a: 1 })` → definition vaqtidagi tashqi `this` (script'da `globalThis`, ES module'da `undefined`) — arrow function da `call` **this ni o'zgartirmaydi**
 - `new greet()` → `greet {}` — yangi bo'sh object (new binding)
 - `new announce()` → ❌ `TypeError: announce is not a constructor` — arrow function `[[Construct]]` slotiga ega emas
 

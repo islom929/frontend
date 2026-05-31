@@ -286,7 +286,7 @@ const p1 = Promise.resolve(42);
 const p2 = Promise.resolve(p1);
 console.log(p1 === p2); // true — bir xil object
 
-// DIQQAT: bu optimizatsiya faqat `p1.constructor === receiver` bo'lganda ishlaydi.
+// DIQQAT: bu optimization faqat `p1.constructor === receiver` bo'lganda ishlaydi.
 // Subclass bo'lsa — yangi instance yaratiladi:
 class MyPromise extends Promise {}
 const mp = MyPromise.resolve(p1);
@@ -430,7 +430,7 @@ promise
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Spec implementatsiyasi sodda**: `Promise.prototype.catch(onRejected) ≡ this.then(undefined, onRejected)` — bir qatorli alias. Lekin bu sodda kod katta semantik farqlarni keltirib chiqaradi.
+**Spec implementation sodda**: `Promise.prototype.catch(onRejected) ≡ this.then(undefined, onRejected)` — bir qatorli alias. Lekin bu sodda kod katta semantik farqlarni keltirib chiqaradi.
 
 **Yangi Promise yaratish**: Har `.catch()` **yangi Promise** qaytaradi. Handler natijasi yangi Promise'ning holatini belgilaydi:
 - Handler qiymat return qildi → yangi Promise: `fulfilled(qiymat)`
@@ -504,7 +504,7 @@ Promise.reject(new Error("birinchi"))
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-**Spec implementatsiyasi** (`.finally()` ES2018):
+**Spec implementation** (`.finally()` ES2018):
 ```
 Promise.prototype.finally(onFinally):
   return this.then(
@@ -948,31 +948,41 @@ Microtask Queue:         [job(handler1), job(handler2)]
 
 ### Thenable Resolution — Qo'shimcha Microtask
 
-`new Promise(resolve => resolve(thenable))` da — ya'ni Promise constructor ichidagi `resolve()` ga Promise yoki thenable (`.then()` methodi bor object) berilsa, **qo'shimcha microtask** kerak:
+`new Promise(resolve => resolve(thenable))` da — ya'ni Promise constructor ichidagi `resolve()` ga Promise yoki thenable (`.then()` methodi bor object) berilsa, settle bo'lish **qo'shimcha microtask tick'lar** talab qiladi. Sabab: spec resolve qilingan thenable'ni darhol qabul qilmaydi, uni `PromiseResolveThenableJob` orqali "assimilate" qiladi.
 
-> **Diqqat:** `Promise.resolve(promise)` boshqacha ishlaydi — u native Promise ni o'zini qaytaradi (wrap qilmaydi, qo'shimcha tick yo'q). Qo'shimcha tick faqat **constructor ichidagi `resolve()`** da sodir bo'ladi.
+> **Diqqat:** `Promise.resolve(promise)` boshqacha ishlaydi — u native Promise'ni o'zini qaytaradi (wrap qilmaydi, qo'shimcha tick yo'q). Qo'shimcha tick faqat **constructor ichidagi `resolve()`** ga thenable berilganda sodir bo'ladi.
 
 ```javascript
-// Oddiy value — 1 microtask
+// Oddiy value — handler 1-microtask'da ishlaydi
 new Promise(resolve => resolve(42)).then(v => console.log("A:", v));
 
-// Thenable value — 2 microtask (PromiseResolveThenableJob uchun +1)
+// Thenable value — handler ancha kechroq ishlaydi (quyida sabab)
 new Promise(resolve => resolve(Promise.resolve(42))).then(v => console.log("B:", v));
 
-// Oddiy value — 1 microtask
+// Oddiy value — handler 1-microtask'da ishlaydi
 new Promise(resolve => resolve(42)).then(v => console.log("C:", v));
 
 // Output:
 // A: 42
 // C: 42
-// B: 42 — 1 microtask kechikdi!
-
-// Sabab: resolve(thenable) → PromiseResolveThenableJob yaratiladi
-// → shu job thenable.then(resolve) chaqiradi → yana microtask → jami 2 tick
-//
-// Promise.resolve(Promise.resolve(42)) esa BOSHQACHA:
-// → native Promise ni O'ZINI qaytaradi, qo'shimcha tick YO'Q
+// B: 42 — eng oxirida
 ```
+
+Mexanizm — `resolve(innerPromise)` (innerPromise allaqachon fulfilled) bo'lganda outer Promise'ning `.then()` handler'i ishlaguncha **uchta** microtask tick o'tadi:
+
+```
+Tick 1: PromiseResolveThenableJob ishlaydi
+        → innerPromise.then(resolveOuter, rejectOuter) chaqiriladi
+        → innerPromise fulfilled → resolveOuter uchun PromiseReactionJob enqueue
+Tick 2: PromiseReactionJob ishlaydi
+        → resolveOuter(42) → outer Promise fulfilled bo'ladi
+        → outer'ning handler'i (.then) uchun PromiseReactionJob enqueue
+Tick 3: handler ishlaydi → "B: 42" log
+```
+
+Oddiy value (`resolve(42)`) da handler 1-tick'da ishlaydi. Demak thenable assimilation handler firing'ni **2 tick'ga kechiktiradi**. Outer Promise'ning o'zi 2-tick'da settle bo'ladi (TC39 `proposal-faster-promise-adoption` shu kechikishni qisqartirishga qaratilgan), lekin chain'dagi `.then()` undan keyin yana 1 tick kutadi.
+
+`Promise.resolve(Promise.resolve(42))` esa boshqacha — native Promise'ni o'zini qaytaradi, `PromiseResolveThenableJob` umuman yaratilmaydi, qo'shimcha tick yo'q.
 
 ---
 
@@ -981,7 +991,7 @@ new Promise(resolve => resolve(42)).then(v => console.log("C:", v));
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Production pattern'lar Promise'ning internal mechansim'lariga asoslanadi. **Retry pattern** — `catch` handler ichida yangi Promise qaytarish orqali chain'ni davom ettiradi: `.catch(err => { return new Promise(...) })` — `.catch()` o'z `resultPromise`'ni qaytaradi, va handler'ning return qiymati (inner Promise) `PromiseResolveThenableJob` orqali `resultPromise` tomonidan **adopt** qilinadi. Keyingi `.then()` handler'lari aynan shu `resultPromise`'ning reaction list'iga qo'shiladi (inner Promise'niki emas) — shu tariqa rekursiv chain hosil bo'ladi. Har bir retry yangi Promise object allocate qiladi — V8 da bu ~80 byte (internal slots + reaction lists). **Timeout pattern** `Promise.race()` ishlatadi — spec bo'yicha race ichki'da barcha Promise'larga `.then()` qo'shadi, birinchi settle bo'lgan Promise'ning qiymati yoki reason'i natija Promise'ga o'tadi. Muhim: `race` da yutqazgan Promise'lar cancel qilinmaydi — ular background'da davom etadi, faqat natijalari ignore qilinadi. **Concurrent limit** pattern'da `active` counter bilan Promise'lar boshqariladi — bu manual scheduling, engine'ning o'zi concurrency limit bermaydi. `AbortController.signal` — EventTarget subclass, `abort()` chaqirilganda `abort` event dispatch qiladi. `fetch` internal'da signal'ga listener qo'shadi va abort bo'lganda network request'ni cancel qilib `AbortError` bilan reject qiladi — bu haqiqiy OS-level socket cancel.
+Production pattern'lar Promise'ning internal mechanism'lariga asoslanadi. **Retry pattern** — `catch` handler ichida yangi Promise qaytarish orqali chain'ni davom ettiradi: `.catch(err => { return new Promise(...) })` — `.catch()` o'z `resultPromise`'ni qaytaradi, va handler'ning return qiymati (inner Promise) `PromiseResolveThenableJob` orqali `resultPromise` tomonidan **adopt** qilinadi. Keyingi `.then()` handler'lari aynan shu `resultPromise`'ning reaction list'iga qo'shiladi (inner Promise'niki emas) — shu tariqa rekursiv chain hosil bo'ladi. Har bir retry yangi Promise object allocate qiladi. **Timeout pattern** `Promise.race()` ishlatadi — spec bo'yicha race ichki'da barcha Promise'larga `.then()` qo'shadi, birinchi settle bo'lgan Promise'ning qiymati yoki reason'i natija Promise'ga o'tadi. Muhim: `race` da yutqazgan Promise'lar cancel qilinmaydi — ular background'da davom etadi, faqat natijalari ignore qilinadi. **Concurrent limit** pattern'da `active` counter bilan Promise'lar boshqariladi — bu manual scheduling, engine'ning o'zi concurrency limit bermaydi. `AbortController.signal` — EventTarget subclass, `abort()` chaqirilganda `abort` event dispatch qiladi. `fetch` internal'da signal'ga listener qo'shadi va abort bo'lganda network request'ni cancel qilib `AbortError` bilan reject qiladi — bu haqiqiy OS-level socket cancel.
 
 </details>
 
@@ -1709,14 +1719,15 @@ console.log("7");
 
 **Tushuntirish:**
 - Sync: `1`, `7`
-- Microtask: `3` → `return Promise.resolve(4)` (thenable — qo'shimcha tick kerak)
-- Microtask: `5` → `.then(6)` queue ga
-- Microtask: ThenableJob (resolve(4) uchun) → `val => console.log(val)` queue ga
-- Microtask: `6`
-- Microtask: `4` — thenable resolution tufayli kechikdi
+- Tick 1: `3` log → `return Promise.resolve(4)` → outer1 inner Promise bilan resolve → `PromiseResolveThenableJob` enqueue
+- Tick 2: `5` log → ikkinchi chain'ning `.then(6)` enqueue
+- Tick 3: `PromiseResolveThenableJob` ishlaydi → inner Promise'ga reaction enqueue (hali `4` log emas)
+- Tick 4: `6` log
+- Tick 5: inner reaction → outer1 fulfilled → `val => console.log(val)` enqueue
+- Tick 6: `4` log
 - Macrotask: `2`
 
-`return Promise.resolve(4)` — thenable resolve uchun **qo'shimcha microtask** kerak. Shuning uchun `4` `5` va `6` dan keyin.
+`return Promise.resolve(4)` — handler native Promise qaytarganda uni adopt qilish bir nechta qo'shimcha microtask tick talab qiladi (`PromiseResolveThenableJob` + inner reaction). Shuning uchun `4` `5` va `6` dan keyin chiqadi.
 
 </details>
 

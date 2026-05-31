@@ -16,8 +16,8 @@ JavaScript engine xotirani ikki hududda boshqaradi:
 | | Stack | Heap |
 |---|-------|------|
 | **Nima saqlanadi** | Primitives, pointers, call frames | Objects, Arrays, Functions |
-| **Hajm** | Kichik, fixed (OS/engine konfiguratsiyasiga bog'liq, Node.js'da `--stack-size` flag bilan boshqariladi) | Katta, dynamic (`--max-old-space-size` bilan cheklanadi) |
-| **Tezlik** | Juda tez (LIFO — pointer siljitish) | Sekinroq (allokatsiya + GC kerak) |
+| **Hajm** | Kichik, fixed (OS/engine sozlamasiga bog'liq, Node.js'da `--stack-size` flag bilan beriladi) | Katta, dynamic (`--max-old-space-size` bilan cheklanadi) |
+| **Tezlik** | Juda tez (LIFO — pointer siljitish) | Sekinroq (allocation + GC kerak) |
 | **Boshqaruv** | Avtomatik (scope/funksiya tugasa tozalanadi) | Garbage Collector boshqaradi |
 | **Tartib** | LIFO (Last In, First Out) | Tartibsiz |
 | **Xato** | Stack Overflow (chuqur recursion) | Out of Memory (ko'p object) |
@@ -248,7 +248,7 @@ V8 **Generational Hypothesis** ga asoslanadi: ko'pchilik object'lar qisqa muddat
 **Young Generation (New Space):**
 - Barcha yangi object'lar shu yerda yaratiladi
 - Ikki **semi-space** (From, To) — Cheney's copying algorithm
-- **Scavenger** (Minor GC) — tez, tez-tez ishlaydi (odatda millisekund'lar darajasida)
+- **Scavenger** (Minor GC) — tez, tez-tez ishlaydi (New Space to'lganda triggered)
 - Tirik object'larni From → To ko'chiradi, keyin almashadi
 - 2 marta omon qolgan object → Old Generation ga **promote** bo'ladi
 
@@ -392,7 +392,7 @@ class SmartCache {
 }
 ```
 
-Muhim: callback **QACHON** chaqirilishi kafolatlanmagan — GC o'z vaqtida tozalaydi. Deterministik cleanup kerak bo'lsa — `try/finally` yoki ES2025 `using`/`Symbol.dispose` ishlatish kerak.
+Muhim: callback **QACHON** chaqirilishi kafolatlanmagan — GC o'z vaqtida tozalaydi. Deterministik cleanup kerak bo'lsa — `try/finally` yoki Explicit Resource Management (`using`/`Symbol.dispose`, ES2026) ishlatish kerak.
 
 **Deep Dive:** ECMAScript spec bo'yicha `FinalizationRegistry` callback microtask emas, balki host-defined "cleanup job" sifatida schedule qilinadi — brauzerda bu odatda GC cycle'dan keyin, keyingi task'da bajariladi. `unregister` token bilan registry'dan entry olib tashlash ham mumkin — bu `WeakRef` + `FinalizationRegistry` juftligida stale cleanup'ni oldini olish uchun muhim.
 
@@ -520,8 +520,9 @@ console.log(`Heap snapshot: ${snapshotStream}`);
 **--max-old-space-size** — Old Generation hajmini cheklash:
 
 ```bash
-# Default ~1.5GB (64-bit), ko'paytirish:
-node --max-old-space-size=4096 app.js  # 4GB
+# Default — Node mavjud (yoki container cgroup) xotiraga qarab avtomatik tanlaydi;
+# qo'lda oshirish:
+node --max-old-space-size=4096 app.js  # 4096 MB
 
 # Debug uchun GC loglarini ko'rish:
 node --trace-gc app.js
@@ -707,17 +708,17 @@ function outerFixed() {
 
 ```javascript
 const weakMap = new WeakMap();
-let obj1 = { a: 1 };
-let obj2 = { b: 2 };
+let session = { id: 1 };
+let profile = { id: 2 };
 
-weakMap.set(obj1, "first");
-weakMap.set(obj2, "second");
+weakMap.set(session, "first");
+weakMap.set(profile, "second");
 
-console.log(weakMap.has(obj1)); // ?
+console.log(weakMap.has(session)); // ?
 
-obj1 = null;
+session = null;
 // GC ishlagandan keyin:
-console.log(weakMap.has(obj1)); // ?
+console.log(weakMap.has(session)); // ?
 ```
 
 <details>
@@ -728,10 +729,10 @@ true
 false
 ```
 
-- Birinchi `weakMap.has(obj1)` → `true` — `obj1` hali tirik, WeakMap da entry bor
-- `obj1 = null` dan keyin — `weakMap.has(obj1)` aslida `weakMap.has(null)` → `false`
+- Birinchi `weakMap.has(session)` → `true` — `session` hali tirik, WeakMap da entry bor
+- `session = null` dan keyin — `weakMap.has(session)` aslida `weakMap.has(null)` → `false`
 
-Muhim nuance: `obj1 = null` qilganda WeakMap dan entry **ham** yo'qoladi (GC tozalaganda), lekin `weakMap.has(null)` ning o'zi `false` qaytaradi chunki `null` WeakMap key bo'la olmaydi. Hatto `obj1` ga yangi object tayinlasangiz ham — eski entry yo'q, chunki eski object'ga boshqa reference yo'q.
+Muhim nuance: `session = null` qilganda WeakMap dan entry **ham** yo'qoladi (GC tozalaganda), lekin `weakMap.has(null)` ning o'zi `false` qaytaradi chunki `null` WeakMap key bo'la olmaydi. Hatto `session` ga yangi object tayinlasangiz ham — eski entry yo'q, chunki eski object'ga boshqa reference yo'q.
 
 </details>
 
@@ -805,11 +806,9 @@ worker.postMessage(buffer, [buffer]);
 
 console.log(view.length);
 console.log(buffer.byteLength);
-try {
-  view[0] = 99;
-} catch (err) {
-  console.log(err.constructor.name);
-}
+
+view[0] = 99;          // detached buffer'ga indexed write
+console.log(view[0]);  // ?
 ```
 
 <details>
@@ -818,24 +817,29 @@ try {
 ```
 0
 0
-TypeError
+undefined
 ```
 
-`postMessage(data, transferList)` ikkinchi argumenti — **transfer list**. Buffer ownership Worker thread'ga o'tkaziladi (zero-copy). Original buffer **detached** holatga o'tadi — `byteLength = 0`, har qanday read/write `TypeError` beradi.
+`postMessage(data, transferList)` ikkinchi argumenti — **transfer list**. Buffer ownership Worker thread'ga o'tkaziladi (zero-copy). Original buffer **detached** holatga o'tadi — `byteLength = 0`, view'ning `length` ham 0.
 
-**Detached holat:** Memory aslida allocated bo'ladi (Worker'da), lekin original realm'da undan foydalanib bo'lmaydi. Bu **race condition** oldini olish uchun — ikki thread bitta buffer'ga egalik qila olmaydi.
+Eng muhim nuance: detached buffer ustidagi TypedArray'ga **indexed write** (`view[0] = 99`) `TypeError` bermaydi — bu **silent no-op**. Spec'dagi `TypedArraySetElement` operatsiyasi `IsValidIntegerIndex` `false` qaytarganda (detached buffer shu holatga olib keladi) hech narsa qilmasdan return qiladi. Indexed **read** (`view[0]`) esa `undefined` qaytaradi. Shuning uchun yuqorida hech qanday exception otilmaydi.
+
+**Detached holat:** Memory aslida allocated bo'ladi (Worker'da), lekin original realm'da undan foydalanib bo'lmaydi. Bu ikki thread bitta buffer'ga bir vaqtda egalik qilishini oldini oladi.
 
 ```javascript
-// Tekshirish:
+// Detached'ni tekshirish:
 buffer.byteLength === 0; // detached belgisi
-// Yoki:
+buffer.detached;         // true (ES2024 — ArrayBuffer.prototype.detached)
+
+// Indexed write — silent, lekin TypedArray CONSTRUCTOR detached buffer'da throw qiladi:
+view[0] = 99;            // no-op, exception yo'q
 try { new Uint8Array(buffer, 0, 1); }
-catch (e) { /* TypeError: ArrayBuffer is detached */ }
+catch (e) { /* TypeError: Cannot perform ... on a detached ArrayBuffer */ }
 ```
 
 **Yechim:** Agar buffer ikkala tomonda kerak bo'lsa — transfer qilmang (structured clone copy bo'ladi), yoki `SharedArrayBuffer` ishlating (atomic operations bilan).
 
-**Deep Dive:** Spec'da `ArrayBuffer`'ning `[[ArrayBufferData]]` slot'i `null` ga o'rnatiladi transfer'dan keyin. Har bir `TypedArray` view shu slot'ni tekshiradi — `null` bo'lsa `TypeError`. `SharedArrayBuffer` esa `postMessage` orqali kopiya emas, ikkala realm'da bir xil memory'ga reference saqlaydi — lekin `COOP/COEP` header'lari talab qilinadi (Spectre security mitigation).
+**Deep Dive:** Transfer'dan keyin `ArrayBuffer`'ning `[[ArrayBufferData]]` slot'i `null` ga o'rnatiladi. `TypedArray` ustidagi indexed access `IsValidIntegerIndex` orqali shu slot'ni tekshiradi: detached bo'lsa write — silent no-op (`TypedArraySetElement`), read — `undefined` (`IntegerIndexedElementGet`). `TypeError` esa boshqa joylarda otiladi: TypedArray constructor (`new Uint8Array(buffer)`), `set`/`subarray`/`slice` kabi metodlar, yoki `DataView` operatsiyalari detached buffer'da. `SharedArrayBuffer` esa `postMessage` orqali kopiya emas — ikkala realm'da bir xil memory'ga reference saqlaydi, lekin `COOP/COEP` header'lari talab qilinadi (Spectre security mitigation).
 
 </details>
 
@@ -979,7 +983,7 @@ function createFilterNullify() {
 <details>
 <summary><strong>Javob</strong></summary>
 
-ES2023+ `using` declaration va `Symbol.dispose` — **deterministic resource cleanup** uchun. `FinalizationRegistry`'dan farqli — cleanup **aniq paytda** bajariladi (scope tugaganda), GC ga bog'liq emas.
+`using` declaration va `Symbol.dispose` (Explicit Resource Management, ES2026) — **deterministic resource cleanup** uchun. `FinalizationRegistry`'dan farqli — cleanup **aniq paytda** bajariladi (scope tugaganda), GC ga bog'liq emas.
 
 ```javascript
 // Resource class — Symbol.dispose implement qiladi

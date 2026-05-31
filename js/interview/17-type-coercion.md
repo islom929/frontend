@@ -58,7 +58,7 @@ typeof undefined    // "undefined"
 typeof NaN          // "number" — NaN ham number!
 ```
 
-`typeof null === "object"` — 1995 yildagi implementatsiya xatosi. Qiymatlar ichki representatsiyada type tag bilan saqlangan edi: object tag = `000`. `null` esa NULL pointer (barcha bitlar 0) edi → tag `000` → `"object"`. Bu bug hech qachon tuzatilmaydi — millionlab saytlar buziladi.
+`typeof null === "object"` — JavaScript'ning birinchi versiyasidagi xato. Qiymatlar engine ichida type tag bilan saqlangan edi: object tag = `000`. `null` esa NULL pointer (barcha bitlar 0) edi → tag `000` → `"object"`. Bu xato hech qachon tuzatilmaydi — uni o'zgartirish mavjud kod bazasini buzadi.
 
 To'g'ri null tekshirish: `value === null`. Array tekshirish: `Array.isArray(value)`. Aniq type: `Object.prototype.toString.call(value)` → `"[object Array]"`, `"[object Null]"`, `"[object Date]"`.
 
@@ -138,7 +138,7 @@ Object primitive emas. Engine object'ni primitive ga aylantirishi kerak bo'lgand
 | `"number"` | `Number()`, unary `+`, `-`, `<`, `>` | `valueOf()` → `toString()` |
 | `"default"` | binary `+`, `==` | `valueOf()` → `toString()` |
 
-> **Date — istisno:** `Date.prototype[Symbol.toPrimitive]` `"default"` hint'ni `"string"` kabi qabul qiladi. Shu sababli `date + ""` → string, lekin oddiy object'da `obj + ""` → `valueOf()` natijasi.
+> **Date — istisno:** `Date.prototype[Symbol.toPrimitive]` `"default"` hint kelganda `"string"` tartibini qo'llaydi (`toString()` → `valueOf()`). Shu sababli `date + ""` → string, lekin oddiy object'da `obj + ""` → `valueOf()` natijasi.
 
 `Symbol.toPrimitive` — eng yuqori prioritet. Agar mavjud bo'lsa, `valueOf`/`toString` e'tiborga olinmaydi:
 
@@ -224,7 +224,7 @@ Reflect.ownKeys(user);               // ["name", Symbol(id)]
 
 `Symbol.for("key")` — global registry. Har doim bir xil key uchun bir xil Symbol qaytaradi (cross-module shared state uchun).
 
-Type coercion cheklovi: implicit string konversiya `TypeError` beradi (`"x" + sym`). Bu atayin — tasodifiy konversiyani oldini olish.
+Type coercion cheklovi: Symbol'ni implicit string coercion qilish `TypeError` beradi (`"x" + sym`). Bu atayin — tasodifiy coercion'ni oldini olish.
 
 </details>
 
@@ -317,7 +317,7 @@ class User {
 // User instance GC bo'lganda — password ham avtomatik o'chadi
 ```
 
-**Use case'lar:** private data, DOM element metadata, caching (object yo'qolsa — cache ham tozalanadi). WeakSet ham xuddi shunday — faqat object saqlaydi, GC-friendly.
+**Use case'lar:** private data, DOM element metadata, caching (object yo'qolsa — cache ham tozalanadi). WeakSet bir xil GC-friendly mexanizmga ega — faqat object saqlaydi, weakly referenced.
 
 </details>
 
@@ -326,7 +326,7 @@ class User {
 <details>
 <summary><strong>Javob</strong></summary>
 
-`structuredClone()` — ES2022 da qo'shilgan built-in deep copy. JSON hack'dan kuchli:
+`structuredClone()` — HTML Standard'da belgilangan global funksiya (ECMAScript emas, Web API). Node.js 17'dan, brauzerlarda 2022'dan mavjud. Structured clone algorithm orqali deep copy qiladi — JSON hack'dan kuchli:
 
 | | JSON hack | structuredClone |
 |---|-----------|-----------------|

@@ -182,7 +182,7 @@ console.log(globalThis.newLet); // undefined
 <details>
 <summary><strong>Javob</strong></summary>
 
-`var` keyword faqat **function scope** ni tan oladi — `if`, `for`, `while`, `{}` kabi block konstruktsiyalar `var` uchun scope chegarasi hisoblanmaydi. `var` bilan block ichida e'lon qilingan o'zgaruvchi tashqi function scope'ga "chiqadi".
+`var` keyword faqat **function scope** ni tan oladi — `if`, `for`, `while`, `{}` kabi block construct'lar `var` uchun scope chegarasi hisoblanmaydi. `var` bilan block ichida e'lon qilingan o'zgaruvchi tashqi function scope'ga "chiqadi".
 
 ```javascript
 function example() {
@@ -235,7 +235,7 @@ function show() { console.log(this); }
 show(); // undefined (non-strict: globalThis)
 ```
 
-**3. Scope izolyatsiyasi kuchaytiriladi:**
+**3. Scope isolation kuchaytiriladi:**
 ```javascript
 "use strict";
 // Dynamic kod baholash o'z scope'ini yaratadi
@@ -418,7 +418,7 @@ Nima uchun taqiqlangan:
 
 1. **Scope chain buziladi** — engine compile-time da identifier qaysi scope'ga tegishli ekanini aniqlay olmaydi. `with` ichidagi `host` — bu local variable mi, tashqi scope variable mi, yoki object property mi? Runtime'gacha noma'lum.
 
-2. **Optimizatsiya imkonsiz** — V8 scope analysis va variable caching qila olmaydi, chunki scope dynamic bo'lib qoladi.
+2. **Optimization imkonsiz** — V8 scope analysis va variable caching qila olmaydi, chunki scope dynamic bo'lib qoladi.
 
 3. **Bug'lar** — agar object'da kutilmagan property bo'lsa, boshqa scope'dagi o'zgaruvchi "yashirinadi":
 
@@ -477,7 +477,7 @@ Block ichida `var x = 10` — `var` block scope tanimaydi, u function scope'dagi
 
 Block tashqarisida: `x = 10` (var qayta yozilgan), `y = 2` (block scope'dagi let tugadi, function scope'dagi let qaytdi).
 
-| Deklaratsiya | Block ichida | Block tashqarisida | Sabab |
+| Declaration | Block ichida | Block tashqarisida | Sabab |
 |---|---|---|---|
 | `var x = 10` | 10 | 10 | var block scope tanimaydi — function scope'dagi x ni o'zgartirdi |
 | `let y = 20` | 20 | 2 | let block scope'da yangi binding — tashqi y ga tegmadi |
@@ -781,7 +781,7 @@ Scope chain: `increment()` → `createPrivateCounter()` scope (count bu yerda) �
 
 Engine ichida har bir return qilingan method `[[Environment]]` internal slot orqali `createPrivateCounter`'ning Environment Record'iga reference saqlaydi (closure). V8 **scope analysis** parse-time'da `count` o'zgaruvchisining captured ekanini aniqlaydi va uni stack frame o'rniga **Context object slot**'iga joylashtiradi — shu sababli funksiya tugaganidan keyin ham `count` heap'da tirik qoladi. Returned object'ning har method'i (`increment`, `decrement`, ...) bir xil `Context`'ga reference tutadi — shuning uchun barchasi bir xil `count` binding'iga ta'sir qiladi.
 
-Memory implikatsiyasi: har `createPrivateCounter()` chaqiruvi yangi Context yaratadi — agar 1000 ta counter yaratilsa, 1000 ta alohida `count` binding heap'da bo'ladi. Object reachable bo'lmagandan keyin GC barcha closure'larni va Context'ni tozalaydi. `#private` class field bilan farqi: class field'lar instance'ga to'g'ridan-to'g'ri yashirin slot bo'lib joylashadi (Context overhead'siz), shu sababli pure performance jihatidan `#private` yengilroq — lekin functional API uchun closure pattern declarativ.
+Memory ta'siri: har `createPrivateCounter()` chaqiruvi yangi Context yaratadi — agar N ta counter yaratilsa, N ta alohida `count` binding heap'da bo'ladi. Object reachable bo'lmagandan keyin GC barcha closure'larni va Context'ni tozalaydi. `#private` class field bilan farqi: class field'lar instance'ga to'g'ridan-to'g'ri yashirin slot bo'lib joylashadi (Context overhead'siz), shu sababli pure performance jihatidan `#private` yengilroq — lekin functional API uchun closure pattern declarative.
 
 </details>
 
@@ -885,9 +885,9 @@ function leaky() {
 
 **Deep Dive:**
 
-V8 parse-time da har bir identifier uchun **scope depth** va **slot index** ni aniqlaydi. Bu **scope analysis** bosqichi — har bir o'zgaruvchining `STACK_ALLOCATED`, `CONTEXT_ALLOCATED`, yoki `MODULE_ALLOCATED` ekanligi belgilanadi. Runtime'da scope chain bo'ylab `HasBinding` qidirilmaydi — to'g'ridan-to'g'ri kerakli Context object'dagi slot index orqali murojaat qilinadi. Bu **scope caching** deyiladi va variable lookup'ni O(1)'ga keltiradi (oddiy O(scope depth) o'rniga).
+V8 parse-time da har bir o'zgaruvchining joylashuvini (`VariableLocation`) aniqlaydi — captured bo'lmagan local'lar stack frame'da (`LOCAL`/`PARAMETER`), inner funksiya tomonidan capture qilinganlar esa heap'dagi Context object'da (`CONTEXT`) joylashadi. Bu **scope analysis** bosqichi. Natijada runtime'da identifier nom bo'yicha `HasBinding` orqali qidirilmaydi — har murojaat oldindan hisoblangan (context depth, slot index) juftligiga aylantirilgan bo'ladi, ya'ni string kalit bilan qidiruv o'rniga to'g'ridan-to'g'ri slot'ga indeks orqali kirish. Tashqi scope o'zgaruvchisi uchun V8 shu depth qiymatiga teng marta parent context link'ini kuzatadi.
 
-`eval`, `with`, dinamik `Function` constructor scope analysis'ni buzadi — chunki bu konstruktsiyalar runtime'da yangi binding'lar qo'shishi mumkin. Shu hollarda V8 fallback sifatida runtime scope chain traversal qiladi — bu performance jarima.
+`eval`, `with`, dynamic `Function` constructor scope analysis'ni buzadi — chunki bu construct'lar runtime'da yangi binding'lar qo'shishi mumkin. Shu hollarda V8 fallback sifatida runtime scope chain traversal qiladi — bu performance jarima.
 
 </details>
 
@@ -896,7 +896,7 @@ V8 parse-time da har bir identifier uchun **scope depth** va **slot index** ni a
 <details>
 <summary><strong>Javob</strong></summary>
 
-Label — identifier + colon (`:`) konstruktsiyasi bo'lib, loop yoki block'ga **nom berish** imkonini beradi. Asosiy foyda — nested loop'larda `break` va `continue` ni tashqi loop'ga yo'naltirish.
+Label — identifier + colon (`:`) construct bo'lib, loop yoki block'ga **nom berish** imkonini beradi. Asosiy foyda — nested loop'larda `break` va `continue` ni tashqi loop'ga yo'naltirish.
 
 Standart `break` faqat **eng ichki** loop'ni to'xtatadi. Labeled `break` esa **istalgan tashqi loop**'ni to'xtatishi mumkin.
 

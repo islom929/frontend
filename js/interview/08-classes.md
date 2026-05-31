@@ -140,7 +140,7 @@ console.log(b.getName()); // "Ali" — faqat public method orqali
 
 | | `_convention` | `#private` |
 |-|--------------|-----------|
-| **Himoya** | Yo'q (faqat kelishuv) | Til enforsementi |
+| **Himoya** | Yo'q (faqat kelishuv) | Til darajasida enforcement |
 | **Tashqaridan kirish** | Mumkin | SyntaxError |
 | **Subclass kirishi** | Mumkin | ❌ Mumkin emas |
 | **`Object.keys`** | Ko'rinadi | Ko'rinmaydi |

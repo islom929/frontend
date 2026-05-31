@@ -34,7 +34,7 @@ inner.addEventListener("click", () => console.log("inner BUBBLE"));
 
 **Deep Dive:**
 
-DOM spec bo'yicha target element da (eventPhase === AT_TARGET) **barcha handler'lar registratsiya tartibida** ishlaydi — capture flag farq qilmaydi. Ya'ni birinchi qo'shilgan handler birinchi ishlaydi, capture yoki bubble ekaniga qaramay. Ba'zi eventlar bubble qilmaydi: `focus`/`blur` (o'rniga `focusin`/`focusout`), `mouseenter`/`mouseleave`, `load`, `error`.
+DOM spec bo'yicha target element da (eventPhase === AT_TARGET) **barcha handler'lar registration tartibida** ishlaydi — capture flag farq qilmaydi. Ya'ni birinchi qo'shilgan handler birinchi ishlaydi, capture yoki bubble ekaniga qaramay. Ba'zi eventlar bubble qilmaydi: `focus`/`blur` (o'rniga `focusin`/`focusout`), `mouseenter`/`mouseleave`, `load`, `error`.
 
 
 </details>
@@ -220,7 +220,7 @@ document.addEventListener("touchmove", handleTouch, { passive: true });
 // passive da preventDefault = warning, ishlamaydi
 ```
 
-Chrome 51+ da document-level `touchstart`, `touchmove`, `wheel` — **default passive: true**. Agar `preventDefault` haqiqatan kerak — `{ passive: false }` aniq yozish kerak.
+DOM spec'da `passive` default qiymati doim `false`. Lekin Safari'dan tashqari brauzerlar `touchstart`, `touchmove`, `wheel`, `mousewheel` event'larini document-level node'larda (`Window`, `Document`, `Document.body`) **default passive: true** sifatida qabul qiladi. Shuning uchun bunday listener ichida `preventDefault` ishlamaydi — agar u haqiqatan kerak bo'lsa, `{ passive: false }` aniq yozish shart.
 
 
 </details>
@@ -255,7 +255,7 @@ function setupWidget(container) {
 **Qoidalar:**
 - Element DOM dan o'chirilsa — unga qo'yilgan listener'lar yo'qoladi
 - Global listener'lar (window, document) — alohida o'chirilishi kerak
-- SPA da har navigatsiyada cleanup qilish shart
+- SPA da har navigation'da cleanup qilish shart
 
 
 </details>
@@ -322,7 +322,7 @@ Mobile da odatiy event tartibi (Chrome/Edge, boshqa brauzerlar farq qilishi mumk
 
 **Tavsiya:** Pointer Events ishlatish — barcha qurilmalar uchun bitta API.
 
-**Deep Dive:** W3C Pointer Events spec bo'yicha brauzer touch event'ni `pointerdown` sifatida dispatch qilgandan keyin 300ms kutadi — bu "tap vs click" farqlash uchun. `touch-action: manipulation` CSS property bilan bu delay'ni yo'q qilish mumkin. Pointer Events `pointerId` orqali multi-touch'ni track qiladi — har bir barmoq alohida `pointerId` oladi, `setPointerCapture(id)` bilan element'ga bind qilinadi.
+**Deep Dive:** Touch event'dan keyin brauzer `click` event'ini kechiktirishi mumkin — bu double-tap zoom gesture'ini kutish uchun. Tap/double-tap aniqlash mexanizmi W3C Pointer Events spec'da out of scope deb belgilangan, ya'ni delay'ning aniq qiymati spec'da emas, user agent implementation'ida. Spec faqat yechimni beradi: `touch-action: manipulation` (yoki `none`) CSS property bilan brauzerga double-tap kutishi shart emasligini bildirib, delay'ni yo'qotish mumkin. Pointer Events `pointerId` orqali multi-touch'ni track qiladi — har bir barmoq alohida `pointerId` oladi, `setPointerCapture(id)` bilan element'ga bind qilinadi.
 
 </details>
 
@@ -347,7 +347,7 @@ element.addEventListener("click", handler, {
 | `passive` | `false`* | preventDefault bloklash |
 | `signal` | — | AbortController bilan cleanup |
 
-*`touchstart`/`touchmove`/`wheel` da document/window uchun Chrome default `passive: true` qilgan.
+*Spec default `false`, lekin Safari'dan tashqari brauzerlar `touchstart`/`touchmove`/`wheel`/`mousewheel` da `Window`/`Document`/`Document.body` uchun `passive: true` ni default qiladi.
 
 **Deep Dive:** DOM spec'da `addEventListener` uchinchi argument `boolean | AddEventListenerOptions` union type. `signal` option WHATWG DOM spec'ga 2020 da qo'shilgan — ichida `AbortSignal` `abort` event'ini tinglaydi va `removeEventListener` ni avtomatik chaqiradi. `once: true` esa engine ichida handler'ni birinchi invocation'da `removeEventListener` bilan o'chiradi — bu `{ once: true }` ni spec darajasida kafolatlaydi.
 
@@ -366,7 +366,7 @@ link.addEventListener("click", () => {
 
 // Faqat onclick PROPERTY da ishlaydi (HTML event handler attribute ham)
 link.onclick = function() { return false; };
-// ✅ faqat preventDefault() chaqiriladi (navigatsiya to'xtaydi)
+// ✅ faqat preventDefault() chaqiriladi (navigation to'xtaydi)
 // ❌ stopPropagation() CHAQIRILMAYDI — event bubble davom etadi
 //
 // Muhim farq:
@@ -378,7 +378,7 @@ link.onclick = function() { return false; };
 **To'g'ri:**
 ```javascript
 link.addEventListener("click", (e) => {
-  e.preventDefault();    // navigatsiya to'xtaydi
+  e.preventDefault();    // navigation to'xtaydi
   e.stopPropagation();   // bubbling to'xtaydi
 });
 ```
@@ -392,7 +392,7 @@ link.addEventListener("click", (e) => {
 <summary>Javob</summary>
 
 ```javascript
-// Har navigatsiyada yangi listener qo'shiladi — LEAK
+// Har navigation'da yangi listener qo'shiladi — LEAK
 function initPage() {
   window.addEventListener("scroll", handleScroll); // har safar +1 listener!
 }
@@ -432,7 +432,7 @@ page.unmount(); // 3 ta listener bir marta o'chirildi
 
 **Deep Dive:**
 
-React da `useEffect` cleanup, Vue da `onUnmounted` — ichida xuddi shu pattern. AbortController zamonaviy va xavfsiz — `removeEventListener` da reference saqlash muammosi yo'q.
+React'da `useEffect` cleanup, Vue'da `onUnmounted` — ikkalasi ham shu pattern'ni component lifecycle'ga bog'laydi. AbortController bitta `signal` orqali ko'p listener'ni bir `abort()` chaqiruvida o'chiradi — `removeEventListener` uchun har bir handler reference'ini alohida saqlash muammosi yo'qoladi.
 
 
 </details>
@@ -466,7 +466,7 @@ button.addEventListener("click", () => console.log("6: button CAPTURE"), true);
 1: document BUBBLE
 ```
 
-Capturing (tashqaridan): document → body. **Target:** button BUBBLE → CAPTURE — **registratsiya tartibi** (5 avval registered → 5 avval ishlaydi, capture flag target'da farq qilmaydi). Bubbling (ichdan): body → document.
+Capturing (tashqaridan): document → body. **Target:** button BUBBLE → CAPTURE — **registration tartibi** (5 avval registered → 5 avval ishlaydi, capture flag target'da farq qilmaydi). Bubbling (ichdan): body → document.
 
 
 </details>

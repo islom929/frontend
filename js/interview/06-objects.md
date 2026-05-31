@@ -135,7 +135,7 @@ console.log(a.inner.y); // 2 — ✅ original saqlanadi
 |------|-----|-------------|-------------|----------|
 | `{ ...obj }` / `Object.assign` | Shallow | ❌ | ❌ ref | ❌ ref |
 | `JSON.parse(JSON.stringify())` | Deep | ❌ Error | ❌ yo'qoladi | ❌ yo'qoladi |
-| `structuredClone()` (ES2022) | Deep | ✅ | ✅ | ❌ Error |
+| `structuredClone()` (WHATWG HTML) | Deep | ✅ | ✅ | ❌ Error |
 | Recursive function | Deep | ✅ (WeakMap) | ✅ | ⚠️ ref |
 
 Zamonaviy kod'da `structuredClone` eng yaxshi tanlov — function copy kerak bo'lmasa.
@@ -270,7 +270,7 @@ Qachon ishlatMASLIK kerak: doim mavjud bo'lishi kerak bo'lgan property'lar uchun
 
 V8 har bir object uchun **Hidden Class** yaratadi (V8 source kodida `Map` deb nomlanadi — JavaScript `Map` data structure'dan boshqa tushuncha). Bu object'ning shape'i. Bir xil tartibda bir xil property'lar qo'shilgan object'lar bitta Hidden Class'ni share qiladi.
 
-Hidden Class'ning maqsadi — **inline caching**. Agar V8 bilsa ki ikkita object bir xil shape'da — birinchi object'da property access optimizatsiya qilinsa, ikkinchisida ham shu optimizatsiya ishlaydi.
+Hidden Class'ning maqsadi — **inline caching**. Agar V8 ikkita object bir xil shape'da ekanini bilsa — birinchi object'da property access uchun yaratilgan optimization ikkinchisida ham qayta ishlatiladi.
 
 ```javascript
 // ✅ Yaxshi — bir xil tartibda property qo'shish
@@ -342,7 +342,7 @@ const byRole = users.reduce((groups, user) => {
 <details>
 <summary><strong>Javob</strong></summary>
 
-`structuredClone()` (ES2022) — browser'ning Structured Clone Algorithm'i asosida deep copy yaratadi:
+`structuredClone()` — global function, WHATWG HTML spec'da belgilangan (ECMAScript emas), browser'ning Structured Clone Algorithm'i asosida deep copy yaratadi:
 
 | Xususiyat | `JSON.parse(JSON.stringify())` | `structuredClone()` |
 |---|---|---|
@@ -503,7 +503,7 @@ console.log(cloned !== original); // true (alohida object)
 
 `WeakMap` circular reference'ni handle qiladi: object birinchi ko'rilganda `seen` ga yoziladi, qayta uchrasa — saqlangan clone qaytariladi.
 
-**⚠️ Cheklovlar (bu implementatsiya bajarmaydi):**
+**⚠️ Cheklovlar (bu implementation bajarmaydi):**
 - **Prototype chain yo'qoladi** — `clone` har doim `Object.prototype` yoki `Array.prototype` bilan yaratiladi. Agar `original instanceof CustomClass` bo'lgan bo'lsa, `cloned instanceof CustomClass` **false** bo'ladi. Tuzatish: `Object.create(Object.getPrototypeOf(obj))` bilan yaratish.
 - **Property descriptor'lar yo'qoladi** — `clone[key] = ...` oddiy assignment, shuning uchun getter/setter, non-enumerable, non-writable flag'lar yo'qoladi. Tuzatish: `Object.defineProperty` bilan descriptor'larni ham copy qilish.
 - **Function'lar reference bo'lib qoladi** — funksiyalar primitive emas, lekin kod ularni shallow copy qiladi. Real clone imkonsiz (closure scope yo'qoladi).
@@ -511,7 +511,7 @@ console.log(cloned !== original); // true (alohida object)
 
 **Deep Dive:**
 
-`structuredClone()` ichida brauzerning Structured Clone Algorithm (HTML spec) ishlatiladi — bu `postMessage`, IndexedDB, va Cache API da ham ishlatiladigan bir xil algoritm. U `[[Transfer]]` va `[[Clone]]` internal method'larini chaqiradi. Custom `deepClone` dan farqi — `structuredClone` `ArrayBuffer` transferable object'larni, TypedArray'larni, `Error`, `Blob`, `File`, `ImageData` kabi ko'p built-in tiplarni ham qo'llab-quvvatlaydi. Lekin `structuredClone` ham prototype chain'ni saqlamaydi va funksiyalar uchun `DataCloneError` throw qiladi.
+`structuredClone()` ichida brauzerning Structured Clone Algorithm (HTML spec) ishlatiladi — bu `postMessage`, IndexedDB, va Cache API da ham ishlatiladigan bir xil algoritm. HTML spec'da u `StructuredSerialize` (qiymatni serialization formatiga aylantirish) va `StructuredDeserialize` (qaytadan tiklash) operation'lari orqali ishlaydi; har bir platform object o'zining "serialization steps" va "deserialization steps"'ini belgilaydi. Custom `deepClone` dan farqi — `structuredClone` `ArrayBuffer` transferable object'larni, TypedArray'larni, `Error`, `Blob`, `File`, `ImageData` kabi ko'p built-in tiplarni ham qo'llab-quvvatlaydi. Lekin `structuredClone` ham prototype chain'ni saqlamaydi (deserialization `CreateDataProperty` bilan toza object yaratadi) va funksiyalar uchun `DataCloneError` throw qiladi.
 
 </details>
 
@@ -577,7 +577,7 @@ ECMAScript spec'da **uchta alohida equality algoritmi** bor — ularni aralashti
 | **SameValue** | `Object.is`, property descriptor invariants | `false` | `true` |
 | **SameValueZero** | `Array.includes`, `Map.has`, `Set.has` | `true` | `true` |
 
-Primitive'lar uchun `===` **value equality** tekshiradi (not reference), object'lar uchun esa reference identity. Deep equality uchun spec'da alohida operation yo'q — bu userland implementatsiya. Node.js'ning `assert.deepStrictEqual` ichida `innerDeepEqual` funksiyasi `Object.keys`, `Object.getOwnPropertySymbols`, va `getPrototypeOf` kombinatsiyasini ishlatib recursive taqqoslash qiladi — va u SameValue semantikasini ishlatadi (NaN === NaN true).
+Primitive'lar uchun `===` **value equality** tekshiradi (not reference), object'lar uchun esa reference identity. Deep equality uchun spec'da alohida operation yo'q — bu userland implementation. Node.js'ning `assert.deepStrictEqual` ichida `innerDeepEqual` funksiyasi `Object.keys`, `Object.getOwnPropertySymbols`, va `getPrototypeOf` kombinatsiyasini ishlatib recursive taqqoslash qiladi — va u SameValue semantikasini ishlatadi (NaN === NaN true).
 
 Shuning uchun custom `deepEqual` yozayotganda primitive taqqoslash uchun odatda `Object.is` (SameValue) ishlatiladi — `NaN` va `-0`/`+0` to'g'ri taqqoslanishi uchun.
 
@@ -625,7 +625,7 @@ Integer-like deganda non-negative integer'ga to'liq mos keladigan string (`"10"`
 
 **Deep Dive:**
 
-ES2015 dan oldin tartib spec'da kafolatlanmagan edi — engine'lar har xil ishlatardi. ES2015 da `[[OwnPropertyKeys]]` internal method standartlashtirildi, lekin **`for...in`** loop uchun tartib **ES2020** gacha to'liq belgilanmagan edi. Hozir har bir engine spec tartibga rioya qiladi. Aniq tartib kerak bo'lsa (insertion order har xil key turlari uchun ham saqlansin) — `Map` ishlatish kerak, chunki `Map` doim insertion order'ni saqlaydi.
+Yuqoridagi qat'iy tartib faqat `[[OwnPropertyKeys]]` internal method'iga (ES2015 da standartlashtirilgan) tegishli — uni `Object.keys`, `Object.getOwnPropertyNames`, `Reflect.ownKeys` ishlatadi. **`for...in`** esa boshqa operation — `EnumerateObjectProperties` — orqali ishlaydi, va spec uni "The mechanics and order of enumerating the properties is not specified" deb belgilaydi: ya'ni `for...in` enumeration tartibi spec tomonidan **kafolatlanmaydi**. Amalda barcha asosiy engine'lar bir xil (integer-asc → string-insertion) ishlatadi, lekin bu engine konvensiyasi, spec talabi emas. Tartibga ishonish kerak bo'lsa — `Object.keys`/`Reflect.ownKeys` (spec kafolatli) ishlat, `for...in` emas. Insertion order har xil key turlari uchun ham qat'iy saqlanishi kerak bo'lsa — `Map` ishlatish kerak, chunki `Map` iteration tartibi spec'da insertion order deb kafolatlangan.
 
 </details>
 

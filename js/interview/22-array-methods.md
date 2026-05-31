@@ -145,7 +145,7 @@ arr.at(-2);   // 40
 arr[-1];      // undefined — ❌ ishlamaydi!
 ```
 
-`arr[-1]` — JavaScript da `[]` property access. `-1` string key `"-1"` sifatida izlanadi — array'da bunday property yo'q → `undefined`. `at()` method esa manfiy index'ni `length + index` deb hisoblanadi.
+`arr[-1]` — JavaScript da `[]` property access. `-1` string key `"-1"` sifatida izlanadi — array'da bunday property yo'q → `undefined`. `at()` method esa manfiy index'ni `length + index` ga aylantirib indekslaydi.
 
 
 </details>
@@ -646,7 +646,7 @@ ECMA-262 (Stage 4 — 2024) `Array.fromAsync` quyidagi tartibda ishlaydi:
 4. Return promise.
 ```
 
-**Sequential vs parallel — implementatsiya farq:**
+**Sequential vs parallel — runtime farqi:**
 
 ```javascript
 // Array.fromAsync — har element ketma-ket await qilinadi
@@ -985,7 +985,7 @@ console.log(items);
 <details>
 <summary><strong>Javob</strong></summary>
 
-**Xato:** String'larni `-` operator bilan ayirib bo'lmaydi. `"2024-01-15" - "2023-12-01"` → `NaN`. Comparator har doim `NaN` qaytaradi — sort behavior undefined bo'ladi (natija tartibsiz).
+**Xato:** String'larni `-` operator bilan ayirib bo'lmaydi. `"2024-01-15" - "2023-12-01"` → `NaN`. Comparator har doim `NaN` qaytaradi — spec `NaN` ni `+0` ga coerce qiladi (ikki element "teng" deb hisoblanadi), shuning uchun sort hech qanday qayta tartiblamaydi va array original tartibda qoladi. Saralash yuz bermaydi.
 
 ```javascript
 // ✅ Tuzatish 1: localeCompare (string sifatida — ISO format alphabetical = chronological)
@@ -1001,7 +1001,7 @@ items.sort((a, b) => new Date(a.date) - new Date(b.date));
 
 **Muhim nuance:** ISO 8601 format string'lar (`YYYY-MM-DD`) alphabetical va chronological tartib **bir xil** — shuning uchun `localeCompare` to'g'ri ishlaydi. Boshqa format'lar (`DD/MM/YYYY`, `MM-DD-YYYY`) uchun bu ishlamaydi — `new Date()` ishlatish kerak.
 
-**Comparator qoidasi:** ECMAScript spec comparator dan number kutadi: manfiy → `a` oldin, 0 → tartib o'zgarmaydi, musbat → `b` oldin, `NaN` → undefined behavior.
+**Comparator qoidasi:** ECMAScript spec comparator return qiymatiga `ToNumber` qo'llaydi: manfiy → `a` oldin, `+0`/`-0` → tartib o'zgarmaydi, musbat → `b` oldin. ES2015 dan boshlab `NaN` return `+0` deb qabul qilinadi ("teng" — tartib o'zgarmaydi), undefined behavior emas.
 
 
 </details>

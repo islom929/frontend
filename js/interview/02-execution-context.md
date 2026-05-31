@@ -11,11 +11,13 @@
 <details>
 <summary><strong>Javob</strong></summary>
 
-Execution Context — JavaScript engine har bir kod bo'lagini bajarishdan oldin yaratiladigan ichki muhit. Bu muhit quyidagi komponentlardan iborat:
+Execution Context — JavaScript engine har bir kod bo'lagini bajarishdan oldin yaratiladigan ichki muhit. Spec'da EC'ning state component'lari quyidagilar:
 
-1. **LexicalEnvironment** — `let`, `const`, `class` declaration'lar saqlanadi
-2. **VariableEnvironment** — `var` va `function` declaration'lar saqlanadi
-3. **ThisBinding** — `this` qiymati
+1. **LexicalEnvironment** — `let`, `const`, `class` declaration'lar saqlanadigan Environment Record'ga pointer
+2. **VariableEnvironment** — `var` va `function` declaration'lar saqlanadigan Environment Record'ga pointer
+3. **PrivateEnvironment** — class'ning `#private` field'lari (PrivateEnvironment Record), class tashqarisida `null`
+
+`this` qiymati alohida EC component emas — u eng yaqin Function/Global Environment Record'ning `[[ThisValue]]`/`[[GlobalThisValue]]` slot'ida saqlanadi va `ResolveThisBinding` orqali olinadi.
 
 Har bir EC ikki bosqichda yaratiladi:
 - **Creation Phase** — muhit tayyorlanadi, o'zgaruvchilar e'lon qilinadi, lekin kod bajarilmaydi
@@ -108,7 +110,7 @@ var result = sum();
 
 Muhim farq: **Parsing** va **Creation Phase** — bular ikki alohida bosqich:
 - **Parsing** (engine source code'dan AST yaratishda) — declaration'lar static ravishda topiladi va saqlanadi (qaysi scope'da qaysi `var`/`let`/`const`/`function` bor). Bu faqat bir marta bajariladi.
-- **Creation Phase** (har EC yaratilganda) — parser'ning static ma'lumotlari asosida Environment Record'lar **runtime'da** to'ldiriladi: `CreateMutableBinding` va `InitializeBinding(undefined)` chaqiriladi (var uchun), let/const faqat `CreateMutableBinding` (uninitialized holatda).
+- **Creation Phase** (har EC yaratilganda) — parser'ning static ma'lumotlari asosida Environment Record'lar **runtime'da** to'ldiriladi: `var` uchun `CreateMutableBinding` + `InitializeBinding(undefined)` chaqiriladi; `let` uchun `CreateMutableBinding` (uninitialized — TDZ); `const` uchun `CreateImmutableBinding` (uninitialized — TDZ). Initialize keyinroq, Execution Phase'da declaration'ga yetganda bo'ladi.
 
 Shuning uchun Creation Phase tez ishlaydi — engine source'ni qayta scan qilmaydi, faqat parser'ning metadata'sidan EC environment'ni yaratadi.
 
@@ -203,13 +205,14 @@ function example() {
 // ES Module scope
 import { counter } from "./module.js";
 // counter — Module Environment Record'da, immutable indirect binding
-// counter = 10; // ❌ SyntaxError: Assignment to constant variable
+// counter = 10; // ❌ early SyntaxError (parse vaqtida, kod ishga tushishidan oldin)
+//                  V8 message: "Assignment to constant variable."
 ```
 
 **Edge Cases:**
 - **`with` statement**: Object ER yaratiladi va scope chain'ga qo'shiladi — strict mode'da taqiq, lookup juda sekin (dynamic property check har binding uchun)
 - **`catch` parameter**: O'ziga xos Declarative ER yaratiladi — `try { ... } catch(e) { ... }` ichida `e` binding faqat shu blok'da mavjud
-- **Module ER va `import.meta`**: Module Environment Record'da `import.meta` object alohida slot — har module uchun unique metadata (URL, va boshqa)
+- **`import.meta`**: Module Environment Record'da emas, Source Text Module Record'ning `[[ImportMeta]]` field'ida saqlanadi — birinchi murojaatda yaratiladi (`module.[[ImportMeta]]` undefined bo'lsa, `HostGetImportMetaProperties` bilan to'ldiriladi), keyin cache qilinadi. Har module uchun unique metadata (URL, va boshqa)
 
 **Follow-up savollar:**
 1. **Global scope'da `var foo` va `globalThis.foo = ...` farqi nima?** — `var foo` Global ER'ning Object ER qismida configurable: false bilan property yaratadi (delete bilan o'chmaydi). `globalThis.foo = ...` configurable: true bilan oddiy property (delete mumkin).
@@ -218,7 +221,7 @@ import { counter } from "./module.js";
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Declarative ER tezroq ishlashining sababi: engine compile vaqtida barcha binding'larning index'ini biladi — hash table lookup kerak emas, direct slot access ishlaydi. Object ER esa dynamic property lookup qiladi (window object orqali, `[[Get]]` internal method) — sekinroq va ko'p JIT optimizatsiyalar uchun to'siq (inline caching murakkab).
+Declarative ER tezroq ishlashining sababi: engine compile vaqtida barcha binding'larning index'ini biladi — hash table lookup kerak emas, direct slot access ishlaydi. Object ER esa dynamic property lookup qiladi (window object orqali, `[[Get]]` internal method) — sekinroq va ko'p JIT optimization'lar uchun to'siq (inline caching murakkab).
 
 Module ER'ning "live binding" xususiyati spec'dagi `GetBindingValue` operatsiyasi orqali implement qilingan: har safar original exporting module'dan qiymatni `ResolveBinding` orqali oladi. Shuning uchun circular import'larda `import` qiymati keyinroq ham yangilanishi mumkin — bu CommonJS'dagi static snapshot semantikasidan farq qiluvchi xususiyat.
 
@@ -301,7 +304,7 @@ function notOptimized() {
 }
 ```
 
-V8 ayrim hollarda **statik bo'sh** kod baholashni specially handle qiladi (constant folding orqali olib tashlanishi mumkin), lekin har qanday non-trivial yoki dinamik baholash scope escape trigger qiladi va kompilyator lokal o'zgaruvchilarni context (heap) ga ko'chirishga majbur bo'ladi.
+V8 ayrim hollarda **statik bo'sh** kod baholashni specially handle qiladi (constant folding orqali olib tashlanishi mumkin), lekin har qanday non-trivial yoki dinamik baholash scope escape trigger qiladi va compiler lokal o'zgaruvchilarni context (heap) ga ko'chirishga majbur bo'ladi.
 
 **3. Direct vs Indirect — spec farqi va scope muammolari:**
 
@@ -465,7 +468,7 @@ Scope chain: `inner() → outer() → global`
 
 `anotherScope()` dagi `a = 3` ga hech qachon borilmaydi — chunki `inner()` `outer()` da yozilgan, `anotherScope()` da emas.
 
-Bu **closure** mexanizmi — `inner()` `outer()` tugagandan keyin ham uning scope'iga kira oladi. Spec'da bu Function ER'ning `[[Environment]]` internal slot orqali implement qilingan: funksiya yaratilganda joriy LexicalEnvironment shu slot'ga saqlanadi, va chaqirilganda yangi FEC'ning `[[OuterEnv]]` qiymati shu slot'dan olinadi. Shuning uchun outer function'ning Environment Record garbage collect bo'lmaydi — inner function reference'i ushlab turadi.
+Bu **closure** mexanizmi — `inner()` `outer()` tugagandan keyin ham uning scope'iga kira oladi. Spec'da bu function object'ning `[[Environment]]` internal slot orqali implement qilingan: funksiya yaratilganda (`OrdinaryFunctionCreate`) joriy LexicalEnvironment shu slot'ga saqlanadi, va chaqirilganda yangi FEC'ning `[[OuterEnv]]` qiymati shu slot'dan olinadi. Shuning uchun outer function'ning Environment Record garbage collect bo'lmaydi — inner function reference'i ushlab turadi.
 
 </details>
 
@@ -810,7 +813,7 @@ calc(200, 0.1); // order.total = 220 — lexical this
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Spec'da `ResolveThisBinding()` (9.4.3):
+Spec'da `ResolveThisBinding()` (9.4.4):
 1. `envRec` = `GetThisEnvironment()` — joriy lexical environment'dan eng yaqin function/module/global ER'ni topish
 2. `envRec.GetThisBinding()` chaqiriladi:
    - Function ER: `[[ThisBindingStatus]] = "uninitialized"` bo'lsa `ReferenceError`, `"lexical"` bo'lsa parent'dan oladi, `"initialized"` bo'lsa `[[ThisValue]]` qaytariladi
@@ -908,7 +911,7 @@ b();
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-Function object yaratilganda `[[Environment]]` internal slot'iga joriy LexicalEnvironment yoziladi (`MakeFunctionAlloc` algoritmi). Har funksiya chaqiruvida `[[Call]]` internal method `PrepareForOrdinaryCall` chaqiradi → yangi Function ER yaratadi → `localEnv.OuterEnv = F.[[Environment]]`. Shuning uchun yangi FEC'ning `[[OuterEnv]]` funksiya **yaratilgan** paytdagi LexicalEnvironment'ga ko'rsatadi, chaqirgan funksiyaning EC'iga emas.
+Function object yaratilganda `[[Environment]]` internal slot'iga joriy LexicalEnvironment yoziladi (`OrdinaryFunctionCreate` abstract operation: `F.[[Environment]] = env`). Har funksiya chaqiruvida `[[Call]]` internal method `PrepareForOrdinaryCall` chaqiradi → bu `NewFunctionEnvironment(F, newTarget)` orqali yangi Function ER (`localEnv`) yaratadi va `localEnv.[[OuterEnv]] = F.[[Environment]]` o'rnatadi → keyin `calleeContext.LexicalEnvironment = localEnv`. Shuning uchun yangi FEC'ning `[[OuterEnv]]` funksiya **yaratilgan** paytdagi LexicalEnvironment'ga ko'rsatadi, chaqirgan funksiyaning EC'iga emas.
 
 Bu mexanizm "closure" deb ataladigan tushunchaning fundamental implementation'i: funksiya o'zining lexical environment'ini hamroh sifatida olib yuradi.
 

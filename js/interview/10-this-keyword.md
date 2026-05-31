@@ -197,7 +197,7 @@ class Button {
 
 ### Follow-up savollar
 
-1. **"`call` va `apply`'dan qaysi biri tezroq?"** — V8'da `call` ozgina tezroq (array iteratsiya yo'q), lekin farq mikro-optimizatsiya darajasida. Tanlash signature qulayligiga qarab.
+1. **"`call` va `apply`'dan qaysi biri tezroq?"** — `apply` argument array-like'ni o'qib element'larni yoyishi kerak, `call` esa argumentlarni to'g'ridan-to'g'ri oladi — shuning uchun `apply`'da qo'shimcha ish bor. Lekin real ilovada bu farq sezilmaydi; tanlash signature qulayligiga qarab.
 2. **"`Reflect.apply` bilan `apply` farqi?"** — `Reflect.apply(fn, thisArg, args)` 3 argument oladi, lekin `Function.prototype.apply` har function'da method sifatida mavjud (shadow qilinishi mumkin). `Reflect.apply` xavfsizroq — `apply` property override qilinmasligi kafolatlangan.
 
 </details>
@@ -267,7 +267,7 @@ arrow.bind({ name: "test" })(); // ESM: undefined | Browser script: globalThis
 
 ### Follow-up savollar
 
-1. **"Arrow function `arguments`'ga muqobil nima?"** — Rest parameter: `const fn = (...args) => args`. Arrow function ichida `arguments` ishlatilsa, enclosing function'ning `arguments`'iga ishora qiladi (yoki TDZ-like xato top-level'da).
+1. **"Arrow function `arguments`'ga muqobil nima?"** — Rest parameter: `const fn = (...args) => args`. Arrow function ichida `arguments` ishlatilsa, enclosing function'ning `arguments`'iga ishora qiladi; enclosing function bo'lmasa (top-level module/script) `ReferenceError: arguments is not defined`.
 2. **"Class method bilan class arrow field qaysi biri afzal?"** — Method (prototype'da, shared) — memory tejaydi; arrow field — `this` callback'da saqlanadi. React class component'larda arrow field keng tarqalgan edi; hooks bilan bu pattern function component'da kerak emas.
 
 </details>
@@ -300,9 +300,10 @@ const fn = service.greet;
 // fn(); // TypeError: Cannot read properties of undefined (reading 'name')
 //       — strict mode (class) → this = undefined → undefined.name throw
 
-// Callback sifatida — bir xil muammo
-setTimeout(service.greet, 100); // log: "Salom, undefined" (Node Timer this)
-                                // yoki TypeError class strict bo'lsa
+// Callback sifatida — implicit binding yo'qoladi, lekin host this beradi
+setTimeout(service.greet, 100); // Node: this = Timeout object → "Salom, undefined"
+                                // Browser: this = window → "Salom, " (window.name "")
+                                // host this beradi → bu yerda TypeError yo'q
 
 // Yechim 1: bind (yangi bound function)
 setTimeout(service.greet.bind(service), 100);
@@ -419,7 +420,7 @@ class Service {
 ### Follow-up savollar
 
 1. **"Node REPL'da `this` nima?"** — REPL global scope'da `this === globalThis` (REPL'da `global`). Bu CJS module'dan farqli — REPL alohida context.
-2. **"Direct vs indirect dynamic evaluation farqi `this`'da?"** — Direct dynamic evaluation enclosing function `this`'ini meros qiladi, indirect (`(0, fn)('this')` pattern) har doim `globalThis`'ga ishora qiladi (separate execution context).
+2. **"Direct vs indirect `eval` farqi `this`'da?"** — Direct `eval("this")` chaqiruvchi context'ning `this`'ini meros qiladi. Indirect `eval` (`(0, eval)("this")` yoki `const run = eval; run("this")`) global context'da ishlaydi — sloppy'da `this = globalThis`, strict'da ham global scope.
 
 </details>
 
@@ -446,8 +447,10 @@ function sloppy() {
 sloppy();
 
 // Strict mode — default binding → undefined
-"use strict";
+// "use strict" directive function tanasi boshida bo'lishi shart;
+// script o'rtasiga qo'yilsa kuchga kirmaydi (Directive Prologue qoidasi).
 function strict() {
+  "use strict";
   console.log(this); // undefined
 }
 strict();
@@ -509,7 +512,7 @@ Method chaining — har method oxirida `return this` qaytarib, keyingi method ca
 
 ### To'liq tushuntirish
 
-Har `obj.method()` chaqiruvi `Reference Record { [[Base]]: obj, ... }` yaratib, `EvaluateCall` orqali `thisArgument = obj` ni uzatadi. Method `return this` qilsa, qaytgan qiymat bir xil object — keyingi `.method2()` xuddi shu object'da `this`'ni saqlaydi. Bu zanjir method'lar mutate qilingan davom etadi, oxirida `build()`/`get()` final natija qaytaradi (`this` o'rniga).
+Har `obj.method()` chaqiruvi `Reference Record { [[Base]]: obj, ... }` yaratib, `EvaluateCall` orqali `thisArgument = obj` ni uzatadi. Method `return this` qilsa, qaytgan qiymat bir xil object — keyingi `.method2()` o'sha object'da `this`'ni saqlaydi. Zanjir method'lar instance'ni mutate qilib davom etadi, oxirida `build()`/`get()` final natija qaytaradi (`this` o'rniga).
 
 ### Kod misol
 
@@ -612,17 +615,19 @@ const broken = new Proxy(collection, {
 });
 // broken.add("c"); // TypeError: Cannot read private member #items
 
-// To'g'ri Proxy — method ni target bilan apply qilish
+// To'g'ri Proxy — method va getter'ni original target ustida ishlatish.
+// Reflect.get'ga receiver=target uzatiladi: getter ichida this=target bo'ladi,
+// shuning uchun #items lookup target'da yuz beradi (proxy'da emas).
 const logged = new Proxy(collection, {
   get(target, prop, receiver) {
-    const value = Reflect.get(target, prop, receiver);
+    const value = Reflect.get(target, prop, target);
     if (typeof value === "function") {
       return function(...args) {
         console.log(`${prop}(${args.join(", ")})`);
         return value.apply(target, args); // this = original target
       };
     }
-    return value;
+    return value; // getter allaqachon target ustida hisoblangan
   }
 });
 
@@ -892,7 +897,7 @@ new Timer().start(); // Nima bo'ladi?
 
 ### Qisqa javob
 
-Browser'da `NaN` chiqadi (loop): `setInterval` callback regular function — HTML spec callback'ga `this = window` beradi, `window.seconds = undefined`, `undefined + 1 = NaN`. Node.js'da `Timeout` object'da `seconds` property yaratiladi (NaN emas — chunki Node Timer'ning custom property), ammo Timer instance hech qachon yangilanmaydi. Class body strict, lekin host explicit `this` beradi — TypeError yo'q.
+Har ikki muhitda ham `NaN` chiqadi (loop): `setInterval` callback regular function — implicit binding yo'qoladi. Browser'da HTML spec callback'ga `this = window` beradi: `window.seconds` boshida `undefined`, `undefined + 1 = NaN`, keyingi tick'larda `NaN + 1 = NaN`. Node.js'da `this = Timeout` object: `Timeout.seconds` boshida `undefined` → birinchi tick'da `NaN` property yaratiladi, keyingilari ham `NaN`. Har ikki holatda Timer instance'ning `seconds` hech qachon yangilanmaydi. Class body strict, lekin host explicit `this` beradi (`undefined` emas) — TypeError yo'q.
 
 ### To'liq tushuntirish
 
@@ -1612,8 +1617,8 @@ const obj = {
 };
 
 const fn = obj.getCount();
-console.log(fn()());           // A: ?
-console.log(fn()().call({count: 99})); // B: ?
+console.log(fn()());                 // A: ?
+console.log(fn().call({count: 99})); // B: ?  (fn() inner arrow'ni qaytaradi, call uni chaqiradi)
 
 const obj2 = {
   count: 20,
@@ -1638,7 +1643,7 @@ C: undefined (browser script) / TypeError (strict)
 
 **A:** `obj.getCount()` — implicit binding, `this = obj`. Ichkari nested arrow function'lar lexical `this` ishlatadi → ikkala arrow ham `obj`'ni saqlaydi → `obj.count = 10`.
 
-**B:** `.call({count: 99})` arrow function'ga ta'sir qilmaydi — arrow `this` lexical, har qanday `call`/`apply`/`bind` `override` qila olmaydi. Hali ham `10`.
+**B:** `fn()` ichki arrow function'ni qaytaradi (chaqirmaydi). `.call({count: 99})` uni chaqiradi, lekin arrow `this` lexical — `call`/`apply`/`bind` `override` qila olmaydi. `this = obj` saqlanadi → `10`.
 
 **C:** `obj2.getCount` arrow function — implicit binding **ishlamaydi**, `this` = enclosing scope (module/script global). Module'da `this = undefined`, `undefined.count` → `TypeError`. Browser non-strict'da `this = window`, `window.count = undefined`.
 

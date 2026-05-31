@@ -49,7 +49,7 @@ Qo'shimcha asosiy qismlar: parser, bytecode interpreter (Ignition), baseline va 
 
 JIT (Just-In-Time) Compilation — kodni runtime da, kerak bo'lganda compile qilish usuli. Bu interpreter va compiler'ning afzalliklarini birlashtiradi.
 
-**Interpreter** source code ni qator-baqatar bajaradi — startup tez, lekin takroriy chaqiruvlarda sekin. **Compiler** butun kodni oldindan machine code ga aylantiradi — startup sekin, lekin runtime tez. **JIT** esa avval interpret qiladi (startup tez), keyin ko'p chaqiriladigan "hot" funksiyalarni compile qiladi (runtime tez).
+**Interpreter** source code ni qator-baqator bajaradi — startup tez, lekin takroriy chaqiruvlarda sekin. **Compiler** butun kodni oldindan machine code ga aylantiradi — startup sekin, lekin runtime tez. **JIT** esa avval interpret qiladi (startup tez), keyin ko'p chaqiriladigan "hot" funksiyalarni compile qiladi (runtime tez).
 
 | Xususiyat | Interpreter | Compiler | JIT |
 |-----------|-------------|----------|-----|
@@ -189,7 +189,7 @@ AST ni nafaqat engine, balki boshqa tool'lar ham ishlatadi:
 
 Hidden Classes (V8 ichki nomi: Maps) — har bir JavaScript object'ga biriktiriladigan ichki tuzilma bo'lib, object'ning shape'ini (qaysi property'lar bor, ular xotirada qayerda) tavsiflaydi.
 
-JavaScript dynamic til — object'ga istalgan vaqtda property qo'shish mumkin. Bu holatda engine property'ni hash table orqali qidirishi kerak — bu sekin. Hidden class yordamida V8 property'ning aniq memory offset'ini biladi va to'g'ridan-to'g'ri oladi — C/C++ struct kabi tez.
+JavaScript dynamic til — object'ga istalgan vaqtda property qo'shish mumkin. Bu holatda engine property'ni hash table orqali qidirishi kerak — bu sekin. Hidden class yordamida V8 property'ning aniq memory offset'ini biladi va to'g'ridan-to'g'ri shu offset'dan o'qiydi — hash lookup o'rniga fixed-offset memory access.
 
 Bir xil tartibda bir xil property'larga ega object'lar **bir xil hidden class**'ni share qiladi. Shuning uchun object'larni doim bir xil tartibda yaratish kerak.
 
@@ -220,7 +220,7 @@ Hidden class'ni buzadigan amallar:
 
 **Deep Dive:**
 
-Hidden class transition chain: har bir property qo'shilganda yangi hidden class yaratiladi va avvalgi class'dan transition saqlanadi. Agar boshqa object ham xuddi shu tartibda property qo'shsa — tayyor transition ishlatiladi.
+Hidden class transition chain: har bir property qo'shilganda yangi hidden class yaratiladi va avvalgi class'dan transition saqlanadi. Agar boshqa object ham aynan shu tartibda property qo'shsa — tayyor transition ishlatiladi.
 
 </details>
 
@@ -229,7 +229,7 @@ Hidden class transition chain: har bir property qo'shilganda yangi hidden class 
 <details>
 <summary>Javob</summary>
 
-Inline Caching (IC) — property access operatsiyasi uchun engine saqlaydigan "yorliq". Birinchi marta `obj.x` bajarilganda engine hidden class va property offset'ini topadi va cache'laydi. Keyingi safar xuddi shu shape'dagi object kelsa — cache'dan to'g'ridan-to'g'ri oladi, qayta qidirish kerak emas.
+Inline Caching (IC) — property access operatsiyasi uchun engine saqlaydigan "yorliq". Birinchi marta `obj.x` bajarilganda engine hidden class va property offset'ini topadi va cache'laydi. Keyingi safar aynan shu shape'dagi object kelsa — cache'dan to'g'ridan-to'g'ri oladi, qayta qidirish kerak emas.
 
 IC uch holatda bo'ladi:
 
@@ -361,7 +361,7 @@ V8 da deoptimization `Deoptimizer::DeoptimizeFunction` orqali amalga oshiriladi.
 |-----------|-------|------|
 | Nima saqlanadi | Primitives, frame'lar | Objects, arrays, functions |
 | Tezlik | Juda tez | Sekinroq |
-| Hajmi | Kichik (1-8 MB) | Katta (yuzlab MB) |
+| Hajmi | Kichik, oldindan cheklangan | Katta, dinamik o'sadi |
 | Boshqaruv | Avtomatik (LIFO) | Garbage Collector |
 
 ```javascript
@@ -676,7 +676,7 @@ for (let i = 0; i < 10000; i++) {
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
-`getName` ichidagi `entity.name` IC `monomorphic` → `polymorphic` → `megamorphic` evolyutsiyasini bosib o'tadi va 6 ta turli shape kelganidan keyin generic property lookup'ga tushadi (5+ shape = megamorphic). Bu performance'ni sezilarli pasaytiradi.
+`getName` ichidagi `entity.name` IC `monomorphic` → `polymorphic` → `megamorphic` evolyutsiyasini bosib o'tadi. 6 ta object beriladi, lekin `user` va `admin` bir xil shape'da — jami 5 ta turli shape. 5-chi turli shape kelganida IC megamorphic bo'lib generic property lookup'ga tushadi (V8 polymorphic holatni 4 shape'gacha saqlaydi). Bu performance'ni sezilarli pasaytiradi.
 
 ### To'liq tushuntirish
 
@@ -764,7 +764,7 @@ for (let i = 0; i < 1000; i++) {
 <summary><strong>Javob</strong></summary>
 
 ### Qisqa javob
-`largeData` event listener closure tomonidan capture qilinadi (gar `console.log` ishlatmasa ham — V8'da context allocation ko'pincha barcha local'larni saqlaydi) va `handlers` array element'larga reference saqlagani uchun element'lar GC qilinmaydi → memory leak.
+Asosiy leak: `handlers` global array har bir `element`'ga reference saqlaydi, shuning uchun element'lar DOM'dan olib tashlansa ham GC root orqali erishish mumkin bo'lib qoladi va tozalanmaydi → memory leak. `largeData` esa listener ichida ishlatilmaydi, shuning uchun V8 escape analysis uni odatda closure context'iga qo'shmaydi — bu o'zi alohida leak emas.
 
 ### To'liq tushuntirish
 
@@ -772,11 +772,11 @@ JavaScript GC mark-and-sweep algoritmi ishlatadi: GC root'lardan (global, call s
 
 Bu kodda muammolar:
 
-1. **`largeData` closure capture**: Event listener funksiyasi `attachHandler` scope'iga `[[Environment]]` orqali ulangan. V8 odatda escape analysis qilib ishlatilmagan variable'larni context'ga qo'shmaydi, lekin closure ichida ishlatilgan har qanday outer variable saqlanadi. Bu yerda listener `console.log` ni chaqirsa ham, V8 implementation darajasida ba'zan keraksiz variable'lar context'ga tushishi mumkin.
+1. **`handlers` array** (asosiy, aniq leak): Global array har bir `element`'ga reference saqlaydi → element'lar DOM'dan olib tashlansa ham, `handlers` ularni ushlab turadi → DOM node'lar va ularning subtree'lari GC qilinmaydi.
 
-2. **`handlers` array**: Global array element'larga reference saqlaydi → element'lar DOM'dan olib tashlansa ham, `handlers` ularni ushlab turadi → DOM node'lar va ularning subtree'lari GC qilinmaydi.
+2. **DOM detached node leak**: `handlers` element'ni ushlab turgani sabab, element DOM'dan olib tashlangach ham JavaScript reference saqlanib qoladi — "detached DOM tree" leak yuzaga keladi (Chrome DevTools Memory profiler'da ko'rinadi).
 
-3. **DOM detached node leak**: Element'lar DOM'dan olib tashlangach ham, JavaScript reference saqlasa — "detached DOM tree" leak yuzaga keladi (Chrome DevTools Memory profiler'da ko'rinadi).
+3. **`largeData` closure capture** (shartli): Listener funksiyasi `attachHandler` scope'iga `[[Environment]]` orqali ulangan, lekin u `largeData`'ni ishlatmaydi. V8 escape analysis odatda closure ichida ishlatilmagan variable'ni context'ga qo'shmaydi — bu holatda `largeData` GC qilinishi mumkin. Faqat listener `largeData`'ni o'qiganda u context'ga majburlanadi va element bilan birga yashab qoladi.
 
 ### Kod misol — tuzatish
 
@@ -815,7 +815,7 @@ function attachHandler(element) {
 <details>
 <summary><strong>Deep Dive</strong></summary>
 
-V8 GC arxitekturasi (Orinoco):
+V8 GC architecture (Orinoco):
 - **Young Generation (Scavenger)**: bump pointer allocation, semi-space copying GC (Cheney's algorithm). Tez, lekin pause beradi.
 - **Old Generation (Mark-Compact)**: mark-and-sweep + compaction. Incremental marking (small steps), concurrent marking (background thread), parallel sweeping (multiple threads).
 - **Generational hypothesis**: ko'p object'lar qisqa muddatli. Young space tez GC qilinadi, Old space kamroq.

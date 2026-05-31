@@ -37,7 +37,7 @@ JavaScript da **iteration protocol** — ma'lumotlarni ketma-ket olish uchun sta
 
 2. **Iterator Protocol** — "men qiymatlarni birma-bir beraman" degan shartnoma. Object'da `next()` method'i bo'lishi kerak va u har safar `{ value, done }` formatidagi ob'ekt qaytarishi kerak.
 
-Bu protocol nima muammoni hal qiladi? ES6 dan oldin turli data structure'lar (Array, arguments, NodeList) ustida iteratsiya qilishning yagona universal usuli yo'q edi — har biri o'z usuli bilan ishlardi. Iteration protocol **yagona standart interfeys** yaratadi — `for...of`, spread operator, destructuring, `Promise.all`, `Array.from` kabi mexanizmlar **istalgan** iterable bilan ishlaydi. Yangi data structure yaratganingizda ham — shu protocol'ni implement qilsangiz, barcha til mexanizmlari avtomatik ishlaydi.
+Bu protocol nima muammoni hal qiladi? ES6 dan oldin turli data structure'lar (Array, arguments, NodeList) ustida iteratsiya qilishning yagona universal usuli yo'q edi — har biri o'z usuli bilan ishlardi. Iteration protocol **yagona standart interface** yaratadi — `for...of`, spread operator, destructuring, `Promise.all`, `Array.from` kabi mexanizmlar **istalgan** iterable bilan ishlaydi. Yangi data structure yaratganingizda ham — shu protocol'ni implement qilsangiz, barcha til mexanizmlari avtomatik ishlaydi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -272,7 +272,7 @@ for (const [key, value] of Object.entries(config)) {
 
 ### Nazariya
 
-Har qanday ob'ektni iterable qilish mumkin — faqat `[Symbol.iterator]()` method'ini implement qilish kerak. Bu method iterator qaytarishi kerak — ya'ni `next()` method'i bo'lgan ob'ekt. Bu qobiliyat o'z data structure'laringizni yaratishda va ularni til mexanizmlari (`for...of`, spread, destructuring) bilan integratsiya qilishda muhim.
+Har qanday ob'ektni iterable qilish mumkin — faqat `[Symbol.iterator]()` method'ini implement qilish kerak. Bu method iterator qaytarishi kerak — ya'ni `next()` method'i bo'lgan ob'ekt. Bu qobiliyat o'z data structure'laringizni yaratishda va ularni til mexanizmlari (`for...of`, spread, destructuring) bilan integration qilishda muhim.
 
 Ikki xil yondashuv bor:
 1. **Alohida iterator ob'ekt** — har safar `[Symbol.iterator]()` chaqirilganda yangi iterator yaratiladi
@@ -1047,7 +1047,7 @@ console.log(g.next()); // { value: 3, done: true } ← return qiymati
 4. **Return propagation** — `return()` ham
 5. **Final value** — ichki generator'ning `return` qiymati `yield*` ifodasining qiymati bo'ladi
 
-**Performance**: V8 `yield*` ni native optimize qiladi — manual `while` loop bilan delegation'ga nisbatan samaraliroq bo'lishi mumkin (aniq farq V8 versiyasiga va iterator implementatsiyasiga bog'liq):
+**Performance**: V8 `yield*` ni native optimize qiladi — manual `while` loop bilan delegation'ga nisbatan samaraliroq bo'lishi mumkin (aniq farq V8 versiyasiga va iterator implementation'iga bog'liq):
 ```javascript
 // Manual loop (boilerplate ko'p)
 function* outer() {
@@ -1679,7 +1679,7 @@ Generator'ning pause/resume xususiyati state machine implement qilish uchun idea
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-Generator spec bo'yicha to'rtta internal state'ga ega (`[[GeneratorState]]` slot qiymati): **`"suspendedStart"`** (yaratilgan, hali `next()` chaqirilmagan), **`"suspendedYield"`** (`yield` da to'xtagan), **`"executing"`** (`next()` bilan ishlayotgan), **`"completed"`** (`return` yoki funksiya tugagan). State machine pattern'da generator o'zining `[[GeneratorState]]` dan tashqari, dasturchi belgilagan business state'larni ham boshqaradi (QIZIL/SARIQ/YASHIL). `while (true)` + `yield` kombinatsiyasi circular state machine yaratadi — generator hech qachon `"completed"` state'ga o'tmaydi. `next(value)` bilan two-way communication — argument oldingi `yield` expression'ning qiymati bo'lib qaytadi. V8 da generator function compile vaqtida state machine'ga aylantiriladi: har bir `yield` alohida switch-case label bo'ladi, `next()` chaqiruvi `[[GeneratorResumeIndex]]` bo'yicha to'g'ri label'ga jump qiladi. Async generator (`async function*`) qo'shimcha murakkablik qo'shadi — har bir `yield` va `await` alohida suspension point, engine ikkalasini internal state'da track qiladi.
+Generator spec bo'yicha to'rtta internal state'ga ega (`[[GeneratorState]]` slot qiymati): **`"suspendedStart"`** (yaratilgan, hali `next()` chaqirilmagan), **`"suspendedYield"`** (`yield` da to'xtagan), **`"executing"`** (`next()` bilan ishlayotgan), **`"completed"`** (`return` yoki funksiya tugagan). State machine pattern'da generator o'zining `[[GeneratorState]]` dan tashqari, dasturchi belgilagan business state'larni ham boshqaradi (QIZIL/SARIQ/YASHIL). `while (true)` + `yield` kombinatsiyasi circular state machine yaratadi — generator hech qachon `"completed"` state'ga o'tmaydi. `next(value)` bilan two-way communication — argument oldingi `yield` expression'ning qiymati bo'lib qaytadi. V8 da generator function compile vaqtida state machine'ga aylantiriladi: `JSGeneratorObject` ichidagi `continuation` field (Smi integer) joriy resume nuqtasini saqlaydi, `next()` chaqiruvida engine shu qiymat bo'yicha jump table orqali to'g'ri resume label'ga o'tadi (`ResumeGenerator` bytecode). Async generator (`async function*`) qo'shimcha murakkablik qo'shadi — har bir `yield` va `await` alohida suspension point, engine ikkalasini internal state'da track qiladi.
 
 ```javascript
 function* trafficLight() {
@@ -2055,7 +2055,7 @@ async function* processParallel(ids, concurrency = 5) {
 }
 ```
 
-**Muhim:** Async generator **sekin emas** — faqat **sequential**. Agar sizga "lazy stream" kerak bo'lsa (masalan, paginated API, database cursor) — async generator ideal. Agar parallel fan-out kerak bo'lsa — `Promise.all` yoki concurrent limit pattern ishlating (14-async-await.md dagi `p-limit` pattern).
+**Muhim:** Async generator **sekin emas** — faqat **sequential**. Agar sizga "lazy stream" kerak bo'lsa (masalan, paginated API, database cursor) — async generator ideal. Agar parallel fan-out kerak bo'lsa — `Promise.all` yoki concurrent limit pattern ishlating (13-async-await.md dagi `p-limit` pattern).
 
 ---
 
@@ -2261,7 +2261,6 @@ console.log([...range(0, 1, 0.2)]); // [0, 0.2, 0.4, 0.6, 0.8, 1]
 // Test:
 function* double(iter) { for (const x of iter) yield x * 2; }
 function* addOne(iter) { for (const x of iter) yield x + 1; }
-function* takeN(n) { return function*(iter) { let i = 0; for (const x of iter) { if (i++ >= n) return; yield x; } } }
 
 const pipeline = pipe(
   function*() { let n = 1; while (true) yield n++; }, // 1, 2, 3, ...

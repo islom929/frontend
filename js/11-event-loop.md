@@ -841,17 +841,18 @@ setTimeout(function tick() {
 }, 0);
 
 // Output (taxminiy):
-// 1ms o'tdi    — birinchi chaqiruv
-// 2ms o'tdi    — ikkinchi
-// 3ms o'tdi    — uchinchi
-// 4ms o'tdi    — to'rtinchi
-// 8ms o'tdi    — beshinchi (4ms clamping boshlandi!)
-// 12ms o'tdi   — oltinchi
-// 16ms o'tdi   — yettinchi
+// 1ms o'tdi    — birinchi chaqiruv  (nesting level 1)
+// 2ms o'tdi    — ikkinchi           (nesting level 2)
+// 3ms o'tdi    — uchinchi           (nesting level 3)
+// 4ms o'tdi    — to'rtinchi         (nesting level 4)
+// 5ms o'tdi    — beshinchi          (nesting level 5)
+// 9ms o'tdi    — oltinchi (4ms clamping boshlandi! nesting level 6)
+// 13ms o'tdi   — yettinchi          (nesting level 7)
 
 // 6-chi nested setTimeout dan boshlab browser minimum 4ms delay qo'yadi
-// HTML spec: "If nesting level is greater than 5, clamp timeout to at least 4ms"
-// Ya'ni nesting level > 5 bo'lganda (6-chi va undan keyin) clamping boshlanadi
+// HTML spec: "If nesting level is greater than 5, and timeout is less than 4,
+//             then set timeout to 4."
+// Ya'ni nesting level > 5 bo'lganda (6-chi chaqiruvdan boshlab) clamping boshlanadi
 ```
 
 setTimeout(0) — real use case — UI unblocking:
@@ -1508,6 +1509,8 @@ Bu muammoni hal qilishning bir nechta usuli bor:
       ↑ UI responsive — har batch orasida render va event'lar ishlaydi
 ```
 
+> Diagrammadagi vaqtlar illustrativ — sync ishning davomiyligi va batch hajmi kodga bog'liq. Asosiy g'oya: bloklovchi ishda render va event'lar to'xtaydi, batch'larga bo'linganda esa ular orasiga sig'adi.
+
 </details>
 
 <details>
@@ -1532,7 +1535,7 @@ searchInput.addEventListener("input", (e) => {
     li.textContent = item;
     resultsList.appendChild(li);
   });
-  // Natija: har bir harf yozganda UI 100-500ms muzlaydi
+  // Natija: har bir harf yozganda UI sezilarli muzlaydi — filter + DOM update bloklaydi
 });
 ```
 
@@ -1899,7 +1902,7 @@ console.log("4 — sync");
 - `setTimeout(fn, 0)` — priority yo'q, faqat FIFO, minimum 4ms delay (nested), cancel qilish uchun `clearTimeout` kerak
 - `scheduler.postTask(fn)` — priority bor, Promise qaytaradi, AbortController bilan cancel, TaskController bilan dynamic priority
 
-**Browser support:** Chrome 94+, Edge 94+. Firefox va Safari da hali yo'q (2024). Progressive enhancement sifatida ishlatish kerak — feature detection bilan.
+**Browser support:** Chrome 94+, Edge 94+ va Firefox qo'llab-quvvatlaydi. Safari da hali yo'q — shuning uchun API hali Baseline emas. Progressive enhancement sifatida ishlatish kerak — feature detection bilan.
 
 <details>
 <summary><strong>Kod Misollari</strong></summary>
@@ -1990,7 +1993,7 @@ scheduler.postTask(
   () => console.log("user-blocking task — keyin qo'shildi"),
   { priority: "user-blocking" }
 );
-// Natija: user-blocking task keyin qo'shildi, user-blocking task birinchi ishlaydi
+// Natija: user-blocking task keyin qo'shilgan bo'lsa ham, priority yuqori — birinchi ishlaydi
 
 // === Feature detection — xavfsiz ishlatish ===
 function scheduleTask(fn, priority = "user-visible") {
@@ -2015,47 +2018,48 @@ function scheduleTask(fn, priority = "user-visible") {
 `setInterval(fn, 1000)` — fn ni har 1000ms'da chaqirishga **harakat qiladi**, lekin kafolat bermaydi. Agar fn 800ms davom etsa, keyingi call 200ms keyin (interval'ning qolgan qismi) sodir bo'ladi — fn tugashini **kutmaydi**. Agar fn interval'dan uzoqroq davom etsa, call'lar **to'planishi** yoki **overlap bo'lishi** mumkin. Recursive `setTimeout` esa har doim oldingi chaqiruv **tugaganidan keyin** delay boshlaydi.
 
 ```javascript
-// ❌ setInterval — drift + overlap xavfi:
+// ❌ setInterval — callback interval'dan uzoq bo'lsa, gap qisqaradi:
+// Interval 1000ms, lekin har callback 1200ms ish qiladi (intervaldan uzoq)
 let count = 0;
 const start = Date.now();
 
 const interval = setInterval(() => {
   count++;
-  // Og'ir ish — 500ms davom etadi
-  const end = Date.now() + 500;
+  const end = Date.now() + 1200; // Og'ir ish — intervaldan uzoq
   while (Date.now() < end) {}
-  console.log(`Interval ${count}: ${Date.now() - start}ms`);
+  console.log(`Interval ${count}: ${Date.now() - start}ms`); // ish tugagach log
 
   if (count === 3) clearInterval(interval);
 }, 1000);
 
 // Natija (taxminiy):
-// Interval 1: 1000ms  (1000 delay + 500 ish)
-// Interval 2: 2000ms  (keyingi interval 500ms o'tib darhol boshlandi!)
-// Interval 3: 3000ms  (fn'lar "yetishadi" — drift kompensatsiyasi)
+// Interval 1: ~2200ms  (1000 delay + 1200 ish)
+// Interval 2: ~3400ms  (~1200 gap — keyingi tick allaqachon kechikkan, darhol ishlaydi)
+// Interval 3: ~4600ms  (~1200 gap — yana darhol)
+// Tick'lar orasida 1000ms gap YO'Q — callback intervaldan uzun, fire'lar ketma-ket
 
-// ✅ Recursive setTimeout — barqaror delay:
+// ✅ Recursive setTimeout — har callback tugagach yangi delay boshlanadi:
 let tickCount = 0;
 const tickStart = Date.now();
 
 function tick() {
   tickCount++;
-  const end = Date.now() + 500;
+  const end = Date.now() + 1200; // bir xil og'ir ish
   while (Date.now() < end) {}
   console.log(`Tick ${tickCount}: ${Date.now() - tickStart}ms`);
 
-  if (tickCount < 3) setTimeout(tick, 1000);
+  if (tickCount < 3) setTimeout(tick, 1000); // ish tugagach yangi 1000ms delay
 }
 setTimeout(tick, 1000);
 
-// Natija:
-// Tick 1: 1000ms   (1000 delay + 500 ish)
-// Tick 2: 2500ms   (1500 + 1000 delay + 500 ish)
-// Tick 3: 4000ms   (3000 + 1000 delay + 500 ish)
-// Har tick orasida to'liq 1500ms — kafolatlangan
+// Natija (taxminiy):
+// Tick 1: ~2200ms  (1000 delay + 1200 ish)
+// Tick 2: ~4400ms  (2200 + 1000 delay + 1200 ish)
+// Tick 3: ~6600ms  (4400 + 1000 delay + 1200 ish)
+// Har tick orasida to'liq 1000ms gap kafolatlangan — ish qancha davom etsa ham
 ```
 
-**Nima uchun:** `setInterval` browser ichida "schedule at fixed time points" modelida ishlaydi — `T+1000`, `T+2000`, `T+3000`. Agar callback oldingi tick'dan oshib ketsa, keyingisi darhol ishga tushadi. `setTimeout` recursion esa har safar "hozirdan +1000ms keyin" modelida ishlaydi — drift yo'q, lekin total time uzoqroq.
+**Nima uchun:** `setInterval` har `1000ms` da callback'ni ishga tushirishga **harakat qiladi** — fixed cadence. Callback intervaldan uzoq davom etsa, navbatdagi chaqiruv allaqachon kechikkan bo'ladi va callback tugashi bilan darhol bajariladi — tick'lar orasidagi gap interval'dan kichikroq bo'lib qoladi. `setTimeout` recursion esa har safar callback **tugagach** yangi `1000ms` delay boshlaydi — ish qancha davom etsa ham, tick'lar orasidagi gap doim kamida `1000ms`.
 
 **Qoida:** Fixed intervals kerak bo'lsa → `setInterval` (masalan, real-time clock). Barqaror gap kerak bo'lsa → recursive `setTimeout` (masalan, polling API).
 
@@ -2111,26 +2115,23 @@ document.addEventListener("visibilitychange", () => {
 `setTimeout(fn, 0)` nested bo'lganda minimum **4ms** delay clamping bor (HTML spec). Agar sizga haqiqiy "keyingi tick'da ishlat" kerak bo'lsa (clamping'siz), `MessageChannel` API bilan zero-delay macrotask yaratish mumkin.
 
 ```javascript
-// Standard setTimeout(0) — 4ms nested clamping:
+// Standard setTimeout(0) — chain nested bo'lsa 4ms clamping kiradi:
 function scheduleWithTimeout(fn) {
   setTimeout(fn, 0);
 }
 
-// MessageChannel — true 0ms, clamping yo'q:
+// MessageChannel — clamping yo'q, recursive ishlatishda ham 4ms cheklov tushmaydi:
 function scheduleWithMessageChannel(fn) {
   const channel = new MessageChannel();
   channel.port1.onmessage = fn;
   channel.port2.postMessage(null);
 }
 
-// Benchmark:
-console.time("setTimeout(0)");
-scheduleWithTimeout(() => console.timeEnd("setTimeout(0)"));
-// ~4ms (nested clamping)
-
-console.time("MessageChannel");
-scheduleWithMessageChannel(() => console.timeEnd("MessageChannel"));
-// ~0.1-1ms (no clamping)
+// Recursive scheduling'da farq seziladi:
+//   setTimeout(0) zanjiri 5 nested'dan keyin har callback minimum 4ms kutadi (HTML spec)
+//   MessageChannel postMessage esa boshqa task source — clamp qo'llanilmaydi
+scheduleWithTimeout(() => console.log("setTimeout — nested chain'da 4ms'ga clamp bo'ladi"));
+scheduleWithMessageChannel(() => console.log("MessageChannel — clamp yo'q"));
 
 // Use case: high-frequency batched DOM updates
 let pendingUpdates = [];
@@ -2220,7 +2221,7 @@ Promise.resolve()
 // queueMicrotask — error uncaught:
 queueMicrotask(() => {
   throw new Error("microtask error");
-  // ❌ "Uncaught (in microtask) Error: microtask error"
+  // ❌ "Uncaught Error: microtask error" — global error sifatida report qilinadi
   // .catch() bilan ushlab bo'lmaydi — bu Promise emas
 });
 
@@ -2364,7 +2365,7 @@ console.log("1 — sync");
 button.addEventListener("click", () => {
   const sorted = hugeArray.sort((a, b) => complexCompare(a, b));
   renderTable(sorted);
-  // UI 3-5 soniya muzlaydi
+  // Massiv katta bo'lsa — sort tugaguncha UI muzlaydi
 });
 ```
 

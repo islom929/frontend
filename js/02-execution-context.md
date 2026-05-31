@@ -44,7 +44,7 @@ Execution context'ni tushunish nima uchun kerak: hoisting, scope chain, closure,
 <details>
 <summary><strong>Under the Hood</strong></summary>
 
-ECMAScript spetsifikatsiyasiga ko'ra, har bir execution context quyidagi komponentlarga ega:
+ECMAScript specification'iga ko'ra, har bir execution context quyidagi komponentlarga ega:
 
 ```
 ┌──────────────────────────────────────┐
@@ -427,7 +427,7 @@ const data = JSON.parse('{"name": "Ali"}');
 
 Har bir execution context (GEC, FEC yoki Eval EC) **ikki bosqichda** ishlaydi: avval **Creation Phase** (muhit yaratiladi — kod hali bajarilmaydi), keyin **Execution Phase** (kod qator-baqatar bajariladi). Bu ajralish JavaScript'ning eng fundamental mexanizmlaridan biri va ko'plab xususiyatlarning sababi — eng muhimi **hoisting**.
 
-**Nima uchun bu ikki bosqich muhim:** hoisting xulq-atvori shu mexanizmga asoslanadi. Misol uchun, `console.log(x); var x = 10;` qatoridagi kod **xato bermaydi** va `undefined` chiqaradi — chunki Creation Phase'da `var x` allaqachon `undefined` qiymati bilan ro'yxatga olingan. Execution Phase boshlanganda `console.log(x)` bajarilganda `x` mavjud (lekin hali `10` qiymati berilmagan). Lekin `let` bilan xuddi shu kod `ReferenceError` beradi — chunki `let` Creation Phase'da "uninitialized" holatda, undan o'qish TDZ xatosini chiqaradi.
+**Nima uchun bu ikki bosqich muhim:** hoisting xulq-atvori shu mexanizmga asoslanadi. Misol uchun, `console.log(x); var x = 10;` qatoridagi kod **xato bermaydi** va `undefined` chiqaradi — chunki Creation Phase'da `var x` allaqachon `undefined` qiymati bilan ro'yxatga olingan. Execution Phase boshlanganda `console.log(x)` bajarilganda `x` mavjud (lekin hali `10` qiymati berilmagan). Lekin `let` bilan aynan shu kod `ReferenceError` beradi — chunki `let` Creation Phase'da "uninitialized" holatda, undan o'qish TDZ xatosini chiqaradi.
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -717,7 +717,7 @@ if block tugaganda, block LexicalEnvironment yo'qoladi — shuning uchun `d` va 
 
 Environment Record — har bir LexicalEnvironment ichidagi o'zgaruvchilar va binding'lar saqlanadigan tuzilma. Bu ECMAScript spec'dagi termin bo'lib, aslida "scope'dagi barcha o'zgaruvchilar ro'yxati" degani.
 
-Environment Record'ning ikki asosiy turi bor — **Declarative** va **Object**. Shulardan foydalanib spec yana ikkita maxsus turni aniqlaydi: **Global** (Object + Declarative birikmasi) va **Function** (Declarative subtype'i). Function Environment Record Declarative'dan qo'shimcha **slot'lar** bilan farq qiladi: `[[ThisValue]]`, `[[ThisBindingStatus]]`, `[[FunctionObject]]`, `[[NewTarget]]` — bular spec slot'lari (binding emas). `arguments` esa oddiy **binding** sifatida (slot emas) FunctionDeclarationInstantiation paytida yaratiladi va shu Function ER'ga qo'shiladi. ES2015'dan `Module Environment Record` ham qo'shildi — u ham Declarative subtype'i, `[[ExportedName]]` kabi slot'lari bilan.
+Environment Record'ning ikki asosiy turi bor — **Declarative** va **Object**. Shulardan foydalanib spec yana ikkita maxsus turni aniqlaydi: **Global** (Object + Declarative birikmasi) va **Function** (Declarative subtype'i). Function Environment Record Declarative'dan qo'shimcha **slot'lar** bilan farq qiladi: `[[ThisValue]]`, `[[ThisBindingStatus]]`, `[[FunctionObject]]`, `[[NewTarget]]` — bular spec slot'lari (binding emas). `arguments` esa oddiy **binding** sifatida (slot emas) FunctionDeclarationInstantiation paytida yaratiladi va shu Function ER'ga qo'shiladi. ES2015'dan `Module Environment Record` ham qo'shildi — u ham Declarative subtype'i, import binding'larni `CreateImportBinding` orqali boshqaruvchi qo'shimcha mexanizmi bilan.
 
 **1. Declarative Environment Record:**
 - `let`, `const`, `var`, `function`, `class`, `import`, `catch` parameter binding'lari saqlanadi
@@ -767,7 +767,7 @@ Global Environment Record:
 └──────────────────────────────────────────┘
 ```
 
-Function scope'larda faqat Declarative Environment Record ishlatiladi — bu engine uchun optimizatsiya imkonini beradi (o'zgaruvchi indexi oldindan ma'lum, hash lookup kerak emas).
+Function scope'larda faqat Declarative Environment Record ishlatiladi — bu engine uchun optimization imkonini beradi (o'zgaruvchi indexi oldindan ma'lum, hash lookup kerak emas).
 
 </details>
 
@@ -1274,13 +1274,13 @@ class User {
 const user = new User("Ali"); // ✅ e'londan keyin ishlaydi
 ```
 
-**Yechim:** Class'larni doim ishlatishdan oldin deklaratsiya qiling. Modullarda import statement'lar har doim top'ga qo'yiladi — bu TDZ muammolarini oldini oladi.
+**Yechim:** Class'larni doim ishlatishdan oldin e'lon qiling. Modullarda import statement'lar har doim top'ga qo'yiladi — bu TDZ muammolarini oldini oladi.
 
 ---
 
 ### Block'da function declaration — Annex B legacy behavior
 
-Non-strict mode'da `if`/`for`/`while` block ichidagi function declaration **ikki binding'ga** ega bo'ladi (Annex B "Web Compatibility Semantics" — 2015'dan barcha web brauzerlar uchun majburiy): block-scoped binding (block ichida `let`-like) + function-scoped binding (block tashqarisida — last assigned value). Strict mode'da esa faqat block-scoped binding qoladi — Annex B qoidalari qo'llanilmaydi.
+Non-strict mode'da `if`/`for`/`while` block ichidagi function declaration **ikki binding'ga** ega bo'ladi (Annex B.3.3 "Block-Level Function Declarations Web Legacy Compatibility Semantics" — 2015'dan barcha web brauzerlar uchun majburiy): block-scoped binding (block ichida `let`-like) + function-scoped binding (block tashqarisida — function declaration'ga ijro yetganda shu qiymat function scope'ga yoziladi). Strict mode'da esa faqat block-scoped binding qoladi — Annex B qoidalari qo'llanilmaydi.
 
 ```javascript
 // Non-strict mode — Annex B web compatibility (zamonaviy brauzerlar bir xil ishlaydi)
@@ -1288,7 +1288,7 @@ if (true) {
   function sneaky() { return 1; }
 }
 sneaky(); // Non-strict (brauzer va Node): 1 (function-scoped binding yaratilgan)
-          // Eslatma: Annex B B.3.2 — 2015'dan barcha brauzerlar va Node majburiy qo'llab-quvvatlaydi
+          // Eslatma: Annex B.3.3 — 2015'dan barcha brauzerlar va Node majburiy qo'llab-quvvatlaydi
 
 // Strict mode — lexical (block-scoped), aniq behavior
 "use strict";
@@ -1408,7 +1408,7 @@ console.log(secret); // "hidden" — ❌ ko'pchilik undefined yoki xato kutadi
 if (true) {
   let blockScoped = "hidden";
 }
-console.log(blockScoped); // ✅ ReferenceError — let block-scoped
+console.log(blockScoped); // ❌ ReferenceError — let block-scoped (if tashqarisida yo'q)
 ```
 
 **Nima uchun:** `var` VariableEnvironment'da saqlanadi — bu function-level. `let`/`const` LexicalEnvironment'da — block-level. If block o'z VariableEnvironment'ini yaratMAYDI, faqat LexicalEnvironment yaratadi.
@@ -1724,7 +1724,7 @@ Bu bo'limda Execution Context'ning ichki tuzilmasini o'rgandik:
 - **Scope Chain** — outer environment reference orqali quriladi, o'zgaruvchi ichidan tashqariga qidiriladi
 - **EC Stack** — Call Stack bilan bir xil — execution context'larni LIFO tartibida boshqaradi
 
-Creation Phase'ni tushunish hoisting'ni tushunishning kaliti — keyingi bo'limda aynan hoisting mexanizmini chuqur o'rganamiz.
+Creation Phase mexanizmini tushunish hoisting'ni tushunishning asosi — keyingi bo'limda aynan hoisting mexanizmini chuqur o'rganamiz.
 
 ---
 

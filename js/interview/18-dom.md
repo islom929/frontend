@@ -673,8 +673,8 @@ showProfile({
 <summary><strong>Javob</strong></summary>
 
 **3 ta XSS xavfi:**
-1. innerHTML bilan user input — script/img injection
-2. `href` ga user input — `javascript:` protocol
+1. innerHTML bilan user input — `name` dagi `<script>` HTML spec bo'yicha innerHTML orqali joylashtirilganda **bajarilmaydi**, lekin `bio` dagi `<img src=x onerror="...">` event handler attribute darhol ishga tushadi (real vektor)
+2. `href` ga user input — `javascript:` protocol bilan `website` kod bajaradi
 3. Hech qanday sanitization yo'q
 
 **To'g'ri:**
@@ -862,7 +862,7 @@ function createTodoApp(containerId) {
 }
 ```
 
-**Kalit nuqtalar:**
+**Asosiy nuqtalar:**
 - `textContent` — XSS xavfsiz
 - Event delegation — bitta handler, dinamik elementlar uchun ishlaydi
 - `classList.toggle()` — toggle pattern

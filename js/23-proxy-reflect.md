@@ -37,7 +37,7 @@ Meta-programming — dastur o'zining tuzilishi yoki xatti-harakatini runtime da 
 
 3. **Intercession** — dasturning fundamental operatsiyalarini **ushlash va qayta belgilash**. Proxy aynan shu darajada ishlaydi — object ustidagi har qanday operatsiyani intercept qilish imkonini beradi.
 
-Proxy intercession uchun yaratilgan. ECMAScript spetsifikatsiyasi ordinary object uchun 11 ta **essential internal method** belgilaydi (`[[Get]]`, `[[Set]]`, `[[HasProperty]]`, `[[Delete]]`, `[[OwnPropertyKeys]]`, `[[GetOwnProperty]]`, `[[DefineOwnProperty]]`, `[[GetPrototypeOf]]`, `[[SetPrototypeOf]]`, `[[IsExtensible]]`, `[[PreventExtensions]]`), callable object'larga qo'shimcha `[[Call]]` va `[[Construct]]` — jami 13 ta. Oddiy object'larda bu metodlar standart xatti-harakatga ega. Proxy esa bu internal method'larning har birini **custom logic** bilan almashtirishga imkon beradi.
+Proxy intercession uchun yaratilgan. ECMAScript spec ordinary object uchun 11 ta **essential internal method** belgilaydi (`[[Get]]`, `[[Set]]`, `[[HasProperty]]`, `[[Delete]]`, `[[OwnPropertyKeys]]`, `[[GetOwnProperty]]`, `[[DefineOwnProperty]]`, `[[GetPrototypeOf]]`, `[[SetPrototypeOf]]`, `[[IsExtensible]]`, `[[PreventExtensions]]`), callable object'larga qo'shimcha `[[Call]]` va `[[Construct]]` — jami 13 ta. Oddiy object'larda bu metodlar standart xatti-harakatga ega. Proxy esa bu internal method'larning har birini **custom logic** bilan almashtirishga imkon beradi.
 
 <details>
 <summary><strong>Under the Hood</strong></summary>
@@ -121,7 +121,7 @@ console.log(user.age); // 26 — target ham o'zgardi
 <summary><strong>Under the Hood</strong></summary>
 
 ```
-Proxy arxitekturasi:
+Proxy architecture:
 
                Proxy Object
 Kod ────────▶ ┌──────────────┐ ──────▶ Target Object
@@ -184,7 +184,7 @@ console.log(config.size);     // "M" — hali default
 console.log(config.missing);  // undefined — defaults da ham yo'q
 ```
 
-Property yozishda validatsiya — noto'g'ri qiymatni rad etish:
+Property yozishda validation — noto'g'ri qiymatni rad etish:
 
 ```javascript
 const user = new Proxy({ name: "", age: 0, email: "" }, {
@@ -861,7 +861,7 @@ function createValidator(rules) {
         throw new Error(`"${prop}" format noto'g'ri`);
       }
       if (custom && !custom(value)) {
-        throw new Error(`"${prop}" custom validatsiyadan o'tmadi`);
+        throw new Error(`"${prop}" custom validation'dan o'tmadi`);
       }
 
       return Reflect.set(target, prop, value);
@@ -882,7 +882,7 @@ user.email = "ali@example.com"; // ✅
 user.role = "admin";            // ✅
 // user.age = -5;               // ❌ RangeError: kamida 0
 // user.email = "invalid";      // ❌ format noto'g'ri
-// user.role = "superadmin";    // ❌ custom validatsiyadan o'tmadi
+// user.role = "superadmin";    // ❌ custom validation'dan o'tmadi
 // user.phone = "+998";         // ❌ schema da mavjud emas
 ```
 
@@ -1133,7 +1133,7 @@ model.title = "Xayr"; // [View] Title: Xayr | Count: 1
 
 ### Nazariya
 
-Proxy har bir operatsiyada qo'shimcha function call qo'shadi — bu **overhead** yaratadi. V8 engine Proxy'ni oddiy object'dek optimize qila olmaydi — inline caching va hidden class optimization Proxy uchun to'liq ishlamaydi (zamonaviy V8 ba'zi Proxy pattern'lar uchun optimizatsiyalar qo'shgan, lekin oddiy property access'ga yetmaydi).
+Proxy har bir operatsiyada qo'shimcha function call qo'shadi — bu **overhead** yaratadi. V8 engine Proxy'ni oddiy object'dek optimize qila olmaydi — inline caching va hidden class optimization Proxy uchun to'liq ishlamaydi (zamonaviy V8 ba'zi Proxy pattern'lar uchun optimization qo'shgan, lekin oddiy property access'ga yetmaydi).
 
 **Umumiy tendentsiya:**
 
@@ -1191,10 +1191,10 @@ const proxiedArray = new Proxy(bigArray, {
 
 Oddiy Proxy bitta object'ni wrap qiladi, lekin shu object ichida **boshqa object'lar** bo'lsa — ular wrap qilinmagan holatda tashqariga "oqib" chiqishi mumkin. Masalan: `proxy.user` — user object'i **original** (proxied emas). Agar untrusted kod `proxy.user.password = "pwned"` deb yozsa — sizning security proxy'ingiz buni ko'rmaydi, chunki `user` wrap qilinmagan.
 
-**Membrane yechimi:** chegaradan o'tayotgan har qanday **object** (return qiymati, argument) — avtomatik ravishda shu chegaraning Proxy'siga wrap qilinadi. Va aksincha — chegaradan tashqariga qaytayotgan object unwrap qilinadi. Bu **transitive isolation** — butun object graph izolyatsiya qilinadi.
+**Membrane yechimi:** chegaradan o'tayotgan har qanday **object** (return qiymati, argument) — avtomatik ravishda shu chegaraning Proxy'siga wrap qilinadi. Va aksincha — chegaradan tashqariga qaytayotgan object unwrap qilinadi. Bu **transitive isolation** — butun object graph isolation qilinadi.
 
 **Ishlatish joylari:**
-- **Security sandboxing** — untrusted JavaScript'ni izolyatsiya qilish (masalan, plugin, user script, iframe o'rnini bosuvchi)
+- **Security sandboxing** — untrusted JavaScript'ni isolation qilish (masalan, plugin, user script, iframe o'rnini bosuvchi)
 - **Revocable permissions** — bitta revoke butun grafga ta'sir qiladi, recursive
 - **Read-only enforcement** — "frozen" membrane: barcha nested object'lar ham read-only
 - **SES (Secure ECMAScript)** va **ShadowRealm API** (ilgari Realms API nomi bilan tanilgan) proposal'larida membrane foydalaniladi
@@ -1217,7 +1217,7 @@ Membrane'ning asosiy murakkabligi — **identity preservation**: agar siz bir xi
 - Dry tomon'ga chiqayotgan object — `wetToDry` cache'da qidiriladi, yo'q bo'lsa yangi proxy yaratiladi
 - Wet tomon'ga kirayotgan object (argument sifatida) — `dryToWet` cache'da qidiriladi, yoki unwrap qilinadi
 
-Membrane'ning haqiqiy implementatsiyasi `WeakMap` identity, symmetric wrap/unwrap, function va prototype chain handling — juda nozik. Quyida soddalashtirilgan versiya ko'rsatiladi.
+Membrane'ning haqiqiy implementation'i `WeakMap` identity, symmetric wrap/unwrap, function va prototype chain handling — juda nozik. Quyida soddalashtirilgan versiya ko'rsatiladi.
 
 </details>
 
@@ -1408,17 +1408,17 @@ loadUntrustedPlugin(maliciousPlugin, {
 
 1. **Identity preservation** — `WeakMap` orqali bir xil target bir xil proxy'ni qaytaradi, `===` ishlaydi
 2. **Transitive wrapping** — har qaytarilgan object/function avtomatik wrap qilinadi, chuqurlik cheklanmagan
-3. **Symmetric wrap/unwrap** — membrane ikki tomonlama: out'ga chiqayotgan narsa wrap, in'ga kirayotgan argument unwrap (to'liq implementatsiyada)
+3. **Symmetric wrap/unwrap** — membrane ikki tomonlama: out'ga chiqayotgan narsa wrap, in'ga kirayotgan argument unwrap (to'liq implementation'da)
 4. **Revocation cascading** — bitta `revoke()` butun object graph'ni o'lik qiladi, nested reference'lar ham yaramaydi
 5. **Primitive'lar transparent** — string, number, boolean membrane'dan bemalol o'tadi (ular immutable va reference'siz)
 
-**Haqiqiy production implementatsiyalar:**
-- **ShadowRealm API** (Stage 3 TC39 proposal) — Realms va membrane pattern standart'ga kiritilmoqda
+**Haqiqiy production implementation'lar:**
+- **ShadowRealm API** (Stage 2.7 TC39 proposal) — Realms va membrane pattern standart'ga kiritilmoqda
 - **SES (Secure ECMAScript)** — Agoric/MetaMask tomonidan ishlab chiqilgan secure JavaScript runtime
 - **MetaMask Snaps** — extension plugin'lar uchun isolated execution environment
-- **Figma plugins** — plugin'lar iframe + membrane bilan izolyatsiyalangan
+- **Figma plugins** — plugin'lar iframe + membrane bilan isolation qilingan
 
-Oddiy loyihalarda membrane kerak emas — bu **high-security** yoki **plugin system** quruvchilar uchun. Lekin pattern'ni tushunish Proxy'ning haqiqiy kuchini ko'rsatadi: oddiy proxy bitta object'ni wrap qiladi, membrane esa **butun object universe**'ni izolyatsiya qiladi.
+Oddiy loyihalarda membrane kerak emas — bu **high-security** yoki **plugin system** quruvchilar uchun. Lekin pattern'ni tushunish Proxy'ning haqiqiy kuchini ko'rsatadi: oddiy proxy bitta object'ni wrap qiladi, membrane esa **butun object universe**'ni isolation qiladi.
 
 </details>
 
@@ -1445,7 +1445,8 @@ const wm = new WeakMap();
 wm.set(target, "original");
 console.log(wm.get(proxy)); // undefined — proxy boshqa key!
 wm.set(proxy, "proxied");
-console.log(wm.size); // konceptual: 2 ta yozuv
+console.log(wm.get(target)); // "original"
+console.log(wm.get(proxy));  // "proxied" — proxy va target alohida key sifatida saqlangan
 
 // ❌ Set membership
 const seen = new Set();
@@ -1631,7 +1632,7 @@ const proxyWithToJSON = new Proxy(target, {
 });
 ```
 
-**Nima uchun:** `JSON.stringify` spec'da quyidagicha ishlaydi: (1) `toJSON` method mavjudligini tekshirish (Date kabi built-in object'lar uchun), (2) agar bor bo'lsa chaqirish va natijani serialize qilish, (3) aks holda enumerable own property'larni iteratsiya qilish. Har qadam `[[Get]]` internal method chaqiradi — Proxy'da bu `get` trap'ga map bo'ladi. Har trap call engine'ning side-effect orientirovkasi bo'lmagan — spec to'liq transparent forwarding'ni taxmin qiladi.
+**Nima uchun:** `JSON.stringify` spec'da quyidagicha ishlaydi: (1) `toJSON` method mavjudligini tekshirish (Date kabi built-in object'lar uchun), (2) agar bor bo'lsa chaqirish va natijani serialize qilish, (3) aks holda enumerable own property'larni iteratsiya qilish. Har qadam `[[Get]]` internal method chaqiradi — Proxy'da bu `get` trap'ga map bo'ladi. Spec `get` trap'ni side-effect'siz, faqat qiymat qaytaruvchi operatsiya deb taxmin qiladi — trap ichida dependency tracking yoki logging qilinsa, har serialize bu side-effect'larni trigger qiladi.
 
 **Yechim:** Reactive/tracking'li proxy'larda `JSON.stringify` dan oldin **tracking'ni vaqtincha o'chirish**, yoki `toRaw()` bilan original'ni olish, yoki `toJSON` trap'da side-effect'siz path yaratish. Vue 3 `toRaw()` aynan shu muammoni hal qiladi.
 
@@ -1726,7 +1727,7 @@ const api = new Proxy({}, {
 // HTTP request "/api/then" ga jo'natiladi — bug!
 ```
 
-**Nima uchun:** ECMAScript Promise spec "thenable" ni duck typing bilan aniqlaydi: `typeof obj.then === "function"`. `await` va `Promise.resolve()` bu check'ni o'tkazadi. Proxy'ning `get` trap'i har qanday property'ga javob beradi — shu jumladan `then`'ga ham. Agar trap function qaytarsa, engine proxy'ni thenable deb qabul qiladi va `then(resolve, reject)` chaqiradi. Bu "structural subtyping" ning chegarasi — JavaScript runtime explicit "this is a thenable" deklaratsiyasini talab qilmaydi.
+**Nima uchun:** ECMAScript Promise spec "thenable" ni duck typing bilan aniqlaydi: `typeof obj.then === "function"`. `await` va `Promise.resolve()` bu check'ni o'tkazadi. Proxy'ning `get` trap'i har qanday property'ga javob beradi — shu jumladan `then`'ga ham. Agar trap function qaytarsa, engine proxy'ni thenable deb qabul qiladi va `then(resolve, reject)` chaqiradi. Bu "structural subtyping" ning chegarasi — JavaScript runtime explicit "this is a thenable" declaration'ini talab qilmaydi.
 
 **Yechim:** Proxy yaratganda `get` trap'da `then` (va boshqa Promise method'lari `catch`, `finally`) uchun **`undefined` qaytarish**. Shuningdek `Symbol` property'lar uchun ham (masalan `Symbol.toPrimitive` — `String(proxy)` chaqirilganda muammo bo'ladi). "Virtual API" pattern'larida bu **majburiy defensive check**.
 
@@ -2081,7 +2082,7 @@ state.count = 2;
 
 ### Mashq 2: createTyped — Schema-Based Type System (Qiyin)
 
-**Savol:** `createTyped(schema)` funksiyasi yarating. Schema'da belgilangan type va validatsiya qoidalariga mos kelmaydigan qiymatlar rad etilsin. Schema'da yo'q property'lar ham rad etilsin.
+**Savol:** `createTyped(schema)` funksiyasi yarating. Schema'da belgilangan type va validation qoidalariga mos kelmaydigan qiymatlar rad etilsin. Schema'da yo'q property'lar ham rad etilsin.
 
 <details>
 <summary>Javob</summary>
@@ -2103,7 +2104,7 @@ function createTyped(schema) {
       // rule funksiya bo'lsa — custom validator
       if (typeof rule === "function") {
         if (!rule(value)) {
-          throw new Error(`"${prop}" validatsiyadan o'tmadi`);
+          throw new Error(`"${prop}" validation'dan o'tmadi`);
         }
       }
       // rule object bo'lsa — murakkab qoidalar
@@ -2146,7 +2147,7 @@ product.rating = 4.5;               // ✅
 
 // product.price = -100;            // ❌ RangeError
 // product.category = "toys";       // ❌ Error: faqat electronics, clothing, food
-// product.rating = 6;              // ❌ Error: validatsiyadan o'tmadi
+// product.rating = 6;              // ❌ Error: validation'dan o'tmadi
 // product.color = "red";           // ❌ Error: schema da yo'q
 ```
 
