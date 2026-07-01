@@ -28,3 +28,12 @@ React kutubxonasini chuqur o'rganish uchun quyidagi resurslardan foydalanishingi
 - 📚 Darslik (Tutorial): [Kirish va Mundarija](react/00-index.md) — Nazariy va amaliy bilimlarni o'z ichiga olgan to'liq kurs.
 - 🗺️ Research Plan: [Mustaqil O'rganish Rejasi](react/plan.md) — Agar siz mavzularni o'zingiz tadqiq qilib (research) o'rganmoqchi bo'lsangiz, ushbu reja asosida ketishingiz mumkin.
 - 💼 Interview: [Suhbat Savollari](react/interview/00-index.md) — Texnik suhbatlarga tayyorgarlik ko'rish va bilimlaringizni sinash uchun maxsus savollar to'plami.
+
+
+## Vue
+
+Vue.js kutubxonasini chuqur o'rganish uchun quyidagi resurslardan foydalanishingiz mumkin:
+
+- 📚 Darslik (Tutorial): [Kirish va Mundarija](vue/00-index.md) — Nazariy va amaliy bilimlarni o'z ichiga olgan to'liq kurs.
+- 🗺️ Research Plan: [Mustaqil O'rganish Rejasi](vue/plan.md) — Agar siz mavzularni o'zingiz tadqiq qilib (research) o'rganmoqchi bo'lsangiz, ushbu reja asosida ketishingiz mumkin.
+- 💼 Interview: [Suhbat Savollari](vue/interview/00-index.md) — Texnik suhbatlarga tayyorgarlik ko'rish va bilimlaringizni sinash uchun maxsus savollar to'plami.
